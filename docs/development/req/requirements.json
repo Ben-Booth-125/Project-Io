@@ -4366,6 +4366,97 @@
      "evidence": null
     }
    ]
+  },
+  {
+   "brief": "two-span-prehistory",
+   "title": "BL-747 - the Era -1 sim runs on the 1960 arc, as two spans on one engine",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-747 - Sprint 32",
+   "batch": "sprint-32",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "The polity sim runs at any epoch: era_minus_one_enabled gates on prehistory_years > 0 alone, and an epoch_year of 1960 with prehistory_years > 0 produces a non-empty history_sim_state with battles, conquests or foundings non-zero.",
+     "verification": [
+      "headless: world_determinism (a 1960 world reports a run era pass)",
+      "headless: history_sweep at --epoch 1960"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "THE INVARIANT. The 0 CE arc is byte-identical to the pre-change build: world_determinism's deep digests stay 039EE9880739CDF6 (seed ABCDEF01, prehistory on), B0EBBA249B3DDABB (seed 12345678, prehistory on) and DE55600457797638 (seed ABCDEF01, prehistory off), and the era report stays years=400 battles=270 conquests=207 foundings=833 on seed A.",
+     "verification": [
+      "headless: world_determinism R3.1-R3.5 against the 2026-09-03 baseline digests"
+     ],
+     "notes": "Baseline captured 2026-09-03 before any change; the digests are the acceptance test, not a golden to re-bless.",
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "ONE INVOCATION, NOT TWO. The two spans are expressed inside a single run_history_sim call via a boundary_year on history_sim_params and per-span tick bands, so era_minus_one_fixture still captures the whole run and the count of run_history_sim callers is unchanged. A second production call site is a failure of this row.",
+     "verification": [
+      "static: one call to run_history_sim in src/, asserted by inspection in the review pass",
+      "headless: history_conquest_gap still reproduces generation's counts from the fixture"
+     ],
+     "notes": "era_minus_one.hpp documents six divergences plus an uncounted seventh caller; two calls would double that seam.",
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "The band a polity may reach is ceilinged per span - Medieval before the boundary year, unrestricted after - for BOTH the works roster and the unit roster, and the ceiling is derived from the boundary rather than authored twice.",
+     "verification": [
+      "headless: history_sweep reports works raised by band either side of the boundary at --epoch 1960"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "On an ancient epoch the boundary falls past stop_year, so the ceiling never lifts and the second span is empty by construction - not by a branch that could be taken wrongly.",
+     "verification": [
+      "headless: world_determinism R3 (the 0 CE digests, which R2 pins)"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "generation-budget",
+   "title": "BL-754 - the generating-screen budget, instrumented per pass",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-754 - Sprint 32",
+   "batch": "sprint-32",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "Generation reports its wall clock per pass, so the cost of each of the three simulated passes is a number rather than an impression. The measurement is reported, never asserted against a threshold.",
+     "verification": [
+      "headless: world_determinism prints per-pass timings",
+      "headless: history_sweep reports the sim's own span cost"
+     ],
+     "notes": "Baseline 2026-09-03, before any change: world build 11.2 s with prehistory on vs 4.79 s off, so the 400-year era pass is 6.4 s - 57% of the build. That is the figure the second span is measured against.",
+     "evidence": null
+    }
+   ]
   }
  ]
 }

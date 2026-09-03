@@ -370,7 +370,9 @@
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
-    "BL-747"
+    "BL-747",
+    "BL-755",
+    "BL-756"
    ],
    "blocked_on": null,
    "parked": false,
@@ -386,7 +388,7 @@
     "scripts/works.lua",
     "tools/verify/history_sweep.cpp"
    ],
-   "design": "THE GAP. The sim knows enclosed-sea ring closure (w_ring) and nothing else about water: no Campaign or Settle target lies across a sea leg, so \"the extent of colonisation by major powers\" cannot be produced by pass 2 at all. The works roster already authors the rows that should gate it - Harbour Mole, Deepwater Wharf, Naval Yard, Coaling Station - and they do nothing for reach today.\n\nTHE DESIGN, in the sim's own currency. A sea leg is a candidate-grain extension of the target set: a region reachable by a coastal walk from a staging hub that holds a harbour work, with the leg's supply cost read from the same reach substrate the land term uses (one reach field, BL-325 ruling 3) and its range capped by the hub's best harbour row (Mole: littoral; Wharf: the enclosed sea; Naval Yard: open water; Coaling Station: any coast). Settle across the leg founds a holding that counts toward holdings_burden_q like any other - the burden of breadth is what makes an overseas empire strain, and reach-fed strain (COLLAPSE.md § 5, the Metropole's inevitability) is the accumulator it feeds. A colony is therefore expensive to hold and worth holding, and the major that holds too many culminates. Non-hegemony (BL-224, the non-hegemony invariant) is not relaxed for the sea: 1960 arrives multipolar.\n\nBOUNDED BY CONSTRUCTION like the land verbs: two staging hubs per polity per round (the capital and one rotated coastal holding), candidate legs from those only. Deterministic - the coastal walk is over sorted tile indices.\n\nDONE WHEN: history_sweep reports overseas holdings per major at the epoch and the distribution is wide; a polity with no harbour work never founds across water (asserted); world_determinism on the 0 CE arc unchanged."
+   "design": "THE GAP. The sim knows enclosed-sea ring closure (w_ring) and nothing else about water: no Campaign or Settle target lies across a sea leg, so \"the extent of colonisation by major powers\" cannot be produced by pass 2 at all. The works roster already authors the rows that should gate it - Harbour Mole, Deepwater Wharf, Naval Yard, Coaling Station - and they do nothing for reach today.\n\nTHE DESIGN, in the sim's own currency. A sea leg is a candidate-grain extension of the target set: a region reachable by a coastal walk from a staging hub that holds a harbour work, with the leg's supply cost read from the same reach substrate the land term uses (one reach field, BL-325 ruling 3) and its range capped by the hub's best harbour row (Mole: littoral; Wharf: the enclosed sea; Naval Yard: open water; Coaling Station: any coast). Settle across the leg founds a holding that counts toward holdings_burden_q like any other - the burden of breadth is what makes an overseas empire strain, and reach-fed strain (COLLAPSE.md § 5, the Metropole's inevitability) is the accumulator it feeds. A colony is therefore expensive to hold and worth holding, and the major that holds too many culminates. Non-hegemony (BL-224, the non-hegemony invariant) is not relaxed for the sea: 1960 arrives multipolar.\n\nBOUNDED BY CONSTRUCTION like the land verbs: two staging hubs per polity per round (the capital and one rotated coastal holding), candidate legs from those only. Deterministic - the coastal walk is over sorted tile indices.\n\nDONE WHEN: history_sweep reports overseas holdings per major at the epoch and the distribution is wide; a polity with no harbour work never founds across water (asserted); world_determinism on the 0 CE arc unchanged.\n\n--- WHAT THE SUBSYSTEM MAP FOUND, 2026-09-03 (amends the premise above) ---\n\nTHE PREMISE ABOVE IS WRONG IN ONE IMPORTANT WAY. \"The sim knows nothing about water\" is false. Region adjacency is water-blind at neighbour_radius 9, so short overseas campaigns are ALREADY legal and free (BL-755), and the Settle verb founds on ocean without a terrain test (BL-756). This item therefore PRICES AND GATES an existing capability; both prerequisites must be settled first, and the \"before\" figure for any sea-leg measurement is not zero.\n\nWHAT IS ALREADY IN PLACE, and cheaper than expected: the sim ALREADY HOLDS THE COASTLINE. sim_terrain_view::substrate (history_sim.hpp:81) is the raster substrate array in row*gw+col order, populated verbatim from tile.substrate by build_sim_terrain, and it carries ocean / lake / coast. A deterministic coastal walk is expressible on the EXISTING view with no signature change, no world& and no ECS access - which preserves the sim's deliberate world-free design (history_sim.hpp:70-75). The substrate is fixed at generation and nothing rewrites it (components.hpp:545-546), so a per-body walk may be precomputed once.\n\nTHE HARD CONSTRAINTS. (1) INTEGER FIXED-POINT ONLY in the decision path (history_sim.hpp:24-28); every campaign-era pathfinding structure (tile_traversal_cost, flood_field_for, body_reach_field, logistics_path) is float-valued and CANNOT be reused. (2) Price the leg inside campaign_supply (history_sim.cpp:572), never beside it - pricing supply in two places is the BL-318 defect the comment at 545-566 records. (3) is_sea (components.hpp:378), never is_water: the campaign era's crosses_ocean reads is_water and so flips on a single lake tile, which is what sea_leg_census exists to measure. (4) Adding a candidate to the scorer changes the argmax even when it never wins, so the ancient arc must be gated to execute identically or world_determinism's 0 CE digests move.\n\nSTILL OPEN, and needing Ben before this is buildable: which walk (coast tiles only vs all is_sea) and how the four harbour rows map onto ranges, given nothing in the code labels a sea \"enclosed\"; where the walk is anchored, since a region has no harbour tile and adding one is a save-format change; how \"holds a harbour work\" is tested, since work_row has no harbour flag; whether the naval roster rows (Coastal Galley, Broadside Ship, Ironclad - all base power 0 and skipped by sum_stack) gain real power here or stay inert; and whether an overseas daughter region re-surveys port_q instead of inheriting 0.7x."
   },
   {
    "status": "designed",
@@ -526,6 +528,53 @@
     "tools/verify/history_sweep.cpp"
    ],
    "design": "BEN, 2026-09-03: \"I am interested to see if this can be done cheaply. This is in fact a difficult abstraction problem.\" The budget is the generating screen's wait (~25-38 s generation + ~6 s warm start today, per app.cpp). Pass 1 is already the most expensive pass; pass 2 doubles it and pass 3 lengthens the settle by an order of magnitude at 4 ticks a year. Cost tracks the province table, not the fighting (COLLAPSE.md § The 4000-year problem).\n\nTHE WORK. (1) Instrument the wait per pass on the loading screen's progress sink and in history_sweep, so every sprint-32 item records its cost on this item as it lands. (2) The affordability rungs in COLLAPSE.md § The 4000-year problem - kill the O(provinces) scans, quiet-province fast path, banded year grain, record on change - were purged with the ancient pivot and are NOT re-filed here in advance. Re-file the one the measurement points at, when it does, in that order. (3) The abstraction question Ben names is the handoff between two engines, not either engine: keep the handoff a struct of plain outputs (regions, works, strain, ties, posture) so pass 3 never reads pass 2's internals.\n\nDONE WHEN: a 1960 world with all three passes generates inside a budget Ben has stated on this item; if it cannot, the item records which rung buys it back and that rung is filed."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Claude (sprint 32 subsystem map, 2026-09-03)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-755",
+   "short_name": "SIM_CROSSES_WATER_FREE",
+   "category": "Generation",
+   "title": "The Era -1 campaign already crosses open water, unpriced and ungated - sea reach is not absent, it is free",
+   "authority_doc": "docs/lore/HISTORY.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "design": "FOUND 2026-09-03 by the sprint 32 subsystem map, while scoping BL-749 (sea-leg campaign). It inverts that item's premise and must be understood before it is built.\n\nTHE FACT. Region adjacency is precomputed by the O(n^2) loop at history_sim.cpp:358-363 over region_distance (204-212), which is integer Chebyshev max(|dc|,|dr|) with wrapped columns - PURELY GEOMETRIC AND WATER-BLIND. With neighbour_radius = 9 (history_sim.hpp:262), a campaign target up to nine tiles across open ocean is ALREADY a legal candidate, scored and fightable, with no harbour work, no naval unit, and no supply penalty for the water. campaign_supply (572-586) prices hub distance and the terrain reach term; rebuild_reach's per-node tile_cost (374-387) reads LANDFORM ONLY, so a water anchor costs the same as plains.\n\nWHY IT MATTERS. BL-749 is written as \"the sim knows nothing about water, so colonisation cannot be produced\". The truth is the opposite and worse: short overseas conquest is already happening for free, and every tuning constant in history_sim_params was measured with it happening. So BL-749 is not ADDING a capability, it is PRICING and GATING one that exists - and the \"before\" number for any sea-leg measurement is not zero.\n\nTHE WORK IS TO DECIDE, not yet to code. Either (a) the water-blind radius is the intended abstraction and the sea leg is a separate priced channel layered on top, or (b) adjacency should test water and the existing free crossings are a defect to close - which would move every polity's decision set and change every generated world, ancient arc included. (b) is a determinism-visible change and needs Ben's call. Measure first: instrument how many campaigns and conquests in a standard 400-year run cross a water tile between hub and target, and report it on the sweep before touching anything.\n\nNOT a review-queue entry: this is work somebody must do, and the call it needs is stated above rather than filed as a question."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Claude (sprint 32 subsystem map, 2026-09-03)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-756",
+   "short_name": "SIM_SETTLES_ON_OCEAN",
+   "category": "Generation",
+   "title": "The Settle verb applies no terrain test, so a polity can found a region on an ocean tile - and that region is silently undefendable",
+   "authority_doc": "docs/lore/HISTORY.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/history_sim_harness.cpp"
+   ],
+   "design": "FOUND 2026-09-03 by the sprint 32 subsystem map. A prerequisite for BL-749 (sea-leg campaign), which cannot assert \"a polity with no harbour work never founds across water\" while founding on water is unconditionally legal.\n\nTHE FACT. The Settle verb's ring probe (history_sim.cpp:1160-1180) checks only whether another region already occupies the candidate cell (1176-1178). There is no substrate test, so an ocean cell is a legal founding site. The consequence is not cosmetic: sub_at(terrain, np.anchor) then hands resolve_battle a water substrate, and terrain_combat.cpp:87-89 returns 0 defence and 0 forage for every water kind, so a region founded on water is silently undefendable and unforageable. Nothing reports it.\n\nA SECOND, RELATED FACT worth carrying with it: region::port_q is not sea access. survey_endowment counts is_water tiles - LAKES INCLUDED - over a neighbourhood window (settlement.cpp:166,180,199), and a founded region never re-surveys, inheriting 0.7x the parent's value (history_sim.cpp:1193). So port_q is a decayed wetness fraction, and any harbour-work or sea-leg gate keyed on it gates on the wrong thing. Whatever BL-749 tests for sea access must be a real is_sea test at the anchor (components.hpp:378, which excludes lakes), not a port_q threshold.\n\nTHE WORK. Add the land test to the Settle probe, and a harness row that asserts no region in a full run sits on water. MEASURE FIRST and report the count in a standard 400-year run: if foundings on water are common the fix moves every world, ancient arc included, and world_determinism's 0 CE digests will change - which makes it Ben's call to take, not a quiet correctness fix. If the count is zero the test is a cheap guard and lands free."
   }
  ]
 }
