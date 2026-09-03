@@ -145,6 +145,27 @@ struct history_sim_params
     };
     int tick_band_count = 6; ///< Live entries in `tick_bands`.
 
+    // --- The two spans (BL-747) -------------------------------------------
+    //
+    // ONE engine, TWO spans: an ancient span to a boundary year, then an
+    // industrial span from the boundary to the epoch with the higher roster
+    // bands unlocked. Expressed as params on the SINGLE existing invocation
+    // rather than as a second call to `run_history_sim` — see
+    // era_minus_one.hpp for the six axes a second caller drifts on.
+
+    /// The year the INDUSTRIAL span begins. Before it a polity may not reach
+    /// past `span1_band_ceiling`; at or after it the ladder is unrestricted.
+    /// The default is INT64_MIN — no year is before it, so the whole run is
+    /// one unrestricted span and the struct default is exactly today's
+    /// behaviour. A caller that sets neither field cannot change a world.
+    int64_t boundary_year = INT64_MIN;
+
+    /// The highest roster band reachable before `boundary_year`. `industrial`
+    /// (the default) is no restriction at all, so the ceiling is inert twice
+    /// over on a single-span run: no year is before the boundary, AND the
+    /// clamp is the identity.
+    roster_band span1_band_ceiling = roster_band::industrial;
+
     // --- Objective selection (BL-277 Q1) ----------------------------------
     int w_farm = 300; ///< Weight on a target region's farm endowment.
     int w_ore  = 250; ///< Weight on its ore endowment.
@@ -747,6 +768,12 @@ int region_distance(const region& a, const region& b, int gw);
 /// that recomputed the ladder its own way would be testing its own arithmetic,
 /// the same reason `region_distance` is public.
 int step_for_year(const history_sim_params& p, int64_t y);
+
+/// The roster band ceiling in force at year @p y. ONE derivation, read by
+/// BOTH roster sites — the works table off materials capacity and the unit
+/// table off military — so the two tables cannot drift apart on the span.
+inline roster_band sim_band_ceiling(const history_sim_params& p, int64_t y)
+{ return y < p.boundary_year ? p.span1_band_ceiling : roster_band::industrial; }
 
 /// Bytes the time-lapse substrate occupies — the quantity the requirement
 /// bounds, and the reason the encoding is a change list rather than a grid.

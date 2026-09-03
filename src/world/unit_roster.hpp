@@ -234,6 +234,11 @@ std::vector<army_stack_entry> roster_stack(int64_t     manpower,
 /// its roster band. This is the ONE place the two numberings meet.
 roster_band roster_band_for_capacity(int military_capacity);
 
+/// The lower of two bands. Bands are an ordered ladder, so a ceiling is a
+/// min — never a separate branch at each roster site.
+inline roster_band min_band(roster_band a, roster_band b)
+{ return static_cast<uint8_t>(a) < static_cast<uint8_t>(b) ? a : b; }
+
 // ===========================================================================
 // BL-454 / BL-459 — standing-force upkeep and derived strength
 // ===========================================================================

@@ -71,6 +71,12 @@ struct world_params
     /// Determinism is untouched — the value is part of the params, so the same
     /// params still give the same world.
     int             prehistory_years = 400;
+
+    /// Years of INDUSTRIAL span the sim plays after the boundary year, on an
+    /// epoch that has one. `prehistory_years` is the ANCIENT span before it,
+    /// so a 1960 arc at the defaults runs 1160 -> 1560 -> 1960. Zero means no
+    /// industrial span and the run is single-span, as an ancient epoch is.
+    int             industrial_years = 400;
     int             body_count = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a
     // *consequence* of its habitable land area and the minimum-viable-territory floor

@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>       // BL-754: the generation budget, MEASURED not asserted
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -197,6 +198,30 @@ world make_hard_coded_world(world_params params, generation_report* report,
                             era_minus_one_fixture* fixture)
 {
     world w;
+
+    // --- The generation budget (BL-754) -------------------------------------
+    //
+    // Per-pass wall clock, REPORTED and never asserted. Ben's question for the
+    // sprint is what the two-span era costs against the single-span one, and
+    // that is not a number any check can own: it varies with the machine, the
+    // build type and what else is running. So it is measured, handed to the
+    // fixture (which has no save-seam presence — see era_minus_one.hpp) and
+    // printed once; nothing reads it back.
+    //
+    // THESE CLOCKS TOUCH NO CONTROL FLOW AND NO DIGEST. A `steady_clock` read
+    // inside `world/*` is only safe while it is write-only with respect to the
+    // world, and every use below is: the values land in the fixture and in one
+    // fprintf, and never in a branch, a seed, a hash or a stored field. The
+    // standing determinism rule forbids timing that can VARY OUTPUT, not
+    // measuring how long the output took.
+    using gen_clock = std::chrono::steady_clock;
+    const auto ms_between = [](gen_clock::time_point a, gen_clock::time_point b) {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(b - a).count();
+    };
+    const gen_clock::time_point t_world_begin = gen_clock::now();
+    gen_clock::time_point t_settlement_begin = t_world_begin;
+    gen_clock::time_point t_settlement_end   = t_world_begin;
+    gen_clock::time_point t_era_end          = t_world_begin;
 
     // Coarse progress for a caller drawing a loading screen on another thread.
     // `bump` is the only writer and it only ever moves forward, so a reader
@@ -511,10 +536,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
         const int budget = std::max(1, kepler_land / std::max(1, kepler_np.land_tiles_per_seed));
 
         bump(7);
+        t_settlement_begin = gen_clock::now(); // BL-754
         kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
                                            kepler_tiles, home_grid_width, home_grid_height, budget,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
                                            /*stop_year=*/params.epoch_year);
+        t_settlement_end = gen_clock::now(); // BL-754
         // ------------------------------------------------------------------
         // The year-tick sim, wired into generation (Ben, 2026-08-12).
         //
@@ -637,6 +664,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 fixture->years     = hs.years;
             }
         }
+        // OUTSIDE the gate, deliberately: a skipped era must read as zero
+        // elapsed rather than folding the whole remainder of generation into
+        // the era's bucket (BL-754).
+        t_era_end = gen_clock::now();
 
         // Population centres (BL-610, centres from demography): placed HERE,
         // after the Era -1 sim has grown, warred and plagued the regions'
@@ -1318,5 +1349,43 @@ world make_hard_coded_world(world_params params, generation_report* report,
     seed_nation_garrisons(w);
 
     bump(12);
+
+    // --- The generation budget, reported (BL-754) ---------------------------
+    //
+    // One line to stderr and, when a caller asked for a fixture, the same
+    // numbers on it. stderr rather than stdout so a harness parsing its own
+    // stdout is unaffected, and gated on the fixture so an ordinary game
+    // launch stays silent — the budget is a development measurement, not a
+    // player-facing one.
+    {
+        const gen_clock::time_point t_world_end = gen_clock::now();
+        const int64_t ms_total      = ms_between(t_world_begin, t_world_end);
+        const int64_t ms_before     = ms_between(t_world_begin, t_settlement_begin);
+        const int64_t ms_settlement = ms_between(t_settlement_begin, t_settlement_end);
+        const int64_t ms_era        = ms_between(t_settlement_end, t_era_end);
+        const int64_t ms_after      = ms_between(t_era_end, t_world_end);
+
+        if (fixture != nullptr)
+        {
+            fixture->ms_world_total       = ms_total;
+            fixture->ms_before_settlement = ms_before;
+            fixture->ms_settlement        = ms_settlement;
+            fixture->ms_era               = ms_era;
+            fixture->ms_after_era         = ms_after;
+
+            std::fprintf(stderr,
+                         "[gen budget] total %lld ms  (pre-settlement %lld, settlement %lld, "
+                         "era-1 %lld, post-era %lld)  epoch=%lld ancient=%d industrial=%d\n",
+                         static_cast<long long>(ms_total),
+                         static_cast<long long>(ms_before),
+                         static_cast<long long>(ms_settlement),
+                         static_cast<long long>(ms_era),
+                         static_cast<long long>(ms_after),
+                         static_cast<long long>(params.epoch_year),
+                         params.prehistory_years,
+                         era_minus_one_has_industrial_span(params) ? params.industrial_years : 0);
+        }
+    }
+
     return w;
 }
