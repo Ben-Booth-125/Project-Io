@@ -50,5 +50,71 @@
   "PURGE 2026-08-23: 240 open entries -> 18. Every entry referring only to backlog ids <= BL-568 (retired by the same-day backlog purge) was retired; 16 more were answered by reading the current docs and tree. All 223 are frozen verbatim in archive/needs-review-purged-2026-08-23.json, each with a resolution saying why. The survivors are asked as a form: tools/session/register/review_queue.js, built by register/build.js, published at https://claude.ai/code/artifact/53fb4e56-2eae-439e-bcb7-121fa49bd340 . NR-576 records the calls taken in the sweep.",
   "DRAINED 2026-09-01 on Ben's instruction, from 117 open to 0. The queue had become a shadow backlog: most entries named WORK rather than a judgement, so ten backlog items (BL-713..BL-722) were minted to carry it and every entry was closed with a resolution saying where it went. THE RULE THAT KEEPS IT DRAINED, and it is now in CLAUDE.md Rule 0c: a call only Ben can make belongs here; work belongs in backlog.json; a fact worth remembering belongs in the comment or doc next to the code."
  ],
- "items": []
+ "items": [
+  {
+   "status": "open",
+   "raised": "2026-09-03",
+   "resolution": null,
+   "id": "NR-783",
+   "kind": "question",
+   "title": "The span boundary: an authored 400 years before the epoch, or the year the first polity lights a furnace?",
+   "source": "BL-747 (two-span prehistory), building it 2026-09-03. The design doc records the authored offset as the default and the derived one as the better-founded alternative; the code now has the authored one.",
+   "what": "The two spans need a boundary year. Built as authored: world_params::industrial_years = 400, so the boundary is epoch - 400 and a 1960 arc runs 1160 -> 1560 -> 1960.\n\n(a) KEEP THE AUTHORED OFFSET. One number, same on every seed, trivially reproducible. But it says every world industrialised in the same year, which is exactly the flat outcome the asymmetry ruling (2026-08-31) tells generation not to produce.\n\n(b) DERIVE IT from the first furnace - the year a polity crosses the Industrial rung of the capacity ladder inside the run (BL-748 puts that event inside the sim). Then the boundary is a CONSEQUENCE of endowment, per seed, and the span structure varies the way everything else in generation does. Costs: the boundary is not known until the run reaches it, so the tick-band table cannot be built up front, and the run has to switch bands mid-flight from a state-derived predicate - which must be a pure function of sim state or it is a die roll wearing a timestep.\n\n(c) HYBRID - authored offset as a backstop, derived if the furnace lands first. Keeps a bound on the industrial span while letting an early-industrialising seed have a longer one.",
+   "why_it_matters": "It decides whether \"when did this world industrialise\" is a fact about the world or a constant. It also sets the cost profile: a derived boundary makes the industrial span variable-length, and the industrial span is the expensive one.",
+   "options": [
+    "(a) authored offset, as built",
+    "(b) derived from the first furnace",
+    "(c) hybrid: authored backstop, derived if earlier"
+   ],
+   "recommendation": "(b) eventually, (a) for now. The authored offset is in and measurable today; deriving it is a small change once BL-748 puts the furnace inside the run, and it is the option consistent with the asymmetry ruling. Do not build (c) unless the measurement shows the derived span running away.",
+   "files": [
+    "src/world/era_minus_one.cpp",
+    "src/world/hard_coded_world.hpp",
+    "docs/lore/HISTORY.md"
+   ]
+  },
+  {
+   "status": "open",
+   "raised": "2026-09-03",
+   "resolution": null,
+   "id": "NR-784",
+   "kind": "decision-taken",
+   "title": "The ancient arc keeps its unrestricted band ladder, because capping it would move every 0 CE world",
+   "source": "BL-747 (two-span prehistory), 2026-09-03. Found by implementing, not by reading: the design as written implied a cap the invariant forbids.",
+   "what": "The design says pass 1 runs the Classical and Medieval bands. Read literally, that caps the roster band on the ANCIENT arc too, since there the whole run is pass 1. It cannot be done: today a 0 CE polity may climb the capacity ladder to gunpowder or industrial, and capping it changes the decision set, the argmax, and therefore every 0 CE world - which BL-747's own acceptance test (world_determinism digests 039EE9880739CDF6 / B0EBBA249B3DDABB / DE55600457797638) forbids.\n\nTAKEN, so the work could proceed: the ceiling is OPT-IN. history_sim_params::span1_band_ceiling defaults to `industrial` (no restriction) and boundary_year to INT64_MIN (no year is before it), so a single-span run is inert twice over and the ancient arc executes the same values through the same code. Generation sets the medieval ceiling only on an epoch that has an industrial span.\n\nWHAT IS LEFT FOR BEN, and it is a real question: SHOULD the ancient arc be capped at medieval? A polity fielding gunpowder units in 200 BCE is an anachronism the ladder currently permits, and the works roster has the same hole. If the answer is yes it is a deliberate re-blessing of the 0 CE digests, not a bug fix - and it should be taken as its own item with its own before/after, never folded into BL-747.",
+   "why_it_matters": "It is the difference between a change that cannot move the ancient world and one that quietly does. It also names an anachronism nobody has looked at: what band a 400 BCE polity can actually reach in 100 rounds is unmeasured.",
+   "options": [
+    "Leave the ancient arc uncapped (as built)",
+    "Cap the ancient arc at medieval too, as a separate item with a deliberate digest re-bless",
+    "Measure first: report the band distribution a 0 CE run actually reaches, then decide"
+   ],
+   "recommendation": "Measure first. history_sweep can report the highest band reached per polity on the ancient arc; if nothing ever passes medieval the question is moot and the cap is free.",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/era_minus_one.cpp"
+   ]
+  },
+  {
+   "status": "open",
+   "raised": "2026-09-03",
+   "resolution": null,
+   "id": "NR-785",
+   "kind": "question",
+   "title": "BL-749 (sea legs) is blocked on five design calls, and its premise was wrong - it prices an existing capability rather than adding one",
+   "source": "The sprint 32 subsystem map, 2026-09-03, scoping BL-749 for wave 1. It came out under-specified and was held back rather than guessed at.",
+   "what": "Two facts invert the item and are filed as their own work: the sim ALREADY campaigns across up to nine tiles of open water for free (BL-755, region adjacency is water-blind Chebyshev at radius 9), and it ALREADY founds regions on ocean with no terrain test (BL-756, where terrain_combat returns 0 defence, so such a region is silently undefendable). So the \"before\" number for any sea-leg measurement is not zero, and every tuning constant in history_sim_params was measured with free overseas conquest happening.\n\nThe five calls, all recorded in full on BL-749: which walk (coast tiles only, or all is_sea) and how the four harbour rows map onto ranges, given nothing in the code labels a sea \"enclosed\"; where the walk is anchored, since a region has no harbour tile and adding one is a save-format change; how \"holds a harbour work\" is tested, since work_row has no harbour flag; whether the naval roster rows (Coastal Galley, Broadside Ship, Ironclad - all base power 0 and skipped by sum_stack today) gain real power here or stay inert; and whether an overseas daughter region re-surveys port_q instead of inheriting 0.7x of its parent's.\n\nThe good news is in the same map: the sim already holds the coastline (sim_terrain_view::substrate carries ocean/lake/coast), so a deterministic coastal walk needs no signature change, no world& and no ECS access.",
+   "why_it_matters": "BL-749 is the item that produces \"the extent of colonisation by major powers\", which is half of what the sprint is for. Building it on the stated premise would have priced a capability that already exists and asserted a gate the Settle verb does not have.",
+   "options": [
+    "Answer the five calls on BL-749 and build it in wave 2",
+    "Take BL-755 and BL-756 first, measure how much free overseas conquest actually happens, then decide the design against that number",
+    "Park BL-749 for this sprint and deliver the two spans, the furnace and the tariff only"
+   ],
+   "recommendation": "The middle one. The measurement is cheap, it is needed for the before/after either way, and the answer to \"how much is already happening\" changes several of the five calls.",
+   "files": [
+    "docs/development/backlog.json",
+    "src/world/history_sim.cpp"
+   ]
+  }
+ ]
 }
