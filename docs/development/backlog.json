@@ -575,6 +575,29 @@
     "tools/verify/history_sim_harness.cpp"
    ],
    "design": "FOUND 2026-09-03 by the sprint 32 subsystem map. A prerequisite for BL-749 (sea-leg campaign), which cannot assert \"a polity with no harbour work never founds across water\" while founding on water is unconditionally legal.\n\nTHE FACT. The Settle verb's ring probe (history_sim.cpp:1160-1180) checks only whether another region already occupies the candidate cell (1176-1178). There is no substrate test, so an ocean cell is a legal founding site. The consequence is not cosmetic: sub_at(terrain, np.anchor) then hands resolve_battle a water substrate, and terrain_combat.cpp:87-89 returns 0 defence and 0 forage for every water kind, so a region founded on water is silently undefendable and unforageable. Nothing reports it.\n\nA SECOND, RELATED FACT worth carrying with it: region::port_q is not sea access. survey_endowment counts is_water tiles - LAKES INCLUDED - over a neighbourhood window (settlement.cpp:166,180,199), and a founded region never re-surveys, inheriting 0.7x the parent's value (history_sim.cpp:1193). So port_q is a decayed wetness fraction, and any harbour-work or sea-leg gate keyed on it gates on the wrong thing. Whatever BL-749 tests for sea access must be a real is_sea test at the anchor (components.hpp:378, which excludes lakes), not a port_q threshold.\n\nTHE WORK. Add the land test to the Settle probe, and a harness row that asserts no region in a full run sits on water. MEASURE FIRST and report the count in a standard 400-year run: if foundings on water are common the fix moves every world, ancient arc included, and world_determinism's 0 CE digests will change - which makes it Ben's call to take, not a quiet correctness fix. If the count is zero the test is a cheap guard and lands free."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Claude (measured on the pre-change tree, 2026-09-03)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-757",
+   "short_name": "SWEEP_MEASURES_ANOTHER_ERA",
+   "category": "Generation",
+   "title": "history_sweep sweeps the struct default, not the era generation runs - BL-462 unclosed in the one harness whose whole job is the era",
+   "authority_doc": "docs/lore/HISTORY.md",
+   "files": [
+    "tools/verify/history_sweep.cpp",
+    "src/world/era_minus_one.hpp"
+   ],
+   "design": "MEASURED 2026-09-03, on the tree before any sprint 32 change, by running ./build_gen/verify/history_sweep.exe.\n\nTHE FACT. The report prints its own span in its header: \"=== history sweep (BL-275) - 16 seeds, -4000 -> 0 ===\". Generation runs -400 -> 0. The cause is one line: history_sweep.cpp:314 constructs a default history_sim_params - the bare struct default, six bands and 136 rounds - and never calls era_minus_one_sim_params(world_params). Line 272 does the same for the header. So every distribution the sweep reports (province counts, powers, hegemony rate, battles, conquests, peak population, works raised) describes a 4000-year six-band run that no world is ever generated from.\n\nWHY THIS IS THE BL-462 DEFECT AND NOT A NEW ONE. era_minus_one.hpp exists to stop exactly this: its header lists six axes on which a re-derived invocation diverges from generation, and HISTORY.md states \"Every harness derives its parameters through the same helpers, so no check measures a different run from the one that generates a world (BL-462)\". That sentence is false for history_sweep, which is the harness the design leans on hardest - COLLAPSE.md and HISTORY.md both name it as the place every magnitude in the Era -1 layer is argued. era_minus_one.hpp:49-57 already records that BL-462's scope missed a caller nobody counted; this is a second one.\n\nA SECOND READING IS DEFENSIBLE and should be settled rather than assumed: the 4000-year ladder is the stated TARGET (BL-494, four-thousand-year ladder) and the 400-year band is a placeholder, so sweeping the default ladder may be deliberate research rather than an error. If so the harness must SAY so on its face and offer generation's run too; a report that silently describes a different sim is the \"instrument that cannot see its subject\" pattern BL-714 groups.\n\nTHE WORK. Give the sweep an --epoch flag that builds a world_params and derives through era_minus_one_sim_params, so it can measure generation's real run; keep the default-ladder sweep as an explicitly labelled second mode. Print the params actually used - start, boundary, stop, band count, rounds - in the header of both.\n\nOBSERVED ALONGSIDE, needs confirming rather than acting on: the same run raised ZERO works across all 16 seeds with the works fixture enabled (the works column read 0 on every row). Either the fixture gates never fire or build_work never wins the scored contest. If build_work never wins, the works roster is inert and BL-748's band unlock has nothing to unlock - which would make this a much larger finding than a mislabelled header."
   }
  ]
 }
