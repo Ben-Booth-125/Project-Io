@@ -4424,11 +4424,11 @@
     {
      "id": "R5",
      "status": "pending",
-     "requirement": "On an ancient epoch the boundary falls past stop_year, so the ceiling never lifts and the second span is empty by construction - not by a branch that could be taken wrongly.",
+     "requirement": "On an ancient epoch NO second span is configured: boundary_year stays at its INT64_MIN default and span1_band_ceiling at industrial, so the ceiling is inert twice over - no year is before the boundary, AND the clamp is the identity - and the ancient arc executes today values through today code. The second span is absent by DEFAULT, not by a branch that could be taken wrongly.",
      "verification": [
       "headless: world_determinism R3 (the 0 CE digests, which R2 pins)"
      ],
-     "notes": null,
+     "notes": "CORRECTED 2026-09-03 while building. The row first read that the boundary falls PAST stop_year on an ancient epoch, so the ceiling applies throughout. That would cap the 0 CE run at medieval and move every ancient world, which R2 forbids. Whether the ancient arc SHOULD be capped is a real question and is NR-784, to be taken as its own item with a deliberate digest re-bless.",
      "evidence": null
     }
    ]
