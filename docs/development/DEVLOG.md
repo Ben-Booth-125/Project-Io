@@ -85,6 +85,22 @@ expenditure > income in every trailing window. Two differentials say what is in 
   starvation cliff) filed at priority A; NR-782 asks which rule — a floor on the factor, no draw
   where no wire reaches, or a generation bootstrap.
 
+### Addendum, same session — the lights go dim, not out
+
+Ben approved NR-782 (a) and (b). **The floor:** `supply_floor_permille = 500` in
+`economy.building_upkeep`, parsed and range-checked like its siblings; the decay stops there and a
+stranded factor is lifted to it. **No wire, no draw:** an unreached building's grid goods are struck
+from its basket before the shared draw, so it neither draws power it cannot receive nor weakens for
+want of it, while timber and stone still bind. `building_upkeep` R8/R9 pin both with differentials
+(floor 500 → 500 over 41 ticks, floor 250 → 250, lift from 120; unreached + on-grid stays 1000,
+off-grid decays to 750, timber alone to 950). PRODUCTION.md § A shortfall scales output carries the
+rule. **Re-measured:** no building reaches factor 0 at any tick; active buildings 224 → 221 over
+ticks 20–60 on seed 0 (was 219 → 2), 178 → 137 on seed 1; income at tick 60 13.4k / 6.8k (was
+132 / 2.9k); debtors 11 of 86 / 6 of 73 (was 22 of 66 / 13 of 58). The ancient band is byte-identical.
+What remains: the field's mean supply factor sits at ~0.57 — most buildings run at the floor
+because power still does not arrive (BL-746 stage 2, the generation bootstrap, NR-782 (c) held) —
+and 42 of the 57 remaining debt entries are loss-converting processors, which is BL-745's ground.
+
 ### The finding — the anchor is necessary and was never sufficient
 
 `campaign_lapse --epoch 1960`, seeds 0 and 1: valued production ~0 at every measured tick,

@@ -24,24 +24,13 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*8 entries — 1 open, 7 resolved.*
+*8 entries — 0 open, 8 resolved.*
 
 ---
 
 ## Open
 
-### NR-782 — The industrial band goes dark at tick 20: which rule stops an unmet upkeep draw zeroing a building?
-*question · raised 2026-09-02 · from campaign_lapse debt instrumentation, 2026-09-02 (BL-746). The one-tick cliff is the supply factor reaching zero 20 ticks after an unmet power/timber/stone draw; with the draws zeroed the field is solvent and growing.*
-
-Three rules, not exclusive; the doc already says the lights go dim, not out:
-
-(a) FLOOR the supply factor - an unmet draw scales output down to a floor (0.5?) and never to zero. One constant in economy.building_upkeep; keeps the draw as a real cost everywhere. Recommended first, because it is the doc's own sentence.
-
-(b) NO WIRE, NO DRAW - a building the road network does not reach does not draw power at all (it cannot receive it, so the draw is a fiction) and does not decay for want of it. Keeps decay meaningful where power CAN arrive. Pairs with (a).
-
-(c) BOOTSTRAP - generators exempt from the power draw, and a building starts drawing power only once its catchment market has priced it. Addresses the 18 -> 3 supply collapse from the generation side.
-
-Recommendation: (a) + (b) now, measured on the debt instrument; (c) if generation still cannot bootstrap. Your call.
+*Nothing open.*
 
 ---
 
@@ -122,4 +111,19 @@ recipe_margin now finds, per band and per primary output, the route with the low
 2. spawn_solvency R3 - "the seated corp is not out-earning the field per holding (no handed subsidy)", tolerance 3.0x: seated 99.3 vs field 31.9 cr/qtr per holding. No subsidy path changed; the seated spawn's holdings are mostly extraction on rich deposits, and extraction income per building doubled with base_rate 40 while the field's mean includes idle processors. Recommendation: keep the row, raise the tolerance only with a stated reason, or re-express it as seated <= max(field) rather than 3x mean. Your call; nothing changed until you make it.
 
 > **RESOLVED.** RESOLVED. Ben, 2026-09-02, via the review form. (1) tier_margin R2: accept and reword - the ladder claim is per unit of value; R2 now compares net per UNIT of output between the tiers (both per-tick figures still printed). (2) spawn_solvency R3: re-expressed as the seated corp earning no more per holding than the BEST rival (within the field's range), not 3x the field mean; seed_result carries rival_max_per_holding.
+
+### NR-782 — The industrial band goes dark at tick 20: which rule stops an unmet upkeep draw zeroing a building?
+*question · raised 2026-09-02 · from campaign_lapse debt instrumentation, 2026-09-02 (BL-746). The one-tick cliff is the supply factor reaching zero 20 ticks after an unmet power/timber/stone draw; with the draws zeroed the field is solvent and growing.*
+
+Three rules, not exclusive; the doc already says the lights go dim, not out:
+
+(a) FLOOR the supply factor - an unmet draw scales output down to a floor (0.5?) and never to zero. One constant in economy.building_upkeep; keeps the draw as a real cost everywhere. Recommended first, because it is the doc's own sentence.
+
+(b) NO WIRE, NO DRAW - a building the road network does not reach does not draw power at all (it cannot receive it, so the draw is a fiction) and does not decay for want of it. Keeps decay meaningful where power CAN arrive. Pairs with (a).
+
+(c) BOOTSTRAP - generators exempt from the power draw, and a building starts drawing power only once its catchment market has priced it. Addresses the 18 -> 3 supply collapse from the generation side.
+
+Recommendation: (a) + (b) now, measured on the debt instrument; (c) if generation still cannot bootstrap. Your call.
+
+> **RESOLVED.** RESOLVED. Ben, 2026-09-02: (a) and (b) approved. Applied as economy.building_upkeep.supply_floor_permille = 500 (the decay stops at the floor; a factor below it is lifted on the next unmet tick) and the no-wire rule in run_building_upkeep (grid goods struck from an unreached building's basket before the draw; ordinary goods still bind). building_upkeep R8/R9 pin both with differentials. Re-measured on the debt lapse: the tick-20 cliff is gone on both seeds (221 / 137 active at tick 60 against 2), income at tick 60 13.4k against 132, debtors 11 of 86 against 22 of 66. (c) - the generation bootstrap - is HELD as BL-746 stage 2: the field now runs at a mean supply factor of ~0.57, i.e. most buildings sit at the floor because power still does not arrive.
 

@@ -4796,6 +4796,60 @@
      "evidence": "COMPLETE 2026-09-02. recipe_margin R2/R4 green in both bands at W=0.5, floor 0.25 (extraction maintenance 2, wage 4, base_rate 40; processing maintenance 2). haulage_measure re-run: cheapest good now 1.00, binding bound ceil > 8.84 against the authored 10.0 (was 14.07 - the derivation clears again; MARKETS.md § Where the ceiling comes from re-derived). recipe_margin added to IO_TEST_SCRIPT_ROOTED_HARNESSES and passes under ctest (0.02 s). RE-VERIFIED 2026-09-02 after NR-778 was overturned: one price table, ancient steel at depth 1 (steel_bloomery), recipe_margin ALL PASS in both bands against the single table."
     }
    ]
+  },
+  {
+   "brief": "upkeep-starvation-cliff",
+   "title": "BL-746 - the lights go dim, not out",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-746 - Sprint 31",
+   "batch": "sprint-31",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "An unmet goods-upkeep draw decays a building's supply factor to the authored floor (economy.building_upkeep.supply_floor_permille) and no further; a met draw recovers from the floor by the authored step; a factor below the floor is lifted to it on the next unmet tick; the floor is data, range-checked in [0, 1000].",
+     "verification": [
+      "headless: building_upkeep R8 (floor 500 and 250, recovery, lift)"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. building_upkeep R8: 41 unmet ticks at floor 500 leave 500 (scalar 0.5); a met draw recovers to 600; floor 250 lands at 250; a factor of 120 is lifted to 500 on the next unmet tick. Parse rejects a floor outside [0, 1000]."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "A grid good is drawn only where the road network reaches the building's tile; an unreached building neither draws it nor weakens for want of it, while the ordinary goods in its basket still draw and still bind.",
+     "verification": [
+      "headless: building_upkeep R9 (unreached tile, grid flag on/off, timber still binds)"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. building_upkeep R9: an unreached processor drawing power on the grid stays at 1000 over 5 ticks; the same draw with power off the grid decays to 750; with timber in the basket the unreached building decays to 950 for the timber alone."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Measured on the debt instrument (campaign_lapse --epoch 1960 --warm 0 --ticks 60): no building reaches supply factor 0 at any tick, and the industrial field's active count no longer collapses at tick 1000/decay.",
+     "verification": [
+      "headless: campaign_lapse corps.csv bldg_supply_zero == 0 every tick, buildings_active at tick 60"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. Tags fix-ind-s0 / fix-ind-s1: bldg_supply_zero 0 at every tick (was 182 at tick 20); active 221 / 137 at tick 60 (was 2 / 12); income 13.4k / 6.8k (was 132 / 2.9k); debtors 11 of 86 / 6 of 73 (was 22 of 66 / 13 of 58). Ancient band byte-identical (fix-anc-s0 == debt-anc-s0: 19 entries)."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "The field's mean supply factor climbs off the floor: power arrives where the network reaches (the generation bootstrap, NR-782 (c) held).",
+     "verification": [
+      "headless: campaign_lapse corps.csv supply_factor_mean trend"
+     ],
+     "notes": "Today ~0.57 - most buildings sit at the floor.",
+     "evidence": null
+    }
+   ]
   }
  ]
 }
