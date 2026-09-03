@@ -4464,7 +4464,7 @@
    "difficulty": 4,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "active",
+   "status": "in-flight",
    "resolved": null,
    "promoted_from": "backlog.json BL-762 - Sprint 32",
    "batch": "sprint-32-wave-2",
@@ -4472,14 +4472,14 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "A `resource_origin` classification exists as ONE table and is the single source of the geological/biological split. Nothing re-derives it from an inline gate, and every resource in the roster carries a value.",
      "verification": [
       "headless: a new or extended harness asserts every resource_type has an origin",
       "static: review confirms no second classification exists"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03, and the completeness guarantee is a COMPILE ERROR rather than a harness assertion - which is strictly stronger, since a harness row can be skipped and a build cannot. resource_origin (unset/geological/biological/manufactured) plus resource_origin_of(), a switch with NO default over all 49 resources, feeding a constexpr table and a static_assert that no entry survives as `unset`. RED-PROOFED: removing one case (clay) fails the build with 'every resource_type must declare a resource_origin - see resource_origin_of' across every TU, and restoring it compiles. Adding a resource without classifying it therefore cannot ship. Also: is_biological_resource / is_geological_resource are the predicates the Life pass will select on. FOSSIL AND LIVING ARE ONE CLASS deliberately - coal and timber differ in WHEN their life existed, and planetology already encodes that in which scalar it gates on (peak vs stage); a three-way enum would duplicate that distinction in a second place."
     },
     {
      "id": "R2",
@@ -4488,28 +4488,28 @@
      "verification": [
       "headless: earthlike_tile_census reports zero biological deposits after the Body phase"
      ],
-     "notes": null,
-     "evidence": null
+     "notes": "Re-sequenced 2026-09-03. R2 should be re-homed onto BL-765 rather than left open here, since it cannot be satisfied until that item runs. BL-762's own contribution is the classification, which is complete.",
+     "evidence": "NOT DELIVERED, and it is not independently deliverable - which is a finding about the item's decomposition rather than a shortfall in the work. Removing biological deposits from the Body phase requires the Life phase to place them, and the Life phase (BL-765) needs BL-763 (landed) AND BL-764 (Lagrangian tiles, held back at difficulty 5). Doing R2 now would delete agricultural_produce, which survey_endowment reads as a region's FARM score (settlement.cpp), which drives cradle placement, region class, corporate focus and the entire food chain - and coal+petroleum, which it reads as ENERGY and which gate industrialisation. The world would generate without food. So the split must land WITH BL-765, not before it: the classification is the seam, and the move across it is BL-765's act."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "THE STREAM IS NOT SILENTLY RE-CUT. `tile_rng` is consumed past the deposit block by the endemic amount draw and by derive_environment's hazard/habitability jitter, so the biological draws either stay in place and consuming (writing zero), or the stream is re-cut deliberately and the 0 CE digests are re-blessed as a STATED act with the old and new values recorded.",
      "verification": [
       "headless: world_determinism - either the three digests hold, or they move once with both values recorded on the item"
      ],
      "notes": "This is the row that decides whether BL-762 is a refactor or a world change. It must not be resolved by adjusting the harness.",
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03, satisfied by not being touched. No draw was added, removed or reordered: the change is a compile-time classification with no runtime presence in the deposit path, so tile_rng's sequence past generate_deposits - the endemic amount draw and derive_environment's hazard/habitability jitter - is exactly where it was. world_determinism digests unmoved: 039EE9880739CDF6 / B0EBBA249B3DDABB / DE55600457797638. THE HAZARD THIS ROW EXISTS FOR IS STILL LIVE for whoever does R2: the biological draws must keep consuming (writing zero) rather than being deleted, or hazard and habitability move on every tile."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "partial",
      "requirement": "Endowment still gates: a body whose biosphere never reached land has no coal anywhere, and the gate is the origin table plus planetology rather than a scattered `>=` in S8.",
      "verification": [
       "headless: planetology_sweep or an extension reports coal endowment zero for a pre-land peak"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "PARTIAL 2026-09-03. The endowment gate still works and is untouched - a body whose biosphere never reached land still has no coal, because planetology S8 still zeroes it. What is NOT done is the second half of the row: the gate is still 'a scattered >= in S8' rather than the origin table plus planetology. Making it the table needs something the table does not yet carry - the SPECIFIC life stage each biological resource requires (coal on peak >= land, petroleum on peak >= oxygenated, timber on stage >= land). resource_origin says a resource is biological; it does not say which stage produced it. Encoding that per resource is the natural follow-on and is exactly what BL-765 needs to derive placement from the paleo record, so it belongs with that item."
     }
    ]
   },

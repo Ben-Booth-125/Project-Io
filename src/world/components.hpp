@@ -269,6 +269,165 @@ enum class resource_type : uint8_t
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);
 
+// ===========================================================================
+// BL-762 — where a resource CAME FROM
+// ===========================================================================
+//
+// THE GAP THIS CLOSES. Nothing in the codebase could answer "is this resource
+// biological". The roster above groups by SOURCE LOCATION and TIER (Earth /
+// space / ambient / endemic / Tier 2 / ancient), and RESOURCES.md groups by
+// production tier and value track — neither axis is geological vs biological.
+// The only 'biotic' predicate in the tree is `is_biotic_cover`, which classifies
+// COVER. Meanwhile the split already existed IMPLICITLY, as scattered inline
+// gates in planetology's S8 legacy block: coal gated on peak life reaching land,
+// petroleum on oxygenation, peat and timber and produce on life still being
+// present — fossils keyed to `peak`, living resources to `stage`, which is
+// exactly why a dead world keeps its coal and loses its forests.
+//
+// So this is not a new idea; it is the existing idea given ONE home instead of
+// six scattered ones. Ben's reorder (2026-09-03, points 1 and 2) needs it
+// because phase 1 seeds geology with the body while phase 2 derives the
+// biosphere's residue from the paleo record (BL-765).
+//
+// FOSSIL AND LIVING ARE BOTH `biological`, DELIBERATELY. Coal and timber differ
+// in WHEN their life existed, not in whether it did, and planetology already
+// encodes that difference in which scalar it gates on. Splitting the enum three
+// ways here would duplicate that distinction in a second place, which is the
+// defect this type exists to remove.
+
+enum class resource_origin : std::uint8_t
+{
+    /// Sentinel only. The static_assert below makes it a COMPILE error for any
+    /// resource to still carry it, so adding a row to `resource_type` without
+    /// classifying it does not build. That is the point: a runtime check would
+    /// let an unclassified resource ship and be discovered by its absence.
+    unset = 0,
+    /// The lithosphere's: ores, aggregates, ice. Placed with the body (phase 1).
+    geological,
+    /// The biosphere's residue, whether fossil (coal, petroleum, peat) or living
+    /// (timber, crops, hides). Placed by the Life phase from the paleo record.
+    biological,
+    /// Made by a recipe, never deposited. Has no origin in the ground at all,
+    /// and asking for one is a category error rather than a missing entry.
+    manufactured,
+};
+
+/// Which of the three @p r belongs to. Total over `resource_type` by
+/// construction — there is no `default:`, so the sentinel return is reachable
+/// only for a row nobody classified, and the static_assert below catches that
+/// at compile time.
+constexpr resource_origin resource_origin_of(resource_type r)
+{
+    switch (r)
+    {
+        // --- geological: the lithosphere's ---------------------------------
+        case resource_type::iron_ore:
+        case resource_type::silica:
+        case resource_type::copper_ore:
+        case resource_type::rare_earth_ore:
+        case resource_type::water:
+        case resource_type::iron_nickel_ore:
+        case resource_type::platinum_group_metals:
+        case resource_type::regolith:
+        case resource_type::stone:
+        case resource_type::sand:
+        case resource_type::clay:
+            return resource_origin::geological;
+
+        // --- biological: fossil --------------------------------------------
+        case resource_type::coal:
+        case resource_type::petroleum:
+        case resource_type::peat:
+        // --- biological: living --------------------------------------------
+        case resource_type::agricultural_produce:
+        case resource_type::timber:
+        case resource_type::fibre:
+        case resource_type::tobacco:
+        case resource_type::spices:
+        case resource_type::coffee:
+        case resource_type::furs:
+        case resource_type::hides:
+            return resource_origin::biological;
+
+        // --- manufactured: no deposit anywhere -----------------------------
+        case resource_type::steel:
+        case resource_type::refined_fuel:
+        case resource_type::food_rations:
+        case resource_type::charcoal:
+        case resource_type::iron_blooms:
+        case resource_type::trade_goods_misc:
+        case resource_type::propellant:
+        case resource_type::silicon:
+        case resource_type::refined_copper:
+        case resource_type::ree_alloy:
+        case resource_type::machinery:
+        case resource_type::alloys:
+        case resource_type::electronics:
+        case resource_type::spacecraft_components:
+        case resource_type::clean_water:
+        case resource_type::consumer_goods:
+        case resource_type::medical_supplies:
+        case resource_type::ordnance:
+        case resource_type::ceramics:
+        case resource_type::dressed_stone:
+        case resource_type::planks:
+        case resource_type::tools:
+        case resource_type::leather:
+        case resource_type::cloth:
+        case resource_type::rigging:
+        case resource_type::power:
+        case resource_type::construction_capacity:
+            return resource_origin::manufactured;
+
+        case resource_type::count:
+            break;
+    }
+    return resource_origin::unset;
+}
+
+namespace detail
+{
+
+inline constexpr std::array<resource_origin, resource_count> build_resource_origins()
+{
+    std::array<resource_origin, resource_count> t{};
+    for (std::size_t i = 0; i < resource_count; ++i)
+        t[i] = resource_origin_of(static_cast<resource_type>(i));
+    return t;
+}
+
+inline constexpr std::array<resource_origin, resource_count> resource_origins =
+    build_resource_origins();
+
+inline constexpr bool resource_origins_are_total()
+{
+    for (std::size_t i = 0; i < resource_count; ++i)
+        if (resource_origins[i] == resource_origin::unset) return false;
+    return true;
+}
+
+} // namespace detail
+
+// THE COMPLETENESS GUARANTEE, and it is a compile error rather than a check.
+// Add a row to `resource_type` without classifying it and this fails to build,
+// naming the problem. A harness assertion would have let it ship.
+static_assert(detail::resource_origins_are_total(),
+              "every resource_type must declare a resource_origin - see resource_origin_of");
+
+/// True for the biosphere's residue, fossil or living. The predicate the Life
+/// phase's deposit pass (BL-765) selects on.
+constexpr bool is_biological_resource(resource_type r)
+{
+    return resource_origin_of(r) == resource_origin::biological;
+}
+
+/// True for the lithosphere's. The predicate phase 1's deposit pass keeps.
+constexpr bool is_geological_resource(resource_type r)
+{
+    return resource_origin_of(r) == resource_origin::geological;
+}
+
+
 // ---------------------------------------------------------------------------
 // The tile terrain axes (BL-519, 2026-08-21)
 // ---------------------------------------------------------------------------
