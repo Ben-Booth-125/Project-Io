@@ -283,7 +283,7 @@
   {
    "status": "designed",
    "glyph": "~",
-   "priority": "A",
+   "priority": "B",
    "difficulty": 3,
    "version_goal": null,
    "sprint": "31",
@@ -303,7 +303,33 @@
     "scripts/economy.lua",
     "tools/verify/campaign_lapse.cpp"
    ],
-   "design": "THE FINDING (BL-744 stage 2, 2026-09-02). With every recipe clearing the margin anchor at base price, the industrial field still collapses by tick 25 of an unwarmed lapse: expenditure runs 1.5-2.5x income from tick 4, corps go into debt, exit twelve quarters later, and the survivors are idled by their own agency. The anchor is evaluated at BASE; the sim runs at the CEILING - processed goods are ceiled in every market (10x base), so a processor pays up to 10x for inputs its recipe values at 2x, loses on every batch, and is idled as 'persistently loss-making'. Idling it removes supply, which keeps the ceiling on, which idles the next one. The ancient band takes the same wave and recovers because its chains are shallow; the industrial mid-chain (silicon, refined_copper, electronics) does not.\n\nTHE DESIGN, in the anchor's own terms: a processor's input purchase (pool bid, BL-654; auto-demand) is capped so that Σ inputs at the bid price <= output value at the current price minus the wage per batch - the M1 identity carried from authoring time to the live tick. Above the cap it does not buy and runs at the supply scalar it has (the shortfall rule: scale down, never idle - PRODUCTION.md). This is a per-recipe reservation ceiling in place of the flat reservation_mult (9x base) for processing inputs; the flat one stays for upkeep goods. It must be pure and deterministic, one rule at the one shared seam, and the rival scorer's dial_recipe reads the same number.\n\nMEASURE FIRST: campaign_lapse --epoch 1960 --warm 0 --ticks 40 (tags diag-ind, diag-anc are the 2026-09-02 traces) with the expenditure/income split per tick; the done-when is the sprint's - operating-positive survivors that keep producing. Also owed: the agency's 'persistently loss-making' idle rule should read operating net at the recipe's own bid cap, not realised loss at the ceiling, or it will keep idling the buildings the cap is meant to save."
+   "design": "THE FINDING (BL-744 stage 2, 2026-09-02). With every recipe clearing the margin anchor at base price, the industrial field still collapses by tick 25 of an unwarmed lapse: expenditure runs 1.5-2.5x income from tick 4, corps go into debt, exit twelve quarters later, and the survivors are idled by their own agency. The anchor is evaluated at BASE; the sim runs at the CEILING - processed goods are ceiled in every market (10x base), so a processor pays up to 10x for inputs its recipe values at 2x, loses on every batch, and is idled as 'persistently loss-making'. Idling it removes supply, which keeps the ceiling on, which idles the next one. The ancient band takes the same wave and recovers because its chains are shallow; the industrial mid-chain (silicon, refined_copper, electronics) does not.\n\nTHE DESIGN, in the anchor's own terms: a processor's input purchase (pool bid, BL-654; auto-demand) is capped so that Σ inputs at the bid price <= output value at the current price minus the wage per batch - the M1 identity carried from authoring time to the live tick. Above the cap it does not buy and runs at the supply scalar it has (the shortfall rule: scale down, never idle - PRODUCTION.md). This is a per-recipe reservation ceiling in place of the flat reservation_mult (9x base) for processing inputs; the flat one stays for upkeep goods. It must be pure and deterministic, one rule at the one shared seam, and the rival scorer's dial_recipe reads the same number.\n\nMEASURE FIRST: campaign_lapse --epoch 1960 --warm 0 --ticks 40 (tags diag-ind, diag-anc are the 2026-09-02 traces) with the expenditure/income split per tick; the done-when is the sprint's - operating-positive survivors that keep producing. Also owed: the agency's 'persistently loss-making' idle rule should read operating net at the recipe's own bid cap, not realised loss at the ceiling, or it will keep idling the buildings the cap is meant to save.\n\nMEASURED 2026-09-02 (campaign_lapse debt instrumentation, industrial band, unwarmed, seeds 0/1 - build_gen/verify/lapse/debt-ind-s*/debt.csv): 129 of 129 debt entries are dominated by the EXPENDITURE flow, and in every one of them expenditure exceeded income over the four ticks before entry. But two differential runs re-order the levers. (1) Construction materials at market price are the FIRST wave: with resource_costs zeroed the early wave nearly vanishes (debtors at tick 20: 26 -> 4; median entry tick 22 -> 34), because a processor costs 25 steel at 8-10x base = 3-4k against a mine earning ~50/tick and the scorer builds through the boom. (2) The pool bids are NOT the drain: reservation_mult 0 changes nothing. (3) The tick-20 cliff is BL-746's, not this item's: with the industrial goods-upkeep draws zeroed there is no collapse at all. This item therefore drops to B and re-scopes to the two real purchase leaks - construction materials bought at the ceiling (the scorer's build tempo should price materials at the live market, and the cap here should bound them by the building's expected value) and processing inputs bought above the recipe's output value - AFTER BL-746 lands, measured on the same instrument."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "31",
+   "written": "2026-09-02",
+   "author": "Claude (campaign_lapse debt instrumentation, Ben's instruction to track every balance)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-746",
+   "short_name": "UPKEEP_STARVATION_CLIFF",
+   "category": "Economy",
+   "title": "The industrial band goes dark at tick 20 - an unmet goods-upkeep draw decays every building to zero",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/economy_system.cpp",
+    "src/world/components.hpp",
+    "tools/verify/campaign_lapse.cpp",
+    "tools/verify/building_upkeep.cpp"
+   ],
+   "design": "THE FINDING (2026-09-02, campaign_lapse --epoch 1960 --warm 0, seed 0). Between tick 20 and tick 21 active buildings fall 219 -> 40 and idle rise 18 -> 198 in ONE tick, with unstaffed 0, exhausted 0 and labour unchanged (118.5 -> 119.0). 77 of 95 corps go from active to zero-active that tick, almost all extraction corps, many with positive balances. The per-corp mean supply factor decays from 1.0 at tick 1 toward 0 and reaches it at tick 20: supply_decay_permille = 50 is 5% per tick of a 0..1000 factor, so a building whose goods-upkeep draw is never met hits zero output exactly 20 ticks after it starts. In the industrial band every extraction site draws power 0.25 + timber 0.05 + stone 0.05 per tick and every processor power 0.40 + timber 0.08 + stone 0.08 (BL-708, BL-738 stage 2); power is a GRID good that reaches only network-connected tiles, generation is 18 falling to 3 units against a demand of 64, and a generator short of power throttles itself. The ancient band has no such draw and takes the same debt wave without a cliff. DIFFERENTIAL PROOF: with the two industrial goods baskets zeroed the field holds 207-257 active buildings through tick 60, income runs ahead of inputs from tick 25, produced value 16-31k/tick, debtors 19 -> 5. Nothing else was changed.\n\nWHY IT IS A DESIGN DEFECT AND NOT A TUNING ONE. PRODUCTION.md § A shortfall scales output; it never idles says the lights go dim, not out - but a factor that decays without floor DOES go out, and it goes out for every building the grid cannot reach, which is most of them. Three levers, and Ben's call which (NR-782): (a) a FLOOR on the supply factor (e.g. 0.5) so an unmet draw halves output and never zeroes it - the rule as the doc states it; (b) NO DRAW WHERE THERE IS NO WIRE - a building the network does not reach does not draw power and does not decay for want of it (it pays the no-grid penalty some other way, or none); (c) generation bootstrap - generators exempt from the power draw, and the draw switched on per building only once its market has ever priced power. (a) and (b) are one-line rules at the one shared seam; (c) is the census's own reading of BL-708. Then re-run the debt instrument: the done-when is no one-tick cliff and a field whose active count tracks its holdings.\n\nMEASURE with: campaign_lapse --epoch 1960 --seed N --warm 0 --ticks 60 --tag <tag>; corps.csv carries supply_factor_mean and bldg_supply_zero per corp per tick; world.csv buildings_active/idle. The 2026-09-02 traces are debt-ind-s0/s1 (the cliff) and exp-noupkeep (without it)."
   }
  ]
 }

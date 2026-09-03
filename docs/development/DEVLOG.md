@@ -60,6 +60,31 @@ now compares net per unit of output between the tiers (the per-tick figures stay
 `spawn_solvency` R3 holds the seated corp to the best rival's income per holding rather than
 3× the field mean. The stale 1.433× markup derivations in world_gen.lua's comments were swept.
 
+### Addendum, same session — every balance tracked, and the collapse has a name
+
+Ben: *"run a harness which tracks balance for every company"*. `campaign_lapse` now attributes
+every corp's balance delta per tick to the tick's phases — convoy legs, the agency batch
+(build, hire, buyout: capital), the seven budget flows, the nation step, convoy arrivals, exits —
+by snapshotting balances between phases (exact by construction, residual 0.000000, row C3), and
+logs each corp's produced value, active/idle/limited/unstaffed/exhausted/building/mothballed
+counts, labour and mean supply factor. `debt.csv` carries one row per debt entry with the
+trailing-4-tick flows and the dominant drain.
+
+**Industrial band, unwarmed, seeds 0/1: 129 of 129 debt entries dominated by expenditure**, and
+expenditure > income in every trailing window. Two differentials say what is in it:
+- Pool bids off (`reservation_mult` 0): no change. **Not the drain.**
+- Construction materials free: the first wave nearly vanishes (debtors at tick 20: 26 → 4,
+  median entry tick 22 → 34). **A processor costs 25 steel at 8–10× base while the scorer builds
+  through the boom.** BL-745 re-scoped to this, priority B.
+- **The cliff.** Between tick 20 and 21 active buildings fall 219 → 40 in one tick; unstaffed 0,
+  exhausted 0, labour unchanged. The mean supply factor decays from 1.0 to 0 and lands at tick 20:
+  `supply_decay_permille` 50 is 5%/tick, so a building whose power/timber/stone draw is never met
+  is dark exactly 20 ticks in — and power is a grid good most tiles cannot receive. **Industrial
+  goods-upkeep draws zeroed: no cliff, 207 active at tick 60, income ahead of inputs from tick
+  25, debtors 19 → 5.** The ancient band has no such draw and recovers on its own. BL-746 (upkeep
+  starvation cliff) filed at priority A; NR-782 asks which rule — a floor on the factor, no draw
+  where no wire reaches, or a generation bootstrap.
+
 ### The finding — the anchor is necessary and was never sufficient
 
 `campaign_lapse --epoch 1960`, seeds 0 and 1: valued production ~0 at every measured tick,
