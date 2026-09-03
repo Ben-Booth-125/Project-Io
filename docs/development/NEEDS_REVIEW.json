@@ -119,7 +119,7 @@
   {
    "id": "NR-786",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "raised": "2026-09-03",
    "title": "Phase 6 at 4 years a tick simulates a DIFFERENT economy - take 25 honest years at the quarterly tick instead?",
    "source": "BL-771, auditing what a 16x tick actually rescales, 2026-09-03. The item was filed assuming the tick length was the dial; the audit says it is the wrong one.",
@@ -139,7 +139,8 @@
     "src/world/recipe_registry.hpp",
     "docs/generation/GENERATION_STRATEGY.md"
    ],
-   "resolution": null
+   "resolution": "RULED (a), the quarterly tick (Ben, 2026-09-03: \"go with the quarterly tick\"). Phase 6 keeps econ_tick_days at 90 and simulates fewer years rather than rescaling every rate in the economy. Consequences applied the same day: BL-771's R1 (make the tick a parameter), R2 (declare every rate's period) and R4 (the differential harness) are CANCELLED rather than deferred - nothing varies the tick, so a parameter for it is not work. BL-771 closes on its audit, which is what produced this ruling. ONE CONSEQUENCE IS LARGER THAN THE ITEM AND IS RECORDED ON BL-770: at the quarterly tick, 100 ticks is 25 years, not the 400 Ben's point 6 named - so phase 6's SPAN is now the open question, and the arithmetic says the full 1560-1960 span is reachable only if the per-tick cost is fixed first (BL-761). That is a prerequisite relationship, not a neighbouring one.",
+   "resolved": "2026-09-03"
   }
  ]
 }

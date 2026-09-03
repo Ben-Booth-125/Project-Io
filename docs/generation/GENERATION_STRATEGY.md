@@ -349,7 +349,7 @@ work.
 | 3 | **The People** | Where people are, weighted toward ground that farms easily — drawn **before** history and evolved by it. | BL-766 (population map early) |
 | 4 | **The History** | Empires that form, grow and collapse; the roads that supplied them; the markets that emerged from their trade. | BL-767 (empires reliably form), BL-768 (roads and markets from history) |
 | 5 | **The map of consequence** | **Finalise** what the history produced, rather than invent it. City states and pseudo-national borders belong to phase 4. | BL-769 (consequence folds into history) |
-| 6 | **The economic substrate** | The Era 0 sim, 1560–1960: search in parallel for a corporate landscape that is **viable but uneven**. | BL-770 (Era 0 candidate search), BL-771 (tick length is a constant) |
+| 6 | **The economic substrate** | The Era 0 sim: search in parallel for a corporate landscape that is **viable but uneven**. Runs at the ordinary **quarterly tick** (Ben, 2026-09-03), so its SPAN is set by the budget rather than by the calendar — see BL-770 for the arithmetic. | BL-770 (Era 0 candidate search) |
 | 7 | **The rest** | The other bodies, the laws, the partitions. Expands as core systems land. | — |
 | 8 | ~~Warm start~~ | **Retired.** Its burden moves to phase 6. | BL-772 (retire warm start) |
 

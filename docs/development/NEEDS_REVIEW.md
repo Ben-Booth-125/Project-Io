@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*4 entries — 4 open, 0 resolved.*
+*4 entries — 3 open, 1 resolved.*
 
 ---
 
@@ -89,6 +89,13 @@ The good news is in the same map: the sim already holds the coastline (sim_terra
 
 *Files: `docs/development/backlog.json`, `src/world/history_sim.cpp`*
 
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-786 — Phase 6 at 4 years a tick simulates a DIFFERENT economy - take 25 honest years at the quarterly tick instead?
 *question · raised 2026-09-03 · from BL-771, auditing what a 16x tick actually rescales, 2026-09-03. The item was filed assuming the tick length was the dial; the audit says it is the wrong one.*
 
@@ -111,12 +118,7 @@ THE ALTERNATIVE COSTS THE SAME. Keep the quarterly tick and simulate fewer years
 
 > **Recommendation:** (a). Phase 6 does not need 400 years to RANK candidate rosters, it needs long enough for the ranking to stabilise - and how long that is happens to be measurable, by running one candidate for 200 quarterly ticks and watching when the ranking stops moving. That is the right first experiment for BL-770 and it is cheap. Take (b) only if the 400-year span turns out to carry design weight the ranking actually needs, and note it would change the campaign economy as well as the generation pass.
 
+> **RESOLVED.** RULED (a), the quarterly tick (Ben, 2026-09-03: "go with the quarterly tick"). Phase 6 keeps econ_tick_days at 90 and simulates fewer years rather than rescaling every rate in the economy. Consequences applied the same day: BL-771's R1 (make the tick a parameter), R2 (declare every rate's period) and R4 (the differential harness) are CANCELLED rather than deferred - nothing varies the tick, so a parameter for it is not work. BL-771 closes on its audit, which is what produced this ruling. ONE CONSEQUENCE IS LARGER THAN THE ITEM AND IS RECORDED ON BL-770: at the quarterly tick, 100 ticks is 25 years, not the 400 Ben's point 6 named - so phase 6's SPAN is now the open question, and the arithmetic says the full 1560-1960 span is reachable only if the per-tick cost is fixed first (BL-761). That is a prerequisite relationship, not a neighbouring one.
+
 *Files: `src/core/sim_loop.hpp`, `src/world/budget_system.hpp`, `src/world/supply_system.hpp`, `src/world/recipe_registry.hpp`, `docs/generation/GENERATION_STRATEGY.md`*
-
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
 

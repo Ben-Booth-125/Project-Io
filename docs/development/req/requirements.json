@@ -4584,32 +4584,32 @@
    "difficulty": 4,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-09-03",
    "promoted_from": "backlog.json BL-771 - Sprint 32",
    "batch": "sprint-32-wave-2",
    "archived": false,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "cancelled",
      "requirement": "Tick length is a PARAMETER, not a static constexpr. `econ_tick_days` becomes configurable and the default reproduces today's 90-day quarter exactly.",
      "verification": [
       "headless: econ_harness and upkeep_harness green at the default",
       "headless: world_determinism unchanged"
      ],
      "notes": "If Ben chooses the quarterly-tick alternative, this row is CANCELLED rather than deferred - there is no reason to make the tick length variable if nothing varies it.",
-     "evidence": "NOT BUILT, and deliberately not - the audit (R3) says the parameter is the wrong fix. econ_tick_days is a static constexpr read in ~12 places including the UI clock, session-history dating and intra-tick canvas interpolation, so parameterising it is a real change; and the audit shows that USING it at 16x would simulate a different economy rather than the same one faster. Held pending Ben's ruling on NR-786."
+     "evidence": "CANCELLED 2026-09-03 by Ben's ruling on NR-786: the tick stays quarterly, so nothing varies it and a parameter for it is not work. Cancelled rather than deferred, deliberately - a deferred row invites someone to build it later for a reason that no longer exists."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "cancelled",
      "requirement": "Every rate constant declares its PERIOD (per-tick, per-quarter, per-year) and is derived from the tick-length parameter rather than assumed quarterly. The authored tables say which they are.",
      "verification": [
       "headless: a harness enumerates the rate set and asserts each carries a declared period"
      ],
      "notes": null,
-     "evidence": "NOT BUILT. Declaring every rate's period is a sweep across scripts/economy.lua and the budget constants, and it is only worth doing if the tick length actually varies (R1). Sequenced behind NR-786."
+     "evidence": "CANCELLED 2026-09-03 by Ben's ruling on NR-786: the tick stays quarterly, so nothing varies it and a parameter for it is not work. Cancelled rather than deferred, deliberately - a deferred row invites someone to build it later for a reason that no longer exists."
     },
     {
      "id": "R3",
@@ -4623,13 +4623,13 @@
     },
     {
      "id": "R4",
-     "status": "partial",
+     "status": "cancelled",
      "requirement": "REPORTED, NOT ASSERTED: the same simulated span at two different tick lengths reaches comparable state, and the harness prints the per-flow divergence so the trade is visible. No magnitude is pinned.",
      "verification": [
       "headless: the differential harness prints the table"
      ],
      "notes": "The legitimate alternative - run phase 6 at the ordinary quarterly tick and simulate fewer years - is Ben's to choose, and this row's numbers are what he chooses from.",
-     "evidence": "PARTIAL 2026-09-03. No differential harness was built, because the audit made the comparison it would measure moot: at 16x the two runs are not the same economy at two resolutions, they are two different economies, and a table of per-flow divergence would invite tuning the divergence away. What the row wanted - the numbers Ben chooses from - is delivered as the audit instead. IF he chooses to vary the tick after all, the harness becomes worth building and this row is the place for it."
+     "evidence": "CANCELLED 2026-09-03 by Ben's ruling on NR-786: the tick stays quarterly, so nothing varies it and a parameter for it is not work. Cancelled rather than deferred, deliberately - a deferred row invites someone to build it later for a reason that no longer exists."
     }
    ]
   },
