@@ -10,6 +10,57 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-02 (sprint 31 closes, sprint 33 opens) — A field that can pay, and the one that must grow
+
+**Mode:** the whole arc in one session — Design → Full → measure → rule → fix → measure — closed on
+Ben's call. **Runtime:** one long session; ~10 full builds, ~40 harness builds, ~20 lapse runs, one
+doc-sweep agent, no worktree agents.
+
+### What the session did, in order
+
+1. Merged sprint 29's ground bake to main and pushed.
+2. Ben's brief for the market: *every recipe, at base price, makes a greater profit than marginal
+   cost*. Built the instrument first (`recipe_margin`), and its first table was the finding: 41 of
+   44 priced recipes failed.
+3. Three rulings by form (reading A, processing rate 16, extraction fixed costs cut) → the retune,
+   the consequences absorbed (unit wages ×2.776, three harnesses re-aimed, two CMake targets that
+   never linked, an era-band header split), the docs re-priced.
+4. Four more rulings (one table with the ancient chain at depth one; the constants and the anchor
+   route rule ratified; two design-red harness rows re-expressed).
+5. Ben: *track balance for every company*. The lapse gained phase-attributed balance deltas and a
+   debt table; two differential runs named the drains — construction materials at the ceiling,
+   and the tick-20 supply-factor cliff on an unmet power draw.
+6. NR-782 (a)+(b) approved: the supply floor and the no-wire rule. The cliff is gone.
+
+### The session's number
+
+Standard industrial lapse, 80 warm / 120 measured, session-start tables against the engine now:
+
+| quarter 81 → 200 | baseline s0 | baseline s1 | now s0 | now s1 |
+|---|---|---|---|---|
+| operating-positive corps at end | 4 of 37 | 0 of 44 | 46 of 61 | 31 of 55 |
+| corps in debt at end | 7 of 37 | 12 of 44 | 6 of 61 | 4 of 55 |
+| median operating net / qtr at end | −3.0 | −3.0 | +16.9 | +1.7 |
+| median balance at end | 1,022 | 908 | 4,424 | 3,797 |
+| active buildings at end | 9 | 4 | 140 | 85 |
+| valued production 81 → 200 | 1,091 → 181 | 1,245 → 685 | 20,761 → 4,364 | 5,775 → 3,531 |
+| interest share of net loss at end | 84% | 82% | 5% | 70% |
+
+**Success on the solvency half; not yet on growth.** Valued production still falls across the
+thirty years, from a level ten to twenty times the old one; the field runs at a mean supply factor
+of ~0.57 for want of power; 42 of the 57 remaining debt entries are processors converting at a loss.
+
+### Closed, filed, archived
+
+BL-744 (recipe margin anchor) closed with BL-740; sprint 31 closed with its retro; **sprint 33**
+opened on the growth half — BL-746 stage 2 (generation bootstrap) first, then BL-745, BL-738,
+BL-726, BL-725 — with a done-when of production holding or growing over the run, a majority
+operating-positive, mean supply factor above 0.8, interest under a quarter of net loss. NR-775..782
+ruled and archived; the review queue is empty. Requirements groups archived. `NEXT_SESSION.md`
+is superseded by sprint 33's plan.
+
+---
+
 ## 2026-09-02 (BL-744 stage 2) — The tables clear the anchor, and the field still falls
 
 **Mode:** Full. **Runtime:** the same session as the opening, after Ben's three rulings via

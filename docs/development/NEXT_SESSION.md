@@ -1,49 +1,48 @@
-# Next session — the sweeps run
+# Next session — sprint 33, the growth half
 
-The success-lever session (2026-09-01) landed the two missing buyers and designed the measurement
-programme. The backlog holds exactly that programme: BL-723 (campaign lapse instrument) is the
-gate — everything else queues behind it.
-
-## NR-774 is RULED (Ben, 2026-09-01, via the session form) — resolved and archived
-
-1. **GDP** := valued production. 2. **Influence** := market share + footprint + routes.
-3. **Band** := **INDUSTRIAL 1960 ONLY** — every success-programme sweep passes `--epoch 1960`.
-   The `world_params` default epoch is 0 (ancient), so an unflagged run is the WRONG band; the
-   lapse manifest's band line is the check. The ancient rounds already run stand as labelled
-   history.
-4. **Proxy** := the corp AI with the two stated brackets. The sprint-31 spawn-intelligence idea
-   was ruled HOLD — nothing filed.
+Sprint 31 closed 2026-09-02 a success on solvency: on the standard industrial lapse the field ends
+thirty years with a majority of corps operating-positive (46 of 61, 31 of 55) where it began with
+four and none, debtors a tenth of the field, median balances climbing. Sprint 33 owns what is left:
+**valued production still falls across the run** (×0.2 on seed 0, ×0.6 on seed 1, from a level ten
+to twenty times the old baseline). `docs/development/SPRINTS.md` § Sprint 33 is the plan; this note
+is the handoff.
 
 ## Order of work
 
-1. **BL-723 (campaign lapse instrument)** — acquisition_viability's setup + per-tick CSV +
-   parameter overrides on the `--reach` pattern + the lens-capture time-lapse script. T0 validity
-   rows built in (A/A byte-identity, every metric differentially proved, zero-observation fails).
-2. **BL-724 (spawn distribution)** and **BL-728 (demand composition)** — the two priority-A
-   sweeps. Expect BL-728 to dominate every other lever's effect size.
-3. **BL-725 (price levers)** — carries a live finding: the ceiling derivation has drifted.
-   `haulage_measure` now demands **ceil > 14.07** at the binding case against the authored 10.0
-   (p90 haul 5.65 cr/unit vs the 1.67 the 10.0 was derived from). Trade is healthy today (1,481
-   dispatches vs the 1055 baseline) but the worst-tail market pair is unservable at any scarcity.
-4. **BL-731 (nation_scorer_harness rot)** when convenient — calm_space has no direct scorer
-   verification until it compiles again.
+1. **BL-746 stage 2 (the generation bootstrap, NR-782 (c) held).** The field's mean supply factor
+   sits at ~0.57 — most buildings run at the new floor because power does not arrive (generation
+   18 → 3 units against a demand of 64; a generator short of power throttles itself; only
+   network-reached tiles can receive it). Design it so a fix that only silences the draw reads as
+   one: measure the supply-factor trend AND the power price together.
+2. **BL-745 (processor input bid cap).** 42 of 57 remaining debt entries are processors producing
+   less than they buy — construction materials at 8–10× base through the boom, and inputs above the
+   recipe's output value. The anchor's M1 identity carried to the live tick.
+3. BL-738 re-measure, then BL-726 (seed 1's interest is still 70% of net loss), then BL-725.
 
-## Two delegated calls awaiting a word
+## The instrument
 
-- **BL-644's player exclusion under spectate:** `derive_space_programme_claims` skips
-  `w.player_entity` unconditionally. Under BL-409's no-subject ruling the skip should arguably
-  lift when spectating; today it stands, so one corp in every spectated field never sells to the
-  state — a small measurement asymmetry the sweeps inherit until ruled.
-- **BL-647 basket scope:** `trade_goods_misc` deliberately excluded (the design names four
-  goods); BL-730 owns finding its buyer.
+```
+cmd //c tools\verify\build_lua_harness.bat campaign_lapse
+./build_gen/verify/campaign_lapse.exe --epoch 1960 --seed 0 --warm 0 --ticks 60 --tag <tag>   # where debt begins
+./build_gen/verify/campaign_lapse.exe --epoch 1960 --seed 0 --tag <tag>                        # the done-when form
+```
 
-## Traps (unchanged from last hand-off, still true)
+`corps.csv` carries every corp's balance delta attributed by tick phase (residual asserted zero),
+produced value, building state counts, labour and supply factor; `debt.csv` one row per debt entry
+with the dominant drain. The 2026-09-02 traces to compare against: `final-ind-s0/s1` (standard
+form, the sprint-33 baseline), `fix-ind-s0/s1` (unwarmed), `exp-noupkeep` (the zero-draw control),
+`debt-ind-s0/s1` (the cliff, before the fix). The aggregator pattern is in the devlog entry
+"every balance tracked".
+
+## Traps (still true)
 
 - Lua-linked harnesses build via `cmd //c tools\verify\build_lua_harness.bat <name>`; run as
-  `./build_gen/verify/<name>.exe` from the repo root. `cmake --build` needs a vcvars shell.
-- Worktree agents cut from a stale base — cut worktrees by hand from local `main` and name the
-  expected commit in the brief (it caught both agents this session; the step-0 check works).
-- chain_depth's one red row is the DELIBERATE named-list guard (tools, rigging,
-  trade_goods_misc). Do not quiet it; shrink it by landing owners.
-- The k_extractable widening moved every world: any remembered seed-0 number from before
-  2026-09-01 is stale. Re-baseline from today's census.
+  `./build_gen/verify/<name>.exe` from the repo root. `nmake all` stops at
+  `battle_engagement_harness` (BL-731's sibling rot) and everything after reads as ctest "Not
+  Run"; build the target you need. `ctest -j6` is unusable — Debug world-building harnesses hit
+  the 60 s timeout under contention.
+- A function called from `io_world_obj` must not live in a Lua-linked TU (world_gen_config.cpp,
+  recipe_registry.cpp, tech_tree.cpp), or every Lua-free harness fails to link.
+- chain_depth's one red row is the DELIBERATE named-list guard. Do not quiet it.
+- Every remembered seed-0 number from before 2026-09-02 is stale twice over (the anchor, then the
+  floor). Re-baseline from `final-ind-s*`.

@@ -4031,35 +4031,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-695 - Sprint 26, watch the AI play",
    "batch": "sprint-26-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: spectator_determinism"
-     ],
-     "requirement": "A session started in spectator mode has ui_state::spectating true without any --verify script running, and run_economy_step receives it: every corp including world::player_entity evaluates on the staggered cadence.",
-     "notes": "The entry route is the item's design call (CLI flag first cut; wizard is the question). What this row asserts is that the route ARRIVES at the flag. DONE: --spectate applied to all four rendered entry paths; app::spectate_session sets the flag before the wizard, so it carries through to every campaign the session opens."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: spectator_determinism"
-     ],
-     "requirement": "spectator_determinism passes unchanged: the flag still DEFAULTS FALSE so an ordinary played session is byte-identical, and admitting one more corp shifts no rival's cadence slot.",
-     "notes": "The two properties the standing rule names. Do NOT re-bless its constant to make a change fit - a failure here is the change being wrong. DONE: both named properties PASS. The harness's third row (byte-identity vs a world-content golden) FAILS and is pre-existing - see NR-752."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "visual: live click"
-     ],
-     "requirement": "Live: start the app in spectate, watch at least one economy tick resolve, and confirm rival corps act while no seat is held.",
-     "notes": "Interactive surface - a capture is not sufficient (DELIVERY.md step 4). DONE: ProjectIo --spectate --autostart-windowed runs wizard -> generation -> seating -> 80-tick warm start -> 120 rendered frames, exit 0."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "spectate-god-view-control",
@@ -4068,35 +4040,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-702 - Sprint 26, watch the AI play",
    "batch": "sprint-26-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "visual: live click"
-     ],
-     "requirement": "A control sets ui_state::god_view, is offered ONLY while spectating, and follows the toggle rule (clicking it while active turns it off).",
-     "notes": "time_panel.cpp:344-350 already has the offered-only-while-spectating shape. Satisfied by BL-408 before this sprint opened - the control, its ACTIONS entry, its question-log entry and scripts/verify/spectator_god_view.lua all predate it. No code written."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "visual: a capture with the pair on, against one with god_view off"
-     ],
-     "requirement": "With the pair spectating && god_view true, a rival building's hover card and Selection page show its internals, and the survey mask lifts on the body canvas.",
-     "notes": "The read sites are body_surface_canvas.cpp, hover_content.cpp, selection_panel.cpp - all already gated on the pair. Satisfied by BL-408 before this sprint opened - the control, its ACTIONS entry, its question-log entry and scripts/verify/spectator_god_view.lua all predate it. No code written."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: assertion or inspection of the read sites"
-     ],
-     "requirement": "god_view has no effect in a seated session: every read site tests the PAIR, so setting god_view without spectating changes nothing.",
-     "notes": "The safety property. It is already written this way; this row stops the control breaking it. Satisfied by BL-408 before this sprint opened - the control, its ACTIONS entry, its question-log entry and scripts/verify/spectator_god_view.lua all predate it. No code written."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "selectable-1960s-start",
@@ -4105,35 +4049,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-705 - Sprint 26, watch the AI play",
    "batch": "sprint-26-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: a world-generation harness run at 1960"
-     ],
-     "requirement": "A campaign can be started with world_params::epoch_year = 1960 without editing a source default, and it generates: era_band_for_epoch puts the registry on the industrial band and the antiquity prehistory is skipped.",
-     "notes": "The branch is live today and simply unreachable - nothing in src/ sets epoch_year. DONE: --epoch <year>, applied at all four app construction sites, validated as the value that lands. Verified live: --autostart --epoch 1960 exits 0, setup_world 0 ms (antiquity prehistory correctly skipped)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "visual: the time panel and the AI decision feed, one capture per start"
-     ],
-     "requirement": "The displayed campaign year derives from world_params::epoch_year, not from a hard-coded constant. A 0 CE campaign renders 0 CE dates and a 1960 campaign renders 1960 dates.",
-     "notes": "Today campaign_epoch_year is a hard-coded 1960 in format.hpp:82 AND planetology.hpp:275, tied by a static_assert in tile_inspector.cpp, and no UI site reads world_params. A 1960s start makes the constant ACCIDENTALLY correct - fix it anyway. DONE, and the fix was larger than the row assumed: the constant existed TWICE under one name. ::history_datum_year (serialised, stays constexpr) split from ui::fmt::campaign_epoch_year() (dynamic, published from live world_params). The static_assert was retired, not replaced - it had nothing left to guard."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: the existing generation harness set"
-     ],
-     "requirement": "The 0 CE start still generates and still passes the generation harnesses. Both starts remain supported.",
-     "notes": "Non-regression. ERAS.md § Where the ladder starts keeps both. DONE: era_world_harness rebuilt under the pinned MSVC toolchain on the MERGED tree - 13 passed, 0 failed, including its R4 0 CE determinism row and its R5 1960 rows. world_determinism digests unmoved."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "composite-standing-index",
@@ -4142,35 +4058,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-700 - Sprint 26, watch the AI play",
    "batch": "sprint-26-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: corp_ai_harness or a new row asserting the composite responds to each component independently"
-     ],
-     "requirement": "A single function returns a corporation's composite standing from net worth, accumulated science, and summed unit_strength over its fielded units. All three components verified present: components.hpp:1343 (science), unit_roster.hpp (unit_strength, computed not stored).",
-     "notes": "Minted separately so BL-697 and BL-699 do not each invent their own number. DONE: corp_standing_index() -> standing_index{component[3], total}. NOT named corp_standing - src/world/standing.hpp already owns that for the Corporations panel. Ten R7 rows in corp_ai_harness, ALL PASS on the integrated tree."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: two runs same seed, identical state_hash"
-     ],
-     "requirement": "The read is deterministic: taken at a settled point in the tick and stable under the sorted-corp iteration order, so the evaluation cadence cannot become the tiebreak.",
-     "notes": "The standing rule's constraint on every scorer input. Name the read point explicitly. DONE: read point is the econ-tick boundary after apply_budget and clear_markets, before any corp evaluation mutates the world - named in the header and asserted. R7 proves bit-identity when w.units is rebuilt in the opposite insertion order, and that a whole-field snapshot is identical forwards or backwards."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: inspection"
-     ],
-     "requirement": "Component weights live in corp_ai_params, so tuning the composite is a data change.",
-     "notes": "That file's own convention - trade_hold_threshold and siblings. DONE: corp_ai_params::standing_weights, an array indexed by the component enum, defaults {1.0, 25.0, 0.02} derived rather than tuned. R7 asserts zeroing a weight removes exactly that term."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "decision-feed-reasons",
@@ -4179,26 +4067,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-696 - Sprint 26, watch the AI play",
    "batch": "sprint-26-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "visual: live click on the AI decisions ledger"
-     ],
-     "requirement": "Feed rows show the chosen candidate's actual score and its named reason. A run produces rows with more than one distinct reason and at least one non-zero score.",
-     "notes": "NR-626: today every row reads 'overridden' at 0.00, so the only window onto rival reasoning is blank. DONE: rows now read \"3.62, uncontested\" / \"4.85 v 0.37 decisive\" / \"3.11, uncontested\" against a uniform \"3.62 v 307.02 overridden\" before."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: inspection plus the corp_ai harnesses"
-     ],
-     "requirement": "The cause is fixed where it lives - whether the score is not carried out of the scorer or is carried and not rendered - not patched at the render site.",
-     "notes": "corp_decision_reason already has a vocabulary (corp_ai.cpp ~285). The question is why the feed is not receiving it. DONE, and the cause was in the scorer, not the render. (1) run_corp_strategic_step counted seam-REFUSED candidates as forgone options - 160 of 249 rejections scoring above 50 were seam-refused set_recipe candidates. (2) The runner-up was one maximum across families whose scores share no scale; now per-family."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "skill-harness-margin-metric",
@@ -4299,26 +4168,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-704 - Sprint 26, watch the AI play",
    "batch": "carried out of sprint 26 - blocked on demand (NR-758)",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: run and inspect the artifact"
-     ],
-     "requirement": "A run produces a readable per-corp trace of chosen candidate, score, runners-up, reason and tick.",
-     "notes": "FIRST check whether the existing world history log (history_log.{hpp,cpp}, decision topic) already carries this - a reader over it beats a new export."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: ai_skill_harness R0 with tracing toggled"
-     ],
-     "requirement": "The trace is an observation and never an input: a run with tracing on and one with it off produce the same state_hash.",
-     "notes": "Non-negotiable."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "a-channel-must-bid",
@@ -4327,44 +4177,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-654 - Sprint 27, demand",
    "batch": "sprint-27-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: a harness asserting the bid reaches market demand and the credits leave the buyer"
-     ],
-     "requirement": "A goods draw that is short bids the shortfall into market_component::demand and PAYS for what it gets - it does not silently take from a pool. One rule for every goods draw: building upkeep and unit upkeep take the same path, not two.",
-     "notes": "Ben, 2026-08-26: 'Buy on the market, but at a threshold, buying is not allowed.'"
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: a harness row at both sides of the ceiling"
-     ],
-     "requirement": "Above a reservation ceiling the draw does NOT bid at all, and the existing shortfall rule weakens the building or unit instead. The ceiling is authored in the PRICE BAND family beside floor_mult/ceil_mult, not in upkeep.",
-     "notes": "It is a statement about what a good is worth paying, not about who is buying. Exact mirror of BL-386 seller-side floor_price: both sides may decline a trade, neither may dictate one."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: demand_census before/after plus the operating-firm count"
-     ],
-     "requirement": "The ceiling's value is MEASURED against the census and the operating-firm count, never guessed. Report the number and how it was derived.",
-     "notes": "BL-641 is the worked example of guessing: rates on, operating firms 227 -> 19."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "headless: ai_skill_harness R0 or equivalent"
-     ],
-     "requirement": "Determinism: the bid path is order-independent. Two runs on one seed produce an identical state_hash.",
-     "notes": ""
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "injectors-must-not-skip-silently",
@@ -4373,26 +4186,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-652 - Sprint 27, demand",
    "batch": "sprint-27-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: run with a deliberately unpriced basket entry and observe the diagnostic"
-     ],
-     "requirement": "inject_population_demand and inject_background_demand emit a named diagnostic on the first basket entry they cannot price, rather than skipping it silently.",
-     "notes": "Two separate bugs hid behind this on one day in 2026-08: the census read as having no background demand, and spawn_solvency measured a whole spawn diagnosis in a world where background demand did not exist. Neither failed."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: the new row, red against a seeded fault and green otherwise"
-     ],
-     "requirement": "A harness row FAILS on a basket naming an unpriced good.",
-     "notes": "The combination is always a missing script or an authoring error and is never intended."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "chain-completeness-read",
@@ -4401,35 +4195,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-706 - Sprint 27, demand",
    "batch": "sprint-27-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: demand_census"
-     ],
-     "requirement": "demand_census reports, per market, the fraction of chains TERMINATING there that can be sourced within reach.",
-     "notes": "'Within reach' needs defining and it is a real design question - reach is LOGISTICS.md's. Default to market grain since the census already walks markets; STOP AND REPORT if that reads wrong rather than inventing a grain."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: demand_census"
-     ],
-     "requirement": "It reports the SPREAD of that fraction across the world - the distribution, not any single value.",
-     "notes": "The deliverable is the spread. GENERATION_STRATEGY.md § Asymmetry is the deliverable."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: inspection plus demand_census"
-     ],
-     "requirement": "It REPORTS and does not GATE. No assertion fails on an individual region being poor or rich.",
-     "notes": "The enemy is uniformity, not self-sufficiency. A world where every region scores the same is the defect; any individual score is not."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "ancient-chain-does-not-convert",
@@ -4438,26 +4204,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-707 - Sprint 27, demand",
    "batch": "sprint-27-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: whatever instrument the diagnosis rests on, cited"
-     ],
-     "requirement": "A written diagnosis, evidenced, naming why no firm converts fibre to cloth or hides to leather when the output prices at ~10x base with unmet demand in 13 of 14 markets.",
-     "notes": "Candidates, none confirmed: input_demand_pull not reaching these chains; placement rules refusing the sites; a recipe wanting an input that is itself unavailable; background-firm calibration seeding a world without the converting firms. DIAGNOSE BEFORE FIXING."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: demand_census before/after, if a fix lands"
-     ],
-     "requirement": "If a fix is small and clearly correct, it lands with a before/after census. If it is not, the diagnosis is the deliverable and a fresh item carries the fix.",
-     "notes": "DO NOT raise the price ceiling to make the reading go away. The ceiling is reporting the shortage; moving it hides it."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "power-as-a-grid",
@@ -4466,53 +4213,7 @@
    "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-708 - Sprint 27, demand",
    "batch": "sprint-27-wave-2",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: demand_census showing coal/petroleum leaving the no-sink list"
-     ],
-     "requirement": "A generation building converts fuel to power; every building that needs power BIDS for it as upkeep, through BL-654 path. Both links of the chain reach the market.",
-     "notes": "Power upkeep is the first channel built on BL-654 rule, not an exception to it."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: a harness asserting a disconnected building cannot draw"
-     ],
-     "requirement": "Transmission rides the EXISTING network: connectivity is tile_reach_cost read as a boolean, latency is a flat one tick regardless of distance, and no second graph is introduced.",
-     "notes": "LOGISTICS.md § 3a."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: operating-firm count does not collapse when power is enabled"
-     ],
-     "requirement": "A building short of power SCALES ITS OUTPUT DOWN and is not idled.",
-     "notes": "BL-641's lesson applied before the fact: 227 -> 19 was an upkeep draw that idled the firms that would have induced the supply."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "headless: inspection plus a harness row"
-     ],
-     "requirement": "Power is stockpiled with a CEILING, and never rides a convoy.",
-     "notes": "Its one genuinely novel property against every other good."
-    },
-    {
-     "id": "R5",
-     "status": "complete",
-     "verification": [
-      "headless: a harness row on a cross-border match"
-     ],
-     "requirement": "Cross-border power pays the enacted import duty through the existing tariff path - no new machinery.",
-     "notes": "MARKETS.md § Tariffs already resolves a market to a jurisdiction."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "construction-as-a-rate",
@@ -4571,49 +4272,7 @@
    "resolved": "2026-09-01",
    "promoted_from": "backlog.json BL-732 - Sprint 29, rendering",
    "batch": "sprint-29",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "requirement": "Item-spanning: with no lens active, the Planetary canvas draws its ground from baked chunk textures - continuous painterly terrain (no hex grid lines or per-tile gaps), hillshaded relief from the height field, the C-F near-future grade - at play zoom and at the whole-grid view, with the cylinder wrap seam invisible.",
-     "verification": [
-      "visual: scripts/verify/ground_bake.lua captures at play zoom, whole-grid, and across the wrap seam"
-     ],
-     "notes": "The acceptance gate. Judged against docs/ui/design/renders/map/it3 panel C-F for direction, not pixel identity.",
-     "evidence": "COMPLETE 2026-09-01. scripts/verify/ground_bake.lua captures: ground_bake_wide/play/close/seam plus the bare pair (border band off via the verify-only set_border_band toggle). The ground is continuous painterly terrain - no grid lines or per-tile gaps on the plain canvas, organic domain-warped coastlines, fractal-detail hillshade, C-F grade - and the wrap seam frame shows no discontinuity. Judged in-family against it3 panel C-F for direction; Ben final eye owed on the live app (left open). Known and expected: the analytic chrome (national border band above all) visually dominates the muted ground - BL-734 evidence, not a defect here."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "requirement": "The bake is a pure function of world state: two bakes of the same chunk are byte-identical; land and water classes do not cross-blend (coastline stays hard); survey-masked tiles bake as the lock colour and do not leak terrain into revealed neighbours; the grade pass measurably desaturates; the wrap seam columns are continuous.",
-     "verification": [
-      "headless: tools/verify/ground_bake_check.cpp over make_hard_coded_world"
-     ],
-     "notes": "Compiles ground_bake.cpp + terrain_palette.cpp with the world objects - both files must stay SDL/ImGui/Lua-free.",
-     "evidence": "COMPLETE 2026-09-01. ground_bake_check: 10/10 - determinism (byte-identical re-bake), wrap (px0+W byte-identical, noise lattices period-snapped), class separation (land/water distinct, water blue), relief responds, grade separable + desaturates, unsurveyed body bakes lock colour only, region_hash moves with a covered tile. Also emits 6 param-variant preview PNGs per run for look iteration."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "requirement": "The classic per-tile renderer survives as the fallback: any active lens renders through the existing per-tile path unchanged, and a tile whose chunk is not yet baked falls back to the vector fill.",
-     "verification": [
-      "visual: a lens rung in ground_bake.lua matches the pre-item lens render",
-      "code: the not-ready branch in body_surface_canvas.cpp"
-     ],
-     "notes": "Fallback-by-coverage, RENDERING.md. Lens-over-painterly is BL-734, not this item.",
-     "evidence": "COMPLETE 2026-09-01. ground_bake_lens_fallback capture: Resource lens renders the classic per-tile path (crisp water hexes, per-tile fills); ground images are not drawn under any lens (ground_on gates on overlay==none). Chunk-not-ready fallback is the same skip flag (on_bake) per tile."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "requirement": "Live: on the built app, pan/zoom/hover/select work over the baked ground - hover card appears, a click selects (amber hex on the selection), progressive chunk fill does not hitch the frame.",
-     "verification": [
-      "live: open the built exe, click the thing"
-     ],
-     "notes": "The 2026-08-19 live-click rule; a capture alone does not close this row.",
-     "evidence": "COMPLETE 2026-09-01. Live on the built exe (launched --load into a verify-produced save, driven via computer use): click selected a tile/province (Selection panel filled, Tile [106,51] - Track), scroll zoom anchored and the wanted-chunk bake followed with no vector holes, hover showed the card (Barrens - Highland / Habitability 18% / convoy cost) with the hover hex outline. Debug-build chunk bake can jank the first seconds after a body switch (budget 2 chunks/frame, CPU bake); far page covers meanwhile - noted for a future threaded bake, not a blocker."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "ground-wave-2",
@@ -4622,50 +4281,7 @@
    "resolved": "2026-09-01",
    "promoted_from": "backlog.json BL-735 - Sprint 29",
    "batch": "sprint-29",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "requirement": "The national border band draws as a single frontier ring at 0.35 alpha in a luma-muted nation colour, wash and stroke alike; depth 1+ tiles carry no wash.",
-     "verification": [
-      "visual: ground_bake.lua wide/play captures vs the previous 3-ring render"
-     ],
-     "notes": "The BL-734 partial ruling (Ben 2026-09-01), recorded in PLANETARY.md.",
-     "evidence": "COMPLETE 2026-09-01. ground_bake_wide/play captures + live Release session: the band is the single frontier ring at 0.35 alpha, luma-muted (k_border_mute 0.55) on wash and stroke; the coastal bead-strings are gone and the map reads as terrain first. PLANETARY.md falloff table rewritten with the ruling."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "requirement": "Planetary zoom steps a fixed x2 ladder (wheel and = / - keys; upper rungs stay continuous; verify set_zoom free-form), and every rung draws its ground from a bake tier that is never magnified more than ~7% - crisp at each step, including a new closest rung capture.",
-     "verification": [
-      "visual: per-rung captures at ~6/26/51/102 px hexes",
-      "live: wheel steps land on the ladder"
-     ],
-     "notes": "Tiers {far 6, 12, 24, 48, 96 px/r}.",
-     "evidence": "COMPLETE 2026-09-01. Captures at every rung (ground_bake_wide ~6px far page, play ~26px/24 tier, close ~51px/48 tier, closest ~102px/96 tier) after resolution-adaptive sharpening (weight-exponent wpow, detail/noise lift, colour mottle at the close tiers). Live on the Release build: each wheel notch doubles the drawn hex scale and the tier chunks follow (diagnostic probe confirmed draw_r 35.5 -> tier 48, 30 chunks published). Multi-notch wheel events step ONE rung (sign-only) - deliberate. Verify set_zoom stays free-form; existing script framings unchanged. POST-REVIEW: rung-1 capture (ground_bake_mid, the 12 px tier) added - the fleet caught that tier unexercised; tier headroom fixed 0.93->1.2x so rungs land on their MATCHING tier (0.93 sent every rung one tier high); fractional/multi-notch wheel input accumulates to whole notches before a rung fires."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "requirement": "No ground bake executes on the render thread outside --verify: chunks and the far page bake on a worker against immutable source snapshots, generation-guarded, LRU-capped; live pan/zoom does not hitch on bakes.",
-     "verification": [
-      "code: ground_layer worker path",
-      "live: pan/zoom on the Release build"
-     ],
-     "notes": "Release build staged at the granted path for play.",
-     "evidence": "COMPLETE 2026-09-01. ground_layer.cpp: bake_region runs only in worker_main (jobs carry immutable source snapshot + geometry + params; generation counter discards stale results) and in bake_now, which only the bake_everything (--verify) path calls; the render thread hashes, enqueues (cap 6), uploads and publishes; far hash once per source generation; LRU eviction per tier. Live Release session panned and stepped zoom with no visible stalls; the Release play build is staged at the granted Start-menu path (the previous roughness was in large part the Debug build staged there). POST-REVIEW: the fleet confirmed a critical flag-wedge family (generation bump or texture-allocation failure orphaning a result left queued/m_far_queued stuck forever - bricked chunks, far page dark until body switch). Fixed: upload clears the pending flag unconditionally before any early return, the far hash re-arms on an orphaned drop, the source refresh gates on an in-flight counter (not just queue emptiness), and eviction floors its cap at 2x the wanted set."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "requirement": "The bake stays pure and green: ground_bake_check 10/10 unchanged (determinism, wrap, classes, mask - the harness bakes at 24 px/r, where the adaptive dials are at rest, so P1/P2 remain exact). The close-grain octave gating (>= 40 px/r) is verified by code inspection plus the per-rung captures, NOT by the harness.",
-     "verification": [
-      "headless: ground_bake_check"
-     ],
-     "notes": null,
-     "evidence": "COMPLETE 2026-09-01. ground_bake_check 10/10 after every wave-2 bake change; at the harness geometry (24 px/r) res_t=0, wpow=2, fine octave off, so the wrap/determinism checks bind exactly. Octave gate: code (ground_bake.cpp fine_on = g.s >= 40) + the close/closest captures. Reworded after the review fleet flagged the original row promising harness evidence the fixture cannot produce."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "ground-sharpness",
@@ -4674,39 +4290,7 @@
    "resolved": "2026-09-02",
    "promoted_from": "backlog.json BL-736 - Sprint 30",
    "batch": "sprint-30",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "requirement": "Cover-class boundaries and the shoreline carry a crisp 1px ink stroke that follows the warped (organic) boundary; the close tiers additionally pass an unsharp mask; neither pass may seam at a chunk edge (apron) nor touch the survey lock fill or the transparent margin.",
-     "verification": [
-      "visual: per-rung captures + 48px forest preview",
-      "headless: ground_bake_check P8 (48px determinism + wrap, all passes active)"
-     ],
-     "notes": null,
-     "evidence": "COMPLETE 2026-09-02. ground_preview_v7_forest48 + per-rung captures: every cover patch and the coastline carries the 1px ink stroke following the warped organic boundary; unsharp bites on rock texture at 48/96. Apron A=6 around every window; both passes tag-gated (lock fill and transparent margin untouched, unsharp additionally requires kernel-reach tags). ground_bake_check P8 13->17 checks green with all passes active."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "requirement": "The grade haze lift falls and contrast rises with bake resolution, so the close tiers keep local contrast; the far/play tiers are visually unchanged in character.",
-     "verification": [
-      "visual: wide/play captures vs previous run"
-     ],
-     "notes": null,
-     "evidence": "COMPLETE 2026-09-02. Grade sweep: lift *= (1 - 0.5*res_t), contrast += 0.045*res_t; res_t=0 at the far/12/24 tiers so their captures keep the wave-2 character."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "requirement": "With the frame HUD on, the Planetary canvas reports the ground detail metric: active tier px/r, texel:pixel ratio, published chunk count.",
-     "verification": [
-      "live: toggle the HUD, read the line"
-     ],
-     "notes": "The polygon-count analogue.",
-     "evidence": "COMPLETE 2026-09-02. Canvas draws the ground line into the FOREGROUND list behind show_frame_hud: active tier px/r, texel:pixel, chunk count (far-page variant when no chunk tier is active)."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "stepped-tilt",
@@ -4715,40 +4299,7 @@
    "resolved": "2026-09-02",
    "promoted_from": "backlog.json BL-737 - Sprint 30",
    "batch": "sprint-30",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "requirement": "Zoom rungs 3 and 4 draw the ground at 22.5 and 45 degrees: y squashed by cos(tilt), the height field displacing rows upward (hills carry silhouettes), trees as upright sprites drawn back-to-front. Lower rungs and the far page stay flat; the squashed far page carries a tier fill transitionally.",
-     "verification": [
-      "visual: rung-3/rung-4 captures",
-      "headless: ground_bake_check tilt phase (determinism + wrap at a tilted tier)"
-     ],
-     "notes": null,
-     "evidence": "COMPLETE 2026-09-02. ground_bake_close (22.5 deg) and ground_bake_closest (45 deg) captures + ground_preview_v8_tilt45: height-displaced ground, standing trees (trunk, upright canopy, ground shadow), lower rungs flat. ground_bake_check P9: oblique bake byte-identical twice, wrap-exact one period east, lift derives to ~0.9, projection differs from flat."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "requirement": "Interaction survives the squash: hover hit-testing is elliptical (dy/sy), click selects the intended tile at both tilted rungs, the wheel anchor keeps the point under the cursor fixed across a tilt-crossing step, and the selection/hover hexes draw squashed.",
-     "verification": [
-      "live: click/hover/step at rungs 3-4"
-     ],
-     "notes": "Height displacement is deliberately ignored for hits.",
-     "evidence": "COMPLETE 2026-09-02. Live on the Release build at the tilted rung: click selected the aimed tile (Tile [124,46], squashed province outline drawn), hover card resolved the correct tile under the cursor (Scrubby Rock 27%), wheel steps crossed the tilt thresholds with the cursor anchor holding. Hit tests run in ground space via the camera inverse (mouse_g); height displacement deliberately ignored for hits."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "requirement": "Tilt is a pure function of zoom (verify set_zoom included), so captures are deterministic; ACTIONS zoom entries describe the tilt at the top rungs.",
-     "verification": [
-      "code + docs/ai/ACTIONS.json",
-      "visual: capture at a free-form zoom between rungs"
-     ],
-     "notes": null,
-     "evidence": "COMPLETE 2026-09-02. planetary_tilt_sy is pure in zoom (thresholds at rung midpoints); the ground_bake_midrung_tilt capture (free-form zoom 8) lands deterministically on the 22.5-deg side; ACTIONS zoom entries note the tilt at the top rungs, plain canvas only."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "recipe-margin-anchor",
@@ -4760,42 +4311,7 @@
    "resolved": "2026-09-02",
    "promoted_from": "backlog.json BL-744 - Sprint 31",
    "batch": "sprint-31",
-   "archived": false,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "requirement": "An authoring-time instrument prices every processing recipe and every extractable target in BOTH era bands from the three authored tables (recipes.lua, economy.lua, world_gen.lua base_price) through a live Lua state, prints the per-row table, and asserts the two halves of PRODUCTION.md § The recipe margin anchor: M1 (margin >= k x marginal cost at base) and M2 (fixed cost covered at the price floor at typical staffing). Unpriced-output recipes are exempt and named; an unpriced INPUT fails. Non-vacuity and a differential red-proof are rows of their own.",
-     "verification": [
-      "headless: recipe_margin R0, R5, R6 (green); R1-R4 (the finding)"
-     ],
-     "notes": "Not add_test'ed until R1-R4 clear - a permanently red gate is ignored.",
-     "evidence": "COMPLETE 2026-09-02. build_lua_harness.bat recipe_margin; run from the repo root: R0 both bands loaded (19 / 27 recipes), authored table read (44 priced), anchor read (k=1.0, W=0.5); R5 no unpriced inputs; R6 zero-revenue row fails both halves, profitable row passes both, uncoverable fixed cost fails M2 alone, halving floor_mult lowers floor_net and leaves M1 untouched. R1-R4 red as expected: ancient 18/18/1/16, industrial 23/23/1/16."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "requirement": "M1 holds for every priced recipe and every priced extraction target in both bands: recipe_margin R1 and R3 green, after a retune that does not simply lift every output base price (NR-776 order: rates and costs, then input quantities, prices last).",
-     "verification": [
-      "headless: recipe_margin R1, R3 (both bands)",
-      "headless: tier_margin R2 still holds (refining out-earns mining)"
-     ],
-     "notes": null,
-     "evidence": "COMPLETE 2026-09-02. recipe_margin R1/R3 green in both bands after the retune (reading A, base_rate 16, per-band prices, anchor route rule): ancient 19/19 recipes, industrial 25/25 priced recipes, 18/18 extraction targets each band. tier_margin R2 (refining out-earns mining per building-tick) now reads 24.94 vs 28.24 and is RED - the ruled constants make extraction the larger per-building earner; NR-781 carries the call."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "requirement": "M2 holds for every priced recipe and every priced extraction target in both bands (BL-740's anchor, whole roster): recipe_margin R2 and R4 green at the authored typical_workforce and floor_mult; ceil_mult re-derived by haulage_measure if the cheapest base price moved; recipe_margin registered with ctest.",
-     "verification": [
-      "headless: recipe_margin R2, R4 (both bands)",
-      "headless: haulage_measure (ceiling derivation still clears)",
-      "code: CMakeLists add_test(recipe_margin)"
-     ],
-     "notes": null,
-     "evidence": "COMPLETE 2026-09-02. recipe_margin R2/R4 green in both bands at W=0.5, floor 0.25 (extraction maintenance 2, wage 4, base_rate 40; processing maintenance 2). haulage_measure re-run: cheapest good now 1.00, binding bound ceil > 8.84 against the authored 10.0 (was 14.07 - the derivation clears again; MARKETS.md § Where the ceiling comes from re-derived). recipe_margin added to IO_TEST_SCRIPT_ROOTED_HARNESSES and passes under ctest (0.02 s). RE-VERIFIED 2026-09-02 after NR-778 was overturned: one price table, ancient steel at depth 1 (steel_bloomery), recipe_margin ALL PASS in both bands against the single table."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "upkeep-starvation-cliff",
