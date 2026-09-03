@@ -97,6 +97,8 @@ NUMBERING. Filed as sprint 32 with items BL-746..BL-753 on a branch cut before 2
 
 ORDER OF CHEAPNESS. BL-747 and BL-754 first because they are the arc running at all and the number that says whether the rest is affordable; BL-748/749/750 are pass-2 substance and can fan out to generation-dev agents in worktrees once BL-747 is in; BL-751 waits on sprint 33; BL-752 and BL-753 close the loop. OPEN CALLS FOR BEN, to be put on a form when BL-747 is picked up: the boundary year (authored 400 before the epoch vs derived from the first furnace); tariff as a scored polity VERB vs a DERIVED output at handoff; whether the settle REPLACES the warm start or follows it.
 
+NUMBER REUSE IS DELIBERATE AND SUPPORTED. A sprint 32 ran BEFORE the 2026-08-30 numbering reset, and its items are cold in the archive - so `backlog_query --sprint 32 --all` returns both that sprint and this one. The store schema allows exactly this ("Freed numbers may be re-used after a purge; the archive disambiguates colliding keys by date"), and Ben chose 32 knowing the gap. Filter by the 2026-09-03 written date, or query the hot file without --all, to see this sprint alone.
+
 ## Where things stand
 
 | Sprint | Theme | State |

@@ -25,7 +25,14 @@ bool era_minus_one_enabled(const world_params& params)
 bool era_minus_one_has_industrial_span(const world_params& params)
 {
     // The same 1700 the gate used to turn on, now asking a different question.
-    return params.epoch_year >= 1700;
+    //
+    // `industrial_years > 0` is the second clause for the same reason
+    // `prehistory_years > 0` is one on the gate above: the field is a SCOPE
+    // KNOB, and its own doc-comment promises that zero means no industrial
+    // span. Without this clause a zero would instead put the boundary AT the
+    // epoch, which leaves the ancient span running the whole way with the
+    // medieval ceiling on — the opposite of what the knob says it does.
+    return params.epoch_year >= 1700 && params.industrial_years > 0;
 }
 
 history_sim_params era_minus_one_sim_params(const world_params& params)

@@ -191,7 +191,17 @@ struct era_minus_one_fixture
     int64_t ms_world_total = 0;
 
     /// Wall clock of the Era -1 year-tick sim alone — the pass BL-754 exists
-    /// to price, and historically ~6.4 s of an ~11.2 s single-span build.
+    /// to price.
+    ///
+    /// DO NOT QUOTE A FIGURE HERE WITHOUT ITS BUILD TYPE. An earlier draft of
+    /// this comment said "~6.4 s of an ~11.2 s single-span build", which was a
+    /// misreading of a harness line (6.45 s was the whole world build, and no
+    /// build ever produced 11.2 s). Measured 2026-09-03: the Release harness
+    /// path (`build_lua_harness.bat` -> `build_gen/verify/`) prices the 400-year
+    /// ancient span at ~323 ms of an ~8.2 s world, while a Debug `build/` prices
+    /// the same pass at ~26 s of ~73 s. The pass's SHARE of the build differs by
+    /// roughly 9x between them, so any ratio taken from this field is a fact
+    /// about one build type and must say which.
     int64_t ms_era = 0;
 
     /// Wall clock of the settlement pass that precedes the era, and of

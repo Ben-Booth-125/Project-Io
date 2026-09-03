@@ -4373,7 +4373,7 @@
    "difficulty": 3,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "active",
+   "status": "in-flight",
    "resolved": null,
    "promoted_from": "backlog.json BL-747 - Sprint 32",
    "batch": "sprint-32",
@@ -4381,55 +4381,55 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The polity sim runs at any epoch: era_minus_one_enabled gates on prehistory_years > 0 alone, and an epoch_year of 1960 with prehistory_years > 0 produces a non-empty history_sim_state with battles, conquests or foundings non-zero.",
      "verification": [
       "headless: world_determinism (a 1960 world reports a run era pass)",
       "headless: history_sweep at --epoch 1960"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03. world_determinism R4.2: at epoch 1960 the era pass runs where it used to be skipped entirely - years=800 battles=1323 conquests=1128 foundings=506. The gate is now prehistory_years > 0 alone."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "THE INVARIANT. The 0 CE arc is byte-identical to the pre-change build: world_determinism's deep digests stay 039EE9880739CDF6 (seed ABCDEF01, prehistory on), B0EBBA249B3DDABB (seed 12345678, prehistory on) and DE55600457797638 (seed ABCDEF01, prehistory off), and the era report stays years=400 battles=270 conquests=207 foundings=833 on seed A.",
      "verification": [
       "headless: world_determinism R3.1-R3.5 against the 2026-09-03 baseline digests"
      ],
      "notes": "Baseline captured 2026-09-03 before any change; the digests are the acceptance test, not a golden to re-bless.",
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03, verified in the MAIN session on the merged tree, not on the agent report. world_determinism ALL PASS with the three digests unmoved: 039EE9880739CDF6 (seed A on), B0EBBA249B3DDABB (seed B on), DE55600457797638 (seed A off), and the era report still years=400 battles=270 conquests=207 foundings=833 on seed A. Corroborated independently by history_conquest_gap A1 on 8 seeds. NOTE: this row is about the ANCIENT arc only. The cold review found the 1960 arc gains era-seeded demography as a consequence of the sim now running there (era_world_harness R2 red) - see BL-758."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "ONE INVOCATION, NOT TWO. The two spans are expressed inside a single run_history_sim call via a boundary_year on history_sim_params and per-span tick bands, so era_minus_one_fixture still captures the whole run and the count of run_history_sim callers is unchanged. A second production call site is a failure of this row.",
      "verification": [
       "static: one call to run_history_sim in src/, asserted by inspection in the review pass",
       "headless: history_conquest_gap still reproduces generation's counts from the fixture"
      ],
      "notes": "era_minus_one.hpp documents six divergences plus an uncounted seventh caller; two calls would double that seam.",
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03. One production call to run_history_sim, unchanged: the spans are expressed inside it by history_sim_params::boundary_year plus span1_band_ceiling. era_minus_one_fixture still captures the whole run, and history_conquest_gap A1 (\"the re-run IS generation own Era -1\") passes on every seed."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "partial",
      "requirement": "The band a polity may reach is ceilinged per span - Medieval before the boundary year, unrestricted after - for BOTH the works roster and the unit roster, and the ceiling is derived from the boundary rather than authored twice.",
      "verification": [
       "headless: history_sweep reports works raised by band either side of the boundary at --epoch 1960"
      ],
-     "notes": null,
-     "evidence": null
+     "notes": "DOWNGRADED FROM COMPLETE 2026-09-03 by the cold review. The row declares its verification as \"history_sweep reports works raised by band either side of the boundary\", and that was never implemented - works_raised is a single scalar with no band split anywhere in history_sim_state. The evidence substituted world_determinism printing \"span-1 ceiling band 1\", which proves the PARAMETER WAS SET, not that the clamp changed a decision. Nothing in the project can currently distinguish span1_band_ceiling = medieval from = industrial at epoch 1960: if no polity reaches capacity 4 before the boundary the ceiling is inert and no check would notice. BL-760 owns the observable.",
+     "evidence": "PARTIAL 2026-09-03. Mechanically verified and no more: sim_band_ceiling(params, y) is the single derivation; roster_band_for_capacity has exactly two call sites in the era path and both are min_band-clamped against it (cold review confirmed there is no third). world_determinism prints the ceiling in force per run. The BEHAVIOURAL half - that the clamp changes what a polity fields or builds - is unverified and currently unobservable."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "requirement": "On an ancient epoch NO second span is configured: boundary_year stays at its INT64_MIN default and span1_band_ceiling at industrial, so the ceiling is inert twice over - no year is before the boundary, AND the clamp is the identity - and the ancient arc executes today values through today code. The second span is absent by DEFAULT, not by a branch that could be taken wrongly.",
      "verification": [
       "headless: world_determinism R3 (the 0 CE digests, which R2 pins)"
      ],
      "notes": "CORRECTED 2026-09-03 while building. The row first read that the boundary falls PAST stop_year on an ancient epoch, so the ceiling applies throughout. That would cap the 0 CE run at medieval and move every ancient world, which R2 forbids. Whether the ancient arc SHOULD be capped is a real question and is NR-784, to be taken as its own item with a deliberate digest re-bless.",
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03. On an ancient epoch era_minus_one_sim_params takes the else branch and leaves boundary_year at INT64_MIN and span1_band_ceiling at industrial, so the ceiling is inert twice over. R2 digests are the proof. A defect found reviewing the merge was fixed in the main session: era_minus_one_has_industrial_span tested only the epoch, so industrial_years = 0 on a 1960 arc would have put the boundary AT the epoch and capped the whole run at medieval - the opposite of what that field doc-comment promises. It now tests industrial_years > 0 as well."
     }
    ]
   },
@@ -4439,22 +4439,22 @@
    "difficulty": 2,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "active",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-09-03",
    "promoted_from": "backlog.json BL-754 - Sprint 32",
    "batch": "sprint-32",
    "archived": false,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Generation reports its wall clock per pass, so the cost of each of the three simulated passes is a number rather than an impression. The measurement is reported, never asserted against a threshold.",
      "verification": [
       "headless: world_determinism prints per-pass timings",
       "headless: history_sweep reports the sim's own span cost"
      ],
-     "notes": "Baseline 2026-09-03, before any change: world build 11.2 s with prehistory on vs 4.79 s off, so the 400-year era pass is 6.4 s - 57% of the build. That is the figure the second span is measured against.",
-     "evidence": null
+     "notes": "BASELINE CORRECTED 2026-09-03. The note first read \"world build 11.2 s with prehistory on vs 4.79 s off, so the 400-year era pass is 6.4 s\". That was a MISREADING of the pre-change harness output: 6.45 s was the whole world build with prehistory on, not the era pass, and 11.2 s was never a figure the harness printed. The instrumentation this row added is what settles it.",
+     "evidence": "COMPLETE 2026-09-03. Generation now reports per-pass wall clock and the span structure; world_determinism prints both. Measured on the merged tree, RELEASE harness path (build_lua_harness.bat -> build_gen/verify/), which memory io-headless-build-invocation names as the evidence path:\n\n  0 CE, 400 y      total 8200 ms = pre-settlement 443 + settlement 4 + ERA-1 323 + post-era 7428\n  0 CE, no era     total 6661 ms = pre-settlement 455 + settlement 3 + ERA-1   0 + post-era 6202\n  1960, two-span   total 7996 ms = pre-settlement 465 + settlement 2 + ERA-1 197 + post-era 7331\n\nTWO FINDINGS. (1) THE SECOND SPAN IS FREE, and in fact cheaper: 800 years at epoch 1960 costs 197 ms against 323 ms for 400 years at 0 CE. Cost tracks the region table the sim grows, not the years it walks, and at 1960 the settlement pass has already founded most regions - 506 sim foundings against 833. (2) THE ERA PASS COSTS 4x ITS OWN WALL CLOCK. Era on vs off at 0 CE is a ~1.5 s difference of which only 323 ms is the sim; the rest is the post-era passes working over the 833 regions it founded. Anyone budgeting the era off its own timer is wrong by four. Reported, never asserted.\n\nBUILD TYPE IS PART OF THE MEASUREMENT (cold review, 2026-09-03). The same passes in a Debug build/ tree price at 0 CE total 73130 ms with era-1 26189 ms, and 1960 two-span total 57792 ms with era-1 13838 ms. The era pass is 3.9% of a Release build and 36% of a Debug one - a ~9x difference in SHARE - so the derived ratio \"the era costs 4x its own wall clock\" is a Release fact and reads 1.45x in Debug. What reproduces across BOTH build types, and is the finding that matters, is the DIRECTION: the two-span 1960 world builds FASTER than the single-span 0 CE one (57.8 s vs 73.1 s in Debug, 8.0 s vs 8.2 s in Release). Quote no ratio from this row without its build type."
     }
    ]
   }

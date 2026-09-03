@@ -10,6 +10,132 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-03 (sprint 32 opens, wave 1) — The second span is free, and four instruments were pointing the wrong way
+
+**Mode:** Design → Full (merge repair, then one delivery wave). **Runtime:** one session; one
+7-agent subsystem map, one implementer in a worktree, one cold review; ~6 harness builds.
+
+### The design
+
+Ben's brief: gamify generation — duplicate the 400-year timelapse so a second pass produces
+post-Enlightenment industry, colonisation by major powers, and market conditions at game start.
+Settled as **three passes on two engines** and written into `GENERATION_STRATEGY.md` § Three
+passes of simulated history, `HISTORY.md` § The epoch and the run, `ERAS.md`, and
+`CORPORATION_GENERATION.md` § Pass 6. Two polity spans on the existing sim, then the warm start
+promoted to an economic settle. Market differentiation comes from three in-world forces with
+visible causes — tariffs from industrialisation timing, distance on the real network, colonial
+ties as preferred sellers — and a seed-sweep scoreboard reads the SPREAD, never a per-world value.
+
+### The merge, which needed three repairs
+
+The branch was cut before 2026-09-02 and collided on all three shared numbering spaces. Main had
+minted **BL-746** (upkeep starvation cliff) while this branch filed BL-746 (two-span prehistory);
+**sprint 31 closed** mid-session and sprint 33 opened; and the sprint number itself moved twice —
+renumbered to 34 by reading `next_up`, then corrected back to **32** by Ben, who reads 32 as a gap
+to fill rather than a number to skip. `next_up` is corrected so the next session does not re-derive
+34. Resolution took main's stores whole and re-applied this branch's additions on top, so nothing
+of the other session's was displaced. Memory `io-backlog-id-collision-on-stale-branch` records the
+tell: `next_id.js` reported its own scan INCOMPLETE and was believed anyway.
+
+### Built — BL-747 (two-span prehistory) and BL-754 (generation budget)
+
+**One invocation, not two.** `era_minus_one.hpp` exists because this exact call has drifted across
+callers on six axes with a seventh going uncounted, so a second `run_history_sim` call was ruled
+out at design time. The spans live inside the single existing call: `history_sim_params` gains
+`boundary_year` (default `INT64_MIN`) and `span1_band_ceiling` (default `industrial`), and
+`sim_band_ceiling(params, y)` is one derivation read at BOTH roster sites — the works table off
+materials capacity, the unit table through a new `build_stack` ceiling argument. The gate drops its
+epoch clause and asks `prehistory_years > 0` alone; the epoch now decides only whether there is a
+second span.
+
+**Both new fields are inert at their defaults**, which is what makes the ancient arc byte-identical
+rather than hoped-identical: no year is before `INT64_MIN`, and a clamp to `industrial` is the
+identity. Adding a candidate to the scorer would have moved the argmax even where it never won; an
+inert clamp cannot.
+
+**Save format:** `world_params` is serialised, so `industrial_years` is a mid-record insertion and
+`save_game_version` goes 3 → 4. **Existing `.iosave` files are rejected** — that file has no
+upgrade path by design, refusal being its whole compatibility story.
+
+### Verified — in the main session, not on the agent's report
+
+`world_determinism` ALL PASS. The three 0 CE digests are unmoved — `039EE9880739CDF6`,
+`B0EBBA249B3DDABB`, `DE55600457797638` — with the era report still years=400 battles=270
+conquests=207 foundings=833 on seed A. The 1960 arc runs **1160 → 1560 → 1960**, two tick bands,
+span-1 ceiling medieval, years=800 battles=1323 conquests=1128 foundings=506, digest
+`DB86651B9A596F7B` identical across two builds. Three new reported rows (R4.1–R4.3) assert only
+that both spans ran, that the pass did something, and that it is deterministic — no magnitude pinned.
+
+**A defect found while reviewing the merge, fixed in the main session:**
+`era_minus_one_has_industrial_span` tested only the epoch, so `industrial_years = 0` on a 1960 arc
+would have put the boundary AT the epoch and capped the whole run at medieval — the exact opposite
+of what that field's own doc-comment promises. It now tests `industrial_years > 0` too.
+
+### The answer to Ben's question, which was the point of the wave
+
+*"I am interested to see if this can be done cheaply."* **Yes, and the second span is free.**
+
+| run | total | pre-settle | settlement | era-1 | post-era |
+|---|---|---|---|---|---|
+| 0 CE, 400 y | 8200 ms | 443 | 4 | **323** | 7428 |
+| 0 CE, no era | 6661 ms | 455 | 3 | 0 | 6202 |
+| 1960, two-span 800 y | 7996 ms | 465 | 2 | **197** | 7331 |
+
+800 simulated years at 1960 cost **less** than 400 at 0 CE, and the whole 1960 world builds faster
+than the ancient one. Cost tracks the region table the sim grows, not the years it walks — at 1960
+the settlement pass has already founded most regions, so the sim founds 506 where the ancient arc
+founds 833. `COLLAPSE.md` § The 4000-year problem already said cost tracks the province table; this
+is that sentence measured.
+
+**And the era pass costs four times its own wall clock.** Era on versus off at 0 CE is a ~1.5 s
+difference of which only 323 ms is the sim; the rest is every pass after it working over the 833
+regions the era founded. A budget taken off the era's own timer is wrong by 4×, and the
+affordability rungs in `COLLAPSE.md` are aimed at the 323 ms rather than the 1.2 s. **No rung is
+re-filed**, per BL-754's own rule: re-file the one a measurement points at, when it does.
+
+### Four instruments that were pointing the wrong way
+
+The wave's most valuable output was not the feature. Scoping the sea-leg item against the code
+inverted its premise, and measuring the baseline caught two more:
+
+- **BL-755** — region adjacency is Chebyshev radius 9 and **water-blind**, so short overseas
+  campaigns are already legal and FREE, and every tuning constant in `history_sim_params` was
+  measured with that happening. Sea reach is unpriced, not absent.
+- **BL-756** — the Settle verb applies **no terrain test**, so a region can be founded on ocean,
+  where `terrain_combat` returns 0 defence. Silently undefendable, and nothing reports it. Also:
+  `region::port_q` counts lakes and is inherited-and-decayed rather than re-surveyed, so it is
+  wetness, not sea access — any harbour gate keyed on it gates on the wrong thing.
+- **BL-757** — `history_sweep` prints "16 seeds, -4000 -> 0" because it constructs bare default
+  params instead of deriving through `era_minus_one_sim_params`. Generation runs -400 -> 0 on one
+  band. So the harness both `HISTORY.md` and `COLLAPSE.md` name as the place every Era -1 magnitude
+  is argued describes a run no world is built from — BL-462's defect, unclosed, in the one harness
+  whose whole subject is the era. Its banner now says which params it runs, and `--epoch` derives
+  through the real helper.
+- **Zero works raised across all 16 seeds**, reproduced in all three modes. The cause is the
+  **argmax, not the gates**: gates are met comfortably, but `work_score_q` lands in the low tens
+  while `build_work` is scored LAST against a `best_score` already set by campaign and settle. So
+  the roster is not inert, but **BL-748's band unlock has nothing to unlock** until `build_work` can
+  win a round. Read from code, not yet measured.
+- A fifth, same class: every harness calls generation with `works = nullptr` while the app passes
+  the real registry, so **the shipped game scores five verbs and every harness scores four**.
+
+`history_conquest_gap` R3 fails on all 8 seeds and **was already failing** — confirmed by building
+the harness from unmodified base sources in a scratch tree, which emits the identical table. The pin
+is stale, not broken by this change; `history_sweep.json` is stale the same way. Neither was
+re-blessed, because re-blessing inside this commit would bury the signal.
+
+### Left open, deliberately
+
+BL-749 (sea legs) is held out of wave 1: its premise is inverted by BL-755/BL-756 and five design
+calls on it are open (NR-785). BL-751 (economic settle) is gated on sprint 33's growth half — sprint
+31 made the field solvent, but valued production still falls, and a settle over a shrinking field
+culls toward a smaller economy rather than a steady one. **NR-783** asks whether the span boundary
+should be derived from the first furnace rather than authored at epoch − 400; **NR-784** records the
+call taken to keep the ancient arc's band ladder uncapped, and asks whether it should be capped at
+all — a 400 BCE polity can currently reach the gunpowder band and nobody has measured whether it does.
+
+---
+
 ## 2026-09-02 (sprint 31 closes, sprint 33 opens) — A field that can pay, and the one that must grow
 
 **Mode:** the whole arc in one session — Design → Full → measure → rule → fix → measure — closed on

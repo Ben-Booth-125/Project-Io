@@ -324,9 +324,19 @@ int main(int argc, char** argv)
             y += step_for_year(params, y);
         }
 
+        // BE PRECISE ABOUT WHAT --epoch BUYS. Deriving the params closes only
+        // axes 1-2 of the six divergences era_minus_one.hpp enumerates (the
+        // span and the clock). This loop still passes the BARE seed rather than
+        // era_minus_one_sim_seed's fold (axis 3), a null creed pointer that
+        // flattens every polity's aggression to 500 (axis 4), the synthetic
+        // works_fixture rather than generation's registry (axis 5), and the
+        // POST-sim settlement out of the report (axis 6). Calling that
+        // "generation's own run" was the exact mislabel BL-757 is filed about,
+        // so it says what it is instead.
         std::printf("    params: %s\n",
                     derive_from_generation
-                        ? "DERIVED via era_minus_one_sim_params — generation's own run"
+                        ? "span+clock DERIVED via era_minus_one_sim_params — but seed, creeds,"
+                          " works and settlement still diverge (BL-757): NOT generation's run"
                         : "history_sim_params STRUCT DEFAULTS — *not* the run that builds a world");
         if (two_span)
             std::printf("    spans:  ancient %lld -> %lld (%lld rounds, band ceiling %d)"
@@ -576,14 +586,20 @@ int main(int argc, char** argv)
     // Determinism across the sweep boundary: re-running one seed reproduces it.
     if (!rows.empty())
     {
-        world_params wp; wp.seed = rows.front().seed;
+        // The epoch too, not just the seed: without it the recheck built its
+        // world at epoch 0 while the rows were built at --epoch, so S2 compared
+        // a run against a different world and called the agreement determinism.
+        world_params wp; wp.seed = rows.front().seed; wp.epoch_year = epoch_year;
         generation_report rep;
         const world w = make_hard_coded_world(wp, &rep);
         const generation_report::body_entry* k = kepler_of(rep);
         settlement_state ss = k->settlement;
-        // Defaults, exactly as the sweep rows above use them — a recheck that
-        // ran a different span would not be a recheck.
-        history_sim_params params;
+        // The SAME params the sweep rows above ran on — a recheck that ran a
+        // different span would not be a recheck. This used to re-declare
+        // `history_sim_params params;` here, which shadowed the hoisted one
+        // (MSVC C4456) and silently made the recheck a -4000 -> 0 six-band run
+        // whenever --epoch put the rows on a two-span clock. It passed only
+        // because both sides were vacuously zero at the default epoch.
         // The re-run must be the SAME run: real terrain, real dims. The original
         // recheck passed an empty sim_terrain_view against real-terrain rows —
         // a guaranteed false FAIL the moment terrain changes any decision.

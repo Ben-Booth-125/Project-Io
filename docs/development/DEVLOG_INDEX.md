@@ -3,7 +3,7 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 196 entries across 2 volume(s).
+One line per session, newest first — 197 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
@@ -197,6 +197,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-06-13 | [Layer 2: Primary canvases](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 1: ECS data model](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 0: Engine scaffolding](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
+| ? | [2026-09-03 (sprint 32 opens, wave 1) — The second span is free, and four instruments were pointing the wrong way](DEVLOG.md) | BL-462 BL-746 BL-747 BL-748 BL-749 BL-751 BL-754 BL-755 BL-756 BL-757 | DEVLOG.md |
 | ? | [2026-09-02 (sprint 31 closes, sprint 33 opens) — A field that can pay, and the one that must grow](DEVLOG.md) | BL-725 BL-726 BL-738 BL-740 BL-744 BL-745 BL-746 | DEVLOG.md |
 | ? | [2026-09-02 (BL-744 stage 2) — The tables clear the anchor, and the field still falls](DEVLOG.md) | BL-731 BL-740 BL-744 BL-745 BL-746 | DEVLOG.md |
 | ? | [2026-09-02 (sprint 31 opens) — Every recipe priced at base, and most of them lose](DEVLOG.md) | BL-740 BL-744 | DEVLOG.md |
