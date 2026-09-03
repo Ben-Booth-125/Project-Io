@@ -180,6 +180,16 @@ struct sweep_row
     /// which is the failure this item is most likely to have.
     int64_t works_raised   = 0;
     int     regions_with_works = 0;
+    /// BL-757 R4: works standing at the end of the run, PER ROSTER BAND, so
+    /// "the roster never fired" can be told apart from "it fired only at the
+    /// bottom of the ladder". Derived in the harness from region::works_built
+    /// and the registry's own band column — the sim is not touched.
+    ///
+    /// WHAT THIS IS NOT: R4 also asks for works EITHER SIDE of the boundary
+    /// year, and that is not derivable here. The mask is end-state only and
+    /// nothing timestamps a work, so splitting by boundary needs the sim to
+    /// record the year each row was raised. R4 stays PARTIAL for that half.
+    int64_t works_by_band[roster_band_count] = {0, 0, 0, 0};
 
     int64_t peak_population  = 0;
     int64_t peak_year        = 0;
@@ -335,8 +345,9 @@ int main(int argc, char** argv)
         // so it says what it is instead.
         std::printf("    params: %s\n",
                     derive_from_generation
-                        ? "span+clock DERIVED via era_minus_one_sim_params — but seed, creeds,"
-                          " works and settlement still diverge (BL-757): NOT generation's run"
+                        ? "GENERATION'S OWN ERA via era_minus_one_fixture — span, clock, folded"
+                          " seed, creeds, works and PRE-sim settlement all from the real run."
+                          " S1b asserts the counts match the report, per seed"
                         : "history_sim_params STRUCT DEFAULTS — *not* the run that builds a world");
         if (two_span)
             std::printf("    spans:  ancient %lld -> %lld (%lld rounds, band ceiling %d)"
@@ -360,6 +371,14 @@ int main(int argc, char** argv)
     std::vector<sweep_row> rows;
     rows.reserve(static_cast<std::size_t>(seed_count));
 
+    // BL-757 R1's acceptance test, and it is SELF-CHECKING rather than a pinned
+    // literal. generation_report carries the counts generation's own era run
+    // produced (prehistory_battles and its two siblings), so a sweep that truly
+    // re-runs generation's era must reproduce them for every seed. A literal
+    // would rot the moment the world legitimately changed; this cannot.
+    bool derived_matches_generation = true;
+    int  derived_seeds_checked      = 0;
+
     // BL-321: every sweep run now carries the works roster, so the distributions
     // below describe a world whose polities could BUILD. That is a deliberate
     // change to what this harness measures — the item's whole claim is that
@@ -373,13 +392,36 @@ int main(int argc, char** argv)
 
         world_params wp;
         wp.seed = static_cast<uint32_t>(i);
-        generation_report rep;
-        const world w = make_hard_coded_world(wp, &rep);
+        // THE EPOCH REACHES GENERATION (BL-757 R1). Without this the sweep built
+        // an ancient world and then ran an industrial span over its settlement,
+        // which is a different world from the one --epoch names.
+        wp.epoch_year = epoch_year;
+
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        // Ask for the fixture only on the deriving path, so the default sweep
+        // pays nothing for it and stays byte-for-byte the instrument it was.
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
+                                              /*progress=*/nullptr, /*works=*/nullptr,
+                                              derive_from_generation ? &fx : nullptr);
 
         const generation_report::body_entry* k = kepler_of(rep);
         if (!k) continue;
 
-        settlement_state ss = k->settlement;
+        if (derive_from_generation && !fx.ran)
+        {
+            // The fixture's gate is the REAL one, settlement clause included. An
+            // unran era would make every number below a struct default, which is
+            // the exact failure this item exists to close — so say so and skip.
+            std::printf("  seed %d: THE ERA DID NOT RUN (fixture gate false) — skipped.\n", i);
+            continue;
+        }
+
+        // THE PRE-SIM SETTLEMENT (divergence axis 6). The report's copy is the
+        // state AFTER the sim mutated it in place, so re-running from it starts
+        // the era from its own ending. The fixture captures what generation
+        // actually handed in.
+        settlement_state ss = derive_from_generation ? fx.settlement : k->settlement;
 
         sweep_row row;
         row.seed            = wp.seed;
@@ -402,10 +444,30 @@ int main(int argc, char** argv)
         const sim_terrain_arrays terr = build_sim_terrain(w, kepler_id,
                                                           home_grid_width, home_grid_height);
 
-        const history_sim_state sim =
-            run_history_sim(ss, nullptr, terr.view(),
-                            home_grid_width, home_grid_height, params, wp.seed,
-                            nullptr, &works);
+        // BL-757 R1 — SIX AXES, NOT TWO. Deriving the params closes only the
+        // span and the clock. The deriving path now also takes generation's
+        // FOLDED seed (era_minus_one_sim_seed, not the bare world seed), its
+        // REAL creed pointer (a null one flattens every polity's aggression to
+        // 500 — in a sweep whose subject is why polities fight), its works
+        // pointer, and its pre-sim settlement above. era_minus_one.hpp's header
+        // enumerates all six; this is the call that finally honours them.
+        //
+        // The default path is untouched (R2), deliberately: it remains the
+        // struct-default research ladder, labelled as such in the banner.
+        //
+        // RESIDUAL, and NOT this item's to fix: generation is called here with
+        // works = nullptr, which is what world_determinism does and is why the
+        // acceptance figures (battles 270 / conquests 207 / foundings 833 on
+        // seed ABCDEF01) are reachable. The APP passes its real registry, so
+        // the shipped game scores FIVE verbs where every harness scores four.
+        // That divergence is real and is recorded on BL-757 rather than papered
+        // over here.
+        const history_sim_state sim = derive_from_generation
+            ? run_history_sim(ss, &fx.creeds, fx.terrain.view(), fx.gw, fx.gh,
+                              fx.params, fx.seed, nullptr, fx.works)
+            : run_history_sim(ss, nullptr, terr.view(),
+                              home_grid_width, home_grid_height, params, wp.seed,
+                              nullptr, &works);
 
         {
             int64_t early = 0;
@@ -423,12 +485,54 @@ int main(int argc, char** argv)
         row.battles       = sim.battles;
         row.conquests     = sim.conquests;
         row.foundings     = sim.foundings;
+
+        if (derive_from_generation)
+        {
+            ++derived_seeds_checked;
+            const bool same = sim.battles   == rep.prehistory_battles
+                           && sim.conquests == rep.prehistory_conquests
+                           && sim.foundings == rep.prehistory_foundings;
+            if (!same)
+            {
+                derived_matches_generation = false;
+                std::printf("  seed %u: RE-RUN DIVERGED from generation's own era —\n"
+                            "          sweep  battles %lld conquests %lld foundings %lld\n"
+                            "          gen    battles %lld conquests %lld foundings %lld\n",
+                            wp.seed,
+                            static_cast<long long>(sim.battles),
+                            static_cast<long long>(sim.conquests),
+                            static_cast<long long>(sim.foundings),
+                            static_cast<long long>(rep.prehistory_battles),
+                            static_cast<long long>(rep.prehistory_conquests),
+                            static_cast<long long>(rep.prehistory_foundings));
+            }
+        }
         row.peak_population = sim.peak_population;
         row.peak_year       = sim.peak_year;
 
         row.works_raised = sim.works_raised;
         for (const region& p : ss.regions)
             if (p.works_built != 0) ++row.regions_with_works;
+
+        // BL-757 R4 — WHICH BAND DID THE ROSTER REACH? Read from the end-state
+        // masks against whichever registry was actually in play, so the answer
+        // describes the run rather than the table. A null registry means no work
+        // was buildable at all, and the honest report of that is four zeroes.
+        {
+            const works_registry* reg = derive_from_generation ? fx.works : &works;
+            if (reg != nullptr)
+                for (const region& p : ss.regions)
+                    for (std::size_t id = 0; id < reg->size() && id < works_mask_bits; ++id)
+                        if ((p.works_built & (1u << id)) != 0)
+                        {
+                            const work_row* wr = reg->row_at(id);
+                            if (wr != nullptr)
+                            {
+                                const int bi = static_cast<int>(wr->band);
+                                if (bi >= 0 && bi < roster_band_count) ++row.works_by_band[bi];
+                            }
+                        }
+        }
 
         for (const region& p : ss.regions) row.epoch_population += p.population;
 
@@ -522,6 +626,19 @@ int main(int argc, char** argv)
                     static_cast<long long>(median_of(conq)));
         std::printf("  regions at epoch   median %lld\n",
                     static_cast<long long>(median_of(ends)));
+        // BL-757 R4: the band the roster actually reached, summed over the
+        // sweep. All zeroes means build_work never won a round — which is the
+        // measured state as of 2026-09-03 and the thing BL-767 and BL-768 both
+        // need to see move.
+        {
+            int64_t band_tot[roster_band_count] = {0, 0, 0, 0};
+            for (const sweep_row& r : rows)
+                for (int bi = 0; bi < roster_band_count; ++bi) band_tot[bi] += r.works_by_band[bi];
+            std::printf("  works by band        classical %lld  medieval %lld  gunpowder %lld"
+                        "  industrial %lld\n",
+                        static_cast<long long>(band_tot[0]), static_cast<long long>(band_tot[1]),
+                        static_cast<long long>(band_tot[2]), static_cast<long long>(band_tot[3]));
+        }
         std::vector<int64_t> lasts;
         for (const sweep_row& r : rows) lasts.push_back(r.last_change_year);
         int64_t early_sum = 0;
@@ -583,6 +700,10 @@ int main(int argc, char** argv)
     check(static_cast<int>(rows.size()) == seed_count,
           "S1   every seed produced a world and completed its run");
 
+    if (derive_from_generation)
+        check(derived_matches_generation && derived_seeds_checked > 0,
+              "S1b  --epoch: the re-run IS generation's own era (counts match the report)");
+
     // Determinism across the sweep boundary: re-running one seed reproduces it.
     if (!rows.empty())
     {
@@ -590,10 +711,19 @@ int main(int argc, char** argv)
         // world at epoch 0 while the rows were built at --epoch, so S2 compared
         // a run against a different world and called the agreement determinism.
         world_params wp; wp.seed = rows.front().seed; wp.epoch_year = epoch_year;
-        generation_report rep;
-        const world w = make_hard_coded_world(wp, &rep);
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        // SAME ROUTE AS THE ROWS. The rows take the fixture under --epoch; a
+        // recheck that took the other route would compare generation's era
+        // against the struct-default one and call the disagreement
+        // non-determinism. That is the BL-757 defect reappearing inside the
+        // check meant to catch it.
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
+                                              /*progress=*/nullptr, /*works=*/nullptr,
+                                              derive_from_generation ? &fx : nullptr);
         const generation_report::body_entry* k = kepler_of(rep);
-        settlement_state ss = k->settlement;
+        settlement_state ss = (derive_from_generation && fx.ran) ? fx.settlement
+                                                                 : k->settlement;
         // The SAME params the sweep rows above ran on — a recheck that ran a
         // different span would not be a recheck. This used to re-declare
         // `history_sim_params params;` here, which shadowed the hoisted one
@@ -609,8 +739,10 @@ int main(int argc, char** argv)
         // The re-run must carry the SAME works registry for the same reason it
         // must carry the same terrain: a re-run that differs in an input is not
         // a determinism check, it is a guaranteed false FAIL.
-        const history_sim_state again =
-            run_history_sim(ss, nullptr, terr.view(),
+        const history_sim_state again = (derive_from_generation && fx.ran)
+            ? run_history_sim(ss, &fx.creeds, fx.terrain.view(), fx.gw, fx.gh,
+                              fx.params, fx.seed, nullptr, fx.works)
+            : run_history_sim(ss, nullptr, terr.view(),
                             home_grid_width, home_grid_height, params, wp.seed,
                             nullptr, &works);
         check(again.battles == rows.front().battles

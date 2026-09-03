@@ -4639,7 +4639,7 @@
    "difficulty": 2,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "active",
+   "status": "in-flight",
    "resolved": null,
    "promoted_from": "backlog.json BL-757 - Sprint 32",
    "batch": "sprint-32-wave-2",
@@ -4647,43 +4647,43 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "`history_sweep --epoch <year>` derives its params through `era_minus_one_sim_params` AND matches generation on the other four divergence axes: the folded seed (`era_minus_one_sim_seed`), a real creed pointer, generation's works registry, and the PRE-sim settlement.",
      "verification": [
       "headless: history_sweep --epoch 0 reproduces generation's own counts for a seed - battles 270, conquests 207, foundings 833 on seed ABCDEF01"
      ],
      "notes": "Deriving the params alone closes axes 1-2 of six. The 2026-09-03 banner fix already says so honestly; this row makes the claim true instead.",
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03. The deriving path now runs from era_minus_one_fixture, so all six divergence axes are generation's: span and clock (fx.params), the FOLDED seed (fx.seed), a real creed pointer (&fx.creeds), the works pointer (fx.works) and the PRE-sim settlement (fx.settlement). Asserted per seed by a new row S1b, which is SELF-CHECKING rather than a pinned literal: generation_report carries the counts generation's own era produced, and S1b requires the re-run to reproduce prehistory_battles/conquests/foundings exactly. A hardcoded 270/207/833 would have rotted the moment the world legitimately changed. Two visible confirmations that the fix is real: regions_start fell 1333 -> 149 (the pre-sim settlement replacing the post-sim one) and battles went from flat zero to real values. history_sweep 2 --epoch 0: ALL PASS."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The default (no --epoch) sweep is unchanged and still labelled as the struct-default ladder, so the research instrument survives alongside the generation-measuring one.",
      "verification": [
       "headless: history_sweep with no flag reports the same distributions as before"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03, verified against the pre-change baseline rather than by inspection. The default 16-seed sweep is ALL PASS and its rows are IDENTICAL to the 2026-09-03 baseline capture on (seed, regions_start, regions_end). The fixture is requested only on the deriving path, so the default pays nothing for it; the call-site widening passes exactly make_hard_coded_world's own parameter defaults ({}, nullptr, nullptr), so the default path's inputs are unchanged. Banner still labels it 'STRUCT DEFAULTS - *not* the run that builds a world'. NOTE: S3 fails at 2 seeds on the default path and did so before this change - it is satisfied only when some seed's battle count differs from the first, which two seeds on the coarse ladder need not do. Pre-existing weak assertion, not a regression; worth strengthening separately."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The S2 recheck runs the SAME span and the SAME world as the rows it rechecks.",
      "verification": [
       "headless: history_sweep --epoch 1960 - S2 green and comparing a two-span run against a two-span run"
      ],
      "notes": "Partly fixed 2026-09-03: the shadowed params and the epoch-less recheck world were corrected. This row closes what remains.",
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03. S2's recheck now takes the SAME route as the rows it rechecks - the fixture under --epoch - and passes on both paths. It previously would have compared generation's era against the struct-default one and called the disagreement non-determinism, which is the BL-757 defect reappearing inside the check meant to catch it. history_sweep 2 --epoch 0: S2 PASS. Default 16 seeds: S2 PASS."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "partial",
      "requirement": "Works raised is reported PER BAND, so BL-767 can tune against it and BL-768 can see whether build_work ever wins.",
      "verification": [
       "headless: history_sweep reports works per roster band, either side of the boundary year"
      ],
-     "notes": "Zero works were raised across 16 seeds; the cause is the argmax, not the gates. A per-band figure is what makes that visible rather than inferred.",
-     "evidence": null
+     "notes": "Downgraded from the row as written. The remaining halves are prerequisites for BL-767 (tuning against works) and BL-768 (whether build_work ever wins), and should be filed on whichever of those is picked up first.",
+     "evidence": "PARTIAL 2026-09-03. Works standing at end of run are now tallied PER ROSTER BAND, derived in the harness from region::works_built against whichever registry was actually in play, and printed as a distribution line. The sim is untouched. TWO HALVES REMAIN, both recorded in the code rather than glossed. (1) On the deriving path the figure is vacuous: generation is called with works = nullptr - which is what world_determinism does, and is why R1's acceptance figures are reachable - so no work is buildable and four zeroes is the honest report. Making it meaningful needs generation handed its REAL works.lua registry, which is divergence axis 5 fully closed and is scope beyond this item. (2) 'Either side of the boundary year' is NOT derivable in the harness at all: the mask is end-state only and nothing timestamps a work, so the split needs the sim to record the year each row was raised. The zero-works finding itself still stands from the DEFAULT path, which does carry a registry and still raised nothing across 16 seeds."
     }
    ]
   }
