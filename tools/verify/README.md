@@ -929,7 +929,21 @@ engine).
 cmd //c tools\verify\build_lua_harness.bat campaign_lapse
 ./build_gen/verify/campaign_lapse.exe --t0
 ./build_gen/verify/campaign_lapse.exe --tag baseline-s0
+./build_gen/verify/campaign_lapse.exe --epoch 1960 --seed 0 --warm 0 --ticks 60 --tag debt-ind-s0
 ```
+
+**Debt instrumentation (BL-745 / BL-746, 2026-09-02).** `corps.csv` carries, per corp per tick,
+the balance delta attributed by tick phase — `convoys` (legs debited at dispatch), `agency` (the
+corp AI batch: build cost and materials, hires, buyouts — capital, in no filed flow), `budget`
+(the seven flows), `nation`, `arrivals`, `exits`, and `delta` = their sum, which is exactly
+balance(t) − balance(t−1); row C3 asserts the residual is zero. Beside them: `produced_value`
+(NR-774's GDP definition per owner), `bldg_active/idle/limited/unstaffed/exhausted/building/
+mothballed`, `labour` and `supply_factor_mean` / `bldg_supply_zero` (BL-641's output scalar).
+`debt.csv` has one row per corp that entered debt in the window: tick, focus, holdings by type,
+the trailing-4-tick flows, and the dominant drain; the run ends with a histogram of dominant
+drains and the median entry tick. Run it **unwarmed** (`--warm 0`) to see where debt begins — the
+80-tick warm start hides the first wave. Compare tags with the aggregator pattern in
+`docs/development/DEVLOG.md` (2026-09-02, "every balance tracked").
 
 ## Build note (2026-08-30): the glob loop carries the sol2 + Lua INCLUDE paths
 

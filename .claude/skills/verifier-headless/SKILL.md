@@ -310,7 +310,14 @@ in `tools/verify/README.md`.
   byte-identity, differential knob proof, zero-observation-fails, wall-clock ceiling — every row
   mutation-proved red at authoring. Lua-linked class: build via
   `cmd //c tools\verify\build_lua_harness.bat campaign_lapse`. The visual half is
-  `scripts/verify/campaign_lapse.lua` (capture-only, no goldens).
+  `scripts/verify/campaign_lapse.lua` (capture-only, no goldens). **Debt instrumentation
+  (BL-745/BL-746, 2026-09-02):** `corps.csv` also carries each corp's balance delta attributed
+  by tick phase (convoys / agency / budget / nation / arrivals / exits — exact by construction,
+  row C3 asserts a zero residual), its produced value, active / idle / limited / unstaffed /
+  exhausted / building / mothballed counts, labour and mean supply factor; `debt.csv` has one
+  row per corp that ENTERED debt in the window with its trailing-4-tick flows and the dominant
+  drain, summarised as a histogram at the end of the run. Run it unwarmed
+  (`--warm 0 --ticks 60`) to see where debt begins — the warm start hides it.
 - **`firm_exit_harness`** — BL-743 firm exit (2026-09-01): the insolvency wind-up. F1/F1b the
   trigger fires and the estate liquidates (building demolished, unit disbanded, pool lands WHOLE
   in market inventory — the conservation law); F2 the player is exempt absolutely; F3 a short
