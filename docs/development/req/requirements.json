@@ -4686,6 +4686,51 @@
      "evidence": "PARTIAL 2026-09-03. Works standing at end of run are now tallied PER ROSTER BAND, derived in the harness from region::works_built against whichever registry was actually in play, and printed as a distribution line. The sim is untouched. TWO HALVES REMAIN, both recorded in the code rather than glossed. (1) On the deriving path the figure is vacuous: generation is called with works = nullptr - which is what world_determinism does, and is why R1's acceptance figures are reachable - so no work is buildable and four zeroes is the honest report. Making it meaningful needs generation handed its REAL works.lua registry, which is divergence axis 5 fully closed and is scope beyond this item. (2) 'Either side of the boundary year' is NOT derivable in the harness at all: the mask is end-state only and nothing timestamps a work, so the split needs the sim to record the year each row was raised. The zero-works finding itself still stands from the DEFAULT path, which does carry a registry and still raised nothing across 16 seeds."
     }
    ]
+  },
+  {
+   "brief": "saturation-measure-promoted",
+   "title": "BL-775 - the saturation measure moves out of the harness so generation can call it",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-03",
+   "promoted_from": "backlog.json BL-775 - Sprint 32",
+   "batch": "sprint-32-wave-2",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "The saturation measure and its dependencies live in src/world and are callable from generation: measure_market_completeness, classify_resources, terminal_resources, tile_in_reach, sorted_market_ids, and the two structs.",
+     "verification": [
+      "static: src/world/market_saturation.{hpp,cpp} exists and compiles into the world TU set"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-03. src/world/market_saturation.{hpp,cpp}, 127 and 360 lines. Compiles and links into the harness world TU set. One real dependency surfaced during the move: the measure calls market_for_tile, so it was already reaching into the market layer while sitting in a harness - now an explicit include rather than an accident of where the code sat. Two names were changed because they ALREADY collide inside src/world: classification -> resource_classification and classify -> classify_resources; generic names are tolerable in a harness anonymous namespace and not in a shared header. measure_completeness -> measure_market_completeness to match its struct."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "BEHAVIOUR IS UNCHANGED. The promoted bodies are the originals, and the census reports what it reported before.",
+     "verification": [
+      "static: every promoted body diffed against the original extracted from git",
+      "headless: demand_census green"
+     ],
+     "notes": "Proven textually rather than by a before/after run, deliberately - see the evidence.",
+     "evidence": "COMPLETE 2026-09-03, and proven BY CONSTRUCTION rather than by comparison. A before/after byte comparison would have cost two ~10-minute census runs, and the baseline run had already exceeded its timeout before the code changed - so instead the original bodies were extracted from git, the same four renames applied, and diffed against the promoted file: ALL SEVEN blocks IDENTICAL (sorted_market_ids, classify_resources, terminal_resources, tile_in_reach, measure_market_completeness, and both structs). That is stronger than two runs agreeing, which only speaks to the inputs actually run. Confirmed live: demand_census --fast --band ancient reports PASS - 0 failure(s), both R5 rows green, completeness spread over 3 markets min 0.6818 median 0.8636 max 0.8636."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The world is unchanged: adding a translation unit to src/world moves no generated world.",
+     "verification": [
+      "headless: world_determinism, the three 0 CE digests"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-03. Nothing in generation calls the promoted code yet - it is compiled and unreferenced - so the world cannot move, and world_determinism confirms it rather than assuming it."
+    }
+   ]
   }
  ]
 }
