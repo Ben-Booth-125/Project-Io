@@ -358,3 +358,23 @@ measure_market_completeness(world& w, const recipe_registry& reg,
 
     return rows;
 }
+
+margin_eval evaluate_margin(double revenue, double inputs, double wage_pb,
+                  double units_per_tick, double wages_pt, double fixed,
+                  double floor_mult, double k)
+{
+    margin_eval e;
+    e.revenue  = revenue;
+    e.inputs   = inputs;
+    e.wage_pb  = wage_pb;
+    e.mc       = inputs + wage_pb;
+    e.margin   = revenue - e.mc;
+    e.ratio    = (e.mc > 0.0) ? e.margin / e.mc : (revenue > 0.0 ? INFINITY : 0.0);
+    e.m1       = (e.mc > 0.0) ? (e.margin >= k * e.mc) : (revenue > 0.0);
+    e.fixed    = fixed;
+    e.wages_pt = wages_pt;
+    e.base_net  = (revenue - inputs) * units_per_tick - wages_pt - fixed;
+    e.floor_net = (revenue - inputs) * floor_mult * units_per_tick - wages_pt - fixed;
+    e.m2        = e.floor_net >= 0.0;
+    return e;
+}

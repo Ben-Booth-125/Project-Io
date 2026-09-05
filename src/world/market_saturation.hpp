@@ -124,3 +124,45 @@ std::vector<entity_id> sorted_market_ids(const world& w);
 std::vector<market_completeness>
 measure_market_completeness(world& w, const recipe_registry& reg,
                             const std::array<resource_classification, resource_count>& cls);
+
+// ===========================================================================
+// The other half of the question — does each part PAY?
+// ===========================================================================
+//
+// Saturation says a market CAN close its chains. It does not say anyone can
+// afford to. Ben's phase 6 asks both at once ("so that each part makes some
+// profit"), so the margin computation is promoted alongside the completeness
+// measure and for the same reason: it was written inside the anonymous
+// namespace of tools/verify/recipe_margin.cpp, where generation could not reach
+// it.
+//
+// PURE, AND IT NEEDS NO WORLD. `evaluate_margin` takes plain doubles — a row's
+// revenue, its inputs at base, its wage per batch — so it can price a candidate
+// firm without a market, a tick or a price history. That is what makes the
+// static search possible: the two halves of the question are both answerable
+// from tables plus a generated world, with no clock.
+
+struct margin_eval
+{
+    double revenue   = 0.0; ///< per batch / per unit, at base
+    double inputs    = 0.0; ///< per batch, at base
+    double wage_pb   = 0.0; ///< wage per batch / per unit
+    double mc        = 0.0; ///< marginal cost = inputs + wage_pb
+    double margin    = 0.0; ///< revenue - mc
+    double ratio     = 0.0; ///< margin / mc (revenue/mc - 1); +inf when mc == 0
+    bool   m1        = false;
+    double fixed     = 0.0; ///< maintenance + goods upkeep at base, per tick
+    double wages_pt  = 0.0; ///< wages per tick at W
+    double base_net  = 0.0; ///< per tick at base (information)
+    double floor_net = 0.0; ///< per tick at the floor (M2's quantity)
+    bool   m2        = false;
+};
+
+/// Price one row — a recipe in a band, or an extraction target — at BASE.
+/// `m1` is the margin anchor (margin >= k x marginal cost) and `m2` the floor
+/// anchor (a building at typical staffing still covers its fixed costs at the
+/// price floor). Both are the authoring-time checks PRODUCTION.md § The recipe
+/// margin anchor defines.
+margin_eval evaluate_margin(double revenue, double inputs, double wage_pb,
+                            double units_per_tick, double wages_pt, double fixed,
+                            double floor_mult, double k);

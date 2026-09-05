@@ -4729,6 +4729,17 @@
      ],
      "notes": null,
      "evidence": "COMPLETE 2026-09-03. Nothing in generation calls the promoted code yet - it is compiled and unreferenced - so the world cannot move, and world_determinism confirms it rather than assuming it."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "The MARGIN computation is promoted too. \"Each part makes some profit\" is the other half of the phase 6 question, and generation could not ask it either.",
+     "verification": [
+      "static: evaluate_margin and margin_eval live in src/world/market_saturation",
+      "headless: recipe_margin green after the move"
+     ],
+     "notes": "ADDED 2026-09-03 AS A CORRECTION. The item said \"promote both\"; the first pass delivered only the saturation half and the group was closed complete on it. Caught on the next read of the item, not by a check - worth noting, because nothing in the process would have caught it.",
+     "evidence": "COMPLETE 2026-09-03. row_eval -> margin_eval and evaluate() -> evaluate_margin() now live in src/world/market_saturation.{hpp,cpp}; recipe_margin.cpp includes the header and its own copies are gone. evaluate_margin takes plain doubles - no world, no registry, no tick - which is what lets a candidate firm be priced statically. Move proven textual by the same git-extract-and-diff method as the saturation half: struct and function both IDENTICAL modulo the rename. recipe_margin runs ALL PASS (0 failures) afterwards, including R6 as its differential red-proof."
     }
    ]
   }
