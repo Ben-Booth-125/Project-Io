@@ -837,33 +837,6 @@
    "status": "designed",
    "glyph": "✓",
    "priority": "A",
-   "difficulty": 3,
-   "version_goal": null,
-   "sprint": "32b",
-   "written": "2026-09-06",
-   "author": "Ben (the water-domain ruling, 2026-09-06); Claude (itemisation, against the measured census)",
-   "requires": [
-    "BL-776"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-777",
-   "short_name": "REGION_DOMAIN",
-   "category": "Generation",
-   "title": "Regions carry their domain, and the Settle verb stops founding on open ocean",
-   "authority_doc": "docs/lore/HISTORY.md",
-   "files": [
-    "src/world/settlement.hpp",
-    "src/world/history_sim.cpp",
-    "src/core/save_game.cpp",
-    "tools/verify/sim_water_census.cpp"
-   ],
-   "design": "THE GAP, MEASURED not assumed (sim_water_census.cpp, 2026-09-03): the Settle verb's ring probe applies NO terrain test, so 1105 of 3819 regions across three seeds sit on water at their anchor - 29% - and 613 of those on open ocean. history_sim.cpp:1056 then hands resolve_battle sub_at(terrain, tgt.anchor), and terrain_combat returns 0 defence and 0 forage for every water kind.\n\nTHE FIX IS NOW THE SMALLER HALF OF WHAT BL-756 PROPOSED. Under the ownership rule (BL-776) coastal founding is LEGITIMATE - the shore has an owner to found under - so the Settle verb does not need a \"no water\" test. It needs \"no OPEN OCEAN\", which has no owner at all. That is ~613 regions rather than ~1105, and it is principled rather than a blanket ban.\n\nTHE REGION CARRIES ITS DOMAIN. The same three-way split the province layer already uses (province_kind: land / coastal_water / open_ocean, exclusive by construction), brought down to the grain the sim actually acts on. The sim is the first pass that decides anything about water, and it currently cannot see it: sim_terrain_view carries substrate, so the domain is derivable without a new input - what is missing is that nothing reads it.\n\nSAVE FORMAT: region is serialised field-for-field with a positional read chain (save_game.cpp), so a domain field is a save_game_version bump with both paths in the same change.\n\nDONE WHEN: no region anchors on open ocean; regions expose their domain; sim_water_census reports open-ocean regions at zero and coastal regions unchanged in kind."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
    "difficulty": 4,
    "version_goal": null,
    "sprint": "32b",

@@ -342,10 +342,17 @@ split cleanly rather than being deleted wholesale — the ~492 coastal and lake 
 legitimate owned shoreline, and only the **613 anchored on open ocean** have no owner to belong to.
 
 **Coastal units join the ancient roster alongside every other class.** They are not a separate
-system: they are rows in the same `unit_roster`, scored in the same contest, gated on the same
-ground (`port_q`), and they make the rare cases expressible — a strait contested, a coastal province
-changing hands, a shore denied to a rival's trade. `../military/MILITARY.md` § Domains and traversal
-owns the traversal rule; this section owns only that the ancient sim uses it.
+system: they are rows in the same `unit_roster`, scored in the same contest, and they make the rare
+cases expressible — a strait contested, a coastal province changing hands, a shore denied to a
+rival's trade. `../military/MILITARY.md` § Domains and traversal owns the traversal rule; this
+section owns only that the ancient sim uses it.
+
+**They gate on `region::domain`, NOT on `port_q`**, and this sentence exists because the earlier
+draft said the opposite. `port_q` is not sea access: `survey_endowment` counts `is_water` tiles —
+**lakes included** — over a neighbourhood window, and a region founded by the Settle verb inherits
+0.7× its parent's without ever re-surveying. So it is a decayed wetness fraction, and a landlocked
+region beside a big lake can carry more of it than a genuine harbour. The domain field is the real
+`is_sea` test, exclusive by construction, and it is what any coastal gate reads.
 
 **The Settle verb gains the test it never had.** Not "no water" — the ownership rule makes coastal
 founding legitimate — but no founding on open ocean, which has no owner to found under. That is the

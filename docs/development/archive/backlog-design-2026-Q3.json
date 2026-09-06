@@ -5998,6 +5998,57 @@
     "completed",
     "resolved"
    ]
+  },
+  "BL-777": {
+   "status": "complete",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "32b",
+   "written": "2026-09-06",
+   "author": "Ben (the water-domain ruling, 2026-09-06); Claude (itemisation, against the measured census)",
+   "requires": [
+    "BL-776"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-777",
+   "short_name": "REGION_DOMAIN",
+   "category": "Generation",
+   "title": "Regions carry their domain, and the Settle verb stops founding on open ocean",
+   "authority_doc": "docs/lore/HISTORY.md",
+   "files": [
+    "src/world/settlement.hpp",
+    "src/world/history_sim.cpp",
+    "src/core/save_game.cpp",
+    "tools/verify/sim_water_census.cpp"
+   ],
+   "design": "THE GAP, MEASURED not assumed (sim_water_census.cpp, 2026-09-03): the Settle verb's ring probe applies NO terrain test, so 1105 of 3819 regions across three seeds sit on water at their anchor - 29% - and 613 of those on open ocean. history_sim.cpp:1056 then hands resolve_battle sub_at(terrain, tgt.anchor), and terrain_combat returns 0 defence and 0 forage for every water kind.\n\nTHE FIX IS NOW THE SMALLER HALF OF WHAT BL-756 PROPOSED. Under the ownership rule (BL-776) coastal founding is LEGITIMATE - the shore has an owner to found under - so the Settle verb does not need a \"no water\" test. It needs \"no OPEN OCEAN\", which has no owner at all. That is ~613 regions rather than ~1105, and it is principled rather than a blanket ban.\n\nTHE REGION CARRIES ITS DOMAIN. The same three-way split the province layer already uses (province_kind: land / coastal_water / open_ocean, exclusive by construction), brought down to the grain the sim actually acts on. The sim is the first pass that decides anything about water, and it currently cannot see it: sim_terrain_view carries substrate, so the domain is derivable without a new input - what is missing is that nothing reads it.\n\nSAVE FORMAT: region is serialised field-for-field with a positional read chain (save_game.cpp), so a domain field is a save_game_version bump with both paths in the same change.\n\nDONE WHEN: no region anchors on open ocean; regions expose their domain; sim_water_census reports open-ocean regions at zero and coastal regions unchanged in kind.\n--- DELIVERED 2026-09-06 ---\n\nR2 MET AND MEASURED: open ocean regions 183 -> 0 on the agent base, and 0 on EVERY seed in the\nmerged tree (613/574/572 regions per seed, open_ocean 0, stored domain disagreeing with the\nsubstrate in ZERO cases). Sea-crossing adjacency edges 46% -> 32%.\n\nCOASTAL WATER RISES, 264 -> 318, AND THAT IS THE FIX WORKING RATHER THAN LEAKING. Sites that would\nhave anchored on open ocean now land on shore instead, which is exactly what the ownership rule\nsays should happen: the shore has an owner to found under (BL-776), open ocean has none. A reading\nthat treated the coastal rise as a regression would have been reading the blanket-ban design\nBL-756 proposed and this item deliberately replaced.\n\nW4 IS MEASURED FROM THE SUBSTRATE, NOT FROM THE STORED FIELD, so a mislabelled domain cannot make\nthe assertion pass - and W3 separately asserts the two agree. Two checks, because one of them\ntrusting the other would test nothing.\n\nSAVE FORMAT 6 -> 7: layout 7 is layout 6 plus one enum byte at the TAIL of every region record,\nnothing moved, range-checked on read. The agent built and RAN save_envelope_roundtrip from its own\nworktree (cmake resolved the main checkout deps cache by itself) - 0 failures - and it is green in\nthe merged tree with both this field and BL-783 urban record asserted at distinct values.\n\nseedA/off UNCHANGED is the useful control: prehistory-off runs no sim, so the only mover is the\nSettle verb, exactly as intended. The pre-sim placement change is behaviourally inert today and\nthat digest proves it.\n\nTHREE PRE-EXISTING REDS were each confirmed pre-existing by stashing, rebuilding and re-running on\nmain rather than assumed: province_partition_harness A1, history_sim_harness (same 7, byte-identical\nlist), era_world_harness R2. None is this item.\n\nAND IT CAUGHT A DOC FICTION IT DID NOT OWN: HISTORY.md said coastal units gate on port_q. They must\nnot - port_q counts LAKES and is inherited at 0.7x without re-survey, so a landlocked region beside\na big lake can carry more of it than a real harbour. The agent flagged rather than edited another\nitem paragraph; the main session corrected it to region::domain. That matters for BL-778/BL-779.",
+   "completed": "2026-09-06",
+   "resolved": "2026-09-06",
+   "_row_keys": [
+    "status",
+    "glyph",
+    "priority",
+    "difficulty",
+    "version_goal",
+    "sprint",
+    "written",
+    "author",
+    "requires",
+    "blocked_on",
+    "parked",
+    "id",
+    "short_name",
+    "category",
+    "title",
+    "authority_doc",
+    "files",
+    "design",
+    "completed",
+    "resolved"
+   ]
   }
  }
 }
