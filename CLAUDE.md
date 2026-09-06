@@ -84,7 +84,7 @@ follow. Where a store has a query tool, use the tool, never load the file.
 ### Military, politics, relations
 | Doc | Owns |
 |---|---|
-| `docs/military/MILITARY.md` | How force works: two resolvers, units, muster, terrain, march, battles, upkeep, one reach field. |
+| `docs/military/MILITARY.md` | How force works **in the campaign** — what the player meets: `resolve_campaign_battle`, units, muster, terrain, march, battles, upkeep, one reach field. The Era −1 half is `generation/MILITARY_HISTORY.md`. |
 | `docs/politics/NATIONS.md` | The nation as actor: territory, treasury, law, lobbying, the national budget. |
 | `docs/politics/RELATIONS.md` | Sentiment (derived), stance (declared), reputation, embargo, standing — which quantity answers which question. |
 
@@ -99,6 +99,7 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | `docs/generation/NATION_GENERATION.md` | Territory placement, resource profile, character, naming. |
 | `docs/generation/CORPORATION_GENERATION.md` | Nation assignment, focus, starting assets, finances. |
 | `docs/generation/GENERATION_LEDGER.md` | The why-did-this-tile-generate surface. |
+| `docs/generation/MILITARY_HISTORY.md` | **How force works inside the Era −1 sim** — `resolve_battle`, the band ladder, naval, the forage simplification, sea legs. A *generation* doc: its rules are what make a history cheap to generate, not claims about the game. `military/MILITARY.md` is its campaign-era sibling. |
 | `docs/lore/HISTORY.md` | The institutional ladder that drives the Era −1 sim. |
 | `docs/lore/COLLAPSE.md` | Polity strategies and culminating events for Era −1. |
 | `docs/lore/CREEDS.md` | Pantheons per cradle-culture, generated tongues. |
