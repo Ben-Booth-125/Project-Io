@@ -158,6 +158,28 @@
     "src/world/tile_generation.cpp",
     "docs/generation/TILE_GENERATION.md"
    ]
+  },
+  {
+   "status": "open",
+   "raised": "2026-09-06",
+   "resolution": null,
+   "id": "NR-792",
+   "kind": "question",
+   "title": "Coastal water is 100% owned while land is 39% owned - the carve claims water by GROWTH, not from the shore the doc says owns it",
+   "source": "Lane D's water_ownership_census (BL-780 prep), 2026-09-06. The harness passes; this is what it measured on the way past.",
+   "what": "MEASURED over 4 seeds, on main: coastal water 6680 seen / 6680 owned, lake 4992 / 4992, open ocean 0 of 65963 owned - and LAND 48689 owned of 125969, or 39%. Water ownership is TOTAL; land ownership is not.\n\nTHE DOC SAYS OWNERSHIP IS DERIVED FROM THE SHORE. docs/generation/PROVINCES.md § Who owns water: 'Coastal water belongs to whoever owns the shore... A province's owner is derived from its tiles, so a coastal province becomes owned the moment its tiles are claimed.'\n\nTHE CODE DOES SOMETHING ELSE. src/world/nation_generation.cpp:804 marks ONLY open ocean `unclaimable`; coast and lake are ordinary claimable ground for the carve's growth. So coastal water is claimed by the SAME FLOOD that claims land - and it is claimed more completely than land is. With 61% of land unowned, there must be coastal water whose adjacent shore carries no nation and which is nonetheless owned.\n\nSo the causal story in the doc - shore first, water derived - is not the mechanism. The mechanism is: water is cheap to grow across and the flood reaches all of it.",
+   "why_it_matters": "Two reasons, and the second is the one with a deadline.\n\n(1) It is a doc-vs-code disagreement on the WATER MODEL'S CENTRAL CLAIM, in the same week BL-780 asks Ben to authorise a re-bless of that model by looking at it. The standing rule is that one of them is wrong and the fix is work, not a footnote.\n\n(2) It changes what BL-778's legality test MEANS. 'A land stack may cross coastal water its polity owns' still works - owned by SOMEONE is not owned by YOU. But there is currently NO NEUTRAL COASTAL WATER anywhere in any world, so the rule 'you may walk your own shore, not someone else's' never encounters unclaimed shore. If the doc's reading is the intended one, a large fraction of coast would be unowned and the water model would bite considerably harder.",
+   "options": [
+    "The DOC is right, the code is wrong: derive coastal water's owner from its adjacent shore, leaving water unowned where the shore is. Produces real neutral coastal water and moves every carve again.",
+    "The CODE is right, the doc's phrasing is loose: water is claimed by the same growth as land, and 'belongs to whoever owns the shore' is an approximation to be reworded.",
+    "Neither yet - accept it for this wave, record it against BL-780's shape description, and decide after the water model is complete and can be judged whole."
+   ],
+   "recommendation": "The THIRD for this wave, then the first. Changing the carve now adds a FIFTH world-moving cause to a re-bless that already carries four, which is exactly what BL-780 exists to prevent - and lane A is mid-flight against the current world. But the first option is very likely the real answer: neutral coastal water is the thing that makes 'you may walk your own shore, not someone else's' mean anything, and 100% ownership quietly deletes it.",
+   "files": [
+    "src/world/nation_generation.cpp",
+    "docs/generation/PROVINCES.md",
+    "tools/verify/water_ownership_census.cpp"
+   ]
   }
  ]
 }

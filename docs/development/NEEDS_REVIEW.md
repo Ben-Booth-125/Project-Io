@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*5 entries — 5 open, 0 resolved.*
+*6 entries — 6 open, 0 resolved.*
 
 ---
 
@@ -128,6 +128,31 @@ It is defensible and it is still AUTHORED. A different mapping - a fixed epoch, 
 > **Recommendation:** Confirm. It reuses quantities the chain already derives rather than inventing a constant, and the oil-after-coal ordering follows from the chain rather than from taste. The third option is worth taking later if a second fossil family arrives - at one coal and one oil it would be a knob with no second reader.
 
 *Files: `src/world/tile_generation.cpp`, `docs/generation/TILE_GENERATION.md`*
+
+### NR-792 — Coastal water is 100% owned while land is 39% owned - the carve claims water by GROWTH, not from the shore the doc says owns it
+*question · raised 2026-09-06 · from Lane D's water_ownership_census (BL-780 prep), 2026-09-06. The harness passes; this is what it measured on the way past.*
+
+MEASURED over 4 seeds, on main: coastal water 6680 seen / 6680 owned, lake 4992 / 4992, open ocean 0 of 65963 owned - and LAND 48689 owned of 125969, or 39%. Water ownership is TOTAL; land ownership is not.
+
+THE DOC SAYS OWNERSHIP IS DERIVED FROM THE SHORE. docs/generation/PROVINCES.md § Who owns water: 'Coastal water belongs to whoever owns the shore... A province's owner is derived from its tiles, so a coastal province becomes owned the moment its tiles are claimed.'
+
+THE CODE DOES SOMETHING ELSE. src/world/nation_generation.cpp:804 marks ONLY open ocean `unclaimable`; coast and lake are ordinary claimable ground for the carve's growth. So coastal water is claimed by the SAME FLOOD that claims land - and it is claimed more completely than land is. With 61% of land unowned, there must be coastal water whose adjacent shore carries no nation and which is nonetheless owned.
+
+So the causal story in the doc - shore first, water derived - is not the mechanism. The mechanism is: water is cheap to grow across and the flood reaches all of it.
+
+**Why it matters.** Two reasons, and the second is the one with a deadline.
+
+(1) It is a doc-vs-code disagreement on the WATER MODEL'S CENTRAL CLAIM, in the same week BL-780 asks Ben to authorise a re-bless of that model by looking at it. The standing rule is that one of them is wrong and the fix is work, not a footnote.
+
+(2) It changes what BL-778's legality test MEANS. 'A land stack may cross coastal water its polity owns' still works - owned by SOMEONE is not owned by YOU. But there is currently NO NEUTRAL COASTAL WATER anywhere in any world, so the rule 'you may walk your own shore, not someone else's' never encounters unclaimed shore. If the doc's reading is the intended one, a large fraction of coast would be unowned and the water model would bite considerably harder.
+
+- The DOC is right, the code is wrong: derive coastal water's owner from its adjacent shore, leaving water unowned where the shore is. Produces real neutral coastal water and moves every carve again.
+- The CODE is right, the doc's phrasing is loose: water is claimed by the same growth as land, and 'belongs to whoever owns the shore' is an approximation to be reworded.
+- Neither yet - accept it for this wave, record it against BL-780's shape description, and decide after the water model is complete and can be judged whole.
+
+> **Recommendation:** The THIRD for this wave, then the first. Changing the carve now adds a FIFTH world-moving cause to a re-bless that already carries four, which is exactly what BL-780 exists to prevent - and lane A is mid-flight against the current world. But the first option is very likely the real answer: neutral coastal water is the thing that makes 'you may walk your own shore, not someone else's' mean anything, and 100% ownership quietly deletes it.
+
+*Files: `src/world/nation_generation.cpp`, `docs/generation/PROVINCES.md`, `tools/verify/water_ownership_census.cpp`*
 
 ---
 
