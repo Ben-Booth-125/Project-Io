@@ -589,35 +589,6 @@
    "status": "designed",
    "glyph": "✓",
    "priority": "A",
-   "difficulty": 4,
-   "version_goal": null,
-   "sprint": "32b",
-   "written": "2026-09-03",
-   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
-   "requires": [
-    "BL-763",
-    "BL-764",
-    "BL-762"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-765",
-   "short_name": "PALEO_DEPOSITS",
-   "category": "Generation",
-   "title": "Phase 2 - coal where the ancient swamps were, oil where the ancient seas were, timber where the forest is now",
-   "authority_doc": "docs/generation/PLANETOLOGY.md",
-   "files": [
-    "src/world/tile_generation.cpp",
-    "src/world/planetology.cpp",
-    "docs/economy/RESOURCES.md",
-    "docs/generation/TILE_GENERATION.md"
-   ],
-   "design": "THE AIM (Ben, point 2): a Life phase that maps \"ancient life to modern resources\" over the real landform. This is the payoff item - BL-763 and BL-764 exist only to make it possible.\n\nTHE SHAPE. A sibling pass (the established extension pattern: every tile-layer extension lands as a sibling reading the shared generation_record, settled 2026-07-21) that runs AFTER planetology's biosphere chain and places the biological deposits BL-762 deferred. Each resource reads the epoch its formation belongs to: coal from swamp cover at the carboniferous-analogue epoch, petroleum from shallow-sea extent at its own, peat from present marsh, timber and produce from present cover. Fossils read PAST state, living resources read PRESENT - the same fossil/living split planetology S8 already encodes in its peak-vs-stage gates.\n\nIT MUST BE A CONSEQUENCE, NOT A ROLL (Ben, standing: new generation stages are deterministic consequences of upstream scalars). The epoch a resource forms in is derived from the biosphere history, not authored per resource; the placement is derived from the paleo-climate at that epoch, not from a rarity draw.\n\nWHAT ALREADY POINTS THIS WAY: ore-field siting ALREADY crosses the geological/biological line - coal's candidate test reads COVER (marsh, forest, grass) plus a land-height percentile (tile_generation.cpp:1004-1013), sitting in the same routine that sites porphyry copper off the convergent-boundary mask. So a coal field already asks a biological question; it just asks it of the PRESENT map.\n\nDONE WHEN: coal, petroleum and peat are placed from the paleo record rather than from present cover; a world whose biosphere never reached land has no coal anywhere (already true via endowment, now true by construction); the distribution across a seed sweep is reported, not asserted."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
    "difficulty": 5,
    "version_goal": null,
    "sprint": "32b",

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*6 entries — 5 open, 1 resolved.*
+*8 entries — 7 open, 1 resolved.*
 
 ---
 
@@ -132,6 +132,46 @@ The cost of leaving them unnamed is not zero: an unnamed check is one a later se
 > **Recommendation:** Name all five. They are already committed and already green; the skill entry is the only thing standing between them and being run by a session that does not know they exist.
 
 *Files: `.claude/skills/verifier-headless/SKILL.md`*
+
+### NR-789 — Petroleum is +68% across the seed spread, and peat is down 58% - both honest consequences of BL-765, neither asked for
+*question · raised 2026-09-06 · from BL-765 (paleo deposits), building it 2026-09-06. Reported by the implementer rather than tuned away, which is why it is a question and not a defect.*
+
+Two magnitudes moved at economy scale when fossils started reading the past.
+
+PETROLEUM +67.9% (120-seed median 51544.8 -> 86536.2). Per-tile magnitude is UNCHANGED and now carries a belt weight <= 1, so the whole rise is AREA. The old rule gated petroleum on `substrate == barren` - roughly 10% of land, and a bad proxy for an ancient sea. The new one is the lower 40% of land height in a productive belt, which is `ore_fields_for`'s own already-shipped definition of old shelf and basin. Concentration also TIGHTENED (top-10% p05 18.6 -> 54.6), so it is not a smear.
+
+The implementer deliberately did NOT tune the percentile to preserve the number the bad proxy produced. That was the right instinct - reverse-engineering a constant to protect an artefact is how a defect becomes a requirement - but it means the world now carries substantially more oil than any economy tuning has ever seen.
+
+PEAT -58% (7792 -> 3307 raw). The design text says peat comes from PRESENT marsh; the body phase had been reaching it through `sedimentary + scrub` (the old tundra row), and marsh is rarer than scrub. So the new number may simply be the design finally being followed - or the design may have meant the broader ground all along.
+
+**Why it matters.** Petroleum is an Industrial-band input and sprint 33 is tuning the field it feeds. A 68% supply change lands directly on the market work, and it moved for a generation reason rather than an economic one - so whoever reads a price shift next will look in the wrong layer for it.
+
+- Accept both: the old petroleum gate was wrong and the new one is principled; peat now follows its own design text
+- Accept petroleum, re-examine peat: the "present marsh" reading may be too narrow
+- Re-scope the petroleum percentile against what the economy can absorb, and say so explicitly as an economic constraint rather than a geological one
+
+> **Recommendation:** Accept petroleum and re-examine peat. The petroleum change replaces a proxy nobody defends with the definition the ore-field layer already used, and tuning it back toward the artefact would be exactly the forced outcome the standing rules reject. Peat is the weaker case: -58% rests on reading "marsh" narrowly, and that reading was never explicitly chosen. Either way the numbers should reach sprint 33 BEFORE it tunes prices again.
+
+*Files: `src/world/tile_generation.cpp`, `docs/generation/TILE_GENERATION.md`, `docs/economy/RESOURCES.md`*
+
+### NR-790 — BL-765 authored WHEN a fossil forms, because no doc owned the question
+*decision taken on your behalf · raised 2026-09-06 · from BL-765 (paleo deposits), 2026-09-06. Flagged by the implementer as novel: nothing in its reading list said when coal forms relative to the drift record.*
+
+The paleo query answers where a tile WAS at age T. It does not say which T a coal seam should be read at, and no authority doc does either.
+
+TAKEN, so the work could proceed: the formation epoch is derived from the two windows the planetology chain ALREADY computes - `land_burial_gyr` for coal, `marine_anoxia_gyr` for oil - each clamped against its own chain step (S7 / S6) rather than extrapolated, and mapped across `continent_drift_epochs`. Oil is forced never shallower than coal, from the chain's own ordering: anoxia opens at oxygenation, burial only after land. Written into TILE_GENERATION.md § The Life phase.
+
+It is defensible and it is still AUTHORED. A different mapping - a fixed epoch, or one keyed on biosphere peak rather than burial - would place every seam somewhere else on the same world, and nothing in the repo would object.
+
+**Why it matters.** It decides where every coal and oil deposit on every generated world sits, and it is the first rule in the generator that reads the drift history for anything. Every later paleo consumer will copy its shape.
+
+- Confirm the derivation as authored (windows from the chain, clamped, oil never shallower than coal)
+- Key the epoch on something else - biosphere peak, or a fixed age per fossil
+- Leave it derived but expose the mapping as tunable data rather than code
+
+> **Recommendation:** Confirm. It reuses quantities the chain already derives rather than inventing a constant, and the oil-after-coal ordering follows from the chain rather than from taste. The third option is worth taking later if a second fossil family arrives - at one coal and one oil it would be a knob with no second reader.
+
+*Files: `src/world/tile_generation.cpp`, `docs/generation/TILE_GENERATION.md`*
 
 ---
 
