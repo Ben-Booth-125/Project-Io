@@ -8,11 +8,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <functional>
 #include <random>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -86,7 +88,22 @@ int scale_for_share(int64_t share_heads)
     return s;
 }
 
-/// Carve a body's Era -1 demography into centre scales (BL-610).
+/// One carved centre: WHICH REGION grew it, and how large it stands.
+///
+/// BL-783 (a centre stands where its region stood) added the `region` half. The
+/// carve used to return a bare scale list, so the count and the scale were the
+/// region record's consequence but the PLACE was not — a region sacked twice
+/// and a region never touched handed their different counts to the same
+/// undifferentiated body-wide placement pass, and the causal story died at the
+/// last step.
+struct carved_centre
+{
+    int region = -1; ///< Index into `settlement_state::regions`.
+    int scale  = 1;  ///< 1-5, on `k_population_for_scale`'s own rungs.
+};
+
+/// Carve a body's Era -1 demography into centre scales (BL-610), each BOUND to
+/// the region that grew it (BL-783).
 ///
 /// COUNT is per region: a living region's urban headcount over
 /// `k_demography_heads_per_centre`, floored at one — a region history kept
@@ -99,19 +116,37 @@ int scale_for_share(int64_t share_heads)
 /// receives U/(i*H_n), H_n the harmonic number — one hierarchy of a few
 /// cities over many towns over a train of villages, the concentration real
 /// settlement systems show (a MECHANISM, never a name — the standing rule).
-/// Carved body-wide rather than per region because placement is body-wide
-/// too: the region record decides HOW MANY and HOW LARGE, the placement pass
-/// decides where.
+///
+/// WHICH REGION TAKES WHICH RANK (BL-783). The body-wide rank-size share-out is
+/// unchanged — same n, same harmonic, same scale multiset — but the ranks are
+/// no longer handed out in an arbitrary order. Every region enters its own
+/// centres as SLOTS keyed `urban_population / k` for k = 1..centres: the
+/// region's internal rank-size read, so a region's first city competes on its
+/// whole urban headcount and its fifth on a fifth of it. Sorting those slots
+/// descending IS the body-wide rank order, and it is causal in both directions:
+/// a heavily sacked region carries a small `urban_population`, so its slots
+/// sort late and it materialises fewer AND smaller cities than an untouched
+/// neighbour of the same farming ground. That is the whole of R2.
 ///
 /// All integer (harmonic sum in millionths), no RNG: a pure function of the
-/// region populations, so count and scale are the demography's consequence
-/// and nothing else's.
-std::vector<int> carve_demography_scales(const settlement_state& settlement,
-                                         int heads_per_centre)
+/// region populations, so count, scale and binding are the demography's
+/// consequence and nothing else's.
+std::vector<carved_centre> carve_demography_centres(const settlement_state& settlement,
+                                                    int heads_per_centre)
 {
-    std::vector<int> out;
+    std::vector<carved_centre> out;
     if (heads_per_centre <= 0)
         return out;
+
+    /// A candidate rank: the k-th centre of one region, competing on that
+    /// region's urban headcount divided by its own internal rank.
+    struct slot
+    {
+        int64_t key = 0;
+        int     region = 0;
+        int     rank_in_region = 0;
+    };
+    std::vector<slot> slots;
 
     // BL-766: the two quantities are now READ, not re-derived. `region::centres`
     // and `region::urban_population` were drawn before the Era -1 sim and moved
@@ -125,12 +160,15 @@ std::vector<int> carve_demography_scales(const settlement_state& settlement,
     int64_t count       = 0;
     if (settlement.urban_map_drawn)
     {
-        for (const region& p : settlement.regions)
+        for (std::size_t ri = 0; ri < settlement.regions.size(); ++ri)
         {
+            const region& p = settlement.regions[ri];
             if (p.population <= 0 || p.centres <= 0)
                 continue; // A razed or emptied region towns nobody.
             urban_total += p.urban_population;
             count       += p.centres;
+            for (int k = 1; k <= p.centres; ++k)
+                slots.push_back({ p.urban_population / k, static_cast<int>(ri), k });
         }
     }
     else
@@ -148,29 +186,52 @@ std::vector<int> carve_demography_scales(const settlement_state& settlement,
         //
         // Kept unchanged all the same: it is a fallback for fixtures, not a
         // second model to keep in step with the first.
-        for (const region& p : settlement.regions)
+        for (std::size_t ri = 0; ri < settlement.regions.size(); ++ri)
         {
+            const region& p = settlement.regions[ri];
             if (p.population <= 0)
                 continue;
             const int64_t urban = p.population * k_demography_urban_share_q / 1000;
+            const int64_t here  = std::max<int64_t>(1, urban / heads_per_centre);
             urban_total += urban;
-            count       += std::max<int64_t>(1, urban / heads_per_centre);
+            count       += here;
+            const int capped = static_cast<int>(std::min<int64_t>(here, 65536));
+            for (int k = 1; k <= capped; ++k)
+                slots.push_back({ urban / k, static_cast<int>(ri), k });
         }
     }
-    if (count <= 0)
+    if (count <= 0 || slots.empty())
         return out;
 
-    const int n = static_cast<int>(std::min<int64_t>(count, 65536));
+    // Descending by key IS the body-wide rank order. The tie-break is TOTAL and
+    // layout-free — region index then internal rank, both plain integers — so
+    // two runs order identically whatever any container did on the way here
+    // (src/world/CLAUDE.md: no pointer- or hash-layout-dependent iteration
+    // order, and no "same process" carve-out on that rule).
+    std::stable_sort(slots.begin(), slots.end(),
+                     [](const slot& a, const slot& b) {
+                         if (a.key != b.key) return a.key > b.key;
+                         if (a.region != b.region) return a.region < b.region;
+                         return a.rank_in_region < b.rank_in_region;
+                     });
+
+    const int n = static_cast<int>(
+        std::min<int64_t>(std::min<int64_t>(count, static_cast<int64_t>(slots.size())),
+                          65536));
 
     int64_t harmonic_millionths = 0;
     for (int i = 1; i <= n; ++i)
         harmonic_millionths += 1000000 / i;
 
-    // Rank-size share-out of the urban total; already descending by rank.
+    // Rank-size share-out of the urban total; already descending by rank. The
+    // scale MULTISET is exactly what it was before BL-783 — same n, same
+    // harmonic, same c — so the body's scale histogram does not move; only
+    // WHICH region receives which rank is new.
     const int64_t c = urban_total * 1000000 / harmonic_millionths;
     out.reserve(static_cast<std::size_t>(n));
     for (int i = 1; i <= n; ++i)
-        out.push_back(scale_for_share(c / i));
+        out.push_back({ slots[static_cast<std::size_t>(i - 1)].region,
+                        scale_for_share(c / i) });
     return out;
 }
 
@@ -317,14 +378,15 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
     // history fed more people carries more and larger towns — replacing the
     // land-area divisor and the authored 40/30/20/8/2 weighted draw at once.
     //
-    // The carve comes back descending by rank, so the largest cities are
-    // placed first and the adjacency weighting below clusters the train of
-    // villages around them.
-    std::vector<int> demography_scales;
+    // BL-783 adds the third quantity: each carved centre also carries the
+    // REGION that grew it. The carve comes back descending by rank, so the
+    // largest cities are placed first and the adjacency weighting below
+    // clusters the train of villages around them.
+    std::vector<carved_centre> demography_centres;
     if (settlement != nullptr)
-        demography_scales = carve_demography_scales(*settlement,
-                                                    k_demography_heads_per_centre);
-    const bool from_demography = !demography_scales.empty();
+        demography_centres = carve_demography_centres(*settlement,
+                                                      k_demography_heads_per_centre);
+    const bool from_demography = !demography_centres.empty();
 
     // The FALLBACK: land area over a divisor (BL-463: land area, not grid
     // area). Taken only when there is no settlement record to read — a body
@@ -346,12 +408,14 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
             ++land_tiles;
 
     const int centre_count = from_demography
-        ? std::min(static_cast<int>(demography_scales.size()),
+        ? std::min(static_cast<int>(demography_centres.size()),
                    static_cast<int>(candidates.size()))
         : std::clamp(land_tiles / divisor,
                      1, static_cast<int>(candidates.size()));
 
-    // Seeded RNG — deterministic, never draws from random_device.
+    // Seeded RNG — deterministic, never draws from random_device. Consumed by
+    // the FALLBACK path only since BL-783: the campaign path's placement is a
+    // pure argmax, seedless like the urban draw it materialises.
     std::mt19937 rng(seed);
 
     // Track which tiles already host a centre (for adjacency weighting).
@@ -362,63 +426,25 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
     std::unordered_set<int> adjacent_indices;
     adjacent_indices.reserve(static_cast<std::size_t>(centre_count * 8));
 
-    // Place centres one at a time, rebuilding the weighted candidate pool each
-    // time so agglomeration is progressive (each placed centre attracts the next).
-    for (int placed = 0; placed < centre_count; ++placed)
-    {
-        if (candidates.empty())
-            break;
-
-        // Build weighted candidate list: tiles adjacent to an existing centre
-        // get 3× weight; others get 1×. BL-132 change (1): multiplied by a
-        // 1..5 richness weight so a rich, unclaimed deposit competes with (and
-        // can outweigh) a merely-adjacent tile, rather than richness only ever
-        // acting as a tie-breaker within the adjacency tier.
-        std::vector<int> pool;
-        pool.reserve(candidates.size() * 3);
-        for (const int idx : candidates)
-        {
-            if (occupied_indices.count(idx))
-                continue; // already occupied
-            const int weight = (adjacent_indices.count(idx) ? 3 : 1)
-                             * richness_weight(idx)
-                             * farm_weight(idx); // BL-766: cities stand where the food is.
-            for (int w2 = 0; w2 < weight; ++w2)
-                pool.push_back(idx);
-        }
-
-        if (pool.empty())
-            break;
-
-        std::uniform_int_distribution<std::size_t> pick(0, pool.size() - 1);
-        const int chosen_idx = pool[pick(rng)];
+    // Founding one centre: create the entity, mark the ground taken, and widen
+    // the adjacency set. Shared by both placement paths so the two cannot drift
+    // in what a founding actually writes.
+    auto found_centre = [&](int chosen_idx, int scale) {
         const entity_id chosen_tile = tile_ids[static_cast<std::size_t>(chosen_idx)];
         if (chosen_tile == null_entity)
-            continue;
+            return;
 
-        // Read habitability from the tile.
         const auto tc_it = w.tiles.find(chosen_tile);
         const float hab = (tc_it != w.tiles.end()) ? tc_it->second.habitability : 1.0f;
 
-        // The scale: carved from the demography on the campaign path (BL-610,
-        // largest first — the sort above), drawn from the weighted table on the
-        // fallback. Either way `k_population_for_scale` stays the one
-        // scale -> headcount mapping.
-        const int scale = from_demography
-            ? demography_scales[static_cast<std::size_t>(placed)]
-            : draw_scale(rng);
-        const int pop   = k_population_for_scale[scale - 1];
-
-        // Create the population centre entity.
         const entity_id centre_id = w.create_entity();
         population_centre_component pcc;
         pcc.scale        = scale;
-        pcc.population   = pop;
+        pcc.population   = k_population_for_scale[scale - 1];
         pcc.habitability = hab;
         w.population_centres[centre_id] = pcc;
         w.population_centre_tile[centre_id] = chosen_tile;
 
-        // Mark the tile occupied and update adjacency set.
         occupied_indices.insert(chosen_idx);
 
         const int col = chosen_idx % gw;
@@ -430,12 +456,165 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
         {
             if (nbrs[n] == null_entity)
                 continue;
-            // Find the raster index for this neighbour.
             const auto nit = w.tiles.find(nbrs[n]);
             if (nit == w.tiles.end())
                 continue;
-            const int nidx = nit->second.grid_y * gw + nit->second.grid_x;
-            adjacent_indices.insert(nidx);
+            adjacent_indices.insert(nit->second.grid_y * gw + nit->second.grid_x);
+        }
+    };
+
+    // The ground weight a candidate tile carries, unchanged in its three terms
+    // from BL-132 / BL-766: adjacency 1x or 3x, times a 1..5 richness bucket,
+    // times a 1..3 food bucket.
+    auto ground_weight = [&](int idx) {
+        return (adjacent_indices.count(idx) ? 3 : 1)
+             * richness_weight(idx)
+             * farm_weight(idx); // BL-766: cities stand where the food is.
+    };
+
+    if (from_demography)
+    {
+        // -------------------------------------------------------------------
+        // BL-783 — A CENTRE STANDS WHERE ITS REGION STOOD.
+        //
+        // Before this, the carve handed the count and the scale to a body-wide
+        // weighted draw, so nothing bound a placed city back to the farmland
+        // that grew it: a region sacked twice and a region never touched fed
+        // the same undifferentiated pass, and a player reading the map could
+        // not find the war behind a ruin. Now every carved centre carries its
+        // source region and is founded on THAT REGION'S OWN GROUND.
+        //
+        // WHAT "WITHIN THE REGION" MEANS. A region is an anchor, not a stored
+        // tile set — the Voronoi over anchors IS its extent, and `nearest_region`
+        // is already the canonical read of it (city_names.cpp names a centre in
+        // its nearest region's tongue). So the same function partitions the
+        // candidates here, which also makes those names correct rather than
+        // accidental: the city is now named by the region that actually grew it.
+        //
+        // SEEDLESS (R3). Placement is a pure argmax over the region's own
+        // candidates — the same three ground terms as before, tie-broken on
+        // habitability and then on the lowest raster index, both total orders
+        // over plain integers. No RNG on this path, matching the urban draw it
+        // materialises, and no container walk whose order could vary: the
+        // buckets are filled in ascending raster order from the ascending
+        // `candidates` list (src/world/CLAUDE.md — no hash-layout-dependent
+        // iteration, and no "same process" carve-out on that rule).
+        const std::size_t region_count = settlement->regions.size();
+        std::vector<std::vector<int>> region_candidates(region_count);
+        for (const int idx : candidates)
+        {
+            const int ri = nearest_region(*settlement, idx % gw, idx / gw, gw);
+            if (ri >= 0 && ri < static_cast<int>(region_count))
+                region_candidates[static_cast<std::size_t>(ri)].push_back(idx);
+        }
+
+        // Best unoccupied candidate in one region, or -1 when it has none left.
+        auto best_in_region = [&](int ri) -> int {
+            if (ri < 0 || ri >= static_cast<int>(region_count))
+                return -1;
+            int best_idx = -1;
+            long long best_score = -1;
+            for (const int idx : region_candidates[static_cast<std::size_t>(ri)])
+            {
+                if (occupied_indices.count(idx))
+                    continue;
+                const auto tit = w.tiles.find(tile_ids[static_cast<std::size_t>(idx)]);
+                const float hab = (tit != w.tiles.end()) ? tit->second.habitability : 0.0f;
+                const int hab_q = std::clamp(static_cast<int>(hab * 1000.0f + 0.5f), 0, 1000);
+                const long long score =
+                    static_cast<long long>(ground_weight(idx)) * 1001LL + hab_q;
+                // Strictly greater: the ascending walk makes the lowest raster
+                // index the tie-break, which is a total order and stable.
+                if (score > best_score)
+                {
+                    best_score = score;
+                    best_idx   = idx;
+                }
+            }
+            return best_idx;
+        };
+
+        // Regions ordered by anchor distance from a given region — the spill
+        // order for the rare region that grew more cities than its own ground
+        // can host. Built lazily and cached, since most regions never spill.
+        std::unordered_map<int, std::vector<int>> spill_order;
+        auto spill_for = [&](int ri) -> const std::vector<int>& {
+            auto it = spill_order.find(ri);
+            if (it != spill_order.end())
+                return it->second;
+            const region& home = settlement->regions[static_cast<std::size_t>(ri)];
+            std::vector<std::pair<int, int>> keyed; // (distance, region index)
+            keyed.reserve(region_count);
+            for (std::size_t j = 0; j < region_count; ++j)
+            {
+                if (static_cast<int>(j) == ri) continue;
+                const region& o = settlement->regions[j];
+                const int dc = std::abs(o.col - home.col);
+                const int d  = std::max(std::min(dc, gw - dc), std::abs(o.row - home.row));
+                keyed.push_back({ d, static_cast<int>(j) });
+            }
+            std::sort(keyed.begin(), keyed.end()); // distance, then region index
+            std::vector<int> order;
+            order.reserve(keyed.size());
+            for (const auto& kv : keyed) order.push_back(kv.second);
+            return spill_order.emplace(ri, std::move(order)).first->second;
+        };
+
+        for (int placed = 0; placed < centre_count; ++placed)
+        {
+            const carved_centre& cc = demography_centres[static_cast<std::size_t>(placed)];
+            int chosen_idx = best_in_region(cc.region);
+
+            // SPILL, counted by construction rather than hidden: a region whose
+            // whole extent is already built out still materialises its city, on
+            // the nearest region that has ground left. The alternative is to
+            // drop it, which would silently lose a settlement history grew.
+            if (chosen_idx < 0 && cc.region >= 0
+                && cc.region < static_cast<int>(region_count))
+            {
+                for (const int alt : spill_for(cc.region))
+                {
+                    chosen_idx = best_in_region(alt);
+                    if (chosen_idx >= 0) break;
+                }
+            }
+
+            if (chosen_idx < 0)
+                break; // The whole body is built out.
+
+            found_centre(chosen_idx, cc.scale);
+        }
+    }
+    else
+    {
+        // THE FALLBACK, unchanged: no settlement record to bind to, so the
+        // weighted seeded draw stands. Reached by a harness probing placement
+        // alone, or a body with no Era -1 sim.
+        for (int placed = 0; placed < centre_count; ++placed)
+        {
+            if (candidates.empty())
+                break;
+
+            std::vector<int> pool;
+            pool.reserve(candidates.size() * 3);
+            for (const int idx : candidates)
+            {
+                if (occupied_indices.count(idx))
+                    continue; // already occupied
+                const int weight = ground_weight(idx);
+                for (int w2 = 0; w2 < weight; ++w2)
+                    pool.push_back(idx);
+            }
+
+            if (pool.empty())
+                break;
+
+            std::uniform_int_distribution<std::size_t> pick(0, pool.size() - 1);
+            const int chosen_idx = pool[pick(rng)];
+            if (tile_ids[static_cast<std::size_t>(chosen_idx)] == null_entity)
+                continue;
+
+            found_centre(chosen_idx, draw_scale(rng));
         }
     }
 
