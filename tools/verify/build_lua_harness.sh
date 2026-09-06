@@ -38,6 +38,35 @@ RUN=0
 SRC="tools/verify/${NAME}.cpp"
 [ -f "$SRC" ] || die "ERROR: $SRC does not exist."
 
+# --- the dependency cache ---------------------------------------------------
+# RESOLVED BEFORE THE MSYS EXPORTS BELOW, AND THAT ORDER IS LOAD-BEARING.
+# MSYS_NO_PATHCONV=1 / MSYS2_ARG_CONV_EXCL='*' stop Git Bash rewriting POSIX
+# paths into Windows ones. They are set for the `cl` invocations, which need
+# their /switches left alone - but with them in force `git -C /c/Users/...`
+# hands Windows git a path it cannot resolve, rev-parse dies with "cannot change
+# to", the fallback below silently yields nothing, and DEPS lands on the
+# worktree's own non-existent cache. The symptom is a missing sol/sol.hpp, which
+# reads like the wrong builder. Measured 2026-09-06 after a second agent
+# reported it; the first fix put this block after the exports and was inert.
+#
+# IO_DEPS_CACHE mirrors CMakeLists' own env override, exactly as the .bat does.
+# A git WORKTREE has no _deps_cache of its own, so fall back to the MAIN
+# checkout via git's common dir before giving up. Without this every worktree
+# agent has to discover IO_DEPS_CACHE for itself (reported 2026-09-06).
+DEPS="${IO_DEPS_CACHE:-}"
+if [ -z "$DEPS" ]; then
+    if [ -d "$ROOT/_deps_cache" ]; then
+        DEPS="$ROOT/_deps_cache"
+    else
+        _common="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+        [ -n "$_common" ] && DEPS="$(dirname "$_common")/_deps_cache"
+        [ -n "$DEPS" ] || DEPS="$ROOT/_deps_cache"
+    fi
+fi
+[ -f "$DEPS/sol2_src/include/sol/sol.hpp" ] || die "ERROR: sol2 headers not found under \"$DEPS/sol2_src/include\".
+  Set IO_DEPS_CACHE to a checkout that carries lua_src / sol2_src."
+[ -f "$DEPS/lua_src/lua.h" ] || die "ERROR: Lua sources not found under \"$DEPS/lua_src\"."
+
 # --- the MSVC environment, built by hand ------------------------------------
 # PINNED, and the pin is load-bearing (build_app.bat § 2 records why): the tree
 # is built by BuildTools MSVC 14.44.35207. If a NEWER Visual Studio is also
@@ -68,25 +97,6 @@ CL="$MSVC/bin/Hostx64/x64/cl.exe"
 # every /nologo-style switch. This turns that off for the cl invocations below.
 export MSYS2_ARG_CONV_EXCL='*'
 export MSYS_NO_PATHCONV=1
-
-# --- the dependency cache ---------------------------------------------------
-# IO_DEPS_CACHE mirrors CMakeLists' own env override, exactly as the .bat does.
-# A git WORKTREE has no _deps_cache of its own, so fall back to the MAIN
-# checkout via git's common dir before giving up. Without this every worktree
-# agent has to discover IO_DEPS_CACHE for itself (reported 2026-09-06).
-DEPS="${IO_DEPS_CACHE:-}"
-if [ -z "$DEPS" ]; then
-    if [ -d "$ROOT/_deps_cache" ]; then
-        DEPS="$ROOT/_deps_cache"
-    else
-        _common="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
-        [ -n "$_common" ] && DEPS="$(dirname "$_common")/_deps_cache"
-        [ -n "$DEPS" ] || DEPS="$ROOT/_deps_cache"
-    fi
-fi
-[ -f "$DEPS/sol2_src/include/sol/sol.hpp" ] || die "ERROR: sol2 headers not found under \"$DEPS/sol2_src/include\".
-  Set IO_DEPS_CACHE to a checkout that carries lua_src / sol2_src."
-[ -f "$DEPS/lua_src/lua.h" ] || die "ERROR: Lua sources not found under \"$DEPS/lua_src\"."
 
 OUTDIR="build_gen/verify"
 OBJDIR="$OUTDIR/${NAME}.obj"
