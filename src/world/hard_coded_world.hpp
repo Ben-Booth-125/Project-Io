@@ -117,6 +117,34 @@ struct generation_progress
     std::atomic<int> sub_progress{0};
     std::atomic<int> sub_total{0};
 
+    // --- The generation budget, published to the loading screen (BL-754) ----
+    //
+    // WHY HERE AND NOWHERE ELSE. The same numbers already reach a harness on
+    // `era_minus_one_fixture` (see that type for why they may not live on
+    // `generation_report` — the report is serialised, and a wall clock is the
+    // worst possible thing to put through a save). But the fixture is a heavy
+    // capture the app never asks for, and BL-754's remaining half is the APP
+    // printing its own budget on its own generating screen. This sink is
+    // already the app-to-generation seam, already atomic, already a pure tap
+    // with no save presence — so it is the one place the measurement can sit
+    // without becoming world state or costing a capture.
+    //
+    // NOTHING BELOW MAY EVER ENTER A DIGEST, A HASH, OR A BRANCH. These are
+    // milliseconds of wall clock: reading one back into generation would make
+    // the world non-deterministic by construction. They are WRITE-ONLY from
+    // the worker and READ-ONLY from the renderer, exactly like every other
+    // field in this struct, and they are reported to a human, never asserted.
+    //
+    // `budget_ready` is release-stored AFTER the five values, so an
+    // acquire-load of it is the renderer's guarantee that all five are filled.
+    // Zero until generation finishes; zero for any pass that did not run.
+    std::atomic<int64_t> ms_world_total{0};
+    std::atomic<int64_t> ms_before_settlement{0};
+    std::atomic<int64_t> ms_settlement{0};
+    std::atomic<int64_t> ms_era{0};
+    std::atomic<int64_t> ms_after_era{0};
+    std::atomic<bool>    budget_ready{false};
+
     // --- The territory carve, live (BL-305) ---------------------------------
     //
     // The two passes that decide the world's POLITICS — the nation carve and

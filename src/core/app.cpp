@@ -502,6 +502,17 @@ void app::begin_new_game()
     m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
     m_worldgen_progress.sub_total.store(0, std::memory_order_relaxed);
 
+    // BL-754: the budget is a member too, so a second campaign start would
+    // otherwise show the previous world's numbers for the whole of its wait.
+    // Clear `budget_ready` FIRST so no frame can read a stale pass split as a
+    // fresh one.
+    m_worldgen_progress.budget_ready.store(false, std::memory_order_relaxed);
+    m_worldgen_progress.ms_world_total.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.ms_before_settlement.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.ms_settlement.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.ms_era.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.ms_after_era.store(0, std::memory_order_relaxed);
+
     // The carve sink is a member, so a SECOND campaign start would otherwise
     // open on the previous world's borders and charter marks. begin_carve
     // clears the map itself; these are the fields it does not own. The view is
@@ -573,6 +584,29 @@ void app::poll_worldgen()
         return;
 
     m_world = m_worldgen_future.get();
+
+    // BL-754: the generation budget, on the app's own console alongside the
+    // `[start_new_game]` phase lines it already prints. Deliberately the same
+    // words and the same order as the `[gen budget]` line the harness tier
+    // emits, so an app run and a `world_determinism` run can be read against
+    // each other digit for digit. The on-screen half is in
+    // draw_building_screen; this is the half that survives into a log.
+    if (m_worldgen_progress.budget_ready.load(std::memory_order_acquire))
+    {
+        std::printf("[gen budget] total %lld ms  (pre-settlement %lld, settlement %lld, "
+                    "era-1 %lld, post-era %lld)\n",
+                    static_cast<long long>(m_worldgen_progress.ms_world_total.load(
+                        std::memory_order_relaxed)),
+                    static_cast<long long>(m_worldgen_progress.ms_before_settlement.load(
+                        std::memory_order_relaxed)),
+                    static_cast<long long>(m_worldgen_progress.ms_settlement.load(
+                        std::memory_order_relaxed)),
+                    static_cast<long long>(m_worldgen_progress.ms_era.load(
+                        std::memory_order_relaxed)),
+                    static_cast<long long>(m_worldgen_progress.ms_after_era.load(
+                        std::memory_order_relaxed)));
+        std::fflush(stdout);
+    }
 
     // Phase 1 — the cheap main-thread tail (~20 ms measured): setup_world, the
     // Lua economy load, background firms — then arm the sliced warm start.
@@ -667,6 +701,38 @@ void app::draw_building_screen()
             ? "Twenty years of commerce settle the markets."
             : "Four hundred years of history are being lived through.");
         ImGui::PopStyleColor();
+
+        // --- The generation budget, on the screen that spends it (BL-754) ---
+        //
+        // Work item (1) of BL-754 named the loading screen's progress sink as
+        // the place to instrument, and until now the only reader was a
+        // harness: the `[gen budget]` line lives behind `if (fixture)` and the
+        // app passes none, so the game never reported its own budget and the
+        // screen said nothing about where its wait went.
+        //
+        // It appears the moment generation finishes and stays for the rest of
+        // the screen — which is the honest placement, because the world build
+        // is over and its split is final, while the pass still running below
+        // it is not this measurement's subject. Seconds to two places: this is
+        // read by a human deciding whether a pass is affordable, and a
+        // millisecond of a six-second build is noise dressed as precision.
+        if (m_worldgen_progress.budget_ready.load(std::memory_order_acquire))
+        {
+            const auto secs = [](const std::atomic<int64_t>& ms) {
+                return static_cast<double>(ms.load(std::memory_order_relaxed)) / 1000.0;
+            };
+            ImGui::Dummy({420.0f, 6.0f});
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(104, 112, 126, 255));
+            ImGui::Text("world built in %.2f s", secs(m_worldgen_progress.ms_world_total));
+            // Same four passes, same order and same names as the harness line,
+            // so a screen and a `world_determinism` run can be read together.
+            ImGui::Text("pre-settlement %.2f  settlement %.2f  era-1 %.2f  post-era %.2f",
+                        secs(m_worldgen_progress.ms_before_settlement),
+                        secs(m_worldgen_progress.ms_settlement),
+                        secs(m_worldgen_progress.ms_era),
+                        secs(m_worldgen_progress.ms_after_era));
+            ImGui::PopStyleColor();
+        }
 
         draw_building_carve();
     }

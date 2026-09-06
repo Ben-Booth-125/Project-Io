@@ -45,14 +45,23 @@ single band is `hp.tick_bands[0] = {epoch_year, 4}` in `hard_coded_world.cpp`). 
 overrides it on every world. A settle-dominated run is the intended shape, not a defect (NR-205,
 ruled 2026-08-12). Authority for the prehistory run is `docs/lore/HISTORY.md`.
 
-**The warm start has no calendar meaning** (BL-369, warm start). `app::start_new_game` runs
-`pre_game_ticks` (80, ~20 years) before play begins, then rebases the clock — so play always opens
-at the epoch regardless of how many warm-start ticks ran. It is a settling pass that produces a
-plausible opening position: the world is generated *at* the epoch and ticked forward to reach a
-steady economy, not generated at an earlier date and advanced. It is the third pass of simulated
-history — the economic settle in which firms spawn and exit until the field is operating-positive
-and steady — and its design is `docs/generation/GENERATION_STRATEGY.md` § Three passes of
-simulated history.
+**The opening position has no calendar meaning** (BL-369, warm start; BL-772, retire warm start).
+The world is generated *at* the epoch and handed to play **already settled** — not generated at an
+earlier date and advanced to it. Whatever the pass that settles it spends in simulated quarters,
+the clock is **rebased at the handoff**, so play always opens at `epoch_year`. That rebase is the
+load-bearing half of this paragraph and it does not depend on which pass does the settling: the
+opening position owes the calendar nothing.
+
+**What settles it is a search, not a settle.** The third pass of simulated history is phase 6 — a
+**directed static search** over candidate corporate landscapes (rosters, placements, road tiers),
+scored on chain completeness, the supply-to-demand ratio and the *spread* of both, with one short
+validation run on the winner. It is not an undirected pre-game tick loop run long enough for the
+dust to settle: a settle asks *what survives whatever generation happened to place*, a search asks
+*which placement is worth handing over*, and paying for both would pay twice for the weaker answer.
+The property that must hold either way is the one the player meets — they enter a field that has
+**already been decided** rather than one about to be. The design is
+`docs/generation/GENERATION_STRATEGY.md` § The eight phases and § Three passes of simulated
+history; the search itself is BL-770 (Era 0 candidate search).
 
 ## Three things that say "era" in code, and which one this is
 

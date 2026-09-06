@@ -1367,11 +1367,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // --- The generation budget, reported (BL-754) ---------------------------
     //
-    // One line to stderr and, when a caller asked for a fixture, the same
-    // numbers on it. stderr rather than stdout so a harness parsing its own
-    // stdout is unaffected, and gated on the fixture so an ordinary game
-    // launch stays silent — the budget is a development measurement, not a
-    // player-facing one.
+    // Three destinations, and they are deliberately different. (1) The
+    // progress sink, ALWAYS — that is what lets the app print its own budget
+    // on its own generating screen, which is the half of BL-754 that was
+    // still owed. (2) The fixture, when a caller asked for one. (3) One line
+    // to stderr, gated on the fixture: stderr rather than stdout so a harness
+    // parsing its own stdout is unaffected, and gated so the harness tier's
+    // output stays exactly as it was when the app started publishing too.
     {
         const gen_clock::time_point t_world_end = gen_clock::now();
         const int64_t ms_total      = ms_between(t_world_begin, t_world_end);
@@ -1379,6 +1381,18 @@ world make_hard_coded_world(world_params params, generation_report* report,
         const int64_t ms_settlement = ms_between(t_settlement_begin, t_settlement_end);
         const int64_t ms_era        = ms_between(t_settlement_end, t_era_end);
         const int64_t ms_after      = ms_between(t_era_end, t_world_end);
+
+        // Write-only tap. `budget_ready` is released last, so a renderer that
+        // acquire-loads it sees all five values or none of them.
+        if (progress != nullptr)
+        {
+            progress->ms_world_total.store(ms_total, std::memory_order_relaxed);
+            progress->ms_before_settlement.store(ms_before, std::memory_order_relaxed);
+            progress->ms_settlement.store(ms_settlement, std::memory_order_relaxed);
+            progress->ms_era.store(ms_era, std::memory_order_relaxed);
+            progress->ms_after_era.store(ms_after, std::memory_order_relaxed);
+            progress->budget_ready.store(true, std::memory_order_release);
+        }
 
         if (fixture != nullptr)
         {
