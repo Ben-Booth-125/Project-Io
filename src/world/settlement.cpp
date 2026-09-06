@@ -476,6 +476,15 @@ settlement_state run_settlement(const planetology_state& pl,
         p.anchor = idx;
         p.col = col;
         p.row = row;
+        // BL-777: derived, not assumed. This pass already refuses water above
+        // (`score` is 0 on any water tile, BL-516), so the answer is always
+        // `land` here — but deriving it from the tile rather than writing the
+        // default keeps ONE writer's rule for the field, so a future change to
+        // the scoring filter cannot silently mislabel the ground.
+        {
+            const tile_component* at = tile_at(w, tile_ids, idx);
+            p.domain = at ? region_domain_of(at->substrate) : region_domain::land;
+        }
         p.settle_score_q = clampi(score[static_cast<std::size_t>(idx)] * 10, 0, 1000);
 
         // WHOSE GODS. A region inherits the nearest surviving cradle's

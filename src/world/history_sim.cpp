@@ -1317,6 +1317,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (gw > 0) cc = ((cc % gw) + gw) % gw;
                         const int rr = clampi(src.row + dr, 0, gh > 0 ? gh - 1 : 0);
 
+                        // BL-777 — NOBODY FOUNDS ON OPEN OCEAN.
+                        //
+                        // This probe applied no terrain test at all, so 447 of
+                        // 1754 regions across three seeds were anchored on
+                        // water and 183 of those on open ocean (measured by
+                        // sim_water_census, 2026-09-06). `terrain_combat`
+                        // returns 0 defence and 0 forage for every water kind,
+                        // so those regions were silently undefendable.
+                        //
+                        // IT IS NOT A "NO WATER" TEST, and the distinction is
+                        // the design. Under the ownership ruling (BL-776,
+                        // PROVINCES.md § Who owns water) coastal water belongs
+                        // to whoever owns the shore, so founding on the
+                        // shoreline ring or a lake is LEGITIMATE — there is an
+                        // owner to found under. Open ocean has no owner at all,
+                        // structurally, so it is the only domain refused. That
+                        // is ~183 sites rather than the ~447 a blanket ban
+                        // would have deleted.
+                        //
+                        // A caller with no terrain is unaffected: `sub_at`
+                        // hands out the neutral dry default, so every synthetic
+                        // harness case probes exactly the cells it always did.
+                        const int cand = (gw > 0) ? rr * gw + cc : -1;
+                        if (region_domain_of(sub_at(terrain, cand)) == region_domain::open_ocean)
+                            continue;
+
                         bool taken = false;
                         for (const region& e : ss.regions)
                             if (e.col == cc && e.row == rr) { taken = true; break; }
@@ -1329,6 +1355,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.col = nc;
                 np.row = nr;
                 np.anchor = (gw > 0) ? np.row * gw + np.col : -1;
+                // BL-777: the domain of the ground actually chosen. The probe
+                // above has already refused open ocean, so this records `land`
+                // or `coastal_water` — but it is DERIVED rather than assumed,
+                // so the field stays a fact about the tile and the census can
+                // check the two against each other.
+                np.domain = region_domain_of(sub_at(terrain, np.anchor));
 
                 // Daughter ground is a decayed inheritance of the parent's —
                 // good land begets good land, but never better than its parent.

@@ -26,6 +26,7 @@ constexpr auto max_chain_stage = chain_stage::count;
 constexpr auto max_life_stage  = life_stage::civilised;
 constexpr auto max_rung        = ladder_rung::borders;
 constexpr auto max_region_cls  = region_class::port;
+constexpr auto max_region_dom  = region_domain::open_ocean;
 constexpr auto max_temp        = temperature_class::frozen;
 constexpr auto max_atmos       = atmosphere_class::thick;
 constexpr auto max_hydro       = hydrological_state::liquid;
@@ -309,6 +310,11 @@ void w_region(std::ostream& o, const region& r)
     w_int(o, r.centres);
     w_int(o, r.centres_razed);
     w_i64(o, r.urban_population);
+    // save_game_version 7 (BL-777, the region domain) -- keep r_region in step.
+    // ONE BYTE, APPENDED. See save_game.hpp's layout-7 note: nothing before it
+    // moved, and the strict-equality version check is still what refuses a v6
+    // stream rather than any attempt to read one.
+    w_enum(o, r.domain);
 }
 
 bool r_region(std::istream& i, region& r)
@@ -326,7 +332,9 @@ bool r_region(std::istream& i, region& r)
         && r_int(i, r.work_defence_mod) && r_int(i, r.work_industrial_mod)
         // save_game_version 5 (BL-766) -- keep w_region in step.
         && r_int(i, r.centres) && r_int(i, r.centres_razed)
-        && r_i64(i, r.urban_population);
+        && r_i64(i, r.urban_population)
+        // save_game_version 7 (BL-777) -- keep w_region in step.
+        && r_enum(i, r.domain, max_region_dom);
 }
 
 void w_settlement(std::ostream& o, const settlement_state& s)

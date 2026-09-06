@@ -69,6 +69,42 @@ enum class region_class : uint8_t
     port,      ///< Coastal, deposit-poor: it lives on what passes through.
 };
 
+/// Which of the three domains a region's ANCHOR stands in — the province
+/// layer's `province_kind` brought down to the grain the Era -1 sim acts on
+/// (BL-777, against Ben's water-domain ruling of 2026-09-06).
+///
+/// EXCLUSIVE BY CONSTRUCTION, exactly as `province_kind` is: a substrate names
+/// one of the three and only one, so this is a classification of the ground and
+/// never a judgement about it.
+///
+/// DERIVED, THEN STORED — and the asymmetry with `province_kind` is deliberate.
+/// A province is derived-never-stored because it holds its own tile ids and can
+/// re-ask them at any time. A region cannot: the Era -1 sim owns no `world&`,
+/// no tile ids and no allocator by design (history_sim.hpp), and once the run
+/// is over the campaign holds `settlement_state` without the era fixture's
+/// terrain arrays beside it. So the domain is written ONCE at founding, from
+/// `region_domain_of` on the anchor's substrate, and travels with the record.
+/// Nothing ever moves an anchor, so it cannot desynchronise from the tile it
+/// describes; `sim_water_census` asserts that identity rather than assuming it.
+///
+/// Values match `province_kind`'s numbering so the two can be compared directly.
+enum class region_domain : uint8_t
+{
+    land          = 0, ///< Dry ground. What a region is normally founded on.
+    coastal_water = 1, ///< The shoreline ring and the lakes — OWNED, via the shore (BL-776).
+    open_ocean    = 2, ///< Open sea. Owned by nobody, so nothing may be founded here.
+};
+
+/// The one derivation, shared by every writer of the field above. Mirrors
+/// `province_kind_of`'s branch order (province.cpp) — open ocean first, then
+/// any other water, then land — so the two classifications cannot drift.
+constexpr region_domain region_domain_of(terrain_substrate s)
+{
+    if (is_open_ocean(s)) return region_domain::open_ocean;
+    if (is_water(s))      return region_domain::coastal_water;
+    return region_domain::land;
+}
+
 /// One settled region — the unit of settlement history, and the unit BL-219
 /// reads a corporation's focus from.
 struct region
@@ -76,6 +112,17 @@ struct region
     int anchor = -1;        ///< Raster index (row * gw + col) of the core tile.
     int col = 0;
     int row = 0;
+
+    /// BL-777 — WHAT THIS GROUND IS, not merely where it is.
+    ///
+    /// Set at founding from the anchor's substrate and never recomputed. The
+    /// sim is the first pass that decides anything about water and until this
+    /// field existed it could not see any: `sim_terrain_view` carried the
+    /// substrate all along, and nothing read it. Defaults to `land` because a
+    /// region built by a caller with no terrain (the synthetic harness cases,
+    /// whose `sim_terrain_view` is empty by design) is standing on the neutral
+    /// default ground `sub_at` hands out, which is dry.
+    region_domain domain = region_domain::land;
 
     /// Index into `creed_state::cultures` — WHOSE GODS this region keeps.
     /// Starts as the nearest cradle's and can be overwritten by conquest.

@@ -103,7 +103,28 @@ inline constexpr uint32_t save_game_magic =
 /// A v4 or v5 stream misreads `nation` and everything after it, in a record that
 /// repeats hundreds of times per body, so both are refused whole on the same
 /// strict-equality contract as the v2 and v4 bumps above.
-inline constexpr uint32_t save_game_version = 6; // BL-748 + BL-766, merged
+///
+/// LAYOUT 7 = LAYOUT 6 PLUS ONE BYTE AT THE TAIL OF EVERY REGION RECORD.
+///
+/// BL-777 (the region domain) gives `region` a `region_domain` — the three-way
+/// land / coastal_water / open_ocean split the province layer already uses,
+/// brought down to the grain the Era -1 sim acts on. It is written by
+/// `w_region` as a single enum byte AFTER `urban_population`, which is the last
+/// field layout 6 wrote, and read back by `r_region` in the same place with a
+/// range check against `region_domain::open_ocean`.
+///
+/// So layout 7 is layout 6 with exactly one appended byte per region, and
+/// nothing moved. That still refuses every v6 stream whole, and correctly: a
+/// v6 reader handed a v7 stream would run one byte behind for the whole rest of
+/// the file, and a v7 reader handed a v6 stream would consume the NEXT region's
+/// `anchor` low byte as this one's domain. Appending is not compatibility; the
+/// strict-equality check is the compatibility story, as it has been since v2.
+///
+/// THIS IS THE ONLY BUMP IN ITS WAVE, deliberately, and the v6 note above says
+/// why that matters: two items each bumping "the next number" in separate
+/// worktrees produce two on-disk layouts sharing one version, each readable
+/// only by the build that wrote it.
+inline constexpr uint32_t save_game_version = 7; // BL-777, the region domain
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

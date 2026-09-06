@@ -74,6 +74,15 @@ struct seed_row
     long long edges = 0;         ///< adjacency pairs inside neighbour_radius
     long long edges_over_water = 0;
     long long edges_over_sea = 0;
+    /// BL-777: the STORED `region::domain`, tallied independently of the
+    /// substrate columns above, plus the count of regions where the two
+    /// disagree. The field is written once at founding and never recomputed,
+    /// so "it cannot desynchronise" is a claim worth checking rather than one
+    /// to assert in a comment.
+    int dom_land = 0;
+    int dom_coastal = 0;
+    int dom_open = 0;
+    int dom_mismatch = 0;
 };
 
 } // namespace
@@ -126,6 +135,17 @@ int main(int argc, char** argv)
             if (is_water(sub[a]))      ++row.on_water;
             if (is_sea(sub[a]))        ++row.on_sea;
             if (is_open_ocean(sub[a])) ++row.on_open_ocean;
+
+            // BL-777. Two INDEPENDENT reads of one fact: what the ground IS
+            // (the substrate, above) and what the region SAYS it is (the
+            // stored field). W3 binds them together.
+            switch (p.domain)
+            {
+                case region_domain::land:          ++row.dom_land; break;
+                case region_domain::coastal_water: ++row.dom_coastal; break;
+                case region_domain::open_ocean:    ++row.dom_open; break;
+            }
+            if (p.domain != region_domain_of(sub[a])) ++row.dom_mismatch;
         }
 
         // BL-755's precondition: adjacency pairs whose straight line crosses
@@ -159,6 +179,9 @@ int main(int argc, char** argv)
         rows.push_back(row);
         std::printf("  seed %u: %d regions | ON WATER %d (sea %d, open ocean %d)\n",
                     row.seed, row.regions, row.on_water, row.on_sea, row.on_open_ocean);
+        std::printf("           domain field: land %d, coastal_water %d, open_ocean %d"
+                    " | disagreeing with the substrate %d\n",
+                    row.dom_land, row.dom_coastal, row.dom_open, row.dom_mismatch);
         std::printf("           %lld adjacency edges | crossing water %lld (%lld%%)"
                     " | crossing SEA %lld (%lld%%)\n",
                     row.edges, row.edges_over_water,
@@ -169,8 +192,11 @@ int main(int argc, char** argv)
 
     std::printf("\n--- what the numbers mean for the two items ---\n");
     long long tot_water = 0, tot_sea = 0, tot_edges = 0, tot_edge_sea = 0;
+    long long tot_open = 0, tot_dom_coastal = 0, tot_dom_mismatch = 0, tot_regions = 0;
     for (const seed_row& r : rows)
-    { tot_water += r.on_water; tot_sea += r.on_sea; tot_edges += r.edges; tot_edge_sea += r.edges_over_sea; }
+    { tot_water += r.on_water; tot_sea += r.on_sea; tot_edges += r.edges; tot_edge_sea += r.edges_over_sea;
+      tot_open += r.on_open_ocean; tot_dom_coastal += r.dom_coastal;
+      tot_dom_mismatch += r.dom_mismatch; tot_regions += r.regions; }
 
     std::printf("  BL-756 regions founded on water: %lld across %d seeds (%lld on sea proper)\n",
                 tot_water, static_cast<int>(rows.size()), tot_sea);
@@ -180,10 +206,27 @@ int main(int argc, char** argv)
                 tot_edge_sea, tot_edges, tot_edges ? tot_edge_sea * 100 / tot_edges : 0);
     std::printf("         -> this BOUNDS the free sea reach. Zero would mean the water-blind\n"
                 "            radius is harmless in practice and BL-755 is theoretical.\n");
+    std::printf("  BL-777 regions by STORED domain: coastal_water %lld, open_ocean %lld,"
+                " of %lld\n", tot_dom_coastal, tot_open, tot_regions);
+    std::printf("         -> W4 is the ruling: open ocean has no owner, so nothing founds\n"
+                "            there. Coastal water is NOT refused - the shore has an owner\n"
+                "            (BL-776) - so a non-zero coastal count is the fix working.\n");
 
     std::printf("\n");
     check(all_ran && !rows.empty(), "W1  every seed generated and ran its era (the fixture gate)");
     check(tot_edges > 0, "W2  the census actually examined adjacency edges (non-vacuous)");
+    // BL-777 R1. The field is derived from the substrate and then STORED, which
+    // is safe only because of three sentences: it is written once at founding,
+    // never recomputed, and nothing ever moves an anchor. One disagreement means
+    // one of the three stopped being true.
+    check(tot_dom_mismatch == 0,
+          "W3  every region's stored domain agrees with the substrate under its anchor");
+    // BL-777 R2. Deliberately NOT `tot_water == 0`: a blanket water ban would
+    // delete the coastal foundings BL-776 made legitimate, and the distinction
+    // IS the design. Measured from the SUBSTRATE rather than from the field, so
+    // a mislabelled field cannot make it pass.
+    check(tot_open == 0,
+          "W4  no region anchors on OPEN OCEAN (coastal water is legitimate, and untouched)");
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");

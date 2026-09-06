@@ -266,9 +266,22 @@ if (isWindows) {
     // on C1083 before a single assertion runs, which is how main sat with the whole
     // verifier-headless tier unbuildable (2026-08-31). Third rot of this arg list;
     // this file's own header comment already warned about the first two.
-    // ABSOLUTE, VIA resolveDepsCache(), because these were relative and a git
-    // WORKTREE has no _deps_cache of its own — so every worktree agent died here
-    // on C1083 while the main checkout worked fine. Fourth rot of this arg list.
+    // RESOLVED AND PROPERLY QUOTED, and it took two goes plus two agents to get
+    // both halves right. These were the literal cwd-relative strings
+    // `_deps_cache\sol2_src\include` and `_deps_cache\lua_src`, so
+    // `resolveDepsCache()` above — added to let a worktree find the MAIN
+    // checkout's cache — never reached the Windows branch at all, and every
+    // Windows worktree agent still died on C1083 'sol/sol.hpp'. Two agents
+    // reported it independently.
+    //
+    // The second half is why this uses q() and not JSON.stringify: JSON escaping
+    // DOUBLES backslashes, so the now-absolute path came out as
+    // `"C:\\Users\\benbo\\..."` and named a directory that does not exist.
+    // That survived on the source-file arguments because cl tolerates it there,
+    // and failed outright on an /I path — as C1083 again, indistinguishable from
+    // the wrong-builder symptom this file exists to diagnose. Shell quoting is
+    // not string escaping. Verified from a worktree with IO_DEPS_CACHE unset.
+    // Fifth rot of this arg list; the header comment warned about the first two.
     '/I', q(path.join(DEPS, 'sol2_src', 'include')), '/I', q(path.join(DEPS, 'lua_src')),
     q(path.relative(ROOT, src)),
     ...sources.map(s => q(path.relative(ROOT, s))),
