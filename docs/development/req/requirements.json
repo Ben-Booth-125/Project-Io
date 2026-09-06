@@ -5165,6 +5165,218 @@
      "evidence": null
     }
    ]
+  },
+  {
+   "brief": "paleo-deposits",
+   "title": "BL-765 - coal where the ancient swamps were, oil where the ancient seas were",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-765 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "Biological deposits are placed from the tile's PAST climate, sampled through BL-764's paleo query, rather than from its present cover.",
+     "verification": [
+      "headless: a coal seam lands on ground that was swamp at the relevant age, not on ground that is barren today",
+      "headless: deposit_origin stays green"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "This closes BL-762's remaining half: agricultural_produce and the other biological resources can now leave the Body phase, because the Life phase has somewhere to place them FROM.",
+     "verification": [
+      "headless: the Body phase places no biological deposit and the world still has food"
+     ],
+     "notes": "BL-762 could not do this alone - deleting it from the Body phase generated a world with no food. That is why this item is its unblocker.",
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Digest movement is REPORTED with its cause, never re-blessed.",
+     "verification": [
+      "headless: world_determinism run, movement reported"
+     ],
+     "notes": "tile_rng is shared between the deposit draw, the endemic draw and hazard/habitability jitter. Reordering a draw moves the other two.",
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "retire-the-warm-start",
+   "title": "BL-754 + BL-772 - the generation budget is printed, and the warm start retires into phase 6",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-754, BL-772 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "BL-754: the app prints its own per-pass generation budget on the generating screen, as world_determinism already does headlessly.",
+     "verification": [
+      "static: app.cpp emits the per-pass split",
+      "visual: the generating screen shows it"
+     ],
+     "notes": "The measurement half already exists - world_determinism emits [gen budget] total/pre-settlement/settlement/era-1/post-era. Only the APP-side print is owed.",
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "BL-772: no pre_game_ticks loop remains, and Pass 6 background-firm generation stops running as a separate one-shot.",
+     "verification": [
+      "static: the loop is gone from app::start_new_game",
+      "headless: a generated world still carries background firms"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "WHAT MUST NOT BE LOST: play still opens on a SETTLED position with the clock rebased to the epoch (BL-369). That is the one property the warm start existed for.",
+     "verification": [
+      "headless: a handed-over world is settled, and the clock starts at the epoch"
+     ],
+     "notes": "If phase 6 cannot yet hand over a settled world, say so and STOP rather than shipping an unsettled one. That is a legitimate outcome.",
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "ERAS.md and MARKETS.md are rewritten to describe the new source of the background economy, not merely stripped of the old one.",
+     "verification": [
+      "static: both docs describe phase 6 as the source"
+     ],
+     "notes": "ERAS.md's \"the warm start has no calendar meaning\" paragraph needs rewriting rather than deleting.",
+     "evidence": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "The startup time drop is MEASURED and reported.",
+     "verification": [
+      "headless: before/after wall clock"
+     ],
+     "notes": "BL-761 measured the warm start at 72-73 s on both arcs against a ~6 s budget. That is the number this should move.",
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "region-domain",
+   "title": "BL-777 - regions carry their domain, and Settle stops founding on open ocean",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-777 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "region carries the same three-way domain the province layer uses (land / coastal_water / open_ocean), derived from the substrate the sim already sees.",
+     "verification": [
+      "headless: regions expose their domain",
+      "headless: sim_water_census reports it"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The Settle verb stops founding on OPEN OCEAN - and only open ocean. Coastal founding stays legitimate, because the shore has an owner under BL-776.",
+     "verification": [
+      "headless: no region anchors on open ocean",
+      "headless: coastal regions still exist and are owned"
+     ],
+     "notes": "~613 regions, not the ~1105 a blanket water ban would have deleted. That distinction IS the design.",
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "The save format carries the new field, both paths in the same change, with a round-trip assertion at a DISTINCT non-default value.",
+     "verification": [
+      "headless: save_envelope_roundtrip green on the new version"
+     ],
+     "notes": "save_game_version is at 6 and this item takes it to 7. IT IS THE ONLY ITEM IN THIS WAVE PERMITTED TO BUMP IT.",
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Digest movement REPORTED, never re-blessed - BL-780 still owns the water model's single re-bless.",
+     "verification": [
+      "headless: world_determinism run, movement reported with cause"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "centre-bound-to-region",
+   "title": "BL-783 - a materialised centre stands where the region that grew it stood",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-783 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "Each materialised population centre is bound to the region whose record produced it, and placed within that region rather than across the body.",
+     "verification": [
+      "headless: a centre position falls inside its source region"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The causal story survives to the map: a heavily sacked region visibly carries fewer or smaller cities than an untouched neighbour of the same farm quality.",
+     "verification": [
+      "headless: sacked vs untouched regions of comparable farm_q differ in centre count/scale"
+     ],
+     "notes": "This is the point of the item. BL-766 made history grow and raze specific places; a body-wide scatter loses that at the last step.",
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Deterministic and seedless, like the draw it materialises.",
+     "verification": [
+      "headless: repeat generation is identical",
+      "static: no unsorted container walk feeding a position"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
   }
  ]
 }
