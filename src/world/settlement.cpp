@@ -559,12 +559,21 @@ settlement_state run_settlement(const planetology_state& pl,
         }
     }
 
-    // --- Stage 4: who lights the furnaces, and when ----------------------------
+    // --- Stage 4: WHO CAN light the furnaces, and how long their ground takes --
     // "Coal-near-cities made Britain — endowment, not virtue" (HISTORY.md Stage
     // 4). The gate is the ground; the creed only moves the date, and only where
     // the creed itself came from the same ground (a forge god is raised over
     // ore, one stage earlier). Never reached by antiquity worlds: no furnace
     // has lit by year 0, and that history belongs to the sim, not the pass.
+    //
+    // THE DATE MOVED INSIDE THE RUN (BL-748). This block used to resolve
+    // `industrial_year` and `industrialised` here, before `run_history_sim`
+    // started — which under an industrial epoch is backwards, because the
+    // second span is exactly where industrialisation happens. What it produces
+    // now is the ENDOWMENT HALF only: the gate (above-average fuel) and the
+    // LAG the ground imposes once its owner reaches the Industrial rung. The
+    // arithmetic below is unchanged coefficient for coefficient; only its
+    // anchor moved, from the calendar to the polity's own crossing.
     rng rf(seed, tag_furnace);
     const int arable_q = clampi(static_cast<int>(pl.arable_share * 1000.0f), 0, 1000);
 
@@ -587,21 +596,26 @@ settlement_state run_settlement(const planetology_state& pl,
         if (creed_holds(cs, p.culture, "the sealed oath")) year -= 15; // Stage 3: contract law reaches capital.
         if (p.founded_year > 0) year += p.founded_year / 8;            // Late settlement, late furnaces.
 
-        p.industrial_year = clampi(static_cast<int>(year), 1700, 1935);
-        p.industrialised = true;
+        // THE SAME NUMBER, RE-ANCHORED. The clamp's own floor (1700) becomes
+        // the ZERO of the lag axis, so the best-endowed ground in a world takes
+        // 0 years past its polity's crossing and the worst takes 235 — exactly
+        // the spread the absolute dates carried, expressed against a year the
+        // sim knows rather than a calendar it does not.
+        p.industrial_lag_years = clampi(static_cast<int>(year), 1700, 1935) - 1700;
+        // `industrial_year` and `industrialised` are LEFT ALONE here. The run
+        // sets them (history_sim.cpp § the furnace), and a region whose polity
+        // never crosses the rung ends the epoch never having industrialised —
+        // which is a legitimate outcome, not a gap to fill in.
     }
 
-    // Median over the industrialised set — BL-219's early/late pivot.
-    {
-        std::vector<int64_t> years;
-        for (const region& p : out.regions)
-            if (p.industrialised) years.push_back(p.industrial_year);
-        if (!years.empty())
-        {
-            std::sort(years.begin(), years.end());
-            out.median_industrial_year = years[years.size() / 2];
-        }
-    }
+    // `median_industrial_year` is NOT computed here any more (BL-748). Nothing
+    // has industrialised at this point in the pass by construction, so a median
+    // taken here would be a guaranteed zero dressed as a measurement. The sim
+    // recomputes it into this same field at the end of its run, which is the
+    // first moment the answer exists; a world whose era never ran (
+    // `prehistory_years == 0`) therefore reports 0 — nobody — and the
+    // never-industrialised rung in corporation_generation.cpp fires, which is
+    // the branch that exists for exactly that case.
 
     // --- The founding lines ----------------------------------------------------
     // Bounded deliberately: a biography with seventy founding lines is a table,

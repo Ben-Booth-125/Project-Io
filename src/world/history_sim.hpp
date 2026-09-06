@@ -240,8 +240,69 @@ struct history_sim_params
     /// Cost charged per per-mille of missing supply, in the shared currency.
     int campaign_supply_cost_q = 260;
     /// Capacity yield as a fraction of holdings value, and its payback years.
-    int invest_yield_q        = 90;
-    int invest_amortise_years = 12;
+    ///
+    /// RE-PRICED BY MEASUREMENT (BL-767, history_sweep 8 seeds at --epoch 1960,
+    /// 2026-09-06). At 90 over 12 years a capacity band was worth ~75 a year to
+    /// a polity holding forty regions, against Settle at ~190 and Campaign at
+    /// ~140 in the same currency — so Invest lost every round it was offered
+    /// past band 2, and every world in the spread topped out at materials band
+    /// 2 against an Industrial rung of 5. The pair says a permanent capacity
+    /// band pays back over FIVE years rather than twelve, which is the honest
+    /// reading of a benefit that never expires; measured, it puts three worlds
+    /// in eight over the rung with the first furnace spread from 1560 to 1804.
+    int invest_yield_q        = 260;
+    int invest_amortise_years = 5;
+
+    /// Accumulated progress one rung of the capacity ladder costs, MULTIPLIED
+    /// by the band already held — so band 4 costs four times what band 1 did
+    /// and capacity never runs away (ANCIENT_TECH_LADDER § diffusion).
+    ///
+    /// PROMOTED FROM A LITERAL (BL-767). It was `4000 * q.capacity[d]` inline
+    /// in the Invest execution, which made the single most load-bearing
+    /// quantity in the tech ladder the one thing in this file that could not be
+    /// tuned as data. The value is unchanged; only its address is.
+    int capacity_band_cost = 4000;
+
+    /// WHERE A POLITY'S INVESTMENT GOES (BL-767). The Invest verb raises ONE
+    /// domain a round, and these two weights decide which.
+    ///
+    /// THE DEFECT THEY EXIST TO CLOSE. The choice used to be "whichever domain
+    /// sits at the lowest band", full stop — which levels all seven domains in
+    /// LOCKSTEP and makes `capacity[]` a flat line rather than the PROFILE the
+    /// ladder's own § Shape asks for. It also puts the Industrial rung out of
+    /// arithmetic reach: crossing it in materials means dragging all seven
+    /// domains to band 5, roughly seven times the investment of the one rung
+    /// that matters, and measured (history_sweep, 4 seeds at --epoch 1960,
+    /// 2026-09-06) every world in the spread topped out at materials band 2.
+    /// No weight anywhere else could move that, because the ceiling was in the
+    /// selection rule rather than in the price.
+    ///
+    /// `invest_level_pull_q` is the old rule as a force: how strongly a domain
+    /// being BEHIND pulls investment toward it, per band of arrears.
+    /// `invest_ground_pull_q` is the new one: how strongly the polity's own
+    /// GROUND pulls, scored off the mean endowment of what it holds — farm to
+    /// agriculture, ore to materials, energy to energy, port to transport, and
+    /// nothing to institutions, military or medicine, which no window measures.
+    ///
+    /// The claim is HISTORY.md's Stage 4 hook read one stage earlier:
+    /// endowment, not virtue. A people sitting on ore climbs the materials
+    /// ladder because of the ore, and the furnace that eventually lights over
+    /// it is the same fact read twice.
+    ///
+    /// AT `invest_ground_pull_q = 0` THE OLD RULE IS EXACTLY RECOVERED, which
+    /// is what makes this a dial rather than a rewrite.
+    ///
+    /// THE DEFAULTS ARE MEASURED, NOT GUESSED. At `level_pull` 1000 a single
+    /// band of arrears outweighs any ground signal (endowment windows top out
+    /// at 1000, so the ground term cannot reach 1000 x 900/1000), and the run
+    /// levels in lockstep exactly as it did — which is what the first trial
+    /// measured. At 200/1000 the ground can outweigh roughly two bands of
+    /// arrears at a mean endowment of 400, so a polity specialises where its
+    /// ground argues and still catches a domain up once it falls far enough
+    /// behind. Military, which no window measures, therefore advances on
+    /// arrears alone and still reaches the medieval roster.
+    int invest_level_pull_q  = 200;
+    int invest_ground_pull_q = 1000;
     /// Divisor turning holdings-value-at-risk into a comparable annual figure.
     int consolidate_divisor = 24;
 
@@ -371,7 +432,24 @@ struct history_sim_params
 
     /// Payback horizon turning a work's permanent benefit into the annual
     /// figure the shared currency is denominated in.
-    int work_amortise_years = 4;
+    ///
+    /// 4 -> 2 (BL-767), and it is a CONSEQUENCE rather than a finding of its
+    /// own. Re-pricing Invest to make the capacity ladder climbable made it
+    /// ~7x stronger in the shared currency, and this file's own § Magnitudes
+    /// note says the works weights exist to put the verb "in the same band as
+    /// the other verbs" — so leaving this at 4 dropped `build_work` out of the
+    /// contest entirely, taking three green harness checks (history_sweep W5 /
+    /// W5c / W5d) red with it. Halving the horizon puts it back in band.
+    ///
+    /// DELIBERATELY PARTIAL: a 2x correction against a 7x move. It restores
+    /// the checks and does NOT pretend to fix BL-757, whose zero-works finding
+    /// is a SCALE MISMATCH rather than a weight — Invest's score is
+    /// proportional to the whole empire's holdings while a work's local term is
+    /// proportional to ONE region, so the gap widens with every region a polity
+    /// takes. Measured under this change: real worlds still raise ZERO works
+    /// (history_sweep, 8 seeds at --epoch 1960, 2026-09-06), and no value of
+    /// this dial changes that.
+    int work_amortise_years = 2;
 
     /// Minimum in the shared currency, like the four thresholds above.
     /// Deliberately LOW: a Way Station on poor ground is a marginal choice and
@@ -475,6 +553,22 @@ struct polity
     /// raw-score comparison Consolidate was never chosen after ~year 176 and
     /// this escape did not exist.
     int cohesion_q = 1000;
+
+    /// BL-748 — THE YEAR THIS POLITY CROSSED THE INDUSTRIAL RUNG, or 0 for
+    /// never. The sim's industrial clock is the capacity ladder, and the rung
+    /// is `roster_band_for_capacity(capacity[materials]) == industrial` under
+    /// the span ceiling in force — the SAME derivation the works table reads,
+    /// so a polity cannot light a furnace at a band it could not build at.
+    ///
+    /// Materials, not military, for the reason HISTORY.md § The works roster
+    /// gives: a Blast Works turns over with metallurgy, not with the column
+    /// whose rows turn over at a roster boundary.
+    ///
+    /// This is the polity half of Stage 4. The REGION half is
+    /// `region::industrial_lag_years` — how long that particular ground takes
+    /// once its owner can pay for a furnace at all — and a region lights at
+    /// `industrial_year + lag`, if that year falls before the epoch.
+    int64_t industrial_year = 0;
 
     /// True for a seeded great power (BL-299). Majors start with more ground
     /// and an opposed strategic creed; the periphery stays alive as actors.
@@ -717,6 +811,14 @@ struct history_sim_state
     /// fought steadily for two millennia have the same total and nothing else
     /// in common — the total alone cannot tell them apart.
     std::vector<int32_t> battles_per_century;
+
+    /// BL-748 — how many polities crossed the Industrial rung inside the run,
+    /// and how many regions actually lit a furnace before the epoch. The two
+    /// differ and the gap is the point: a polity can cross with two years left
+    /// and industrialise nothing, and a counter that reported only the second
+    /// could not tell that world from one where the rung was never reached.
+    int64_t polities_industrialised = 0;
+    int64_t regions_industrialised  = 0;
 
     /// Highest total population the body ever carried, and the year it peaked.
     /// Peak has to be tracked as the run goes: the epoch figure alone cannot

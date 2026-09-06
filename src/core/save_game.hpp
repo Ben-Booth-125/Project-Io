@@ -80,7 +80,13 @@ inline constexpr uint32_t save_game_magic =
 /// stream's world-params record misreads `body_count` and the preferences
 /// after it — refused whole on the same strict-equality contract, for the same
 /// reason as the v2 bump above.
-inline constexpr uint32_t save_game_version = 4; // BL-747: world_params carries industrial_years
+/// Bumped to 5 when `region` gained `industrial_lag_years` (BL-748, the furnace
+/// moving inside the run): `w_region` gains one int between `industrialised`
+/// and `nation`. A MID-RECORD gap again — a v4 stream's per-region record
+/// misreads `nation` and everything after it, in a record that repeats hundreds
+/// of times per body — so the same strict-equality refusal applies, for the
+/// same reason as the v2 and v4 bumps above.
+inline constexpr uint32_t save_game_version = 5; // BL-748: region carries industrial_lag_years
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

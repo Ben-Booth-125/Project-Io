@@ -293,6 +293,7 @@ void w_region(std::ostream& o, const region& r)
     w_i64(o, r.founded_year);
     w_i64(o, r.industrial_year);
     w_bool(o, r.industrialised);
+    w_int(o, r.industrial_lag_years); // save_game_version 5 (BL-748) -- keep r_region in step.
     w_int(o, r.nation);
     w_int(o, r.contest_q);
     w_i64(o, r.population);
@@ -313,6 +314,7 @@ bool r_region(std::istream& i, region& r)
         && r_int(i, r.settle_score_q) && r_int(i, r.farm_q) && r_int(i, r.ore_q)
         && r_int(i, r.energy_q) && r_int(i, r.port_q) && r_enum(i, r.dominant, max_region_cls)
         && r_i64(i, r.founded_year) && r_i64(i, r.industrial_year) && r_bool(i, r.industrialised)
+        && r_int(i, r.industrial_lag_years) // save_game_version 5
         && r_int(i, r.nation) && r_int(i, r.contest_q) && r_i64(i, r.population)
         && r_i64(i, r.last_demography_year) && r_i64(i, r.manpower_stock)
         && r_u32(i, r.works_built) && r_int(i, r.work_capacity_mod)
