@@ -135,10 +135,19 @@ std::vector<int> carve_demography_scales(const settlement_state& settlement,
     }
     else
     {
-        // THE PRE-BL-766 CARVE, kept for every path that never drew a map — a
-        // harness holding a hand-built settlement record, a body whose urban
-        // draw did not run. Unchanged, deliberately: it is a fallback, not a
-        // second model to keep in step.
+        // THE PRE-BL-766 CARVE, and it is reachable ONLY from a hand-built
+        // settlement record — which in practice means a harness fixture.
+        //
+        // The first version of this comment also offered "a body whose urban
+        // draw did not run", and that state does not exist: `draw_urban_map` is
+        // called unconditionally in `make_hard_coded_world`, OUTSIDE the
+        // `era_minus_one_enabled` gate, so every generated body has
+        // `urban_map_drawn == true` whether or not the era sim ran. Naming an
+        // unreachable state as a live one invites the next reader to preserve a
+        // branch for a case that cannot occur.
+        //
+        // Kept unchanged all the same: it is a fallback for fixtures, not a
+        // second model to keep in step with the first.
         for (const region& p : settlement.regions)
         {
             if (p.population <= 0)

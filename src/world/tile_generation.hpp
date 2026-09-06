@@ -138,9 +138,16 @@ struct generation_record
     // coal, and reading these arrays post-endowment would hide that.
     //
     // Endemic trade goods (the C -> D addition) are counted in
-    // `life_phase_placed`, at the magnitude actually written into the tile: they
-    // are biosphere output by construction, and the endemic set is empty on any
-    // world that never reached a land biosphere.
+    // `life_phase_placed` — biosphere output by construction, and the endemic
+    // set is empty on any world that never reached a land biosphere.
+    //
+    // AT THE RAW MAGNITUDE, LIKE EVERYTHING ELSE HERE. The first cut recorded
+    // the endemic contribution at `amount * deposit_scalar` — the value written
+    // into the tile — while the two accumulations above record the pre-multiply
+    // draw. On `abundance_level::sparse` or `lean`, where `deposit_scalar != 1`,
+    // that made `life_phase_placed[coal]` a sum of two different units and the
+    // total meaningless. Both halves are raw placement now, which is what makes
+    // this array comparable to itself across abundance levels.
     std::array<double, resource_count> body_phase_placed{};
     std::array<double, resource_count> life_phase_placed{};
 };

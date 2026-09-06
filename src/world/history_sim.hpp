@@ -543,6 +543,11 @@ enum class sim_domain : uint8_t
 };
 
 inline constexpr int sim_domain_count = 7;
+/// "This polity never crossed the Industrial rung." A sentinel outside every
+/// arc this sim runs, because 0 is a legitimate crossing year on the ancient
+/// arc (4000 BCE -> 0 CE).
+inline constexpr int64_t k_never_industrialised = INT64_MIN;
+
 
 /// One governing entity. At the antiquity start these are CULTURES, not
 /// nations — `run_settlement` leaves `region::nation` at -1 until the
@@ -604,7 +609,16 @@ struct polity
     /// `region::industrial_lag_years` — how long that particular ground takes
     /// once its owner can pay for a furnace at all — and a region lights at
     /// `industrial_year + lag`, if that year falls before the epoch.
-    int64_t industrial_year = 0;
+    /// `k_never_industrialised`, NOT 0, and the distinction is not pedantry:
+    /// 0 CE is a real calendar year on every arc this sim runs, and the ancient
+    /// arc runs 4000 BCE -> 0 CE. Sentinel-as-zero meant three things at once.
+    /// A polity that crossed the rung in year 0 wrote the sentinel, so it was
+    /// re-detected on every later round and `polities_industrialised`
+    /// double-counted it. And on the default single-span arc `sim_band_ceiling`
+    /// is inert, so a median of four polities per world "crossed" between 2000
+    /// and 3100 BCE - garbage that no consumer could tell from a real date, two
+    /// lines beneath a summary correctly printing "no polity reached the rung".
+    int64_t industrial_year = k_never_industrialised;
 
     /// True for a seeded great power (BL-299). Majors start with more ground
     /// and an opposed strategic creed; the periphery stays alive as actors.

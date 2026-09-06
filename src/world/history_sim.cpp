@@ -1543,13 +1543,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // Placed AFTER the verb executes so a crossing bought by this
             // round's Invest is visible this round rather than next.
             {
-                if (q.industrial_year == 0 && mat_band == roster_band::industrial)
+                if (q.industrial_year == k_never_industrialised
+                    && mat_band == roster_band::industrial)
                 {
                     q.industrial_year = y;
                     ++out.polities_industrialised;
                 }
 
-                if (q.industrial_year != 0)
+                if (q.industrial_year != k_never_industrialised)
                 {
                     for (int hi : held)
                     {
