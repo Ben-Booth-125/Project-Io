@@ -167,8 +167,23 @@ struct region
     /// best-endowed ground in a world lights the year its owner crosses.
     int industrial_lag_years = -1;
 
-    int nation = -1;   ///< Index into the nation-id list, once the political pass has run.
+    /// Index into the nation-id list, once the political pass has run.
+    ///
+    /// BEFORE that pass it holds the POLITY id that owned this region at the
+    /// epoch — `run_history_sim` writes it as it goes, and BL-769 is the item
+    /// that stopped throwing it away: `settlement_seed_polities` reads exactly
+    /// this field to hand the history's political map to `generate_nations`,
+    /// which folds the regions of one polity into one nation rather than
+    /// re-inventing borders from the anchors.
+    int nation = -1;
     int contest_q = 0; ///< 0-1000 — how hard this region's frontier was pressed.
+
+    /// BL-750 — the tariff posture of whoever held this region at the epoch,
+    /// 0-1000, broadcast off `polity::protection_q` at the end of the sim. Held
+    /// per region for the same reason `contest_q` is: the political pass reads
+    /// regions, not polities, and this is the handoff object. Zero on every
+    /// path where no sim ran.
+    int protection_q = 0;
 
     // --- Demography (BL-273) ----------------------------------------------
     // The region is the unit of population as well as of settlement — see
@@ -384,6 +399,32 @@ settlement_state run_settlement(const planetology_state& pl,
 /// expansion does not": the Voronoi/BFS growth machinery is untouched, it just
 /// starts from places people actually settled.
 std::vector<int> settlement_seed_tiles(const settlement_state& ss);
+
+/// BL-769 — THE HISTORY'S POLITICAL MAP, in the shape `generate_nations` reads.
+///
+/// Parallel to `settlement_seed_tiles` entry for entry (same filter, same
+/// order): the id of the polity that held each anchored region at the epoch, or
+/// -1 for ground no polity ended up holding. Phase 5 folds the regions of one
+/// polity into one nation instead of growing an independent realm out of every
+/// anchor — which is the whole of BL-769's "finalise what the history produced,
+/// rather than invent it".
+///
+/// MUST BE CALLED BEFORE `derive_national_character`, which overwrites
+/// `region::nation` with the nation index. Pure; no RNG.
+std::vector<int> settlement_seed_polities(const settlement_state& ss);
+
+/// BL-750 — each nation's tariff posture, 0-1000, indexed by nation index.
+///
+/// Reads `region::protection_q` (the polity's, broadcast at the end of the sim)
+/// over the regions each nation ended up holding, and takes the MAXIMUM. Under
+/// BL-769's polity fold a nation's regions all carry the same value and the max
+/// is that value; the max is what keeps the answer a deterministic total where
+/// the size-floor merge has folded two polities together — the more protective
+/// history is the one the merged realm inherits.
+///
+/// MUST BE CALLED AFTER `derive_national_character`, which is what puts the
+/// nation index in `region::nation`. Pure; no RNG.
+std::vector<int> derive_national_protection(const settlement_state& ss, int nation_count);
 
 /// Attribute every region to the nation that ended up holding it, compute the
 /// border-contest integral, and DERIVE the three political axes from the

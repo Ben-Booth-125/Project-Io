@@ -652,6 +652,30 @@ std::vector<int> settlement_seed_tiles(const settlement_state& ss)
     return seeds;
 }
 
+std::vector<int> settlement_seed_polities(const settlement_state& ss)
+{
+    // SAME FILTER, SAME ORDER as `settlement_seed_tiles` — the two are read as
+    // parallel arrays by `generate_nations`, so a divergence here would silently
+    // give a nation somebody else's history.
+    std::vector<int> owners;
+    owners.reserve(ss.regions.size());
+    for (const region& p : ss.regions)
+        if (p.anchor >= 0) owners.push_back(p.nation);
+    return owners;
+}
+
+std::vector<int> derive_national_protection(const settlement_state& ss, int nation_count)
+{
+    std::vector<int> out(static_cast<std::size_t>(nation_count > 0 ? nation_count : 0), 0);
+    for (const region& p : ss.regions)
+    {
+        if (p.nation < 0 || p.nation >= nation_count) continue;
+        int& v = out[static_cast<std::size_t>(p.nation)];
+        if (p.protection_q > v) v = p.protection_q;
+    }
+    return out;
+}
+
 int nearest_region(const settlement_state& ss, int col, int row, int gw)
 {
     int best = -1, best_d = 1 << 30;

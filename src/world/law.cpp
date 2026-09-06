@@ -144,6 +144,52 @@ void seed_prototype_laws(world& w, float rate)
 }
 
 // ---------------------------------------------------------------------------
+// BL-750 — the generated tariff
+// ---------------------------------------------------------------------------
+
+float tariff_rate_for_protection(int protection_q, const tariff_bands& b)
+{
+    if (protection_q < b.threshold_q) return 0.0f;
+    if (protection_q >= b.high_q)     return b.rate_high;
+    if (protection_q >= b.mid_q)      return b.rate_mid;
+    return b.rate_low;
+}
+
+void seed_national_tariffs(world& w,
+                           const std::vector<entity_id>& nation_ids,
+                           const std::vector<int>& protection_q,
+                           const tariff_bands& bands)
+{
+    for (std::size_t ni = 0; ni < nation_ids.size(); ++ni)
+    {
+        if (ni >= protection_q.size()) break;
+        const entity_id author = nation_ids[ni];
+        // BL-480: a law with no author cannot exist, and a dangling one charges
+        // nothing — so an ill-formed record is never written in the first place.
+        if (author == null_entity || w.nations.find(author) == w.nations.end())
+            continue;
+
+        const int   pq   = protection_q[ni];
+        const float rate = tariff_rate_for_protection(pq, bands);
+        if (rate <= 0.0f) continue; // under the floor: this history protects nothing
+
+        law duty;
+        duty.id      = "LAW-IMPORT-TARIFF-" + std::to_string(author);
+        duty.name    = "Import Tariff";
+        duty.effect  = law_effect_kind::import_tariff;
+        duty.rate    = rate;
+        // BLANKET, not directional. The directional form — (author, target,
+        // resource) -> rate — is BL-541's and needs the pair outcomes this
+        // handoff does not carry; scoping the first instance to one resource
+        // would be inventing half of that item here.
+        duty.scope_resource  = law::all_resources;
+        duty.enacting_nation = author;
+        duty.enacted         = true;
+        w.laws.push_back(duty);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // The import tariff (Sprint D4)
 // ---------------------------------------------------------------------------
 // Deliberately NOT folded into `evaluate_laws`. That function resolves the laws

@@ -231,18 +231,23 @@ mechanism.
 `all_nations` sentinel for the blanket form. The intended authoring path is a derivation at campaign
 setup from the Era −1 sim's pair outcomes.
 
-**The tariff has no author** (Ben, 2026-08-23, ruling on NR-400). This is a deliberate ordering, and
-it is stated here so the section above is not read as describing a live duty. `import_tariff` is a
-member of the law-effect vocabulary and of the save format, and `market_clearing` carries the whole
-duty pass — but **nothing enacts one**. No corp verb, no control, and no generation path authors a
-tariff law; the generator seeds the extraction levy alone. So `any_import_tariff_enacted` is false
-for the whole of a played campaign, and the duty pass is unreached.
+**Its author is the history that produced it.** `seed_national_tariffs` enacts one blanket tariff
+per nation whose inherited protection clears the floor, authored by that nation — so the duty falls
+in the author's own market and credits the author's own treasury, through the single
+`enacting_nation` field the levy already uses. No second author, no branch in `market_clearing`, no
+corp verb and no control: the *only* path that writes a tariff is the handoff out of pre-history
+(§ 4 Tariffs).
 
-That makes the tariff **vocabulary ahead of its consumer** — the same shape META_LAYER.md's unwired
-modifier subjects have, and subject to the same discipline: a shape is proven by an instance, and
-an instance is owed. What it is *not* is an inert mechanic the reader should design against as
-though it were charging anyone. The nation grant (§ The 2026-08-18 grant) is what a rate-setting
-author would be built on: setting a tariff rate is named there as a nation power.
+That is what closes the ordering this section used to record. `import_tariff` was **vocabulary ahead
+of its consumer** — a member of the law-effect enum and of the save format, with the whole duty pass
+built and nothing enacting one — the same shape META_LAYER.md's unwired modifier subjects have, and
+subject to the same discipline: *a shape is proven by an instance, and an instance is owed*. The
+instance is the generated posture, and it arrives from history rather than from a dial, which is the
+only form of it § 4 Tariffs would accept.
+
+**`any_import_tariff_enacted` therefore answers a real question now**, and the answer varies by
+world: a world whose pre-history produced no protective polity enacts nothing and pays nothing for
+the mechanism, exactly as before. No tariff is a legitimate world, not a gap.
 
 ---
 
@@ -458,6 +463,29 @@ deterministically by facts it already accumulates — when it industrialised rel
 neighbours (the axis `derive_national_character` already reads for ideology), and whether it holds
 colonies, since a metropole protects its ties. At handoff a polity above the threshold enacts an
 ordinary `import_tariff` law on its campaign nation, the rate banded off the scalar.
+
+**The timing term is a PRODUCT of two readings, and neither alone would do.** How much of the field
+is ahead — the share of surviving polities that lit a furnace strictly before this one — multiplied
+by how far behind it is, its own lag from the world's first furnace as a share of the span from that
+furnace to the epoch. Rank alone is uniform by construction: the last polity in a twelve-way field
+always scores top whether it lit two years late or never. Lag alone makes every non-industrialiser
+saturate, so a world where one polity of twelve industrialises would tariff eleven nations
+identically. The product says *behind, and far behind*.
+
+**A world where nobody lit a furnace scores zero for everyone**, and it falls out rather than being
+special-cased: with no furnace nobody is strictly ahead of anybody and the share term collapses.
+That is the honest reading — protection is a response to an industrial competitor, and a world
+without one has nothing to protect against.
+
+**The colony term is owed, not forgotten.** It has no input while a polity cannot take ground across
+water; BL-749 (sea-leg campaign) is what gives it one, and it lands as an addend on the same scalar.
+A far-flung holding is a large empire, not an overseas one, so no proxy stands in for it meanwhile.
+
+**Rates are banded, blanket, and first-cut.** Three ad-valorem bands above a floor, so the report can
+show *how hard* a history protects and not merely *whether* — a single threshold yields one number
+per world and cannot show whether the scalar carries variation, which is the measurement the
+paragraph below turns on. The directional form — `(author, target, resource) → rate` — stays
+BL-541's; scoping the first instance to one resource would be building half of that item here.
 
 The alternative — protection as a **verb** the polity spends a round on, which would make it a real
 strategy weighting alongside the others — is held as the **fallback, conditioned on a

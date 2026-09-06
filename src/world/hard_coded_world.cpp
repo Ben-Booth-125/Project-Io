@@ -707,6 +707,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
         kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
 
+        // BL-769 — THE HISTORY'S POLITICAL MAP CROSSES THE HANDOFF. Read here,
+        // BEFORE `derive_national_character` overwrites `region::nation` with
+        // the nation index: until that call the field holds the POLITY id the
+        // sim wrote as it ran. Phase 5 folds a polity's regions into one nation
+        // instead of growing an independent realm out of each anchor.
+        kepler_np.seed_polities = settlement_seed_polities(kepler_settlement);
+
         // Each anchor carries its region's tongue across into Pass 5, so a
         // nation is named in the speech of the people who settled its core
         // rather than out of a bank of its own (BL-290).
@@ -739,6 +746,18 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Pass 4 draw, which stays as the fallback for bodies with no settlement.
     derive_national_character(kepler_settlement, kepler_creeds, w,
                               kepler_nations, kepler_tiles, home_grid_width, home_grid_height);
+
+    // BL-750 — THE TARIFF POSTURE, ENACTED. `derive_national_character` has just
+    // put the nation index in `region::nation`, so this is the first moment a
+    // nation's inherited protection can be read; the law it bands to is an
+    // ordinary `import_tariff` authored by that nation, which is what finally
+    // gives NATIONS.md's "vocabulary ahead of its consumer" its instance.
+    //
+    // A world whose polities never industrialised enacts NOTHING here, and that
+    // is a legitimate outcome rather than a gap — see `polity::protection_q`.
+    seed_national_tariffs(w, kepler_nations,
+                          derive_national_protection(
+                              kepler_settlement, static_cast<int>(kepler_nations.size())));
 
     // Coverage (BL-463): the population pass above ran before there were borders,
     // so it could only derive its target from LAND AREA. The NATION term lands

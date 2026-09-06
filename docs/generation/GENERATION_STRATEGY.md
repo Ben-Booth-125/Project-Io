@@ -348,7 +348,7 @@ work.
 | 2 | **Life** | The biosphere's residue as resources — coal where the ancient swamps were, oil where the ancient seas were, timber where the forest still stands. | BL-763 (continent time axis), BL-764 (Lagrangian tiles), BL-765 (paleo deposits) |
 | 3 | **The People** | Where people are, weighted toward ground that farms easily — drawn **before** history and evolved by it. | BL-766 (population map early) |
 | 4 | **The History** | Empires that form, grow and collapse; the roads that supplied them; the markets that emerged from their trade. | BL-767 (empires reliably form), BL-768 (roads and markets from history) |
-| 5 | **The map of consequence** | **Finalise** what the history produced, rather than invent it. City states and pseudo-national borders belong to phase 4. | BL-769 (consequence folds into history) |
+| 5 | **The map of consequence** | **Finalise** what the history produced, rather than invent it: the anchors of one polity fold into one nation, city states survive the size floor, and the tariff posture is enacted. City states and pseudo-national borders belong to phase 4. | BL-769 (consequence folds into history), BL-750 (tariff posture) |
 | 6 | **The economic substrate** | The Era 0 sim: search in parallel for a corporate landscape that is **viable but uneven**. Runs at the ordinary **quarterly tick** (Ben, 2026-09-03), so its SPAN is set by the budget rather than by the calendar — see BL-770 for the arithmetic. | BL-770 (Era 0 candidate search) |
 | 7 | **The rest** | The other bodies, the laws, the partitions. Expands as core systems land. | — |
 | 8 | ~~Warm start~~ | **Retired.** Its burden moves to phase 6. | BL-772 (retire warm start) |
@@ -503,11 +503,24 @@ passes before the search runs, not an axis the search trades against.
 **What crosses each handoff, and nothing else.**
 
 - Pass 1 → pass 2: the region table, cultures, works, the strain accumulators. Nothing is reset.
-- Pass 2 → the political map: the same outputs `generate_nations` reads today, plus two new
-  ones — a nation's **tariff posture**, enacted as an ordinary `import_tariff` law at world
-  setup where pass 2's polity chose protection, and its **colonial ties**, which seed the
-  order book's preferred-seller relationships so a colony's chains close through its metropole
-  before they close anywhere else.
+- Pass 2 → the political map: the same outputs `generate_nations` reads today, plus the
+  **polity map itself** — which polity held each region at the epoch, so a realm arrives as one
+  nation rather than as a Voronoi cell per region — plus a nation's **tariff posture**, enacted
+  as an ordinary `import_tariff` law at world setup where pass 2's polity ended up protective,
+  and its **colonial ties**, which seed the order book's preferred-seller relationships so a
+  colony's chains close through its metropole before they close anywhere else.
+
+  **The fold is what makes phase 5 a finalisation.** Before it, the political map was re-derived
+  from the region anchors as though the history had not just drawn one, and every empire the sim
+  built was dissolved back into its provinces at the handoff. The carve is unchanged and stays
+  unchanged: it answers where the line between two of a realm's own regions falls, which is a
+  geometric question the history never asked. What crosses is whose flag flies over both.
+
+  **A city state crosses as itself.** A polity that reached the epoch holding one region with a
+  city on it is exempt from the size floor that would otherwise absorb it — "it is fine to
+  consider city states as population centres" (Ben, point 5) — and never absorbs anybody, since a
+  city state that annexed its neighbours would stop being one. A world with no city state is a
+  legitimate outcome; the exemption is a permission, never a quota.
 - Pass 3 → play: the world state, as the warm start hands it over today. Pass 3 seeds no
   behaviour (§ Generation seeds no behaviour in `CORPORATION_GENERATION.md` still holds).
 

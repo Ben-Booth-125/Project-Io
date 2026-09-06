@@ -17,6 +17,7 @@
 #include <random>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -460,10 +461,23 @@ void assign_orphan_islands(std::vector<int>& owner_map,
 /// nation so the pass always progresses. `owner_map` is mutated in place; ocean
 /// tiles stay -1.
 ///
+/// BL-769 — `exempt` NAMES THE CITY STATES. An exempt nation is never chosen as
+/// the smallest (so the loop steps past it and keeps working on the rest rather
+/// than stopping at the first survivor under the floor), is never absorbed, and
+/// is never an ABSORBER either — a city state that swallowed its neighbours
+/// would stop being one, which is the failure the exemption exists to prevent.
+/// An empty mask is exactly the pre-BL-769 pass.
+///
 /// @return the final nation count (distinct nations after compaction).
 int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
-                             int min_tiles, int gw, int gh)
+                             int min_tiles, int gw, int gh,
+                             const std::vector<bool>& exempt)
 {
+    const auto is_exempt = [&](int ni) {
+        return ni >= 0 && ni < static_cast<int>(exempt.size())
+            && exempt[static_cast<std::size_t>(ni)];
+    };
+
     const int total = gw * gh;
 
     std::vector<int> count(static_cast<std::size_t>(seed_count), 0);
@@ -481,11 +495,15 @@ int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
 
     while (distinct > 1)
     {
-        // Smallest active nation (tie: lowest index).
+        // Smallest active NON-EXEMPT nation (tie: lowest index). Exempt ones are
+        // skipped rather than breaking the loop: the stopping condition below is
+        // about the realms the floor still governs, and a city state sitting
+        // permanently under it would otherwise halt the pass on its first turn.
         int small = -1;
         for (int ni = 0; ni < seed_count; ++ni)
         {
             if (!active[static_cast<std::size_t>(ni)]) continue;
+            if (is_exempt(ni)) continue;
             if (small < 0 || count[static_cast<std::size_t>(ni)] < count[static_cast<std::size_t>(small)])
                 small = ni;
         }
@@ -509,6 +527,7 @@ int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
                 const int no = owner_map[static_cast<std::size_t>(
                     raster_idx(nbrs[i].first, nbrs[i].second, gw))];
                 if (no < 0 || no == small || !active[static_cast<std::size_t>(no)]) continue;
+                if (is_exempt(no)) continue; // a city state does not annex
                 if (seen[static_cast<std::size_t>(no)]) continue;
                 seen[static_cast<std::size_t>(no)] = true;
                 if (best < 0
@@ -523,6 +542,7 @@ int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
             for (int ni = 0; ni < seed_count; ++ni)
             {
                 if (!active[static_cast<std::size_t>(ni)] || ni == small) continue;
+                if (is_exempt(ni)) continue;
                 if (best < 0 || count[static_cast<std::size_t>(ni)] > count[static_cast<std::size_t>(best)])
                     best = ni;
             }
@@ -550,6 +570,81 @@ int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
             owner_map[static_cast<std::size_t>(idx)] = remap[static_cast<std::size_t>(ni)];
     }
     return next;
+}
+
+// ---------------------------------------------------------------------------
+// Pass 2c' — the city states (BL-769)
+// ---------------------------------------------------------------------------
+
+/// Which surviving candidate nations are CITY STATES, and therefore not the
+/// size floor's business.
+///
+/// THREE CONDITIONS, ALL FROM THE HISTORY, none of them a size:
+///   1. the nation came out of the polity fold at all (its representative seed
+///      carries a real polity id) — a Voronoi cell nobody ever governed is not
+///      a city state, it is unclaimed ground;
+///   2. the polity held exactly ONE region at the epoch. That is what a city
+///      state IS at sim grain, and it is the condition that keeps the exemption
+///      narrow: an empire below the floor is a failed empire, not a city;
+///   3. a population centre stands on its ground. Ben's point 5 is "it is fine
+///      to consider city states as population centres", so a single-region
+///      polity with no city is a holdout, not a city state, and merges as any
+///      other undersized realm does.
+///
+/// DETERMINISTIC OVER AN UNORDERED CONTAINER, explicitly rather than by luck:
+/// `w.population_centres` is hashed, so the ids are SORTED before the walk. The
+/// result would be the same either way (the walk only sets flags, and set-union
+/// does not care about order) but a later edit that made it care would not be
+/// visible, and this file's invariant is that no iteration order can be read.
+std::vector<bool> mark_city_states(const world& w,
+                                   const std::vector<entity_id>& tile_ids,
+                                   const std::vector<int>& owner_map,
+                                   const std::vector<int>& fold,
+                                   const std::vector<int>& seed_polity,
+                                   int seed_count, int total)
+{
+    std::vector<bool> exempt(static_cast<std::size_t>(seed_count), false);
+    if (seed_polity.empty()) return exempt;
+
+    // (1) + (2): how many seeds folded into each representative, and did that
+    // representative carry a polity at all.
+    std::vector<int> folded_seeds(static_cast<std::size_t>(seed_count), 0);
+    for (int si = 0; si < seed_count && si < static_cast<int>(seed_polity.size()); ++si)
+    {
+        if (seed_polity[static_cast<std::size_t>(si)] < 0) continue;
+        const int rep = fold[static_cast<std::size_t>(si)];
+        if (rep >= 0 && rep < seed_count) ++folded_seeds[static_cast<std::size_t>(rep)];
+    }
+
+    // (3): the cities. Reverse index tile -> raster idx, then one sorted walk.
+    std::unordered_map<entity_id, int> tile_slot;
+    tile_slot.reserve(tile_ids.size() * 2);
+    for (int idx = 0; idx < total && idx < static_cast<int>(tile_ids.size()); ++idx)
+        if (tile_ids[static_cast<std::size_t>(idx)] != null_entity)
+            tile_slot[tile_ids[static_cast<std::size_t>(idx)]] = idx;
+
+    std::vector<entity_id> centre_ids;
+    centre_ids.reserve(w.population_centres.size());
+    for (const auto& [cid, cc] : w.population_centres) { (void)cc; centre_ids.push_back(cid); }
+    std::sort(centre_ids.begin(), centre_ids.end());
+
+    std::vector<bool> has_centre(static_cast<std::size_t>(seed_count), false);
+    for (const entity_id cid : centre_ids)
+    {
+        const auto ct = w.population_centre_tile.find(cid);
+        if (ct == w.population_centre_tile.end()) continue;
+        const auto slot = tile_slot.find(ct->second);
+        if (slot == tile_slot.end()) continue;
+        const int ni = owner_map[static_cast<std::size_t>(slot->second)];
+        if (ni >= 0 && ni < seed_count) has_centre[static_cast<std::size_t>(ni)] = true;
+    }
+
+    for (int ni = 0; ni < seed_count; ++ni)
+        if (folded_seeds[static_cast<std::size_t>(ni)] == 1
+            && has_centre[static_cast<std::size_t>(ni)])
+            exempt[static_cast<std::size_t>(ni)] = true;
+
+    return exempt;
 }
 
 // ---------------------------------------------------------------------------
@@ -739,6 +834,10 @@ std::vector<entity_id> generate_nations(
     // core. Empty entries (or the random-placement path) fall back to a rolled
     // tongue there.
     std::vector<tongue> seed_speech;
+    // Parallel to `seeds` again (BL-769): which polity held the region this seed
+    // is the anchor of. -1 = ground no polity ended up holding, and also every
+    // entry on a body with no settlement pass.
+    std::vector<int> seed_polity;
     if (!params.seed_tiles.empty())
     {
         std::vector<bool> taken(static_cast<std::size_t>(total), false);
@@ -753,6 +852,9 @@ std::vector<entity_id> generate_nations(
             seed_speech.push_back(si < params.seed_tongues.size()
                                       ? params.seed_tongues[si]
                                       : tongue{});
+            seed_polity.push_back(si < params.seed_polities.size()
+                                      ? params.seed_polities[si]
+                                      : -1);
         }
     }
     if (seeds.empty())
@@ -793,12 +895,75 @@ std::vector<entity_id> generate_nations(
     // --- Pass 2b: orphan-island assignment (claim sea-disconnected ground) ---
     assign_orphan_islands(owner_map, unclaimable, gw, gh);
 
+    // --- Pass 2d: THE POLITY FOLD (BL-769) ---------------------------------
+    //
+    // Phase 5 finalises what the history produced rather than inventing it. The
+    // carve above answered a geometric question — where the boundary between
+    // two anchors falls — and this answers the political one the sim already
+    // answered: whose flag flies over both. Seeds anchored in regions the same
+    // polity held collapse to ONE nation, so an empire that took nine regions
+    // arrives as one realm holding nine regions' ground instead of nine
+    // separate realms that happen to sit next to each other.
+    //
+    // The representative is the LOWEST-INDEXED seed of the polity. Region ids
+    // ascend in founding order (`run_settlement` places, `Settle` appends), so
+    // the lowest-indexed region of a polity is its founding core — which is
+    // also what Pass 5 already means by "the region it grew from" when it picks
+    // the realm's tongue and its capital tile. One rule, three consumers.
+    //
+    // Territory can end up NON-CONTIGUOUS, and that is the point rather than a
+    // defect: a polity that conquered across a neighbour holds ground on both
+    // sides of it, which is a fact of the history and was previously erased.
+    //
+    // Empty `seed_polities` (or all -1) is the identity, so every body without a
+    // settlement pass carves exactly as it did before this item.
+    std::vector<int> fold(static_cast<std::size_t>(seed_count));
+    for (int si = 0; si < seed_count; ++si) fold[static_cast<std::size_t>(si)] = si;
+    {
+        int max_polity = -1;
+        for (std::size_t si = 0; si < seed_polity.size(); ++si)
+            if (seed_polity[si] > max_polity) max_polity = seed_polity[si];
+
+        if (max_polity >= 0)
+        {
+            // Indexed by polity id, not hashed: the walk below is ascending over
+            // a vector, so the representative a polity gets cannot depend on any
+            // container's layout.
+            std::vector<int> first_seed(static_cast<std::size_t>(max_polity + 1), -1);
+            for (int si = 0; si < seed_count && si < static_cast<int>(seed_polity.size()); ++si)
+            {
+                const int pol = seed_polity[static_cast<std::size_t>(si)];
+                if (pol < 0) continue;
+                int& rep = first_seed[static_cast<std::size_t>(pol)];
+                if (rep < 0) rep = si;
+                fold[static_cast<std::size_t>(si)] = rep;
+            }
+
+            for (int idx = 0; idx < total; ++idx)
+            {
+                const int ni = owner_map[static_cast<std::size_t>(idx)];
+                if (ni >= 0 && ni < seed_count)
+                    owner_map[static_cast<std::size_t>(idx)] = fold[static_cast<std::size_t>(ni)];
+            }
+        }
+    }
+
     // --- Pass 2c: light "in history" merges — absorb anything below the size floor ---
     // No target count: the loop stops when every survivor holds a viable territory,
     // so the final nation count is whatever the landmass and coastline produce.
+    //
+    // BL-769: the floor now judges POLITY-GRAIN territories, because the fold
+    // ran first — so a realm is absorbed for being a small realm, not for being
+    // one province of a large one.
+    const std::vector<bool> city_states =
+        params.keep_city_states
+            ? mark_city_states(w, tile_ids, owner_map, fold, seed_polity, seed_count, total)
+            : std::vector<bool>{};
+
     int nation_count = seed_count;
     if (params.min_nation_tiles > 0)
-        nation_count = merge_undersized_nations(owner_map, seed_count, params.min_nation_tiles, gw, gh);
+        nation_count = merge_undersized_nations(owner_map, seed_count, params.min_nation_tiles,
+                                                gw, gh, city_states);
 
     // BL-305: 2b and 2c both rewrite owner indices wholesale (the merge also
     // COMPACTS them), so this is the one place the published map has to be
