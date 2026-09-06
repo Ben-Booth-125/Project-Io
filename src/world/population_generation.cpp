@@ -62,6 +62,14 @@ int draw_scale(std::mt19937& rng)
 /// demography and the density.
 constexpr int64_t k_demography_urban_share_q = 100; // 10%
 
+// The sim-grain rung and the campaign-era rung are the SAME rung (BL-766): a
+// region that stood up three centres during the era must materialise three at
+// the epoch. Two copies of a constant is how they drift apart, so bind them at
+// compile time rather than in a comment.
+static_assert(k_demography_heads_per_centre == region_centre_heads,
+              "BL-766: the sim-grain centre rung and the campaign-era carve rung "
+              "must be the same headcount");
+
 /// Scale banding thresholds in RAW HEADS: the geometric midpoints between the
 /// `k_population_for_scale` rungs (10k/50k/200k/1M/5M heads), so a carved share
 /// lands on the NEAREST rung in log space rather than always rounding down.
@@ -105,15 +113,40 @@ std::vector<int> carve_demography_scales(const settlement_state& settlement,
     if (heads_per_centre <= 0)
         return out;
 
+    // BL-766: the two quantities are now READ, not re-derived. `region::centres`
+    // and `region::urban_population` were drawn before the Era -1 sim and moved
+    // by it, so the count carries every founding, every sack and every ruin the
+    // history produced — which the flat urban share below could not see.
+    //
+    // `urban_map_drawn` is the discriminator and not the headcount: a world
+    // whose cities history razed to the last one and a world where no map was
+    // ever drawn both sum to zero, and they want opposite answers.
     int64_t urban_total = 0;
     int64_t count       = 0;
-    for (const region& p : settlement.regions)
+    if (settlement.urban_map_drawn)
     {
-        if (p.population <= 0)
-            continue;
-        const int64_t urban = p.population * k_demography_urban_share_q / 1000;
-        urban_total += urban;
-        count       += std::max<int64_t>(1, urban / heads_per_centre);
+        for (const region& p : settlement.regions)
+        {
+            if (p.population <= 0 || p.centres <= 0)
+                continue; // A razed or emptied region towns nobody.
+            urban_total += p.urban_population;
+            count       += p.centres;
+        }
+    }
+    else
+    {
+        // THE PRE-BL-766 CARVE, kept for every path that never drew a map — a
+        // harness holding a hand-built settlement record, a body whose urban
+        // draw did not run. Unchanged, deliberately: it is a fallback, not a
+        // second model to keep in step.
+        for (const region& p : settlement.regions)
+        {
+            if (p.population <= 0)
+                continue;
+            const int64_t urban = p.population * k_demography_urban_share_q / 1000;
+            urban_total += urban;
+            count       += std::max<int64_t>(1, urban / heads_per_centre);
+        }
     }
     if (count <= 0)
         return out;
@@ -236,6 +269,39 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
             : 1;
     };
 
+    // BL-766, the tile-grain half of "extra attention to areas where farming
+    // would be easy" (Ben, the eight-phase reorder). The region-grain half is
+    // the urban map drawn before the sim, which decides HOW MANY centres and
+    // HOW LARGE; this decides WHERE on the body they land, and the two compose
+    // by multiplication like every other term in this pool.
+    //
+    // Separate from `richness_weight` on purpose even though that sum already
+    // includes agricultural_produce: there, food is one extractable among
+    // seven and a rich ore tile drowns it out. Cities stand on ground that
+    // feeds them, so the food deposit gets a term of its own — a 1..3 bucket,
+    // deliberately narrower than richness's 1..5, so it tilts placement toward
+    // farmland without overturning the deposit pull BL-132 established.
+    std::unordered_map<int, float> idx_to_farm;
+    idx_to_farm.reserve(candidates.size());
+    float max_farm = 0.0f;
+    for (const int idx : candidates)
+    {
+        const auto tc_it = w.tiles.find(tile_ids[static_cast<std::size_t>(idx)]);
+        if (tc_it == w.tiles.end())
+            continue;
+        const float f = tc_it->second.resource_deposit[
+            static_cast<std::size_t>(resource_type::agricultural_produce)];
+        idx_to_farm[idx] = f;
+        max_farm = std::max(max_farm, f);
+    }
+    auto farm_weight = [&](int idx) -> int {
+        const auto fit = idx_to_farm.find(idx);
+        const float f = (fit != idx_to_farm.end()) ? fit->second : 0.0f;
+        return (max_farm > 0.0f)
+            ? 1 + static_cast<int>(std::round(2.0f * f / max_farm))
+            : 1;
+    };
+
     // Target centre count and scales — BL-610 (centres from demography): on a
     // body with an Era -1 settlement record, BOTH derive from the regions'
     // simulated populations. Density is history's consequence — a world whose
@@ -305,7 +371,9 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
         {
             if (occupied_indices.count(idx))
                 continue; // already occupied
-            const int weight = (adjacent_indices.count(idx) ? 3 : 1) * richness_weight(idx);
+            const int weight = (adjacent_indices.count(idx) ? 3 : 1)
+                             * richness_weight(idx)
+                             * farm_weight(idx); // BL-766: cities stand where the food is.
             for (int w2 = 0; w2 < weight; ++w2)
                 pool.push_back(idx);
         }

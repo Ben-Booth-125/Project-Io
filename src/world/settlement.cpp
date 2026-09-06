@@ -1309,6 +1309,37 @@ constexpr int64_t demog_plague_core_q     = 250;    // Epicentre loses up to 25%
 constexpr int64_t demog_plague_falloff_q  = 60;     // Per grid step of distance, the loss tapers.
 constexpr int      demog_plague_radius    = 6;      // Neighbours beyond this feel nothing.
 
+// --- The urban record (BL-766) ---------------------------------------------
+// Same fixed-point discipline: thousandths, no floats, no RNG anywhere on this
+// path. Every one of these is a first cut sized off the demography constants
+// above rather than a measured figure, and they are grouped here so the tuning
+// surface stays one place.
+
+/// The population the sim seeds an empty region with, as a divisor of its
+/// carrying capacity. Mirrors what `run_history_sim` has always used; named
+/// here because the urban draw has to size itself against the same figure.
+constexpr int64_t urban_seed_pop_divisor = 8;
+
+/// Below this `farm_q` the ground feeds its own farmers and nobody else, so no
+/// town is drawn on it at all. THE ITEM'S WHOLE WEIGHTING, in one gate: the
+/// opening map is a map of where farming is easy.
+constexpr int urban_seed_farm_floor_q = 300;
+
+/// Urban share of a region's people: a floor plus a slope on `farm_q`, so a
+/// hard-farming region towns 4% of itself and the best ground towns 20%.
+constexpr int urban_share_floor_q = 40;
+constexpr int urban_share_farm_q  = 160;
+
+/// Per-mille of the gap to the urban target closed each simulated year. Cities
+/// grow and shrink; they never jump.
+constexpr int64_t urban_converge_q = 40;
+
+/// A sack costs the city this multiple of what it costs the countryside
+/// (per mille, so 2000 = twice). Walls are what an army sacks; fields survive
+/// it. This is the term that lets history DESTROY a centre rather than only
+/// thin it.
+constexpr int64_t urban_sack_multiple_q = 2000;
+
 } // namespace
 
 int64_t region_carrying_capacity(int farm_q)
@@ -1357,6 +1388,127 @@ int64_t raise_manpower(region& p, int64_t want)
     const int64_t raised = std::min(want, p.manpower_stock);
     p.manpower_stock -= raised; // Bounded by construction: never negative, never over-drawn.
     return raised;
+}
+
+// ---------------------------------------------------------------------------
+// The urban record (BL-766) — the population map, drawn early and then lived in
+// ---------------------------------------------------------------------------
+
+int64_t region_seed_population(int farm_q)
+{
+    const int64_t k = region_carrying_capacity(farm_q) / urban_seed_pop_divisor;
+    return clampi64(k, 1, 1 << 30);
+}
+
+int region_urban_share_q(int farm_q)
+{
+    const int q = clampi(farm_q, 0, 1000);
+    return urban_share_floor_q + (q * urban_share_farm_q) / 1000;
+}
+
+namespace {
+
+/// Promote `centres` to whatever `urban_population` now stands up, never
+/// demote. POPULATION.md's asymmetry: passive failure shrinks a centre and
+/// never destroys one, so only `sack_region_urban` takes a centre off the map.
+void promote_centres(region& p)
+{
+    const int stood = static_cast<int>(
+        clampi64(p.urban_population / region_centre_heads, 0, region_centre_limit));
+    if (stood > p.centres)
+        p.centres = stood;
+}
+
+} // namespace
+
+void draw_region_urban(region& p)
+{
+    // The ground that feeds a town. Below the floor the map stays empty here —
+    // and it should: a region with no city is what makes a region WITH one mean
+    // something.
+    if (clampi(p.farm_q, 0, 1000) < urban_seed_farm_floor_q)
+    {
+        p.urban_population = 0;
+        p.centres          = 0;
+        return;
+    }
+
+    // Size against the population the region HAS, or — the case at the opening
+    // draw, before the sim has seeded anything — against the one it is about to
+    // be given.
+    const int64_t heads = (p.population > 0) ? p.population
+                                             : region_seed_population(p.farm_q);
+    p.urban_population = clampi64(
+        (heads * region_urban_share_q(p.farm_q)) / 1000, 0, 1LL << 40);
+
+    // At least one settlement stands where the ground invited one, even where
+    // the opening headcount is below a full rung. Two reasons, and the second
+    // is the one that took a measurement to find:
+    //
+    //  1. The map has to be DRAWN before the sim, not merely made drawable, or
+    //     the sim runs over an empty world again and nothing has changed.
+    //  2. Applied at EVERY founding, it is what makes a frontier region
+    //     razeable. Without it a region founded by the Settle verb held no
+    //     settlement until its townsfolk crossed a full rung, and since most
+    //     ground a war changes hands over is exactly that young frontier, a
+    //     sack had nothing to destroy: 207 conquests over a 400-year era razed
+    //     zero centres. The rule is now ONE rule — ground that farms gets a
+    //     settlement, whenever it is settled — rather than one rule for the
+    //     opening map and another for everything history founded after it.
+    p.centres = 1;
+    promote_centres(p);
+}
+
+void draw_urban_map(settlement_state& s)
+{
+    for (region& p : s.regions)
+        draw_region_urban(p);
+    s.urban_map_drawn = true;
+}
+
+void advance_region_urban(region& p)
+{
+    if (p.population <= 0)
+    {
+        // A region history emptied keeps no city. `centres_razed` is not
+        // touched here: nobody sacked these walls, the people simply went.
+        p.urban_population = 0;
+        p.centres          = 0;
+        return;
+    }
+
+    const int64_t target =
+        clampi64((p.population * region_urban_share_q(p.farm_q)) / 1000, 0, 1LL << 40);
+    const int64_t gap = target - p.urban_population;
+    // Integer division truncates toward zero in both directions, so the step is
+    // symmetric and a gap smaller than 1000/urban_converge_q simply stalls —
+    // which is the correct behaviour for a town already at its ground's size.
+    p.urban_population = clampi64(p.urban_population + (gap * urban_converge_q) / 1000,
+                                  0, 1LL << 40);
+    promote_centres(p);
+}
+
+void sack_region_urban(region& p, int population_loss_q)
+{
+    if (p.centres <= 0 && p.urban_population <= 0)
+        return;
+
+    const int64_t loss_q =
+        clampi64((static_cast<int64_t>(clampi(population_loss_q, 0, 1000))
+                  * urban_sack_multiple_q) / 1000, 0, 1000);
+    p.urban_population = clampi64(
+        p.urban_population - (p.urban_population * loss_q) / 1000, 0, 1LL << 40);
+
+    // What the survivors can still stand up. The difference is destruction, and
+    // it is RECORDED — a razed city that is later rebuilt still says it was
+    // razed, which is the only way the epoch map can read as historied.
+    const int stands = static_cast<int>(
+        clampi64(p.urban_population / region_centre_heads, 0, region_centre_limit));
+    if (stands < p.centres)
+    {
+        p.centres_razed += p.centres - stands;
+        p.centres = stands;
+    }
 }
 
 void advance_region_demography(region& p, int years, int war_pressure_q)
