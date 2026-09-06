@@ -790,6 +790,22 @@
    ]
   },
   {
+   "id": "UI-117",
+   "name": "Water tile selection",
+   "kind": "sub-element",
+   "parent": "UI-043",
+   "source": [
+    "docs/ui/SELECTION.md § A water tile is selectable, and its selection answers ownership",
+    "docs/generation/PROVINCES.md § Who owns water"
+   ],
+   "summary": "The water variant of the tile element: the same header, hex ring and action grid, with a centre column that answers OWNER and DOMAIN first, then province and habitability, in place of the five ground sections. Unowned is stated in words, never left blank.",
+   "interesting_question": "The band answers 'who holds THIS tile', one tile at a time. Does answering ownership one hex at a time create pressure for a territory lens the design deliberately leaves unbuilt?",
+   "resolution": "Open by design: SELECTION.md names the lens as the thing this is NOT ('the lens stays unbuilt and unpromised'), so the pressure is acknowledged rather than resolved.",
+   "checks": [
+    "water_tile_selection"
+   ]
+  },
+  {
    "id": "UI-046",
    "name": "Body selection action/facts",
    "kind": "sub-element",
