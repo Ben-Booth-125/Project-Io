@@ -434,12 +434,23 @@ injects supply and demand.** Nothing in the engine injects fictional supply; the
 quantities are the two pure demand pulls in step 3. The design is BL-365 (real background
 corporations).
 
-World-gen runs a **second, later corporation-generation pass**
-(`docs/generation/CORPORATION_GENERATION.md` § Pass 6) that places real background firms — real
-buildings, on real tiles, with `corporation_component.is_background = true` — until the body's
-real production meets a ~90% target fraction of real demand. The count is **calibrated**, not
-authored: generation keeps adding firms/holdings until the measured production/demand ratio
-crosses the target, so the figure stays correct as recipes, deposits, or population are retuned.
+**The background economy is the landscape phase 6 selected** — not a separate injection pass bolted
+on after generation (BL-772, retire warm start). Generation scores candidate corporate landscapes
+— rosters, placements and road tiers — statically against the finished world, and the winning
+candidate's firms *are* the background economy: real buildings, on real tiles, with
+`corporation_component.is_background = true`. Placement mechanics are
+`docs/generation/CORPORATION_GENERATION.md` § Pass 6; what is placed is decided by the search
+(`docs/generation/GENERATION_STRATEGY.md` § The eight phases; BL-770, Era 0 candidate search).
+
+**So the roster is a consequence of the objective, not of a calibrated stopping rule.** The earlier
+design added firms until measured production crossed a ~90% target fraction of measured demand.
+That is superseded, and for a reason worth stating rather than dropping: a target fraction pushes
+every market toward the same coverage, and an even map is exactly what
+`docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the deliverable exists to prevent. The
+search's objective is **viable-but-uneven** — chain completeness, the supply-to-demand ratio, and
+the *spread* of both across markets, with unevenness scored for rather than tolerated. What the
+calibrated rule got right is kept: nothing is authored as a fixed count, so the roster stays
+correct as recipes, deposits or population are retuned.
 
 Background firms are not a cheaper stand-in for the player's rivals. They run the **full corp_ai
 scored-utility layer** — build, demolish, survey, road, hire, and trade decisions, identical to
