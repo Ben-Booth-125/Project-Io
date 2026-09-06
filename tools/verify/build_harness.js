@@ -61,6 +61,17 @@ function resolveDepsCache() {
   return local;
 }
 const DEPS = resolveDepsCache();
+
+/// Quote one argument for the cl command line.
+///
+/// NOT JSON.stringify, which is the trap this replaced. JSON escaping DOUBLES
+/// backslashes, so an absolute Windows path came out as
+/// `"C:\\Users\\benbo\\..."` and named a directory that does not exist. It
+/// survived unnoticed for the source-file arguments only because cl tolerates it
+/// there; on an `/I` include path it fails outright, and it fails as C1083 on
+/// sol/sol.hpp — indistinguishable from the wrong-builder symptom this file
+/// exists to diagnose. Shell quoting is not string escaping.
+function q(p) { return '"' + p + '"'; }
 const WORLD = path.join(ROOT, 'src', 'world');
 
 // The five sol2/Lua TUs io_world_obj excludes. Mirrored from CMakeLists
@@ -255,9 +266,12 @@ if (isWindows) {
     // on C1083 before a single assertion runs, which is how main sat with the whole
     // verifier-headless tier unbuildable (2026-08-31). Third rot of this arg list;
     // this file's own header comment already warned about the first two.
-    '/I', '_deps_cache\\sol2_src\\include', '/I', '_deps_cache\\lua_src',
-    JSON.stringify(path.relative(ROOT, src)),
-    ...sources.map(s => JSON.stringify(path.relative(ROOT, s))),
+    // ABSOLUTE, VIA resolveDepsCache(), because these were relative and a git
+    // WORKTREE has no _deps_cache of its own — so every worktree agent died here
+    // on C1083 while the main checkout worked fine. Fourth rot of this arg list.
+    '/I', q(path.join(DEPS, 'sol2_src', 'include')), '/I', q(path.join(DEPS, 'lua_src')),
+    q(path.relative(ROOT, src)),
+    ...sources.map(s => q(path.relative(ROOT, s))),
     `/Fo:${path.relative(ROOT, objDir)}\\`, `/Fe:${path.relative(ROOT, exe)}`].join(' ');
   // ONE command string, and argv0 is NOT 'cmd'. It used to be
   // spawnSync('cmd', ['/c', ...], { shell: true }), which is a DOUBLE WRAP:
