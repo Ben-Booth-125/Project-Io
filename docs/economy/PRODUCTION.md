@@ -561,6 +561,27 @@ together, which is the cliff this rule exists to prevent. **And no wire, no draw
 does not, the good cannot arrive, so the building neither draws it nor weakens for want of it; the
 ordinary goods in its basket still draw and still bind. Owner: BL-746 (upkeep starvation cliff).
 
+**And no price, no draw (Ben, 2026-09-06).** A building draws a grid good only once its **catchment
+market has priced it** — that is, only once the market this building clears against has ever
+resolved a real price for that good, rather than carrying the untouched authored default. Before
+that moment the good has no supplier the building could have bought from, so a draw against it is
+not scarcity being expressed, it is a bill for a market that does not exist yet.
+
+This is the third rung of the same rule, and it exists for the same reason as the other two: it is
+what lets a supply industry **come into being at all**. A universal draw switched on at tick 0
+prices out the generation buildings that would have met it — a generator short of power throttles
+itself — so the draw suppresses its own supply and the shortfall is structural rather than
+transient. Gating on the priced market makes the draw arrive *behind* the industry instead of ahead
+of it.
+
+**The failure mode is that this silences the scarcity rather than resolving it**, and it is not
+distinguishable from success by the supply factor alone. A grid good that is never priced anywhere
+is never drawn anywhere, and the field then reads healthy for the reason a field with no economy
+reads healthy. So the pair is read together: the **supply factor** and the **price of the grid
+good**. A supply factor climbing while the good stays unpriced is the fix hiding the problem; a
+supply factor climbing while the good carries a real, moving price is the industry having been
+allowed to form.
+
 **The corollary for authoring:** a channel's rates may ship at zero while its shape ships complete.
 A draw for a good the world does not yet make is not a channel that needs tuning down — it is a
 channel whose supply has not been induced yet, and the honest response is to ship it inert and turn

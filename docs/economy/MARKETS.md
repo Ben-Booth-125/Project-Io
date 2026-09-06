@@ -387,6 +387,23 @@ gameplay that good produces.
   nations crave different luxuries and the trade route is asymmetric by construction. This is the
   most *Trade*-shaped channel of the eight: extract where it grows, sell where the money is.
 
+  **`trade_goods_misc` joins this basket as its fifth member (Ben, 2026-09-06).** It is a *produced*
+  endemic-class good — the Potter & Weaver's and the Glassworks' output — where the other four are
+  extracted, and until now it was produced, priced and wanted by nothing, which under this document's
+  admission rule (a consumer is a mechanism, not a noun) makes it a name rather than a resource.
+  Putting it in the wealth-scaled basket gives it the one thing it lacked: a terminal sink in its
+  own band.
+
+  **What it costs, and it is worth stating rather than discovering.** The four extracted luxuries
+  carry *geography* — each grows in one lat/sector and nowhere else, which is what makes the trade
+  route asymmetric and the price a function of distance. `trade_goods_misc` has no endemic geography;
+  it is made wherever clay and a workshop are. So its row **dilutes the directional asymmetry** that
+  is the whole point of the channel — a fifth craving that every nation can satisfy locally. It is
+  admitted anyway because a sink in the right band beats no sink at all, and because the dilution is
+  bounded by the row's own weight. If the channel's asymmetry measurably weakens, the honest next
+  step is to give the good a geography (an endemic *recipe* input, or a named luxury replacing the
+  placeholder) rather than to widen the basket further.
+
 ### Measuring it
 
 A demand model is only as good as the census that checks it, and the failure it must catch is a

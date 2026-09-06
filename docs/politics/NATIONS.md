@@ -452,6 +452,26 @@ scorer's grudge term (§ 5).
 
 *Owned by BL-541 (directional tariffs).*
 
+**A polity's protection is a DERIVED output, not a scored verb (Ben, 2026-09-06).** The pre-history
+polity does not spend a round choosing protectionism. It carries a protection scalar moved
+deterministically by facts it already accumulates — when it industrialised relative to its
+neighbours (the axis `derive_national_character` already reads for ideology), and whether it holds
+colonies, since a metropole protects its ties. At handoff a polity above the threshold enacts an
+ordinary `import_tariff` law on its campaign nation, the rate banded off the scalar.
+
+The alternative — protection as a **verb** the polity spends a round on, which would make it a real
+strategy weighting alongside the others — is held as the **fallback, conditioned on a
+measurement**: if the derived form produces a *flat* distribution, where every world tariffs the
+same nations to the same degree or none at all, then the scalar is not carrying real variation and
+the verb is what would give it some. Flatness is the trigger and it is the only one; the verb costs
+a candidate per round and is not bought for elegance.
+
+This keeps the tariff inside the 2026-08-18 nation grant unchanged either way — setting a rate is
+named there as a nation power, and a derived posture is pure, seeded and replayable by
+construction. And it keeps the player-facing half honest: a home market sheltered because *its
+nation's history sheltered it* is a force with a visible cause, which is the standing requirement
+that market conditions never come from a term inside an agent.
+
 ### 5. What a nation wants — **a positional objective, not an accumulative one**
 
 Ben: *"Nation objectives should be terrestrial diplomacy. Figuring out which economic niche can be

@@ -127,6 +127,60 @@ THE BEFORE-FIGURES ARE ALREADY CAPTURED - do not re-measure them:
   warm start         72-73 s on BOTH arcs (53.7 s on one later run - treat 72 s as standing until BL-761 measures it properly)
   generation         ~8.2 s Release; the era pass itself only 197-323 ms
 
+--- RE-PLANNED 2026-09-06 ON BEN CALL: THE GENERATION-SIDE MARKETS GO FIRST, NOT THE WATER WAVE ---
+
+Asked which body of market work to continue, Ben chose 32b GENERATION-SIDE MARKETS and chose it with
+the gate stated as unmet. That re-orders this sprint: wave 1 (the water model, BL-776..BL-780) is not
+next, and the market chain is. The water wave keeps its shape and its captured before-figures for
+whenever it opens - nothing about it is withdrawn, only deferred.
+
+THE GATE HE ACCEPTED, recorded so the result is read correctly rather than rediscovered. BL-770 was
+gated on sprint 33 showing valued production flat or rising, because a search over a field whose
+production falls (x0.2 on seed 0, x0.6 on seed 1 across the standard lapse) selects the least-bad
+SHRINKING economy - it ranks degrees of failure and reports a winner. Ben took that knowingly. The
+discipline it costs: phase 6 candidate scores in this state are ORDINAL and provisional, not
+evidence that the chosen landscape is viable, and the item must say so in whatever it reports. The
+first slice happens to be the one least exposed to this, which is what makes the ordering survivable.
+
+WHAT IS ACTUALLY REACHABLE UNDER THIS CHOICE - and it is one item, not five:
+  * BL-770 (Era 0 candidate search), FIRST SLICE ONLY: the scorer, sliced out and measured for
+    whether it DISCRIMINATES between hand-made candidate rosters. Requires BL-775, which is complete.
+    This is the whole of the reachable work today.
+  * BL-772 (retire warm start) requires BL-770 - the 72-second budget win, unreachable until the
+    search exists.
+  * BL-768 (roads and markets from history) requires BL-766 (population map early), a difficulty-5
+    phase foundation that has not started.
+  * BL-750 (tariff posture) requires BL-748 (industrial pass ladder), not started. Its own design
+    call is now taken (derived at handoff), so it is unblocked in DESIGN and blocked in SEQUENCE.
+  * BL-752 (colonial ties) requires BL-749 (sea-leg campaign), which is itself held on the five
+    design calls at NR-785. Its BL-751 require was repointed to BL-770 when BL-751 was cancelled.
+
+So the honest read of this ordering is: it buys the phase 6 scorer experiment now, and the rest of
+the generation-side market chain still waits on phase foundations that are not market work at all.
+If that experiment comes back with completeness flat across candidates, the chain has no root and
+sprint 33 becomes the only market work left standing.
+
+EIGHT CALLS TAKEN THE SAME DAY, on the market-work elicitation form. Five are recorded in authority
+docs and all eight on their items:
+  * BL-746 stage 2 - NO PRICE, NO DRAW. A building draws a grid good only once its catchment market
+    has priced it. PRODUCTION.md § A shortfall scales output. Done-when is a PAIR (supply factor AND
+    the grid good price), because the gate silencing the draw looks identical to the gate working.
+  * BL-745 - both purchase leaks in one item; ordered after BL-746 stage 2.
+  * BL-782 (NEW) - the agency idle rule reads operating net at the recipe own bid cap, split out of
+    BL-745 on Ben call.
+  * BL-738 - industry rates wait for the field to hold power; its stage 1 figures are void.
+  * BL-751 - CANCELLED superseded; its parts are named on BL-770 and BL-772.
+  * BL-770 - the objective is completeness + supply-to-demand ratio + the SPREAD rewarded for
+    unevenness. Recipe margin deliberately excluded (a precondition, not an axis). Scorer first.
+  * BL-750 - protection DERIVED at handoff; the scored-verb form held with flatness as its only
+    trigger. NATIONS.md § 4 Tariffs.
+  * BL-730 - trade_goods_misc joins the endemic luxury basket, with the asymmetry dilution stated in
+    MARKETS.md rather than left to be found.
+
+GENERATION_STRATEGY.md § Three passes WAS REWRITTEN in the same pass: it still described pass 3 as
+"the warm start, promoted", which BL-751 cancellation makes a fiction. Pass 3 now SELECTS a landscape
+rather than settling one, and pass 3 table row names the static scorer plus one validation run.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -178,7 +232,7 @@ THE BEFORE-FIGURES ARE ALREADY CAPTURED - do not re-measure them:
 | 31 | Long-term market viability - every recipe pays at base price | CLOSED 2026-09-02 on Ben's call, stage one a SUCCESS: the field ends the standard thirty-year lapse with a majority of corps operating-positive (46 of 61, 31 of 55) where it began with four and none, debtors a tenth of the field, median balances climbing, buildings running. The growth half - valued production still declines over the run - is sprint 33. |
 | 32a | Gamified generation, 32a - the arc runs, and the instruments that measure it are honest | CLOSED 2026-09-06 at a natural boundary. Five items delivered - the two-span sim, the sweep that measures the real run, the continent time axis, the tick-length audit, and the saturation measure promoted where generation can call it. The remaining 29 carry to 32b, led by the water model. |
 | 33 | Long-term market viability, the growth half - the field that keeps producing | OPENED 2026-09-02 on Ben's call as sprint 31's second half. Sprint 31 made the field solvent; this sprint makes it grow. The instrument is campaign_lapse with its debt columns, and the two levers are already filed. |
-| 32b | Gamified generation, 32b - the water model, and the reorder that 32a built the instruments for | OPEN 2026-09-06, continuing 32a directly. 32a made the arc RUN and its instruments HONEST; 32b makes the world CHANGE. Wave 1 is the water model (BL-776..BL-780) - self-contained, moves every generated world, and re-blesses the digests exactly once. 29 items carried over. |
+| 32b | Gamified generation, 32b - the water model, and the reorder that 32a built the instruments for | OPEN 2026-09-06, continuing 32a directly. RE-PLANNED 2026-09-06 on Ben call: the generation-side MARKET chain leads, not the water wave - BL-770 scorer slice is the only reachable item, and the sprint-33 growth gate was accepted unmet. Water model (BL-776..BL-780) deferred with its before-figures intact. 29 items carried over. |
 
 **Next up.** SPRINT 32a CLOSED 2026-09-06 (5 of 34 delivered - the arc runs and its instruments are honest). SPRINT 32b IS OPEN and carries the remaining 29, led by the water model. Sprint 33 (long-term market viability, the growth half) is also open and untouched by this session. THE NEXT NEW SPRINT IS 34.
 

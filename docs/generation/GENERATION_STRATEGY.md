@@ -404,6 +404,32 @@ loss-making. The cheap proxy is a per-resource supply-to-demand **ratio** per ma
 static, and it is what drives a price to the ceiling in the first place. The validation run is what
 confirms the proxy was good enough.
 
+**What the objective is made of (Ben, 2026-09-06).** Three terms, and the third is what makes it an
+*asymmetry* objective rather than a coverage one:
+
+1. **Chain completeness** — terminals closed over terminals total, per market. Does a chain reach a
+   sink here at all.
+2. **The supply-to-demand ratio**, per resource per market — the static price-feedback proxy above.
+   A market whose ratio pins a good at the band edge is not saturated, it is broken, and only this
+   term can tell the difference.
+3. **The spread of the first two across markets, explicitly rewarded for unevenness.** Not tolerated
+   as a side effect — *scored for*. A candidate landscape in which every market is equally complete
+   scores worse than one with rich and poor markets at the same mean, because an even map is the
+   outcome § Asymmetry is the deliverable exists to prevent, and a search that is merely neutral
+   about evenness will drift toward it.
+
+**Recipe margin is deliberately NOT a term.** It exists (the registry computes revenue minus inputs
+at base plus the wage per batch) and it stays the *authoring* check that every recipe can pay — but
+it is a property of the roster, not of the landscape, and it is near-identical across candidates
+that differ only in placement and road tier. Scoring it would add a constant to every candidate and
+pull the objective back toward "most profitable", which is the reading point 4 above rejects.
+
+**The first slice is the scorer, and its job is to fail informatively.** Before any search is built,
+score a handful of hand-made candidate rosters and ask whether these terms **discriminate between
+them at all**. If completeness is flat across every candidate, the search has nothing to search on
+and everything downstream of it is wasted — that is a result worth having in an afternoon rather
+than after the parallel harness is written.
+
 **The parallelism is not an optimisation, it is why the shape fits.** Six candidates at 53–71 s
 each is 5–7 minutes serially and breaks the 3–6 minute budget; run in parallel they cost about one
 candidate's wall clock. That makes determinism the binding constraint: each candidate must be a
@@ -437,7 +463,7 @@ target.
 |---|---|---|---|
 | **1 — Ancient** | The polity sim (`history_sim`), Classical and Medieval bands | The prehistory span to the **boundary year** | Ancient borders, cultural doctrines, the lacunae — who walked where |
 | **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | The boundary year to the epoch | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture |
-| **3 — Settle** | The campaign economy tick (`run_economy_step`) with the full corp AI | No calendar meaning; banded coarse, at the epoch | Market conditions at game start: which firms exist, what each market can close, the price field |
+| **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which firms exist, what each market can close, the price field |
 
 **Pass 1 and pass 2 are one engine, not two.** The works roster is cumulative across its four
 bands and the unit roster is era-keyed, so the second span is the first span continued with more
@@ -453,18 +479,26 @@ furnace — is the better-founded alternative and is open; both are consequences
 scalars, and neither is a roll. On an ancient epoch there is no pass 2: the boundary falls past
 the epoch and the sim stops where it stops today.
 
-**Pass 3 is the warm start, promoted.** `app::start_new_game`'s pre-game ticks already settle
-the economy before play; pass 3 makes that a generation pass with the two acts it lacks:
-background firm generation (`CORPORATION_GENERATION.md` § Pass 6) **recurs** through the settle
-rather than running once, and **firm exit** is the cull. Firms spawn and collapse until the field
-is operating-positive and steady; the survivors are viable by construction, and the player enters
-a field that has already been selected rather than one that is about to be. Two properties bound
-it. **Stable is not saturated**: the stop condition is operating-positive and steady, never every
-chain closed, and the chain-completeness spread is asserted at the end of the pass, so the
-opportunity surface the economic premise needs survives the settle. And **a settle can only select
-over a roster that can pay**: on a roster that loses at base, a longer settle produces an empty
-world, not a stable one. The recipe-margin anchor (`../economy/PRODUCTION.md`) is therefore a
-precondition of pass 3, not a neighbour.
+**Pass 3 SELECTS a landscape; it does not settle one.** The earlier design made pass 3 the warm
+start promoted — the same undirected pre-game ticks, run longer, with firm spawn added and firm
+exit as the cull. That is superseded: § The eight phases retires the warm start outright and
+replaces it with phase 6's **directed static search**, and the two are not variations of one
+another. A settle asks *what survives whatever generation happened to place*; a search asks *which
+placement is worth handing over*. Keeping both would pay twice for the weaker answer.
+
+So the acts of pass 3 are the scorer's: score every candidate landscape statically on the three
+terms in § The eight phases, pick the winner by a deterministic argmax with an explicit tie-break,
+and run **one** short validation tick-simulation on that winner alone to confirm the static proxy
+held. The player still enters a field that has already been selected rather than one about to be —
+which is the property the warm start was there for, and the one thing that must not be lost.
+
+Two constraints bound it, and both survive the change of mechanism. **Stable is not saturated**:
+the objective is viable-but-uneven, never every chain closed, and the chain-completeness *spread*
+is scored rather than merely tolerated. And **a search can only select over a roster that can
+pay**: on a roster that loses at base price, every candidate loses and the argmax ranks degrees of
+failure. The recipe-margin anchor (`../economy/PRODUCTION.md`) is therefore a **precondition** of
+pass 3 — which is precisely why margin is not one of the scoring terms. It is the gate the roster
+passes before the search runs, not an axis the search trades against.
 
 **What crosses each handoff, and nothing else.**
 
