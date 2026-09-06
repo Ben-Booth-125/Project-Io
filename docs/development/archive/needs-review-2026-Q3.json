@@ -4050,6 +4050,55 @@
       "what": "Three rules, not exclusive; the doc already says the lights go dim, not out:\n\n(a) FLOOR the supply factor - an unmet draw scales output down to a floor (0.5?) and never to zero. One constant in economy.building_upkeep; keeps the draw as a real cost everywhere. Recommended first, because it is the doc's own sentence.\n\n(b) NO WIRE, NO DRAW - a building the road network does not reach does not draw power at all (it cannot receive it, so the draw is a fiction) and does not decay for want of it. Keeps decay meaningful where power CAN arrive. Pairs with (a).\n\n(c) BOOTSTRAP - generators exempt from the power draw, and a building starts drawing power only once its catchment market has priced it. Addresses the 18 -> 3 supply collapse from the generation side.\n\nRecommendation: (a) + (b) now, measured on the debt instrument; (c) if generation still cannot bootstrap. Your call.",
       "resolved": "2026-09-02",
       "resolution": "RESOLVED. Ben, 2026-09-02: (a) and (b) approved. Applied as economy.building_upkeep.supply_floor_permille = 500 (the decay stops at the floor; a factor below it is lifted on the next unmet tick) and the no-wire rule in run_building_upkeep (grid goods struck from an unreached building's basket before the draw; ordinary goods still bind). building_upkeep R8/R9 pin both with differentials. Re-measured on the debt lapse: the tick-20 cliff is gone on both seeds (221 / 137 active at tick 60 against 2), income at tick 60 13.4k against 132, debtors 11 of 86 against 22 of 66. (c) - the generation bootstrap - is HELD as BL-746 stage 2: the field now runs at a mean supply factor of ~0.57, i.e. most buildings sit at the floor because power still does not arrive."
+    },
+    "NR-786": {
+      "id": "NR-786",
+      "kind": "question",
+      "status": "resolved",
+      "raised": "2026-09-03",
+      "title": "Phase 6 at 4 years a tick simulates a DIFFERENT economy - take 25 honest years at the quarterly tick instead?",
+      "source": "BL-771, auditing what a 16x tick actually rescales, 2026-09-03. The item was filed assuming the tick length was the dial; the audit says it is the wrong one.",
+      "what": "Ben's phase 6 (BL-770) is specified as a 400-year pass at four years a tick. Auditing every rate and duration the economy carries turns up two classes of breakage.\n\nRATES THAT COMPOUND: debt interest is charged per tick and compounds. 16 x 0.015 = 0.240 against a compounded 0.269, so a 4-year tick under-charges debt by ~11% - and more importantly hands a debtor 16 years to trade out of a hole quarterly interest would have closed. Sentiment's two decays have the same shape.\n\nQUANTITIES COUNTED IN TICKS - about fifteen of them, and this is the one that settles it. These change MEANING, not magnitude: a convoy leg (travel_ticks = 1) becomes FOUR YEARS; build_duration_ticks becomes decades; procurement lead (base_lead_ticks = 2) becomes eight years; the deposit depletion taper becomes 32 years; survey transit and scan become decades; and corp_ai's planning horizon silently stretches 16x.\n\nSo a 16x tick does not simulate the same economy faster. It simulates one where goods take years to move, buildings take decades to raise and debt is cheap - and phase 6's entire purpose is to find which corporate landscape is VIABLE. It would be measuring viability under logistics the campaign does not have, which is the BL-462 defect (a check measuring a different run) in its most expensive form.\n\nTHE ALTERNATIVE COSTS THE SAME. Keep the quarterly tick and simulate fewer years: 100 quarterly ticks is 25 years at 53-71 s per candidate, which is the budget the reorder already assumed. Six candidates in parallel still fit inside 3-6 minutes.",
+      "why_it_matters": "It decides whether phase 6 measures the economy the player will actually run. It also decides whether BL-771 (make the tick a parameter) is work at all - if the tick stays quarterly, nothing varies it and that item is cancelled rather than deferred.",
+      "options": [
+        "(a) Quarterly tick, fewer years - 25 years per candidate, same budget, honest logistics. Recommended.",
+        "(b) 4-year tick, and fix the ~15 tick-counted quantities to be time-based rather than tick-counted. Correct but large, and it changes the campaign economy too.",
+        "(c) 4-year tick with the durations left as they are, accepting that phase 6 ranks candidates under unrealistic logistics.",
+        "(d) Something between: a 1-year tick, which is 4x rather than 16x and breaks less."
+      ],
+      "recommendation": "(a). Phase 6 does not need 400 years to RANK candidate rosters, it needs long enough for the ranking to stabilise - and how long that is happens to be measurable, by running one candidate for 200 quarterly ticks and watching when the ranking stops moving. That is the right first experiment for BL-770 and it is cheap. Take (b) only if the 400-year span turns out to carry design weight the ranking actually needs, and note it would change the campaign economy as well as the generation pass.",
+      "files": [
+        "src/core/sim_loop.hpp",
+        "src/world/budget_system.hpp",
+        "src/world/supply_system.hpp",
+        "src/world/recipe_registry.hpp",
+        "docs/generation/GENERATION_STRATEGY.md"
+      ],
+      "resolution": "RULED (a), the quarterly tick (Ben, 2026-09-03: \"go with the quarterly tick\"). Phase 6 keeps econ_tick_days at 90 and simulates fewer years rather than rescaling every rate in the economy. Consequences applied the same day: BL-771's R1 (make the tick a parameter), R2 (declare every rate's period) and R4 (the differential harness) are CANCELLED rather than deferred - nothing varies the tick, so a parameter for it is not work. BL-771 closes on its audit, which is what produced this ruling. ONE CONSEQUENCE IS LARGER THAN THE ITEM AND IS RECORDED ON BL-770: at the quarterly tick, 100 ticks is 25 years, not the 400 Ben's point 6 named - so phase 6's SPAN is now the open question, and the arithmetic says the full 1560-1960 span is reachable only if the per-tick cost is fixed first (BL-761). That is a prerequisite relationship, not a neighbouring one.",
+      "resolved": "2026-09-03"
+    },
+    "NR-789": {
+      "status": "resolved",
+      "raised": "2026-09-06",
+      "resolution": "RULED (Ben, 2026-09-06): ACCEPT PETROLEUM, RE-EXAMINE PEAT - and a design steer larger than both.\n\nPETROLEUM ACCEPTED at +68%. The old substrate == barren gate was a bad proxy nobody defends; the\nlower-40%-in-a-warm-belt rule is ore_fields_for own shipped definition of shelf and basin. Not\ntuned back toward the artefact.\n\nPEAT RE-EXAMINED AND RESTORED, and the re-examination overturned the change. RESOURCES.md\n§ Ambient goods authors peat as a PAIR - scrub cover on sedimentary substrate, plains or valley.\nBL-765 narrowed it to marsh-only on a reading of the prose (a peat bog is a marsh), which the\nresource table does not sanction, and marsh is rarer than scrub - so 58% of the world peat was\nlost as a side effect of a comment rather than a decision. The doc rule is restored and MEASURED\nBACK: 7930.4 raw against the 7792 baseline, with body-phase peat 0 so the origin split still\nholds. If peat should come from marsh, RESOURCES.md Peat row changes first.\n\nTHE STEER, and it is the part that outlives this item: \"our per-province infrastructure scores\nwill account for anything which seems too rich.\" Richness is absorbed by the province sustain\nscore - area x habitability x ROADS x population - never clamped at placement. Ground is a fact\nabout the world; what a corporation can DO with it is gated behind infrastructure it has to build.\nWritten into PROVINCES.md § Richness is absorbed here, never clamped at generation, with the\nconsequence for measurement stated: a magnitude moving is not itself a defect, and the question is\nnever \"is this number too big\" but \"does the province score already bound what can be taken from\nit\".",
+      "id": "NR-789",
+      "kind": "question",
+      "title": "Petroleum is +68% across the seed spread, and peat is down 58% - both honest consequences of BL-765, neither asked for",
+      "source": "BL-765 (paleo deposits), building it 2026-09-06. Reported by the implementer rather than tuned away, which is why it is a question and not a defect.",
+      "what": "Two magnitudes moved at economy scale when fossils started reading the past.\n\nPETROLEUM +67.9% (120-seed median 51544.8 -> 86536.2). Per-tile magnitude is UNCHANGED and now carries a belt weight <= 1, so the whole rise is AREA. The old rule gated petroleum on `substrate == barren` - roughly 10% of land, and a bad proxy for an ancient sea. The new one is the lower 40% of land height in a productive belt, which is `ore_fields_for`'s own already-shipped definition of old shelf and basin. Concentration also TIGHTENED (top-10% p05 18.6 -> 54.6), so it is not a smear.\n\nThe implementer deliberately did NOT tune the percentile to preserve the number the bad proxy produced. That was the right instinct - reverse-engineering a constant to protect an artefact is how a defect becomes a requirement - but it means the world now carries substantially more oil than any economy tuning has ever seen.\n\nPEAT -58% (7792 -> 3307 raw). The design text says peat comes from PRESENT marsh; the body phase had been reaching it through `sedimentary + scrub` (the old tundra row), and marsh is rarer than scrub. So the new number may simply be the design finally being followed - or the design may have meant the broader ground all along.",
+      "why_it_matters": "Petroleum is an Industrial-band input and sprint 33 is tuning the field it feeds. A 68% supply change lands directly on the market work, and it moved for a generation reason rather than an economic one - so whoever reads a price shift next will look in the wrong layer for it.",
+      "options": [
+        "Accept both: the old petroleum gate was wrong and the new one is principled; peat now follows its own design text",
+        "Accept petroleum, re-examine peat: the \"present marsh\" reading may be too narrow",
+        "Re-scope the petroleum percentile against what the economy can absorb, and say so explicitly as an economic constraint rather than a geological one"
+      ],
+      "recommendation": "Accept petroleum and re-examine peat. The petroleum change replaces a proxy nobody defends with the definition the ore-field layer already used, and tuning it back toward the artefact would be exactly the forced outcome the standing rules reject. Peat is the weaker case: -58% rests on reading \"marsh\" narrowly, and that reading was never explicitly chosen. Either way the numbers should reach sprint 33 BEFORE it tunes prices again.",
+      "files": [
+        "src/world/tile_generation.cpp",
+        "docs/generation/TILE_GENERATION.md",
+        "docs/economy/RESOURCES.md"
+      ],
+      "resolved": "2026-09-06"
     }
   }
 }
