@@ -119,6 +119,12 @@ tested FROM a worktree or it is not tested.
 
 Carried from 32b: 28 open items. The two ad-hoc harness families still want Ben naming them as skills (NR-788, now five: continent_drift, sim_water_census, the saturation measure, deposit_origin, landscape_score_harness - plus centre_region_bind from BL-783). Open calls waiting: NR-783 (span boundary), NR-784 (cap the ancient arc), NR-785 (three sea-leg calls), NR-787 (stagnant lid), NR-790 (fossil epoch derivation), NR-791 (coastal ownership invisible), and BL-758.
 
+THE SESSION OF 2026-09-06 PIVOTED TO DOC RECONCILIATION BEFORE ANY BUILD, on Ben's call, and it was the right order. Scoping the two chains found THREE PAIRS OF AUTHORITY DOCS CONTRADICTING EACH OTHER - all three because a 2026-09-06 ruling landed in one doc and not its siblings. MILITARY.md contradicted ITSELF (naval strategic-only vs its own domains section); TILE_GENERATION.md still carried the exact deferral PROVINCES.md quotes as lifted; CORPORATION_GENERATION.md Pass 6 still recurred through a settle GENERATION_STRATEGY.md retires the same day. Briefing implementers off those docs would have built the contradiction into code.
+
+EIGHT CALLS TAKEN on an elicitation form and written into the owning docs: water forage (adjacency to owned shore, not a flat zero), buildings on water (a port, nothing else), realisation as a FOURTH scored term, candidate generation as greedy refinement over fixed rounds, the wave re-bless rule into DELIVERY.md as method, water tiles selectable, Pass 6 density is the cap (the 0.90 ratio that never bound is retired), and the five ad-hoc harnesses named in the verifier-headless skill. BL-656 - design-owed since 2026-08-26 - was closed by the density ruling.
+
+SIX FURTHER CONFLICTS NEEDED NO RULING and were resolved on newest-dated-wins or on the archive rather than being put to Ben.
+
 ## Where things stand
 
 | Sprint | Theme | State |

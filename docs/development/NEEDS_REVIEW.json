@@ -142,26 +142,6 @@
    "status": "open",
    "raised": "2026-09-06",
    "resolution": null,
-   "id": "NR-788",
-   "kind": "question",
-   "title": "Five harnesses are now ad hoc, waiting on Ben to name them as skills",
-   "source": "Accumulated across sprint 32a and 32b wave 1. Authoring the check was ours; wrapping it as a skill is his call (CLAUDE.md § Tool creation is skill creation).",
-   "what": "Each of these is a committed, working check that nothing can invoke by name, because .claude/skills/verifier-headless/SKILL.md does not list it. The rule is that authoring a check is ours and naming it as a skill needs Ben's permission, so they sit as 'ad hoc' until he says.\n\n  continent_drift          - the plate time axis (BL-763)\n  sim_water_census         - the water figures the whole water model is judged against\n  the promoted saturation measure - BL-775\n  deposit_origin           - BL-762, asserts the Body phase places no biological deposit\n  landscape_score_harness  - BL-770, the phase 6 objective's discrimination check\n\nThe cost of leaving them unnamed is not zero: an unnamed check is one a later session does not know to run, which is the same failure mode as a check that does not exist.",
-   "why_it_matters": "Two of these guard invariants that only they can see - deposit_origin is the only thing asserting the origin split holds, and landscape_score_harness is the only thing that can tell whether phase 6 has anything to search on.",
-   "options": [
-    "Name all five in the verifier-headless skill",
-    "Name a subset",
-    "Leave them ad hoc and run them by hand"
-   ],
-   "recommendation": "Name all five. They are already committed and already green; the skill entry is the only thing standing between them and being run by a session that does not know they exist.",
-   "files": [
-    ".claude/skills/verifier-headless/SKILL.md"
-   ]
-  },
-  {
-   "status": "open",
-   "raised": "2026-09-06",
-   "resolution": null,
    "id": "NR-790",
    "kind": "decision-taken",
    "title": "BL-765 authored WHEN a fossil forms, because no doc owned the question",
@@ -177,30 +157,6 @@
    "files": [
     "src/world/tile_generation.cpp",
     "docs/generation/TILE_GENERATION.md"
-   ]
-  },
-  {
-   "status": "open",
-   "raised": "2026-09-06",
-   "resolution": null,
-   "id": "NR-791",
-   "kind": "observation",
-   "title": "Coastal territory has no surface that shows ownership, so the water model cannot be checked by looking",
-   "source": "The 2026-09-06 live check of wave 1/2a. Two of three visual requirements were verifiable; this one was not, and the reason is a gap rather than an oversight.",
-   "what": "BL-776 and BL-777 make coastal water OWNED and open ocean unowned. That is measured and green headlessly - the ownership table reads coast 2177 owned, lake 1312 owned, open ocean 0 owned against 15336 unowned, and sim_water_census reports coastal_water 318 / open_ocean 0 with the stored domain disagreeing with the substrate in ZERO cases.\n\nBUT IT CANNOT BE SEEN. Live, in the built app: the hover card over water reports TERRAIN and HABITABILITY ('Ocean, Habitability: 48%') and says nothing about an owner. Clicking a water tile does not update the Selection panel at all. No lens in the nav rail colours territory by nation - the map/book slot is the Generation Ledger.\n\nWhat IS visible, and it is genuinely encouraging: the province partition extends over water as coherent outlined water provinces, and open-ocean tiles report no owner, which is what the design says. But that is consistent-with, not a demonstration-of.\n\nSO BL-780's done-when has a hole. It asks Ben to authorise a re-bless 'against a stated description of what changed in the world's SHAPE rather than against the hash' - and the single most important shape change, coastal water acquiring an owner, is the one a human cannot currently look at.",
-   "why_it_matters": "BL-780 is the wave's single judgement point and it is meant to be judged by looking. If the central change is invisible on every surface the game has, the judgement collapses back onto trusting the harness - which is exactly what BL-780 exists to avoid.",
-   "options": [
-    "Add ownership to the water hover card (cheapest - the card already exists and already reads the tile)",
-    "Make water tiles selectable so the Selection panel answers it",
-    "A territory/political lens that colours by owning nation, which would answer it at a glance and serve far more than this item",
-    "Accept it: judge BL-780 on the harness figures and the province outlines, and record that the shape claim was not eyeballed"
-   ],
-   "recommendation": "The hover card, before BL-780. It is the smallest change that closes the hole, the card is already on the tile, and it turns \"coastal water is owned\" from a number in a log into something a person can point at. The lens is the better long-term answer and should be its own item rather than a rider on the water wave.",
-   "files": [
-    "docs/ui/TOOLTIP.md",
-    "docs/ui/SELECTION.md",
-    "docs/ui/LENSES.md",
-    "docs/generation/PROVINCES.md"
    ]
   }
  ]
