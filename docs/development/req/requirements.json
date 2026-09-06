@@ -4742,6 +4742,189 @@
      "evidence": "COMPLETE 2026-09-03. row_eval -> margin_eval and evaluate() -> evaluate_margin() now live in src/world/market_saturation.{hpp,cpp}; recipe_margin.cpp includes the header and its own copies are gone. evaluate_margin takes plain doubles - no world, no registry, no tick - which is what lets a candidate firm be priced statically. Move proven textual by the same git-extract-and-diff method as the saturation half: struct and function both IDENTICAL modulo the rename. recipe_margin runs ALL PASS (0 failures) afterwards, including R6 as its differential red-proof."
     }
    ]
+  },
+  {
+   "brief": "lua-harness-builder-bash",
+   "title": "BL-774 - a worktree agent builds the Lua-linked harness class with one command, and the class is derived rather than listed",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-774 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "A bash sibling builds any Lua-linked harness with one documented command, from the repo root, with no cmd and no MSVC archaeology.",
+     "verification": [
+      "headless: bash tools/verify/build_lua_harness.sh world_determinism produces build_gen/verify/world_determinism.exe",
+      "headless: the produced exe runs and reports its assertions"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. tools/verify/build_lua_harness.sh builds the MSVC environment by hand from the PINNED BuildTools toolchain (14.44.35207 + SDK 10.0.26100.0) - bash cannot call vcvars, which is the whole reason the .bat was unreachable. Verified building four harnesses: world_determinism, campaign_lapse, history_sweep, landscape_score_harness. world_determinism then RAN to ALL PASS, so the produced exe is good, not merely linked."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The builder choice is DERIVED, not listed: build_harness.js computes whether a harness needs the Lua builder from its translation-unit closure, and refuses with that reason rather than from a hand-written NEEDS_LUA map.",
+     "verification": [
+      "headless: build_harness.js correctly routes every harness in tools/verify, including ones absent from the old hand list",
+      "static: the four-entry NEEDS_LUA map is gone or reduced to an override with a stated reason"
+     ],
+     "notes": "Closes NR-767. The old hand list named 4-6 while the real set is 16+, and a wrong-builder failure reads exactly like broken code.",
+     "evidence": "COMPLETE 2026-09-06. The hand list is deleted. Derived set is 21 of 138 against a hand list of FOUR. THE FIRST PREDICATE WAS WRONG AND WAS CAUGHT BY MEASUREMENT: include-closure-reaches-lua_state.hpp flags 54 of 138, because sol2/Lua headers are on the include path for every world-superset harness - world_determinism reaches that header and links clean. The failure is a LINK failure, so the test is a live-code reference to load_from_lua / lua_state / persona_pack in the harness own TU. Comments and string literals excluded (works_roster_harness names load_from_lua in a comment and links fine). Validated against 16 real link probes: zero false positives, zero false negatives."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The bash path is named in the generation-dev and economy-dev agent definitions, so a spawn does not need to be told.",
+     "verification": [
+      "static: .claude/agents/generation-dev.md and economy-dev.md name the script"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. Both .claude/agents/generation-dev.md and economy-dev.md carry the two bash commands and the wrong-builder symptom (\"failing on sol/sol.hpp or LNK2019 is the WRONG BUILDER, not broken code\"), each keeping its own preamble."
+    }
+   ]
+  },
+  {
+   "brief": "1960-baselines-rebased",
+   "title": "BL-759 - the sprint 33 baselines are restated against the world HEAD actually builds",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-759 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "campaign_lapse --epoch 1960 is re-run on the post-BL-747 tree for both standard seeds, and the four lapse metrics are restated from that run.",
+     "verification": [
+      "headless: campaign_lapse --epoch 1960 --seed 0/1 --warm 80 --ticks 120 completes and writes its csv set"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. campaign_lapse --epoch 1960 --warm 80 --ticks 120 on seeds 0 and 1, post-BL-747 tree, tags rebase-s0 / rebase-s1. Both runs PASS (C1-C3), 99 s each."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Every store quoting a 1960-epoch figure is corrected or marked as historical: sprint 33 done_when and its opening baseline, BL-745, BL-746, BL-708.",
+     "verification": [
+      "static: each named figure either restated against the new run or explicitly dated as the pre-BL-747 measurement"
+     ],
+     "notes": "The old numbers are not WRONG about the code they measured - they are no longer reproducible from HEAD. Date them; do not silently overwrite.",
+     "evidence": "COMPLETE 2026-09-06. Full pre/post table written onto BL-759; BL-745 and BL-746 carry a dated pointer to it rather than losing their old figures. THREE MATERIAL MOVES: (1) seed-1 interest share of net loss 70% -> 7%, which VOIDS BL-726 premise and already satisfies sprint 33 interest done-when; (2) the field is healthier than assumed - op-positive at q200 is 48/55 and 50/63 against 46/61 and 31/55; (3) valued production falls x0.57 / x0.68, not x0.21 / x0.61, so the growth gate is still unmet but the gap is a third of what was thought. UNMOVED: mean supply factor 0.598 / 0.570 against the quoted ~0.57, so BL-746 is sized as it was."
+    }
+   ]
+  },
+  {
+   "brief": "band-ceiling-observable",
+   "title": "BL-760 - the two-span band ceiling becomes observable, and world_params round-trips under assertion",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-760 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Works raised and units fielded are reported PER ROSTER BAND, either side of the span boundary, so span1_band_ceiling = medieval is distinguishable from = industrial.",
+     "verification": [
+      "headless: history_sweep reports per-band counts either side of the boundary",
+      "headless: the ancient span raises nothing above medieval"
+     ],
+     "notes": "Entangled with BL-757: build_work never wins the scored contest, so a per-band zero may have a second cause. Report the cause, do not assert past it.",
+     "evidence": "COMPLETE 2026-09-06. history_sim_state gains works_by_band / units_by_band / works_by_span / units_by_span, counted at the event. build_stack REPORTS the band it fielded via an out-param rather than the call site re-deriving min_band - a second copy would be free to drift. span_index() handles the INT64_MIN sentinel explicitly so a single-span ancient arc reports span 0, not an industrial span it does not have. history_sweep prints the per-band and per-span table and asserts B1. MEASURED over 16 seeds: classical 8,179,138 units / medieval 101,814 / gunpowder 0 / industrial 0; span 0 8,280,952, span 1 zero. B1 PASSES and can now fail. WORKS ARE ZERO IN EVERY BAND - that is BL-757 (build_work never wins the scored contest), reported not asserted past, exactly as the requirement directed."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "save_envelope_roundtrip S3 asserts EVERY world_params field, with prehistory_years and industrial_years set to DIFFERENT non-default values so an order swap fails.",
+     "verification": [
+      "headless: save_envelope_roundtrip S3 green with distinct non-default year values",
+      "headless: deliberately swapping the two write orders makes S3 fail"
+     ],
+     "notes": "Both default to 400 today, so a swap round-trips clean. The differential is the requirement, not the green.",
+     "evidence": "COMPLETE 2026-09-06. S3 asserts all six world_params fields, with prehistory_years=137 and industrial_years=291 - distinct, non-default, not each other transposition - plus a second row pinning them to their literal slots (a symmetric writer/reader swap would survive a compare-to-original). THE DIFFERENTIAL WAS ACTUALLY RUN, not reasoned about: swapping the two w_int calls in save_game.cpp made BOTH new assertions FAIL; reverting restored PASS (0 failures)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "build_stack's dead ceiling = roster_band::industrial default argument is removed, or the two-caller invariant is asserted.",
+     "verification": [
+      "static: no default argument, or an assertion that both call sites pass it explicitly"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. The default argument is removed from build_stack. Both call sites already passed sim_band_ceiling(params, y) explicitly, so the default was dead in the dangerous direction - a new in-TU caller omitting it would have silently un-applied the span cap. Now a compile error."
+    }
+   ]
+  },
+  {
+   "brief": "landscape-scorer-discriminates",
+   "title": "BL-770 slice 1 - the phase 6 scorer exists, and we know whether it discriminates between candidate landscapes at all",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-09-06",
+   "promoted_from": "backlog.json BL-770 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "A landscape scorer lives in src/world and computes the three ruled terms from a static world: chain completeness per market, the per-resource supply-to-demand ratio per market, and the SPREAD of both across markets with unevenness rewarded.",
+     "verification": [
+      "static: src/world/landscape_score.{hpp,cpp} exists and compiles into the world TU set",
+      "headless: the scorer returns all three terms on a generated world"
+     ],
+     "notes": "Recipe margin is deliberately NOT a term (GENERATION_STRATEGY.md § The eight phases) - it is the precondition gate, not an axis.",
+     "evidence": "COMPLETE 2026-09-06. src/world/landscape_score.{hpp,cpp}. Term 1 delegates to BL-775 promoted measure_market_completeness (two callers, one implementation). Term 2 is the per-market per-resource supply:demand ratio with a pin band. Term 3 is the coefficient of variation over markets - CV rather than variance deliberately, because it is scale-free, so a landscape uniformly twice as good scores as MORE VIABLE and no more UNEVEN. Unevenness is a MULTIPLIER on viability, never an addend: a landscape where nothing works is not rescued by being unevenly broken. Recipe margin correctly excluded."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "THE SLICE'S ACTUAL QUESTION: scoring several hand-made candidate landscapes on one generated world produces MATERIALLY DIFFERENT scores. If the terms do not discriminate, that is the reported result and the search is not built.",
+     "verification": [
+      "headless: K candidates scored on one world, per-term range and spread reported per candidate",
+      "headless: the report states plainly whether each term discriminates"
+     ],
+     "notes": "The slice is built to be able to FAIL. A flat completeness across every candidate means the search has nothing to search on, and that answer is the deliverable.",
+     "evidence": "COMPLETE 2026-09-06 - AND THE ANSWER IS NO. Five candidates on one fixed world (corporation_count 4/8/16, two placement seeds at 8 - exactly Ben point-3 axes) score IDENTICALLY to the last digit: every term relative range 0.000e+00. The POSITIVE CONTROL, built in so that \"flat\" could be told from \"constant\", moves 1.000e+00 over three different worlds. CAUSE IS STRUCTURAL: every term reads tiles, markets and population, and market_saturation.cpp contains neither \"corporation\" nor \"building\" - so the objective measures the WORLD saturation potential, not a roster realisation of it. Phase 6 cannot search on it as ruled. A roster-aware term (actual vs potential completeness) is owed; recorded on BL-770, deliberately not built in this slice."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The scorer is PURE and deterministic: same world and same candidate produce the same score, and the score does not depend on container traversal order.",
+     "verification": [
+      "headless: repeat scoring is bit-identical",
+      "headless: the market walk uses sorted_market_ids, not world::markets order"
+     ],
+     "notes": "Determinism is the binding constraint on the eventual parallel search - it is asserted from the first slice, not retrofitted.",
+     "evidence": "COMPLETE 2026-09-06. R3.1 asserts three scorings of one world are bit-identical on every term - PASS. The market walk uses sorted_market_ids. NOTED IN THE SOURCE rather than hidden: the tile accumulation is float += over the unordered w.tiles map, which is sound for RANKING candidates within one process (every candidate sees the identical traversal) and would need a sorted walk before any cross-process comparison. Submitted to the cold review barrier specifically to be attacked on this point."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "The report states that scores taken in this state are ORDINAL AND PROVISIONAL, because the sprint 33 growth gate is unmet (valued production falls x0.2 / x0.6 across the standard lapse).",
+     "verification": [
+      "static: the harness prints the caveat with the measured figures behind it"
+     ],
+     "notes": "Ben accepted the gate unmet on 2026-09-06. The discipline that buys back is that the report cannot be read as evidence of viability.",
+     "evidence": "COMPLETE 2026-09-06. The harness prints the caveat with the BL-759 RE-BASED figures behind it (11738 -> 6693 and 5845 -> 3971), not the stale x0.2/x0.6 pair, and states that scores order candidates and do not evidence viability."
+    }
+   ]
   }
  ]
 }

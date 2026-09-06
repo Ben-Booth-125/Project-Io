@@ -181,6 +181,52 @@ GENERATION_STRATEGY.md § Three passes WAS REWRITTEN in the same pass: it still 
 "the warm start, promoted", which BL-751 cancellation makes a fiction. Pass 3 now SELECTS a landscape
 rather than settling one, and pass 3 table row names the static scorer plus one validation run.
 
+--- THE MARKET BATCH DELIVERED 2026-09-06: FOUR ITEMS, AND THE HEADLINE IS A NEGATIVE RESULT ---
+
+BL-774, BL-759, BL-760 and BL-770 slice 1. All four requirement groups complete.
+
+BL-770 SLICE 1 ANSWERED ITS QUESTION, AND THE ANSWER IS NO. The phase 6 objective does not
+discriminate between candidate rosters: five candidates on one fixed world (corporation_count
+4/8/16 and two placement seeds - exactly the axes Ben point 3 names) score IDENTICALLY, every
+term at relative range 0.000e+00. The positive control, built in so "flat" could be told from
+"a scorer that returns a constant", moves 1.000e+00 across three different worlds.
+THE CAUSE IS STRUCTURAL. Every term reads tiles, markets and population; market_saturation.cpp
+contains neither "corporation" nor "building". The objective measures the WORLD saturation
+POTENTIAL - whether a chain COULD close in reach of a market - and says nothing about whether
+any firm closes it. So phase 6 cannot search on it as ruled, and a roster-aware term (actual
+against potential completeness) is owed before the parallel search is worth a line of code.
+This is exactly what the slice was commissioned to find out, at the cost the ruling predicted.
+
+BL-759 RE-BASED THE SPRINT 33 NUMBERS AND THREE OF THEM MOVED MATERIALLY.
+  * Seed-1 interest share of net loss 70% -> 7%. That VOIDS BL-726 premise outright, and
+    sprint 33 interest done-when ("below a quarter of net loss on every seed") is ALREADY MET.
+  * The field is healthier than assumed: op-positive at q200 is 48 of 55 and 50 of 63, against
+    the recorded 46 of 61 and 31 of 55.
+  * Valued production falls x0.57 and x0.68, not x0.21 and x0.61. The growth gate is still
+    UNMET on both seeds, but the gap is a third of what sprint 33 was written against.
+  Unmoved: mean supply factor at 0.598 / 0.570 against ~0.57, so BL-746 is sized as it was.
+
+BL-760 GAVE THE BAND CEILING AN OBSERVABLE. Over 16 seeds: classical 8,179,138 units, medieval
+101,814, gunpowder 0, industrial 0; span 0 8,280,952, span 1 zero. Assertion B1 (the ancient
+span fields nothing above medieval) passes and can now FAIL. Works are zero in every band -
+that is BL-757 (build_work never wins the scored contest), reported rather than asserted past.
+The save round-trip differential was RUN: swapping the two year writes makes it fail.
+
+BL-774 CLOSED THE AGENT TOLL AND UNCOVERED A BIGGER DEFECT. The bash builder exists; the
+Lua-class routing is DERIVED (21 of 138, against a hand list that named four) and validated
+against 16 real link probes with zero errors in both directions. On the way: build_harness.js
+DID NOT WORK AT ALL, for anyone, from any shell - a spawnSync double-wrap split the vcvars path
+at its first space and >nul swallowed the error, so the whole non-Lua verifier-headless tier
+was unbuildable. Fixed, because BL-760 needed it.
+
+DETERMINISM UNMOVED ACROSS THE BATCH despite history_sim.cpp being touched: world_determinism
+ALL PASS with all four digests at their recorded values.
+
+WHAT THE BATCH DID NOT DO, and it is the honest limit of the scope call: it did not advance the
+generation-side market chain past its first question. BL-772, BL-768, BL-750 and BL-752 remain
+blocked on BL-770, BL-766, BL-748 and BL-749 respectively - unchanged. The chain is still a
+sequence, and its root now has a known defect to fix before the next link.
+
 ## Where things stand
 
 | Sprint | Theme | State |
