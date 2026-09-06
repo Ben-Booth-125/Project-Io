@@ -1589,6 +1589,7 @@ void generate_life_deposits(terrain_substrate sub, terrain_cover cov, std::uint8
     };
 
     const bool valley = lf == terrain_landform::valley;
+    const bool plains = lf == terrain_landform::plains;
     const float thickness = 0.6f + 0.55f * cover_fraction(density);
 
     // --- LIVING: what grows here NOW ---------------------------------------
@@ -1598,11 +1599,19 @@ void generate_life_deposits(terrain_substrate sub, terrain_cover cov, std::uint8
     if (cov == cv::forest || cov == cv::marsh)
         put(r::timber, roll(rng, 15.0f, 40.0f) * thickness);
 
-    // PEAT IS THE MARSH ITSELF, still accumulating — a living resource, gated on
-    // the CURRENT biosphere in S8 and read from the present cover here. The body
-    // phase reached it through `sedimentary + scrub`, the old tundra row; a peat
-    // bog is a marsh, and saying so is the axis split (BL-519) paying out again.
-    if (cov == cv::marsh)
+    // PEAT KEEPS THE RULE RESOURCES.md AUTHORS: a PAIR, scrub cover on
+    // sedimentary substrate, on plains or valley. Living resource, read from the
+    // present cover — only the stream it draws from moved.
+    //
+    // THE MOVE TO MARSH-ONLY WAS A NARROWING THE TABLE DOES NOT SANCTION
+    // (re-examined on Ben's call, 2026-09-06). It was a defensible reading of the
+    // prose — a peat bog is a marsh — but § Ambient goods states the rule as a
+    // pair on scrub, and marsh is rarer than scrub, so the change cost 58% of the
+    // world's peat (7792 -> 3307 raw) as a side effect of a comment rather than a
+    // decision. The docs are the authority: where code and doc disagree one of
+    // them is wrong, and the fix is work rather than a footnote. If peat should
+    // come from marsh, RESOURCES.md's Peat row changes first.
+    if (sub == su::sedimentary && cov == cv::scrub && (plains || valley))
         put(r::peat, roll(rng, 5.0f, 15.0f));
 
     if (sub == su::sedimentary)

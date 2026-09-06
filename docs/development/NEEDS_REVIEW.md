@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*8 entries — 7 open, 1 resolved.*
+*8 entries — 6 open, 2 resolved.*
 
 ---
 
@@ -133,27 +133,6 @@ The cost of leaving them unnamed is not zero: an unnamed check is one a later se
 
 *Files: `.claude/skills/verifier-headless/SKILL.md`*
 
-### NR-789 — Petroleum is +68% across the seed spread, and peat is down 58% - both honest consequences of BL-765, neither asked for
-*question · raised 2026-09-06 · from BL-765 (paleo deposits), building it 2026-09-06. Reported by the implementer rather than tuned away, which is why it is a question and not a defect.*
-
-Two magnitudes moved at economy scale when fossils started reading the past.
-
-PETROLEUM +67.9% (120-seed median 51544.8 -> 86536.2). Per-tile magnitude is UNCHANGED and now carries a belt weight <= 1, so the whole rise is AREA. The old rule gated petroleum on `substrate == barren` - roughly 10% of land, and a bad proxy for an ancient sea. The new one is the lower 40% of land height in a productive belt, which is `ore_fields_for`'s own already-shipped definition of old shelf and basin. Concentration also TIGHTENED (top-10% p05 18.6 -> 54.6), so it is not a smear.
-
-The implementer deliberately did NOT tune the percentile to preserve the number the bad proxy produced. That was the right instinct - reverse-engineering a constant to protect an artefact is how a defect becomes a requirement - but it means the world now carries substantially more oil than any economy tuning has ever seen.
-
-PEAT -58% (7792 -> 3307 raw). The design text says peat comes from PRESENT marsh; the body phase had been reaching it through `sedimentary + scrub` (the old tundra row), and marsh is rarer than scrub. So the new number may simply be the design finally being followed - or the design may have meant the broader ground all along.
-
-**Why it matters.** Petroleum is an Industrial-band input and sprint 33 is tuning the field it feeds. A 68% supply change lands directly on the market work, and it moved for a generation reason rather than an economic one - so whoever reads a price shift next will look in the wrong layer for it.
-
-- Accept both: the old petroleum gate was wrong and the new one is principled; peat now follows its own design text
-- Accept petroleum, re-examine peat: the "present marsh" reading may be too narrow
-- Re-scope the petroleum percentile against what the economy can absorb, and say so explicitly as an economic constraint rather than a geological one
-
-> **Recommendation:** Accept petroleum and re-examine peat. The petroleum change replaces a proxy nobody defends with the definition the ore-field layer already used, and tuning it back toward the artefact would be exactly the forced outcome the standing rules reject. Peat is the weaker case: -58% rests on reading "marsh" narrowly, and that reading was never explicitly chosen. Either way the numbers should reach sprint 33 BEFORE it tunes prices again.
-
-*Files: `src/world/tile_generation.cpp`, `docs/generation/TILE_GENERATION.md`, `docs/economy/RESOURCES.md`*
-
 ### NR-790 — BL-765 authored WHEN a fossil forms, because no doc owned the question
 *decision taken on your behalf · raised 2026-09-06 · from BL-765 (paleo deposits), 2026-09-06. Flagged by the implementer as novel: nothing in its reading list said when coal forms relative to the drift record.*
 
@@ -205,4 +184,48 @@ THE ALTERNATIVE COSTS THE SAME. Keep the quarterly tick and simulate fewer years
 > **RESOLVED.** RULED (a), the quarterly tick (Ben, 2026-09-03: "go with the quarterly tick"). Phase 6 keeps econ_tick_days at 90 and simulates fewer years rather than rescaling every rate in the economy. Consequences applied the same day: BL-771's R1 (make the tick a parameter), R2 (declare every rate's period) and R4 (the differential harness) are CANCELLED rather than deferred - nothing varies the tick, so a parameter for it is not work. BL-771 closes on its audit, which is what produced this ruling. ONE CONSEQUENCE IS LARGER THAN THE ITEM AND IS RECORDED ON BL-770: at the quarterly tick, 100 ticks is 25 years, not the 400 Ben's point 6 named - so phase 6's SPAN is now the open question, and the arithmetic says the full 1560-1960 span is reachable only if the per-tick cost is fixed first (BL-761). That is a prerequisite relationship, not a neighbouring one.
 
 *Files: `src/core/sim_loop.hpp`, `src/world/budget_system.hpp`, `src/world/supply_system.hpp`, `src/world/recipe_registry.hpp`, `docs/generation/GENERATION_STRATEGY.md`*
+
+### NR-789 — Petroleum is +68% across the seed spread, and peat is down 58% - both honest consequences of BL-765, neither asked for
+*question · raised 2026-09-06 · from BL-765 (paleo deposits), building it 2026-09-06. Reported by the implementer rather than tuned away, which is why it is a question and not a defect.*
+
+Two magnitudes moved at economy scale when fossils started reading the past.
+
+PETROLEUM +67.9% (120-seed median 51544.8 -> 86536.2). Per-tile magnitude is UNCHANGED and now carries a belt weight <= 1, so the whole rise is AREA. The old rule gated petroleum on `substrate == barren` - roughly 10% of land, and a bad proxy for an ancient sea. The new one is the lower 40% of land height in a productive belt, which is `ore_fields_for`'s own already-shipped definition of old shelf and basin. Concentration also TIGHTENED (top-10% p05 18.6 -> 54.6), so it is not a smear.
+
+The implementer deliberately did NOT tune the percentile to preserve the number the bad proxy produced. That was the right instinct - reverse-engineering a constant to protect an artefact is how a defect becomes a requirement - but it means the world now carries substantially more oil than any economy tuning has ever seen.
+
+PEAT -58% (7792 -> 3307 raw). The design text says peat comes from PRESENT marsh; the body phase had been reaching it through `sedimentary + scrub` (the old tundra row), and marsh is rarer than scrub. So the new number may simply be the design finally being followed - or the design may have meant the broader ground all along.
+
+**Why it matters.** Petroleum is an Industrial-band input and sprint 33 is tuning the field it feeds. A 68% supply change lands directly on the market work, and it moved for a generation reason rather than an economic one - so whoever reads a price shift next will look in the wrong layer for it.
+
+- Accept both: the old petroleum gate was wrong and the new one is principled; peat now follows its own design text
+- Accept petroleum, re-examine peat: the "present marsh" reading may be too narrow
+- Re-scope the petroleum percentile against what the economy can absorb, and say so explicitly as an economic constraint rather than a geological one
+
+> **Recommendation:** Accept petroleum and re-examine peat. The petroleum change replaces a proxy nobody defends with the definition the ore-field layer already used, and tuning it back toward the artefact would be exactly the forced outcome the standing rules reject. Peat is the weaker case: -58% rests on reading "marsh" narrowly, and that reading was never explicitly chosen. Either way the numbers should reach sprint 33 BEFORE it tunes prices again.
+
+> **RESOLVED.** RULED (Ben, 2026-09-06): ACCEPT PETROLEUM, RE-EXAMINE PEAT - and a design steer larger than both.
+
+PETROLEUM ACCEPTED at +68%. The old substrate == barren gate was a bad proxy nobody defends; the
+lower-40%-in-a-warm-belt rule is ore_fields_for own shipped definition of shelf and basin. Not
+tuned back toward the artefact.
+
+PEAT RE-EXAMINED AND RESTORED, and the re-examination overturned the change. RESOURCES.md
+§ Ambient goods authors peat as a PAIR - scrub cover on sedimentary substrate, plains or valley.
+BL-765 narrowed it to marsh-only on a reading of the prose (a peat bog is a marsh), which the
+resource table does not sanction, and marsh is rarer than scrub - so 58% of the world peat was
+lost as a side effect of a comment rather than a decision. The doc rule is restored and MEASURED
+BACK: 7930.4 raw against the 7792 baseline, with body-phase peat 0 so the origin split still
+holds. If peat should come from marsh, RESOURCES.md Peat row changes first.
+
+THE STEER, and it is the part that outlives this item: "our per-province infrastructure scores
+will account for anything which seems too rich." Richness is absorbed by the province sustain
+score - area x habitability x ROADS x population - never clamped at placement. Ground is a fact
+about the world; what a corporation can DO with it is gated behind infrastructure it has to build.
+Written into PROVINCES.md § Richness is absorbed here, never clamped at generation, with the
+consequence for measurement stated: a magnitude moving is not itself a defect, and the question is
+never "is this number too big" but "does the province score already bound what can be taken from
+it".
+
+*Files: `src/world/tile_generation.cpp`, `docs/generation/TILE_GENERATION.md`, `docs/economy/RESOURCES.md`*
 

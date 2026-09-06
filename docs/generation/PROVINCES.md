@@ -258,6 +258,33 @@ codebase already defines, leaving **one free scalar**, `k_province_buildings_per
 capacity the pooled per-tile cap already grants. The ceiling is **computed on demand, never
 cached**, so it moves as roads are built — the one placement bound not fixed at generation.
 
+### Richness is absorbed here, never clamped at generation (Ben, 2026-09-06)
+
+**When a deposit field comes out "too rich", the correction belongs in this score and not in the
+generator.** Ben, ruling on a paleo-deposit measurement that moved the world's petroleum by +68%:
+*"our per-province infrastructure scores will account for anything which seems 'too rich'."*
+
+The reasoning is the one this project applies everywhere else. Ground is a **fact about the
+world** — geology and biosphere history put oil where the ancient seas were, and how much is
+there is not a dial. What a corporation can *do* with it is bounded by something else entirely:
+how many buildings the province sustains, which is area × habitability × **roads** × population.
+So an extravagantly rich province is not an error to be tuned away at the point of placement; it
+is a province whose wealth is **gated behind infrastructure it has to build**, and that is a
+force with a visible cause a player can read on the map.
+
+Clamping the deposit instead would break two standing rules at once. It would make the generator
+produce an outcome rather than a consequence (§ Asymmetry is the deliverable — the spread is the
+point), and it would hide the richness from the player rather than making it *expensive to
+reach*. A seam of oil under an unroaded province should read as an opportunity nobody has paid
+for yet.
+
+**The practical consequence for anyone measuring a generation change:** a magnitude moving is not
+by itself a defect, and the question to ask is never "is this number too big" but "does the
+province score already bound what can be taken from it". If the answer is no, the fix is in the
+score's terms — the road multiplier's domain, the habitability weight, the free scalar — and not
+in the placement rule. `k_province_buildings_per_sustain_unit` is pinned by measurement precisely
+so that this stays checkable rather than a matter of taste.
+
 **Ben's ruling on what the ceiling is for (2026-08-22): drop it to where it bites**, and *"use
 technology for deeper mines and denser facilities which use more of the cap."* The ceiling is a
 real constraint and **technology is the thing that relieves it** — the first consumer of a

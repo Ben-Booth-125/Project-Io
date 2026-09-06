@@ -185,9 +185,9 @@
    ]
   },
   {
-   "status": "open",
+   "status": "resolved",
    "raised": "2026-09-06",
-   "resolution": null,
+   "resolution": "RULED (Ben, 2026-09-06): ACCEPT PETROLEUM, RE-EXAMINE PEAT - and a design steer larger than both.\n\nPETROLEUM ACCEPTED at +68%. The old substrate == barren gate was a bad proxy nobody defends; the\nlower-40%-in-a-warm-belt rule is ore_fields_for own shipped definition of shelf and basin. Not\ntuned back toward the artefact.\n\nPEAT RE-EXAMINED AND RESTORED, and the re-examination overturned the change. RESOURCES.md\n§ Ambient goods authors peat as a PAIR - scrub cover on sedimentary substrate, plains or valley.\nBL-765 narrowed it to marsh-only on a reading of the prose (a peat bog is a marsh), which the\nresource table does not sanction, and marsh is rarer than scrub - so 58% of the world peat was\nlost as a side effect of a comment rather than a decision. The doc rule is restored and MEASURED\nBACK: 7930.4 raw against the 7792 baseline, with body-phase peat 0 so the origin split still\nholds. If peat should come from marsh, RESOURCES.md Peat row changes first.\n\nTHE STEER, and it is the part that outlives this item: \"our per-province infrastructure scores\nwill account for anything which seems too rich.\" Richness is absorbed by the province sustain\nscore - area x habitability x ROADS x population - never clamped at placement. Ground is a fact\nabout the world; what a corporation can DO with it is gated behind infrastructure it has to build.\nWritten into PROVINCES.md § Richness is absorbed here, never clamped at generation, with the\nconsequence for measurement stated: a magnitude moving is not itself a defect, and the question is\nnever \"is this number too big\" but \"does the province score already bound what can be taken from\nit\".",
    "id": "NR-789",
    "kind": "question",
    "title": "Petroleum is +68% across the seed spread, and peat is down 58% - both honest consequences of BL-765, neither asked for",
@@ -204,7 +204,8 @@
     "src/world/tile_generation.cpp",
     "docs/generation/TILE_GENERATION.md",
     "docs/economy/RESOURCES.md"
-   ]
+   ],
+   "resolved": "2026-09-06"
   },
   {
    "status": "open",
