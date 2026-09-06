@@ -10,6 +10,91 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-06 (sprint 32b closes) — The world changes, and the instruments learn to see it
+
+**Mode:** Design (one elicitation form, eight calls) → Full batch delivery in three waves → two cold
+reviews → live check → close.
+**Runtime:** one long session; ~40 harness builds, three play builds, 10 sub-agents in worktrees,
+two cold adversarial reviews.
+
+Sprint 32b closed with **eleven items delivered** across three waves; **32c opened** for the
+remaining 28. The distinction from 32a is the whole point: 32a delivered instruments and moved no
+world on purpose; 32b moved every world four separate times and kept the causes attributable.
+
+### The design pass that set the scope
+
+Ben answered a market-work elicitation form settling **eight open calls**. Five became authority-doc
+text rather than commit messages: *no price, no draw* in PRODUCTION.md; phase 6's three-term
+objective in GENERATION_STRATEGY.md; pass 3 rewritten to SELECT a landscape rather than settle one;
+protection DERIVED at handoff in NATIONS.md; `trade_goods_misc` joining the endemic basket with its
+asymmetry cost stated in MARKETS.md. BL-751 was cancelled superseded with its parts named on BL-770
+and BL-772, so nothing went with it.
+
+Later, ruling on a paleo measurement, Ben added the steer that outlives the item: **richness is
+absorbed by the per-province infrastructure score, never clamped at generation** (PROVINCES.md
+§ Richness is absorbed here). Ground is a fact about the world; what a corporation can *do* with it
+is gated behind roads it has to build.
+
+### The result that decides the most
+
+**BL-770 slice 1 returned a negative result, and it was the right question to ask.** Five candidates
+whose fixtures differed by 20 corporations and 41 buildings scored *identically to the last digit* —
+every term read tiles, markets and population, and `market_saturation.cpp` contains neither
+"corporation" nor "building". Slice 2 added the roster-aware term (actual against potential
+completeness) and the same five candidates now spread **3.2e-01**. The search itself is still
+unbuilt, which is why BL-772 stayed blocked rather than shipping an unsettled opening position.
+
+### Four things that went wrong, kept because they will recur
+
+1. **Two agents bumped `save_game_version` 4 → 5 independently**, each correct alone. Merged, the
+   stream carried both and was neither one's v5 — two layouts under one version number, each
+   readable only by the build that wrote it. Resolved to 6; the wave ended at 8. Thereafter: exactly
+   one item per wave may bump it.
+2. **Three save-format changes landed unasserted**, because no worktree agent can build
+   `save_envelope_roundtrip` (it links imgui). Each time the integrating session wrote the assertion
+   and ran the differential. That is the builder gap's standing cost, now recorded in the harness.
+3. **The cold review caught a regression shipped as an improvement.** BL-767's Invest ground-pull
+   made industrialisation *worse* — 8/16 against 14/16 at the value that measures best — and the
+   item's own diagnosis ("the ceiling is in the selection rule, not the price") was falsified by
+   measurement. Underneath it was a real bug: a capped domain kept its pull, but the investment it
+   won did nothing.
+4. **Three builder fixes, and my first two verifications were run where the bug could not appear.**
+   Deps-cache resolution, `JSON.stringify` quoting, MSYS export ordering — each "fixed" and each
+   still broken for worktree agents until tested *from* a worktree.
+
+### Measurement over argument
+
+The pattern that worked, repeatedly. BL-783 tested its causal claim as a controlled **experiment** —
+sack 59 regions in a copy and re-materialise: sacked lose 73.3% of their cities, controls 2.4% —
+rather than resting on the one razed region the seed happened to produce. BL-765 asserted "the
+fossils read the past" by generating the same body twice with the drift record withheld. BL-768
+measured both its constants off a bimodal distribution instead of choosing round numbers. BL-750
+traced its flat tariff table to an upstream furnace count rather than tuning the banding.
+
+And the peat re-examination **overturned** a change: RESOURCES.md authors peat as a pair on scrub,
+BL-765 had narrowed it to marsh on a reading of prose, and 58% of the world's peat went with it.
+Restored, and measured back to 7930 against a 7792 baseline.
+
+### The live check, run at the close rather than owed forward
+
+BL-754's budget line **verified on screen**. BL-768's roads render, but an ancient road is
+indistinguishable by eye from a national one, so the headless differential is the stronger evidence.
+**Coastal ownership could not be checked at all** (NR-791): the hover card reports terrain, clicking
+water selects nothing, no lens colours by owner. That is a hole in BL-780's own done-when.
+
+Two measurements fell out of it: `build/` is Debug, so its 84.75 s generation must not be quoted
+against BL-761's Release figure; and the Debug warm start is **667,428 ms**, of which
+`run_economy_step` is 534,719 — BL-761's finding quantified, naming the same culprits.
+
+### And a bug the harnesses could not see
+
+Ben, looking at the live world: **one nation carries a complete road lattice** while its neighbours
+are sparse. The aggregate (+320 roaded tiles) was right and the per-nation distribution was wrong,
+and nothing reports per-nation road density. I had seen the same density, doubted it, checked a
+different region and moved on — an aggregate cannot see a distribution. **BL-784.**
+
+---
+
 ## 2026-09-06 (sprint 32a closes) — The arc runs, and four instruments could not see
 
 **Mode:** Design → Full (batch, then hand-built slices) → three design rulings → close.

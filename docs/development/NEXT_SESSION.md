@@ -1,91 +1,90 @@
-# Next session — sprint 32b, after the market batch
+# Next session — sprint 32c
 
-The market batch landed 2026-09-06: **BL-774, BL-759, BL-760, BL-770 slice 1**. All four
-requirement groups complete. `docs/development/SPRINTS.md` § Sprint 32b has the full record;
-this note is the handoff.
+Sprint 32b closed 2026-09-06 with **eleven items delivered**. 32c carries the remaining **28**.
+`docs/development/SPRINTS.md` § Sprint 32c is the plan; this note is the handoff.
 
-## Start here — the batch produced one decision and it is Ben's
+## Start here — two independent chains
 
-**BL-770 slice 1 returned the negative result.** The phase 6 objective **does not discriminate
-between candidate rosters**. Five candidates on one fixed world — `corporation_count` 4/8/16 and
-two placement seeds, exactly the axes Ben's point 3 names — score *identically*, every term at
-relative range `0.000e+00`. The positive control moves `1.000e+00` across three different worlds,
-so the scorer sees plenty; it just cannot see a roster.
+**1. The water model reaches its judgement point.** BL-776 and BL-777 landed: coastal water and
+lakes are owned, open ocean is not, and no region anchors on open ocean. Remaining:
 
-The cause is structural, not tuning: every term reads tiles, markets and population, and
-`src/world/market_saturation.cpp` contains neither "corporation" nor "building". The objective
-measures the **world's saturation potential** — whether a chain *could* close within reach of a
-market — and is silent on whether any firm closes it.
+- **BL-778** (unit traversal domains) — a roster row declares which domains it crosses; land units
+  may cross **owned** coastal water, the deliberate middle case. **Gate on `region::domain`, never
+  on `port_q`** — that is a decayed wetness fraction that counts lakes and is inherited at 0.7×
+  without re-surveying. `HISTORY.md` now says so explicitly.
+- **BL-779** (naval rows become real) — `unit_class::naval` returns base power 0 and `sum_stack`
+  skips the class, so three authored port-gated rows are worth nothing.
+- **BL-780** (the ONE re-bless) — read the warning below before touching it.
 
-**The owed fix, and it is BL-770 slice 2:** a roster-aware term. The natural shape is **actual
-against potential completeness** — of the terminals a market *could* close, how many are closed by
-a building that actually exists in its catchment. Small, because the scorer already walks the
-catchment. Until it exists, the parallel search is not worth a line of code.
+**2. Phase 6 gets its search.** The objective can finally see a roster (BL-770 slices 1–2). What is
+missing is candidate generation, parallel evaluation and a deterministic argmax —
+`landscape_score.cpp` still has **no caller outside its own harness**. Building it unblocks BL-772
+(retire the warm start) and BL-773 (the 3–6 minute budget).
 
-## Three things the batch changed that other items believed
+## BL-780 carries two problems it did not create
 
-1. **BL-726's premise is void.** Seed-1 interest share of net loss went **70% → 7%**. The
-   asymmetry the item exists to chase is gone, and sprint 33's interest done-when is *already met*.
-   Re-scope it against the re-based numbers or close it — Ben's call, recorded on the item.
-2. **Sprint 33's baseline is a third off.** Valued production falls **×0.57 / ×0.68**, not
-   ×0.21 / ×0.61. The growth gate is still unmet on both seeds, but the gap is much smaller than
-   the sprint was written against. Op-positive is better too: 48 of 55 and 50 of 63.
-3. **`build_harness.js` had never worked**, for anyone, from any shell — a `spawnSync` double-wrap
-   split the vcvars path at its first space and `>nul` swallowed the error. The whole non-Lua
-   verifier-headless tier was unbuildable. Fixed.
+**FOUR CAUSES, NOT ONE.** BL-780 was designed as the single point where the *water model* moves the
+world once and a human asks whether the new world is better. Wave 1 ran three reorder items
+alongside it, so the movement is now the water carve **plus** the population map **plus** the empire
+forces **plus** the paleo deposits. Every item measured its own before/after in isolation, so the
+causes stay attributable — but the question is no longer simple, and the description Ben authorises
+against must name all four.
 
-## Building a harness — no more archaeology
+**AND THE CENTRAL CLAIM CANNOT BE SEEN — NR-791.** The hover card over water reports terrain and
+habitability and says nothing about an owner; clicking water does not update the Selection panel; no
+lens colours territory by owner. BL-780 asks for a judgement *by looking* at a change that is
+currently invisible on every surface the game has. **Close that before the re-bless, not after** —
+the recommendation on the entry is to put ownership on the water hover card, since the card already
+reads the tile.
 
-```bash
-node tools/verify/build_harness.js <name>        # SDL/Lua-free world superset
-bash tools/verify/build_lua_harness.sh <name>    # needs a live Lua state
-```
+## What Ben spotted that no harness could — BL-784
 
-`build_harness.js` now **derives** which builder a harness needs (21 of 138, against a hand list
-that named four) and refuses with the reason and the exact command. A harness failing on
-`sol/sol.hpp` or `LNK2019` is the **wrong builder, not broken code**.
+**One nation comes out with a complete road lattice** while its neighbours carry the sparse trunk
+shape BL-768 intended. The aggregate was right (+320 roaded tiles era-ON) and the *per-nation
+distribution* was wrong — and nothing reports per-nation road density.
 
-## The chain past BL-770 is unchanged, and still a sequence
+Likely mechanism, to confirm rather than assume: BL-768 records a corridor at the **settle** path
+too, `(parent, daughter)` for every founding, and the run is settle-dominated by design (833
+foundings against 270 battles). A polity that expanded by settling has a corridor from every parent
+to every daughter, which over a contiguous holding **is** a spanning lattice. The corridor histogram
+agrees: 3,119 of 3,185 walked exactly once — a founding tree, not a trade network.
 
-| Item | Blocked on |
+The design question underneath is not a tuning one: **is a founding line a trade corridor at all?**
+A parent settling a daughter walked that ground once; a supply line walked forty times is a road.
+Weight or exclude the settle corridors rather than raising the threshold — but that is a call.
+
+## Open calls waiting on Ben
+
+| | |
 |---|---|
-| BL-772 (retire warm start) — the 72 s budget win | BL-770 |
-| BL-768 (roads and markets from history) | BL-766 (population map early), d5, not started |
-| BL-750 (tariff posture) — design settled 2026-09-06 | BL-748 (industrial pass ladder) |
-| BL-752 (colonial ties) | BL-749, held on NR-785's five calls |
+| **NR-791** | Coastal ownership is invisible — blocks BL-780's own done-when |
+| **NR-785** | Three surviving sea-leg calls; hold BL-749 and through it BL-752 |
+| **NR-783** | Span boundary: authored at epoch − 400, or derived from the first furnace |
+| **NR-784** | Cap the ancient arc at medieval? BL-760's counters can now answer it — nothing above medieval is ever fielded |
+| **NR-787** | Stagnant lid immobile in the paleo frame — a modelling call that turned a red row green |
+| **NR-790** | The fossil epoch derivation — authored, and every later paleo consumer copies its shape |
+| **NR-788** | **Six** harnesses now ad hoc, awaiting skill names: `continent_drift`, `sim_water_census`, the saturation measure, `deposit_origin`, `landscape_score_harness`, `centre_region_bind` |
+| **BL-758** | Era-seeded demography at 1960; `era_world_harness` R2 is deliberately **red** |
 
-## The water wave is still deferred, not withdrawn
+Two more from 32b, both about the furnace: is **1–4 crossers of 12** the intended outcome (BL-748's
+own done-when asked for a *wide* distribution), and is **within-world tariff flatness** enough to
+open BL-488's verb form?
 
-BL-776 → BL-780 keep their shape and their before-figures. BL-780 exists so the water model moves
-every world **once**; do not let 776–779 each re-bless.
+## Standing hazards, learned the hard way this sprint
 
-```
-world_determinism   039EE9880739CDF6 / B0EBBA249B3DDABB / DE55600457797638
-1960 two-span       1160 -> 1560 -> 1960, digest DB86651B9A596F7B
-sim_water_census    1105 of 3819 regions on water (982 sea, 613 OPEN OCEAN)
-                    43% of adjacency edges cross sea (54% / 22% / 57% by seed)
-warm start          72-73 s on BOTH arcs, ~12x the ~6 s app.cpp budgets
-```
+- **Exactly one item per wave may bump `save_game_version`.** Two agents bumped 4→5 independently
+  and produced two layouts under one version number. It is at **8**.
+- **A worktree agent cannot build `save_envelope_roundtrip`** (imgui). Every save-format change this
+  sprint arrived unasserted and the integrating session had to write the check. Budget for it.
+- **Any tooling fix for worktree agents must be tested FROM a worktree.** Three builder fixes landed
+  and the first two verifications were run in the main checkout, where the bug could not appear.
+- **`build/` is Debug.** Its generation and warm-start timings are not comparable to BL-761's
+  Release figures. The Debug warm start is ~11 minutes, which makes the Debug play loop barely
+  usable — a sharper argument for BL-772 than the Release number.
+- **Agents' worktree bases are stale by default.** Every one this session was; all had to merge main
+  before starting.
 
-All four determinism digests were **re-confirmed unmoved** after this batch touched
-`history_sim.cpp`.
+## Sprint 33 is untouched and still open
 
-## Calls still waiting on Ben
-
-- **BL-726** — re-scope or close, now its premise is void (new, from this batch).
-- **NR-783** — span boundary: authored at epoch − 400, or derived from the first furnace?
-- **NR-784** — cap the ancient arc at medieval? BL-760's new per-band counters can now *answer*
-  this: over 16 seeds nothing above medieval is ever fielded, so the cap looks free. Worth
-  deciding with that number in hand.
-- **NR-785** — BL-749's five design calls, which hold the sea leg and therefore BL-752.
-- **BL-758** — era-seeded demography at 1960. `era_world_harness` R2 is deliberately **red**.
-- **Water's 0 forage**; **can a coastal province hold a port?**
-- **Three ad-hoc harnesses** still want naming in `.claude/skills/verifier-headless/SKILL.md`:
-  `continent_drift`, `sim_water_census`, the promoted saturation measure — and now a fourth,
-  `landscape_score_harness`.
-
-## One economic signal nobody asked for
-
-Mean supply:demand **balance is 0.008** — under 1% of priced resources sit within a 4× band of
-their own demand. Almost everything is glutted or starved. That is a static shadow of the illness
-sprint 33 is chasing dynamically, and it is visible without running a single tick.
+Its six: BL-746 → BL-745 → BL-782, plus BL-738, BL-725, and BL-726 — **whose premise 32b voided**
+(seed-1 interest is 7%, not 70%, so the sprint's interest done-when is already met).
