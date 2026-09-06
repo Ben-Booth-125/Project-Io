@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*6 entries — 6 open, 0 resolved.*
+*7 entries — 7 open, 0 resolved.*
 
 ---
 
@@ -153,6 +153,30 @@ So the causal story in the doc - shore first, water derived - is not the mechani
 > **Recommendation:** The THIRD for this wave, then the first. Changing the carve now adds a FIFTH world-moving cause to a re-bless that already carries four, which is exactly what BL-780 exists to prevent - and lane A is mid-flight against the current world. But the first option is very likely the real answer: neutral coastal water is the thing that makes 'you may walk your own shore, not someone else's' mean anything, and 100% ownership quietly deletes it.
 
 *Files: `src/world/nation_generation.cpp`, `docs/generation/PROVINCES.md`, `tools/verify/water_ownership_census.cpp`*
+
+### NR-793 — One of phase 6's three candidate axes buys NOTHING - road tier is invisible to the objective, and costs a third of every round
+*question · raised 2026-09-07 · from Lane C (BL-770 slice 3, the search), measured by tools/verify/landscape_search_harness.cpp, 2026-09-07.*
+
+ROAD TIER 1, 2 AND 3 SCORE BIT-IDENTICALLY on every term of the objective. Verified independently on the harness here: every road_tier proposal in a four-round walk returned the incumbent's exact composite (0.007301, then 0.008397), never once differing in the last digit.
+
+IT IS NOT A NO-OP IN THE WORLD. The harness carries a fixture control: the base field is tier1=2973 / tier2=173 / tier3=0, and applying road_tier=3 genuinely raises 3146 tiles to Highway. The tiles change; the score does not.
+
+THE CAUSE IS STRUCTURAL. A road tier scales traversal COST (x0.67 / x0.50 / x0.40). The objective reads catchment MEMBERSHIP and terminal CLOSURE - both booleans - and this world's reach field never flips one on a cost discount. So the axis moves a continuous quantity the objective only reads through a threshold.
+
+Ben's point 3 named three axes: rosters, placements, road tiers. On this world only PLACEMENT actually moved the winner (+15.0% composite, entirely through that axis). SECONDARY, from the same run: corps=10 scores bit-identically to corps=8, while corps=6 and corps=7 differ - so the roster axis is live but COARSE, and extra corps close no additional terminals past a point.
+
+**Why it matters.** A third of every round's work is spent proposing a change that cannot be scored. That is not just waste: it makes the search look like it explores three dimensions when it explores two, and a later session reading the doc would believe road tier is being optimised.
+
+It also echoes the slice-1 finding exactly, one level up. Slice 1 found the objective blind to ROSTERS and the fix was a new term (realisation). This is the same shape - an axis the objective cannot see - and the same two exits are available.
+
+- Give the objective a term that can see a cost discount - something continuous like mean traversal cost to market, rather than a boolean closure count. Mirrors the slice-2 fix that made rosters visible.
+- Drop road tier as a candidate axis and say so in GENERATION_STRATEGY.md - two axes, honestly, rather than three where one is inert.
+- Change what a road tier DOES to a candidate so it can flip a boolean - e.g. tier affects catchment reach, not only cost. Largest blast radius; touches LOGISTICS.md.
+- Accept for now, record it in the doc as a known-inert axis, and revisit when the objective next changes.
+
+> **Recommendation:** The FIRST if phase 6 is meant to select infrastructure at all, otherwise the SECOND. What should NOT happen is leaving it as-is silently: Ben chose three axes on the assumption they discriminate, and one does not. Worth noting the third option would be the most faithful to what a road is FOR, but it changes the logistics model to serve a search, which is the tail wagging the dog.
+
+*Files: `src/world/landscape_score.cpp`, `src/world/landscape_search.cpp`, `docs/generation/GENERATION_STRATEGY.md`*
 
 ---
 
