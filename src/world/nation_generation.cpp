@@ -89,7 +89,7 @@ bool habitable_ground(terrain_substrate sub, terrain_cover cov)
 /// Falls back to any land tile if the preferred pool is exhausted.
 ///
 /// Returns the raster indices of the chosen seed tiles.
-std::vector<int> place_seeds(const std::vector<bool>& is_ocean,
+std::vector<int> place_seeds(const std::vector<bool>& is_water_map,
                              const std::vector<terrain_substrate>& sub,
                              const std::vector<terrain_cover>& cov,
                              int gw, int gh,
@@ -106,7 +106,7 @@ std::vector<int> place_seeds(const std::vector<bool>& is_ocean,
 
     for (int idx = 0; idx < total; ++idx)
     {
-        if (is_ocean[idx])
+        if (is_water_map[idx])
             continue;
         any_land.push_back(idx);
         if (habitable_ground(sub[idx], cov[idx]))
@@ -187,12 +187,14 @@ struct bfs_entry
     bool operator>(const bfs_entry& o) const { return cost > o.cost; }
 };
 
-/// Expand each seed outward until every claimable land tile is assigned.
-/// Ocean tiles are never claimed. Mountains and highlands drain the budget
-/// of the claiming nation so ranges fall at or near those features.
+/// Expand each seed outward until every claimable tile is assigned.
+/// OPEN OCEAN is never claimed; coastal water and lakes are (BL-776, the
+/// water-domain ruling: coastal water is owned by whoever owns the shore, the
+/// deep sea is owned by nobody). Mountains and highlands drain the budget of
+/// the claiming nation so ranges fall at or near those features.
 ///
 /// @param seeds        Raster indices of the nation seeds (one per nation).
-/// @param is_ocean     Per-tile ocean flag.
+/// @param unclaimable  Per-tile open-ocean flag: ground no nation may hold.
 /// @param tiles        Tile components, for landform lookup.
 /// @param tile_ids     Raster-order tile entity IDs.
 /// @param gw, gh       Grid dimensions.
@@ -204,9 +206,9 @@ struct bfs_entry
 ///                     is claimed, so the loading screen shows the borders grow
 ///                     in the order the pass actually grows them. Write-only —
 ///                     never read back, never steers the BFS.
-/// @return             Per-tile nation index (-1 = unclaimed/ocean). Indexed as row*gw+col.
+/// @return             Per-tile nation index (-1 = unclaimed/open ocean). Indexed as row*gw+col.
 std::vector<int> expand_territory(const std::vector<int>& seeds,
-                                  const std::vector<bool>& is_ocean,
+                                  const std::vector<bool>& unclaimable,
                                   const world& w,
                                   const std::vector<entity_id>& tile_ids,
                                   int gw, int gh,
@@ -275,7 +277,8 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
             const int nr  = nbrs[i].second;
             const int nidx = raster_idx(nc, nr, gw);
 
-            if (settled[static_cast<std::size_t>(nidx)] || is_ocean[static_cast<std::size_t>(nidx)])
+            if (settled[static_cast<std::size_t>(nidx)]
+             || unclaimable[static_cast<std::size_t>(nidx)])
                 continue;
 
             // Look up the tile's landform for cost weighting.
@@ -311,12 +314,12 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
 // Pass 2b — orphan-island assignment
 // ---------------------------------------------------------------------------
 
-/// Assign every unclaimed land tile to a nation, closing the gaps the
-/// water-blocked Voronoi BFS leaves behind on landmasses disconnected from
-/// every seed. Orphan land tiles (owner == -1 and not ocean) are grouped into
+/// Assign every unclaimed claimable tile to a nation, closing the gaps the
+/// sea-blocked Voronoi BFS leaves behind on landmasses disconnected from
+/// every seed. Orphan tiles (owner == -1 and not open ocean) are grouped into
 /// connected components by cardinal adjacency (column-wrapped, rows do not
 /// wrap), and each whole component is assigned to the nation owning the nearest
-/// already-claimed land tile by `grid_distance`.
+/// already-claimed tile by `grid_distance`.
 ///
 /// The pass is a pure, deterministic function of its inputs: components are
 /// discovered in raster order and "nearest" is tie-broken first by lowest
@@ -324,11 +327,11 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
 /// RNG is used. If there are no claimed tiles at all, `owner_map` is left
 /// unchanged.
 ///
-/// @param owner_map  Per-tile nation index (-1 = unclaimed/ocean), mutated in place.
-/// @param is_ocean   Per-tile ocean flag.
-/// @param gw, gh     Grid dimensions.
+/// @param owner_map    Per-tile nation index (-1 = unclaimed/open ocean), mutated in place.
+/// @param unclaimable  Per-tile open-ocean flag: ground no nation may hold.
+/// @param gw, gh       Grid dimensions.
 void assign_orphan_islands(std::vector<int>& owner_map,
-                           const std::vector<bool>& is_ocean,
+                           const std::vector<bool>& unclaimable,
                            int gw, int gh)
 {
     const int total = gw * gh;
@@ -354,7 +357,7 @@ void assign_orphan_islands(std::vector<int>& owner_map,
         if (visited[static_cast<std::size_t>(start)])
             continue;
         if (owner_map[static_cast<std::size_t>(start)] != -1
-         || is_ocean[static_cast<std::size_t>(start)])
+         || unclaimable[static_cast<std::size_t>(start)])
         {
             visited[static_cast<std::size_t>(start)] = true;
             continue;
@@ -383,7 +386,7 @@ void assign_orphan_islands(std::vector<int>& owner_map,
                 if (visited[static_cast<std::size_t>(nidx)])
                     continue;
                 if (owner_map[static_cast<std::size_t>(nidx)] != -1
-                 || is_ocean[static_cast<std::size_t>(nidx)])
+                 || unclaimable[static_cast<std::size_t>(nidx)])
                 {
                     visited[static_cast<std::size_t>(nidx)] = true;
                     continue;
@@ -670,11 +673,26 @@ std::vector<entity_id> generate_nations(
     const uint32_t seed_pol    = seed ^ 0x8C7B6A59u;
     const uint32_t seed_name   = seed ^ 0x4E5F607Au;
 
-    // --- Build flat terrain-axis and is_ocean maps from the existing tile data ---
+    // --- Build flat terrain-axis and water maps from the existing tile data ---
+    //
+    // TWO masks, because the layer asks two different questions (BL-776, the
+    // water-domain ruling, Ben 2026-09-06: "give coastal to owners, and sea
+    // provinces are unowned"):
+    //
+    //   `is_water_map` — ground a nation cannot be SEEDED on. A core is a place
+    //                    people settled, so it is land, and the seed budget is
+    //                    scaled to the landmass. Every kind of water fails this.
+    //   `unclaimable`  — ground a nation cannot HOLD. Only the OPEN OCEAN: the
+    //                    deep sea is crossed, not held. Coastal water and lakes
+    //                    are the shore's apron and fall to whoever owns the
+    //                    shore, so the carve claims them like any other tile.
+    //
+    // They coincided until the ruling, which is why one flag used to answer both.
     std::vector<terrain_substrate> sub(static_cast<std::size_t>(total),
                                        terrain_substrate::barren);
     std::vector<terrain_cover> cov(static_cast<std::size_t>(total), terrain_cover::none);
-    std::vector<bool> is_ocean(static_cast<std::size_t>(total), false);
+    std::vector<bool> is_water_map(static_cast<std::size_t>(total), false);
+    std::vector<bool> unclaimable(static_cast<std::size_t>(total), false);
 
     for (int idx = 0; idx < total; ++idx)
     {
@@ -687,7 +705,9 @@ std::vector<entity_id> generate_nations(
         sub[static_cast<std::size_t>(idx)] = it->second.substrate;
         cov[static_cast<std::size_t>(idx)] = it->second.cover;
         if (is_water(it->second.substrate)) // BL-516
-            is_ocean[static_cast<std::size_t>(idx)] = true;
+            is_water_map[static_cast<std::size_t>(idx)] = true;
+        if (is_open_ocean(it->second.substrate)) // BL-776
+            unclaimable[static_cast<std::size_t>(idx)] = true;
     }
 
     // --- Seed budget: scaled to the habitable landmass, not taken as a target ---
@@ -696,7 +716,7 @@ std::vector<entity_id> generate_nations(
     // is downstream of the geography.
     int land_tiles = 0;
     for (int idx = 0; idx < total; ++idx)
-        if (!is_ocean[static_cast<std::size_t>(idx)])
+        if (!is_water_map[static_cast<std::size_t>(idx)])
             ++land_tiles;
 
     const int tiles_per_seed = params.land_tiles_per_seed > 0 ? params.land_tiles_per_seed : 1;
@@ -726,7 +746,7 @@ std::vector<entity_id> generate_nations(
         {
             const int idx = params.seed_tiles[si];
             if (idx < 0 || idx >= total) continue;
-            if (is_ocean[static_cast<std::size_t>(idx)]) continue;
+            if (is_water_map[static_cast<std::size_t>(idx)]) continue;
             if (taken[static_cast<std::size_t>(idx)]) continue;
             taken[static_cast<std::size_t>(idx)] = true;
             seeds.push_back(idx);
@@ -738,7 +758,7 @@ std::vector<entity_id> generate_nations(
     if (seeds.empty())
     {
         seeds = place_seeds(
-            is_ocean, sub, cov, gw, gh,
+            is_water_map, sub, cov, gw, gh,
             seed_target, params.min_seed_separation,
             seed_rng);
     }
@@ -768,10 +788,10 @@ std::vector<entity_id> generate_nations(
     // --- Pass 2: territory expansion (weighted) ---
     std::mt19937 expand_rng(seed_expand);
     std::vector<int> owner_map = expand_territory(
-        seeds, is_ocean, w, tile_ids, gw, gh, weights, expand_rng, progress);
+        seeds, unclaimable, w, tile_ids, gw, gh, weights, expand_rng, progress);
 
-    // --- Pass 2b: orphan-island assignment (claim water-disconnected land) ---
-    assign_orphan_islands(owner_map, is_ocean, gw, gh);
+    // --- Pass 2b: orphan-island assignment (claim sea-disconnected ground) ---
+    assign_orphan_islands(owner_map, unclaimable, gw, gh);
 
     // --- Pass 2c: light "in history" merges — absorb anything below the size floor ---
     // No target count: the loop stops when every survivor holds a viable territory,
