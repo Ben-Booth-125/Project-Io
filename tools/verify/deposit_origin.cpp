@@ -21,12 +21,23 @@
 //   D4  a manufactured good is placed by neither — it has no origin in the
 //       ground, and asking for one is a category error rather than a zero.
 //
-// WHAT THIS DOES NOT CLAIM, and the distinction matters. The life half is still
-// drawn from the PRESENT cover — a coal seam appears where the ground is barren
-// today, not where a swamp stood in that tile's own past. Deriving it from the
-// paleo record is BL-765's act; BL-764 is what makes the past askable. This item
-// builds the seam, and the world is byte-identical because it does not yet write
-// through it.
+// BL-765 WRITES THROUGH THAT SEAM, and adds three rows for what it changed:
+//
+//   D6  the fossil half reads the PAST. Generating the same body twice, once
+//       with the continents result and once with it withheld (which leaves the
+//       ground stationary at every epoch, so every palaeo answer collapses to
+//       the present), must place coal and petroleum DIFFERENTLY. If it does not,
+//       the palaeo query is wired in but not consumed, which is the failure mode
+//       a seam like this actually has.
+//   D7  the world still feeds itself. This is BL-762's deferred half: it stopped
+//       because deleting the biological rows from the Body phase left a world
+//       with no food, and survey_endowment reads agricultural_produce as a
+//       region's farm score. So produce, timber and fibre must all reach tiles.
+//   D8  and it still has energy — coal and petroleum on tiles, the other half of
+//       what survey_endowment reads.
+//
+// The per-resource magnitudes are REPORTED, not asserted. Placement moved on
+// purpose and a pinned band here would be a golden nobody authorised.
 //
 // Lua-free: it runs the shipped planetology -> continents -> tile pipeline and
 // reads the generation record, without a world save or a Lua state.
@@ -38,6 +49,7 @@
 #include "world/tile_generation.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -74,9 +86,11 @@ struct run
     /// Summed `resource_deposit` over the finished tiles — what actually landed,
     /// after the three post-multiplies the phase totals deliberately precede.
     std::array<double, resource_count> on_tiles{};
+    /// Per-tile presence in raster order, for D6.
+    std::vector<char> coal_map, oil_map;
 };
 
-run generate(uint32_t campaign_seed)
+run generate(uint32_t campaign_seed, bool with_drift = true)
 {
     run out;
     const resolved_world rw = resolve_preferences(world_preferences{}, campaign_seed);
@@ -91,7 +105,8 @@ run generate(uint32_t campaign_seed)
     const entity_id body = w.create_entity();
     const std::vector<entity_id> ids =
         generate_body_tiles(w, body, gw, gh, out.st.profile, campaign_seed ^ 0xE471001u,
-                            1.0f, &out.st, &out.rec, &cs.height_bias, &cs.convergent);
+                            1.0f, &out.st, &out.rec, &cs.height_bias, &cs.convergent,
+                            with_drift ? &cs : nullptr);
 
     for (entity_id id : ids)
     {
@@ -99,6 +114,10 @@ run generate(uint32_t campaign_seed)
         const tile_component& t = w.tiles.at(id);
         for (std::size_t r = 0; r < resource_count; ++r)
             out.on_tiles[r] += static_cast<double>(t.resource_deposit[r]);
+        // Raster-order presence, for the drift-vs-no-drift comparison. The tile
+        // ids come back in raster order, so this vector is position-stable.
+        out.coal_map.push_back(t.resource_deposit[static_cast<std::size_t>(resource_type::coal)] > 0.0f);
+        out.oil_map.push_back(t.resource_deposit[static_cast<std::size_t>(resource_type::petroleum)] > 0.0f);
     }
     return out;
 }
@@ -202,6 +221,48 @@ int main(int argc, char** argv)
     // all-zero record satisfies D1 and D2 perfectly and proves nothing.
     check(body_placed_something && life_placed_something,
           "D5   both phases actually placed something — D1/D2 are not vacuous");
+
+    // --- D6: the fossil half reads the PAST ---------------------------------
+    // Same body, same seed, same everything except whether the ground is allowed
+    // to have moved. If the two agree tile-for-tile, nothing is reading the
+    // palaeo record.
+    {
+        const uint32_t seed = 0xABCDEF01u;
+        const run drift = generate(seed, /*with_drift=*/true);
+        const run still = generate(seed, /*with_drift=*/false);
+
+        int coal_moved = 0, oil_moved = 0, land = 0;
+        const std::size_t n = std::min(drift.coal_map.size(), still.coal_map.size());
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            ++land;
+            if (drift.coal_map[i] != still.coal_map[i]) ++coal_moved;
+            if (drift.oil_map[i]  != still.oil_map[i])  ++oil_moved;
+        }
+        std::printf("     drift vs stationary ground (seed %08X, %d tiles):"
+                    " coal differs on %d, petroleum on %d\n",
+                    seed, land, coal_moved, oil_moved);
+        std::printf("     coal total %.0f -> %.0f, petroleum %.0f -> %.0f (stationary -> drifted)\n",
+                    still.on_tiles[static_cast<std::size_t>(resource_type::coal)],
+                    drift.on_tiles[static_cast<std::size_t>(resource_type::coal)],
+                    still.on_tiles[static_cast<std::size_t>(resource_type::petroleum)],
+                    drift.on_tiles[static_cast<std::size_t>(resource_type::petroleum)]);
+        check(coal_moved > 0 || oil_moved > 0,
+              "D6   the fossil half reads the PAST — withholding the drift record moves it");
+
+        // --- D7 / D8: BL-762's deferred half -------------------------------
+        const double produce = drift.on_tiles[static_cast<std::size_t>(resource_type::agricultural_produce)];
+        const double timber  = drift.on_tiles[static_cast<std::size_t>(resource_type::timber)];
+        const double fibre   = drift.on_tiles[static_cast<std::size_t>(resource_type::fibre)];
+        const double coal    = drift.on_tiles[static_cast<std::size_t>(resource_type::coal)];
+        const double oil     = drift.on_tiles[static_cast<std::size_t>(resource_type::petroleum)];
+        std::printf("     food: produce %.0f, timber %.0f, fibre %.0f | energy: coal %.0f, petroleum %.0f\n",
+                    produce, timber, fibre, coal, oil);
+        check(produce > 0.0 && timber > 0.0 && fibre > 0.0,
+              "D7   the world still feeds itself — the Body phase places no food and there IS food");
+        check(coal > 0.0 && oil > 0.0,
+              "D8   and it still has energy — coal and petroleum both reach tiles");
+    }
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");

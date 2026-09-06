@@ -59,9 +59,12 @@ split: nothing re-derives it from an inline gate.
 
 **What origin buys the generator.** The two phases are separate *destinations*, decided by the
 table rather than by which line of the deposit pass happens to write them, so the Body phase's
-output is free of biological deposits by construction rather than by inspection. That is the seam
-the Life phase writes through when it derives the biosphere's residue from a body's own past
-(`docs/generation/CONTINENTS.md` § The Lagrangian frame is what makes that past askable).
+output is free of biological deposits by construction rather than by inspection. The Life phase
+writes through that seam: it derives the biosphere's residue from a body's own past
+(`docs/generation/CONTINENTS.md` § The Lagrangian frame is what makes that past askable), placing
+coal where the ancient swamps were and oil where the ancient seas were, while the living
+resources stay where the forest stands now (`docs/generation/TILE_GENERATION.md` § The Life
+phase).
 
 ### Deposit rarity & scarcity
 
@@ -74,6 +77,10 @@ design is BL-040 (full-set deposit authoring). Rules:
 - The scalar **modulates deposit frequency and magnitude** on top of the terrain affinity: a low
   scalar (e.g. platinum-group metals ≈ rare) keeps deposits sparse and small even on affine
   terrain; a high scalar (ambient stone/sand) approaches the every-tile ambient floor.
+- **The FOSSIL resources take the magnitude half only.** Coal and petroleum are placed by the
+  Life phase from the palaeo record, and their presence is a consequence of a body's own history
+  rather than a draw — so the scalar scales what a bearing tile carries and does not decide
+  whether the tile bears at all. Ordering is preserved; frequency is a fact about the world.
 - The scalar is **seeded**, so a campaign's exact distribution varies but the rarity *ordering*
   (rare goods rare, ambient goods abundant) is stable, matching each resource's base-price
   rarity in the Tier 1 tables.

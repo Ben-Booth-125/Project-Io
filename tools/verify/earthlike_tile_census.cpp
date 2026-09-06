@@ -189,7 +189,7 @@ seed_metrics census_one(uint32_t campaign_seed)
     const entity_id fb = w.create_entity();
     generation_record rec;
     const std::vector<entity_id> ids = generate_body_tiles(w, fb, gw, gh, st.profile,
-        chosen_seed, 1.0f, &st, &rec, &cs.height_bias, &cs.convergent);
+        chosen_seed, 1.0f, &st, &rec, &cs.height_bias, &cs.convergent, &cs);
 
     // Rivers are a SIBLING pass (BL-051 convention), not part of the six — so a
     // harness that calls generate_body_tiles alone measures a world with no

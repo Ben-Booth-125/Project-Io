@@ -188,7 +188,7 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
                                                      params.seed, deposit_scalar);
     return generate_body_tiles(w, body, home_grid_width, home_grid_height,
                                st.profile, tile_seed, deposit_scalar, &st,
-                               nullptr, &cs.height_bias, &cs.convergent);
+                               nullptr, &cs.height_bias, &cs.convergent, &cs);
 }
 
 world make_hard_coded_world(world_params params, generation_report* report,
@@ -285,7 +285,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // match a report entry to a world body by its display name.
     auto plan = [&](int proto_index, entity_id body_id, int gw, int gh,
                     std::vector<float>& bias_out,
-                    std::vector<uint8_t>* convergent_out = nullptr) {
+                    std::vector<uint8_t>* convergent_out = nullptr,
+                    continent_state* cs_out = nullptr) {
         body_inputs in = prototype_body(proto_index);
         // The generated name, not the prototype's placeholder literal — the
         // chain's biography lines quote it (BL-257). `naming` outlives `in`.
@@ -312,6 +313,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
             { return a.years_before_epoch > b.years_before_epoch; });
         bias_out = cs.height_bias;
         if (convergent_out) *convergent_out = cs.convergent;
+        // BL-765: Pass 6's Life phase asks the PLATE SET where a tile sat when
+        // its fossils formed, so the whole continents result has to reach
+        // generate_body_tiles, not just the two per-tile masks derived from it.
+        // Copied rather than referenced because `cs` is moved into the report
+        // below when one is being written.
+        if (cs_out) *cs_out = cs;
 
         if (report)
         {
@@ -395,11 +402,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // Mercury-analogue physical facts; everything else is derived by the chain.
     std::vector<float> cinder_bias;
+    continent_state cinder_cs;
     bump(1);
-    const planetology_state cinder_pl = plan(0, cinder, 180, 84, cinder_bias);
+    const planetology_state cinder_pl = plan(0, cinder, 180, 84, cinder_bias, nullptr, &cinder_cs);
     const uint32_t cinder_tile_seed = params.seed ^ 0xC1D0001u;
     generate_body_tiles(w, cinder, 180, 84, cinder_pl.profile,
-        cinder_tile_seed, deposit_scalar, &cinder_pl, nullptr, &cinder_bias);
+        cinder_tile_seed, deposit_scalar, &cinder_pl, nullptr, &cinder_bias, nullptr, &cinder_cs);
     record_tile_inputs(cinder, cinder_tile_seed, 180, 84, /*used_convergent=*/false);
 
     // -----------------------------------------------------------------------
@@ -443,7 +451,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
     std::vector<float> kepler_bias;
     std::vector<uint8_t> kepler_convergent; // Pass 5 seeds mountain ranges along these
     bump(2);
-    const planetology_state kepler_pl = plan(1, kepler, home_grid_width, home_grid_height, kepler_bias, &kepler_convergent);
+    continent_state kepler_cs;
+    const planetology_state kepler_pl = plan(1, kepler, home_grid_width, home_grid_height,
+                                             kepler_bias, &kepler_convergent, &kepler_cs);
     // A non-null generation_record is requested here so the river pass below can read the
     // Pass-1 heightmap it captures; this is a pure capture (TILE_GENERATION.md § Generation
     // history hook) and does not perturb the deterministic tile surface itself.
@@ -466,7 +476,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
     bump(4);
     auto kepler_tiles = generate_body_tiles(w, kepler, home_grid_width, home_grid_height,
         kepler_pl.profile,
-        kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent);
+        kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent,
+        &kepler_cs);
     record_tile_inputs(kepler, kepler_tile_seed, 180, 84, /*used_convergent=*/true);
 
     // Rivers (BL-170) — sibling pass (BL-051 convention) over the same heightmap Pass 2
@@ -1199,10 +1210,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // instellation); parent_orbit_au is its distance from Kepler, which is what
     // drives the tidal term.
     std::vector<float> selene_bias;
-    const planetology_state selene_pl = plan(2, selene, 90, 42, selene_bias);
+    continent_state selene_cs;
+    const planetology_state selene_pl = plan(2, selene, 90, 42, selene_bias, nullptr, &selene_cs);
     const uint32_t selene_tile_seed = params.seed ^ 0x5E1E001u;
     generate_body_tiles(w, selene, 90, 42, selene_pl.profile,
-        selene_tile_seed, deposit_scalar, &selene_pl, nullptr, &selene_bias);
+        selene_tile_seed, deposit_scalar, &selene_pl, nullptr, &selene_bias, nullptr, &selene_cs);
     record_tile_inputs(selene, selene_tile_seed, 90, 42, /*used_convergent=*/false);
 
     // -----------------------------------------------------------------------
@@ -1242,10 +1254,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // Differentiated on 26-Al heat, then stripped: the core_fragment branch
         // exits the chain at accretion and the whole object becomes the deposit.
         std::vector<float> ast_bias;
-        const planetology_state ast_pl = plan(a.proto_index, id, 30, 14, ast_bias);
+        continent_state ast_cs;
+        const planetology_state ast_pl = plan(a.proto_index, id, 30, 14, ast_bias, nullptr, &ast_cs);
         const uint32_t ast_tile_seed = params.seed ^ a.seed;
         generate_body_tiles(w, id, 30, 14, ast_pl.profile,
-            ast_tile_seed, deposit_scalar, &ast_pl, nullptr, &ast_bias);
+            ast_tile_seed, deposit_scalar, &ast_pl, nullptr, &ast_bias, nullptr, &ast_cs);
         record_tile_inputs(id, ast_tile_seed, 30, 14, /*used_convergent=*/false);
     }
 
