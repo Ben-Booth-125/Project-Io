@@ -207,6 +207,35 @@ struct sweep_row
     int64_t industrial_median = 0;
     int64_t industrial_last   = 0;
 
+    // --- BL-748 R1: the furnace, now an event INSIDE the run --------------
+    /// Polities that crossed the Industrial rung of the capacity ladder, out of
+    /// how many ran at all, and the year the FIRST of them crossed. Reported
+    /// separately from `regions_industrial` because the two can disagree: a
+    /// polity that crosses two years before the epoch industrialises nothing,
+    /// and a single count could not tell that world from one where the rung was
+    /// never reached.
+    int     polities_total     = 0;
+    int     polities_crossed   = 0;
+    int64_t first_cross_year   = 0; ///< 0 = nobody crossed.
+    int     regions_industrial = 0;
+    /// The highest and median MATERIALS capacity any polity reached. The
+    /// diagnostic for a zero furnace count: band 5 is the Industrial rung, so a
+    /// world topping out at 2 is not a furnace problem, it is a ladder problem.
+    int mat_cap_max    = 0;
+    int mat_cap_median = 0;
+
+    // --- BL-767 R2: does the rise-peak-fall shape occur? ------------------
+    /// Polities that ROSE (peak holdings at least double their start, and at
+    /// least three regions more), that FELL (ended at or below 60% of their own
+    /// peak), and that did both — the shape the item names.
+    int shape_rose = 0;
+    int shape_fell = 0;
+    int shape_rpf  = 0;
+    /// The largest single peak any polity reached, as a share of all regions
+    /// live at that sample, per-mille. The "how big did the biggest empire
+    /// actually get" figure, distinct from `peak_share_q` only in its sampling.
+    int shape_top_peak_q = 0;
+
     int64_t ms = 0;
 
     /// DOES THE HISTORY ACTUALLY RECUR? The sim's stated premise is that wars
@@ -273,6 +302,72 @@ std::string json_escape(const std::string& s)
     return out;
 }
 
+
+// ---------------------------------------------------------------------------
+// `--set <field>=<value>` — the tuning override (BL-767)
+// ---------------------------------------------------------------------------
+//
+// WHY THIS EXISTS RATHER THAN A RECOMPILE PER TRIAL. BL-767 is a tuning item:
+// the deliverable is a DISTRIBUTION under a set of forces, and arguing a
+// magnitude means running the same spread under several. Editing struct
+// defaults and rebuilding the world superset for each trial makes the argument
+// unreproducible — nothing in the record says which numbers produced which
+// table. An explicit, whitelisted override makes each trial one command line
+// that can be pasted back into a report.
+//
+// IT IS A DELIBERATE DIVERGENCE FROM GENERATION AND SAYS SO. Under any
+// override the sweep is no longer measuring the run that builds a world, so
+// S1b (the "this IS generation's era" acceptance test) is SKIPPED with its
+// reason printed rather than left to fail confusingly. Whitelisted, so a typo
+// is an error rather than a silently ignored flag.
+struct param_override { std::string name; int value; };
+
+bool apply_override(history_sim_params& p, const std::string& name, int v)
+{
+    if (name == "invest_yield_q")          { p.invest_yield_q = v;          return true; }
+    if (name == "invest_amortise_years")   { p.invest_amortise_years = v;   return true; }
+    if (name == "invest_threshold_q")      { p.invest_threshold_q = v;      return true; }
+    if (name == "capacity_band_cost")      { p.capacity_band_cost = v;      return true; }
+    if (name == "invest_level_pull_q")     { p.invest_level_pull_q = v;     return true; }
+    if (name == "invest_ground_pull_q")    { p.invest_ground_pull_q = v;    return true; }
+    if (name == "campaign_threshold_q")    { p.campaign_threshold_q = v;    return true; }
+    if (name == "settle_threshold_q")      { p.settle_threshold_q = v;      return true; }
+    if (name == "settle_pressure_q")       { p.settle_pressure_q = v;       return true; }
+    if (name == "consolidate_threshold_q") { p.consolidate_threshold_q = v; return true; }
+    if (name == "holdings_burden_q")       { p.holdings_burden_q = v;       return true; }
+    if (name == "free_holdings")           { p.free_holdings = v;           return true; }
+    if (name == "cohesion_loss_on_defeat_q") { p.cohesion_loss_on_defeat_q = v; return true; }
+    if (name == "cohesion_recovery_q")     { p.cohesion_recovery_q = v;     return true; }
+    if (name == "settle_cohesion_gate_q")  { p.settle_cohesion_gate_q = v;  return true; }
+    if (name == "sack_population_loss_q")  { p.sack_population_loss_q = v;  return true; }
+    if (name == "transfer_decisiveness_q") { p.transfer_decisiveness_q = v; return true; }
+    if (name == "contest_transfer_relief_q") { p.contest_transfer_relief_q = v; return true; }
+    if (name == "campaign_gain_q")         { p.campaign_gain_q = v;         return true; }
+    if (name == "work_amortise_years")     { p.work_amortise_years = v;     return true; }
+    if (name == "work_threshold_q")        { p.work_threshold_q = v;        return true; }
+    if (name == "w_work_capacity")         { p.w_work_capacity = v;         return true; }
+    if (name == "w_work_manpower")         { p.w_work_manpower = v;         return true; }
+    if (name == "w_work_reach")            { p.w_work_reach = v;            return true; }
+    if (name == "w_work_defence")          { p.w_work_defence = v;          return true; }
+    if (name == "w_work_industrial")       { p.w_work_industrial = v;       return true; }
+    return false;
+}
+
+/// The overrides, at namespace scope so EVERY run this harness performs sees
+/// them. Half-applying `--set` — the seed loop tuned, the synthetic W-checks
+/// still on struct defaults — is the same silently-misleading failure the
+/// whitelist exists to stop, one layer further in.
+std::vector<param_override> g_overrides;
+
+/// Struct defaults with the overrides applied. The synthetic fixtures build
+/// their params from this rather than from `history_sim_params{}` directly.
+history_sim_params tuned_defaults()
+{
+    history_sim_params p;
+    for (const param_override& o : g_overrides) apply_override(p, o.name, o.value);
+    return p;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -280,10 +375,23 @@ int main(int argc, char** argv)
     int seed_count = 16;
     int64_t epoch_year = 0;
     bool derive_from_generation = false;
+    std::vector<param_override> overrides;
 
     for (int a = 1; a < argc; ++a)
     {
         const std::string arg = argv[a];
+        if (arg == "--set" && a + 1 < argc)
+        {
+            const std::string kv = argv[++a];
+            const std::size_t eq = kv.find('=');
+            if (eq == std::string::npos)
+            {
+                std::printf("FAIL  --set wants <field>=<value>, got \"%s\"\n", kv.c_str());
+                return 2;
+            }
+            overrides.push_back({kv.substr(0, eq), std::atoi(kv.c_str() + eq + 1)});
+            continue;
+        }
         // `--epoch <year>` derives the sim params through
         // `era_minus_one_sim_params`, i.e. the run GENERATION performs. Opt-in
         // rather than the default, so every number this sweep has ever printed
@@ -305,8 +413,21 @@ int main(int argc, char** argv)
     // how "0 -> 1960 CE" drifted in the first place.
     world_params sweep_wp;
     sweep_wp.epoch_year = epoch_year;
-    const history_sim_params params =
+    history_sim_params params =
         derive_from_generation ? era_minus_one_sim_params(sweep_wp) : history_sim_params{};
+
+    // The tuning overrides (BL-767), applied to the derived params and printed.
+    // A name the whitelist does not know is an ERROR, not a shrug: a silently
+    // ignored `--set` would produce a table labelled as a trial of a force that
+    // was never changed, which is worse than no trial at all.
+    for (const param_override& o : overrides)
+        if (!apply_override(params, o.name, o.value))
+        {
+            std::printf("FAIL  --set: no tunable field named \"%s\"\n", o.name.c_str());
+            return 2;
+        }
+    const bool tuned = !overrides.empty();
+    g_overrides = overrides;
 
     std::printf("=== history sweep (BL-275) — %d seeds, %lld -> %lld ===\n",
                 seed_count,
@@ -370,8 +491,17 @@ int main(int argc, char** argv)
                         static_cast<long long>(params.start_year),
                         static_cast<long long>(params.stop_year),
                         static_cast<long long>(rounds_span2));
-        std::printf("    clock:  %d tick band%s\n\n",
+        std::printf("    clock:  %d tick band%s\n",
                     params.tick_band_count, params.tick_band_count == 1 ? "" : "s");
+        if (tuned)
+        {
+            std::printf("    TUNED:  ");
+            for (const param_override& o : overrides)
+                std::printf("%s=%d  ", o.name.c_str(), o.value);
+            std::printf("\n            (a DELIBERATE divergence from the shipped forces — this\n"
+                        "             table is a trial, not a measurement of the built world)\n");
+        }
+        std::printf("\n");
     }
 
     std::vector<sweep_row> rows;
@@ -468,12 +598,25 @@ int main(int argc, char** argv)
         // the shipped game scores FIVE verbs where every harness scores four.
         // That divergence is real and is recorded on BL-757 rather than papered
         // over here.
-        const history_sim_state sim = derive_from_generation
-            ? run_history_sim(ss, &fx.creeds, fx.terrain.view(), fx.gw, fx.gh,
-                              fx.params, fx.seed, nullptr, fx.works)
-            : run_history_sim(ss, nullptr, terr.view(),
-                              home_grid_width, home_grid_height, params, wp.seed,
-                              nullptr, &works);
+        // THE OVERRIDES REACH THE FIXTURE'S PARAMS TOO (BL-767), or a `--set`
+        // on the deriving path would print a "TUNED" banner over an untuned
+        // run — the silently-ignored-flag failure the whitelist exists to stop,
+        // one layer down. The fixture is copied rather than mutated so the
+        // acceptance test below still knows what generation actually ran.
+        history_sim_state sim;
+        if (derive_from_generation)
+        {
+            history_sim_params fp = fx.params;
+            for (const param_override& o : overrides) apply_override(fp, o.name, o.value);
+            sim = run_history_sim(ss, &fx.creeds, fx.terrain.view(), fx.gw, fx.gh,
+                                  fp, fx.seed, nullptr, fx.works);
+        }
+        else
+        {
+            sim = run_history_sim(ss, nullptr, terr.view(),
+                                  home_grid_width, home_grid_height, params, wp.seed,
+                                  nullptr, &works);
+        }
 
         {
             int64_t early = 0;
@@ -492,7 +635,7 @@ int main(int argc, char** argv)
         row.conquests     = sim.conquests;
         row.foundings     = sim.foundings;
 
-        if (derive_from_generation)
+        if (derive_from_generation && !tuned)
         {
             ++derived_seeds_checked;
             const bool same = sim.battles   == rep.prehistory_battles
@@ -569,6 +712,103 @@ int main(int argc, char** argv)
             row.industrial_first  = ind.front();
             row.industrial_median = ind[ind.size() / 2];
             row.industrial_last   = ind.back();
+        }
+        row.regions_industrial = static_cast<int>(ind.size());
+
+        // --- BL-748 R1: who crossed the rung, and how far the ladder got ---
+        //
+        // Read off the polities the run actually produced, not re-derived: the
+        // sim writes `polity::industrial_year` at the crossing, so this is the
+        // same value the furnace fired on.
+        {
+            std::vector<int64_t> mats;
+            row.polities_total = static_cast<int>(sim.polities.size());
+            for (const polity& q : sim.polities)
+            {
+                if (q.industrial_year != 0)
+                {
+                    ++row.polities_crossed;
+                    if (row.first_cross_year == 0 || q.industrial_year < row.first_cross_year)
+                        row.first_cross_year = q.industrial_year;
+                }
+                const int m = q.capacity[static_cast<int>(sim_domain::materials)];
+                mats.push_back(m);
+                if (m > row.mat_cap_max) row.mat_cap_max = m;
+            }
+            if (!mats.empty())
+            {
+                std::sort(mats.begin(), mats.end());
+                row.mat_cap_median = static_cast<int>(mats[mats.size() / 2]);
+            }
+        }
+
+        // --- BL-767 R2: the rise-peak-fall shape, per polity ---------------
+        //
+        // A SEPARATE, FINER WALK than the century sampler above, deliberately.
+        // The century walk feeds `hegemony_year` and `peak_share_q` and those
+        // are published numbers; re-sampling them to serve this measure would
+        // move figures nobody asked to move. Forty samples over the span is
+        // fine enough that a polity which rose and fell inside one century is
+        // still seen, and each `owner_slice_at` is one forward walk of the
+        // change list.
+        //
+        // WHAT IS AND IS NOT MEASURED. This reports a SHAPE, per polity, and
+        // nothing here gates or guarantees it. A world where nothing rises is a
+        // legitimate world (the 2026-08-31 asymmetry ruling, the 2026-07-30
+        // emergent-nation-count ruling, BL-224's non-hegemony invariant), so
+        // the row is a count and the aggregate is a distribution.
+        {
+            const int      n_pol = static_cast<int>(sim.polities.size());
+            const int64_t  step  = std::max<int64_t>(1, span / 40);
+            std::vector<int> start(static_cast<std::size_t>(n_pol), 0);
+            std::vector<int> peak(static_cast<std::size_t>(n_pol), 0);
+            std::vector<int> endh(static_cast<std::size_t>(n_pol), 0);
+
+            bool first_sample = true;
+            for (int64_t y = params.start_year; y <= params.stop_year; y += step)
+            {
+                const std::vector<uint16_t> slice = owner_slice_at(sim, y);
+                std::vector<int> count(static_cast<std::size_t>(n_pol), 0);
+                int live = 0;
+                for (uint16_t o : slice)
+                {
+                    if (o == owner_none) continue;
+                    ++live;
+                    if (o < static_cast<uint16_t>(n_pol)) ++count[o];
+                }
+                for (int i = 0; i < n_pol; ++i)
+                {
+                    const std::size_t ui = static_cast<std::size_t>(i);
+                    if (first_sample) start[ui] = count[ui];
+                    if (count[ui] > peak[ui]) peak[ui] = count[ui];
+                    if (live > 0)
+                    {
+                        const int share = (count[ui] * 1000) / live;
+                        if (share > row.shape_top_peak_q) row.shape_top_peak_q = share;
+                    }
+                }
+                first_sample = false;
+            }
+            {
+                const std::vector<uint16_t> slice = owner_slice_at(sim, params.stop_year);
+                for (uint16_t o : slice)
+                    if (o != owner_none && o < static_cast<uint16_t>(n_pol)) ++endh[o];
+            }
+
+            for (int i = 0; i < n_pol; ++i)
+            {
+                const std::size_t ui = static_cast<std::size_t>(i);
+                // ROSE: at least doubled, and by at least three regions — so a
+                // polity going from one region to two is not a rise.
+                const bool rose = peak[ui] >= 2 * start[ui] && peak[ui] >= start[ui] + 3;
+                // FELL: ended at or under 60% of its own peak. A power that is
+                // still at its height at the epoch has not fallen; it is simply
+                // where the run stopped.
+                const bool fell = peak[ui] > 0 && endh[ui] * 1000 <= peak[ui] * 600;
+                if (rose) ++row.shape_rose;
+                if (fell) ++row.shape_fell;
+                if (rose && fell) ++row.shape_rpf;
+            }
         }
 
         const auto t1 = std::chrono::steady_clock::now();
@@ -723,6 +963,114 @@ int main(int argc, char** argv)
                     static_cast<long long>(ss_.first), static_cast<long long>(ss_.second));
         std::printf("\n  (Both rates are REPORTED, not asserted — BL-224's non-hegemony becomes a\n"
                     "   tuning target read off this spread, not a construction guarantee.)\n");
+
+        // --- BL-748 R1: the furnace distribution --------------------------
+        //
+        // Since BL-748 the furnace date is an EVENT INSIDE THE RUN — the year a
+        // polity's materials capacity crossed the Industrial rung, plus the lag
+        // its ground imposes — rather than a date `run_settlement` fixed before
+        // the loop started. What R1 asks of this table is that the spread be
+        // WIDE: some worlds late, some never, rather than everything clustered
+        // at the span boundary because the rung unlocks there.
+        std::printf("\n--- BL-748  THE FURNACE, per world ---\n");
+        std::printf("  seed   polities  crossed  first cross   regions lit   first / median / last"
+                    "   mat cap (max/med)\n");
+        for (const sweep_row& r : rows)
+        {
+            char cross[24], lit[48];
+            if (r.first_cross_year == 0) std::snprintf(cross, sizeof cross, "%11s", "never");
+            else std::snprintf(cross, sizeof cross, "%11lld",
+                               static_cast<long long>(r.first_cross_year));
+            if (r.regions_industrial == 0) std::snprintf(lit, sizeof lit, "%22s", "-");
+            else std::snprintf(lit, sizeof lit, "%6lld /%6lld /%6lld",
+                               static_cast<long long>(r.industrial_first),
+                               static_cast<long long>(r.industrial_median),
+                               static_cast<long long>(r.industrial_last));
+            std::printf("  %4u   %8d  %7d  %s   %11d   %s   %3d / %3d\n",
+                        r.seed, r.polities_total, r.polities_crossed, cross,
+                        r.regions_industrial, lit, r.mat_cap_max, r.mat_cap_median);
+        }
+        {
+            int worlds_any = 0, worlds_none = 0;
+            std::vector<int64_t> firsts, crossed_n, lit_n, capmax;
+            for (const sweep_row& r : rows)
+            {
+                if (r.regions_industrial > 0) { ++worlds_any; firsts.push_back(r.industrial_first); }
+                else ++worlds_none;
+                crossed_n.push_back(r.polities_crossed);
+                lit_n.push_back(r.regions_industrial);
+                capmax.push_back(r.mat_cap_max);
+            }
+            std::printf("\n  WORLDS THAT INDUSTRIALISED   %d / %d   (never: %d)\n",
+                        worlds_any, static_cast<int>(rows.size()), worlds_none);
+            std::printf("  polities crossing the rung   median %lld\n",
+                        static_cast<long long>(median_of(crossed_n)));
+            std::printf("  regions lit per world        median %lld\n",
+                        static_cast<long long>(median_of(lit_n)));
+            std::printf("  highest materials capacity   median %lld   "
+                        "(the Industrial rung is 5)\n",
+                        static_cast<long long>(median_of(capmax)));
+            if (!firsts.empty())
+            {
+                const auto fs = span(firsts);
+                std::printf("  FIRST FURNACE YEAR           median %lld   range %lld..%lld"
+                            "   (boundary %lld, epoch %lld)\n",
+                            static_cast<long long>(median_of(firsts)),
+                            static_cast<long long>(fs.first), static_cast<long long>(fs.second),
+                            static_cast<long long>(params.boundary_year == INT64_MIN
+                                                   ? params.start_year : params.boundary_year),
+                            static_cast<long long>(params.stop_year));
+            }
+            else
+            {
+                std::printf("  FIRST FURNACE YEAR           NONE — no polity reached the rung.\n"
+                            "                               Read the materials-capacity column:"
+                            " a world topping out below 5\n"
+                            "                               is a LADDER finding, not a furnace"
+                            " one.\n");
+            }
+            std::printf("  (A world with no furnace is a legitimate outcome and is reported, never\n"
+                        "   filled in. R1 asks that the spread be WIDE, not that it be complete.)\n");
+        }
+
+        // --- BL-767 R2: the rise-peak-fall shape --------------------------
+        //
+        // REPORTED, NEVER GUARANTEED. Tuning moves FORCES — the weights in
+        // `history_sim_params` — and this table is how the movement is read.
+        // A world with no empire stays legitimate (BL-224's non-hegemony
+        // invariant, the 2026-07-30 emergent-nation-count ruling), so nothing
+        // below is asserted and no term anywhere forces the shape.
+        std::printf("\n--- BL-767  RISE / PEAK / FALL, per world ---\n");
+        std::printf("  seed   polities   rose   fell   rose+fell   biggest peak share\n");
+        for (const sweep_row& r : rows)
+            std::printf("  %4u   %8d   %4d   %4d   %9d   %16d%%\n",
+                        r.seed, r.polities_total, r.shape_rose, r.shape_fell,
+                        r.shape_rpf, r.shape_top_peak_q / 10);
+        {
+            int worlds_with_shape = 0;
+            std::vector<int64_t> rpf, rose, peaks;
+            for (const sweep_row& r : rows)
+            {
+                if (r.shape_rpf > 0) ++worlds_with_shape;
+                rpf.push_back(r.shape_rpf);
+                rose.push_back(r.shape_rose);
+                peaks.push_back(r.shape_top_peak_q);
+            }
+            const auto pk = span(peaks);
+            std::printf("\n  WORLDS SHOWING THE SHAPE     %d / %d   "
+                        "(at least one polity rose, peaked and fell)\n",
+                        worlds_with_shape, static_cast<int>(rows.size()));
+            std::printf("  polities that ROSE           median %lld per world\n",
+                        static_cast<long long>(median_of(rose)));
+            std::printf("  polities that ROSE AND FELL  median %lld per world\n",
+                        static_cast<long long>(median_of(rpf)));
+            std::printf("  BIGGEST PEAK SHARE reached   median %lld%%   range %lld%%..%lld%%\n",
+                        static_cast<long long>(median_of(peaks) / 10),
+                        static_cast<long long>(pk.first / 10),
+                        static_cast<long long>(pk.second / 10));
+            std::printf("  (ROSE = peak at least double the start and +3 regions. FELL = ended at\n"
+                        "   or under 60%% of its own peak. Both are reporting definitions.)\n");
+        }
     }
 
     // --- JSON ---------------------------------------------------------------
@@ -764,9 +1112,13 @@ int main(int argc, char** argv)
     check(static_cast<int>(rows.size()) == seed_count,
           "S1   every seed produced a world and completed its run");
 
-    if (derive_from_generation)
+    if (derive_from_generation && !tuned)
         check(derived_matches_generation && derived_seeds_checked > 0,
               "S1b  --epoch: the re-run IS generation's own era (counts match the report)");
+    else if (derive_from_generation)
+        std::printf("[SKIP] S1b  --set overrode the forces, so this run is DELIBERATELY not\n"
+                    "            generation's own era. The acceptance test would fail by\n"
+                    "            construction; it is skipped rather than left to mislead.\n");
 
     // Determinism across the sweep boundary: re-running one seed reproduces it.
     if (!rows.empty())
@@ -918,7 +1270,7 @@ int main(int argc, char** argv)
         // Same world, same seed, works on and off: the capacity works must leave
         // the world carrying more people than it otherwise would.
         {
-            history_sim_params wp2;
+            history_sim_params wp2 = tuned_defaults();
             wp2.start_year = -400;
             wp2.stop_year  = 0;
             // Settle OFF (an unreachable pressure threshold), so the region
@@ -958,7 +1310,7 @@ int main(int argc, char** argv)
         // regions: a roster that chose differently on a replay would make
         // every downstream generation pass irreproducible.
         {
-            history_sim_params wp2;
+            history_sim_params wp2 = tuned_defaults();
             wp2.start_year = -400;
             wp2.stop_year  = 0;
 
@@ -993,7 +1345,7 @@ int main(int argc, char** argv)
         // reason. What must be true is that the discount is READ at all — an
         // inert field would leave the two runs byte-identical.
         {
-            history_sim_params wp2;
+            history_sim_params wp2 = tuned_defaults();
             wp2.start_year = -400;
             wp2.stop_year  = 0;
 

@@ -162,13 +162,44 @@ ore accessibility on owned tiles let the history pass *name* which nation indust
 purely from tile data. Each seed gets its own Britain.
 History line: `"YYYY: {nation} lights the first coke furnaces of the {region} basin."`
 
-**How it is closed.** `run_settlement` scores each region's ancient fuel endowment against the
-world's own mean, gates industrialisation on *above-average* fuel, and
-`derive_national_character` names the three earliest furnaces once nations exist. The creed sits
-on top of the endowment rather than beside it — a people who raised a forge god did so because
-their cradle held ore (`CREEDS.md`), so that god's regions light up earlier. Endowment, not
-virtue, in both directions. Under an ancient epoch the furnace date is past the stop year, and
-the industrial clock the sim *does* run is the capacity ladder (§ The works roster).
+**How it is closed — two halves, in two passes.** The **gate** is `run_settlement`'s: it scores
+each region's ancient fuel endowment against the world's own mean, admits only *above-average*
+fuel, and derives the **lag** that ground imposes — how long a furnace takes to raise there once
+somebody can pay for one at all. The creed sits on top of the endowment rather than beside it — a
+people who raised a forge god did so because their cradle held ore (`CREEDS.md`), so that god's
+regions light up earlier. Endowment, not virtue, in both directions.
+
+The **date** is the sim's. **The furnace is an event inside the run, not a date fixed before it
+starts** — on an industrial epoch the second span is *where* industrialisation happens, so
+pre-resolving the year in the settlement pass answers the question before the pass that should
+answer it has run. A region lights in the year its owning polity's **materials capacity crosses
+the Industrial rung** of the capacity ladder, plus its own lag. The rung is read through the same
+span ceiling the works table and the unit roster read, so no polity lights a furnace at a band it
+could not build at, and on a two-span run no furnace can precede the boundary year.
+
+Everything downstream reads the result rather than the schedule: `derive_national_character` names
+the three earliest furnaces once nations exist, and the world's median furnace year — BL-219's
+early/late corporate pivot — is computed at the end of the run, the first moment the answer
+exists. Regions the run *founds* recompute the gate from their own ground and inherit the rest of
+their parent's lag: good land begets good land, never better than its parent.
+
+**A polity that never climbs never lights, and that is a legitimate world.** The crossing is
+reached by playing — a people that spends its rounds fighting does not reach the rung — so
+"nobody industrialised" is an outcome the ladder can produce, not a gap for a later pass to fill
+in. `history_sweep` reports the distribution.
+
+Under an ancient epoch none of this fires: the gate never runs below 1700, so no region carries a
+lag and no furnace lights. The industrial clock the sim *does* run there is the capacity ladder
+itself (§ The works roster).
+
+**A polity's investment follows its ground.** The ladder's seven domains are a *profile*, not a
+level: the Invest verb weighs how far a domain has fallen behind against what the polity's own
+holdings argue for — farm to agriculture, ore to materials, energy to energy, port to transport,
+and nothing to institutions, military or medicine, which no endowment window measures. This is
+Stage 4's hook read one stage earlier, and it is what makes the Industrial rung reachable at all:
+a rule that only ever raised the lowest domain levelled all seven in lockstep, so crossing in
+materials meant dragging six other ladders up with it. Magnitudes are `history_sweep`'s to argue,
+as every magnitude in this layer is.
 
 ### Stage 5 — The averted rupture
 
@@ -410,7 +441,7 @@ own choice. BL-224's non-hegemony stays emergent.
 | `manpower_mod` | `manpower_ceiling(population, mod)`, read by `replenish_manpower` — so every caller gets the effect without being told works exist. |
 | `reach_mod` | Two places: the **staging hub's** own works discount the terrain-weighted term of `supply_here` (scorer) and `supply_raw` (execution) — the two must agree, or a polity decides on one supply figure and fights on another — and the polity's **mean** reach relieves the burden of breadth. Mean, not total, so conquest alone cannot make an empire count itself as well-roaded. |
 | `defence_mod` | Readiness on the defender's stack, which `roster_stack` turns into an additive per-mille offset on `type_power_mod` — the same channel cohesion uses, and for the reason `combat.hpp` gives: the engine scores whatever stack it is handed and knows nothing about walls. Also visible to the **scorer**, so a polity does not walk into a bastion it could not see. A Bastion Fort at +640 is worth ~+64 against row power values of 90–380: it tilts a fight, never decides one. |
-| `industrial_mod` | The polity's mean industrial investment accelerates Invest's progress up the capacity ladder. The sim's industrial clock is that ladder — Stage 4's furnace date is `run_settlement`'s and is fixed before the loop starts — so the pull-forward is expressed against the mechanism that runs. |
+| `industrial_mod` | The polity's mean industrial investment accelerates its climb up the **materials** ladder, and only that one — the rung whose crossing lights the furnace (§ Stage 4). So the pull-forward is expressed against the crossing, in the one domain it belongs to: a Blast Works shortens the road to a furnace, it does not make a polity better at medicine. |
 
 ### The verb
 
@@ -454,6 +485,14 @@ by judgement, not calibrated** — placeholders in the same sense as the surroun
 put at plausible magnitudes so works land in the same band as the other verbs. `history_sweep`
 carries the roster on every run and reports works raised per world; whether the frontier stall
 moves from ceiling to decision is a question for that sweep's numbers.
+
+**Being "in the same band" is a relation, so it moves when a neighbour moves.** Re-pricing another
+verb re-prices this one by omission, and the amortisation horizon is the dial that says so. What
+no dial fixes is the **scale mismatch** underneath: Invest's score is proportional to the whole
+polity's holdings while a work's local term is proportional to ONE region, so the gap widens with
+every region a polity takes and the verb loses by more the larger the empire gets. That is why a
+sweep can report zero works raised across a whole seed spread while every mechanism check on the
+roster stays green — a measured state, and a shape question rather than a magnitude one.
 
 ---
 

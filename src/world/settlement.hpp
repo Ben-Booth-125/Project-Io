@@ -103,6 +103,23 @@ struct region
     int64_t industrial_year = 0;  ///< Calendar year the furnaces lit; 0 when never.
     bool    industrialised = false;
 
+    /// BL-748 — THE ENDOWMENT HALF OF STAGE 4, SEPARATED FROM THE DATE.
+    ///
+    /// Years this ground takes to raise a furnace once its owner can pay for
+    /// one at all, or **negative when it never can**. `run_settlement` still
+    /// owns the gate and the gradient — the fuel test and the endowment/creed
+    /// terms are unchanged, coefficient for coefficient — but it no longer
+    /// owns the DATE. Under an industrial epoch the second span is where
+    /// industrialisation happens, so the year a region lights is the year its
+    /// polity's materials capacity crossed the Industrial rung inside
+    /// `run_history_sim`, plus this lag. Endowment, not virtue, in both
+    /// directions (HISTORY.md § Stage 4) — and reached by playing rather than
+    /// pre-resolved before the loop starts.
+    ///
+    /// -1 rather than 0 as "never", because 0 is a legitimate lag: the
+    /// best-endowed ground in a world lights the year its owner crosses.
+    int industrial_lag_years = -1;
+
     int nation = -1;   ///< Index into the nation-id list, once the political pass has run.
     int contest_q = 0; ///< 0-1000 — how hard this region's frontier was pressed.
 

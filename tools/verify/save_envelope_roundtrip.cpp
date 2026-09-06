@@ -193,6 +193,11 @@ save_envelope make_envelope()
     r0.anchor               = 913;
     r0.farm_q               = 641;
     r0.population           = 84213;
+    // BL-748's field, added in the MERGE rather than by its own agent: it could
+    // not build this harness from a worktree, so the merged v6 stream carried a
+    // field with no round-trip assertion at all. 47 and 213 are distinct from
+    // each other and from every other int in the record.
+    r0.industrial_lag_years = 47;
     r0.centres              = 3;
     r0.centres_razed        = 0;
     r0.urban_population     = 31775;
@@ -201,6 +206,7 @@ save_envelope make_envelope()
     r1.anchor               = 274;
     r1.farm_q               = 388;
     r1.population           = 19507;
+    r1.industrial_lag_years = 213;
     r1.centres              = 1;
     r1.centres_razed        = 5;
     r1.urban_population     = 12099;
@@ -318,6 +324,8 @@ int main()
             && le.report.bodies[0].settlement.regions.size() == 2
             && le.report.bodies[0].settlement.regions[0].name == "Ashen Quarter"
             && le.report.bodies[0].settlement.regions[0].population == 84213
+            && le.report.bodies[0].settlement.regions[0].industrial_lag_years == 47
+            && le.report.bodies[0].settlement.regions[1].industrial_lag_years == 213
             && le.report.bodies[0].settlement.regions[0].centres == 3
             && le.report.bodies[0].settlement.regions[0].centres_razed == 0
             && le.report.bodies[0].settlement.regions[0].urban_population == 31775

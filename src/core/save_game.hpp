@@ -80,14 +80,30 @@ inline constexpr uint32_t save_game_magic =
 /// stream's world-params record misreads `body_count` and the preferences
 /// after it — refused whole on the same strict-equality contract, for the same
 /// reason as the v2 bump above.
-/// Bumped to 5 when `region` gained its URBAN RECORD and `settlement_state`
-/// gained `urban_map_drawn` (BL-766, the population map drawn early):
-/// `w_region` gains two ints and an int64 at the END of the region record, and
-/// `w_settlement` gains one bool after `median_industrial_year`. The region
-/// growth is a TAIL append, but the settlement one is mid-record within the
-/// per-body generation entry, so a v4 stream misreads everything after it —
-/// refused whole, same strict-equality contract, same reason as v2 and v4.
-inline constexpr uint32_t save_game_version = 5; // BL-766: region carries the urban record
+/// Bumped to 6 by TWO INDEPENDENT REGION GROWTHS THAT LANDED IN ONE WAVE, and
+/// the number is 6 rather than 5 precisely because of that. Both wave-1 items
+/// bumped 4 -> 5 in isolation, each correctly, in separate worktrees:
+///
+///   BL-766 (population map drawn early) appended the URBAN RECORD - two ints
+///     and an int64 at the END of the region record - and added
+///     `urban_map_drawn` to `w_settlement` after `median_industrial_year`.
+///   BL-748 (the furnace moves inside the run) inserted `industrial_lag_years`
+///     as one int BETWEEN `industrialised` and `nation`.
+///
+/// Merged, the stream carries BOTH, so it is neither item's v5 and calling it 5
+/// would have been the worst possible outcome: two different on-disk layouts
+/// sharing one version number, each readable only by the build that wrote it,
+/// with the strict-equality check waving both through. A version is a claim
+/// about a LAYOUT, not a count of how many times someone edited the file.
+///
+/// The write and read orders were reconciled and then PROVED by round-trip
+/// rather than by inspection - `industrial_lag_years` mid-record, then the three
+/// urban fields at the tail, in `w_region` and `r_region` alike.
+///
+/// A v4 or v5 stream misreads `nation` and everything after it, in a record that
+/// repeats hundreds of times per body, so both are refused whole on the same
+/// strict-equality contract as the v2 and v4 bumps above.
+inline constexpr uint32_t save_game_version = 6; // BL-748 + BL-766, merged
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

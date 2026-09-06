@@ -576,6 +576,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const int mean_reach_q       = static_cast<int>(works_reach_sum / n_held);
             const int mean_industrial_q  = static_cast<int>(works_ind_sum / n_held);
 
+            // ---- THE MATERIALS BAND, DERIVED ONCE (BL-748) ----------------
+            //
+            // Keyed off MATERIALS, not military. The unit roster reads the
+            // military column because that is the column whose rows turn over
+            // at a roster boundary; a Blast Works turns over with metallurgy
+            // instead. Same band enum, different column — which is the point of
+            // the two tables sharing `roster_band` rather than one deriving
+            // from the other.
+            //
+            // ONE derivation, TWO readers: the `build_work` candidate below,
+            // and the furnace at the end of this round. They must agree, or a
+            // polity would light furnaces at a band it could not build at —
+            // and re-deriving it at each site is exactly the drift this file's
+            // header warns about (see `build_stack`'s `band_out`).
+            const roster_band mat_band = min_band(
+                roster_band_for_capacity(
+                    clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6)),
+                sim_band_ceiling(params, y));
+
             // THE BURDEN OF BREADTH (BL-314 S3). Every region held past
             // `free_holdings` costs supply on every campaign this polity runs.
             const int over = static_cast<int>(held.size()) - params.free_holdings;
@@ -888,10 +907,55 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
             // -- Invest ----------------------------------------------------
             {
-                // One domain: the lowest band, ties to the lower enum value.
+                // ONE DOMAIN, CHOSEN BY ARREARS AND BY GROUND (BL-767).
+                //
+                // The old rule was "whichever domain sits at the lowest band",
+                // which levels all seven in lockstep and makes `capacity[]` a
+                // flat line rather than the profile the ladder asks for. Two
+                // weighted pulls now decide it: how far a domain is behind, and
+                // what the polity's ground argues for. See
+                // `invest_ground_pull_q` for the measurement that motivated it.
+                //
+                // Integer throughout, and the tie-break is the lower enum
+                // value — the same rule the old argmin used, so a world with no
+                // ground signal at all decides exactly as it did.
                 int dom = 0;
-                for (int d = 1; d < sim_domain_count; ++d)
-                    if (q.capacity[d] < q.capacity[dom]) dom = d;
+                {
+                    // The polity's ground, as the mean of what it holds. Means,
+                    // not totals, for the reason the works aggregates above
+                    // give: a total makes conquest alone look like endowment.
+                    int64_t farm_sum = 0, ore_sum = 0, energy_sum = 0, port_sum = 0;
+                    for (int hi : held)
+                    {
+                        const region& hp = ss.regions[static_cast<std::size_t>(hi)];
+                        farm_sum   += hp.farm_q;
+                        ore_sum    += hp.ore_q;
+                        energy_sum += hp.energy_q;
+                        port_sum   += hp.port_q;
+                    }
+                    // Four windows, seven domains. Institutions, military and
+                    // medicine have no ground behind them and take 0 — they
+                    // advance on arrears alone, which is the honest reading of
+                    // "no endowment window measures this".
+                    int ground_q[sim_domain_count] = {0, 0, 0, 0, 0, 0, 0};
+                    ground_q[static_cast<int>(sim_domain::agriculture)] =
+                        static_cast<int>(farm_sum / n_held);
+                    ground_q[static_cast<int>(sim_domain::materials)] =
+                        static_cast<int>(ore_sum / n_held);
+                    ground_q[static_cast<int>(sim_domain::energy)] =
+                        static_cast<int>(energy_sum / n_held);
+                    ground_q[static_cast<int>(sim_domain::transport)] =
+                        static_cast<int>(port_sum / n_held);
+
+                    int best_pull = INT32_MIN;
+                    for (int d = 0; d < sim_domain_count; ++d)
+                    {
+                        const int arrears = 6 - clampi(q.capacity[d], 1, 6);
+                        const int pull = arrears * params.invest_level_pull_q
+                                       + (ground_q[d] * params.invest_ground_pull_q) / 1000;
+                        if (pull > best_pull) { best_pull = pull; dom = d; }
+                    }
+                }
 
                 int64_t pop = 0;
                 for (int hi : held) pop += ss.regions[static_cast<std::size_t>(hi)].population;
@@ -952,15 +1016,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // large against any one polity's holdings.
             if (works != nullptr && works->size() > 0)
             {
-                // Keyed off MATERIALS, not military. The unit roster reads the
-                // military column because that is the column whose rows turn
-                // over at a roster boundary; a Blast Works turns over with
-                // metallurgy instead. Same band enum, different column — which
-                // is the point of the two tables sharing `roster_band` rather
-                // than one deriving from the other.
-                const roster_band band = min_band(
-                    roster_band_for_capacity(clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6)),
-                    sim_band_ceiling(params, y));
+                // The materials band, derived ONCE above this round's verbs
+                // (BL-748) so the works table and the furnace read the same
+                // value. It used to be re-derived here.
+                const roster_band band = mat_band;
 
                 for (int slot = 0; slot < clampi(params.work_candidate_regions, 0, 8); ++slot)
                 {
@@ -1268,6 +1327,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // terms as one drawn before the sim ran — one rule, not two.
                 draw_region_urban(np);
 
+                // THE DAUGHTER'S OWN GROUND DECIDES ITS FURNACE (BL-748).
+                //
+                // Without this every region the run founds would carry the
+                // struct default of -1 — "this ground never could" — and on a
+                // 1960 arc that is two regions in three, so Stage 4 could only
+                // ever reach the settlement pass's original ground. That is
+                // not a bounded simplification, it is the endowment gate
+                // silently answering "no" for a majority of the map.
+                //
+                // The gate is recomputed from the daughter's OWN fuel, on the
+                // same expression settlement.cpp § Stage 4 uses — inheriting
+                // the flag would let poor ground industrialise because its
+                // parent could, which is the opposite of endowment-not-virtue.
+                // The date's ground terms are recomputed the same way; the
+                // rest of that formula (the world's arable share, the creed
+                // bonuses, its own draw) is not reachable inside this loop, so
+                // it is INHERITED as the parent's residual. Good land begets
+                // good land, but never better than its parent — the rule this
+                // block already applies to the four endowment windows, applied
+                // to the fifth quantity that hangs off them.
+                {
+                    const auto ground_lag = [](const region& r) {
+                        return 90 - r.energy_q / 12 - r.ore_q / 22;
+                    };
+                    const int daughter_fuel = np.energy_q + np.ore_q / 2;
+                    if (daughter_fuel >= 900 && src.industrial_lag_years >= 0)
+                    {
+                        const int residual = src.industrial_lag_years - ground_lag(src);
+                        np.industrial_lag_years =
+                            clampi(ground_lag(np) + residual, 0, 235);
+                    }
+                }
+
                 // The change list indexes regions as uint16_t, so refuse to
                 // create one the time-lapse could not address (BL-312). Past
                 // 65,535 the cast wrapped silently and owner_slice_at's bounds
@@ -1298,24 +1390,40 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // advance tech exactly as far as a 1-year one and the ladder
                 // would never leave band 1 (history_sim.hpp § stepped clock).
                 //
-                // THE INDUSTRIAL WORKS LAND HERE (BL-321), and this is a
-                // deliberate divergence from the item's own words, recorded
-                // rather than hidden. The design says `industrial_mod` is a
-                // "pull-forward on the Stage 4 furnace date" — but Stage 4 runs
-                // inside `run_settlement`, which has already finished before
-                // this loop starts, so there is no furnace date left to pull.
-                // What the sim actually has as its industrial clock is the
-                // capacity ladder, and a Blast Works accelerating a polity's
-                // progress up that ladder is the same claim expressed against
-                // the mechanism that exists. Wiring it to Stage 4 instead would
-                // mean either running settlement twice or leaving the field
-                // inert; this reads as the honest third option.
-                const int ind_boost = clampi(mean_industrial_q, 0, 1000);
-                const int progress  = clampi(best_score, 0, 1000) * step_years;
+                // THE INDUSTRIAL WORKS LAND HERE (BL-321), AND THE DIVERGENCE
+                // THAT USED TO BE RECORDED HERE IS CLOSED (BL-748).
+                //
+                // The old note said: the design calls `industrial_mod` a
+                // "pull-forward on the Stage 4 furnace date", but Stage 4 ran
+                // inside `run_settlement` and had already finished before this
+                // loop started, so there was no furnace date left to pull — and
+                // the boost was applied to whatever domain Invest happened to
+                // pick, which is the tech ladder generally rather than the
+                // industrial clock specifically.
+                //
+                // The furnace date now lives INSIDE the run: a polity lights
+                // when its MATERIALS capacity crosses the Industrial rung (see
+                // the furnace block at the end of this round). So the
+                // pull-forward is expressed against that crossing, which means
+                // it applies to the materials ladder and to nothing else. A
+                // Blast Works shortens the road to a furnace; it does not make
+                // a polity better at medicine.
+                //
+                // INERT TODAY, and honestly so: `mean_industrial_q` is the mean
+                // of `region::work_industrial_mod` over the polity's holdings,
+                // and BL-757 measured ZERO works raised across sixteen seeds
+                // because `build_work` never wins the scored contest. The
+                // mechanism is wired and the boost is zero until that is fixed
+                // — which is a finding about BL-757, not a reason to route this
+                // through a domain it does not belong to.
+                const bool  ind_domain = (d == static_cast<int>(sim_domain::materials));
+                const int   ind_boost  = ind_domain ? clampi(mean_industrial_q, 0, 1000) : 0;
+                const int   progress   = clampi(best_score, 0, 1000) * step_years;
                 q.progress_q[d] += progress + (progress * ind_boost) / 1000;
                 // A band costs more the higher it sits — capacity follows the
                 // map, and it never runs away (ANCIENT_TECH_LADDER § diffusion).
-                const int cost = 4000 * q.capacity[d];
+                // The rate is a parameter since BL-767; the value is unchanged.
+                const int cost = params.capacity_band_cost * q.capacity[d];
                 if (q.progress_q[d] >= cost && q.capacity[d] < 6)
                 {
                     q.progress_q[d] -= cost;
@@ -1372,6 +1480,56 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                       params.cohesion_floor_q, 1000);
                 break;
             }
+
+            // ---- THE FURNACE (BL-748) ------------------------------------
+            //
+            // Stage 4's date used to be `run_settlement`'s, fixed before this
+            // loop started. Under an industrial epoch that is backwards — the
+            // SECOND SPAN is where industrialisation happens — so the date is
+            // now the year a polity's materials capacity crosses the Industrial
+            // rung INSIDE the run, plus the lag its ground imposes.
+            //
+            // TWO HALVES, EACH OWNED WHERE IT BELONGS. The endowment gate and
+            // the per-region lag are `run_settlement`'s (settlement.cpp § Stage
+            // 4) — that arithmetic is unchanged, coefficient for coefficient,
+            // only re-anchored. WHEN is this loop's, and it is reached by
+            // playing: a polity that spends its rounds fighting never climbs
+            // the ladder and never lights, which is a legitimate outcome and
+            // not a gap for anything downstream to fill in.
+            //
+            // Read through `mat_band`, so the rung is the same derivation the
+            // works table uses and a polity cannot light a furnace at a band it
+            // could not build at. On a two-span run that means no furnace
+            // before the boundary year, because `sim_band_ceiling` caps span 0
+            // at medieval. On a single-span ancient arc the ceiling is inert —
+            // and no region there carries a lag at all (Stage 4 does not run
+            // below 1700), so the 0 CE world lights nothing, exactly as before.
+            //
+            // Placed AFTER the verb executes so a crossing bought by this
+            // round's Invest is visible this round rather than next.
+            {
+                if (q.industrial_year == 0 && mat_band == roster_band::industrial)
+                {
+                    q.industrial_year = y;
+                    ++out.polities_industrialised;
+                }
+
+                if (q.industrial_year != 0)
+                {
+                    for (int hi : held)
+                    {
+                        region& p = ss.regions[static_cast<std::size_t>(hi)];
+                        // A negative lag is the gate saying "this ground never
+                        // could" — below-average fuel, or an arc whose Stage 4
+                        // never ran at all.
+                        if (p.industrialised || p.industrial_lag_years < 0) continue;
+                        if (y < q.industrial_year + p.industrial_lag_years) continue;
+                        p.industrialised  = true;
+                        p.industrial_year = y;
+                        ++out.regions_industrialised;
+                    }
+                }
+            }
         }
 
         // Ownership changes are appended where they happen (conquest, founding),
@@ -1381,6 +1539,28 @@ history_sim_state run_history_sim(settlement_state&         ss,
     out.region_stride = static_cast<int>(ss.regions.size());
     out.years           = years;
     out.start_year      = params.start_year;
+
+    // --- The world median furnace year (BL-748) ---------------------------
+    //
+    // `run_settlement` used to own this, and could not any more: nothing has
+    // industrialised while that pass is running. THIS is the first moment the
+    // answer exists, so the sim writes it back into the same field on the same
+    // state it was handed — one owner, one field, no second derivation for
+    // BL-219's early/late corporate pivot to disagree with.
+    //
+    // Left at whatever it already held when nobody industrialised, which for
+    // every path in the project is 0 — nobody — and 0 is what the
+    // never-industrialised rung in corporation_generation.cpp reads.
+    {
+        std::vector<int64_t> years_lit;
+        for (const region& p : ss.regions)
+            if (p.industrialised) years_lit.push_back(p.industrial_year);
+        if (!years_lit.empty())
+        {
+            std::sort(years_lit.begin(), years_lit.end());
+            ss.median_industrial_year = years_lit[years_lit.size() / 2];
+        }
+    }
 
     for (polity& q : out.polities)
     {
