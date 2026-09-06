@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// landscape_score — BL-770 slice 1. Does the phase 6 objective DISCRIMINATE?
+// landscape_score — BL-770. Does the phase 6 objective DISCRIMINATE?
 //
 // This harness exists to be able to FAIL, and that is its whole point. Ben's
 // ruling on the market-work form (2026-09-06): "build the SCORER alone, score a
@@ -8,16 +8,25 @@
 // means the search has nothing to search on and every line downstream of it is
 // wasted."
 //
-// So it does not assert that the scorer is good. It asserts that the scorer is
-// HONEST — deterministic, and able to say plainly whether it can see the thing
-// phase 6 would search over.
+// SLICE 1 SAID NO, AND IT WAS RIGHT TO. Five candidates whose fixtures differed
+// by 20 corporations and 41 buildings scored IDENTICALLY on every term, because
+// every term read tiles, markets and population and none of them read a roster.
+// SLICE 2 ADDED THE TERM THAT DOES — actual against potential completeness — and
+// the same five candidates now spread 3.2e-01 on the composite. The harness did
+// not change its question between the two; only the answer moved.
 //
-// THE POSITIVE CONTROL IS THE LOAD-BEARING PART. Measuring "candidate A and
-// candidate B score the same" proves nothing on its own: a scorer that returns a
-// constant would pass that test too. So every run also scores landscapes the
-// objective MUST be able to tell apart (different worlds). If the control moves
-// and the candidates do not, the finding is specific and real; if neither moves,
-// the scorer is broken and says so instead.
+// TWO CONTROLS, AND BOTH ARE LOAD-BEARING. Neither was here at first and each was
+// added because its absence made a result unreadable:
+//
+//   R2.0, THE FIXTURE CONTROL. "The candidates score alike" means nothing unless
+//   the candidates actually differ. Without this, a clamped corporation_count or
+//   a no-op background pass produces the identical flat output and the identical
+//   conclusion, for entirely the wrong reason.
+//
+//   SECTION B, THE WORLD CONTROL. "Flat" must be distinguishable from "the scorer
+//   returns a constant", so it scores landscapes the objective MUST tell apart.
+//   It holds the ROSTER CONSTANT and varies the world — generating no corps here
+//   would measure "different world AND no roster", which is not what it claims.
 //
 // Build:  bash tools/verify/build_lua_harness.sh landscape_score_harness
 // ---------------------------------------------------------------------------
@@ -77,10 +86,11 @@ void note_fixture(candidate& c, const world& w)
 void print_row(const candidate& c)
 {
     const landscape_score& s = c.score;
-    std::printf("  %-26s  complete=%.5f  balance=%.5f  spread=%.5f  composite=%.6f  "
-                "(%d markets, %d corps, %d bldgs)\n",
-                c.label.c_str(), s.mean_completeness, s.mean_balance, s.spread,
-                s.composite, s.market_count, c.corps, c.buildings);
+    std::printf("  %-26s  potential=%.5f  ACTUAL=%.5f  realised=%.3f  balance=%.5f  "
+                "spread=%.5f  composite=%.6f  (%d mkts, %d corps, %d bldgs)\n",
+                c.label.c_str(), s.mean_completeness, s.mean_actual, s.realisation,
+                s.mean_balance, s.spread, s.composite, s.market_count,
+                c.corps, c.buildings);
 }
 
 /// Largest relative gap between any two candidates on one term.
@@ -109,6 +119,8 @@ void report_discrimination(const char* what, const std::vector<candidate>& cs)
 {
     struct { const char* name; double landscape_score::* p; } terms[] = {
         { "chain completeness", &landscape_score::mean_completeness },
+        { "ACTUAL completeness", &landscape_score::mean_actual },
+        { "realisation", &landscape_score::realisation },
         { "supply:demand balance", &landscape_score::mean_balance },
         { "spread (unevenness)", &landscape_score::spread },
         { "composite", &landscape_score::composite },
@@ -129,7 +141,7 @@ void report_discrimination(const char* what, const std::vector<candidate>& cs)
 
 int main()
 {
-    std::printf("landscape_score — BL-770 slice 1, does the phase 6 objective discriminate?\n");
+    std::printf("landscape_score — BL-770, does the phase 6 objective discriminate?\n");
 
     lua_state lua;
     lua.load("scripts/recipes.lua");
@@ -227,9 +239,21 @@ int main()
         world w = make_hard_coded_world(p, nullptr, gen_cfg);
         assign_default_recipes(w, reg);
 
+        // THE CONTROL HOLDS THE ROSTER CONSTANT AND VARIES THE WORLD. The first
+        // cut generated NO corporations here, which made section B measure
+        // "different world AND no roster at all" - and once the objective became
+        // roster-aware that collapsed every control composite toward zero, so the
+        // control stopped controlling for the thing it names. Same corp params,
+        // same seed, different world.
+        corporation_params cp;
+        cp.corporation_count = 8;
+        generate_corporations(w, cp, 0xC0FFEEu);
+        generate_background_firms(w, reg, 0xC0FFEEu);
+
         char lbl[64];
         std::snprintf(lbl, sizeof lbl, "world seed=%08X", s);
         worlds.push_back({ lbl, score_landscape(w, reg) });
+        note_fixture(worlds.back(), w);
         print_row(worlds.back());
     }
     report_discrimination("DIFFERENT WORLDS (the control)", worlds);
@@ -273,7 +297,7 @@ int main()
     {
         std::printf("  VERDICT: the objective DISCRIMINATES between candidate rosters\n"
                     "    (composite relative range %.3e over %zu candidates).\n"
-                    "    Phase 6 has something to search on; slice 2 is the search.\n",
+                    "    Phase 6 has something to search on. The SEARCH itself is the next slice.\n",
                     roster_move, rosters.size());
     }
     else

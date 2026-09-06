@@ -4925,6 +4925,246 @@
      "evidence": "COMPLETE 2026-09-06. The harness prints the caveat with the BL-759 RE-BASED figures behind it (11738 -> 6693 and 5845 -> 3971), not the stale x0.2/x0.6 pair, and states that scores order candidates and do not evidence viability.\n\nCORRECTED 2026-09-06 AFTER THE COLD REVIEW BARRIER. Also corrected: the header claimed score_landscape is PURE and \"writes nothing\". It is not - measure_market_completeness calls body_reach_field, which MEMOISES the reach field into the world, which is why the signature takes world&. The score is order-independent but the call mutates shared state, so phase 6 candidates must not share one world across threads. Documented rather than left to be found by a data race."
     }
    ]
+  },
+  {
+   "brief": "coastal-territory",
+   "title": "BL-776 - the nation carve claims coastal water and lakes; open ocean stays unowned",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-776 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "nation_generation builds its unclaimable mask from is_open_ocean, not is_water, so coastal and lake tiles are claimable.",
+     "verification": [
+      "static: the predicate at nation_generation.cpp:689 is narrowed",
+      "headless: coastal and lake tiles carry a nation; open ocean tiles carry none"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Coastal provinces become owned as a consequence of tile ownership, with no separate province rule.",
+     "verification": [
+      "headless: province ownership derives from tiles, unchanged in mechanism"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "THE WORLD MOVES AND IT IS REPORTED, NEVER RE-BLESSED HERE. Report every golden/digest that shifts; BL-780 owns the single re-bless at the end of the wave.",
+     "verification": [
+      "headless: world_determinism run and its digest movement REPORTED",
+      "static: no golden re-blessed in this item"
+     ],
+     "notes": "The whole point of BL-780 is that the water model moves worlds ONCE. An item that re-blesses on its own destroys that.",
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "resource-origin-and-lagrangian",
+   "title": "BL-762 + BL-764 - deposits split by origin, and tiles gain a drift time axis",
+   "difficulty": 9,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-762, BL-764 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "BL-762: resources declare their ORIGIN (geological vs biological), and the Body phase places only geological deposits; biological ones defer to the Life phase.",
+     "verification": [
+      "headless: a resource origin classification exists and is enforced",
+      "headless: the Body phase places no biological deposit"
+     ],
+     "notes": "Part 1 (resources declare their origin, compile-time enforced) LANDED 2026-09-05 as commit a95af886. Read that first; this is the remaining half.",
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "BL-764: a tile can be asked where it was, and what its climate was, at age T - tiles ride plates rather than having latitude fixed to their grid row.",
+     "verification": [
+      "headless: a tile reports a past position and past climate for a given age",
+      "headless: continent_drift still green"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "HAZARD, and it is the reason this pair is one agent: tile_rng is SHARED between the deposit draw, the endemic draw and hazard/habitability jitter. Removing or reordering a draw MOVES the other two.",
+     "verification": [
+      "headless: world_determinism run and every digest movement REPORTED with its cause"
+     ],
+     "notes": "Do not re-bless. Report what moved and why. BL-780 owns the wave re-bless.",
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "history-sim-ladder-and-empires",
+   "title": "BL-748 + BL-767 - the furnace happens inside the run, and empires reliably form",
+   "difficulty": 8,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-748, BL-767 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "BL-748: the furnace date is the year a polity crosses the Industrial rung of the capacity ladder INSIDE the run, not run_settlement's pre-resolved date. Gunpowder/Industrial works and era-keyed unit rows become reachable only in pass 2.",
+     "verification": [
+      "headless: history_sweep reports the furnace-year DISTRIBUTION and the count industrialised by the epoch",
+      "headless: the distribution is WIDE - some worlds late, some never - not clustered at the boundary"
+     ],
+     "notes": "Fresh authoring: the industrial-ladder prose was purged 2026-08-23. Do NOT restore it; it is reference only (the NR-517 precedent).",
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "BL-767: tune the FORCES until the rise-peak-fall shape is common across the seed spread. Report the distribution.",
+     "verification": [
+      "headless: history_sweep over the standard spread reports the shape distribution"
+     ],
+     "notes": "NEVER CLAMP A WORLD. A world with no empire stays a legitimate outcome - that is the 2026-08-31 asymmetry ruling and BL-224's non-hegemony invariant. Tune forces, report spread.",
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Determinism holds and any digest movement is REPORTED, not re-blessed.",
+     "verification": [
+      "headless: world_determinism run; movement reported with its cause"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "population-map-early",
+   "title": "BL-766 - the population map is drawn before history and evolved by it",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-766 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "Population centres are drawn EARLY, weighted toward ground that farms easily, and then grown and destroyed by the history sim rather than placed after it.",
+     "verification": [
+      "headless: centres exist before the sim runs",
+      "headless: the sim grows and razes them"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The save format carries it, with both write and read paths in the same change and a round-trip assertion.",
+     "verification": [
+      "headless: save_envelope_roundtrip green on the new version",
+      "static: save_game_version bumped, both paths present"
+     ],
+     "notes": "The serialisation seam travels with the change - src/world/CLAUDE.md, absolute.",
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "IT PROBABLY DISSOLVES BL-758. If centres exist before the sim, the sim's seed-any-empty-region rule has nothing to fire on. Report whether BL-758 still has a subject.",
+     "verification": [
+      "static: a stated finding on whether BL-758 survives"
+     ],
+     "notes": "era_world_harness R2 is deliberately RED for BL-758 and must NOT be weakened to pass.",
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Determinism holds; digest movement REPORTED, never re-blessed.",
+     "verification": [
+      "headless: world_determinism run; movement reported with cause"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "scorer-sees-a-roster",
+   "title": "BL-770 slice 2 - the objective gains a roster-aware term, so phase 6 has something to search on",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-770 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "The scorer gains an ACTUAL-against-POTENTIAL completeness term: of the terminals a market COULD close, how many are closed by a building that actually exists in its catchment.",
+     "verification": [
+      "static: the term is computed in src/world/landscape_score.cpp",
+      "headless: it reads buildings, which no existing term does"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "THE SLICE 1 RESULT INVERTS. Candidate rosters that differ now score DIFFERENTLY, measured on the same harness that proved they did not.",
+     "verification": [
+      "headless: landscape_score_harness reports the roster terms DISCRIMINATE",
+      "headless: R2.0 still proves the fixtures differ"
+     ],
+     "notes": "Slice 1 measured 0.000e+00 across five candidates whose fixtures differ by 20 corps and 41 buildings. That is the before-figure.",
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Determinism and purity hold: sorted walks, no hash-order dependence, bit-identical repeat scoring.",
+     "verification": [
+      "headless: R3.1 still green",
+      "static: any new map walk is sorted"
+     ],
+     "notes": "The cold review caught an unsorted double accumulation here once already.",
+     "evidence": null
+    }
+   ]
   }
  ]
 }

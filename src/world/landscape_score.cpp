@@ -163,22 +163,125 @@ landscape_score score_landscape(world& w, const recipe_registry& reg,
         m.balance = m.rated > 0 ? static_cast<double>(m.balanced) / m.rated : 0.0;
     }
 
+    // --- THE ROSTER-AWARE TERM (BL-770 slice 2) -----------------------------
+    //
+    // WHY IT EXISTS. Slice 1 measured the objective over five candidate rosters
+    // on one fixed world and every term came back IDENTICAL TO THE LAST DIGIT,
+    // while the fixtures differed by 20 corporations and 41 buildings. The cause
+    // was structural, not tuning: completeness, the ratio and the spread all read
+    // TILES, MARKETS and POPULATION, and market_saturation.cpp contains neither
+    // the word corporation nor building. So the objective measured the WORLD'S
+    // saturation potential and was silent on whether any firm realised it —
+    // which is exactly the choice phase 6 exists to make.
+    //
+    // THE FIX IS ACTUAL AGAINST POTENTIAL, and it is deliberately the SAME
+    // closure as measure_market_completeness so the two numbers are comparable.
+    // Potential seeds the closure from deposits in reach and lets it use every
+    // era-allowed recipe. Actual seeds it from what extraction buildings in this
+    // catchment REALLY TARGET, and closes it using only the recipes processing
+    // buildings here REALLY RUN. Both axes are roster properties: which ground is
+    // being worked, and which conversions are staffed.
+    {
+        const bool processing_available =
+            reg.building_available(building_type::processing_facility);
+        const int n_allowed = processing_available
+                            ? reg.recipe_count(building_type::processing_facility) : 0;
+
+        std::vector<std::array<bool, resource_count>> mined(mids.size());
+        for (auto& row : mined) row.fill(false);
+        std::vector<std::vector<int>> run(mids.size());
+
+        // Buildings are walked in SORTED id order for the same reason the tile
+        // walk is: w.buildings is unordered, and although these accumulations are
+        // boolean-OR and push_back, the recipe list's ORDER would otherwise
+        // follow bucket layout. The closure below is order-insensitive, but a
+        // list whose order varies by standard library is a latent trap for any
+        // later reader who assumes otherwise.
+        std::vector<entity_id> bids;
+        bids.reserve(w.buildings.size());
+        for (const auto& kv : w.buildings) bids.push_back(kv.first);
+        std::sort(bids.begin(), bids.end());
+
+        for (const entity_id bid : bids)
+        {
+            const building_component& b = w.buildings.at(bid);
+            const auto it = slot.find(market_for_tile(w, b.tile));
+            if (it == slot.end())
+                continue;
+            const std::size_t m = it->second;
+            if (b.type == building_type::processing_facility)
+            {
+                if (b.recipe == no_recipe || b.recipe >= n_allowed)
+                    continue;               // configured with nothing: produces nothing
+                ++out.markets[m].processors;
+                const int rid = static_cast<int>(b.recipe);
+                if (std::find(run[m].begin(), run[m].end(), rid) == run[m].end())
+                    run[m].push_back(rid);
+            }
+            else
+            {
+                ++out.markets[m].extractors;
+                mined[m][static_cast<std::size_t>(b.target_resource)] = true;
+            }
+        }
+
+        const std::array<resource_classification, resource_count>& c2 = cls;
+        const std::vector<std::size_t> terms = terminal_resources(c2);
+
+        for (std::size_t m = 0; m < out.markets.size(); ++m)
+        {
+            std::array<bool, resource_count> have = mined[m];
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                for (const int i : run[m])
+                {
+                    const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                    bool inputs_ok = true;
+                    for (std::size_t r = 0; r < resource_count && inputs_ok; ++r)
+                        if (rc.inputs[r] > 0.0f && !have[r])
+                            inputs_ok = false;
+                    if (!inputs_ok)
+                        continue;
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        if (rc.outputs[r] > 0.0f && !have[r])
+                        {
+                            have[r] = true;
+                            changed = true;
+                        }
+                }
+            }
+            int closed = 0;
+            for (const std::size_t r : terms)
+                if (have[r]) ++closed;
+            out.markets[m].actual_closed = closed;
+            out.markets[m].actual = terms.empty()
+                                  ? 0.0
+                                  : static_cast<double>(closed) / static_cast<double>(terms.size());
+        }
+    }
+
     // --- the levels, and term 3's spreads -----------------------------------
-    std::vector<double> comps, bals;
+    std::vector<double> comps, bals, acts;
     comps.reserve(out.markets.size());
     bals.reserve(out.markets.size());
+    acts.reserve(out.markets.size());
     for (const market_score& m : out.markets)
     {
         comps.push_back(m.completeness);
         bals.push_back(m.balance);
+        acts.push_back(m.actual);
     }
     out.market_count = static_cast<int>(out.markets.size());
     if (!comps.empty())
     {
-        double cs = 0.0, bs = 0.0;
-        for (std::size_t i = 0; i < comps.size(); ++i) { cs += comps[i]; bs += bals[i]; }
+        double cs = 0.0, bs = 0.0, as_ = 0.0;
+        for (std::size_t i = 0; i < comps.size(); ++i)
+        { cs += comps[i]; bs += bals[i]; as_ += acts[i]; }
         out.mean_completeness = cs / static_cast<double>(comps.size());
         out.mean_balance      = bs / static_cast<double>(bals.size());
+        out.mean_actual       = as_ / static_cast<double>(acts.size());
     }
     out.completeness_spread = coeff_of_variation(comps);
     out.balance_spread      = coeff_of_variation(bals);
@@ -189,7 +292,17 @@ landscape_score score_landscape(world& w, const recipe_registry& reg,
     // rescued by being unevenly broken. That keeps "viable" the necessary
     // condition Ben's point 4 makes it, with "uneven" the tie-break among
     // landscapes that already work.
-    const double viability = out.mean_completeness * out.mean_balance;
+    out.realisation = out.mean_completeness > 0.0
+                    ? out.mean_actual / out.mean_completeness
+                    : 0.0;
+
+    // VIABILITY NOW CARRIES THE ROSTER. mean_actual replaces mean_completeness as
+    // the coverage factor: a landscape is viable because its FIRMS close chains,
+    // not because its GROUND could. mean_completeness stays on the record as the
+    // ceiling that realisation is measured against — the search is choosing among
+    // rosters on one fixed world, so the potential is a constant of the world and
+    // scoring it would add the same number to every candidate.
+    const double viability = out.mean_actual * out.mean_balance;
     out.composite = viability * (1.0 + p.unevenness_gain * out.spread);
     return out;
 }

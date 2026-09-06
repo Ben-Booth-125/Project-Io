@@ -74,7 +74,14 @@ struct market_score
 {
     entity_id market      = null_entity;
     entity_id body        = null_entity;
-    double completeness   = 0.0;  ///< terminals closed / terminals total
+    double completeness   = 0.0;  ///< POTENTIAL: terminals closed / terminals total
+    /// ACTUAL: the same closure, seeded from what buildings in this catchment
+    /// really extract and really run, rather than from what the ground could
+    /// yield and the era permits. See § The roster-aware term in the .cpp.
+    double actual         = 0.0;
+    int    actual_closed  = 0;
+    int    extractors     = 0;    ///< extraction buildings in the catchment
+    int    processors     = 0;    ///< processing buildings running a real recipe
     int    balanced       = 0;    ///< resources whose ratio sits inside the pin band
     int    glutted        = 0;    ///< supply >> demand
     int    starved        = 0;    ///< demand >> supply (the ceiling shadow)
@@ -88,8 +95,15 @@ struct landscape_score
     std::vector<market_score> markets;
 
     // --- term 1 and 2, as levels ---
-    double mean_completeness = 0.0;
+    double mean_completeness = 0.0;  ///< potential
+    double mean_actual       = 0.0;  ///< the roster-aware term (BL-770 slice 2)
     double mean_balance      = 0.0;
+
+    /// THE RATIO THAT MAKES THE OBJECTIVE ROSTER-AWARE: actual / potential. How
+    /// much of the opportunity this world offers does THIS roster take up? A
+    /// landscape with rich ground and no firms scores near 0; one whose firms
+    /// close every chain the ground allows scores 1.
+    double realisation = 0.0;
 
     // --- term 3, as spread. Population-free: these are spreads OVER MARKETS,
     //     so a landscape with rich and poor markets scores above a flat one at
