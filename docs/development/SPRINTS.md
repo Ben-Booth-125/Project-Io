@@ -227,6 +227,62 @@ generation-side market chain past its first question. BL-772, BL-768, BL-750 and
 blocked on BL-770, BL-766, BL-748 and BL-749 respectively - unchanged. The chain is still a
 sequence, and its root now has a known defect to fix before the next link.
 
+--- RE-PLANNED AGAIN 2026-09-06: THE WATER MODEL COMES BACK IN, AND THE SPRINT IS 20 ITEMS ---
+
+Ben: "bring the water model back into view for this sprint. Then we should be able to do
+everything but those loose instruments now." Scope is therefore every open 32b item EXCEPT the
+loose instruments (BL-753 scoreboard, BL-758 demography, BL-761 warm-start measure, BL-781 query
+flag) and the non-sprint leaves (BL-714, BL-727, BL-729, BL-730, BL-731, BL-733, BL-734).
+Sprint 33 keeps its own six.
+
+BRINGING THE WATER MODEL BACK CLOSED TWO ITEMS OUTRIGHT. BL-755 (sim crosses water free) and
+BL-756 (sim settles on ocean) are cancelled superseded, on the strength of the water items own
+text: BL-778 says "WHAT IT REPLACES. BL-755 measured 43% of the sim adjacency edges crossing sea
+... this is what prices them", and BL-777 says its fix "is now the SMALLER HALF of what BL-756
+proposed" - 613 open-ocean regions rather than a blanket ban on 1105, because coastal founding is
+legitimate under the ownership rule. Both items had already delivered their measurement half
+(sim_water_census) and both had their decision half taken by Ben water ruling. Neither had
+outstanding work. Backlog 39 -> 37 open.
+
+AND IT SHRANK NR-785 FROM FIVE CALLS TO THREE. BL-779 answers call (4) outright - the naval rows
+DO gain real power. BL-777 largely answers (2), because region save format is bumped by the water
+model anyway, so a harbour anchor field costs no extra migration. Still Ben and still blocking
+BL-749: (1) which walk, coast tiles or all is_sea, and how four harbour rows map onto ranges;
+(3) how "holds a harbour work" is tested, since work_row has no harbour flag; (5) whether an
+overseas daughter re-surveys port_q or inherits it.
+
+THE SHAPE, topologically waved (20 items, difficulty sum 71, six waves deep):
+  W1 (d30) BL-776 coastal territory | BL-770 candidate search slice 2 | BL-766 population map
+           early | BL-764 Lagrangian tiles | BL-762 resource origin | BL-767 empires form |
+           BL-748 industrial pass ladder
+  W2 (d23) BL-777 region domain | BL-772 retire warm start | BL-754 generation budget |
+           BL-768 roads and markets from history | BL-769 consequence folds in | BL-765 paleo
+           deposits | BL-750 tariff posture
+  W3 (d6)  BL-778 unit traversal domains | BL-773 the 3-6 minute budget
+  W4 (d4)  BL-779 naval units become real
+  W5 (d6)  BL-780 the ONE re-bless | BL-749 sea leg campaign
+  W6 (d2)  BL-752 colonial ties
+
+ONE SEQUENCING CORRECTION INSIDE WAVE 5, and it matters more than its size. BL-780 must land
+BEFORE BL-749, not beside it. BL-780 exists so the water model moves every world EXACTLY ONCE, at
+a single point where someone asks whether the new world is BETTER. The sea leg also moves every
+world - it changes where polities can campaign and settle - so landing them together folds two
+independent world changes into one digest movement and destroys the very property BL-780 was
+created to protect. Re-bless the water model, look at it, THEN open the sea leg.
+
+THE THROUGHPUT RISK IS THE ONE WORTH STATING PLAINLY. This session delivered four items at a
+difficulty sum of 9. The proposed scope is 71 across six dependency waves - roughly eight
+sessions at that rate, and the deepest items (BL-764 Lagrangian tiles d5, BL-766 population map
+d5, BL-770 d5) are each larger than this whole batch. Sprint 32a planned 8 and delivered 5 of 34.
+The wave structure is only a mitigation if waves 1 and 2 are not opened simultaneously: W1 alone
+is d30, which is more than three of these sessions.
+
+WHAT IS ACTUALLY GATED, as opposed to merely large: only BL-749 and BL-752, on the three
+remaining NR-785 calls. NR-783 (the span boundary) does NOT hard-block BL-748 - Ben own
+recommendation there was "(b) eventually, (a) for now", and the authored offset is what is built,
+so BL-748 can proceed and NR-783 becomes a follow-on rather than a gate. Everything else in the
+20 is reachable today.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -278,7 +334,7 @@ sequence, and its root now has a known defect to fix before the next link.
 | 31 | Long-term market viability - every recipe pays at base price | CLOSED 2026-09-02 on Ben's call, stage one a SUCCESS: the field ends the standard thirty-year lapse with a majority of corps operating-positive (46 of 61, 31 of 55) where it began with four and none, debtors a tenth of the field, median balances climbing, buildings running. The growth half - valued production still declines over the run - is sprint 33. |
 | 32a | Gamified generation, 32a - the arc runs, and the instruments that measure it are honest | CLOSED 2026-09-06 at a natural boundary. Five items delivered - the two-span sim, the sweep that measures the real run, the continent time axis, the tick-length audit, and the saturation measure promoted where generation can call it. The remaining 29 carry to 32b, led by the water model. |
 | 33 | Long-term market viability, the growth half - the field that keeps producing | OPENED 2026-09-02 on Ben's call as sprint 31's second half. Sprint 31 made the field solvent; this sprint makes it grow. The instrument is campaign_lapse with its debt columns, and the two levers are already filed. |
-| 32b | Gamified generation, 32b - the water model, and the reorder that 32a built the instruments for | OPEN 2026-09-06, continuing 32a directly. RE-PLANNED 2026-09-06 on Ben call: the generation-side MARKET chain leads, not the water wave - BL-770 scorer slice is the only reachable item, and the sprint-33 growth gate was accepted unmet. Water model (BL-776..BL-780) deferred with its before-figures intact. 29 items carried over. |
+| 32b | Gamified generation, 32b - the water model, and the reorder that 32a built the instruments for | OPEN 2026-09-06, continuing 32a. RE-PLANNED TWICE the same day: the market batch delivered (BL-774, BL-759, BL-760, BL-770 slice 1 - which returned the NEGATIVE result that the phase 6 objective cannot see a roster), then the WATER MODEL brought back in on Ben call. Scope is now 20 items, d-sum 71, six waves - everything except the loose instruments. Closing BL-755 and BL-756 as subsumed by the water model took the backlog 39 -> 37. |
 
 **Next up.** SPRINT 32a CLOSED 2026-09-06 (5 of 34 delivered - the arc runs and its instruments are honest). SPRINT 32b IS OPEN and carries the remaining 29, led by the water model. Sprint 33 (long-term market viability, the growth half) is also open and untouched by this session. THE NEXT NEW SPRINT IS 34.
 
