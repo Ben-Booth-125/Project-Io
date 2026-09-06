@@ -41,19 +41,103 @@ const WORLD = path.join(ROOT, 'src', 'world');
 // comment warns about.
 const LUA_TUS = new Set(['recipe_registry', 'works_registry', 'tech_tree', 'world_gen_config']);
 
-// Harnesses that genuinely need a live Lua state, and so cannot be built here.
-// CMakeLists declares each of these explicitly with lua54 linked; see its comments.
-const NEEDS_LUA = new Map([
-  ['pregame_balance_harness', 'constructs a lua_state and calls recipe_registry::load_from_lua'],
-  ['persona_counsel_harness', 'loads scripts/personas/*.lua through src/scripting/persona_pack.cpp'],
-  ['spawn_solvency',          'loads the REAL scripts/recipes.lua + economy.lua through ' +
-                              'recipe_registry::load_from_lua — it measures magnitudes, not ' +
-                              'relations, so a restated registry would answer about a world ' +
-                              'that does not ship (BL-635)'],
-  ['material_floor',          'loads the REAL scripts/recipes.lua + economy.lua + world_gen.lua ' +
-                              'and PARSES world_gen_config from the last of them — the market ' +
-                              'base prices it measures against exist only in that table'],
-]);
+// WHICH HARNESSES NEED THE LUA BUILDER IS DERIVED, NOT LISTED (BL-774, closing
+// NR-767). This used to be a hand-written four-entry map. The real set is 23 —
+// measured, not estimated — so the list was wrong by a factor of five and every
+// harness it missed failed on sol/sol.hpp instead of being refused with a reason.
+// That error reads exactly like broken code, which is why it kept costing time.
+//
+// THE PREDICATE IS A LINK QUESTION, NOT AN INCLUDE ONE, and getting that
+// backwards is the obvious mistake — it was made and measured before this was
+// written. Reaching scripting/lua_state.hpp through the include graph proves
+// nothing, because the sol2 and Lua headers are ON the include path above (a
+// src/world TU pulls them in for every harness). 54 of 138 harnesses reach that
+// header; only ~20 fail to build. world_determinism reaches it and links fine.
+//
+// What actually fails is the LINK: this builder omits the four sol2/Lua TUs, so
+// a harness dies with LNK2019 iff it references a symbol DEFINED in one of them
+// — in practice recipe_registry::load_from_lua and friends, reached by naming
+// `load_from_lua`, or lua_state itself (defined in src/scripting/lua_state.cpp,
+// which is likewise not compiled here).
+//
+// So the test is: does the harness's own translation unit REFERENCE either
+// symbol in live code? Comments do not count — works_roster_harness mentions
+// load_from_lua in a comment, links perfectly well, and was misrouted by a naive
+// grep. Verified against real link probes in both directions (2026-09-06).
+// load_from_lua / lua_state cover the recipe_registry-and-friends route;
+// persona_pack is the third sol2 TU (src/scripting/persona_pack.cpp), which
+// persona_counsel_harness reaches without ever naming a lua_state.
+const LUA_SYMBOLS = /\b(load_from_lua|lua_state|persona_pack)\b/;
+
+/// Source with comments blanked, so a symbol named only in prose does not read
+/// as a reference.
+///
+/// SINGLE PASS, NOT TWO REGEXES. The obvious two-substitution version (block
+/// comments, then line comments) is wrong on this codebase and silently so:
+/// pregame_balance_harness has a `//` line that quotes a `/*`, so the block pass
+/// matched that opener and blanked ~100 lines of real code — including the very
+/// `lua_state lua;` this is looking for. It read as clean and routed a
+/// definitely-Lua harness to the wrong builder. String literals are skipped for
+/// the same class of reason: a "//" inside one starts no comment.
+function stripComments(text) {
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i], d = text[i + 1];
+    if (c === '/' && d === '*') {
+      const end = text.indexOf('*/', i + 2);
+      out += ' ';
+      i = end < 0 ? text.length : end + 1;
+    } else if (c === '/' && d === '/') {
+      const end = text.indexOf('\n', i);
+      out += ' ';
+      i = end < 0 ? text.length : end - 1;
+    } else if (c === '"' || c === "'") {
+      const quote = c;
+      out += ' ';
+      for (i++; i < text.length; i++) {
+        if (text[i] === '\\') { i++; continue; }
+        if (text[i] === quote || text[i] === '\n') break;
+      }
+    } else {
+      out += c;
+    }
+  }
+  return out;
+}
+
+// An include that is ITSELF the signal. scripting/persona_pack.hpp is the third
+// sol2 TU's header and carries no inline-only surface, so including it means
+// linking it — persona_counsel_harness includes it and never names a lua_state.
+//
+// scripting/lua_state.hpp is deliberately NOT here, and the asymmetry is
+// measured rather than assumed: condition_set_harness and recipe_switch_harness
+// both include it, use only the inline helper surface, and link clean on the
+// world path. Include-implies-link is true for one of these headers and false
+// for the other.
+const LUA_INCLUDES = /^\s*#\s*include\s+"[^"]*scripting\/persona_pack\.hpp"/m;
+
+/// Does @p entry reference a symbol only the omitted Lua TUs define?
+/// Returns the matched symbol, or null.
+///
+/// SCOPE IS THE HARNESS'S OWN .cpp, AND THAT IS DELIBERATE — following its
+/// includes makes this wrong in both directions. tools/verify/harness_params.hpp
+/// includes scripting/lua_state.hpp and defines `parsed_gen_config(lua_state&)`,
+/// but that helper is **inline**: including the header costs nothing, and only
+/// CALLING it pulls the definition. Half the harnesses include it and link fine.
+/// A harness that does call it necessarily names lua_state in its own source to
+/// construct the argument, so the direct scan catches it anyway.
+function luaSymbolSite(entry) {
+  let text;
+  try { text = fs.readFileSync(entry, 'utf8'); } catch { return null; }
+  const code = stripComments(text);
+  const m = code.match(LUA_SYMBOLS);
+  if (m) return m[1];
+  // Include paths are string literals, which stripComments blanks — so this
+  // reads the raw text, with comments removed only line-wise to avoid matching
+  // an include quoted inside prose.
+  const uncommented = text.replace(/^\s*\/\/[^\n]*$/gm, '');
+  return LUA_INCLUDES.test(uncommented) ? 'scripting/persona_pack.hpp' : null;
+}
 
 function die(msg, code = 1) { console.error('build_harness: ' + msg); process.exit(code); }
 
@@ -69,9 +153,14 @@ if (!/^[A-Za-z0-9_]+$/.test(name)) die(`"${name}" is not a harness name (letters
 
 const src = path.join(ROOT, 'tools', 'verify', name + '.cpp');
 if (!fs.existsSync(src)) die(`tools/verify/${name}.cpp does not exist`);
-if (NEEDS_LUA.has(name)) {
-  die(`${name} needs a live Lua state — it ${NEEDS_LUA.get(name)}.\n` +
-      '  Build it through CMake instead. See NR-558 for why the headless path cannot reach it.');
+const luaSite = luaSymbolSite(src);
+if (luaSite) {
+  die(`${name} needs a live Lua state — it references \`${luaSite}\`, ` +
+      'defined in a sol2/Lua TU this builder omits.\n' +
+      '  Build it with the Lua builder instead, which links sol2 + Lua:\n' +
+      `    bash tools/verify/build_lua_harness.sh ${name}       (bash — and what a worktree agent uses)\n` +
+      `    cmd /c tools\\verify\\build_lua_harness.bat ${name}   (cmd)\n` +
+      '  A harness that fails on sol/sol.hpp or LNK2019 here is the WRONG BUILDER, not broken code.');
 }
 
 const sources = fs.readdirSync(WORLD)
@@ -115,7 +204,16 @@ if (isWindows) {
     JSON.stringify(path.relative(ROOT, src)),
     ...sources.map(s => JSON.stringify(path.relative(ROOT, s))),
     `/Fo:${path.relative(ROOT, objDir)}\\`, `/Fe:${path.relative(ROOT, exe)}`].join(' ');
-  cmd = 'cmd'; args = ['/c', `call "${vcvars}" >nul 2>&1 && ${cl}`];
+  // ONE command string, and argv0 is NOT 'cmd'. It used to be
+  // spawnSync('cmd', ['/c', ...], { shell: true }), which is a DOUBLE WRAP:
+  // node runs `cmd /d /s /c "cmd /c call "<vcvars>" >nul 2>&1 && cl ..."`, the
+  // nested quotes split the vcvars path at its first space, `call` fails, and
+  // `>nul 2>&1` swallows the error — so the only symptom was `'cl' is not
+  // recognized` from a builder that had never initialised the environment.
+  // Measured 2026-09-06: this failed for EVERY caller, from bash and cmd alike,
+  // so the whole non-Lua verifier-headless tier was unbuildable. Fourth rot of
+  // this invocation; the header comment warns about the earlier three.
+  cmd = `call "${vcvars}" >nul 2>&1 && ${cl}`; args = undefined;
 } else {
   cmd = 'g++';
   args = ['-std=c++20', debug ? '-O0' : '-O2', '-g',
@@ -131,7 +229,9 @@ if (isWindows) {
 const label = isWindows ? 'cl' : 'g++';
 console.log(`build_harness: ${name} <- ${sources.length} world TUs (${label}, ${debug ? 'debug+asan' : 'release'})`);
 const t0 = Date.now();
-const r = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: isWindows });
+const r = args === undefined
+  ? spawnSync(cmd, { cwd: ROOT, stdio: 'inherit', shell: true })
+  : spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: isWindows });
 const secs = ((Date.now() - t0) / 1000).toFixed(1);
 
 if (r.status !== 0 || !fs.existsSync(exe)) {

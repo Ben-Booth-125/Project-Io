@@ -38,6 +38,19 @@ Economy arithmetic is checked by **headless harnesses** (`tools/verify/*.cpp`), 
 framework. Run the harness(es) your brief names; if your change alters observable numbers,
 say exactly which harness rows moved and why that movement is the intended one.
 
+**Building a harness — two builders, and picking the wrong one wastes an hour.** You have no
+`cmd`, so use the bash paths:
+
+```bash
+node tools/verify/build_harness.js <name>          # the SDL/Lua-free world superset
+bash tools/verify/build_lua_harness.sh <name>      # harnesses needing a live Lua state
+```
+
+Do not guess between them — `build_harness.js` **derives** which builder a harness needs and
+refuses with the reason and the exact command to run instead. A harness failing on `sol/sol.hpp`
+or `LNK2019` is the **wrong builder, not broken code**. `world_determinism` builds with the
+first; anything calling `load_from_lua` needs the second.
+
 ## Commit discipline
 
 Build clean, then commit on your worktree branch. **Use the Bash tool with a heredoc for git
