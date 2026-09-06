@@ -986,3 +986,38 @@ or the CMake target `recipe_margin` (declared by hand, `lua54` linked). The two 
 `economy.recipe_margin_anchor` (`profit_over_marginal` on the anchor route,
 `alternate_profit_over_marginal` on every other route, `typical_workforce`); the harness prints
 them and the roster's count at k′ = 0 / 0.5 / 1 / 2 so the bar can move on a measurement.
+
+---
+
+## landscape_score_harness — BL-770 slice 1, does the phase 6 objective discriminate?
+
+Scores candidate landscapes with `src/world/landscape_score.{hpp,cpp}` and reports whether the
+three ruled terms (chain completeness, supply:demand balance, and the spread rewarded for
+unevenness) can tell candidate rosters apart at all. It is built to be able to **fail**: a flat
+result is the deliverable, not a bug.
+
+It carries two controls, and both are load-bearing. **R2.0** asserts the candidate fixtures
+genuinely differ (corp and building counts) before anything is read into their scores matching —
+otherwise "the objective is flat" is indistinguishable from "there was only ever one roster".
+**Section B** scores different worlds, so "flat" can be told from "the scorer returns a constant".
+
+```
+bash tools/verify/build_lua_harness.sh landscape_score_harness
+./build_gen/verify/landscape_score_harness.exe
+```
+
+Result as of 2026-09-06: the objective **does not** discriminate between rosters (every term at
+relative range 0.000e+00 while the fixture moves 149→169 corps), because every term reads tiles,
+markets and population and none reads a roster. A roster-aware term is owed.
+
+## Which builder?
+
+Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:
+
+```
+node tools/verify/build_harness.js <name>        # SDL/Lua-free world superset
+bash tools/verify/build_lua_harness.sh <name>    # needs a live Lua state (22 of 139)
+cmake --build build --target <name>              # includes core/save_game.hpp (links imgui)
+```
+
+A harness failing on `sol/sol.hpp` or `LNK2019` is the **wrong builder, not broken code**.

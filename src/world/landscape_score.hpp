@@ -105,8 +105,20 @@ struct landscape_score
     int market_count = 0;
 };
 
-/// Score one candidate landscape against a fixed world. PURE: it reads @p w and
-/// the registry, walks markets in sorted_market_ids order, and writes nothing.
+/// Score one candidate landscape against a fixed world.
+///
+/// DETERMINISTIC AND SIDE-EFFECT-FREE ON THE SCORE, BUT NOT `const world&`, and
+/// the distinction matters for the parallel search this is eventually for.
+/// `measure_market_completeness` calls `body_reach_field`, which MEMOISES the
+/// per-body reach field into the world. So scoring warms a cache: the score is a
+/// pure function of the world's content and never varies with call order, but
+/// the call mutates shared state.
+///
+/// THE CONSEQUENCE FOR PHASE 6: candidates must not share one `world` object
+/// across threads. Either give each candidate its own copy, or warm the reach
+/// fields once, single-threaded, before any candidate is scored. This was
+/// documented as "writes nothing" in the first cut, which was simply wrong and
+/// would have been found the expensive way.
 landscape_score score_landscape(world& w, const recipe_registry& reg,
                                 const landscape_score_params& p = {});
 

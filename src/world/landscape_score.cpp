@@ -75,12 +75,28 @@ landscape_score score_landscape(world& w, const recipe_registry& reg,
     // here. DEMAND is the structural want: heads for a household sink, a flat
     // weight per other market sink. Both are static; neither reads a price.
     //
-    // Accumulation is by += over an unordered tile map, which is float addition
-    // and therefore NOT associative. The walk is nonetheless deterministic
-    // because it is over w.tiles for a FIXED world within one process, and every
-    // candidate sees the identical traversal — the property the ranking needs.
-    // A cross-process guarantee would want a sorted walk; if this scorer ever
-    // ranks across runs, sort by tile id first and say so here.
+    // THE TILE WALK IS SORTED BY ID, and that is not optional politeness.
+    // Accumulation here is `+=` on a double, which is not associative, and
+    // `w.tiles` is an unordered_map — so summing in hash order makes the result
+    // depend on bucket layout, which varies with the standard library. This file
+    // is in src/world, where the invariant is absolute: no pointer- or
+    // hash-layout-dependent iteration order, with no "same process" carve-out.
+    // market_saturation.cpp — the sibling this file delegates term 1 to — refuses
+    // exactly this and says so at its own tile walk: every accumulation there is
+    // an integer increment or a boolean OR, precisely so it needs no sort.
+    //
+    // The earlier version of this comment argued the unsorted walk was fine
+    // because every candidate sees the same traversal within one run. That is
+    // true and it is not the standard: a score is a recorded number in a repo
+    // whose verification culture is pinned digits, and the same world must not
+    // score differently under libstdc++ than under MSVC. Sorting ~31k ids per
+    // score is far cheaper than a number nobody can reproduce.
+    std::vector<entity_id> tile_ids;
+    tile_ids.reserve(w.tiles.size());
+    for (const auto& kv : w.tiles)
+        tile_ids.push_back(kv.first);
+    std::sort(tile_ids.begin(), tile_ids.end());
+
     const float max_reach = reg.construction().max_logistics_reach;
 
     std::vector<std::array<double, resource_count>> supply(mids.size());
@@ -88,13 +104,14 @@ landscape_score score_landscape(world& w, const recipe_registry& reg,
         row.fill(0.0);
     std::vector<long long> heads(mids.size(), 0);
 
-    for (const auto& [tid, t] : w.tiles)
+    for (const entity_id tid : tile_ids)
     {
         const auto it = slot.find(market_for_tile(w, tid));
         if (it == slot.end())
             continue;
         if (max_reach >= 0.0f && !tile_in_reach(w, tid, max_reach))
             continue;
+        const tile_component& t = w.tiles.at(tid);
         for (std::size_t r = 0; r < resource_count; ++r)
             if (t.resource_deposit[r] > 0.0f)
                 supply[it->second][r] += static_cast<double>(t.resource_deposit[r]);

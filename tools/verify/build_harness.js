@@ -91,12 +91,26 @@ function stripComments(text) {
       const end = text.indexOf('\n', i);
       out += ' ';
       i = end < 0 ? text.length : end - 1;
-    } else if (c === '"' || c === "'") {
-      const quote = c;
+    } else if (c === '"') {
       out += ' ';
       for (i++; i < text.length; i++) {
         if (text[i] === '\\') { i++; continue; }
-        if (text[i] === quote || text[i] === '\n') break;
+        if (text[i] === '"' || text[i] === '\n') break;
+      }
+    } else if (c === "'" && /[0-9A-Za-z_]/.test(text[i - 1] || '') && /[0-9A-Za-z_]/.test(d || '')) {
+      // A DIGIT SEPARATOR, NOT A CHARACTER LITERAL. `1'000'000` and
+      // `0b0000'0001` are live in this tree (river_generation_harness,
+      // demography_harness). Treating that apostrophe as a quote blanks the
+      // rest of the line, which is a FALSE NEGATIVE — the dangerous direction,
+      // because it routes a Lua harness to the plain builder and the reader
+      // gets an unexplained LNK2019. An apostrophe directly after an
+      // identifier character is a separator; a character literal never is.
+      out += ' ';
+    } else if (c === "'") {
+      out += ' ';
+      for (i++; i < text.length; i++) {
+        if (text[i] === '\\') { i++; continue; }
+        if (text[i] === "'" || text[i] === '\n') break;
       }
     } else {
       out += c;
@@ -153,6 +167,18 @@ if (!/^[A-Za-z0-9_]+$/.test(name)) die(`"${name}" is not a harness name (letters
 
 const src = path.join(ROOT, 'tools', 'verify', name + '.cpp');
 if (!fs.existsSync(src)) die(`tools/verify/${name}.cpp does not exist`);
+// A THIRD MISROUTE CLASS, named rather than left to be rediscovered. Neither
+// builder compiles src/core/save_game.cpp, and CMake links it against imgui
+// (save_game.hpp reaches src/ui/plot_history.hpp -> imgui.h). So a save-envelope
+// harness fails here with an unexplained LNK2019 and fails the Lua builder with
+// C1083 on imgui.h. Refusing with the reason costs nothing; discovering it costs
+// a compile and a wrong hypothesis.
+if (/^\s*#\s*include\s+"[^"]*core\/save_game\.hpp"/m.test(fs.readFileSync(src, 'utf8'))) {
+  die(`${name} includes core/save_game.hpp, which links imgui — neither headless builder\n` +
+      '  compiles src/core/save_game.cpp. Build it through CMake:\n' +
+      `    cmake --build build --target ${name}       (from a Developer Prompt / after vcvars)`);
+}
+
 const luaSite = luaSymbolSite(src);
 if (luaSite) {
   die(`${name} needs a live Lua state — it references \`${luaSite}\`, ` +

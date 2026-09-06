@@ -173,9 +173,10 @@ void note_units_fielded(history_sim_state&        out,
     for (const army_stack_entry& e : stack)
         n += e.count;
     const int b = static_cast<int>(band);
-    if (b >= 0 && b < roster_band_count)
-        out.units_by_band[static_cast<std::size_t>(b)] += n;
-    out.units_by_span[static_cast<std::size_t>(span_index(params, y))] += n;
+    if (b < 0 || b >= roster_band_count)
+        return;
+    out.units_by_span_band[static_cast<std::size_t>(span_index(params, y))]
+                          [static_cast<std::size_t>(b)] += n;
 }
 
 /// Turn raised manpower into a typed stack via the era-keyed roster (BL-274),
@@ -1331,8 +1332,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     const int b = static_cast<int>(r->band);
                     if (b >= 0 && b < roster_band_count)
-                        ++out.works_by_band[static_cast<std::size_t>(b)];
-                    ++out.works_by_span[static_cast<std::size_t>(span_index(params, y))];
+                        ++out.works_by_span_band[static_cast<std::size_t>(span_index(params, y))]
+                                                [static_cast<std::size_t>(b)];
                 }
                 out.history.push_back(history_event{
                     years_from_calendar_year(y), chain_stage::legacy,

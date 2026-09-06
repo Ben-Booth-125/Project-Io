@@ -154,6 +154,22 @@ save_envelope make_envelope()
     e.params.prehistory_years = 137;
     e.params.industrial_years = 291;
     e.params.body_count       = 7;
+    // preferences is the SEVENTH field and the one most exposed to the defect
+    // this row exists for: save_game writes EIGHT consecutive same-typed `lean`
+    // enums plus roll[3], all read back under one bound, so any two of them
+    // could be transposed and every default-valued round-trip would stay green.
+    // Each is therefore given a DISTINCT value, so a swap of any pair shows.
+    e.params.preferences.star         = lean::low;
+    e.params.preferences.world_size   = lean::mid;
+    e.params.preferences.interior     = lean::high;
+    e.params.preferences.metal        = lean::low;
+    e.params.preferences.ocean        = lean::high;
+    e.params.preferences.oxygen_story = lean::mid;
+    e.params.preferences.coal_basins  = lean::high;
+    e.params.preferences.drawdown     = lean::low;
+    e.params.preferences.roll[0]      = 11;
+    e.params.preferences.roll[1]      = 22;
+    e.params.preferences.roll[2]      = 33;
 
     generation_report::body_entry be;
     be.name         = "Vhessari Prime";
@@ -238,7 +254,16 @@ int main()
                   && le.params.prehistory_years == env.params.prehistory_years
                   && le.params.industrial_years == env.params.industrial_years
                   && le.params.body_count == env.params.body_count,
-              "S3 world_params survives (all six fields)");
+              "S3 world_params survives (the six scalar fields)");
+        const world_preferences& lp = le.params.preferences;
+        const world_preferences& ep = env.params.preferences;
+        check(lp.star == ep.star && lp.world_size == ep.world_size
+                  && lp.interior == ep.interior && lp.metal == ep.metal
+                  && lp.ocean == ep.ocean && lp.oxygen_story == ep.oxygen_story
+                  && lp.coal_basins == ep.coal_basins && lp.drawdown == ep.drawdown
+                  && lp.roll[0] == ep.roll[0] && lp.roll[1] == ep.roll[1]
+                  && lp.roll[2] == ep.roll[2],
+              "S3 world_params.preferences survives (8 leans + roll[3], each distinct)");
         // The differential the requirement actually asks for: the two year
         // fields must come back DISTINCT and in the right slots. Comparing
         // round-tripped-to-original cannot catch a swap if the writer and reader

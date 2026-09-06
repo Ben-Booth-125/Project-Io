@@ -51,14 +51,36 @@ struct candidate
 {
     std::string      label;
     landscape_score  score;
+    /// THE FIXTURE CONTROL. "The objective is flat across candidates" only means
+    /// anything if the candidates are actually DIFFERENT. If generate_corporations
+    /// clamped the count, or generate_background_firms no-opped, the output would
+    /// be identically flat and the conclusion identically stated — for entirely
+    /// the wrong reason. So each candidate records what it actually built, and
+    /// the run asserts these MOVE before it is allowed to conclude anything from
+    /// the scores not moving.
+    int corps     = 0;
+    int buildings = 0;
 };
+
+/// Count what a candidate landscape actually contains, so the fixture can be
+/// shown to differ independently of the scorer.
+void note_fixture(candidate& c, const world& w)
+{
+    c.corps = static_cast<int>(w.corporations.size());
+    for (const auto& kv : w.buildings)
+    {
+        (void)kv;
+        ++c.buildings;
+    }
+}
 
 void print_row(const candidate& c)
 {
     const landscape_score& s = c.score;
-    std::printf("  %-26s  complete=%.5f  balance=%.5f  spread=%.5f  composite=%.6f  (%d markets)\n",
+    std::printf("  %-26s  complete=%.5f  balance=%.5f  spread=%.5f  composite=%.6f  "
+                "(%d markets, %d corps, %d bldgs)\n",
                 c.label.c_str(), s.mean_completeness, s.mean_balance, s.spread,
-                s.composite, s.market_count);
+                s.composite, s.market_count, c.corps, c.buildings);
 }
 
 /// Largest relative gap between any two candidates on one term.
@@ -74,7 +96,7 @@ double relative_range(const std::vector<candidate>& cs, double landscape_score::
         if (v > hi) hi = v;
     }
     if (hi <= 0.0)
-        return 0.0;
+        return -1.0;   // every candidate scored zero: NOT the same as "all equal"
     return (hi - lo) / hi;
 }
 
@@ -95,8 +117,11 @@ void report_discrimination(const char* what, const std::vector<candidate>& cs)
     for (const auto& t : terms)
     {
         const double r = relative_range(cs, t.p);
-        std::printf("    %-24s relative range %.3e   %s\n", t.name, r,
-                    r > kDiscriminates ? "DISCRIMINATES" : "FLAT — sees no difference");
+        if (r < 0.0)
+            std::printf("    %-24s ALL CANDIDATES ZERO — the term is DEAD, not flat\n", t.name);
+        else
+            std::printf("    %-24s relative range %.3e   %s\n", t.name, r,
+                        r > kDiscriminates ? "DISCRIMINATES" : "FLAT — sees no difference");
     }
 }
 
@@ -144,6 +169,7 @@ int main()
         generate_background_firms(w, reg, 0xC0FFEEu);
 
         rosters.push_back({ "corps=" + std::to_string(n), score_landscape(w, reg) });
+        note_fixture(rosters.back(), w);
         print_row(rosters.back());
     }
 
@@ -161,7 +187,28 @@ int main()
         char lbl[64];
         std::snprintf(lbl, sizeof lbl, "corps=8 placement=%08X", s);
         rosters.push_back({ lbl, score_landscape(w, reg) });
+        note_fixture(rosters.back(), w);
         print_row(rosters.back());
+    }
+
+    // R2.0 - THE FIXTURE CONTROL, and it gates the conclusion. Assert the
+    // candidates genuinely differ BEFORE reading anything into their scores
+    // being identical. Without this, "the objective cannot see a roster" is
+    // indistinguishable from "there was only ever one roster".
+    {
+        int cmin = rosters[0].corps, cmax = cmin, bmin = rosters[0].buildings, bmax = bmin;
+        for (const candidate& c : rosters)
+        {
+            if (c.corps < cmin) cmin = c.corps;
+            if (c.corps > cmax) cmax = c.corps;
+            if (c.buildings < bmin) bmin = c.buildings;
+            if (c.buildings > bmax) bmax = c.buildings;
+        }
+        std::printf("\n  fixture spread: corps %d..%d, buildings %d..%d\n",
+                    cmin, cmax, bmin, bmax);
+        check(cmax > cmin || bmax > bmin, "R2.0",
+              "the CANDIDATES THEMSELVES differ - a flat score is about the objective, "
+              "not about an unchanged fixture");
     }
 
     report_discrimination("CANDIDATE ROSTERS (one world)", rosters);

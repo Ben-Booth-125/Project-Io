@@ -701,10 +701,15 @@ struct history_sim_state
     /// — so a band row of zeros here has two possible causes and the counter
     /// alone cannot separate them. The units rows are the ones carrying signal
     /// until that is fixed.
-    std::array<int64_t, roster_band_count> works_by_band{};
-    std::array<int64_t, roster_band_count> units_by_band{};
-    std::array<int64_t, 2>                 works_by_span{};
-    std::array<int64_t, 2>                 units_by_span{};
+    /// CROSS-TABULATED, not two marginals. [span][band], span 0 = ancient.
+    /// Two separate 1-D arrays cannot answer this question and the first cut of
+    /// this counter got that wrong: with a medieval span-1 ceiling, span 1
+    /// legitimately fields gunpowder, so units_by_band[gunpowder] > 0 and
+    /// units_by_span[0] > 0 - and an UNRESTRICTED run where span 0 fields
+    /// gunpowder produces the IDENTICAL pair of marginals. The counter built to
+    /// see the ceiling was blind to exactly the case it existed for.
+    std::array<std::array<int64_t, roster_band_count>, 2> works_by_span_band{};
+    std::array<std::array<int64_t, roster_band_count>, 2> units_by_span_band{};
 
     /// Battles in each century of the run, index 0 = the first hundred years.
     /// The sweep reports war frequency PER CENTURY rather than as a total,

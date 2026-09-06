@@ -101,6 +101,15 @@ fi
 # scripting bridge. A glob, never a hand-picked list.
 WORLD=()
 for f in src/world/*.cpp; do WORLD+=("$(w "$f")"); done
+
+# THE WHOLE src/scripting BRIDGE, not just lua_state.cpp. The .bat compiles only
+# lua_state.cpp, which means persona_counsel_harness — the harness whose
+# persona_pack dependency build_harness.js explicitly ROUTES HERE — fails with
+# five LNK2019s on persona::pack. A builder that refuses a harness by name and
+# then cannot build it is worse than one that never offered, because the link
+# error reads exactly like broken code, which is the failure BL-774 exists to
+# kill. Globbed for the same reason the world set is: a hand list rots.
+for f in src/scripting/*.cpp; do WORLD+=("$(w "$f")"); done
 LUAOBJS=()
 for f in "$LUAOBJ"/*.obj; do LUAOBJS+=("$(w "$f")"); done
 
@@ -108,7 +117,7 @@ echo "build_lua_harness: $NAME <- world superset + sol2/Lua TUs (cl $MSVC_VER, /
 "$CL" /nologo /std:c++20 /EHsc /MP /MD /O2 /DNDEBUG /DSOL_ALL_SAFETIES_ON=1 \
     /I "$(w "$ROOT/src")" /I "$(w "$ROOT/tools/verify")" \
     /I "$(w "$DEPS/lua_src")" /I "$(w "$DEPS/sol2_src/include")" \
-    "$(w "$SRC")" "${WORLD[@]}" "$(w "$ROOT/src/scripting/lua_state.cpp")" \
+    "$(w "$SRC")" "${WORLD[@]}" \
     /Fo:"$(w "$OBJDIR")\\" /Fe:"$(w "$OUTDIR/$NAME.exe")" \
     /link "${LUAOBJS[@]}" \
     || die "COMPILE_FAILED"
