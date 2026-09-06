@@ -97,6 +97,12 @@ THE BASELINE THIS OPENS ON (2026-09-02, final-ind-s0/s1, standard lapse): corps 
 - BL-770 (Era 0 candidate search) - phase 6, six candidates in parallel, objective viable-but-uneven. BL-771 (tick length is a constant) is its prerequisite.
 - BL-772 (retire warm start) - phase 8. The single biggest budget win, 72 s measured. SUPERSEDES BL-751 in shape.
 - BL-773 (generation budget 3-6 min) - keeps the arithmetic true as each phase lands.
+- --- THE WATER-DOMAIN RULING (Ben, 2026-09-06) ---
+- BL-776 (coastal territory) - the carve claims coast and lakes; open ocean stays unowned. One predicate at nation_generation.cpp:689.
+- BL-777 (region domain) - regions carry their domain; Settle stops founding on OPEN OCEAN only (~613 regions, not the ~1105 BL-756 proposed deleting).
+- BL-778 (unit traversal domains) - a roster row declares its domains; land units cross OWNED coastal water. Replaces BL-755 pricing with legality.
+- BL-779 (naval units become real) - the naval class stops returning power 0 and entering no stack; coastal units join the ancient roster contest.
+- BL-780 (one re-bless) - the four above each move every world, so the 0 CE digests move ONCE at the end, against a description of the new world shape rather than a hash.
 
 **Done when.** A 1960 world generates through both polity spans and the settle inside a budget Ben has stated on BL-754; the scoreboard (BL-753) over the standard seed spread shows a WIDE chain-completeness spread, some nations tariffed and most not, overseas holdings per major that vary by seed, and the lapse four steady from tick 0 of play; the 0 CE world is byte-identical to today (pass 1 only).
 
@@ -158,7 +164,7 @@ NUMBER REUSE IS DELIBERATE AND SUPPORTED. A sprint 32 ran BEFORE the 2026-08-30 
 | 30 | Canvas texture update | CLOSED 2026-09-02 on Ben's call (archive all prior sprints) with wave 1 landed and merged to main the same day: edges back on the ground, the land tilts at the top rungs. |
 | 31 | Long-term market viability - every recipe pays at base price | CLOSED 2026-09-02 on Ben's call, stage one a SUCCESS: the field ends the standard thirty-year lapse with a majority of corps operating-positive (46 of 61, 31 of 55) where it began with four and none, debtors a tenth of the field, median balances climbing, buildings running. The growth half - valued production still declines over the run - is sprint 33. |
 | 33 | Long-term market viability, the growth half - the field that keeps producing | OPENED 2026-09-02 on Ben's call as sprint 31's second half. Sprint 31 made the field solvent; this sprint makes it grow. The instrument is campaign_lapse with its debt columns, and the two levers are already filed. |
-| 32 | Gamified generation - the eight-phase reorder, and three passes of simulated history | OPEN. 2026-09-03: wave 1 landed (BL-747 two spans, BL-754 instrumented) and the 0 CE world is byte-identical. Ben then reordered generation into EIGHT PHASES and took five open calls on a form; 12 more items filed (BL-762..BL-773). Warm start retires (72 s measured); phase 6 becomes a 6-candidate parallel search. era_world_harness R2 is deliberately RED pending BL-758. |
+| 32 | Gamified generation - the eight-phase reorder, and three passes of simulated history | OPEN. 2026-09-06: the WATER-DOMAIN ruling reshapes the sea work - coastal owned, open ocean unowned, units declare traversable domains (BL-776..BL-780 filed; BL-749/755/756 superseded in shape). Wave 2 delivered BL-757, BL-763, BL-771, BL-775; BL-762 partial. Measured: 29% of regions sit on water, 43% of campaign adjacency crosses sea. |
 
 **Next up.** SPRINT NUMBERING: reset by Ben on 2026-08-30 (the next new sprint was 26); sprints 26-31 have run and are cold. Ben named the growth half of sprint 31 SPRINT 33 on 2026-09-02, so 32 is unused by his call, not by accident. SPRINT 32 IS THE GAMIFIED-GENERATION SPRINT, filed 2026-09-03 as GATED on sprint 33 (Ben, 2026-09-03: "this is sprint 32, not 34" - correcting an earlier reading of this note that treated 32 as a number to skip rather than a gap to fill). THE NEXT NEW SPRINT IS 34.
 

@@ -294,6 +294,38 @@ across a seed spread, and that is where every magnitude in this layer is argued.
 
 ---
 
+## Regions carry a domain, and coastal units sail in the ancient sim (Ben, 2026-09-06)
+
+The sim's regions are water-blind, and it shows in two measured ways
+(`tools/verify/sim_water_census.cpp`, 2026-09-03, three seeds of generation's own era):
+
+- **1105 of 3819 regions sit on water at their anchor** — about 29% — of which **613 sit on open
+  ocean**. The Settle verb applies no terrain test, so this is blind placement rather than a choice.
+- **43% of the sim's adjacency edges cross sea**, at `neighbour_radius` 9. So nearly half of every
+  campaign target is already across water, reachable for free, with no harbour and no fleet.
+
+**A region therefore carries its domain**, the same three-way split the province layer already uses
+and for the same reason: a domain is a fact about ground, and the sim is the first pass that acts on
+it. Under the ownership rule (`../generation/PROVINCES.md` § Who owns water) the measured numbers
+split cleanly rather than being deleted wholesale — the ~492 coastal and lake regions become
+legitimate owned shoreline, and only the **613 anchored on open ocean** have no owner to belong to.
+
+**Coastal units join the ancient roster alongside every other class.** They are not a separate
+system: they are rows in the same `unit_roster`, scored in the same contest, gated on the same
+ground (`port_q`), and they make the rare cases expressible — a strait contested, a coastal province
+changing hands, a shore denied to a rival's trade. `../military/MILITARY.md` § Domains and traversal
+owns the traversal rule; this section owns only that the ancient sim uses it.
+
+**The Settle verb gains the test it never had.** Not "no water" — the ownership rule makes coastal
+founding legitimate — but no founding on open ocean, which has no owner to found under. That is the
+smaller and better-founded half of what BL-756 originally proposed deleting.
+
+**This moves every generated world, and that is understood rather than discovered.** Domain-gating
+campaigns changes the decision set, so the argmax, so the world; and claiming the shoreline grows
+every nation's territory. The 0 CE digests move deliberately when it lands, as a stated re-bless
+rather than an absorbed drift.
+
+
 ## The Era −1 sim
 
 Ben's steer, 2026-08-02: the one-shot settlement becomes a **running year-tick simulation** to the

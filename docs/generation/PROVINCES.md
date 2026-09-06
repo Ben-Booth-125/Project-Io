@@ -163,12 +163,41 @@ mixes land with water or a lake with the sea (the land-only invariant narrowed r
 NR-428). The domains are **exclusive by construction** — a tile's substrate names exactly one — so
 the claim is structural rather than checked.
 
-> **Nothing can be in a sea province, and that is expected.** Units are land-bound (`march_unit`
-> refuses a water destination outright), buildings refuse water, and a sea province sustains zero
-> of them. Sea provinces are **addressable empty space, built without inventing the naval model
-> that will eventually fill them** — ships, blockade and coastal trade are settled as eventual and
-> deferred (Ben, 2026-08-22: *"we can defer this for now"*). BL-188 (coastal ports) is the first
-> thing that would occupy one.
+### Who owns water (Ben, 2026-09-06)
+
+**Coastal water belongs to whoever owns the shore. Open ocean belongs to nobody.** That is the
+whole ownership rule, and it replaces the deferral this section used to carry.
+
+| Domain | Owned? | Who can be there |
+|---|---|---|
+| **`land`** | Yes, as always | Land units; buildings |
+| **`coastal_water`** | **Yes** — derived from the shore that claims it | Coastal units, and land units crossing **owned** coastal water |
+| **`open_ocean`** | **No, structurally** | Coastal/naval units only; never a territory |
+
+**The ownership half is one predicate.** A province's owner is derived from its tiles
+(§ above — `world::tile_to_nation`, no field of its own), so a coastal province becomes owned the
+moment its tiles are claimed. Today the nation carve refuses every water tile, because it builds
+its ocean mask from `is_water` — which is coast, lake **and** ocean. Narrowing that to
+`is_open_ocean` claims the shoreline ring and the lakes and leaves the deep sea unclaimed, which
+is exactly the rule above. Nothing about the partition changes: the three domains still never mix,
+and growth still never leaves its domain.
+
+**Why unowned open ocean is the right asymmetry.** A territory is something a polity can hold, and
+holding requires standing somewhere. Coastal water is the shore's apron — reachable, contestable,
+and naturally the shore-owner's. The deep sea is not held; it is *crossed*, and control of it is a
+matter of who is sailing, not who owns the square. So open ocean stays addressable empty space,
+and the thing that makes it matter is traffic rather than title.
+
+**What this un-defers.** This section previously read: *"Sea provinces are addressable empty space,
+built without inventing the naval model that will eventually fill them — ships, blockade and
+coastal trade are settled as eventual and deferred (Ben, 2026-08-22)."* That deferral is lifted for
+the coastal half. The naval model that fills these provinces is `docs/military/MILITARY.md`
+§ Domains and traversal, and the ancient sim's use of it is `docs/lore/HISTORY.md`.
+
+**Two consequences worth stating before anyone builds them.** `march_unit` refuses a water
+destination outright, so it becomes a domain question rather than a flat refusal. And nation
+territory grows by the whole shoreline ring, which moves every carve — see BL-776 (coastal
+territory) for what that costs.
 
 ### Two contracts downstream code depends on
 

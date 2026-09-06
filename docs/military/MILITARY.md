@@ -308,6 +308,43 @@ cycles unit → building → tile on repeat clicks of the same tile.
 
 ---
 
+## Domains and traversal (Ben, 2026-09-06)
+
+**A unit type declares which domains it can cross.** That one variable replaces the flat rule that
+units are land-bound, and it is what makes water a place rather than a wall.
+
+| Domain | Land classes | Coastal/naval classes |
+|---|---|---|
+| `land` | Yes | No |
+| `coastal_water` | **Only where OWNED** (`docs/generation/PROVINCES.md` § Who owns water) | Yes |
+| `open_ocean` | No | Yes |
+
+**Land units crossing owned coastal water is the deliberate middle case.** A shoreline your polity
+holds is a shallow, bridged, causewayed thing — the road layer already reasons this way, treating a
+short crossing with no open ocean in it as a strait rather than a sea. Making the crossing depend on
+*ownership* rather than on distance gives it a cause the player can read: you can walk your own
+shore, not someone else's.
+
+**This gives the naval rows a job they have never had.** `unit_class::naval` currently returns base
+power **0**, `sum_stack` skips the class entirely, and the class matrix marks its row unused — so
+Coastal Galley, Broadside Ship and Ironclad are authored, gated on `port_q`, raisable, and worth
+nothing. Under this model they are the only way to reach or contest water, which is the first
+mechanical reason for them to exist.
+
+**Naval warfare is expected to be RARE, and that is the design.** Most contests are on land; the
+water model exists so that the uncommon ones — a contested strait, a coastal province changing
+hands, a trade shore denied — are expressible at all. A model that made sea battles routine would
+be describing a different game.
+
+**Two things this does not settle**, and neither should be inherited by default:
+
+- **Terrain gives water 0 defence and 0 forage.** Zero cover at sea reads correct. Zero forage means
+  a fleet starves where it sits, which may be the right blockade pressure or may be an accident of a
+  table written for land; it is a decision to take, not a default to keep.
+- **Whether a coastal province can hold anything.** Ports are the obvious first occupant, and
+  buildings currently refuse water outright.
+
+
 ## The muster interface
 
 `building_type::military_base = 6` is the single economy → military interface. It is where units
