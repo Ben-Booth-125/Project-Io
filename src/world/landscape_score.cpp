@@ -218,11 +218,20 @@ landscape_score score_landscape(world& w, const recipe_registry& reg,
                 if (std::find(run[m].begin(), run[m].end(), rid) == run[m].end())
                     run[m].push_back(rid);
             }
-            else
+            else if (b.type == building_type::extraction_site)
             {
                 ++out.markets[m].extractors;
                 mined[m][static_cast<std::size_t>(b.target_resource)] = true;
             }
+            // EVERY OTHER building_type CONTRIBUTES NOTHING TO SUPPLY, and the
+            // explicit test matters more than it looks. This was an `else`, so
+            // a port, launchpad, inland hub, military base, research institute,
+            // school or university all counted as extractors — and
+            // `building_component::target_resource` DEFAULTS to iron_ore. A
+            // catchment holding one port and no mine reported an extractor,
+            // seeded the closure with iron ore, and closed every terminal
+            // reachable from it. `actual` was non-zero for ground that extracts
+            // nothing, and `actual` is now the whole objective.
         }
 
         const std::array<resource_classification, resource_count>& c2 = cls;

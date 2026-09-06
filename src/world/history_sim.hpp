@@ -302,7 +302,25 @@ struct history_sim_params
     /// behind. Military, which no window measures, therefore advances on
     /// arrears alone and still reaches the medieval roster.
     int invest_level_pull_q  = 200;
-    int invest_ground_pull_q = 1000;
+    /// DEFAULT 0, AND THAT IS A MEASUREMENT OVERTURNING THE ITEM'S OWN
+    /// DIAGNOSIS (cold review, 2026-09-06). BL-767 shipped this at 1000 on the
+    /// reading that "the ceiling was in the selection rule rather than in the
+    /// price". Swept over 16 seeds at epoch 1960, the opposite is true:
+    ///
+    ///     ground_pull     0    100   200   400   700  1000  3000  10000
+    ///     worlds ind.   14/16   -     -     -     -   8/16    -     1/16
+    ///
+    /// monotone in the WRONG direction, with the shipped value among the worst.
+    /// The PRICE change alone (invest_yield_q 260, invest_amortise_years 5) is
+    /// what achieves R1 — 14 of 16 worlds industrialise with the selection rule
+    /// left exactly as it was. The ground pull then re-breaks it.
+    ///
+    /// The dial is KEPT rather than deleted, because it is a real force and it
+    /// may earn its keep once a capped domain stops being a sink (fixed
+    /// separately) and once BL-757's zero-works finding moves. But it ships
+    /// INERT, at the value that measures best, and the claim that 0 recovers the
+    /// old argmin exactly was verified from the code rather than assumed.
+    int invest_ground_pull_q = 0;
     /// Divisor turning holdings-value-at-risk into a comparable annual figure.
     int consolidate_divisor = 24;
 
@@ -449,7 +467,25 @@ struct history_sim_params
     /// takes. Measured under this change: real worlds still raise ZERO works
     /// (history_sweep, 8 seeds at --epoch 1960, 2026-09-06), and no value of
     /// this dial changes that.
-    int work_amortise_years = 2;
+    /// 4 -> 2 -> 1, and every step was a CONSEQUENCE of re-pricing Invest
+    /// rather than a finding about works. BL-767 dropped it to 2 as a 2x
+    /// correction against a ~7x Invest re-pricing; excluding capped domains from
+    /// Invest selection (a correctness fix, not a tuning one) made Invest
+    /// productive in rounds where it previously bought nothing, which squeezed
+    /// build_work out of the contest again - 18 works raised fell to 6, and the
+    /// capacity effect on population vanished entirely. 1 restores it (30 works,
+    /// population 2660758 against 2297778 without) with industrialisation
+    /// unchanged at 14/16.
+    ///
+    /// THIS IS THE FLOOR, AND THAT IS THE POINT WORTH CARRYING FORWARD. A work
+    /// cannot amortise over less than one year, so if Invest becomes any more
+    /// productive there is no headroom left in this dial and build_work leaves
+    /// the contest for good. That is BL-757's structural finding arriving at its
+    /// limit: Invest's score scales with the WHOLE EMPIRE while a work's local
+    /// term scales with ONE REGION, so the gap widens with every conquest and no
+    /// dial closes it. It still does not fix BL-757 - real generated worlds
+    /// raise ZERO works at 16 seeds even here.
+    int work_amortise_years = 1;
 
     /// Minimum in the shared currency, like the four thresholds above.
     /// Deliberately LOW: a Way Station on poor ground is a marginal choice and

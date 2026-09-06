@@ -947,14 +947,36 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ground_q[static_cast<int>(sim_domain::transport)] =
                         static_cast<int>(port_sum / n_held);
 
+                    // A CAPPED DOMAIN IS NOT A CANDIDATE, and leaving it as one
+                    // was a real defect rather than a tuning choice. A domain at
+                    // the top band has `arrears == 0` but KEEPS its ground pull,
+                    // so on good ground it outbids every under-levelled domain
+                    // forever — and the investment it wins does nothing, because
+                    // the rung below is gated on `capacity[d] < 6` while
+                    // `progress_q[d]` goes on accumulating. The polity spends
+                    // every remaining round buying a level it already has.
+                    //
+                    // Measured: a polity with mean farm_q ~900 caps agriculture,
+                    // and materials then stalls one band under the Industrial
+                    // rung with every later Invest round producing literally
+                    // nothing. The old argmin could not do this — it could only
+                    // select a capped domain when all seven were capped.
                     int best_pull = INT32_MIN;
+                    bool any_open = false;
                     for (int d = 0; d < sim_domain_count; ++d)
                     {
+                        if (q.capacity[d] >= 6)
+                            continue;               // nothing to buy here
+                        any_open = true;
                         const int arrears = 6 - clampi(q.capacity[d], 1, 6);
                         const int pull = arrears * params.invest_level_pull_q
                                        + (ground_q[d] * params.invest_ground_pull_q) / 1000;
                         if (pull > best_pull) { best_pull = pull; dom = d; }
                     }
+                    // Every domain capped: the verb has nothing to do. `dom`
+                    // stays 0 and the rung gate below makes the round inert,
+                    // which is the same outcome the old rule reached.
+                    (void)any_open;
                 }
 
                 int64_t pop = 0;
@@ -1340,23 +1362,36 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // same expression settlement.cpp § Stage 4 uses — inheriting
                 // the flag would let poor ground industrialise because its
                 // parent could, which is the opposite of endowment-not-virtue.
-                // The date's ground terms are recomputed the same way; the
-                // rest of that formula (the world's arable share, the creed
-                // bonuses, its own draw) is not reachable inside this loop, so
-                // it is INHERITED as the parent's residual. Good land begets
-                // good land, but never better than its parent — the rule this
-                // block already applies to the four endowment windows, applied
-                // to the fifth quantity that hangs off them.
+                // The date's ground terms are recomputed the same way.
+                //
+                // THE FOUNDING TERM IS CHARGED, NOT INHERITED, and getting that
+                // wrong was a real defect. Stage 4's formula carries
+                // `founded_year / 8`, and the first cut folded it into the
+                // parent's residual on the grounds that "the rest of that
+                // formula is not reachable inside this loop". `founded_year` IS
+                // reachable — `np.founded_year = y` is set a few lines above.
+                // So a daughter settled in 1900 by a parent founded in year 0
+                // was charged 0 extra years where the endowment rule charges
+                // ~237, and the late frontier lit its furnaces centuries early.
+                // That term exists precisely to punish a late frontier, so it is
+                // taken off the parent's residual and recomputed from the
+                // daughter's own founding year. Everything genuinely out of
+                // reach — the world's arable share, the creed bonuses, the
+                // parent's own draw — stays inherited.
                 {
                     const auto ground_lag = [](const region& r) {
                         return 90 - r.energy_q / 12 - r.ore_q / 22;
                     };
+                    const auto founding_lag = [](const region& r) {
+                        return static_cast<int>(r.founded_year / 8);
+                    };
                     const int daughter_fuel = np.energy_q + np.ore_q / 2;
                     if (daughter_fuel >= 900 && src.industrial_lag_years >= 0)
                     {
-                        const int residual = src.industrial_lag_years - ground_lag(src);
+                        const int residual = src.industrial_lag_years
+                                           - ground_lag(src) - founding_lag(src);
                         np.industrial_lag_years =
-                            clampi(ground_lag(np) + residual, 0, 235);
+                            clampi(ground_lag(np) + founding_lag(np) + residual, 0, 235);
                     }
                 }
 
