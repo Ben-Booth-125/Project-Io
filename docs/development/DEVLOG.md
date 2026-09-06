@@ -10,6 +10,112 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-06 (sprint 32a closes) — The arc runs, and four instruments could not see
+
+**Mode:** Design → Full (batch, then hand-built slices) → three design rulings → close.
+**Runtime:** one long session across several days; ~25 harness builds, one play build, 12 sub-agent
+launches of which **zero** succeeded.
+
+### What closed, and why here
+
+Sprint 32 opened with 8 items on "three passes of simulated history". Ben's eight-phase reorder
+added 12, the water-domain ruling added 5, and findings added the rest — **34 items, 5 delivered**.
+Closed as **32a** at a natural boundary rather than pushed on: everything delivered is one coherent
+thing (*the arc runs, and the instruments that measure it are honest*), and everything remaining
+moves the generated world, which wants its own before/after. 32b carries the other 29.
+
+### Delivered
+
+**BL-747 (two-span prehistory).** The Era −1 sim now runs at any epoch — the gate had refused
+anything above 1700, so the arc we build the product on had ancient borders and no simulated history
+behind them. Two spans on **one** invocation, because `era_minus_one.hpp` exists precisely to stop
+that call drifting across callers. `boundary_year` (INT64_MIN) and `span1_band_ceiling`
+(`industrial`) are inert at their defaults, which is what makes the 0 CE world byte-identical rather
+than hoped-identical. A 1960 world runs 1160 → 1560 → 1960.
+
+**BL-757 (the sweep measures generation's own era).** `history_sweep` printed "−4000 → 0" because it
+built default params; generation runs −400 → 0. So the harness that `HISTORY.md` and `COLLAPSE.md`
+both name as the place every Era −1 magnitude is argued was describing a run no world is built from.
+It now runs from `era_minus_one_fixture`, closing all six divergence axes, asserted per seed by a
+**self-checking** row: the report already carries generation's own counts, so a pinned 270/207/833
+would have rotted the first time the world legitimately changed.
+
+**BL-763 (continent time axis).** `drift_col`/`drift_row` were documented "per-epoch" with no epoch
+defined anywhere — the vector existed and nothing integrated it. Now 5 My over 20 epochs, with any
+past configuration derived rather than stored (`continent_state` is on the save envelope seam;
+twenty rasters per body would be ~2.5 MB for data that is a pure function of five floats per plate).
+
+**BL-771 (tick length).** Closed on its **audit**, not its code. The audit found the tick length was
+the wrong dial, Ben ruled the quarterly tick, and the parameter became unnecessary — so R1, R2 and
+R4 were **cancelled rather than deferred**, because a deferred row invites someone to build it later
+for a reason that has gone away.
+
+**BL-775 (saturation measure promoted).** Ben's phase 6 question turned out to be already answered
+by two computations the project verifies against daily — they were inside harness anonymous
+namespaces where `src/` could not link them. Now in `src/world/market_saturation.{hpp,cpp}`.
+
+### Three rulings, each of which changed the work rather than confirming it
+
+**The quarterly tick** (NR-786). It moved phase 6's *span*, not just BL-771: at 90-day ticks, 100
+ticks is 25 years rather than the 400 Ben's point 6 named.
+
+**The static saturation search.** Ben restated phase 6 narrowly — *"not a 100% accurate series of
+trades… nor what makes the most profit per tile"* — and that is not a simulation question at all.
+Saturation is a **static property** of a candidate roster against a fixed world. It dissolved the
+span question entirely: there is no span, because there is no clock.
+
+**The water domains.** Ben: *"Give coastal to owners, and sea provinces are unowned."* Better than
+what was filed, and the codebase was most of the way there — `province_kind` already partitions the
+three domains exclusively, ownership already derives from tiles, and the naval class already exists
+as three authored rows worth zero. It halved BL-756's destructiveness and dissolved BL-749.
+
+### The finding that matters most: four instruments that could not see their subject
+
+1. **`history_sweep` swept the struct default** rather than generation's run (BL-757).
+2. **`era_world_harness` was never run** while `world_determinism` was green — so a real regression
+   shipped inside a wave I had called verified. Found by the cold review, confirmed by hand: 12 pass,
+   1 fail, and only the 1960 clause moved (BL-758, left **red** for Ben).
+3. **The app never prints the generation budget** the item added — the line is inside an
+   `if (fixture)` branch and the app passes none, so every figure quoted is a harness figure.
+4. **`history_sweep.json` diffs on a wall-clock field**, so genuine drift hides in timing churn —
+   and the "it is stale" claim I had repeated turned out to be wrong on inspection.
+
+This is the BL-714 pattern recurring, and it recurs because **a green check is not evidence that it
+looked**.
+
+### Measure-first paid for itself twice, and both times the number inverted the item
+
+`sim_water_census`, three seeds of generation's own era:
+
+- **1105 of 3819 regions sit on water** — 29% — with 613 on open ocean. BL-756 had assumed the count
+  might be zero and its guard free; it would have deleted a third of every world.
+- **43% of adjacency edges cross sea.** BL-755 had assumed sea reach was absent. It is unpriced, not
+  absent, and every tuning constant in `history_sim_params` was fitted with it happening.
+
+Both items would have been built wrong from their own filed premise. Ben's water ruling then made
+the ~492 coastal regions *legitimate* and left only the 613 on open ocean to fix.
+
+### Two process lessons
+
+**A requirement written after the code describes the code, not the intent.** BL-775 said "promote
+both"; one half was promoted, the group was written describing that half, and lint, requirements and
+harnesses all went green on a half-delivered item. Caught only by re-reading the item.
+
+**Sub-agent capacity was unavailable for the entire session** — 12 launches, every one a 529 with
+zero tool calls. Every slice was hand-built, and the batch's **cross-slice review barrier never
+ran**. Recorded as a debt, not dropped. BL-774 compounds it: worktree agents cannot build the
+harness class that checks the byte-identity invariant.
+
+### Owed
+
+The review barrier; `continent_drift`, `sim_water_census` and the promoted measure are **ad hoc**
+until Ben names them in the verifier skill; BL-762's deposit split stays blocked on BL-765 because
+removing biological deposits before the Life phase exists would delete `agricultural_produce` and
+take the food chain with it.
+
+
+---
+
 ## 2026-09-03 (sprint 32 opens, wave 1) — The second span is free, and four instruments were pointing the wrong way
 
 **Mode:** Design → Full (merge repair, then one delivery wave). **Runtime:** one session; one

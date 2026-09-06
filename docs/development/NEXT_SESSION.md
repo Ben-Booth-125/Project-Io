@@ -1,48 +1,61 @@
-# Next session — sprint 33, the growth half
+# Next session — sprint 32b, the water model
 
-Sprint 31 closed 2026-09-02 a success on solvency: on the standard industrial lapse the field ends
-thirty years with a majority of corps operating-positive (46 of 61, 31 of 55) where it began with
-four and none, debtors a tenth of the field, median balances climbing. Sprint 33 owns what is left:
-**valued production still falls across the run** (×0.2 on seed 0, ×0.6 on seed 1, from a level ten
-to twenty times the old baseline). `docs/development/SPRINTS.md` § Sprint 33 is the plan; this note
-is the handoff.
+Sprint 32a closed 2026-09-06: five items delivered, the arc runs on the 1960 arc as two spans, and
+four measuring instruments were found describing something other than their subject. 32b carries the
+remaining 29 items. `docs/development/SPRINTS.md` § Sprint 32b is the plan; this note is the handoff.
 
-## Order of work
+## Start here
 
-1. **BL-746 stage 2 (the generation bootstrap, NR-782 (c) held).** The field's mean supply factor
-   sits at ~0.57 — most buildings run at the new floor because power does not arrive (generation
-   18 → 3 units against a demand of 64; a generator short of power throttles itself; only
-   network-reached tiles can receive it). Design it so a fix that only silences the draw reads as
-   one: measure the supply-factor trend AND the power price together.
-2. **BL-745 (processor input bid cap).** 42 of 57 remaining debt entries are processors producing
-   less than they buy — construction materials at 8–10× base through the boom, and inputs above the
-   recipe's output value. The anchor's M1 identity carried to the live tick.
-3. BL-738 re-measure, then BL-726 (seed 1's interest is still 70% of net loss), then BL-725.
+**Wave 1 is the water model, BL-776 → BL-780, in that order.** It is self-contained, it moves every
+generated world, and BL-780 exists so it moves **once**.
 
-## The instrument
+1. **BL-776 (coastal territory)** is one predicate. `nation_generation.cpp:689` builds its
+   unclaimable mask from `is_water` — coast, lake *and* ocean — so the carve refuses every water
+   tile. Narrow it to `is_open_ocean`. Coastal provinces then become owned for free, because
+   province ownership derives from tiles.
+2. **BL-777 (region domain)** stops Settle founding on open ocean — ~613 regions, not the ~1105
+   BL-756 originally proposed deleting. Save-format bump: `region` has a positional read chain.
+3. **BL-778 (unit traversal domains)** adds the field `roster_row` lacks. Land units may cross
+   **owned** coastal water.
+4. **BL-779 (naval units become real)** — `unit_class::naval` returns base power 0 and `sum_stack`
+   skips the class outright, so three authored, port-gated, raisable rows are worth nothing today.
+5. **BL-780 (one re-bless)** closes the wave. Do **not** let 776–779 each re-bless.
+
+## Before-figures, already captured — do not re-measure
 
 ```
-cmd //c tools\verify\build_lua_harness.bat campaign_lapse
-./build_gen/verify/campaign_lapse.exe --epoch 1960 --seed 0 --warm 0 --ticks 60 --tag <tag>   # where debt begins
-./build_gen/verify/campaign_lapse.exe --epoch 1960 --seed 0 --tag <tag>                        # the done-when form
+world_determinism   039EE9880739CDF6 / B0EBBA249B3DDABB / DE55600457797638
+era report seed A   years=400 battles=270 conquests=207 foundings=833
+1960 two-span       1160 -> 1560 -> 1960, digest DB86651B9A596F7B
+sim_water_census    1105 of 3819 regions on water (982 sea, 613 OPEN OCEAN)
+                    43% of adjacency edges cross sea (54% / 22% / 57% by seed)
+warm start          72-73 s on BOTH arcs, ~12x the ~6 s app.cpp budgets
+generation          ~8.2 s Release; the era pass itself only 197-323 ms
 ```
 
-`corps.csv` carries every corp's balance delta attributed by tick phase (residual asserted zero),
-produced value, building state counts, labour and supply factor; `debt.csv` one row per debt entry
-with the dominant drain. The 2026-09-02 traces to compare against: `final-ind-s0/s1` (standard
-form, the sprint-33 baseline), `fix-ind-s0/s1` (unwarmed), `exp-noupkeep` (the zero-draw control),
-`debt-ind-s0/s1` (the cliff, before the fix). The aggregator pattern is in the devlog entry
-"every balance tracked".
+## Four calls waiting on Ben, three of which block work here
 
-## Traps (still true)
+- **BL-758** — does era-seeded demography at 1960 belong, or is it scope BL-747 never claimed?
+  `era_world_harness` R2 is deliberately **RED** for it. Do not weaken it to pass.
+- **Water's 0 forage** — blockade pressure, or an accident of a table written for land?
+- **Can a coastal province hold a port?** Buildings currently refuse water outright.
+- **NR-783** — is the span boundary authored at epoch − 400, or derived from the first furnace?
 
-- Lua-linked harnesses build via `cmd //c tools\verify\build_lua_harness.bat <name>`; run as
-  `./build_gen/verify/<name>.exe` from the repo root. `nmake all` stops at
-  `battle_engagement_harness` (BL-731's sibling rot) and everything after reads as ctest "Not
-  Run"; build the target you need. `ctest -j6` is unusable — Debug world-building harnesses hit
-  the 60 s timeout under contention.
-- A function called from `io_world_obj` must not live in a Lua-linked TU (world_gen_config.cpp,
-  recipe_registry.cpp, tech_tree.cpp), or every Lua-free harness fails to link.
-- chain_depth's one red row is the DELIBERATE named-list guard. Do not quiet it.
-- Every remembered seed-0 number from before 2026-09-02 is stale twice over (the anchor, then the
-  floor). Re-baseline from `final-ind-s*`.
+## Debts from 32a, stated rather than hidden
+
+- **The batch's cross-slice review barrier never ran.** Sub-agent capacity was unavailable for the
+  whole session — 12 launches, every one a 529 with zero tool calls — so each slice was verified
+  individually instead. If agents are available, run a cold review over the five delivered items.
+- **Three harnesses are ad hoc** pending Ben naming them in `.claude/skills/verifier-headless/`:
+  `continent_drift`, `sim_water_census`, and the promoted saturation measure.
+- **BL-774** — worktree agents cannot build the Lua-linked harness class, which includes
+  `world_determinism`. Every agent inheriting the byte-identity invariant pays that toll first.
+
+## Two traps this session hit, worth not repeating
+
+**A green check is not evidence that it looked.** Four instruments were measuring something other
+than their subject, and one of them (`era_world_harness`) let a real regression through a wave I had
+called verified.
+
+**A requirement written after the code describes the code, not the intent.** BL-775 said "promote
+both"; half was promoted and everything went green on it. Write the group from the item, first.
