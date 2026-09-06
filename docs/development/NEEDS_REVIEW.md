@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*8 entries — 6 open, 2 resolved.*
+*9 entries — 7 open, 2 resolved.*
 
 ---
 
@@ -151,6 +151,28 @@ It is defensible and it is still AUTHORED. A different mapping - a fixed epoch, 
 > **Recommendation:** Confirm. It reuses quantities the chain already derives rather than inventing a constant, and the oil-after-coal ordering follows from the chain rather than from taste. The third option is worth taking later if a second fossil family arrives - at one coal and one oil it would be a knob with no second reader.
 
 *Files: `src/world/tile_generation.cpp`, `docs/generation/TILE_GENERATION.md`*
+
+### NR-791 — Coastal territory has no surface that shows ownership, so the water model cannot be checked by looking
+*observation · raised 2026-09-06 · from The 2026-09-06 live check of wave 1/2a. Two of three visual requirements were verifiable; this one was not, and the reason is a gap rather than an oversight.*
+
+BL-776 and BL-777 make coastal water OWNED and open ocean unowned. That is measured and green headlessly - the ownership table reads coast 2177 owned, lake 1312 owned, open ocean 0 owned against 15336 unowned, and sim_water_census reports coastal_water 318 / open_ocean 0 with the stored domain disagreeing with the substrate in ZERO cases.
+
+BUT IT CANNOT BE SEEN. Live, in the built app: the hover card over water reports TERRAIN and HABITABILITY ('Ocean, Habitability: 48%') and says nothing about an owner. Clicking a water tile does not update the Selection panel at all. No lens in the nav rail colours territory by nation - the map/book slot is the Generation Ledger.
+
+What IS visible, and it is genuinely encouraging: the province partition extends over water as coherent outlined water provinces, and open-ocean tiles report no owner, which is what the design says. But that is consistent-with, not a demonstration-of.
+
+SO BL-780's done-when has a hole. It asks Ben to authorise a re-bless 'against a stated description of what changed in the world's SHAPE rather than against the hash' - and the single most important shape change, coastal water acquiring an owner, is the one a human cannot currently look at.
+
+**Why it matters.** BL-780 is the wave's single judgement point and it is meant to be judged by looking. If the central change is invisible on every surface the game has, the judgement collapses back onto trusting the harness - which is exactly what BL-780 exists to avoid.
+
+- Add ownership to the water hover card (cheapest - the card already exists and already reads the tile)
+- Make water tiles selectable so the Selection panel answers it
+- A territory/political lens that colours by owning nation, which would answer it at a glance and serve far more than this item
+- Accept it: judge BL-780 on the harness figures and the province outlines, and record that the shape claim was not eyeballed
+
+> **Recommendation:** The hover card, before BL-780. It is the smallest change that closes the hole, the card is already on the tile, and it turns "coastal water is owned" from a number in a log into something a person can point at. The lens is the better long-term answer and should be its own item rather than a rider on the water wave.
+
+*Files: `docs/ui/TOOLTIP.md`, `docs/ui/SELECTION.md`, `docs/ui/LENSES.md`, `docs/generation/PROVINCES.md`*
 
 ---
 

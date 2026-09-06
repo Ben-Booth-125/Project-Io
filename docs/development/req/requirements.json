@@ -5225,14 +5225,14 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "BL-754: the app prints its own per-pass generation budget on the generating screen, as world_determinism already does headlessly.",
      "verification": [
       "static: app.cpp emits the per-pass split",
       "visual: the generating screen shows it"
      ],
      "notes": "The measurement half already exists - world_determinism emits [gen budget] total/pre-settlement/settlement/era-1/post-era. Only the APP-side print is owed.",
-     "evidence": null
+     "evidence": " LIVE CHECK DONE 2026-09-06, AND R1 IS NOW COMPLETE. Opened the built app (--autostart-play, main checkout build) and read the generating screen directly: \"world built in 84.75 s\" and \"pre-settlement 1.46  settlement 0.02  era-1 8.09  post-era 75.18\". Both lines render. The agent could not do this - its granted computer-use path resolved to a DIFFERENT worktree exe and its window was masked out of every screenshot; the main session hit the same trap and cleared it by granting the running process basename. TWO MEASUREMENTS THE RUN PRODUCED THAT NOBODY HAD. (1) build/ is DEBUG, so 84.75 s must NOT be quoted against BL-761 72-73 s RELEASE figure - different builds, not a regression. (2) The warm start in Debug is 667,428 ms on one run and 389,740 ms on another: run_economy_step 534,719 ms and convoys 117,300 ms of the first, everything else under 3 s combined. That is BL-761 finding quantified and it names the same two culprits. It also means the DEBUG play loop takes ~11 minutes to reach the map, which is a sharper argument for BL-772 than the Release number."
     },
     {
      "id": "R2",
@@ -5429,7 +5429,7 @@
       "visual: roads render on the canvas"
      ],
      "notes": "BL-757 measured ZERO works raised across sixteen seeds because build_work never wins the scored contest, and wave 1 confirmed it still does at 16 seeds. If this item cannot move that, REPORT it - do not tune work_amortise_years further, it is already at its floor of 1.",
-     "evidence": null
+     "evidence": " LIVE CHECK 2026-09-06, PARTIAL AND HONESTLY SO. Roads DO render: the Selection panel reads \"Tile [93, 52] - Road\", and road geometry is visible on the canvas as connected segments with node markers, present on land and absent on water. WHAT THE CANVAS CANNOT SHOW: an ancient history-derived road is indistinguishable by eye from a national-lattice road - they render with the same geometry - so a live look cannot separate them. The headless differential is strictly STRONGER evidence here: era ON vs OFF, 3146 -> 3466 roaded tiles at seed 0 (+320) with Road tier 173 -> 265, plus road_reach_census C7 pinning all five rungs of the tier rule. Recording the live look as done and the ancient-vs-national distinction as unshowable on the canvas, rather than claiming a look proved something it cannot."
     },
     {
      "id": "R5",
