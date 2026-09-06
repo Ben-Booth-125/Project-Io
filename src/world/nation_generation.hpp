@@ -77,6 +77,39 @@ struct nation_params
     /// a consequence of the generation chain rather than by coincidence. Short,
     /// empty, or unusable entries fall back to a tongue rolled in Pass 5.
     std::vector<tongue> seed_tongues;
+
+    /// Parallel to `seed_tiles`: the id of the POLITY that held each anchored
+    /// region at the epoch, or -1 for ground no polity ended up holding
+    /// (`settlement_seed_polities`). BL-769.
+    ///
+    /// THIS IS THE PHASE 4 / PHASE 5 BOUNDARY MOVING. Without it Pass 1 grew an
+    /// independent realm out of every region anchor and the history's own
+    /// political map — which `run_history_sim` spent the whole run drawing — was
+    /// discarded and re-invented from the anchors alone. With it, Pass 2d folds
+    /// the seeds of one polity into ONE nation, so the campaign inherits the
+    /// empires the history actually produced.
+    ///
+    /// The carve is UNTOUCHED, deliberately, and for the same reason BL-218
+    /// left it alone: where exactly the boundary between two of a polity's own
+    /// regions falls is a geometric question the history never answered. What
+    /// changes is which cells end up under one flag.
+    ///
+    /// Empty (the default) keeps the pre-BL-769 behaviour bit-for-bit: no fold,
+    /// one candidate nation per seed, as for any body with no settlement pass.
+    std::vector<int> seed_polities;
+
+    /// BL-769 — CITY STATES SURVIVE THE SIZE FLOOR.
+    ///
+    /// A polity that reached the epoch holding a single region and standing a
+    /// population centre on it is a city state, and Pass 2c would otherwise
+    /// absorb it into whichever neighbour grew fattest — losing exactly the
+    /// detail Ben's point 5 asks the History phase to keep ("it is fine to
+    /// consider city states as population centres"). Such a nation is exempt
+    /// from being absorbed; it is not exempt from the floor in any other sense,
+    /// and it never absorbs anybody.
+    ///
+    /// False disables the exemption and every undersized realm merges as before.
+    bool keep_city_states = true;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.

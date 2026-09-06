@@ -18,6 +18,8 @@
 #include "world/era_minus_one.hpp" // --epoch: derive generation's own sim params
 #include "world/hard_coded_world.hpp"
 #include "world/history_sim.hpp"
+#include "world/law.hpp"            // BL-750: tariff_bands, the enacted duty
+#include "world/nation_generation.hpp" // BL-769: nation_params, the size floor
 #include "world/sim_terrain_build.hpp"
 #include "world/settlement.hpp"
 #include "world/works_roster.hpp"
@@ -216,7 +218,11 @@ struct sweep_row
     /// never reached.
     int     polities_total     = 0;
     int     polities_crossed   = 0;
-    int64_t first_cross_year   = 0; ///< 0 = nobody crossed.
+    /// Year the FIRST polity crossed. Meaningless unless `polities_crossed > 0`
+    /// — read that, never a magic year value: 0 CE is a real crossing year on
+    /// the ancient arc, which is the whole reason `k_never_industrialised` is
+    /// INT64_MIN rather than 0.
+    int64_t first_cross_year   = 0;
     int     regions_industrial = 0;
     /// The highest and median MATERIALS capacity any polity reached. The
     /// diagnostic for a zero furnace count: band 5 is the Industrial rung, so a
@@ -235,6 +241,40 @@ struct sweep_row
     /// live at that sample, per-mille. The "how big did the biggest empire
     /// actually get" figure, distinct from `peak_share_q` only in its sampling.
     int shape_top_peak_q = 0;
+
+    // --- BL-750: THE TARIFF DISTRIBUTION, off the GENERATED WORLD -----------
+    //
+    // Read from `w.laws` and `w.nations` — the world `make_hard_coded_world`
+    // actually built, not the sweep's own re-run of the sim. That distinction
+    // is load-bearing: the tariff is enacted at the HANDOFF, by generation, and
+    // a figure derived from the harness's private re-run would be measuring a
+    // history nothing downstream ever saw.
+    //
+    // THE DELIVERABLE IS THIS DISTRIBUTION, not a working tariff (Ben,
+    // 2026-09-06). FLATNESS IS THE TRIGGER for reopening the scored-verb form
+    // (BL-488): if every world tariffs the same share of its nations at the same
+    // rate, the derived scalar carries no variation and the verb is what would
+    // give it some. So the columns below have to be able to SHOW flat — which
+    // is why the per-band split is here and not just a count.
+    int nations_total   = 0;
+    int nations_tariffed = 0;
+    int tariff_band_low  = 0; ///< rate == tariff_bands::rate_low
+    int tariff_band_mid  = 0;
+    int tariff_band_high = 0;
+    int protection_max_q = 0; ///< Highest posture any surviving polity reached.
+    int protection_med_q = 0; ///< Median over the polities that survived.
+    /// Nations, and how many of them are single-region city states the size
+    /// floor would have absorbed before BL-769.
+    int city_states = 0;
+    /// THE SCALAR AT ITS OWN GRAIN, so a sparse tariff table can be read back to
+    /// its cause. A count of enacted laws cannot tell "the scalar is flat"
+    /// (the BL-488 trigger) from "the scalar varies but the upstream signal it
+    /// reads does not" — and those want opposite work.
+    int polities_alive     = 0;
+    int distinct_cross_yrs = 0; ///< Distinct Industrial-rung crossing years among them.
+    int protection_pmax    = 0;
+    int protection_pmed    = 0;
+    int polities_over_floor = 0; ///< Above `tariff_bands::threshold_q`.
 
     int64_t ms = 0;
 
@@ -725,11 +765,21 @@ int main(int argc, char** argv)
             row.polities_total = static_cast<int>(sim.polities.size());
             for (const polity& q : sim.polities)
             {
-                if (q.industrial_year != 0)
+                // THE SENTINEL, READ CORRECTLY. This tested `!= 0` — the sentinel
+                // BL-748 replaced, and the trap its own header warns about. Since
+                // that item "never industrialised" is `k_never_industrialised`
+                // (INT64_MIN), which is not zero, so EVERY polity counted as
+                // crossed and `first_cross_year` min-reduced to INT64_MIN. The
+                // table printed "polities crossing the rung, median 12" over a
+                // world where three did, and a first-cross column of
+                // -9223372036854775808 next to it. Found while measuring BL-750's
+                // tariff distribution, whose timing term reads the same field:
+                // the two disagreed, and this side was the one that was wrong.
+                if (q.industrial_year != k_never_industrialised)
                 {
-                    ++row.polities_crossed;
-                    if (row.first_cross_year == 0 || q.industrial_year < row.first_cross_year)
+                    if (row.polities_crossed == 0 || q.industrial_year < row.first_cross_year)
                         row.first_cross_year = q.industrial_year;
+                    ++row.polities_crossed;
                 }
                 const int m = q.capacity[static_cast<int>(sim_domain::materials)];
                 mats.push_back(m);
@@ -808,6 +858,74 @@ int main(int argc, char** argv)
                 if (rose) ++row.shape_rose;
                 if (fell) ++row.shape_fell;
                 if (rose && fell) ++row.shape_rpf;
+            }
+        }
+
+        // --- BL-750: the scalar at POLITY grain -----------------------------
+        //
+        // Under `--epoch` this `sim` IS generation's own era (S1b asserts the
+        // counters match the report), so these figures describe the run whose
+        // output the tariff table below was banded from.
+        {
+            const tariff_bands pb;
+            std::vector<int64_t> prot, yrs;
+            for (const polity& q : sim.polities)
+            {
+                if (!q.alive) continue;
+                ++row.polities_alive;
+                prot.push_back(q.protection_q);
+                if (q.protection_q > row.protection_pmax) row.protection_pmax = q.protection_q;
+                if (q.protection_q >= pb.threshold_q)     ++row.polities_over_floor;
+                if (q.industrial_year != k_never_industrialised) yrs.push_back(q.industrial_year);
+            }
+            row.protection_pmed = static_cast<int>(median_of(prot));
+            std::sort(yrs.begin(), yrs.end());
+            yrs.erase(std::unique(yrs.begin(), yrs.end()), yrs.end());
+            row.distinct_cross_yrs = static_cast<int>(yrs.size());
+        }
+
+        // --- BL-750 / BL-769: read the GENERATED world, not the re-run ------
+        //
+        // Both items land at the HANDOFF, so both are measured on `w` and on the
+        // report's post-sim settlement -- the state generation actually handed to
+        // the campaign. The sweep's own `sim` above is a research ladder on
+        // struct defaults unless `--epoch` was passed, and reading these numbers
+        // off it would report a history no player ever gets.
+        {
+            row.nations_total = static_cast<int>(w.nations.size());
+
+            const tariff_bands bands; // the shipped defaults; the seeder's own
+            for (const law& l : w.laws)
+            {
+                if (!l.enacted || l.effect != law_effect_kind::import_tariff) continue;
+                ++row.nations_tariffed;
+                if      (l.rate >= bands.rate_high) ++row.tariff_band_high;
+                else if (l.rate >= bands.rate_mid)  ++row.tariff_band_mid;
+                else                                ++row.tariff_band_low;
+            }
+
+            // The posture itself, off generation's own post-sim settlement. Per
+            // REGION rather than per polity, because that is the grain the
+            // report carries -- and a region's value IS its holder's, broadcast.
+            std::vector<int64_t> post;
+            for (const region& p : k->settlement.regions)
+            {
+                if (p.protection_q > row.protection_max_q)
+                    row.protection_max_q = p.protection_q;
+                post.push_back(p.protection_q);
+            }
+            row.protection_med_q = static_cast<int>(median_of(post));
+
+            // BL-769: nations under the size floor are the city states the
+            // fold's exemption kept -- before it, no nation could finish below
+            // the floor at all. A reporting definition read from OUTSIDE the
+            // generator, deliberately not its own mask: if the two ever
+            // disagree that is a finding rather than a tautology.
+            for (const auto& [nid, nc] : w.nations)
+            {
+                (void)nid;
+                if (static_cast<int>(nc.tiles.size()) < nation_params{}.min_nation_tiles)
+                    ++row.city_states;
             }
         }
 
@@ -978,7 +1096,7 @@ int main(int argc, char** argv)
         for (const sweep_row& r : rows)
         {
             char cross[24], lit[48];
-            if (r.first_cross_year == 0) std::snprintf(cross, sizeof cross, "%11s", "never");
+            if (r.polities_crossed == 0) std::snprintf(cross, sizeof cross, "%11s", "never");
             else std::snprintf(cross, sizeof cross, "%11lld",
                                static_cast<long long>(r.first_cross_year));
             if (r.regions_industrial == 0) std::snprintf(lit, sizeof lit, "%22s", "-");
@@ -1070,6 +1188,82 @@ int main(int argc, char** argv)
                         static_cast<long long>(pk.second / 10));
             std::printf("  (ROSE = peak at least double the start and +3 regions. FELL = ended at\n"
                         "   or under 60%% of its own peak. Both are reporting definitions.)\n");
+        }
+
+        // --- BL-750: THE TARIFF DISTRIBUTION ------------------------------
+        //
+        // THIS TABLE IS THE ITEM'S DELIVERABLE. Ben, 2026-09-06: the derived
+        // form ships, and the VERB form (BL-488) is held as a fallback with one
+        // named trigger -- FLATNESS. If every world tariffs the same share of
+        // its nations in the same band, the protection scalar carries no real
+        // variation and the verb is what would give it some. So read the RANGE
+        // columns, not the medians: a tight range across the spread is the
+        // finding, and it is reported whether or not it is the pleasing answer.
+        //
+        // NOTHING HERE IS GATED. A world with no tariff is a legitimate outcome
+        // -- a world whose polities never industrialised has no industrial
+        // competitor to protect against -- exactly as a world with no empire is.
+        std::printf("\n--- BL-750  TARIFF POSTURE, per world (the GENERATED world) ---\n");
+        std::printf("  seed   nations   tariffed   %%5   %%10   %%20   "
+                    "protection max / median   sub-floor nations\n");
+        for (const sweep_row& r : rows)
+            std::printf("  %4u   %7d   %8d   %3d   %4d   %4d   %11d / %-9d   %17d\n",
+                        r.seed, r.nations_total, r.nations_tariffed,
+                        r.tariff_band_low, r.tariff_band_mid, r.tariff_band_high,
+                        r.protection_max_q, r.protection_med_q, r.city_states);
+        {
+            std::vector<int64_t> tar, share, pmax, cs;
+            int64_t low = 0, mid = 0, high = 0;
+            int worlds_with_tariff = 0;
+            for (const sweep_row& r : rows)
+            {
+                if (r.nations_tariffed > 0) ++worlds_with_tariff;
+                tar.push_back(r.nations_tariffed);
+                share.push_back(r.nations_total > 0
+                                ? (r.nations_tariffed * 1000) / r.nations_total : 0);
+                pmax.push_back(r.protection_max_q);
+                cs.push_back(r.city_states);
+                low  += r.tariff_band_low;
+                mid  += r.tariff_band_mid;
+                high += r.tariff_band_high;
+            }
+            const auto sp_share = span(share);
+            const auto sp_pmax  = span(pmax);
+            const auto sp_tar   = span(tar);
+            std::printf("\n  WORLDS WITH ANY TARIFF       %d / %d\n",
+                        worlds_with_tariff, static_cast<int>(rows.size()));
+            std::printf("  TARIFFED NATIONS             median %lld   range %lld..%lld\n",
+                        static_cast<long long>(median_of(tar)),
+                        static_cast<long long>(sp_tar.first),
+                        static_cast<long long>(sp_tar.second));
+            std::printf("  TARIFFED SHARE of nations    median %lld%%  range %lld%%..%lld%%\n",
+                        static_cast<long long>(median_of(share) / 10),
+                        static_cast<long long>(sp_share.first / 10),
+                        static_cast<long long>(sp_share.second / 10));
+            std::printf("  BAND SPLIT (all seeds)       %%5 %lld   %%10 %lld   %%20 %lld\n",
+                        static_cast<long long>(low),
+                        static_cast<long long>(mid),
+                        static_cast<long long>(high));
+            std::printf("  PEAK PROTECTION reached      median %lld   range %lld..%lld  (of 1000)\n",
+                        static_cast<long long>(median_of(pmax)),
+                        static_cast<long long>(sp_pmax.first),
+                        static_cast<long long>(sp_pmax.second));
+            std::printf("  SUB-FLOOR NATIONS (BL-769)   median %lld per world\n",
+                        static_cast<long long>(median_of(cs)));
+            std::printf("\n  the scalar at POLITY grain (its own, before the handoff):\n");
+            std::printf("  seed   alive   distinct crossing years   protection max / median"
+                        "   over floor\n");
+            for (const sweep_row& r : rows)
+                std::printf("  %4u   %5d   %22d   %11d / %-9d   %10d\n",
+                            r.seed, r.polities_alive, r.distinct_cross_yrs,
+                            r.protection_pmax, r.protection_pmed, r.polities_over_floor);
+            std::printf("  (DISTINCT CROSSING YEARS is the diagnostic. The timing term reads a\n"
+                        "   polity's furnace year against the field; if a world crosses the rung\n"
+                        "   in one or two years flat, that term has nothing to read and a sparse\n"
+                        "   tariff table is an UPSTREAM finding about the furnace, not about the\n"
+                        "   banding and not, on its own, the BL-488 trigger.)\n");
+            std::printf("  (FLAT = every world at the same share in the same band. That, and only\n"
+                        "   that, is what reopens the scored-verb form of protection -- BL-488.)\n");
         }
     }
 

@@ -1637,5 +1637,79 @@ history_sim_state run_history_sim(settlement_state&         ss,
         q.alive = any;
     }
 
+    // --- THE TARIFF POSTURE (BL-750) --------------------------------------
+    //
+    // A DERIVED OUTPUT READ AT HANDOFF, NEVER A SCORED VERB (Ben, 2026-09-06;
+    // NATIONS.md sec 4 Tariffs). Nothing in the decision loop above reads
+    // `protection_q`, and nothing here can move the run: this block executes
+    // once, after the last round, and writes a field no verb, no score and no
+    // RNG draw ever touches. A run with this block deleted would take every
+    // decision it takes with it.
+    //
+    // The formula and the reason for its shape are on `polity::protection_q`.
+    // Integer throughout, walked in polity-id order over a vector, so it is
+    // byte-identical from a seed like everything else in this file.
+    {
+        std::vector<int> alive_ids;
+        for (const polity& q : out.polities)
+            if (q.alive) alive_ids.push_back(q.id);
+
+        // The world's FIRST furnace, among the polities that survived to be
+        // handed over. A polity that lit and was then eliminated is not part of
+        // the field the campaign inherits.
+        int64_t lead = k_never_industrialised;
+        for (int qi : alive_ids)
+        {
+            const int64_t yr = out.polities[static_cast<std::size_t>(qi)].industrial_year;
+            if (yr == k_never_industrialised) continue;
+            if (lead == k_never_industrialised || yr < lead) lead = yr;
+        }
+
+        if (lead != k_never_industrialised && alive_ids.size() > 1)
+        {
+            const int64_t span = std::max<int64_t>(1, params.stop_year - lead);
+            for (int qi : alive_ids)
+            {
+                polity& q = out.polities[static_cast<std::size_t>(qi)];
+
+                // Strictly before: a tie is not "ahead", so two polities that
+                // lit the same year neither protect against each other.
+                int ahead = 0;
+                for (int pi : alive_ids)
+                {
+                    if (pi == qi) continue;
+                    const int64_t py = out.polities[static_cast<std::size_t>(pi)].industrial_year;
+                    if (py == k_never_industrialised) continue;
+                    if (q.industrial_year == k_never_industrialised
+                        || py < q.industrial_year)
+                        ++ahead;
+                }
+                const int share_ahead_q =
+                    (ahead * 1000) / (static_cast<int>(alive_ids.size()) - 1);
+
+                // A polity that never lit is behind by the WHOLE remaining
+                // span, which is the continuous reading of the sentinel rather
+                // than a second branch downstream.
+                const int64_t my_year = q.industrial_year == k_never_industrialised
+                                      ? params.stop_year : q.industrial_year;
+                const int lag_q = clampi(
+                    static_cast<int>(((my_year - lead) * 1000) / span), 0, 1000);
+
+                q.protection_q = clampi((share_ahead_q * lag_q) / 1000, 0, 1000);
+            }
+        }
+
+        // Broadcast onto the ground, the way `contest_q` is broadcast in
+        // `derive_national_character`: the settlement state is the handoff
+        // object, and the political pass reads regions, not polities.
+        for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
+        {
+            const int o = owner[i];
+            ss.regions[i].protection_q =
+                (o >= 0 && o < static_cast<int>(out.polities.size()))
+                    ? out.polities[static_cast<std::size_t>(o)].protection_q : 0;
+        }
+    }
+
     return out;
 }

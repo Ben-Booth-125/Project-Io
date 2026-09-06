@@ -275,8 +275,9 @@ run_history_ladder            ->  cradles, fragmentation
 run_creeds / tribal conflict  ->  one pantheon per cradle; welding
 run_settlement                ->  REGIONS: culture, ancient endowment, furnaces
 run_history_sim               ->  the polities play forward to the epoch
-generate_nations                  seeded on the region anchors
+generate_nations                  seeded on the region anchors, FOLDED BY POLITY
 derive_national_character     ->  the three axes, as outputs
+seed_national_tariffs         ->  the tariff posture, as an enacted law
 generate_corporations         ->  focus from the corp's home region
 ```
 
@@ -300,10 +301,32 @@ into Pass 1 and the growth machinery is reused untouched. The size variance emer
 people settled instead of being dialled in — the cheap alternative (keep Voronoi, narrate over it)
 is the lying-figure problem: prose asserting a settlement history the territory does not reflect.
 
+**And the political map is the sim's, not a second carve of it.** `nation_params::seed_polities`
+carries the polity that held each region at the epoch, and the anchors of one polity fold into one
+nation. That is the difference between a campaign whose borders were *grown out of* where people
+settled and one that inherits *the empires the history actually built*: an empire that took nine
+regions arrives as one realm holding nine regions' ground, not as nine neighbours. The carve is
+still untouched — where the line between two of a realm's OWN regions falls is a geometric question
+the history never asked — so what changed is which cells fly one flag.
+
+Territory can therefore be **non-contiguous**, and that is the record rather than a defect: a
+polity that conquered across a neighbour holds ground on both sides of it.
+
+**A city state is a polity that reached the epoch holding one region with a city standing on it.**
+It survives the size floor that would otherwise absorb it, because absorbing it is exactly the
+detail the History phase is there to keep — one may be a citizen of a city as well as of a realm.
+It never annexes: a city state that swallowed its neighbours would stop being one.
+
 **The political axes are outputs.** `derive_national_character` sets expansionism from the
 border-contest integral, economic focus from the resource class of the regions settled during
 industrialisation, and ideology from industrialisation timing against neighbours, overwriting
 the seeded Pass 4 draw, which remains the fallback for a body with no settlement.
+
+**And so is the tariff posture.** A polity carries a protection scalar off that same
+industrialisation-timing axis, and a nation above the floor opens with an enacted import tariff.
+`../politics/NATIONS.md` § 4 Tariffs owns the derivation; what belongs here is only that it is
+read at the handoff and never chosen in a round — a polity does not spend a decision on
+protectionism.
 
 **The record is destructible, and the hole is visible.** A won war plants the victor's pantheon
 on the regions taken and erases the lines naming them, leaving a dated lacuna with a count of

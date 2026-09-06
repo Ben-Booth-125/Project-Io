@@ -224,3 +224,62 @@ entity_id choose_levy_author(const world& w);
 /// @param rate Credits per unit of raw output extracted in the author's
 ///             jurisdiction.
 void seed_prototype_laws(world& w, float rate = 0.1f);
+
+// ---------------------------------------------------------------------------
+// BL-750 — the generated tariff
+// ---------------------------------------------------------------------------
+
+/// THE BANDS a protection scalar is read through. First-cut constants, the
+/// tune-not-restructure idiom: moving a number here changes how hard a history
+/// protects, never what protection is.
+///
+/// Ad valorem, so the magnitudes are fractions of a trade's value and sit where
+/// real duties sit rather than where the flat extraction levy does. Three bands
+/// and a floor, because the deliverable is a DISTRIBUTION (Ben, 2026-09-06): a
+/// single threshold would report one number per world and could not show
+/// whether the scalar carries variation, which is the measurement that decides
+/// whether the scored-verb form (BL-488) is ever opened.
+struct tariff_bands
+{
+    /// Below this a nation enacts NOTHING. A world whose polities all sit under
+    /// it opens with no tariff at all, which is a legitimate outcome and not a
+    /// gap for anything to fill in.
+    int threshold_q = 300;
+
+    int   mid_q  = 500;  ///< At or above: `rate_mid`.
+    int   high_q = 700;  ///< At or above: `rate_high`.
+
+    float rate_low  = 0.05f; ///< threshold_q  .. mid_q  - 1
+    float rate_mid  = 0.10f; ///< mid_q        .. high_q - 1
+    float rate_high = 0.20f; ///< high_q       .. 1000
+};
+
+/// The rate one protection scalar bands to, or 0 when it is under the floor.
+/// Pure; exposed so a harness can assert the band edges without re-deriving them.
+float tariff_rate_for_protection(int protection_q, const tariff_bands& b = {});
+
+/// BL-750 — ENACT THE HISTORY'S TARIFF POSTURE as ordinary `import_tariff` laws.
+///
+/// One law per nation whose inherited protection clears `bands.threshold_q`,
+/// authored BY that nation, blanket over every resource, enacted at generation.
+/// The author field is the same one the levy uses and the same one
+/// `nation_tariff_rate` and the clearing tick read, so the duty credits the
+/// enacting nation's treasury exactly as the law already specifies — no second
+/// author, no new mechanism, no branch in `market_clearing`.
+///
+/// This is what closes NATIONS.md's "the tariff has no author" ordering: the
+/// vocabulary now has its instance, and it comes from history rather than from
+/// a dial. Under the 2026-08-18 nation grant a nation setting a tariff rate is
+/// exactly what is admitted, and a DERIVED posture is pure, seeded and
+/// replayable by construction — nothing here scores, schedules or plans.
+///
+/// @param nation_ids   Nation entity ids, indexed as `protection_q` is.
+/// @param protection_q Per-nation posture 0-1000 (`derive_national_protection`).
+///                     Short or empty: the missing nations enact nothing.
+///
+/// Walks nations in the caller's index order, which is generation's own; no RNG
+/// is consumed and no float arithmetic is accumulated.
+void seed_national_tariffs(world& w,
+                           const std::vector<entity_id>& nation_ids,
+                           const std::vector<int>& protection_q,
+                           const tariff_bands& bands = {});

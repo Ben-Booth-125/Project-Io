@@ -620,6 +620,45 @@ struct polity
     /// lines beneath a summary correctly printing "no polity reached the rung".
     int64_t industrial_year = k_never_industrialised;
 
+    /// BL-750 — TARIFF POSTURE, AS A DERIVED SCALAR, 0-1000.
+    ///
+    /// How hard this polity protects what it has. Ben ruled the DERIVED form on
+    /// 2026-09-06 (NATIONS.md sec 4 Tariffs): a polity does not spend a round
+    /// choosing protectionism, so this is not a scored verb and nothing in the
+    /// decision loop reads it. It is computed ONCE, after the run, from facts
+    /// the run already accumulated, and read at the handoff by
+    /// `derive_national_protection` -> `seed_national_tariffs`.
+    ///
+    /// TWO TERMS, MULTIPLIED, and the product is the point:
+    ///   - HOW MUCH OF THE FIELD IS AHEAD of it (the share of surviving
+    ///     polities that lit a furnace strictly before it did), and
+    ///   - HOW FAR BEHIND it is (its own lag from the world's first furnace,
+    ///     as a share of the span from that furnace to the epoch).
+    /// Either alone reads flat. Rank alone is uniform by construction — the
+    /// last polity in a twelve-way field always scores 1000 whether it lit two
+    /// years late or never. Lag alone makes every non-industrialiser max out,
+    /// so a world where one polity of twelve industrialises tariffs eleven
+    /// nations identically. The product says "behind, AND far behind".
+    ///
+    /// A WORLD WHERE NOBODY LIT SCORES ZERO FOR EVERYONE, and it falls out
+    /// rather than being special-cased: with no furnace, nobody is strictly
+    /// ahead of anybody, the share term is zero for every polity, and the
+    /// product collapses. That is the honest reading — protection is a response
+    /// to an industrial competitor, and a world without one has nothing to
+    /// protect against. A world with no tariff is a legitimate outcome
+    /// (GENERATION_STRATEGY.md sec Asymmetry is the deliverable) and this is
+    /// where it comes from.
+    ///
+    /// THE COLONY TERM IS OWED, NOT FORGOTTEN. Ben's ruling names two movers:
+    /// industrialisation timing and whether the polity holds colonies, "since a
+    /// metropole protects its ties". The second has NO INPUT in this codebase —
+    /// BL-749 (sea-leg campaign) is what gives a polity ground across water,
+    /// and it has not landed. Rather than invent a proxy for a colony (a
+    /// far-flung holding is a large empire, not an overseas one), the term is
+    /// left out and recorded as owed. It is an addend on this scalar when
+    /// BL-749 lands, not a restructure.
+    int protection_q = 0;
+
     /// True for a seeded great power (BL-299). Majors start with more ground
     /// and an opposed strategic creed; the periphery stays alive as actors.
     bool major = false;
