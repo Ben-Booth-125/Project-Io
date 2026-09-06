@@ -38,10 +38,15 @@
 // are exclusive by construction — a tile's substrate names exactly one — so the
 // claim is structural rather than checked.
 //
-// NOTHING CAN BE IN A SEA PROVINCE YET, and that is expected: units are
-// land-bound (march_unit refuses a water destination outright), buildings refuse
-// water, and a sea province sustains zero of them. They are addressable empty
-// space, built without inventing the naval model that will eventually fill them.
+// WHAT MAY BE IN A SEA PROVINCE IS A DOMAIN QUESTION (BL-778). This read
+// "nothing can be in a sea province yet... units are land-bound (march_unit
+// refuses a water destination outright)". march_unit now asks the unit TYPE
+// which domains it may cross (docs/military/MILITARY.md § Domains and
+// traversal): a land row may enter coastal water its own polity owns, a naval
+// row may hold water outright, and open ocean is closed to everything else.
+// Buildings still refuse water — the port is the named exception and is not
+// built yet — so a sea province remains largely empty in the campaign, because
+// the campaign raises no naval rows, not because water is a wall.
 //
 // The province is deliberately NOT the region: no name, no owner, no culture,
 // no economy. It exists because BL-467 (battle state) needs an engagement

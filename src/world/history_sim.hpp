@@ -882,6 +882,42 @@ struct history_sim_state
     /// — launched, but arriving too thin for the distance. The supply-decay
     /// stall, counted where it happens rather than after the battle resolved.
     int64_t stalled_campaigns = 0;
+
+    // --- BL-778 / BL-779: what the water model actually produced -----------
+    //
+    // Three readings, and all three are CALIBRATION, never coverage targets to
+    // raise (docs/generation/MILITARY_HISTORY.md § Naval — "rare is the design,
+    // not a shortfall"). A sim in which sea battles were routine would be
+    // generating a different history.
+
+    /// Campaign candidates REFUSED on traversal legality (BL-778): the line
+    /// from the staging holding to the target crosses sea, the polity owns no
+    /// shore bridging it, and it can field no naval row to carry the force.
+    /// This is the free overseas conquest BL-755 measured, now priced.
+    int64_t illegal_campaigns = 0;
+
+    /// Campaigns fought at ZERO supply because the force could not forage
+    /// (MILITARY_HISTORY.md § Forage) — it reached ground adjacent to neither
+    /// land nor water its own polity holds. A subset of `stalled_campaigns`.
+    int64_t starved_campaigns = 0;
+
+    /// Battles in which EITHER stack committed a naval entry (BL-779).
+    ///
+    /// READ THIS WITH `sea_leg_battles`, NOT ALONE, and the reason is the
+    /// composition model. `roster_stack` composes a stack from EVERY available
+    /// row by weight (MILITARY_HISTORY.md § Naval — ships "are rows in the same
+    /// roster... composed into the same stack"), so a polity whose ground clears
+    /// `port_q` carries a galley contingent into every fight it has, inland ones
+    /// included. A high figure here therefore measures HOW COASTAL THE POWERS
+    /// ARE, not how often anyone fought at sea.
+    int64_t naval_battles = 0;
+
+    /// Battles reached over a SEA LEG — the line from the staging holding to the
+    /// objective crossed sea. This is the one that answers "how often does naval
+    /// combat actually occur", because it is the only figure that requires water
+    /// to have been crossed rather than merely bordered.
+    int64_t sea_leg_battles = 0;
+
     /// Works raised over the run (BL-321). Counted because "did the roster fire
     /// at all" and "did it fire so much nothing else happened" are the two ways
     /// this item fails, and neither is visible in the battle/founding counts.

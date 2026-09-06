@@ -78,6 +78,46 @@ inline constexpr int roster_band_count = 4;
 /// this header without the cycle noted above.
 roster_band campaign_roster_band_for(era_band band);
 
+// ---------------------------------------------------------------------------
+// Traversal domains (BL-778) — which ground a unit type may cross
+// ---------------------------------------------------------------------------
+//
+// Authority: docs/military/MILITARY.md § Domains and traversal. The domain set
+// is a property of the AUTHORED ROW, not of the engine: adding an amphibious
+// type is a data change here, never a branch in the mover.
+//
+// THE MIDDLE CASE IS THE WHOLE POINT. A land row carries `coastal_water` in its
+// mask, but only crosses it where its OWN polity owns the water — a shore you
+// hold is shallow, bridged, causewayed. Ownership rather than distance is what
+// gives the crossing a cause a player can read. `row_can_traverse` is the one
+// place that asymmetry is expressed, so no caller re-derives it.
+
+enum class traversal_domain : uint8_t
+{
+    land          = 0,
+    coastal_water = 1, ///< The shoreline ring and the lakes. Ownable (PROVINCES.md § Who owns water).
+    open_ocean    = 2, ///< The deep sea. Structurally unowned.
+};
+
+inline constexpr int traversal_domain_count = 3;
+
+/// A set of `traversal_domain`s. A plain bitmask rather than a container so the
+/// row stays trivially copyable and the test is a single AND.
+using traversal_mask = uint8_t;
+
+constexpr traversal_mask domain_bit(traversal_domain d)
+{
+    return static_cast<traversal_mask>(1u << static_cast<uint8_t>(d));
+}
+
+/// Land classes: their own ground, plus coastal water THEY OWN (row_can_traverse).
+inline constexpr traversal_mask k_domains_land =
+    domain_bit(traversal_domain::land) | domain_bit(traversal_domain::coastal_water);
+
+/// Naval classes: water only, and the only rows that may hold open ocean.
+inline constexpr traversal_mask k_domains_naval =
+    domain_bit(traversal_domain::coastal_water) | domain_bit(traversal_domain::open_ocean);
+
 /// What a row needs from the ground before a polity can field it. Each is a
 /// threshold on a region endowment window (0-1000); zero means "no gate".
 struct roster_gate
@@ -103,7 +143,20 @@ struct roster_row
     /// Relative weight when composing a stack from the available rows. Not a
     /// count — the share each available row takes of the raised manpower.
     int weight;
+
+    /// BL-778. Which domains this type may cross. Authored per row; see
+    /// `row_can_traverse` for the owned-coastal-water asymmetry.
+    traversal_mask domains = k_domains_land;
 };
+
+/// May @p r cross @p d? @p owned_by_mover says whether the water in question
+/// belongs to the moving unit's own polity; it is read ONLY for coastal water
+/// crossed by a row that also holds land, which is the one case ownership
+/// decides. Open ocean is never owned, so no caller passes anything for it.
+///
+/// Keyed on the MASK, not on the class: a row that carries both `land` and
+/// `coastal_water` is amphibious-by-ownership, whatever class it belongs to.
+bool row_can_traverse(const roster_row& r, traversal_domain d, bool owned_by_mover);
 
 /// The whole table, in band order. Exposed so a harness can assert over it
 /// rather than re-deriving what it thinks the table says.
