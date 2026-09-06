@@ -1156,6 +1156,14 @@ set(IO_TEST_LONG_HARNESSES
     # is a Timeout, which reads as infrastructure noise rather than as a harness
     # that has never verified anything.
     sea_leg_census
+    # water_ownership_census added 2026-09-06 (sprint 32c lane D). Builds four
+    # prehistory-off worlds and walks every tile of each, to assert the BL-776/
+    # BL-777 claim that coastal water and lakes are territory and the open ocean
+    # is not. ~40 s at /O2 over four worlds; tiered LONG rather than measured in
+    # Debug, on the NR-259 lesson the sea_leg_census entry above records -- the
+    # cost of guessing the tier wrong is a Timeout, which reads as noise rather
+    # than as a check that has never verified anything.
+    water_ownership_census
 )
 
 # EXCLUDED FROM THE ROUTINE GATE - labelled `sweep`. TWO REASONS live here, and
