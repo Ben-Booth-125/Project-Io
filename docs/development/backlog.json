@@ -374,36 +374,6 @@
    "status": "designed",
    "glyph": "✓",
    "priority": "A",
-   "difficulty": 3,
-   "version_goal": null,
-   "sprint": "32b",
-   "written": "2026-09-03",
-   "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
-   "requires": [
-    "BL-748"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-750",
-   "short_name": "TARIFF_POSTURE",
-   "category": "Politics",
-   "title": "A polity chooses protection in the industrial pass, and the nation inherits it as an enacted import tariff at world setup",
-   "authority_doc": "docs/politics/NATIONS.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp",
-    "src/world/nation_generation.cpp",
-    "src/world/law.hpp",
-    "src/world/law.cpp",
-    "src/world/hard_coded_world.cpp"
-   ],
-   "design": "THE LEVER. The import_tariff law (D4) exists and is inert at world setup - no tariff is enacted, so not one line of its arithmetic runs. The design (GENERATION_STRATEGY.md § Three passes, \"separate market conditions are produced by in-world forces with visible causes\") wants each nation's tariff posture to be a FACT OF HISTORY the player can read, not a per-nation dial. A nation that industrialised late relative to its neighbours protects what it has; one that industrialised first wants open markets.\n\nTHE DESIGN. In pass 2 (BL-747 two-span prehistory, BL-748 industrial pass ladder) a polity carries a protection scalar, moved deterministically by its industrialisation timing against its neighbours' (the axis derive_national_character already reads for ideology) and by whether it holds colonies (BL-749, sea-leg campaign: a metropole protects its ties). At handoff, a polity above the protection threshold enacts an import_tariff law on the campaign nation at world setup, rate banded off the scalar, author set so the transfer credits the nation's treasury as the law already specifies. Under the 2026-08-18 nation grant: a nation setting a tariff is exactly what the grant admits; pure, seeded, replayable, never a planner. Whether the polity carries it as a scored VERB (spend a round to raise protection) or as a DERIVED output read at handoff is Ben's call - the derived form is cheaper and is the default here; the verb form makes it a strategy weighting (BL-488, polity strategy weightings) and costs a candidate per round.\n\nTHE PLAYER'S HALF. The player's home market is sheltered because its nation's history sheltered it. That is the \"supporting local companies in their initial sales\" of the 2026-09-03 brief, done as a force with a visible cause.\n\nDONE WHEN: a 1960 world opens with some nations tariffed and most not, the Law panel shows each one, and the tariff pass's own harness (law tests) is green with generated tariffs in place.\n--- RULED (Ben, 2026-09-06, on the market-work form): DERIVED NOW, VERB LATER IF FLAT ---\n\nThe item open call is taken for the DERIVED form: a polity carries protection as a scalar moved\ndeterministically by its industrialisation timing against its neighbours and by whether it holds\ncolonies, read at handoff and enacted as an ordinary import_tariff law. Not a scored verb - a polity\ndoes not spend a round choosing protectionism.\n\nTHE VERB FORM IS HELD AS A FALLBACK WITH A NAMED TRIGGER, which is the part that must not be lost: if\nthe derived scalar produces a FLAT distribution across the seed spread - every world tariffing the\nsame nations to the same degree, or none at all - then the scalar carries no real variation and the\nverb (BL-488, polity strategy weightings) is what would give it some. FLATNESS IS THE ONLY TRIGGER.\nThe verb costs a candidate per round and is not bought for elegance.\n\nSo this item owes a DISTRIBUTION, not just a working tariff: history_sweep reports tariffed-nation\ncounts and rate bands across the spread, and that report is what decides whether the verb form is\never opened. Written into NATIONS.md § 4 Tariffs.",
-   "resolved": "2026-09-06"
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
    "difficulty": 2,
    "version_goal": null,
    "sprint": "32b",
@@ -667,35 +637,6 @@
     "scripts/works.lua"
    ],
    "design": "THE AIM (Ben, point 4): \"We should also be laying simple roads to supply provinces. And markets should begin to emerge towards the end of this phase.\"\n\nFEASIBILITY SAYS: DERIVE THEM FROM THE HISTORY, DO NOT LAY THEM INSIDE IT. Laying roads during the sim came back BLOCKED-NEEDS-NEW-MACHINERY for three independent reasons. (1) The sim has no write channel to the world - no world&, deliberately (history_sim.hpp:68-75). (2) It has no tile-grain route: its Dijkstra is region-to-region over the neighbour graph and returns a COST, never a tile list; the only thing that returns tiles takes world&. (3) generate_roads' node source is w.population_centre_tile, which is empty until after the sim. There is also a determinism idiom mismatch - the sim is integer fixed-point with no floats in the decision path, and edge_tier plus the redundancy rationing are float.\n\nSO THE SHAPE IS: the sim RECORDS what it built (the works roster's road rows - Way Station, Span Bridge, Cut Canal - already represent exactly this), and a pass immediately after it STAMPS ancient-tier roads from that record over the settlement set. Same for markets: carve them at the end of the history phase from where trade actually concentrated, rather than from population alone.\n\nTHIS ALSO GIVES THE WORKS ROSTER SOMETHING TO DO. BL-757 measured zero works raised across sixteen seeds because build_work never wins the scored contest. Roads that visibly persist into the campaign are the first real payoff for winning it, and the scorer should be re-weighted with that payoff in view.\n\nAN ERA-APPROPRIATE TIER RULE IS OWED: edge_tier and the rationing key off nation qualification percentile, a 1960-era field. Ancient roads need their own tier rule rather than borrowing the industrial one.\n\nDONE WHEN: a 1960 world opens with roads whose shape follows the history's trunk routes; markets sit where trade concentrated; works raised is non-zero and its roads are visible on the canvas."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
-   "difficulty": 4,
-   "version_goal": null,
-   "sprint": "32b",
-   "written": "2026-09-03",
-   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
-   "requires": [
-    "BL-766",
-    "BL-767"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-769",
-   "short_name": "CONSEQUENCE_FOLDS_INTO_HISTORY",
-   "category": "Generation",
-   "title": "Phase 5 - city states and pseudo-national borders become part of the History phase, so the history keeps its detail",
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/nation_generation.cpp",
-    "src/world/settlement.cpp",
-    "docs/generation/GENERATION_STRATEGY.md",
-    "docs/lore/HISTORY.md"
-   ],
-   "design": "THE AIM (Ben, point 5): \"if we leave the consequence for after history, we lose detail in that history phase. I think it is fine to consider city states as population centres, and pseudo national borders as part of The History. I.e. you may have a Roman citizen, or an Athenian citizen.\"\n\nWHAT CHANGES. Phase 5 stops CREATING the map and starts FINALISING what the history produced. The sim already writes region::nation as it goes, so pseudo-national borders exist inside it in embryo; what is missing is that they are not a political object a person can belong to. A citizen of a city state needs the centre (BL-766) and the polity to be the same kind of thing at sim grain.\n\nTHE NAMING RULE APPLIES AND IS NOT NEGOTIABLE. Ben's \"Roman or Athenian\" is the reader's analogy, not content: every generated polity, city and people is sci-fi/fantasy from the seeded banks. Real history is a mechanism reference, never a name source.\n\nWHAT PHASE 5 KEEPS: generate_nations resolving the final territory from what the history left, derive_national_character reading its outputs, and the institutional record. What it LOSES: inventing the political map from region anchors as though the history had not just drawn one.\n\nDONE WHEN: the History phase produces named polities and city states that the campaign inherits rather than re-derives; GENERATION_STRATEGY.md's phase table is rewritten around the new boundary."
   },
   {
    "status": "designed",

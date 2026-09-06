@@ -6102,6 +6102,112 @@
     "completed",
     "resolved"
    ]
+  },
+  "BL-750": {
+   "status": "complete",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "32b",
+   "written": "2026-09-03",
+   "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
+   "requires": [
+    "BL-748"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-750",
+   "short_name": "TARIFF_POSTURE",
+   "category": "Politics",
+   "title": "A polity chooses protection in the industrial pass, and the nation inherits it as an enacted import tariff at world setup",
+   "authority_doc": "docs/politics/NATIONS.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "src/world/nation_generation.cpp",
+    "src/world/law.hpp",
+    "src/world/law.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "design": "THE LEVER. The import_tariff law (D4) exists and is inert at world setup - no tariff is enacted, so not one line of its arithmetic runs. The design (GENERATION_STRATEGY.md § Three passes, \"separate market conditions are produced by in-world forces with visible causes\") wants each nation's tariff posture to be a FACT OF HISTORY the player can read, not a per-nation dial. A nation that industrialised late relative to its neighbours protects what it has; one that industrialised first wants open markets.\n\nTHE DESIGN. In pass 2 (BL-747 two-span prehistory, BL-748 industrial pass ladder) a polity carries a protection scalar, moved deterministically by its industrialisation timing against its neighbours' (the axis derive_national_character already reads for ideology) and by whether it holds colonies (BL-749, sea-leg campaign: a metropole protects its ties). At handoff, a polity above the protection threshold enacts an import_tariff law on the campaign nation at world setup, rate banded off the scalar, author set so the transfer credits the nation's treasury as the law already specifies. Under the 2026-08-18 nation grant: a nation setting a tariff is exactly what the grant admits; pure, seeded, replayable, never a planner. Whether the polity carries it as a scored VERB (spend a round to raise protection) or as a DERIVED output read at handoff is Ben's call - the derived form is cheaper and is the default here; the verb form makes it a strategy weighting (BL-488, polity strategy weightings) and costs a candidate per round.\n\nTHE PLAYER'S HALF. The player's home market is sheltered because its nation's history sheltered it. That is the \"supporting local companies in their initial sales\" of the 2026-09-03 brief, done as a force with a visible cause.\n\nDONE WHEN: a 1960 world opens with some nations tariffed and most not, the Law panel shows each one, and the tariff pass's own harness (law tests) is green with generated tariffs in place.\n--- RULED (Ben, 2026-09-06, on the market-work form): DERIVED NOW, VERB LATER IF FLAT ---\n\nThe item open call is taken for the DERIVED form: a polity carries protection as a scalar moved\ndeterministically by its industrialisation timing against its neighbours and by whether it holds\ncolonies, read at handoff and enacted as an ordinary import_tariff law. Not a scored verb - a polity\ndoes not spend a round choosing protectionism.\n\nTHE VERB FORM IS HELD AS A FALLBACK WITH A NAMED TRIGGER, which is the part that must not be lost: if\nthe derived scalar produces a FLAT distribution across the seed spread - every world tariffing the\nsame nations to the same degree, or none at all - then the scalar carries no real variation and the\nverb (BL-488, polity strategy weightings) is what would give it some. FLATNESS IS THE ONLY TRIGGER.\nThe verb costs a candidate per round and is not bought for elegance.\n\nSo this item owes a DISTRIBUTION, not just a working tariff: history_sweep reports tariffed-nation\ncounts and rate bands across the spread, and that report is what decides whether the verb form is\never opened. Written into NATIONS.md § 4 Tariffs.\n--- DELIVERED 2026-09-06, DERIVED FORM, AND THE DISTRIBUTION IS THE FINDING ---\n\npolity::protection_q (0-1000), computed in ONE block at the END of run_history_sim - after the\nalive loop, before return. Nothing in the decision loop reads it: no verb, no score, no RNG draw.\nThat is what keeps it a DERIVED output rather than the scored verb Ben ruled against.\n\nFORMULA: share_ahead_q * lag_q / 1000, integer throughout - the share of surviving polities that\nlit a furnace strictly BEFORE this one, times its own lag from the world first furnace as a share\nof the span to the epoch. Rank alone is uniform by construction; lag alone saturates every\nnon-industrialiser. A world where nobody lit scores 0 for everyone, and that FALLS OUT of the\nformula rather than being special-cased. Broadcast to region::protection_q as contest_q already is;\nderive_national_protection takes the max over held regions; law.cpp seeds one blanket import_tariff\nper nation over a 300 floor, banded 5/10/20%.\n\nTHE COLONY TERM IS NOT BUILT, and no proxy was invented for it. BL-749 has not landed, so a polity\ncannot hold ground across water and there is no colony to read. A far-flung holding is a LARGE\nempire, not an overseas one, and treating it as one would have been a fiction. Recorded as an\naddend owed to BL-749, in code and in NATIONS.md.\n\nTHE DISTRIBUTION, history_sweep 8 --epoch 1960:\n  WORLDS WITH ANY TARIFF   1 / 8\n  PEAK PROTECTION          median 181, range 90..500 of 1000\n  per world: 90 / 90 / 272 / 500 / 181 / 181 / 181 / 181\n\nIT IS NOT FLAT BETWEEN WORLDS BUT IT IS FLAT WITHIN ONE, and the cause was TRACED rather than\ninferred: only 1-4 polities of 9-12 ever cross the Industrial rung, so every non-crosser has\nidentical facts and takes an identical scalar - max == median in all eight worlds. The observed\nmaximum equals crossers * 1000 / (alive - 1) in every case, which is the formula reading the world\ncorrectly rather than failing.\n\nSO THE SPARSENESS IS AN UPSTREAM FINDING ABOUT THE FURNACE COUNT, not about the banding, and NOT\non its own the BL-488 trigger as Ben stated it (flatness across the spread). The 300 floor was a\nfirst-cut constant chosen BEFORE the data was seen and was not tuned toward a better-looking table.\nTWO CALLS OWED TO BEN: (a) is 1-4 crossers of 12 the intended furnace outcome - BL-748 own DONE\nWHEN asked for a WIDE distribution and this is very narrow at the polity end; (b) is within-world\nflatness, every laggard identical until BL-749 supplies the colony term, enough to open BL-488.",
+   "resolved": "2026-09-06",
+   "completed": "2026-09-06",
+   "_row_keys": [
+    "status",
+    "glyph",
+    "priority",
+    "difficulty",
+    "version_goal",
+    "sprint",
+    "written",
+    "author",
+    "requires",
+    "blocked_on",
+    "parked",
+    "id",
+    "short_name",
+    "category",
+    "title",
+    "authority_doc",
+    "files",
+    "design",
+    "resolved",
+    "completed"
+   ]
+  },
+  "BL-769": {
+   "status": "complete",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "32b",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-766",
+    "BL-767"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-769",
+   "short_name": "CONSEQUENCE_FOLDS_INTO_HISTORY",
+   "category": "Generation",
+   "title": "Phase 5 - city states and pseudo-national borders become part of the History phase, so the history keeps its detail",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/nation_generation.cpp",
+    "src/world/settlement.cpp",
+    "docs/generation/GENERATION_STRATEGY.md",
+    "docs/lore/HISTORY.md"
+   ],
+   "design": "THE AIM (Ben, point 5): \"if we leave the consequence for after history, we lose detail in that history phase. I think it is fine to consider city states as population centres, and pseudo national borders as part of The History. I.e. you may have a Roman citizen, or an Athenian citizen.\"\n\nWHAT CHANGES. Phase 5 stops CREATING the map and starts FINALISING what the history produced. The sim already writes region::nation as it goes, so pseudo-national borders exist inside it in embryo; what is missing is that they are not a political object a person can belong to. A citizen of a city state needs the centre (BL-766) and the polity to be the same kind of thing at sim grain.\n\nTHE NAMING RULE APPLIES AND IS NOT NEGOTIABLE. Ben's \"Roman or Athenian\" is the reader's analogy, not content: every generated polity, city and people is sci-fi/fantasy from the seeded banks. Real history is a mechanism reference, never a name source.\n\nWHAT PHASE 5 KEEPS: generate_nations resolving the final territory from what the history left, derive_national_character reading its outputs, and the institutional record. What it LOSES: inventing the political map from region anchors as though the history had not just drawn one.\n\nDONE WHEN: the History phase produces named polities and city states that the campaign inherits rather than re-derives; GENERATION_STRATEGY.md's phase table is rewritten around the new boundary.\n--- DELIVERED 2026-09-06 ---\n\nsettlement_seed_polities reads region::nation BEFORE derive_national_character overwrites it (it\nholds the polity id until then). A new Pass 2d polity fold in generate_nations collapses seeds\nanchored in regions the SAME polity held into one nation, representative = lowest-indexed seed -\nthe founding core, the same rule Pass 5 already uses for tongue and capital tile. THE CARVE ITSELF\nIS UNTOUCHED; only which seeds are considered one nation changed.\n\nmerge_undersized_nations gains an exemption mask, and mark_city_states marks a single-region polity\ncarrying a population centre. A city state is never absorbed and never absorbs.\n\nTHE CITY-STATE PATH IS BUILT BUT DID NOT FIRE IN 8 SEEDS, and it was NOT widened to make it fire.\nSub-floor nations 0 everywhere; seed 0 came closest - a single-region polity existed but carried no\npopulation centre, so it merged as an ordinary holdout. Legitimate under \"a world with no city\nstate is a legitimate outcome\", but it means half of this item is UNEXERCISED by the sweep and the\nnext session should know that rather than read the green as coverage.\n\nDIGESTS: seedA/on, seedB/on and the 1960 arc all moved - the polity fold reshapes the political map,\nso the nation count shifts and every downstream stream (character, naming, corps) with it. seedA/OFF\nUNMOVED is the control the design predicts: no sim means seed_polities is all -1, the fold is the\nidentity and no tariff is enacted. AND THE ERA COUNTERS ARE BYTE-IDENTICAL either side (seedA 4/4/405,\nseedB 76/0/391, 1960 248/107/516), so the SIM ITSELF did not move - only what generation makes of it.",
+   "completed": "2026-09-06",
+   "resolved": "2026-09-06",
+   "_row_keys": [
+    "status",
+    "glyph",
+    "priority",
+    "difficulty",
+    "version_goal",
+    "sprint",
+    "written",
+    "author",
+    "requires",
+    "blocked_on",
+    "parked",
+    "id",
+    "short_name",
+    "category",
+    "title",
+    "authority_doc",
+    "files",
+    "design",
+    "completed",
+    "resolved"
+   ]
   }
  }
 }
