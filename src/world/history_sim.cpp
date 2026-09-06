@@ -147,6 +147,37 @@ doctrine_row doctrine_for(const polity& p)
     return d;
 }
 
+/// Which span a year falls in (BL-760 (1)): 0 = the ancient span, 1 = industrial.
+///
+/// A SINGLE-SPAN RUN REPORTS EVERYTHING AS SPAN 0, which is the reading that
+/// matches the design rather than the sentinel. `boundary_year` defaults to
+/// INT64_MIN so that "no year is before it" leaves a one-span arc inert — but
+/// read naively that puts an ancient arc's whole history in span 1, i.e. in the
+/// industrial span it does not have. The explicit sentinel test is what keeps
+/// the ancient-arc rows readable.
+int span_index(const history_sim_params& params, int64_t y)
+{
+    if (params.boundary_year == INT64_MIN)
+        return 0;
+    return y >= params.boundary_year ? 1 : 0;
+}
+
+/// Count a fielded stack into the per-band and per-span rows.
+void note_units_fielded(history_sim_state&        out,
+                        const history_sim_params& params,
+                        int64_t                   y,
+                        roster_band               band,
+                        const std::vector<army_stack_entry>& stack)
+{
+    int64_t n = 0;
+    for (const army_stack_entry& e : stack)
+        n += e.count;
+    const int b = static_cast<int>(band);
+    if (b >= 0 && b < roster_band_count)
+        out.units_by_band[static_cast<std::size_t>(b)] += n;
+    out.units_by_span[static_cast<std::size_t>(span_index(params, y))] += n;
+}
+
 /// Turn raised manpower into a typed stack via the era-keyed roster (BL-274),
 /// then scale the whole stack by the owner's COHESION (BL-308).
 ///
@@ -158,16 +189,28 @@ doctrine_row doctrine_for(const polity& p)
 /// `readiness_q` is the caller-side lever the winter-campaign candidate uses
 /// against a defender (history_sim.hpp § season).
 ///
-/// `ceiling` is the two-span band cap (BL-747), defaulted to `industrial` — no
-/// restriction — so a caller outside the year loop is unchanged.
+/// `ceiling` is the two-span band cap (BL-747). It carried a
+/// `= roster_band::industrial` default — no restriction — which BOTH call sites
+/// already override with `sim_band_ceiling(params, y)`. The default was therefore
+/// dead, and dead in the dangerous direction: a new in-TU caller that omitted the
+/// argument would silently un-apply the span cap, with no diagnostic and no
+/// harness able to see it (BL-760 (3)). Required rather than defaulted, so
+/// forgetting it is a compile error.
 std::vector<army_stack_entry> build_stack(int64_t manpower,
                                           const region& home,
                                           const polity&   owner,
                                           int             readiness_q,
-                                          roster_band     ceiling = roster_band::industrial)
+                                          roster_band     ceiling,
+                                          roster_band*    band_out)
 {
     const int band_index = clampi(owner.capacity[static_cast<int>(sim_domain::military)], 1, 6);
     const roster_band band = min_band(roster_band_for_capacity(band_index), ceiling);
+    // BL-760 (1): the band is computed HERE and nowhere else, so the counter
+    // reads the value the stack was actually built from. Re-deriving it at the
+    // call site would be a second copy of the min_band rule, free to drift from
+    // this one — the divergence class this file's own header warns about.
+    if (band_out != nullptr)
+        *band_out = band;
 
     // Cohesion folds into readiness rather than into the counts: a shaken
     // polity fields the same men fighting worse, not fewer men fighting well.
@@ -1043,12 +1086,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 for (const polity& o : out.polities)
                     if (o.id == owner[ti]) { dq = &o; break; }
 
+                roster_band atk_band = roster_band::classical;
                 std::vector<army_stack_entry> atk =
-                    build_stack(raised, home, q, 1000, sim_band_ceiling(params, y));
+                    build_stack(raised, home, q, 1000, sim_band_ceiling(params, y), &atk_band);
+                note_units_fielded(out, params, y, atk_band, atk);
                 const int64_t def_want = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
                 const int64_t def_men  = raise_manpower(tgt, def_want);
+                roster_band def_band = roster_band::classical;
                 std::vector<army_stack_entry> def =
-                    build_stack(def_men, tgt, dq ? *dq : q, def_ready, sim_band_ceiling(params, y));
+                    build_stack(def_men, tgt, dq ? *dq : q, def_ready, sim_band_ceiling(params, y), &def_band);
+                note_units_fielded(out, params, y, def_band, def);
 
                 const battle_outcome bo = resolve_battle(
                     atk, doctrine_for(q),
@@ -1281,6 +1328,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 replenish_manpower(bp);
 
                 ++out.works_raised;
+                {
+                    const int b = static_cast<int>(r->band);
+                    if (b >= 0 && b < roster_band_count)
+                        ++out.works_by_band[static_cast<std::size_t>(b)];
+                    ++out.works_by_span[static_cast<std::size_t>(span_index(params, y))];
+                }
                 out.history.push_back(history_event{
                     years_from_calendar_year(y), chain_stage::legacy,
                     bp.name + " raises a " + r->name, std::string{}});

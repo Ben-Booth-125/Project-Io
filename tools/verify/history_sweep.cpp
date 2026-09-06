@@ -180,6 +180,14 @@ struct sweep_row
     /// which is the failure this item is most likely to have.
     int64_t works_raised   = 0;
     int     regions_with_works = 0;
+    /// BL-760 (1): raised/fielded DURING the run, split by roster band and by
+    /// span. Distinct from the end-of-run per-band works census below — that
+    /// one reports what is STANDING, this one what the run actually did, and
+    /// only this one can see a span-1 ceiling binding.
+    std::array<int64_t, roster_band_count> run_works_by_band{};
+    std::array<int64_t, roster_band_count> units_by_band{};
+    std::array<int64_t, 2>                 works_by_span{};
+    std::array<int64_t, 2>                 units_by_span{};
     /// BL-757 R4: works standing at the end of the run, PER ROSTER BAND, so
     /// "the roster never fired" can be told apart from "it fired only at the
     /// bottom of the ladder". Derived in the harness from region::works_built
@@ -511,6 +519,10 @@ int main(int argc, char** argv)
         row.peak_year       = sim.peak_year;
 
         row.works_raised = sim.works_raised;
+        row.run_works_by_band = sim.works_by_band;
+        row.units_by_band = sim.units_by_band;
+        row.works_by_span = sim.works_by_span;
+        row.units_by_span = sim.units_by_span;
         for (const region& p : ss.regions)
             if (p.works_built != 0) ++row.regions_with_works;
 
@@ -589,6 +601,61 @@ int main(int argc, char** argv)
                     static_cast<long long>(r.epoch_population),
                     static_cast<long long>(r.ms),
                     static_cast<long long>(r.works_raised), r.regions_with_works);
+    }
+
+    // --- BL-760 (1): the band ceiling gets an observable ------------------
+    //
+    // WITHOUT THIS SECTION span1_band_ceiling = medieval and = industrial are
+    // indistinguishable from outside the sim. `works_raised` is one scalar with
+    // no band split, so if no polity reaches materials capacity 4 before the
+    // boundary the clamp never binds and every check passes either way — which
+    // is how a two-span requirement came to be marked complete on substituted
+    // evidence.
+    //
+    // READ THE WORKS ROWS WITH BL-757 IN HAND: it measured ZERO works raised
+    // across sixteen seeds because build_work never wins the scored contest. A
+    // row of zeros here therefore has two causes and this counter cannot
+    // separate them. The UNITS rows are the ones carrying signal today.
+    {
+        static const char* kBand[roster_band_count] =
+            { "classical", "medieval", "gunpowder", "industrial" };
+        std::array<int64_t, roster_band_count> w{}, u{};
+        std::array<int64_t, 2> ws{}, us{};
+        for (const auto& r : rows)
+        {
+            for (int b = 0; b < roster_band_count; ++b)
+            {
+                w[static_cast<std::size_t>(b)] += r.run_works_by_band[static_cast<std::size_t>(b)];
+                u[static_cast<std::size_t>(b)] += r.units_by_band[static_cast<std::size_t>(b)];
+            }
+            for (int i = 0; i < 2; ++i)
+            {
+                ws[static_cast<std::size_t>(i)] += r.works_by_span[static_cast<std::size_t>(i)];
+                us[static_cast<std::size_t>(i)] += r.units_by_span[static_cast<std::size_t>(i)];
+            }
+        }
+        std::printf("\n--- raised and fielded during the run, by band (all seeds) ---\n");
+        for (int b = 0; b < roster_band_count; ++b)
+            std::printf("  %-11s works %8lld   units %12lld\n", kBand[b],
+                        static_cast<long long>(w[static_cast<std::size_t>(b)]),
+                        static_cast<long long>(u[static_cast<std::size_t>(b)]));
+        std::printf("  span 0 (ancient)    works %8lld   units %12lld\n",
+                    static_cast<long long>(ws[0]), static_cast<long long>(us[0]));
+        std::printf("  span 1 (industrial) works %8lld   units %12lld\n",
+                    static_cast<long long>(ws[1]), static_cast<long long>(us[1]));
+        if (u[0] + u[1] + u[2] + u[3] == 0)
+            std::printf("  (no units fielded in any seed - no campaign was resolved)\n");
+
+        // The ONE assertion this section makes, and it is deliberately narrow:
+        // on a single-span ancient arc, nothing may be fielded above medieval.
+        // Anything stronger would be asserting a distribution rather than the
+        // ceiling, which is BL-767's job and not this one's.
+        const bool ancient_arc = ws[1] == 0 && us[1] == 0;
+        if (ancient_arc)
+            check(u[2] == 0 && u[3] == 0,
+                  "B1   the ancient span fields nothing above medieval");
+        else
+            std::printf("  [SKIP] B1   this sweep ran an arc WITH an industrial span\n");
     }
 
     // --- The distributions -------------------------------------------------
@@ -761,8 +828,7 @@ int main(int argc, char** argv)
     //
     // These DO gate, unlike the distribution rows above, and the difference is
     // principled: S1-S3 refuse to assert tuning targets nobody has chosen, but
-    // "the gate fires on the ground it names" and "the effect reaches a
-    // consumer" are not tuning — they are the mechanism either working or not.
+    // "the gate fires on the ground it names" and "the effect reaches a\n    // consumer" are not tuning — they are the mechanism either working or not.
     std::printf("\n");
     {
         const sim_terrain_view no_terrain{};

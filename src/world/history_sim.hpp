@@ -55,6 +55,7 @@
 #include "settlement.hpp"
 #include "works_roster.hpp"
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <string>
@@ -684,6 +685,26 @@ struct history_sim_state
     /// at all" and "did it fire so much nothing else happened" are the two ways
     /// this item fails, and neither is visible in the battle/founding counts.
     int64_t works_raised = 0;
+
+    /// BL-760 (1): works raised and units fielded, SPLIT BY ROSTER BAND and by
+    /// which span they happened in (index 0 = the ancient span, 1 = industrial).
+    ///
+    /// WITHOUT THIS THE TWO-SPAN BAND CEILING HAS NO OBSERVABLE. `works_raised`
+    /// is one scalar with no band split, so nothing in the project could tell
+    /// `span1_band_ceiling = medieval` from `= industrial`: if no polity reaches
+    /// materials capacity 4 before the boundary the clamp never binds, and every
+    /// check stays green whether or not the ceiling works at all. A requirement
+    /// was marked complete on substituted evidence because of it.
+    ///
+    /// READ THEM WITH BL-757 IN HAND. That item measured ZERO works raised
+    /// across sixteen seeds, because `build_work` never wins the scored contest
+    /// — so a band row of zeros here has two possible causes and the counter
+    /// alone cannot separate them. The units rows are the ones carrying signal
+    /// until that is fixed.
+    std::array<int64_t, roster_band_count> works_by_band{};
+    std::array<int64_t, roster_band_count> units_by_band{};
+    std::array<int64_t, 2>                 works_by_span{};
+    std::array<int64_t, 2>                 units_by_span{};
 
     /// Battles in each century of the run, index 0 = the first hundred years.
     /// The sweep reports war frequency PER CENTURY rather than as a total,

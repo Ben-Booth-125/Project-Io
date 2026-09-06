@@ -146,6 +146,14 @@ save_envelope make_envelope()
     e.params.seed        = 0xC0FFEEu;
     e.params.abundance   = abundance_level::sparse;
     e.params.epoch_year  = -350;
+    // BL-760 (2): the two year fields must differ from EACH OTHER and from the
+    // authored default. Both default to 400, so a run that left them there would
+    // round-trip clean even if the writer swapped their order — an assertion that
+    // cannot fail is not an assertion. 137 and 291 are distinct, non-default, and
+    // not each other's transposition.
+    e.params.prehistory_years = 137;
+    e.params.industrial_years = 291;
+    e.params.body_count       = 7;
 
     generation_report::body_entry be;
     be.name         = "Vhessari Prime";
@@ -221,9 +229,22 @@ int main()
                   && le.speed == env.speed,
               "S2 the clock survives (five distinct fields)");
 
+        // EVERY field, not three of six. prehistory_years and industrial_years
+        // were both unasserted on a record whose version was just bumped to 4,
+        // and both default to 400 — so an order swap in the writer round-tripped
+        // clean and the comment guarding it was the only check (BL-760 (2)).
         check(le.params.seed == env.params.seed && le.params.abundance == env.params.abundance
-                  && le.params.epoch_year == env.params.epoch_year,
-              "S3 world_params survives");
+                  && le.params.epoch_year == env.params.epoch_year
+                  && le.params.prehistory_years == env.params.prehistory_years
+                  && le.params.industrial_years == env.params.industrial_years
+                  && le.params.body_count == env.params.body_count,
+              "S3 world_params survives (all six fields)");
+        // The differential the requirement actually asks for: the two year
+        // fields must come back DISTINCT and in the right slots. Comparing
+        // round-tripped-to-original cannot catch a swap if the writer and reader
+        // swap symmetrically, so this pins them to their literal values.
+        check(le.params.prehistory_years == 137 && le.params.industrial_years == 291,
+              "S3 the two year fields land in the RIGHT slots (137/291, not swapped)");
         check(le.report.bodies.size() == 1 && le.report.bodies[0].name == "Vhessari Prime"
                   && le.report.bodies[0].id == 41 && le.report.bodies[0].is_homeworld,
               "S3 the generation report's body entry survives (name, id, homeworld flag)");
