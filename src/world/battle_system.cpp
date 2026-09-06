@@ -188,22 +188,28 @@ std::vector<army_stack_entry> build_side(const world& w, const std::vector<entit
     return out;
 }
 
-/// True iff a stack can actually fight — at least one entry with a land class
-/// and a positive count.
+/// True iff a stack can actually fight — at least one entry with a positive
+/// count, of ANY class.
 ///
 /// THE DEGENERATE CASE THIS SCREENS, and it is not theoretical. `resolve_battle`
-/// scores naval entries at EXACTLY zero (combat.cpp: sum_stack skips them,
-/// class_base_power returns 0) and rejects nothing. With BOTH sides at zero
-/// power its tie-break is a strict `>`, so a 0-vs-0 fight resolves as a DEFENDER
-/// VICTORY and still returns 400/200 per-mille losses — casualties inflicted on
-/// forces that could not have fought. Discovery opens a battle on stance and
-/// position alone and never inspects unit class, so nothing else would have
-/// caught it. Unreachable with today's land-only production roster; guarded
-/// rather than left to be discovered when the first naval row lands.
+/// rejects nothing: a stack that scores zero power still resolves, and with BOTH
+/// sides at zero its tie-break is a strict `>`, so a 0-vs-0 fight resolves as a
+/// DEFENDER VICTORY and still returns 400/200 per-mille losses — casualties
+/// inflicted on forces that could not have fought. Discovery opens a battle on
+/// stance and position alone and never inspects unit class, so nothing else
+/// would catch it.
+///
+/// BL-779 NARROWED WHAT THIS COVERS, and the change of status is the point. The
+/// clause read `e.cls != unit_class::naval`, because an all-naval stack was
+/// degenerate BY CONSTRUCTION — combat.cpp scored the class at exactly zero. It
+/// scores like any other class now, so an all-naval fight is an ordinary fight
+/// and screening it out would suppress the very engagement the water model
+/// exists to make expressible. What remains guarded is the genuinely EMPTY
+/// stack, which is a caller error in any era.
 bool stack_can_fight(const std::vector<army_stack_entry>& stack)
 {
     for (const army_stack_entry& e : stack)
-        if (e.cls != unit_class::naval && e.count > 0)
+        if (e.count > 0)
             return true;
     return false;
 }

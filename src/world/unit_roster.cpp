@@ -28,6 +28,17 @@ namespace
 
 // Gates are thresholds on the region endowment windows the settlement pass
 // already surveyed, so nothing here needs a new generation input.
+//
+// BL-779 GAVE THE THREE NAVAL ROWS A REAL power_mod. All three were authored at
+// 0 because the class scored zero regardless (combat.cpp), so the column was
+// meaningless for them. They now sit on the SAME per-band ladder their
+// contemporaries do rather than on a scale invented for ships: Coastal Galley 0
+// beside Levy Spear and Light Horse, Broadside Ship 230 beside Line Infantry's
+// 240 and Dragoon's 210, Ironclad 400 beside Breech Artillery's 400.
+//
+// The last column is the BL-778 traversal mask. It is omitted on every land row,
+// which takes `k_domains_land` from the member's default — the exception is the
+// thing worth writing down, and there are exactly three of them.
 const std::vector<roster_row> g_table = {
     // --- Classical (ladder T1): massed iron infantry, siegecraft -----------
     {"Levy Spear",      roster_band::classical, unit_class::infantry, {  0,   0,   0,   0},   0, 380},
@@ -39,7 +50,7 @@ const std::vector<roster_row> g_table = {
     // flankers, never the heavy charge.
     {"Light Horse",     roster_band::classical, unit_class::cavalry,  {  0, 500,   0,   0},   0, 150},
     {"Siege Train",     roster_band::classical, unit_class::siege,    {350,   0,   0,   0},  40,  90},
-    {"Coastal Galley",  roster_band::classical, unit_class::naval,    {  0,   0, 500,   0},   0,  80},
+    {"Coastal Galley",  roster_band::classical, unit_class::naval,    {  0,   0, 500,   0},   0,  80, k_domains_naval},
 
     // --- Medieval (ladder T2-T3): the stirrup, the fortress, plate ---------
     {"Stirrup Horse",   roster_band::medieval,  unit_class::cavalry,  {400, 550,   0,   0}, 150, 210},
@@ -52,12 +63,12 @@ const std::vector<roster_row> g_table = {
     {"Line Infantry",   roster_band::gunpowder, unit_class::infantry, {550,   0,   0, 400}, 240, 300},
     {"Field Artillery", roster_band::gunpowder, unit_class::siege,    {600,   0,   0, 450}, 260, 150},
     {"Dragoon",         roster_band::gunpowder, unit_class::cavalry,  {500, 500,   0, 400}, 210, 140},
-    {"Broadside Ship",  roster_band::gunpowder, unit_class::naval,    {550,   0, 600, 400},   0, 110},
+    {"Broadside Ship",  roster_band::gunpowder, unit_class::naval,    {550,   0, 600, 400}, 230, 110, k_domains_naval},
 
     // --- Industrial (ladder T5-T6): rifle, ironclad, then armour ----------
     {"Rifle Regiment",  roster_band::industrial, unit_class::infantry,{650,   0,   0, 550}, 380, 340},
     {"Breech Artillery",roster_band::industrial, unit_class::siege,   {700,   0,   0, 600}, 400, 170},
-    {"Ironclad",        roster_band::industrial, unit_class::naval,   {700,   0, 650, 600},   0, 120},
+    {"Ironclad",        roster_band::industrial, unit_class::naval,   {700,   0, 650, 600}, 400, 120, k_domains_naval},
     {"Mechanised Column", roster_band::industrial, unit_class::cavalry,{750,  0,   0, 700}, 420, 160},
 };
 
@@ -80,6 +91,22 @@ bool gate_met(const roster_gate& g, const region& p)
 } // namespace
 
 const std::vector<roster_row>& unit_roster_table() { return g_table; }
+
+bool row_can_traverse(const roster_row& r, traversal_domain d, bool owned_by_mover)
+{
+    if ((r.domains & domain_bit(d)) == 0)
+        return false;
+
+    // The owned-coastal-water asymmetry (BL-778), expressed once. A row that
+    // also holds LAND is a land force wading its own shore, and may do so only
+    // where its polity owns that water. A row without the land bit is at home
+    // on water and asks nobody's permission.
+    if (d == traversal_domain::coastal_water
+     && (r.domains & domain_bit(traversal_domain::land)) != 0)
+        return owned_by_mover;
+
+    return true;
+}
 
 roster_band roster_band_for_capacity(int military_capacity)
 {

@@ -12,9 +12,11 @@
 //       matchup+terrain scenario produces the expected side of outcome.
 //   R3  Doctrine is pure modifier data: two different doctrine_row values
 //       drive the SAME resolve_battle function with no branching per doctrine.
-//   R4  resolve_battle is reachable/callable with no Era-(-1)-sim-only
-//       coupling — no dependency on a settlement/sim type this item does not
-//       build.
+//   R4  Naval scores REAL power (BL-779), an all-naval stack resolves without
+//       dividing by zero, and the matrix row formerly marked "unused" is
+//       exercised. Plus: resolve_battle is reachable/callable with no
+//       Era-(-1)-sim-only coupling — no dependency on a settlement/sim type
+//       this item does not build.
 //
 // The process exits non-zero if any assertion FAILs.
 
@@ -170,17 +172,64 @@ int main()
                     mountain.result == battle_result::attacker_victory ? "attacker" : "defender");
     }
 
-    // --- R4: naval is strategic-only, not a silent crash/branch ------------
+    // --- R4: naval carries REAL power, and the matrix row is live ----------
+    //
+    // THIS ASSERTION INVERTED (BL-779, 2026-09-06). It read "an all-naval stack
+    // contributes zero tactical power (strategic-only, deferred)" and "a token
+    // defending garrison beats a purely naval attacker with no tactical
+    // presence" — both true of a class that was excluded from the calculation
+    // outright. Water is a place now (docs/military/MILITARY.md § Domains and
+    // traversal), and the sole occupant of a place has to be able to fight over
+    // it, so the harness asserts the opposite: naval scores, an all-naval stack
+    // resolves as an ordinary fight, and the matrix row that was marked
+    // "unused" is actually read.
     {
         const std::vector<army_stack_entry> atk = stack_of(unit_class::naval, 500);
         const std::vector<army_stack_entry> def = stack_of(unit_class::infantry, 10);
         const battle_outcome o = resolve_battle(atk, neutral_doctrine, def, neutral_doctrine,
                                                  terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
                                                  season::summer, 1000, 1000);
-        check(o.attacker_power == 0,
-              "R4 an all-naval stack contributes zero tactical power (strategic-only, deferred)");
-        check(o.result == battle_result::defender_victory,
-              "R4 a token defending garrison beats a purely naval 'attacker' with no tactical presence");
+        check(o.attacker_power > 0,
+              "R4 a naval stack contributes REAL tactical power (BL-779 — the class stopped being worth zero)");
+        check(o.result == battle_result::attacker_victory,
+              "R4 500 ships beat a token 10-man garrison — naval weight enters the outcome, not just the sum");
+        std::printf("      naval 500 vs infantry 10: attacker power %lld, defender %lld\n",
+                    static_cast<long long>(o.attacker_power),
+                    static_cast<long long>(o.defender_power));
+
+        // AN ALL-NAVAL FIGHT IS AN ORDINARY FIGHT. Both sides naval means the
+        // matchup average is computed ENTIRELY from the matrix row that used to
+        // be dead — if naval were still skipped, both counts would be zero and
+        // weighted_matchup would divide by zero (or bail to neutral on an empty
+        // stack, scoring 0 vs 0 and resolving as a phantom defender victory).
+        const std::vector<army_stack_entry> fleet_a = stack_of(unit_class::naval, 300, 0, 41);
+        const std::vector<army_stack_entry> fleet_b = stack_of(unit_class::naval, 100, 0, 42);
+        const battle_outcome sea = resolve_battle(fleet_a, neutral_doctrine, fleet_b, neutral_doctrine,
+                                                  terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
+                                                  season::summer, 1000, 1000);
+        check(sea.attacker_power > 0 && sea.defender_power > 0,
+              "R4 an all-naval battle resolves with both sides scoring — no division by zero");
+        check(sea.result == battle_result::attacker_victory && sea.decisiveness > 0,
+              "R4 the bigger fleet wins the all-naval fight, decisively — the unused matrix row is exercised");
+        std::printf("      naval 300 vs naval 100: %lld vs %lld, decisiveness %d\n",
+                    static_cast<long long>(sea.attacker_power),
+                    static_cast<long long>(sea.defender_power), sea.decisiveness);
+
+        // AND THE NAVAL ROW IS READ, not merely reachable: a fleet scored
+        // against a land defender must come out at the class's authored base
+        // power, the same way any other class does. Equal counts, no modifiers,
+        // neutral terrain and full supply — the only thing separating the two
+        // numbers is class_base_power, so a still-skipped naval side would
+        // score exactly zero here.
+        const battle_outcome even = resolve_battle(
+            stack_of(unit_class::naval, 100), neutral_doctrine,
+            stack_of(unit_class::naval, 100, 0, 2), neutral_doctrine,
+            terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
+            season::summer, 1000, 1000);
+        check(even.attacker_power == even.defender_power,
+              "R4 two identical fleets score identically — naval goes through the same arithmetic as any class");
+        check(even.result == battle_result::defender_victory,
+              "R4 an exact naval tie still breaks to the defender (the tie-break is class-blind)");
     }
 
     // --- R4: resolve_battle needs nothing beyond combat.hpp/components.hpp -

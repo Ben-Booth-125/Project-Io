@@ -32,11 +32,24 @@
 // and every tie is broken by an explicit, documented rule rather than `<`
 // ambiguity — see resolve_battle's comment for the exact tie-break.
 //
-// NAVAL IS STRATEGIC-ONLY (this cut). unit_class::naval exists so callers can
-// tag naval presence, but resolve_battle excludes naval entries from the
-// tactical calculation entirely (zero power, zero weight in the matchup
-// average) rather than resolving naval combat. Tactical naval resolution is
-// explicitly deferred.
+// NAVAL SCORES LIKE ANY OTHER CLASS (BL-779, 2026-09-06). It carries base
+// power, weight in the matchup average, and a live matrix row, exactly as the
+// four land classes do. What separates naval is not its arithmetic but its
+// DOMAIN — naval rows are the only rows that may hold open ocean, and the only
+// ones that may contest coastal water a rival owns (unit_roster.hpp § traversal
+// domains; docs/military/MILITARY.md § Domains and traversal).
+//
+// This OVERTURNS "naval is strategic-only", which this header asserted until
+// 2026-09-06 and which gave the class zero power, zero weight and a matrix row
+// marked unused. That was coherent while water was a wall — there was nowhere
+// for a fleet to be. Water is a place now, and the sole occupant of a place has
+// to be able to fight over it.
+//
+// WHO ACTUALLY FIELDS THEM. The Era -1 sim
+// (docs/generation/MILITARY_HISTORY.md § Naval) — the campaign raises no naval
+// units, so campaign-era naval stays unmodelled as a matter of scope. This
+// engine does not know or care which of the two is calling it, which is the
+// property that lets the same resolver serve both.
 //
 // SIEGES ARE A DOCTRINE CHOICE. There is no separate siege resolution path in
 // this first cut — an army besieging a position picks a doctrine_row with an
@@ -54,8 +67,8 @@ enum class unit_class : uint8_t
     cavalry  = 1,
     ranged   = 2,
     siege    = 3,
-    naval    = 4, ///< Strategic-only presence — see file header. Contributes
-                  ///< zero tactical power in resolve_battle.
+    naval    = 4, ///< A fighting class like the other four (BL-779). Separated
+                  ///< by DOMAIN, not by arithmetic — see file header.
 };
 
 inline constexpr int unit_class_count = 5;

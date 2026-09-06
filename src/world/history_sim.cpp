@@ -221,6 +221,55 @@ std::vector<army_stack_entry> build_stack(int64_t manpower,
     return roster_stack(manpower, home, band, effective_readiness);
 }
 
+/// True iff the straight line between two regions crosses SEA (open ocean or
+/// coastal sea; lakes are not sea). BL-778's traversal legality is asked of an
+/// EDGE, and this is the predicate that answers it.
+///
+/// DELIBERATELY THE SAME SAMPLER `tools/verify/sim_water_census.cpp` USES, step
+/// for step, so the "43% of adjacency edges cross sea" figure the item is
+/// scoped against and the legality the sim now enforces are the same
+/// measurement. Sampled along the line rather than pathfound, because the sim
+/// has no path either — its adjacency is a water-blind Chebyshev radius, which
+/// is exactly the free reach this prices.
+///
+/// Integer-only, no wrap (the census does not wrap either), and a function of
+/// the terrain raster alone: two runs at one seed ask it the same questions in
+/// the same order and get the same answers.
+bool line_crosses_sea(const region& a, const region& b,
+                      const sim_terrain_view& terrain, int gw, int gh, int radius)
+{
+    const int steps = radius * 2;
+    for (int t = 1; t < steps; ++t)
+    {
+        const int c = a.col + (b.col - a.col) * t / steps;
+        const int r = a.row + (b.row - a.row) * t / steps;
+        if (c < 0 || r < 0 || c >= gw || r >= gh) continue;
+        if (is_sea(sub_at(terrain, c + r * gw))) return true;
+    }
+    return false;
+}
+
+/// Does @p home's ground let this polity field anything that may hold open
+/// ocean? Asked of the ROW's traversal mask (BL-778), never of `unit_class`,
+/// so an amphibious row added to the table later answers this without touching
+/// the sim. `port_q` is what gates the three naval rows, so this is "does the
+/// staging holding have a harbour good enough to carry an army".
+bool can_field_naval(const region& home, roster_band band)
+{
+    for (const roster_row* r : available_rows(home, band))
+        if (row_can_traverse(*r, traversal_domain::open_ocean, false))
+            return true;
+    return false;
+}
+
+/// Did either stack commit a naval entry? The BL-779 calibration reading.
+bool stack_has_naval(const std::vector<army_stack_entry>& s)
+{
+    for (const army_stack_entry& e : s)
+        if (e.cls == unit_class::naval && e.count > 0) return true;
+    return false;
+}
+
 /// Total committed headcount in a stack — the denominator losses apply to.
 int64_t stack_size(const std::vector<army_stack_entry>& s)
 {
@@ -611,6 +660,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // polity would light furnaces at a band it could not build at —
             // and re-deriving it at each site is exactly the drift this file's
             // header warns about (see `build_stack`'s `band_out`).
+            // The MILITARY band, derived exactly as `build_stack` derives it,
+            // and read by the BL-778 legality gate to ask whether this polity
+            // can field anything that may hold open ocean. Same one-derivation
+            // discipline as `mat_band` immediately below.
+            const roster_band mil_band = min_band(
+                roster_band_for_capacity(
+                    clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6)),
+                sim_band_ceiling(params, y));
+
             const roster_band mat_band = min_band(
                 roster_band_for_capacity(
                     clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6)),
@@ -676,6 +734,51 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             0, 1000);
             };
 
+            // ---- BL-778 / BL-779: the water gate on a campaign edge -------
+            //
+            // TWO QUESTIONS, ASKED OF ONE EDGE, and they are deliberately
+            // different questions with different answers.
+            //
+            // LEGALITY (BL-778, general — docs/military/MILITARY.md § Domains
+            // and traversal): a land force may not cross sea it does not own.
+            // The sim's adjacency is a water-blind Chebyshev radius, so until
+            // now a polity campaigned across up to nine tiles of open water for
+            // free, on 43% of its edges (BL-755's census). Priced as a LEGALITY
+            // TEST rather than a supply penalty, because a legality test cannot
+            // be tuned into meaninglessness.
+            //
+            // FORAGE (ancient-sim SIMPLIFICATION — docs/generation/
+            // MILITARY_HISTORY.md § Forage): a force feeds where it is adjacent
+            // to land or water its own polity owns, and starves where it is
+            // not. It lives HERE, in the sim's caller, and NOT in
+            // `terrain_combat`'s table: both resolvers read that table, and the
+            // general claim is the opposite one — overseas supply works. It is
+            // a stand-in for a logistics model this sim cannot afford, not a
+            // statement about how supply works in Io.
+            //
+            // The bridging case is the polity's OWN SHORE. A q-owned coastal
+            // region touching the target is the shallow, causewayed water a
+            // land force may wade, so it makes the crossing both legal and
+            // fed — which is what makes littoral empires cohere and stops
+            // nothing but the free ocean hop.
+            const auto owns_shore_at = [&](std::size_t ti) {
+                for (int n : neighbours[ti])
+                {
+                    const std::size_t ni = static_cast<std::size_t>(n);
+                    if (owner[ni] == q.id
+                     && ss.regions[ni].domain == region_domain::coastal_water)
+                        return true;
+                }
+                return false;
+            };
+            // The staging holding reaches the target overland (or over its own
+            // lakes) — no sea in the line at all.
+            const auto dry_contact = [&](int hub, std::size_t ti) {
+                return !line_crosses_sea(ss.regions[static_cast<std::size_t>(hub)],
+                                         ss.regions[ti], terrain, gw, gh,
+                                         params.neighbour_radius);
+            };
+
             // ---- Build the bounded candidate set -------------------------
             //
             // Four verbs. The set is bounded by construction: neighbours only,
@@ -719,6 +822,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int to = owner[ti];
                     if (to == q.id || to < 0) continue;
                     if (params.trace_battles) ++out.campaign_contacts;
+
+                    // THE WATER GATE, applied before anything is scored — an
+                    // illegal campaign is not a bad candidate, it is not a
+                    // candidate. See the two lambdas above for the rule.
+                    const bool dry   = dry_contact(hi, ti);
+                    const bool shore = dry ? true : owns_shore_at(ti);
+                    if (!dry && !shore
+                     && !can_field_naval(ss.regions[static_cast<std::size_t>(hi)], mil_band))
+                    {
+                        ++out.illegal_campaigns;
+                        continue;
+                    }
+                    // Forage is the SAME reading: fed on one's own ground or
+                    // one's own shore, starving on a sea leg carried by ships.
+                    // Ships get the force there; they do not feed it.
+                    const bool forages = dry || shore;
 
                     const region& tgt = ss.regions[ti];
                     const int cap_dist = region_distance(cap, tgt, gw);
@@ -782,7 +901,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     // Odds from the power ratio the sim can actually estimate:
                     // levy x supply x cohesion against the defender's levy.
-                    const int supply_here = campaign_supply(hub_dist, ti, hi);
+                    // A force that cannot forage arrives at NOTHING. The
+                    // starvation is expressed through the supply channel the
+                    // resolver already reads rather than through a term of its
+                    // own — zero supply takes the full attrition hit, which is
+                    // the pressure the rule is for (MILITARY_HISTORY.md
+                    // § Forage). No new constant: it is the same 0..1000.
+                    const int supply_here =
+                        forages ? campaign_supply(hub_dist, ti, hi) : 0;
 
                     int64_t atk_men = 0;
                     for (int hi2 : held)
@@ -1143,13 +1269,24 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const std::size_t ti = static_cast<std::size_t>(best_target);
                 region& tgt = ss.regions[ti];
 
-                // Nearest holding is the staging region.
-                int src = held.front(), src_d = 1 << 30;
+                // Nearest LEGAL holding is the staging region (BL-778). The
+                // scorer refused this target unless some hub could reach it,
+                // and execute picks its own hub — so it filters by the same
+                // rule, or it could stage a campaign the scorer would never
+                // have offered. `tgt_shore` and `tgt_naval` are hoisted because
+                // neither depends on which hub is chosen.
+                const bool tgt_shore = owns_shore_at(ti);
+                int src = -1, src_d = 1 << 30;
                 for (int hi : held)
                 {
-                    const int d = region_distance(ss.regions[static_cast<std::size_t>(hi)], tgt, gw);
+                    const std::size_t hs = static_cast<std::size_t>(hi);
+                    if (!dry_contact(hi, ti) && !tgt_shore
+                     && !can_field_naval(ss.regions[hs], mil_band))
+                        continue;
+                    const int d = region_distance(ss.regions[hs], tgt, gw);
                     if (d < src_d) { src_d = d; src = hi; }
                 }
+                if (src < 0) break; // no legal staging holding — nothing marches
                 region& home = ss.regions[static_cast<std::size_t>(src)];
 
                 const int64_t want   = (home.manpower_stock * params.levy_fraction_q) / 1000;
@@ -1167,8 +1304,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // the scored estimate. Optimistic by a bounded amount, and in
                 // the right direction: the sim does not launch campaigns it then
                 // silently under-supplies.
-                const int atk_supply = campaign_supply(src_d, ti, src);
+                //
+                // FORAGE, priced by the same rule the scorer used (§ Forage).
+                // The file's own thesis applies: a cost authored on one scale
+                // and spent on another is the bug, so the estimate and the
+                // outcome ask the identical question.
+                const bool exec_dry     = dry_contact(src, ti);
+                const bool exec_forages = exec_dry || tgt_shore;
+                const int atk_supply = exec_forages ? campaign_supply(src_d, ti, src) : 0;
                 const int def_supply = 1000;
+                if (!exec_forages) ++out.starved_campaigns;
 
                 // BL-768 — THE SUPPLY CORRIDOR, recorded where it is priced.
                 // `src` is the staging holding the army victualled from and
@@ -1224,6 +1369,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     atk_supply, def_supply);
 
                 ++out.battles;
+                // BL-779's calibration reading: how often naval combat actually
+                // occurs. Counted, never asserted upward — rare is the design
+                // (MILITARY_HISTORY.md § Naval).
+                if (stack_has_naval(atk) || stack_has_naval(def)) ++out.naval_battles;
+                if (!exec_dry) ++out.sea_leg_battles;
                 if (century < out.battles_per_century.size())
                     ++out.battles_per_century[century];
                 if (best_winter) ++out.winter_campaigns;

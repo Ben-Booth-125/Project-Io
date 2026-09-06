@@ -1601,15 +1601,54 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (dp == nullptr || dp->tiles.empty())
                 return corp_command_result::rejected_invalid;
 
-            // BL-516 RESTORED A TEST THIS VERB HAD BEEN ABLE TO DROP. Until
-            // water gained provinces, "the partition covers land only by
-            // construction" meant a province id could never name water and no
-            // check was needed. Sea provinces exist now, they are addressable,
-            // and units are land-bound — so marching into one is refused HERE,
-            // explicitly, rather than left to fail obscurely in the path solve.
-            // Rejection mutates nothing, as every path above and below does.
-            if (province_kind_of(w, *dp) != province_kind::land)
-                return corp_command_result::rejected_invalid;
+            // BL-778 TURNED THIS FLAT REFUSAL INTO A DOMAIN QUESTION.
+            //
+            // BL-516 restored a water test here once sea provinces became
+            // addressable, and it read `!= province_kind::land` — units were
+            // land-bound, full stop. Under docs/military/MILITARY.md § Domains
+            // and traversal a unit TYPE declares which domains it may cross, so
+            // the question is no longer "is this water" but "may THIS type be
+            // here". Rejection still mutates nothing, as every path around it
+            // does.
+            //
+            // The middle case is the one this exists for: a land type may enter
+            // coastal water its OWN polity owns — a shore you hold is shallow,
+            // bridged, causewayed — and may not enter anyone else's, nor the
+            // open ocean at any price. Ownership is read from the province
+            // holder, never from what is built on the water
+            // (docs/generation/PROVINCES.md § Who owns water).
+            //
+            // In practice the campaign refuses every water destination today,
+            // because it raises no naval rows and a land row needs owned water
+            // — the behaviour is unchanged where nothing has changed. What is
+            // different is the REASON, which is now a property of the unit.
+            {
+                const province_kind pk = province_kind_of(w, *dp);
+                const traversal_domain dest_domain =
+                      (pk == province_kind::open_ocean)    ? traversal_domain::open_ocean
+                    : (pk == province_kind::coastal_water) ? traversal_domain::coastal_water
+                                                           : traversal_domain::land;
+
+                const std::vector<roster_row>& rows = unit_roster_table();
+                if (uit->second.type >= rows.size())
+                    return corp_command_result::rejected_invalid; // no such row to ask
+
+                // "Its own polity": the acting corp's home nation against the
+                // nation holding the destination. A corp with no home nation
+                // owns no water, which refuses rather than permits.
+                bool owned_by_mover = false;
+                if (dest_domain == traversal_domain::coastal_water)
+                {
+                    const auto cit = w.corporations.find(cmd.corp);
+                    const entity_id home = (cit != w.corporations.end())
+                                         ? cit->second.home_nation : null_entity;
+                    owned_by_mover = (home != null_entity)
+                                  && (province_holder_for(w, cmd.province) == home);
+                }
+
+                if (!row_can_traverse(rows[uit->second.type], dest_domain, owned_by_mover))
+                    return corp_command_result::rejected_invalid;
+            }
 
             const auto sit = w.tiles.find(uit->second.position);
             if (sit == w.tiles.end())

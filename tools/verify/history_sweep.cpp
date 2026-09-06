@@ -176,6 +176,13 @@ struct sweep_row
     int64_t battles   = 0;
     int64_t conquests = 0;
     int64_t foundings = 0;
+    /// BL-778 / BL-779 — what the water model produced. All three are
+    /// CALIBRATION readings, never coverage targets to raise: rare naval
+    /// combat is the design (docs/generation/MILITARY_HISTORY.md § Naval).
+    int64_t illegal_campaigns = 0; ///< Refused on traversal legality (BL-778).
+    int64_t starved_campaigns = 0; ///< Fought at zero supply, could not forage.
+    int64_t naval_battles     = 0; ///< Battles with a naval entry on either side.
+    int64_t sea_leg_battles   = 0; ///< Battles REACHED over water — the real reading.
     /// Works raised over the run (BL-321), and how many regions ended the run
     /// with at least one. Reported rather than gated, like every other metric
     /// here — but a column of zeroes would mean the roster never fired at all,
@@ -690,6 +697,10 @@ int main(int argc, char** argv)
         row.regions_end = static_cast<int>(ss.regions.size());
         row.battles       = sim.battles;
         row.conquests     = sim.conquests;
+        row.illegal_campaigns = sim.illegal_campaigns;
+        row.starved_campaigns = sim.starved_campaigns;
+        row.naval_battles     = sim.naval_battles;
+        row.sea_leg_battles   = sim.sea_leg_battles;
         row.foundings     = sim.foundings;
 
         if (derive_from_generation && !tuned)
@@ -1132,6 +1143,39 @@ int main(int argc, char** argv)
                     static_cast<long long>(bs.first), static_cast<long long>(bs.second));
         std::printf("  conquests per world  median %lld\n",
                     static_cast<long long>(median_of(conq)));
+
+        // --- BL-778 / BL-779  THE WATER MODEL, all seeds ------------------
+        //
+        // Reported, never asserted upward. `illegal` is the free overseas
+        // reach BL-755 measured, now refused; `starved` is the forage
+        // simplification biting; `naval battles` is how often the rare case
+        // the water model exists for actually happens.
+        {
+            long long ill = 0, starved = 0, nav = 0, sea = 0, batt = 0;
+            for (const sweep_row& r : rows)
+            {
+                ill     += r.illegal_campaigns;
+                starved += r.starved_campaigns;
+                nav     += r.naval_battles;
+                sea     += r.sea_leg_battles;
+                batt    += r.battles;
+            }
+            std::printf("\n--- BL-778 / BL-779  THE WATER MODEL (all seeds) ---\n");
+            std::printf("  campaigns REFUSED on traversal legality   %lld\n", ill);
+            std::printf("  campaigns fought STARVING (no forage)     %lld\n", starved);
+            std::printf("  battles with a naval CONTINGENT present   %lld of %lld (%lld%%)\n",
+                        nav, batt, batt ? nav * 100 / batt : 0);
+            std::printf("  battles REACHED OVER A SEA LEG            %lld of %lld (%lld%%)  <- naval combat\n",
+                        sea, batt, batt ? sea * 100 / batt : 0);
+            std::printf("  (THE SECOND LINE IS THE ONE THAT ANSWERS \"how often does naval combat\n"
+                        "   occur\". The first is high because `roster_stack` composes EVERY\n"
+                        "   available row into a stack, so any polity clearing port_q carries a\n"
+                        "   galley contingent into inland fights too — it measures how COASTAL\n"
+                        "   the powers are. Rare is the DESIGN, not a shortfall\n"
+                        "   (MILITARY_HISTORY.md § Naval).\n"
+                        "   A non-zero refusal count is BL-778 working: those campaigns used to\n"
+                        "   cross open ocean for free.)\n");
+        }
         std::printf("  regions at epoch   median %lld\n",
                     static_cast<long long>(median_of(ends)));
         // BL-757 R4: the band the roster actually reached, summed over the
