@@ -5377,6 +5377,126 @@
      "evidence": null
     }
    ]
+  },
+  {
+   "brief": "roads-and-markets-from-history",
+   "title": "BL-768 - simple roads stamped FROM the history, and markets emerging at the end of it",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-768 - Sprint 32b",
+   "batch": "sprint-32b-wave-2b",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "The sim RECORDS what it built (the works roster already carries the road rows), and a pass immediately AFTER it stamps ancient-tier roads over the settlement set from that record.",
+     "verification": [
+      "headless: a 1960 world opens with roads whose shape follows the history trunk routes"
+     ],
+     "notes": "Roads are NOT laid inside the sim. It has no world&, deliberately; its Dijkstra returns a COST between regions, never a tile list; and generate_roads reads population_centre_tile, which is only filled after. Derive from the record, do not fight the architecture.",
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Markets are carved at the end of the history phase from where trade CONCENTRATED, rather than from population alone.",
+     "verification": [
+      "headless: market placement follows the history, and differs from a population-only carve"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "An ERA-APPROPRIATE tier rule. edge_tier and the redundancy rationing key off a nation qualification percentile that is a 1960-era field; ancient roads need their own rule rather than borrowing the industrial one.",
+     "verification": [
+      "static: the ancient tier rule is its own, not the industrial one reused"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Works raised is non-zero, and its roads are visible on the canvas.",
+     "verification": [
+      "headless: works raised > 0 in real generated worlds",
+      "visual: roads render on the canvas"
+     ],
+     "notes": "BL-757 measured ZERO works raised across sixteen seeds because build_work never wins the scored contest, and wave 1 confirmed it still does at 16 seeds. If this item cannot move that, REPORT it - do not tune work_amortise_years further, it is already at its floor of 1.",
+     "evidence": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "Digest movement REPORTED with its cause, never re-blessed.",
+     "verification": [
+      "headless: world_determinism run, movement reported"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "tariff-posture-and-consequence",
+   "title": "BL-750 + BL-769 - a nation inherits its protection from history, and the map of consequence folds into it",
+   "difficulty": 7,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-750, BL-769 - Sprint 32b",
+   "batch": "sprint-32b-wave-2b",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "BL-750: a polity carries a protection scalar moved DETERMINISTICALLY by its industrialisation timing against its neighbours and by whether it holds colonies. Read at handoff; enacted as an ordinary import_tariff law on the campaign nation, rate banded off the scalar.",
+     "verification": [
+      "headless: a 1960 world opens with SOME nations tariffed and most not",
+      "headless: the law panel shows each one"
+     ],
+     "notes": "DERIVED, not a scored verb - Ben ruled this 2026-09-06. A polity does not spend a round choosing protectionism.",
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "BL-750 owes a DISTRIBUTION, not just a working tariff: tariffed-nation counts and rate bands across the seed spread.",
+     "verification": [
+      "headless: history_sweep reports the distribution"
+     ],
+     "notes": "THE DISTRIBUTION IS THE DELIVERABLE, because flatness is the ONLY trigger for reopening the scored-verb form. If every world tariffs the same nations to the same degree, the scalar carries no real variation and BL-488 opens. Report it either way.",
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "BL-769: city states and pseudo-national borders become part of the History phase, so the history keeps its detail rather than having consequence invented after it.",
+     "verification": [
+      "headless: the consequence layer reads the history record rather than re-deriving from the finished map"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Determinism holds and every digest movement is REPORTED, never re-blessed.",
+     "verification": [
+      "headless: world_determinism run, movement reported with cause"
+     ],
+     "notes": "BL-780 owns the water model single re-bless; nothing else re-blesses anything.",
+     "evidence": null
+    }
+   ]
   }
  ]
 }
