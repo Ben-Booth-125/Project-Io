@@ -141,6 +141,98 @@ it in sync with `hard_coded_world.cpp` when either changes.
   the textual half of the "graphical + textual" rule every oral-history stage must
   carry (Ben, 2026-07-28).
 
+## The drift clock
+
+Drift is *per epoch*, and the epoch is a **stated constant**: **5 My**, to a depth of
+**20 epochs (100 My)**. Both numbers are design, not implementation detail, and the
+statement is the point — a "per-epoch" drift vector with no epoch length defined
+anywhere is unfalsifiable, and nothing can integrate it.
+
+- **5 My per epoch.** One grid column on an Earth-sized body is roughly 150 km, and
+  Earth-like plate motion covers that in about 3–6 My, so 5 My puts the clamped
+  0.15–1.2 columns per epoch at a plausible rate rather than an arbitrary one.
+- **20 epochs of depth.** Deep enough to reach a carboniferous-analogue coal window;
+  shallow enough that extrapolating a single straight-line drift vector is still a
+  defensible reconstruction. Past it, the plates' linear motion stops being one.
+
+**Past configurations are DERIVED, never stored.** The plate set is five floats per
+plate, and twenty per-tile plate rasters would be megabytes of save per body for
+data that is a pure function of those floats — so the ordered sequence is
+reconstructed on demand by winding the seeds back along their drift vectors. The
+reconstruction re-runs the Voronoi assignment and **nothing else**: not the boundary
+classification, not the rift-basin search. Those describe the *present* surface, and
+the basin search is the expensive half of the pass, so re-running it per epoch would
+cost more than the snapshot and mean less.
+
+The contract that makes the whole axis usable: **epoch 0 reproduces the present
+exactly** — same seeds, same comparison, same tie-break. If the reconstruction
+disagreed with the present at zero offset, every deeper epoch would be fiction and
+the shipped world would move the moment anything read it.
+
+## The Lagrangian frame
+
+`plate_id` answers "which plate seed is nearest this **fixed grid cell**". Under
+drifting seeds that is a Voronoi partition reshuffling over stationary ground — the
+boundaries move and the ground does not — so "this tile was at the equator in the
+carboniferous" is not a question that partition can answer. Latitude is the same
+problem in its sharpest form: a tile's climate band is derived from its **raster
+row**, which is fixed for all time, so there is no representation in which a tile
+*had* a different latitude. That is exactly what a coal-forming swamp at a tropical
+palaeolatitude requires.
+
+The frame that fixes it: **a tile is a material point on the plate it sits on
+today.** A plate translates rigidly along its own drift vector, so a tile's offset
+from its plate's seed is a *constant of the tile*, and its position at a past epoch
+is simply its present position minus drift × epochs. That is the same winding
+applied to the ground that the drift clock applies to the seeds, which is what makes
+the two one model rather than two: a tile rides **one** plate at every epoch and
+never appears to hop between them as the partition reshuffles underneath it.
+
+**What a tile can be asked, at a given age:**
+
+- **Where it was** — a past column (wrapping, as the surface does) and a past row.
+  The row is deliberately **not clamped**: ground carried past a pole reports a row
+  off the grid, which is the honest answer, and the answer says so rather than
+  quietly pretending otherwise.
+- **What latitude it sat at** — distance from the equator in [0, 1], **folded over
+  the poles**, since latitude as a function of the row fraction is a triangle wave:
+  ground carried past a pole comes back *down* in latitude on the far side. Folding
+  rather than clamping is what keeps a deep epoch honest — clamped, every polar
+  drifter would read as sitting exactly on the pole forever.
+- **Which climate belt that was** — the same band boundaries Pass 3 uses, evaluated
+  at the past latitude. One table, not a second copy of it.
+- **What the moisture was** — the body's moisture field sampled at the **past**
+  position. This is the Lagrangian premise stated in one line: ground moves *through*
+  a climate rather than carrying one with it.
+
+**A stagnant lid never moved.** Its single plate carries a drift vector that nothing
+consumes — the pass never runs the Voronoi, never classifies a boundary, never
+applies a bias — and the palaeo frame honours that: the ground of a stagnant body sat
+where it sits, at every epoch. A world whose whole characterisation is that it has no
+drift history is not given one.
+
+### The boundary of the frame
+
+The frame is a **query over the finished world**, not a moving frame the generator
+runs in, and the difference is the whole of its safety. Pass 3 still bands by present
+row and must: banding by a past row would change every world. So at epoch 0 the frame
+returns the present exactly — same position, same band, same moisture cell — and
+nothing downstream moves until a consumer asks for a non-zero epoch.
+
+Four things it deliberately does **not** answer, each because answering it would be a
+guess rather than a reconstruction:
+
+- **Past height, cover or ocean.** Only position and climate are wound back. Terrain
+  at a past epoch is a re-run of the pipeline in the past, not a lookup.
+- **Longitude across a pole.** Ground that crosses a pole physically comes down the
+  far side, half a wrap away. The latitude folds; the column does not.
+- **A body-global palaeo-thermal term.** Over the 100 My the drift record spans, the
+  radiogenic budget moves by well under a percent — latitude is the whole story at
+  this depth, and a term that cannot change an answer is a term that only looks
+  rigorous.
+- **Boundary classification at a past epoch.** Convergent and divergent describe the
+  present surface, for the reason the drift clock gives above.
+
 ## Surface — the Continent lens
 
 `overlay_mode::continent` on the Planetary canvas: per-plate tint with boundary

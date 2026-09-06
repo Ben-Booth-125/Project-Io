@@ -2,6 +2,7 @@
 
 #include "world.hpp"
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -32,6 +33,38 @@ enum class geological_activity : uint8_t { none, low, moderate, high };
 
 /// Override for bodies whose surface composition is dominated by a single type.
 enum class composition_bias : uint8_t { standard, metallic };
+
+// ---------------------------------------------------------------------------
+// Latitude bands (Pass 3) — PROMOTED OUT OF tile_generation.cpp BY BL-764
+// ---------------------------------------------------------------------------
+//
+// This enum and the two functions below lived in tile_generation.cpp's anonymous
+// namespace, which was the whole reason a tile's latitude was UNASKABLE from
+// anywhere else: `band_for_row(row, gh, temp)` is the only definition of what a
+// latitude means in this generator, and it was reachable from exactly one
+// translation unit. BL-764 needs it from continents.cpp, where a tile is asked
+// what its climate WAS.
+//
+// The promotion is linkage only. The values, the boundaries and the arithmetic
+// are untouched, so Pass 3 assigns exactly the bands it assigned before.
+
+/// The five climate belts Pass 3 assigns, widest-to-narrowest by temperature class.
+enum class lat_band : uint8_t { polar, subpolar, temperate, subtropical, tropical };
+
+/// Latitude band for a distance from the equator.
+///
+/// @param d    |distance from the equator| in [0, 1] — 0 at the equator, 1 at a
+///             pole. Values outside that range are the caller's to fold first
+///             (see `paleo_tile_at`, which folds a past row back over the pole).
+/// @param temp The body's thermal class, which shifts every boundary.
+///
+/// SPLIT OUT OF band_for_row RATHER THAN DUPLICATED. The boundary table is the
+/// generator's definition of a climate belt; a second copy of it for paleo use
+/// is a copy that drifts, which is the defect this split exists to prevent.
+lat_band band_for_distance(double d, temperature_class temp);
+
+/// Latitude band for a grid row. `band_for_distance` with d derived from the row.
+lat_band band_for_row(int row, int gh, temperature_class temp);
 
 /// Solar-level constants describing what kind of world a body is. Derived per
 /// body by the Planetology pass (run_planetology's returned state carries the
@@ -81,6 +114,35 @@ struct generation_record
 
     float ocean_threshold = 0.0f;  ///< Latitude-biased height percentile used for ocean (Pass 2).
     int   ocean_tiles     = 0;     ///< Tiles assigned the ocean composition (Pass 2).
+
+    // -----------------------------------------------------------------------
+    // BL-762 — WHICH PHASE PLACED WHAT
+    // -----------------------------------------------------------------------
+    //
+    // Pass 6 draws every deposit in one traversal, but it no longer writes them
+    // into one array: `generate_deposits` dispatches each `put` on
+    // `resource_origin_of`, so the BODY phase's output (ores, aggregates, ice)
+    // and the LIFE phase's output (coal, petroleum, peat, timber, crops, hides)
+    // are separate destinations decided by the origin table rather than by which
+    // line happens to write them.
+    //
+    // These two arrays are that split, summed over the body's tiles, and they
+    // exist so the claim is CHECKABLE rather than merely asserted in a comment:
+    // every biological resource must be zero in `body_phase_placed`, and every
+    // geological one zero in `life_phase_placed`. See tools/verify/deposit_origin.
+    //
+    // RAW MAGNITUDES, before the three post-multiplies (abundance scalar,
+    // planetology endowment, ore fields). What a phase PLACED is a question about
+    // the draw, not about what survived the endowment — a body whose biosphere
+    // never reached land still had the life phase run and write zero-endowment
+    // coal, and reading these arrays post-endowment would hide that.
+    //
+    // Endemic trade goods (the C -> D addition) are counted in
+    // `life_phase_placed`, at the magnitude actually written into the tile: they
+    // are biosphere output by construction, and the endemic set is empty on any
+    // world that never reached a land biosphere.
+    std::array<double, resource_count> body_phase_placed{};
+    std::array<double, resource_count> life_phase_placed{};
 };
 
 /// Generate the full hex tile grid for one body and attach the tiles to @p w.

@@ -378,6 +378,24 @@ the approximate profiles in `docs/economy/TILES.md`. Amounts are randomised in a
 per-tile draw seeded from the body seed plus tile index, ensuring the same body
 always produces the same deposits.
 
+**The output is split by ORIGIN; the traversal is not.** Pass 6 has two consumers of
+its draws — a **Body phase** that seeds the lithosphere with the body, and a **Life
+phase** that carries the biosphere's residue — and each deposit goes to one of them
+according to the resource's origin (§ Origin in
+[RESOURCES.md](../economy/RESOURCES.md)), never according to which row of the table
+writes it. Since the origin table is total and compile-enforced, the Body phase's
+output is free of biological deposits **by construction**: a new resource is
+classified or the build fails.
+
+The split is a split of the *destination*, not of the pass. The rows below stay in
+one interleaved traversal, drawn in the order they are written, and the reason is a
+hard constraint rather than convenience: `tile_rng` runs on past the deposit block
+into the endemic amount draw and into the derived environment's hazard/habitability
+jitter, so cutting the rows into two sequential passes would reorder the stream and
+move hazard and habitability on **every tile of every world**. Any future change here
+is subject to the same rule — a draw may not be removed, added or reordered without
+that movement being the intended act.
+
 **Ambient resources** are always generated on eligible compositions at a low fixed
 baseline before the main deposit draw. This guarantees every tile has at least one
 extractable resource.

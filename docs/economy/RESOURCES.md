@@ -31,6 +31,38 @@ Price volatility and trade margins increase with tier. Raw materials are abundan
 
 Ambient and habitability resources exist at the edges of the market. They are worth producing and trading, but rarely the primary profit driver. Their value is to ensure every tile is economically meaningful in some way and that population welfare has a supply chain behind it.
 
+### Origin — what put it in the ground
+
+The tiers and tracks above both group resources by **what they are for**. Neither answers the
+question generation actually has to ask, which is **where a resource came from**: metals are the
+lithosphere's and belong with the body, while coal, petroleum, peat, timber, crops, fibre and
+hides are the biosphere's residue and belong with life. Every resource therefore carries an
+**origin**, and it is one of exactly three:
+
+| Origin | What it is | Examples |
+|---|---|---|
+| **Geological** | The lithosphere's. Seeded with the body itself, in the Body phase. | Iron ore, copper ore, silica, stone, sand, clay, water ice, regolith |
+| **Biological** | The biosphere's residue — **fossil and living alike**. Placed by the Life phase. | Coal, petroleum, peat; timber, agricultural produce, fibre, tobacco, spices, coffee, furs, hides |
+| **Manufactured** | Made by a recipe, never deposited. It has no origin in the ground at all, and asking for one is a category error rather than a missing entry. | Steel, refined fuel, machinery, electronics, ordnance |
+
+**Fossil and living are ONE origin, deliberately.** Coal and timber differ in *when* their life
+existed, not in whether it did, and planetology already encodes that difference in which scalar
+it gates on — a fossil resource keys off the biosphere's **peak**, a living one off its **current
+stage**, which is exactly why a dead world keeps its coal and loses its forests. Splitting the
+origin three ways would put that same distinction in a second place, and a second copy of a
+distinction is a copy that drifts.
+
+**The classification is total and enforced at compile time.** Every resource in the roster carries
+an origin or the build fails, naming the resource — a runtime check would let an unclassified
+resource ship and be discovered by its absence from the map. This is the single source of the
+split: nothing re-derives it from an inline gate.
+
+**What origin buys the generator.** The two phases are separate *destinations*, decided by the
+table rather than by which line of the deposit pass happens to write them, so the Body phase's
+output is free of biological deposits by construction rather than by inspection. That is the seam
+the Life phase writes through when it derives the biosphere's residue from a body's own past
+(`docs/generation/CONTINENTS.md` § The Lagrangian frame is what makes that past askable).
+
 ### Deposit rarity & scarcity
 
 Deposit authoring covers the full raw-material set, driven by a **per-resource rarity scalar** — a

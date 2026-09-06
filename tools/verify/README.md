@@ -1010,6 +1010,45 @@ Result as of 2026-09-06: the objective **does not** discriminate between rosters
 relative range 0.000e+00 while the fixture moves 149→169 corps), because every term reads tiles,
 markets and population and none reads a roster. A roster-aware term is owed.
 
+---
+
+## deposit_origin — BL-762, the Body phase places no biological deposit
+
+Runs the shipped planetology → continents → tile pipeline over a few seeds, keeps the
+`generation_record`, and reads what each of Pass 6's two phases actually placed. The classification
+itself is guaranteed by a `static_assert` in `components.hpp` (a switch with no `default` over every
+resource); this harness checks the **behaviour** that classification exists for.
+
+D1 asserts no biological resource reaches the Body phase, D2 that no geological one reaches the Life
+phase, D3 that nothing lands on a tile neither phase placed, and D4 that a manufactured good is
+placed by neither. **D5 is the row that keeps the others honest**: an all-zero record satisfies D1
+and D2 perfectly and proves nothing, so both halves must be non-empty. It also prints the per-resource
+placement table, which is the readable form of the split.
+
+```
+node tools/verify/build_harness.js deposit_origin --run
+./build_gen/verify/deposit_origin.exe [seeds]      # default 4
+```
+
+It does **not** claim the life half is derived from the past — it is still drawn from present cover.
+That is the seam, not the crossing of it.
+
+## continent_drift — BL-763/BL-764, the drift time axis and the Lagrangian frame
+
+C-rows check the drift clock: a stated epoch length and depth, and `continent_snapshot_at`
+reconstructing any past plate configuration purely. **C1 is load-bearing** — epoch 0 must reproduce
+`continent_state::plate_id` bit-identically, or every deeper epoch is fiction.
+
+P-rows check the frame of reference: a tile as a material point on its plate, asked where it was and
+what climate it sat in. **P1 is the same kind of row as C1** — at epoch 0 the position, band and
+moisture cell must be exactly the present ones, which is what guarantees nothing downstream moves.
+P2 is the consistency that makes the two one model: a tile's offset from its plate's seed is constant,
+so ground rides its plate rather than sliding across a reshuffling partition.
+
+```
+node tools/verify/build_harness.js continent_drift --run
+```
+
 ## Which builder?
 
 Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:
