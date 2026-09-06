@@ -74,24 +74,58 @@ and/or a version goal (v0.1.1 etc.).
 
 THE BASELINE THIS OPENS ON (2026-09-02, final-ind-s0/s1, standard lapse): corps 86 -> 61 / 71 -> 55; debtors 13 -> 6 / 7 -> 4; op-positive at 200: 46 of 61 / 31 of 55; median op net +16.9 / +1.7 per quarter; median balance 4,424 / 3,797; active buildings 224 -> 140 / 122 -> 85; valued production 20,761 -> 4,364 / 5,775 -> 3,531; convoys 156 -> 131 / 194 -> 79; interest share of net loss 5% / 70%; mean supply factor ~0.57. Sprint 32 is not skipped by accident: Ben named this 33.
 
-### Sprint 32b — Gamified generation, 32b - the water model, then the rest of the eight-phase reorder
+### Sprint 32b — Gamified generation, 32b - the water model, and the reorder that 32a built the instruments for
 *Open · opened 2026-09-06*
 
-**Goal.** Carry the eight-phase reorder forward from 32a, starting with the water model Ben ruled on 2026-09-06: coastal water is owned by whoever owns the shore, open ocean is owned by nobody, and a unit type declares which domains it can cross. That wave is self-contained and has a single point of judgement - BL-780 re-blesses the 0 CE digests ONCE, against a description of the new world's shape rather than against a hash. After it, the reorder's remaining phases: the Lagrangian tile representation (BL-764, which should split at promotion), paleo deposits, the population map drawn early, empires tuned to form, and phase 6's static saturation search.
+**Goal.** CONTINUE 32a, and the distinction between them is the point. 32a delivered foundations and instruments: the Era -1 sim runs on the 1960 arc as two spans, the sweep measures the run that actually builds a world, continents carry a time axis, the tick question is settled, and the saturation measure sits where generation can call it. NOT ONE of those changed a generated world - the 0 CE digests are unmoved across all five, deliberately.
+
+32b IS WHERE THE WORLD CHANGES. Every wave-1 item moves it: the carve claims the shoreline, Settle stops founding on open ocean, campaigns become legal or illegal by domain, and naval rows stop being worth zero. That is a different KIND of sprint from 32a and wants a different discipline - which is why BL-780 exists, and why nothing else should start until wave 1 closes.
+
+THE THROUGH-LINE FROM 32a's FINDINGS. Two of its measurements are what make wave 1 buildable rather than guesswork: 1105 of 3819 regions sit on water (613 on open ocean) and 43% of campaign adjacency already crosses sea. Ben's water ruling (2026-09-06) then turned both from defects into a model - coastal water is owned by whoever owns the shore, open ocean is owned by nobody, and a unit type declares which domains it can cross. So wave 1 is not new design; it is 32a's measurements plus one ruling, built.
+
+AND THE REORDER CONTINUES BEHIND IT. Phases 2, 3 and 4 of Ben's eight-phase reorder still stand - the Lagrangian tile representation, paleo deposits, the population map drawn early, empires tuned to form - along with phase 6's static saturation search, which 32a unblocked by promoting the measure it needs.
 
 **Planned.**
-- WAVE 1 - THE WATER MODEL, in order. BL-776 (coastal territory) is one predicate at nation_generation.cpp:689: the carve builds its unclaimable mask from is_water, so narrowing it to is_open_ocean claims the shoreline and leaves the deep sea. BL-777 (region domain) then stops Settle founding on open ocean - ~613 regions, not the ~1105 BL-756 proposed deleting. BL-778 (unit traversal domains) gives roster_row the variable it lacks. BL-779 (naval units become real) gives the three authored, raisable, zero-power naval rows their first job. BL-780 (one re-bless) closes the wave.
-- THEN, and each wants its own scoping: BL-764 (Lagrangian tiles) - difficulty 5, a representation change to the oldest layer in the generator, and its own item says split it at promotion. BL-765 (paleo deposits) follows it. BL-766 (population map early) collides with BL-758 and probably dissolves it.
-- BL-770 (Era 0 candidate search) - now unblocked by BL-775. Slice the SCORER first and measure whether completeness discriminates between rosters at all; if it does not, the search has nothing to search on.
-- CHEAP AND OWED: BL-774 (bash harness builder), BL-759 (1960 baselines re-measured), BL-760 (ceiling observable, save round-trip assertion), BL-754 (the app never prints its own generation budget).
+- WAVE 1 - THE WATER MODEL, in this order, and nothing else concurrent with it.
+- BL-776 (coastal territory) - ONE PREDICATE. nation_generation.cpp:689 builds its unclaimable mask from is_water (coast, lake AND ocean), so the carve refuses every water tile. Narrow it to is_open_ocean. Coastal provinces then become owned for free, because province ownership derives from tiles.
+- BL-777 (region domain) - regions carry the same three-way domain the province layer already uses, and Settle stops founding on OPEN OCEAN: ~613 regions, not the ~1105 BL-756 proposed deleting. Save-format bump; region has a positional read chain.
+- BL-778 (unit traversal domains) - roster_row gains the field it lacks. Land units may cross OWNED coastal water, which is the deliberate middle case: you may walk your own shore, not someone else's.
+- BL-779 (naval units become real) - unit_class::naval returns base power 0 and sum_stack skips the class outright, so three authored, port-gated, raisable rows are worth nothing. This is their first job. Rare naval combat is the design, not a shortfall.
+- BL-780 (one re-bless) - closes the wave. The four above each move every world; landed separately they would produce four absorbed digest drifts and no single point where anyone asks whether the new world is BETTER.
+- --- THEN, each wanting its own scoping rather than a slot in a batch ---
+- BL-764 (Lagrangian tiles) - difficulty 5, a representation change to the oldest layer in the generator, every pass downstream reads its output. Its own item says split it at promotion. BL-765 (paleo deposits) follows, and unblocks BL-762's deposit split.
+- BL-766 (population map early) - difficulty 5, touches the sim, the ECS and two save versions. It collides with BL-758 and probably DISSOLVES it: if centres exist before the sim, the sim's seed-any-empty-region rule has nothing to fire on.
+- BL-767 (empires reliably form) - unblocked by 32a's BL-757. Tune until the rise-peak-fall shape is common across the seed spread; report the distribution, never clamp a world.
+- BL-770 (Era 0 static saturation search) - unblocked by 32a's BL-775. SLICE THE SCORER FIRST and measure whether completeness discriminates between candidate rosters at all; if it does not, the search has nothing to search on and the rest is wasted.
+- CHEAP AND OWED: BL-774 (bash harness builder - it has cost every agent and every hand-build in 32a), BL-759 (the 1960 baselines sprint 33 quotes are no longer reproducible), BL-760 (the band ceiling has no observable; the new save field has no round-trip assertion), BL-754 (the app still never prints its own generation budget).
 
-**Done when.** The water model is in and the 0 CE digests have been re-blessed exactly once, against a stated description of what changed in the world's SHAPE - regions lost, territory gained, campaigns made illegal, naval engagements that now occur - with Ben authorising against that description rather than the hash.
+**Done when.** Wave 1 is in and the 0 CE digests have been re-blessed EXACTLY ONCE, with Ben authorising against a stated description of what changed in the world's shape rather than against the hash. Concretely: coastal and lake tiles carry a nation and open ocean tiles do not; no region anchors on open ocean; a land stack cannot enter unowned water but can cross coastal water its polity owns; a naval row contributes real power and the ancient sim fields coastal units; and sim_water_census reports the new figures beside the 2026-09-03 ones (1105 of 3819 regions on water, 613 on open ocean, 43% of adjacency crossing sea).
 
-**Risk.** THE SCOPE GREW FASTER THAN THE DELIVERY IN 32a - 8 items to 34 - and 32b inherits 29 of them. The wave structure is the mitigation: BL-776..780 is a real, self-contained body of work with one judgement point, and nothing else should start until it closes. THE WATER MODEL MOVES EVERY WORLD, which is understood rather than discovered, and BL-780 exists so it moves ONCE. AND THE REVIEW BARRIER IS STILL OWED from 32a: sub-agent capacity was unavailable for the entire session, so no cold cross-slice review ran over the five delivered items.
+**Risk.** THE SCOPE GREW FASTER THAN THE DELIVERY IN 32a - 8 items to 34, 5 delivered - and 32b inherits 29 of them. The wave structure is the mitigation and it only works if it is honoured: BL-776..780 is one self-contained body of work with a single judgement point, and starting anything else alongside it re-creates exactly the sprawl that closed 32a.
 
-FOUR CALLS ARE WAITING ON BEN, and three of them block work in this sprint: BL-758 (does era-seeded demography at 1960 belong, or is it scope BL-747 never claimed - era_world_harness is deliberately RED for it); whether water's 0 forage is blockade pressure or an accident of a land table; whether a coastal province can hold a port; and NR-783 (is the span boundary authored or derived from the first furnace). NR-785 also remains open although the water ruling answered most of it.
+THE WATER MODEL MOVES EVERY WORLD, understood rather than discovered. BL-780 exists so it moves ONCE, and so the re-bless is judged against a description of the new world's SHAPE - regions lost, territory gained, campaigns made illegal, naval engagements that now occur - rather than against a hash. The standing rule is that goldens are contracts: report movement, never re-bless without authorisation.
 
-THREE HARNESSES ARE AD HOC pending Ben naming them in .claude/skills/verifier-headless/SKILL.md: continent_drift, sim_water_census, and the promoted saturation measure. Authoring the check was this session's; wrapping it as a skill is his call.
+THE REVIEW BARRIER IS STILL OWED FROM 32a. Sub-agent capacity was unavailable for that entire session - twelve launches, twelve 529s, zero tool calls - so every slice was hand-built and no cold cross-slice review ran over the five delivered items. If agents are available, run it before building on them.
+
+AND THE 32a LESSON THAT APPLIES DIRECTLY HERE: a green check is not evidence that it looked. Four instruments were found measuring something other than their subject, and one of them let a real regression through a wave already called verified. Wave 1 changes the world on purpose, so the instruments that judge it must be known to see it.
+
+CARRIED FROM 32a, and none of it is optional reading before wave 1 starts.
+
+FOUR CALLS WAIT ON BEN, three of which block work here:
+  * BL-758 - does era-seeded demography at 1960 belong, or is it scope BL-747 never claimed? era_world_harness R2 is deliberately RED for it and must NOT be weakened to pass. BL-766 may dissolve the question entirely.
+  * Water gives 0 defence AND 0 forage. Zero cover at sea reads correct; zero forage starves a fleet where it sits, which may be the right blockade pressure or an accident of a table written for land.
+  * Can a coastal province hold a port? Buildings refuse water outright today.
+  * NR-783 - is the span boundary authored at epoch minus 400, or derived from the first furnace?
+
+THREE HARNESSES ARE AD HOC pending Ben naming them in .claude/skills/verifier-headless/SKILL.md: continent_drift, sim_water_census, and the promoted saturation measure. Authoring the check was 32a's; wrapping it as a skill is his call.
+
+THE BEFORE-FIGURES ARE ALREADY CAPTURED - do not re-measure them:
+  world_determinism  039EE9880739CDF6 / B0EBBA249B3DDABB / DE55600457797638
+  era report seed A  years=400 battles=270 conquests=207 foundings=833
+  1960 two-span      1160 -> 1560 -> 1960, digest DB86651B9A596F7B
+  sim_water_census   1105 of 3819 regions on water (982 sea, 613 open ocean); 43% of edges cross sea
+  warm start         72-73 s on BOTH arcs (53.7 s on one later run - treat 72 s as standing until BL-761 measures it properly)
+  generation         ~8.2 s Release; the era pass itself only 197-323 ms
 
 ## Where things stand
 
@@ -144,7 +178,7 @@ THREE HARNESSES ARE AD HOC pending Ben naming them in .claude/skills/verifier-he
 | 31 | Long-term market viability - every recipe pays at base price | CLOSED 2026-09-02 on Ben's call, stage one a SUCCESS: the field ends the standard thirty-year lapse with a majority of corps operating-positive (46 of 61, 31 of 55) where it began with four and none, debtors a tenth of the field, median balances climbing, buildings running. The growth half - valued production still declines over the run - is sprint 33. |
 | 32a | Gamified generation, 32a - the arc runs, and the instruments that measure it are honest | CLOSED 2026-09-06 at a natural boundary. Five items delivered - the two-span sim, the sweep that measures the real run, the continent time axis, the tick-length audit, and the saturation measure promoted where generation can call it. The remaining 29 carry to 32b, led by the water model. |
 | 33 | Long-term market viability, the growth half - the field that keeps producing | OPENED 2026-09-02 on Ben's call as sprint 31's second half. Sprint 31 made the field solvent; this sprint makes it grow. The instrument is campaign_lapse with its debt columns, and the two levers are already filed. |
-| 32b | Gamified generation, 32b - the water model, then the rest of the eight-phase reorder | OPEN 2026-09-06, carrying 29 items from 32a. Wave 1 is the water model (BL-776..BL-780), which is self-contained and moves every generated world exactly once. |
+| 32b | Gamified generation, 32b - the water model, and the reorder that 32a built the instruments for | OPEN 2026-09-06, continuing 32a directly. 32a made the arc RUN and its instruments HONEST; 32b makes the world CHANGE. Wave 1 is the water model (BL-776..BL-780) - self-contained, moves every generated world, and re-blesses the digests exactly once. 29 items carried over. |
 
 **Next up.** SPRINT 32a CLOSED 2026-09-06 (5 of 34 delivered - the arc runs and its instruments are honest). SPRINT 32b IS OPEN and carries the remaining 29, led by the water model. Sprint 33 (long-term market viability, the growth half) is also open and untouched by this session. THE NEXT NEW SPRINT IS 34.
 

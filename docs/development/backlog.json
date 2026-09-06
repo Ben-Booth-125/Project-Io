@@ -1219,6 +1219,30 @@
     "tools/verify/sim_water_census.cpp"
    ],
    "design": "WHY THIS IS ITS OWN ITEM. Four items in this wave each move the generated world: BL-776 grows every nation by its shoreline, BL-777 removes ~613 open-ocean regions, BL-778 changes which campaigns are legal, BL-779 changes who wins them. Landed independently, each would move world_determinism's digests and each would invite its own re-bless - four absorbed drifts, and no single point where anyone asked whether the new world is BETTER.\n\nTHE STANDING RULE IS THAT GOLDENS ARE CONTRACTS: report movement, never re-bless without authorisation. This item is how that rule is honoured across a wave rather than four times in a row.\n\nTHE WORK. Hold the digest re-bless until the wave's items are all in. Then, in ONE act: record the before and after digests, re-run sim_water_census and history_sweep either side, and state what changed in world SHAPE rather than in hash - regions lost, territory gained, campaigns made illegal, naval engagements that now occur. Ben authorises the re-bless against that description, not against the hash.\n\nTHE BEFORE FIGURES ARE ALREADY CAPTURED: digests 039EE9880739CDF6 / B0EBBA249B3DDABB / DE55600457797638; era report years=400 battles=270 conquests=207 foundings=833; 1105 of 3819 regions on water (613 open ocean); 43% of adjacency edges crossing sea.\n\nDONE WHEN: one commit re-blesses the digests, carrying both values and the shape description; no intermediate item re-blesses anything."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 1,
+   "version_goal": null,
+   "sprint": "32b",
+   "written": "2026-09-06",
+   "author": "Claude (relied on the flag all session before noticing)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-781",
+   "short_name": "QUERY_IGNORES_UNKNOWN_FLAGS",
+   "category": "Tooling",
+   "title": "backlog_query silently ignores an unknown flag, so --sprint returns everything and reads as a filtered result",
+   "authority_doc": "docs/development/DELIVERY.md",
+   "files": [
+    "tools/session/backlog_query.js",
+    "tools/session/requirements_query.js",
+    "tools/session/actions_query.js"
+   ],
+   "design": "FOUND 2026-09-06, after relying on it repeatedly. `backlog_query.js --sprint 32b` returns BL-714 (sprint null) and BL-733 (sprint \"29\") among its rows. `--sprint` is not in the supported filter set - the help lists --status, --priority, --version, --category, --touches, --grep, --fields, --count, --all - so it is parsed as nothing, ignored, and the tool prints EVERY open item. A caller reading the output sees a plausible, shorter-looking list and takes it for a filtered one.\n\nWHY IT MATTERS MORE THAN ITS SIZE. This is the same class as the four instruments 32a turned up: an output that looks like an answer to the question asked, and is an answer to a different one. It is worse than an error, because an unknown flag that errors costs five seconds and an unknown flag that is ignored costs a wrong conclusion. In this session it was caught only because two items whose sprint I happened to know appeared in a list they could not belong to.\n\nTHE FIX IS ONE LINE OF DISCIPLINE, not a feature: reject an unrecognised argument and name it, rather than ignoring it. Apply to the sibling query tools at the same time - requirements_query.js and actions_query.js take the same shape and are likely to have the same hole.\n\nWORTH CONSIDERING WHILE THERE: --sprint is a filter people evidently expect to exist (this session assumed it three times), and every item carries a sprint field. Adding it is cheap; but the rejection is the actual bug and should land even if the filter does not.\n\nDONE WHEN: an unknown flag exits non-zero naming the flag; the three query tools share that behaviour."
   }
  ]
 }
