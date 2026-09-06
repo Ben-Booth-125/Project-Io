@@ -306,16 +306,19 @@ void classify_water_kinds(const std::vector<bool>& is_ocean, int gw, int gh,
 // Pass 3 — latitude bands
 // ---------------------------------------------------------------------------
 
-enum class lat_band : uint8_t { polar, subpolar, temperate, subtropical, tropical };
+// `lat_band` and the two band functions now live in tile_generation.hpp (BL-764):
+// paleo latitude is the same question asked at a past epoch, and it is asked from
+// continents.cpp. The promotion is linkage only — the boundary table below is the
+// one Pass 3 always used, unmoved and unretuned.
 
-// Latitude band for a row, with boundaries shifted by temperature class. `d` is
-// distance from the equator in [0, 1] (0 at the equator, 1 at a pole). Boundaries
-// follow the row-percent table in TILE_GENERATION.md § Pass 3.
-lat_band band_for_row(int row, int gh, temperature_class temp)
+} // namespace
+
+// Latitude band for a distance from the equator, with boundaries shifted by
+// temperature class. `d` is distance from the equator in [0, 1] (0 at the
+// equator, 1 at a pole). Boundaries follow the row-percent table in
+// TILE_GENERATION.md § Pass 3.
+lat_band band_for_distance(double d, temperature_class temp)
 {
-    const double p = (gh > 1) ? static_cast<double>(row) / static_cast<double>(gh - 1) : 0.5;
-    const double d = std::abs(p - 0.5) * 2.0;
-
     switch (temp)
     {
         case temperature_class::frozen:
@@ -349,6 +352,14 @@ lat_band band_for_row(int row, int gh, temperature_class temp)
             return lat_band::tropical;
     }
 }
+
+lat_band band_for_row(int row, int gh, temperature_class temp)
+{
+    const double p = (gh > 1) ? static_cast<double>(row) / static_cast<double>(gh - 1) : 0.5;
+    return band_for_distance(std::abs(p - 0.5) * 2.0, temp);
+}
+
+namespace {
 
 // ---------------------------------------------------------------------------
 // Pass 4 — biome, then the two axes it decomposes into (BL-519)
@@ -1212,16 +1223,70 @@ std::array<float, resource_count> build_rarity_profile(uint32_t seed)
 // with the same magnitudes, and the tiles that were bearing before are bearing
 // now. What is genuinely new is that MORE tiles reach the biotic rows, because
 // Pass 4d can dress rocky and volcanic ground the biome table left bare.
+//
+// ---------------------------------------------------------------------------
+// BL-762 — THE OUTPUT IS SPLIT BY ORIGIN, THE STREAM IS NOT
+// ---------------------------------------------------------------------------
+//
+// Ben's reorder (point 1) puts metals with the body and the biosphere's residue
+// with Life. The obvious way to build that — two functions, geology first, life
+// second — is WRONG HERE, and the reason is the whole hazard on this item:
+// `tile_rng` runs on past this call into the endemic amount draw and into
+// derive_environment's hazard/habitability jitter. The rows below are
+// interleaved (timber is drawn between stone and sand), so cutting them into two
+// sequential passes reorders the stream and moves hazard and habitability on
+// every tile of every world — a world change dressed as a refactor.
+//
+// So the traversal is untouched, draw for draw, and what changed is the
+// DESTINATION: `put` and `put_rare` dispatch on `resource_origin_of`, so a
+// resource lands in the body phase's array or the life phase's array according
+// to the origin table rather than according to which line writes it. Two
+// consequences worth naming. The split cannot be wrong by omission — the origin
+// table is total over `resource_type` and static_asserted complete, so a new
+// resource is classified or the build fails. And the body phase's output is now
+// PROVABLY free of biological deposits, which is a structural fact a harness can
+// read (generation_record::body_phase_placed) rather than a claim in a comment.
+//
+// WHAT THIS IS NOT. The life half is still drawn from the PRESENT cover, not
+// from the paleo record — a coal seam still appears where the ground is barren
+// today rather than where a swamp stood in the tile's own past. Deriving it from
+// the past is BL-765's act, and BL-764 is what makes it askable. This item
+// builds the seam that act writes through; it does not write through it, and the
+// world is byte-identical because of that.
+struct tile_deposits
+{
+    /// Phase 1, the body: the lithosphere's — ores, aggregates, ice.
+    std::array<float, resource_count> geological{};
+    /// Phase 2, life: the biosphere's residue, fossil and living alike.
+    std::array<float, resource_count> biological{};
+
+    /// The two halves as one array. They are DISJOINT by construction — a
+    /// resource has exactly one origin — so the sum is a union, not a blend.
+    std::array<float, resource_count> merged() const
+    {
+        std::array<float, resource_count> out{};
+        for (std::size_t i = 0; i < resource_count; ++i)
+            out[i] = geological[i] + biological[i];
+        return out;
+    }
+};
+
 void generate_deposits(terrain_substrate sub, terrain_cover cov, std::uint8_t density,
                        terrain_landform lf,
-                       std::array<float, resource_count>& dep, std::mt19937& rng,
+                       tile_deposits& dep, std::mt19937& rng,
                        std::mt19937& rare_rng,
                        const std::array<float, resource_count>& rarity)
 {
     using su = terrain_substrate;
     using cv = terrain_cover;
     using r  = resource_type;
-    auto put = [&](resource_type res, float v) { dep[static_cast<std::size_t>(res)] = v; };
+    // THE ORIGIN TABLE DECIDES, NOT THE CALL SITE. Every `put` below reads
+    // exactly as it did; the routing is a property of the resource.
+    auto put = [&](resource_type res, float v)
+    {
+        auto& dst = is_biological_resource(res) ? dep.biological : dep.geological;
+        dst[static_cast<std::size_t>(res)] = v;
+    };
 
     const bool mountain = lf == terrain_landform::mountain;
     const bool rift     = lf == terrain_landform::rift;
@@ -1803,8 +1868,12 @@ std::vector<entity_id> generate_body_tiles(
             if (is_ocean[idx]) continue;
             std::mt19937 tr(seed_deposit ^ (static_cast<uint32_t>(idx) * 2654435761u));
             std::mt19937 rr(seed_deposit ^ (static_cast<uint32_t>(idx) * 40503u) ^ 0x5BD1E995u);
-            std::array<float, resource_count> d{};
-            generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], d, tr, rr, rarity);
+            // BOTH HALVES, deliberately: two of the four specs are biological
+            // (coal, petroleum) and two geological, and the region budget is
+            // conserved over the BEARING set regardless of which phase placed it.
+            tile_deposits td{};
+            generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], td, tr, rr, rarity);
+            const std::array<float, resource_count> d = td.merged();
             for (std::size_t k = 0; k < 4; ++k)
                 if (d[static_cast<std::size_t>(k_specs[k].res)] > 0.0f)
                     bears[k][static_cast<std::size_t>(idx)] = 1u;
@@ -1822,6 +1891,12 @@ std::vector<entity_id> generate_body_tiles(
         }
     }
 
+    // BL-762: what each phase PLACED, summed over the body. Accumulated in raster
+    // order out of one traversal, so the sum is order-independent in fact and
+    // order-fixed in form — no map walk, no float ordering surprise.
+    std::array<double, resource_count> body_placed{};
+    std::array<double, resource_count> life_placed{};
+
     std::vector<entity_id> tile_ids(total, null_entity);
     for (int row = 0; row < gh; ++row)
     {
@@ -1836,9 +1911,21 @@ std::vector<entity_id> generate_body_tiles(
             // perturb the calibrated subset draws or derive_environment (BL-040).
             std::mt19937 rare_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 40503u) ^ 0x5BD1E995u);
 
-            std::array<float, resource_count> deposits{};
+            // BL-762: the two phases are separate destinations, filled by one
+            // traversal so the stream past this point is exactly where it was.
+            tile_deposits phases{};
             if (!is_ocean[idx])
-                generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], deposits, tile_rng, rare_rng, rarity);
+                generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], phases, tile_rng, rare_rng, rarity);
+
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                body_placed[r] += static_cast<double>(phases.geological[r]);
+                life_placed[r] += static_cast<double>(phases.biological[r]);
+            }
+
+            // Recombined for everything downstream. The halves are disjoint, so
+            // this is a union and the tile carries exactly what it always did.
+            std::array<float, resource_count> deposits = phases.merged();
 
             // BL-114: resource-abundance scalar. A pure post-multiply on the filled
             // deposit array — it draws no RNG, so deposit_scalar == 1.0f reproduces the
@@ -1933,7 +2020,16 @@ std::vector<entity_id> generate_body_tiles(
                     std::uniform_real_distribution<float> u(0.0f, 1.0f);
                     const float amount = (30.0f + 90.0f * u(tile_rng)) * e.richness * falloff;
                     if (amount > 1.0f)
+                    {
                         deposits[static_cast<std::size_t>(e.good)] = amount * deposit_scalar;
+                        // BL-762: an endemic good is biosphere output, so it is
+                        // the LIFE phase that placed it. Every good in the
+                        // endemic set is `biological` by the origin table, and
+                        // the set itself is empty on a world that never reached
+                        // a land biosphere — the accounting and the gate agree.
+                        life_placed[static_cast<std::size_t>(e.good)] +=
+                            static_cast<double>(amount * deposit_scalar);
+                    }
                 }
             }
 
@@ -1984,6 +2080,8 @@ std::vector<entity_id> generate_body_tiles(
         record->ocean_score     = std::move(ocean_score);
         record->ocean_threshold = ocean_threshold;
         record->ocean_tiles     = ocean_tiles;
+        record->body_phase_placed = body_placed;
+        record->life_phase_placed = life_placed;
     }
 
     return tile_ids;
