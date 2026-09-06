@@ -27,6 +27,30 @@ deterministic, with a seeded jitter on the borderline. If no centre qualifies, o
 fallback market is seeded. On seed 0 the home body carries nine carved markets, and *no single one
 of them stands for the body*.
 
+**A market also emerges where trade CONCENTRATED, not from population alone** (Ben, 2026-09-03,
+the eight-phase reorder point 4: *"markets should begin to emerge towards the end of this
+phase"*). The carve above is a **nation-grain** judgement — this nation's geology, and how many
+corporations already compete in it — and it says nothing about *where inside that territory*
+exchange actually happened. The Era −1 history does: it records every corridor it supplied an
+army or a founding party along (`LOGISTICS.md` § The ancient network), and a region several of
+them **meet** at is a junction. A centre standing at a junction is gated as a rich nation's
+centres are, whatever its own nation's concentration says.
+
+Three properties keep that from becoming a second, competing carve:
+
+1. **It only ever LOWERS the gate**, so it adds markets and removes none. Raising the gate at a
+   quiet region would delete a market the economy is already built on, and this is an emergence
+   rather than a cull.
+2. **The floor is the existing fracture gate.** A village never carries a market however many
+   roads meet on it — the ladder's own bottom rung does not move.
+3. **A junction is a graph property**, not a percentile: the count of distinct corridors
+   incident on a region. So it is a plain integer over a sorted record rather than a threshold
+   argued from a distribution.
+
+What it produces is the **entrepôt on poor ground** — a barren nation that would otherwise fold
+into its neighbour keeps a market where the routes cross. BL-768 (roads and markets from
+history) owns the design.
+
 **Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
 (`market_for_tile`); a corp's body-aggregate clearing routes via its lowest-id building's tile
 (`market_for_corp_on_body`).

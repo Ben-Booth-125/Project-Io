@@ -452,6 +452,25 @@ struct generation_report
     int64_t prehistory_conquests = 0; ///< Regions that changed hands.
     int64_t prehistory_foundings = 0; ///< Regions founded by the sim.
 
+    // --- The ancient road record and what it carved (BL-768) ----------------
+    //
+    // Reported for the reason the four counters above are: the acceptance test
+    // is behavioural — roads whose shape follows the history's trunk routes, and
+    // markets where trade concentrated — and a pass that recorded nothing looks
+    // exactly like one that was never wired. These three make the difference
+    // countable rather than eyeballed.
+    //
+    // Zero when the era did not run, which is every `no_prehistory()` harness.
+    int64_t prehistory_corridors = 0; ///< Distinct region-to-region corridors recorded.
+    int64_t prehistory_junctions = 0; ///< Regions where three or more of them met.
+    /// Markets that qualified ONLY because their centre stands at a trade
+    /// junction — the ones that would not exist on the nation gate alone. THE
+    /// EXACT COUNT, taken at the carve by evaluating both gates, rather than a
+    /// difference between two worlds: an era-ON and an era-OFF world do not
+    /// share a settlement pattern, so subtracting their market counts would
+    /// measure the whole era rather than this term.
+    int64_t markets_from_trade   = 0;
+
 };
 
 /// Construct and return a world populated with the prototype's authored bodies.

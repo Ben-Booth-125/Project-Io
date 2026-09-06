@@ -25,6 +25,7 @@
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
 #include "harness_params.hpp"
+#include "world/road_generation.hpp" // C7: stamp_history_roads, called directly
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -202,6 +203,167 @@ int main()
                 static_cast<unsigned long long>(ha), static_cast<unsigned long long>(hb));
     check(mismatches == 0, "C4 road_level field identical across two generations");
     check(ha == hb, "C4 state_hash identical across two generations");
+
+    // -----------------------------------------------------------------------
+    // C6 — THE ANCIENT NETWORK (BL-768), and the only place in the project that
+    // can see it.
+    //
+    // Every census above declares `no_prehistory()`, which is correct for its
+    // own subject and blind to this one: with the Era -1 sim off there are no
+    // recorded corridors, so `stamp_history_roads` is a no-op and the road field
+    // is exactly the national lattice. The ancient half is therefore invisible
+    // to every existing road check — including this file's own C1-C5 — and
+    // asserting it needs a world with the era ON.
+    //
+    // The measurement is a DIFFERENCE, not an absolute: one world at the
+    // shipping defaults with the era on, the same seed with it off, and the
+    // delta in the tier census. "How many road tiles should an ancient world
+    // have" has no answer independent of how much history happened in it, while
+    // "does the era leave more road on the ground" has exactly one.
+    //
+    // BE PRECISE ABOUT WHAT THE DELTA IS, because it is easy to over-read. The
+    // era moves populations, sacks cities and redraws borders, so an era-ON
+    // world has a DIFFERENT national lattice as well as an ancient one, and the
+    // delta below is the era's whole contribution to the road field rather than
+    // the stamp's alone. It is the right row for "did anything happen"; C7 is
+    // the row that isolates the stamp and its tier rule.
+    {
+        std::printf("\n--- C6  the ancient network (BL-768), era ON vs OFF at one seed ---\n");
+        world_params on0;             // Shipping defaults: epoch 0, 400 prehistory years.
+        on0.seed = 0;
+        const world w_on  = make_hard_coded_world(on0);
+        const world w_off = make_hard_coded_world(no_prehistory(on0));
+
+        auto tiers = [](const world& ww, int out4[4], int& ocean) {
+            out4[0] = out4[1] = out4[2] = out4[3] = 0;
+            ocean = 0;
+            for (const auto& [tid, tc] : ww.tiles)
+            {
+                if (tc.body != ww.home_body || tc.road_level == 0) continue;
+                if (is_water(tc.substrate)) ++ocean;
+                const int t = tc.road_level < 4 ? tc.road_level : 3;
+                ++out4[0];
+                if (t >= 1 && t <= 3) ++out4[t];
+            }
+        };
+        int on4[4], off4[4], on_ocean = 0, off_ocean = 0;
+        tiers(w_on, on4, on_ocean);
+        tiers(w_off, off4, off_ocean);
+        std::printf("      era OFF: roaded %d  (track %d / road %d / highway %d)\n",
+                    off4[0], off4[1], off4[2], off4[3]);
+        std::printf("      era ON : roaded %d  (track %d / road %d / highway %d)   delta %+d tiles\n",
+                    on4[0], on4[1], on4[2], on4[3], on4[0] - off4[0]);
+
+        check(on4[0] > off4[0],
+              "C6 the era adds road tiles the national lattice did not lay (the pass is not a no-op)");
+        check(on_ocean == 0, "C6 no ancient road is stamped on water");
+
+        // Determinism of the ancient half specifically. C4 above proves it for
+        // the era-off field; nothing proved it for the corridor record, whose
+        // whole point is that it is produced by a 400-year simulation.
+        const world w_on2 = make_hard_coded_world(on0);
+        int road_mismatch = 0;
+        for (const auto& [tid, tc] : w_on.tiles)
+        {
+            const auto it = w_on2.tiles.find(tid);
+            if (it == w_on2.tiles.end() || it->second.road_level != tc.road_level)
+                ++road_mismatch;
+        }
+        check(road_mismatch == 0,
+              "C6 the ancient road field is identical across two era-ON generations");
+
+        // -------------------------------------------------------------------
+        // C7 — THE ANCIENT TIER RULE, isolated (BL-768).
+        //
+        // C6 measures the era's whole effect; this measures the rule. The pass
+        // is called DIRECTLY on a copy of the era-OFF world with one synthetic
+        // corridor, which is exactly why `history_road_node` is a flattened pair
+        // of integers rather than a `settlement_state` — the case is two structs
+        // and no settled world.
+        //
+        // The era-OFF world carries ZERO highway tiles (C6 prints it), and that
+        // is what makes the promotion rung unambiguous: any highway tile after a
+        // single stamp came from this rule and nothing else.
+        //
+        //   traffic below the threshold, no works -> Track,   no highway
+        //   traffic at    the threshold, no works -> Road,    no highway
+        //   traffic at    the threshold, both ends worked -> Highway
+        //   works at ONE end only                          -> no promotion
+        //
+        // The last row is the one worth having: it is the difference between "a
+        // work promotes the corridor" and "a single Way Station promotes every
+        // line radiating out of one region".
+        {
+            std::printf("\n--- C7  the ancient tier rule, isolated ---\n");
+            // Two population-centre tiles on the home body, far enough apart to
+            // give the stamp a real route. Sorted ids, so the pick is stable.
+            std::vector<std::pair<entity_id, entity_id>> centres; // (centre, tile)
+            for (const auto& [cid, tid] : w_off.population_centre_tile)
+            {
+                const auto it = w_off.tiles.find(tid);
+                if (it != w_off.tiles.end() && it->second.body == w_off.home_body
+                    && !is_water(it->second.substrate))
+                    centres.push_back({cid, tid});
+            }
+            std::sort(centres.begin(), centres.end());
+            check(centres.size() >= 2, "C7 the census world has centres to route between");
+
+            auto highways = [](const world& ww) {
+                int n = 0;
+                for (const auto& [tid, tc] : ww.tiles)
+                    if (tc.body == ww.home_body && tc.road_level >= 3) ++n;
+                return n;
+            };
+            auto roads_or_better = [](const world& ww) {
+                int n = 0;
+                for (const auto& [tid, tc] : ww.tiles)
+                    if (tc.body == ww.home_body && tc.road_level >= 2) ++n;
+                return n;
+            };
+
+            if (centres.size() >= 2)
+            {
+                const auto ta = w_off.tiles.at(centres.front().second);
+                const auto tb = w_off.tiles.at(centres.back().second);
+                const int base_hw = highways(w_off);
+                const int base_rd = roads_or_better(w_off);
+                std::printf("      base: highway %d, road-or-better %d\n", base_hw, base_rd);
+
+                auto run = [&](int uses, int reach_a, int reach_b, int& hw, int& rd) {
+                    world ww = w_off; // value copy: each case starts from the same field
+                    const std::vector<history_road_node> nodes = {
+                        { ta.grid_x, ta.grid_y, reach_a },
+                        { tb.grid_x, tb.grid_y, reach_b } };
+                    const std::vector<history_corridor> cor = {
+                        { 0, 1, static_cast<int32_t>(uses) } };
+                    stamp_history_roads(ww, ww.home_body, nodes, cor);
+                    hw = highways(ww);
+                    rd = roads_or_better(ww);
+                };
+
+                int hw = 0, rd = 0;
+                run(1, 0, 0, hw, rd);
+                check(hw == base_hw, "C7a one walk, no works -> Track: no highway appears");
+                const int track_rd = rd;
+
+                run(4, 0, 0, hw, rd);
+                check(hw == base_hw, "C7b four walks, no works -> Road: still no highway");
+                check(rd > track_rd, "C7b four walks lay road-tier tiles a single walk did not");
+
+                run(4, 200, 0, hw, rd);
+                check(hw == base_hw,
+                      "C7c a work at ONE end does not promote (the corridor is only as good as its worse end)");
+
+                run(4, 200, 200, hw, rd);
+                check(hw > base_hw,
+                      "C7d four walks with BOTH ends worked reach the Highway rung — the works payoff");
+
+                run(1, 200, 200, hw, rd);
+                check(hw == base_hw,
+                      "C7e works alone do not reach Highway: promotion is one rung, off the traffic tier");
+            }
+        }
+    }
 
     std::printf("%s (%d failure(s))\n", g_fail ? "ROAD REACH CENSUS FAILED" : "ROAD REACH CENSUS OK", g_fail);
     return g_fail ? 1 : 0;

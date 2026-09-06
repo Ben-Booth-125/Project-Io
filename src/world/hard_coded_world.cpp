@@ -532,6 +532,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // inherits its nearest cradle's culture, so the pantheons the creeds pass
     // raised are now mapped onto specific ground and specific ancient deposits.
     settlement_state kepler_settlement;
+
+    // BL-768 — THE ANCIENT ROAD RECORD, hoisted to this scope because the two
+    // passes that consume it (the road stamp, and the market carve's trade-
+    // concentration term) both run long after the block below has closed. The
+    // sim's own `history_sim_state` stays local to that block: what crosses out
+    // of it is the record, not the run.
+    std::vector<history_corridor> kepler_corridors;
+
     nation_params kepler_np =
         nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 });
     {
@@ -648,6 +656,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
             if (progress != nullptr)
                 progress->sub_total.store(0, std::memory_order_relaxed);
+
+            // BL-768: the corridors the history walked, carried out of this
+            // block. Copied rather than moved — `hs` is const, and the record is
+            // small (one row per distinct region pair) against the settlement it
+            // travels beside.
+            kepler_corridors = hs.supply_corridors;
 
             // The sim narrates through the same history_event shape the other
             // generation passes use, so its wars join the world log without a
@@ -864,6 +878,29 @@ world make_hard_coded_world(world_params params, generation_report* report,
     bump(10);
     generate_roads(w, kepler);
 
+    // ANCIENT ROADS, STAMPED FROM THE HISTORY (BL-768; Ben, the eight-phase
+    // reorder point 4 — "we should also be laying simple roads to supply
+    // provinces"). The Era -1 sim recorded every corridor it moved an army or a
+    // founding party along; this stamps those lines onto the tile field at their
+    // own ancient tier — traffic, and the works the corridor's two ends raised,
+    // never the 1960 qualification percentile the national lattice reads.
+    //
+    // AFTER generate_roads, and the ordering is argued in road_generation.hpp:
+    // stamping takes the max per tile, so this is purely additive and no
+    // national road is downgraded, whereas stamping first would re-route the
+    // whole national MST off the ancient corridors' cheapened ground.
+    //
+    // No-op when the era did not run — `kepler_corridors` is empty, and every
+    // harness declaring `no_prehistory()` takes exactly that path.
+    if (!kepler_corridors.empty())
+    {
+        std::vector<history_road_node> road_nodes;
+        road_nodes.reserve(kepler_settlement.regions.size());
+        for (const region& p : kepler_settlement.regions)
+            road_nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
+        stamp_history_roads(w, kepler, road_nodes, kepler_corridors);
+    }
+
     // Attach installations to the first two land tiles found in raster order.
     // This lookup used to publish its first tile as `kepler_home_tile` for the
     // player unit stub further down; BL-635 deleted that stub (see below), and
@@ -999,6 +1036,73 @@ world make_hard_coded_world(world_params params, generation_report* report,
             return 3;
         };
 
+        // ------------------------------------------------------------------
+        // BL-768 — MARKETS EMERGE WHERE TRADE CONCENTRATED, not from population
+        // alone. Ben, the eight-phase reorder point 4: "markets should begin to
+        // emerge towards the end of this phase."
+        //
+        // The gate above is a nation-grain judgement — this nation's geology and
+        // its competing corporations — and it says nothing about WHERE inside
+        // that territory exchange actually happened. The history now does: every
+        // corridor in `kepler_corridors` is a line the era supplied an army or a
+        // founding party along, so a region several of them MEET at is a
+        // junction, and a junction is where goods change hands.
+        //
+        // A JUNCTION IS A GRAPH PROPERTY, NOT A TUNED PERCENTILE. Degree — the
+        // number of distinct corridors incident on a region — is a plain integer
+        // count over a sorted record, so it cannot drift with a container's
+        // layout and it needs no threshold argued from a distribution. It is
+        // still MEASURED: over `history_sweep 8 --epoch 1960` (2026-09-06) the
+        // 4,657 regions of eight worlds grade 1,297 at degree 0, 3,236 at 1-2,
+        // and only 124 at 3 or more — the busiest at 66. So three keeps the
+        // junction set at 2.7% of regions, which is the difference between a
+        // line and a crossing rather than a nudge to the whole map.
+        //
+        // IT ONLY EVER LOWERS THE GATE, so this term ADDS markets and removes
+        // none. Raising it at a quiet region would delete a market the economy
+        // is already built on, and "markets emerge" is an emergence rather than
+        // a cull. The floor is the existing FRACTURE gate (2), never below it,
+        // so a village still never carries a market however many roads meet on
+        // it — the ladder's own bottom rung is not moved.
+        //
+        // AND IT DROPS TO THAT FLOOR OUTRIGHT, rather than by one rung. One rung
+        // was the first cut and it is the weaker claim: it only ever helps a
+        // centre sitting exactly one scale under its nation's gate, so on the
+        // shipping seed it opened no market at all. Dropping to the fracture gate
+        // says the stronger and more historical thing — a crossroads fractures
+        // into markets as finely as a rich nation's territory does, BECAUSE
+        // trade concentrated there. That is an entrepôt on poor ground, which is
+        // the shape a barren nation folded into its neighbour could not
+        // otherwise produce.
+        constexpr int kMarketJunctionDegree = 3;
+        std::vector<int> region_corridor_degree(kepler_settlement.regions.size(), 0);
+        for (const history_corridor& c : kepler_corridors)
+        {
+            if (c.a < region_corridor_degree.size()) ++region_corridor_degree[c.a];
+            if (c.b < region_corridor_degree.size()) ++region_corridor_degree[c.b];
+        }
+        if (report != nullptr)
+        {
+            report->prehistory_corridors = static_cast<int64_t>(kepler_corridors.size());
+            for (const int d : region_corridor_degree)
+                if (d >= kMarketJunctionDegree) ++report->prehistory_junctions;
+        }
+        // `nearest_region` is the canonical read of a region's extent — the same
+        // Voronoi over anchors that binds a centre to the region that grew it
+        // (BL-783) and names it in that region's tongue. Reusing it is what makes
+        // "this centre's region" one answer rather than two.
+        auto centre_is_trade_junction = [&](entity_id pop_tile) -> bool {
+            if (kepler_corridors.empty()) return false;
+            const auto pit = w.tiles.find(pop_tile);
+            if (pit == w.tiles.end()) return false;
+            const int ri = nearest_region(kepler_settlement, pit->second.grid_x,
+                                          pit->second.grid_y, home_grid_width);
+            if (ri < 0 || ri >= static_cast<int>(region_corridor_degree.size()))
+                return false;
+            return region_corridor_degree[static_cast<std::size_t>(ri)]
+                   >= kMarketJunctionDegree;
+        };
+
         // Seed markets in ascending centre-id order for deterministic market ids.
         std::vector<entity_id> centre_ids;
         centre_ids.reserve(w.population_centres.size());
@@ -1087,6 +1191,19 @@ world make_hard_coded_world(world_params params, generation_report* report,
             const auto nit = w.tile_to_nation.find(tile_it->second);
             if (nit != w.tile_to_nation.end())
                 gate = gate_for_nation(nit->second);
+            // BL-768: a centre standing where the history's corridors met is
+            // gated as a rich nation's centres are. The GATE moves, not the
+            // scale — a trade junction lets a smaller centre carry a market, it
+            // does not make the centre big.
+            const int nation_gate = gate;
+            if (centre_is_trade_junction(tile_it->second))
+                gate = std::min(gate, 2);
+            // Counted HERE, where both gates are in hand, so the report carries
+            // the exact number of markets the history's trade opened rather than
+            // a difference between two worlds that do not share a settlement.
+            if (report != nullptr && gate < nation_gate && pcc.scale >= gate
+                && pcc.scale < nation_gate)
+                ++report->markets_from_trade;
             if (pcc.scale < gate)
                 continue; // folds into a neighbouring market (routed by market_for_tile)
 

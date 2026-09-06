@@ -197,6 +197,23 @@ struct sweep_row
     /// record the year each row was raised. R4 stays PARTIAL for that half.
     int64_t works_by_band[roster_band_count] = {0, 0, 0, 0};
 
+    /// BL-768 — THE ANCIENT ROAD RECORD, as the sim produced it. The stamping
+    /// pass's two constants are read off these columns rather than chosen: the
+    /// tier threshold off the traffic histogram (where does the tail start), the
+    /// market junction degree off the degree histogram (where does a line stop
+    /// being a line). Reported, never asserted into a band — the record is a
+    /// consequence of how much history happened, and a world that fought and
+    /// settled less legitimately walks fewer roads.
+    int64_t corridors        = 0;  ///< Distinct region pairs recorded.
+    int64_t corridor_walks   = 0;  ///< Total uses summed over them.
+    int64_t corridor_max_use = 0;
+    /// Uses histogram, bucketed 1 / 2 / 3 / 4+ — the split the tier rule reads.
+    int64_t corridor_use_hist[4] = {0, 0, 0, 0};
+    /// Regions by corridor DEGREE, bucketed 0 / 1-2 / 3-4 / 5+ — the split the
+    /// market carve's junction rule reads.
+    int64_t corridor_degree_hist[4] = {0, 0, 0, 0};
+    int64_t corridor_max_degree = 0;
+
     int64_t peak_population  = 0;
     int64_t peak_year        = 0;
     int64_t epoch_population = 0;
@@ -662,6 +679,29 @@ int main(int argc, char** argv)
         row.works_raised = sim.works_raised;
         row.run_works_by_span_band = sim.works_by_span_band;
         row.units_by_span_band     = sim.units_by_span_band;
+
+        // BL-768 — the ancient road record. Derived here from the sim's own
+        // output rather than recomputed: a census that re-derived the corridor
+        // set its own way would be measuring its own arithmetic.
+        {
+            row.corridors = static_cast<int64_t>(sim.supply_corridors.size());
+            std::vector<int> degree(ss.regions.size(), 0);
+            for (const history_corridor& c : sim.supply_corridors)
+            {
+                row.corridor_walks += c.uses;
+                if (c.uses > row.corridor_max_use) row.corridor_max_use = c.uses;
+                const int b = c.uses >= 4 ? 3 : (c.uses - 1);
+                if (b >= 0 && b < 4) ++row.corridor_use_hist[b];
+                if (c.a < degree.size()) ++degree[c.a];
+                if (c.b < degree.size()) ++degree[c.b];
+            }
+            for (const int d : degree)
+            {
+                if (d > row.corridor_max_degree) row.corridor_max_degree = d;
+                const int b = d == 0 ? 0 : (d <= 2 ? 1 : (d <= 4 ? 2 : 3));
+                ++row.corridor_degree_hist[b];
+            }
+        }
         for (const region& p : ss.regions)
             if (p.works_built != 0) ++row.regions_with_works;
 
@@ -865,6 +905,52 @@ int main(int argc, char** argv)
                     u[static_cast<std::size_t>(sp)][static_cast<std::size_t>(b)]
                         += r.units_by_span_band[static_cast<std::size_t>(sp)][static_cast<std::size_t>(b)];
                 }
+
+        // ------------------------------------------------------------------
+        // BL-768 — THE ANCIENT ROAD RECORD, per seed and pooled.
+        //
+        // This is the instrument the two stamping constants are read off, which
+        // is why it prints a distribution rather than a mean. `kAncientRoadUses`
+        // (road_generation.cpp) is the point where the traffic histogram's tail
+        // starts, and `kMarketJunctionDegree` (hard_coded_world.cpp) is where
+        // the degree histogram stops being lines and starts being crossings. A
+        // future re-measure is therefore reading two rows off this block rather
+        // than reopening an argument.
+        //
+        // REPORTED, NEVER GATED, on the same terms as the hegemony and
+        // elimination rates above: how many corridors a world walks is a
+        // consequence of how much history happened in it, and a quiet world
+        // legitimately walks fewer. The only assertion is presence — a sim that
+        // recorded NOTHING while founding and fighting would mean the record is
+        // not wired, which is a defect rather than a quiet world.
+        {
+            int64_t tot_c = 0, tot_w = 0, uh[4] = {0,0,0,0}, dh[4] = {0,0,0,0};
+            int64_t max_use = 0, max_deg = 0;
+            for (const auto& r : rows)
+            {
+                tot_c += r.corridors;
+                tot_w += r.corridor_walks;
+                for (int i = 0; i < 4; ++i) { uh[i] += r.corridor_use_hist[i];
+                                              dh[i] += r.corridor_degree_hist[i]; }
+                if (r.corridor_max_use    > max_use) max_use = r.corridor_max_use;
+                if (r.corridor_max_degree > max_deg) max_deg = r.corridor_max_degree;
+            }
+            std::printf("\n--- BL-768  THE ANCIENT ROAD RECORD (all seeds) ---\n");
+            std::printf("  corridors recorded   %lld distinct, %lld walks, busiest %lld\n",
+                        static_cast<long long>(tot_c), static_cast<long long>(tot_w),
+                        static_cast<long long>(max_use));
+            std::printf("  traffic histogram    1 use %lld | 2 %lld | 3 %lld | 4+ %lld"
+                        "   <- kAncientRoadUses reads this row\n",
+                        static_cast<long long>(uh[0]), static_cast<long long>(uh[1]),
+                        static_cast<long long>(uh[2]), static_cast<long long>(uh[3]));
+            std::printf("  region degree        0 %lld | 1-2 %lld | 3-4 %lld | 5+ %lld"
+                        "  (busiest %lld)  <- kMarketJunctionDegree reads this row\n",
+                        static_cast<long long>(dh[0]), static_cast<long long>(dh[1]),
+                        static_cast<long long>(dh[2]), static_cast<long long>(dh[3]),
+                        static_cast<long long>(max_deg));
+            check(tot_c > 0,
+                  "BL-768 the sim records supply corridors (the ancient road record is wired)");
+        }
 
         std::printf("\n--- raised and fielded during the run, SPAN x BAND (all seeds) ---\n");
         for (int sp = 0; sp < 2; ++sp)

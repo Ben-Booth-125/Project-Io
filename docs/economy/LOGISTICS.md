@@ -186,6 +186,47 @@ rather than silently left off the lattice.
 
 The player extends the lattice with `place_road`; rivals do too, through the same verb.
 
+### 4a. The ancient network — roads stamped FROM the history
+
+> *"We should also be laying simple roads to supply provinces."*
+> — Ben, 2026-09-03, the eight-phase reorder, point 4
+
+**The national lattice above is not the only road on the map.** Before any nation existed the
+Era −1 sim moved armies and founding parties across the ground, and those lines are the
+world's first roads. They are **derived from the history, never laid inside it**: the sim
+records each corridor it walked — a campaign's staging-holding-to-objective supply line, a
+settle's parent-to-daughter route — and a pass immediately after it stamps those lines onto
+`road_level`. `GENERATION_STRATEGY.md` § The eight phases states why the record is the only
+possible shape: the sim has no write channel to the world, its pathfinder returns a cost
+between regions rather than a list of tiles, and the modern pass's node source does not exist
+until after it runs.
+
+**The ancient tier rule is its own, not the industrial one.** § 4's gates read a nation's
+qualification percentile — a field derived from industrialisation timing, which an antiquity
+world neither has nor has any spread in. What an ancient corridor has instead is:
+
+- **traffic** — how many times the history actually used it. Repeat traffic earns a **Road**;
+  a line walked once is a **Track**;
+- **works** — a corridor whose **two** ends both raised something reach-bearing from the Era −1
+  works roster (`docs/lore/HISTORY.md` § The works roster) promotes one rung. Both ends,
+  because a paved trunk with a station at one end and nothing at the other is a road that
+  stops. This is the **only** route to a **Highway** before the industrial era, which keeps
+  § 4's antiquity shape intact — a world that built nothing carries Roads and no Highways —
+  while giving the works roster a payoff that persists onto the campaign map.
+
+**Purely additive.** The stamp takes the maximum per tile, so no national road is ever
+downgraded and the ancient corridors appear where the modern lattice did not reach or reached
+lower. The land rule is unchanged: water tiles are skipped and a corridor whose route crosses
+open ocean is not stamped at all.
+
+Why it matters beyond decoration: `docs/generation/PROVINCES.md` § Richness is absorbed makes
+roads the term that **gates what a rich province can yield**. Laying them from the history is
+what turns that gate into a fact with a visible cause — a province is well-served because an
+empire supplied through it, not because a generator rolled well.
+
+BL-768 (roads and markets from history) owns this design; `src/world/road_generation.hpp`
+carries the constants and the measurement they were read off.
+
 **Roads do not decay** (Ben, 2026-08-22): *"Roads do not decay, but nations have to pay tax to
 support them. If a nation runs into too much debt supporting infrastructure, it can go bankrupt
 with major penalties. But between these states nothing changes."* The cost is **binary, not

@@ -124,7 +124,7 @@ inline constexpr uint32_t save_game_magic =
 /// why that matters: two items each bumping "the next number" in separate
 /// worktrees produce two on-disk layouts sharing one version, each readable
 /// only by the build that wrote it.
-inline constexpr uint32_t save_game_version = 7; // BL-777, the region domain
+inline constexpr uint32_t save_game_version = 8; // BL-768, the ancient road record's report counters
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.
