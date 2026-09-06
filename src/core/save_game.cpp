@@ -304,6 +304,10 @@ void w_region(std::ostream& o, const region& r)
     w_int(o, r.work_reach_mod);
     w_int(o, r.work_defence_mod);
     w_int(o, r.work_industrial_mod);
+    // save_game_version 5 (BL-766, the urban record) -- keep r_region in step.
+    w_int(o, r.centres);
+    w_int(o, r.centres_razed);
+    w_i64(o, r.urban_population);
 }
 
 bool r_region(std::istream& i, region& r)
@@ -317,7 +321,10 @@ bool r_region(std::istream& i, region& r)
         && r_i64(i, r.last_demography_year) && r_i64(i, r.manpower_stock)
         && r_u32(i, r.works_built) && r_int(i, r.work_capacity_mod)
         && r_int(i, r.work_manpower_mod) && r_int(i, r.work_reach_mod)
-        && r_int(i, r.work_defence_mod) && r_int(i, r.work_industrial_mod);
+        && r_int(i, r.work_defence_mod) && r_int(i, r.work_industrial_mod)
+        // save_game_version 5 (BL-766) -- keep w_region in step.
+        && r_int(i, r.centres) && r_int(i, r.centres_razed)
+        && r_i64(i, r.urban_population);
 }
 
 void w_settlement(std::ostream& o, const settlement_state& s)
@@ -327,13 +334,15 @@ void w_settlement(std::ostream& o, const settlement_state& s)
     w_vec(o, s.checkpoints, w_checkpoint);
     w_int(o, s.lacunae);
     w_i64(o, s.median_industrial_year);
+    w_bool(o, s.urban_map_drawn); // save_game_version 5 (BL-766)
 }
 
 bool r_settlement(std::istream& i, settlement_state& s)
 {
     return r_vec(i, s.regions, r_region) && r_vec(i, s.history, r_history_event)
         && r_vec(i, s.checkpoints, r_checkpoint) && r_int(i, s.lacunae)
-        && r_i64(i, s.median_industrial_year);
+        && r_i64(i, s.median_industrial_year)
+        && r_bool(i, s.urban_map_drawn); // save_game_version 5 (BL-766)
 }
 
 // ---------------------------------------------------------------------------

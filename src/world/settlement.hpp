@@ -125,6 +125,35 @@ struct region
     /// refilled gradually by `replenish_manpower`, spent by `raise_manpower`.
     int64_t manpower_stock = 0;
 
+    // --- The urban record (BL-766, the population map is drawn early) ------
+    // WHY IT LIVES HERE AND NOT AS ENTITIES. The Era -1 sim has no ECS access
+    // by design (history_sim.hpp: no `world&`, no tile ids, no allocator), so
+    // a city the sim can grow and sack cannot BE a population_centre entity
+    // while the sim runs. It is represented at SIM GRAIN instead — three
+    // integers on the region — and `generate_population_centres` materialises
+    // the campaign-era entities from this record once the sim has finished.
+    //
+    // The map is DRAWN BEFORE THE SIM (`draw_urban_map`), weighted toward
+    // ground that farms easily, and then grown by `advance_region_urban` and
+    // destroyed by `sack_region_urban` as the history runs. That ordering is
+    // the item's whole point: centres are still history's consequence, but
+    // because history grew and sacked them rather than because they were
+    // placed afterwards — and the sim stops running over a world with no
+    // cities in it.
+
+    /// Population centres standing in this region. Promoted as
+    /// `urban_population` crosses `region_centre_heads`, cut by a sack.
+    int centres = 0;
+
+    /// Centres history DESTROYED here — cumulative, never decremented. A
+    /// region that was sacked and rebuilt still records that it was sacked,
+    /// which is what makes the ruin legible rather than merely absent.
+    int centres_razed = 0;
+
+    /// Heads living in this region's centres, a subset of `population`. The
+    /// quantity the campaign-era centre count and scale carve reads.
+    int64_t urban_population = 0;
+
     // --- Era -1 works (BL-321) --------------------------------------------
     // What this region has BUILT, and what those works are worth. The works
     // TABLE lives in works_roster.hpp/works.lua; only the per-region record
@@ -239,6 +268,12 @@ struct settlement_state
     /// The world-median industrialisation year over industrialised regions,
     /// or 0 when none industrialised. BL-219's "early vs late" pivot reads it.
     int64_t median_industrial_year = 0;
+
+    /// True once `draw_urban_map` has run over these regions (BL-766). It is
+    /// the difference between "history razed every city" and "no urban map was
+    /// ever drawn", which a zero urban headcount alone cannot tell apart — and
+    /// the two want opposite behaviour from the campaign-era carve.
+    bool urban_map_drawn = false;
 
     /// Stage 1's diffusion frame (BL-638). Carried on the settlement record
     /// rather than passed separately because every consumer already holds one:
@@ -395,6 +430,69 @@ int64_t region_carrying_capacity(int farm_q, int capacity_mod_q);
 ///                         no war). The caller derives it from combat/
 ///                         checkpoint records — this function only spends it.
 void advance_region_demography(region& p, int years, int war_pressure_q);
+
+// ---------------------------------------------------------------------------
+// The urban record (BL-766) — cities at sim grain
+// ---------------------------------------------------------------------------
+
+/// The headcount one sim-grain population centre stands on. Deliberately the
+/// SAME rung the campaign-era carve counts centres by
+/// (`k_demography_heads_per_centre`, population_generation.hpp) so a region
+/// that stood up three centres during the era materialises three at the epoch;
+/// population_generation.cpp static_asserts the two against each other, since
+/// two copies of a rung is how they drift apart.
+inline constexpr int64_t region_centre_heads = 10000;
+
+/// Hard ceiling on one region's centre count. Structural, not tuning: the
+/// campaign-era carve caps the body total at 65,536 and a runaway region
+/// should hit a named bound rather than eat that budget silently.
+inline constexpr int region_centre_limit = 32;
+
+/// The headcount `run_history_sim` seeds an unpopulated region with, and the
+/// figure `draw_urban_map` sizes its seed cities against. ONE derivation, read
+/// by both — the sim's seeding line and the urban draw have to agree or the
+/// map is drawn against a population that never arrives.
+int64_t region_seed_population(int farm_q);
+
+/// The share of a region's people who live in its centres, per mille. Rises
+/// with `farm_q`: a surplus is what feeds a town, so easy-farming ground
+/// towns a larger fraction of itself than ground that barely feeds its own
+/// farmers. This is Ben's "extra attention to areas where farming would be
+/// easy" at region grain (the tile-grain half is the placement weight in
+/// population_generation.cpp).
+int region_urban_share_q(int farm_q);
+
+/// Draw ONE region's opening urban record from its farming ground: the map's
+/// rule for a single region. Applied at the opening draw and again at every
+/// founding the Era -1 sim makes, so a frontier region settled in year 300
+/// gets its settlement on the same terms as one settled before the sim began.
+void draw_region_urban(region& p);
+
+/// DRAW THE POPULATION MAP (BL-766). Runs over a settled body BEFORE the Era
+/// -1 sim: every region whose ground clears the farming floor is given an
+/// opening urban headcount and the centres those heads stand up, so the sim
+/// runs over a world that already has cities in it.
+///
+/// PURE — no RNG, no seed. A deterministic consequence of `farm_q` and the
+/// region's own population, per the generation layer's standing shape
+/// (consequences of upstream scalars, not dice). Idempotent: running it twice
+/// produces the same map.
+void draw_urban_map(settlement_state& s);
+
+/// Advance one region's urban headcount by one simulated year: converge a
+/// fraction of the gap toward `population * region_urban_share_q(farm_q)`,
+/// then promote `centres` to whatever the surviving heads stand up.
+///
+/// GROWTH ONLY PROMOTES. A shrinking city keeps its centre — POPULATION.md's
+/// asymmetry, that passive failure shrinks a centre and never destroys one.
+/// Destruction is `sack_region_urban`, a deliberate act of history.
+void advance_region_urban(region& p);
+
+/// SACK a region's cities. `population_loss_q` is the per-mille the
+/// countryside lost; the city loses a multiple of it, because a sack falls on
+/// the walls and not the fields. Centres fall to what the surviving heads can
+/// stand, and every one lost is recorded in `centres_razed`.
+void sack_region_urban(region& p, int population_loss_q);
 
 /// The manpower ceiling a region's CURRENT population can support — a
 /// bounded fraction (`manpower_ceiling`'s own constant), not additive, so a

@@ -17,7 +17,8 @@
 //       world and an envelope equal to the ones written.
 //   S2  The CLOCK survives -- every field distinct, so a field read into its
 //       neighbour shows.
-//   S3  `world_params` and the generation report survive.
+//   S3  `world_params` and the generation report survive -- including the
+//       per-body settlement record and its BL-766 urban fields.
 //   S4  The app-owned histories survive, values and order.
 //   S5  The ui_state slice survives -- the two enums and the nine floats, each a
 //       distinct non-dyadic value, so a swapped pair cannot pass.
@@ -30,6 +31,7 @@
 // Kept outside src/ so the CMake game glob does not pull it into the build.
 
 #include "core/save_game.hpp"
+#include "world/settlement.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 
@@ -175,6 +177,39 @@ save_envelope make_envelope()
     be.name         = "Vhessari Prime";
     be.id           = 41;
     be.is_homeworld = true;
+
+    // BL-766, the urban record on `region`, and the S3 precedent this file set
+    // for BL-747: two ints and an int64 appended to a record whose other ints
+    // are also small — so every one of them gets a DISTINCT, non-default value
+    // and the population is distinct from the urban population, or a writer
+    // that emitted `centres_razed` where `centres` belongs would round-trip
+    // clean and this row would assert nothing.
+    //
+    // Two regions, and the SECOND is the one carrying the razed count, so a
+    // reader that dropped a field would desynchronise the vector rather than
+    // merely mis-set one member.
+    region r0;
+    r0.name                 = "Ashen Quarter";
+    r0.anchor               = 913;
+    r0.farm_q               = 641;
+    r0.population           = 84213;
+    r0.centres              = 3;
+    r0.centres_razed        = 0;
+    r0.urban_population     = 31775;
+    region r1;
+    r1.name                 = "Torrend Reach";
+    r1.anchor               = 274;
+    r1.farm_q               = 388;
+    r1.population           = 19507;
+    r1.centres              = 1;
+    r1.centres_razed        = 5;
+    r1.urban_population     = 12099;
+    be.settlement.regions.push_back(r0);
+    be.settlement.regions.push_back(r1);
+    be.settlement.lacunae                = 6;
+    be.settlement.median_industrial_year = 1843;
+    be.settlement.urban_map_drawn        = true;
+
     e.report.bodies.push_back(be);
 
     e.balance_history     = { 1.5f, -2.25f, 3.125f };
@@ -273,6 +308,32 @@ int main()
         check(le.report.bodies.size() == 1 && le.report.bodies[0].name == "Vhessari Prime"
                   && le.report.bodies[0].id == 41 && le.report.bodies[0].is_homeworld,
               "S3 the generation report's body entry survives (name, id, homeworld flag)");
+
+        // BL-766: the urban record. Pinned to LITERALS rather than compared
+        // field-to-field, for the reason the year-slot row above gives — a
+        // writer and reader that swap symmetrically compare equal to each other
+        // and are still wrong.
+        const bool settlement_ok =
+            le.report.bodies.size() == 1
+            && le.report.bodies[0].settlement.regions.size() == 2
+            && le.report.bodies[0].settlement.regions[0].name == "Ashen Quarter"
+            && le.report.bodies[0].settlement.regions[0].population == 84213
+            && le.report.bodies[0].settlement.regions[0].centres == 3
+            && le.report.bodies[0].settlement.regions[0].centres_razed == 0
+            && le.report.bodies[0].settlement.regions[0].urban_population == 31775
+            && le.report.bodies[0].settlement.regions[1].name == "Torrend Reach"
+            && le.report.bodies[0].settlement.regions[1].population == 19507
+            && le.report.bodies[0].settlement.regions[1].centres == 1
+            && le.report.bodies[0].settlement.regions[1].centres_razed == 5
+            && le.report.bodies[0].settlement.regions[1].urban_population == 12099;
+        check(settlement_ok,
+              "S3 the region urban record survives (centres / razed / urban heads, "
+              "each distinct, both regions)");
+        check(le.report.bodies.size() == 1
+                  && le.report.bodies[0].settlement.lacunae == 6
+                  && le.report.bodies[0].settlement.median_industrial_year == 1843
+                  && le.report.bodies[0].settlement.urban_map_drawn,
+              "S3 settlement_state's own scalars survive, urban_map_drawn included");
 
         check(le.balance_history == env.balance_history
                   && le.income_history == env.income_history

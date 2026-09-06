@@ -374,7 +374,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // Seed a headcount so demography has something to grow from — the
         // graduation path settlement.hpp's demography note leaves to this item.
         if (p.population <= 0)
-            p.population = clampi64(region_carrying_capacity(p.farm_q) / 8, 1, 1 << 30);
+            p.population = region_seed_population(p.farm_q); // BL-766: ONE derivation,
+                                                             // shared with `draw_urban_map`.
         p.last_demography_year = params.start_year;
         replenish_manpower(p);
     }
@@ -499,6 +500,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {
             advance_region_demography(ss.regions[i], 1, war_pressure[i]);
+            // BL-766: the cities drawn before this loop started live through it
+            // — they grow with the region and thin when it thins.
+            advance_region_urban(ss.regions[i]);
             war_pressure[i] = 0;
             total_pop += ss.regions[i].population;
         }
@@ -1185,6 +1189,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     tgt.population = clampi64(
                         tgt.population - (tgt.population * params.sack_population_loss_q) / 1000,
                         0, 1LL << 40);
+                    // BL-766: and it falls hardest on the walls. This is the
+                    // one place history DESTROYS a centre rather than thinning
+                    // it, so a sacked city reads as a smaller or absent centre
+                    // on the epoch map.
+                    sack_region_urban(tgt, params.sack_population_loss_q);
 
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
@@ -1255,6 +1264,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.nation = q.id;
                 np.population = clampi64(region_carrying_capacity(np.farm_q) / 16, 1, 1 << 30);
                 replenish_manpower(np);
+                // BL-766: a region founded HERE gets its settlement on the same
+                // terms as one drawn before the sim ran — one rule, not two.
+                draw_region_urban(np);
 
                 // The change list indexes regions as uint16_t, so refuse to
                 // create one the time-lapse could not address (BL-312). Past

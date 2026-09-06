@@ -80,7 +80,14 @@ inline constexpr uint32_t save_game_magic =
 /// stream's world-params record misreads `body_count` and the preferences
 /// after it — refused whole on the same strict-equality contract, for the same
 /// reason as the v2 bump above.
-inline constexpr uint32_t save_game_version = 4; // BL-747: world_params carries industrial_years
+/// Bumped to 5 when `region` gained its URBAN RECORD and `settlement_state`
+/// gained `urban_map_drawn` (BL-766, the population map drawn early):
+/// `w_region` gains two ints and an int64 at the END of the region record, and
+/// `w_settlement` gains one bool after `median_industrial_year`. The region
+/// growth is a TAIL append, but the settlement one is mid-record within the
+/// per-body generation entry, so a v4 stream misreads everything after it —
+/// refused whole, same strict-equality contract, same reason as v2 and v4.
+inline constexpr uint32_t save_game_version = 5; // BL-766: region carries the urban record
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

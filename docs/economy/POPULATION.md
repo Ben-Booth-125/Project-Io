@@ -22,23 +22,57 @@ nation generation and drives it: the Era −1 settlement ladder (`docs/lore/HIST
 `generate_nations` reads the result, so the political map is a consequence of where people
 settled rather than the other way round.
 
-- **Placement is habitability-gated and clustered.** A candidate tile must pass the placement
-  rules' habitability gate; among candidates, a tile adjacent to an existing centre carries 3×
-  weight, multiplied by a 1–5 richness bucket, so centres cluster progressively and a rich tile
-  can outweigh a merely adjacent one.
+**The population map is drawn EARLY, and history then grows and destroys it** (Ben, the
+eight-phase generation reorder, 2026-09-03; BL-766, population map early). The map is drawn
+over the settled regions **before** the Era −1 sim runs, weighted toward ground that farms
+easily, and the sim then grows the cities, sacks them and razes them as it goes. Centres are
+still the history's **consequence** — the goal BL-610 (centres from demography) set — but now
+because history grew and sacked them rather than because they were placed once it had
+finished, and the sim no longer runs over a world with no cities in it.
+
+The record is kept at **sim grain**, three integers on the `region` (`centres`,
+`centres_razed`, `urban_population`), not as entities: the Era −1 sim has no ECS access by
+design, so a city it can grow and sack cannot be a `population_centre_component` while it
+runs. `generate_population_centres` materialises the campaign-era entities from that record
+once the sim has finished. Three rules govern it, and they are pure integer functions with no
+RNG anywhere on the path:
+
+- **The draw.** A region whose ground clears a farming floor receives an opening urban
+  headcount — a share of its people that itself rises with how easily the ground farms, so
+  easy-farming country towns a larger fraction of itself — and a settlement to stand them in.
+  The same rule applies at **every** founding, including the ones the sim makes mid-era, so a
+  frontier region settled in year 300 gets its town on the same terms as an ancient core.
+- **Growth only promotes.** Each simulated year a region's urban headcount converges a
+  fraction of the way toward its target, and centres are promoted as the heads cross a rung.
+  A shrinking city keeps its centre — the same asymmetry § Growth, decline and razing states
+  for play: passive failure shrinks a centre and never destroys one.
+- **The sack destroys.** A conquest costs the taken region's cities a multiple of what it
+  costs its countryside, because a sack falls on the walls and not the fields. Centres fall to
+  what the surviving heads can stand up, and every one lost is recorded in `centres_razed` —
+  so a razed city that is later rebuilt still says it was razed. Razing stays **rare**, as
+  § Growth, decline and razing requires: an occupier almost always prefers to occupy.
+
+- **Placement is habitability-gated, clustered, and pulled toward farmland.** A candidate tile
+  must pass the placement rules' habitability gate; among candidates, a tile adjacent to an
+  existing centre carries 3× weight, multiplied by a 1–5 richness bucket and a 1–3 **food**
+  bucket on the tile's own agricultural deposit, so centres cluster progressively, a rich tile
+  can outweigh a merely adjacent one, and cities stand on ground that feeds them. The food
+  bucket is deliberately narrower than richness: it tilts placement toward farmland without
+  overturning the deposit pull. It is the tile-grain half of the weighting the early urban map
+  applies at region grain.
 - **Count and scale derive from Era −1 region demography** (Ben, 2026-08-25; BL-610, centres
-  from demography). Density is history's consequence: the simulated regions' populations
-  (§ Region demography) decide how many centres a body carries and how large each is, replacing
-  the land-area divisor and the authored weighted scale draw. `k_population_for_scale` =
-  10 / 50 / 200 / 1,000 / 5,000 thousand heads remains the scale→headcount mapping.
-  The carve is a pure integer function of the region populations, no RNG: an urban share
-  (a tenth, `k_demography_urban_share_q`) of each living region's headcount towns; the
-  **count** is each region's urban headcount over one village's-worth
-  (`k_demography_heads_per_centre` = `k_population_for_scale[0]`), floored at one — a razed
-  region contributes nothing; the **scales** are a rank-size share-out of the body's whole
-  urban headcount, banded to the nearest `k_population_for_scale` rung in log space — a few
-  cities over many towns over a train of villages, real settlement concentration as mechanism,
-  never a name. A body with no settlement record keeps a land-area fallback.
+  from demography). Density is history's consequence: the simulated regions decide how many
+  centres a body carries and how large each is, replacing the land-area divisor and the
+  authored weighted scale draw. `k_population_for_scale` = 10 / 50 / 200 / 1,000 / 5,000
+  thousand heads remains the scale→headcount mapping. The carve is a pure integer function of
+  the region record, no RNG: the **count** is the sum of the living regions' own `centres` —
+  the settlements the era drew, grew and left standing, so a razed region contributes nothing
+  and a sacked one contributes fewer; the **scales** are a rank-size share-out of the body's
+  whole urban headcount, banded to the nearest `k_population_for_scale` rung in log space — a
+  few cities over many towns over a train of villages, real settlement concentration as
+  mechanism, never a name. A body whose urban map was never drawn falls back to the flat urban
+  share of population the carve used before it, and a body with no settlement record at all
+  keeps the land-area fallback.
 - **Every province is anchored by a centre** (Ben, 2026-08-25; BL-611, province centre anchor).
   A centre of *any* scale — most are small; towns stand where history earned them. The anchor
   is the province's political decider: the centre's nation is the province's nation, and taking
@@ -345,10 +379,12 @@ simplification), and the manpower budget triple (`manpower_ceiling` / `replenish
 capped by fiat). Every rate is a `_q` thousandths quantity — no floats in a gate path.
 Verified by `tools/verify/demography_harness.cpp`.
 
-Region demography is self-contained at the region level. On graduation to the campaign era it
-is the source both the centre **count** and the **scale distribution** draw from (§ Generation;
-BL-610, centres from demography) — density is a consequence of the simulated history, not a
-divisor or a weighted draw. It also aggregates into each nation's opening qualification
+Region demography is self-contained at the region level, and carries the **urban record**
+alongside it (§ Generation): the cities a region holds, the heads living in them, and the
+count history has destroyed there. On graduation to the campaign era that record is the source
+both the centre **count** and the **scale distribution** draw from (§ Generation; BL-610,
+centres from demography; BL-766, population map early) — density is a consequence of the
+simulated history, not a divisor or a weighted draw. It also aggregates into each nation's opening qualification
 fraction (§ Qualification).
 
 ---

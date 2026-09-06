@@ -60,7 +60,11 @@ bool regions_identical(const std::vector<region>& a, const std::vector<region>& 
             || x.founded_year != y.founded_year || x.industrial_year != y.industrial_year
             || x.population != y.population || x.manpower_stock != y.manpower_stock
             || x.farm_q != y.farm_q || x.ore_q != y.ore_q || x.energy_q != y.energy_q
-            || x.port_q != y.port_q || x.nation != y.nation)
+            || x.port_q != y.port_q || x.nation != y.nation
+            // BL-766: the urban record is sim output too, so R4's determinism
+            // claim has to cover it or a non-deterministic city map passes.
+            || x.centres != y.centres || x.centres_razed != y.centres_razed
+            || x.urban_population != y.urban_population)
             return false;
     }
     return true;

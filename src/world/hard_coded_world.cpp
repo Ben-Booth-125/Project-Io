@@ -542,6 +542,21 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
                                            /*stop_year=*/params.epoch_year);
         t_settlement_end = gen_clock::now(); // BL-754
+
+        // THE POPULATION MAP, DRAWN EARLY (BL-766). Before the Era -1 sim, not
+        // after it: every region whose ground farms easily is given an opening
+        // urban headcount and the centres those heads stand up, so the sim runs
+        // over a world that has cities in it and can grow, sack and raze them.
+        //
+        // This deliberately overturns BL-610's ORDERING while keeping its goal.
+        // Centre count and scale are still the history's consequence — they are
+        // carved from `region::centres` / `region::urban_population`, which only
+        // this sim moves — but now because history grew and sacked the cities
+        // rather than because they were placed after it had finished.
+        //
+        // Pure and seedless: a deterministic consequence of `farm_q`, which is
+        // the shape the generation layer asks new stages to take.
+        draw_urban_map(kepler_settlement);
         // ------------------------------------------------------------------
         // The year-tick sim, wired into generation (Ben, 2026-08-12).
         //
