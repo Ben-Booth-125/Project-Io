@@ -52,14 +52,37 @@ RNG anywhere on the path:
   so a razed city that is later rebuilt still says it was razed. Razing stays **rare**, as
   § Growth, decline and razing requires: an occupier almost always prefers to occupy.
 
-- **Placement is habitability-gated, clustered, and pulled toward farmland.** A candidate tile
-  must pass the placement rules' habitability gate; among candidates, a tile adjacent to an
-  existing centre carries 3× weight, multiplied by a 1–5 richness bucket and a 1–3 **food**
-  bucket on the tile's own agricultural deposit, so centres cluster progressively, a rich tile
-  can outweigh a merely adjacent one, and cities stand on ground that feeds them. The food
-  bucket is deliberately narrower than richness: it tilts placement toward farmland without
-  overturning the deposit pull. It is the tile-grain half of the weighting the early urban map
-  applies at region grain.
+- **A centre stands in the region that grew it.** Each carved centre is **bound to its source
+  region** and placed inside that region's own cell of the settlement partition
+  (`nearest_region` — the same partition city naming already reads, so a centre's name and its
+  ground now agree by construction rather than by luck). A region whose cell is built out
+  spills to its nearest neighbour rather than losing the settlement.
+
+  Without the binding the causal chain died at its last step: history grew and sacked *specific*
+  regions, and an undifferentiated body-wide scatter then threw that away, so a player could not
+  find the war behind a ruin. **Measured** (BL-783): centres displaced from their source region
+  fall from 56.3% to 17.9%, and every remaining displacement is a region wanting more cities
+  than it has ground — not a placement that ignored it.
+
+- **The campaign placement path consumes no randomness.** Within the region it is a pure argmax
+  over habitability, tie-broken by lowest raster index — count, scale *and* place are all the
+  demography's consequence and nothing else's. The seeded weighted draw survives only on the
+  no-settlement fallback, where there is no region record to be a consequence of.
+
+- **The candidate weighting is habitability-gated, clustered, and pulled toward farmland.** A
+  candidate tile must pass the placement rules' habitability gate; among candidates, a tile
+  adjacent to an existing centre carries 3× weight, multiplied by a 1–5 richness bucket and a
+  1–3 **food** bucket on the tile's own agricultural deposit, so centres cluster progressively,
+  a rich tile can outweigh a merely adjacent one, and cities stand on ground that feeds them.
+  The food bucket is deliberately narrower than richness: it tilts placement toward farmland
+  without overturning the deposit pull. It is the tile-grain half of the weighting the early
+  urban map applies at region grain.
+
+- **Two later passes are deliberately region-blind**, and it is worth knowing which:
+  `ensure_province_anchor_centres` and `ensure_national_population_centres` add coverage seats
+  that answer to the province and nation layers, not to the demography. They are not bound and
+  should not be — a measurement of the binding has to exclude them or it reads their coverage
+  as the carve's failure.
 - **Count and scale derive from Era −1 region demography** (Ben, 2026-08-25; BL-610, centres
   from demography). Density is history's consequence: the simulated regions decide how many
   centres a body carries and how large each is, replacing the land-area divisor and the

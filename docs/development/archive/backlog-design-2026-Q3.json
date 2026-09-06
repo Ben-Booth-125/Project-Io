@@ -5949,6 +5949,55 @@
     "completed",
     "resolved"
    ]
+  },
+  "BL-783": {
+   "status": "complete",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "32b",
+   "written": "2026-09-06",
+   "author": "BL-766 implementer (2026-09-06); main session (itemisation)",
+   "requires": [
+    "BL-766"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-783",
+   "short_name": "CENTRE_BOUND_TO_ITS_REGION",
+   "category": "Generation",
+   "title": "A materialised population centre does not stand where the region that grew it stood",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "src/world/population_generation.cpp",
+    "src/world/settlement.hpp"
+   ],
+   "design": "FOUND BY BUILDING BL-766 (2026-09-06), and named in that item own note 1 as the half it did not close.\n\nTHE GAP. BL-766 makes cities sim-grain state: region carries centres, centres_razed and\nurban_population, and the Era -1 sim grows and sacks that record. After the sim,\ngenerate_population_centres materialises campaign entities from it. But the materialisation is\nBODY-WIDE - only the COUNT and the SCALE are region-derived. Nothing binds a placed centre back to\nthe region whose farmland grew it.\n\nWHY IT MATTERS, and it is not cosmetic. The whole point of drawing the map early is that history\nGREW AND SACKED specific places. If the surviving cities are then scattered body-wide, the causal\nstory is lost at the last step: a region that was sacked twice and a region that was never touched\nhand their (different) counts to the same undifferentiated placement pass. A player reading the map\ncannot find the war behind a ruin, which is the \"forces with visible causes\" standard\nGENERATION_STRATEGY.md holds generation to.\n\nIT ALSO BLOCKS A LATER CLAIM. BL-768 stamps markets where trade concentrated and roads along the\nhistory trunk routes. Both key off where settlement actually IS, so a body-wide scatter weakens\nthem from history-derived to merely plausible.\n\nTHE WORK: bind each materialised centre to its source region, and place it within that region\nrather than across the body. The region already carries an anchor. Deterministic and seedless like\nthe draw itself.\n\nDONE WHEN: a centre position is inside the region that grew it; a heavily sacked region visibly\ncarries fewer/smaller cities than an untouched neighbour of the same farm quality.\n--- DELIVERED 2026-09-06 ---\n\nTHE RANK-SIZE SHARE-OUT IS BYTE-FOR-BYTE UNCHANGED - same n, same harmonic, same c - so the body\nscale multiset does not move. What is new is WHICH REGION TAKES WHICH RANK: each region enters\nslots keyed urban_population / k for k = 1..centres, and sorting those descending IS the body-wide\nrank order. Causal in both directions - a sacked region carries a small urban_population, so its\nslots sort late and it materialises fewer AND smaller cities.\n\nCampaign placement is now a pure argmax inside the source region own Voronoi cell, via the same\nnearest_region partition city_names.cpp already reads - so a centre name and its ground agree by\nconstruction rather than by luck. NO RNG on that path at all; the seeded draw survives only on the\nno-settlement fallback.\n\nR2 WAS MEASURED PROPERLY, and the first attempt was wrong in an instructive way. Measuring the\nFINISHED world read 71% drift - which was ensure_province_anchor_centres and\nensure_national_population_centres, two deliberately region-blind coverage passes this item does\nnot own (1805 centres against 812 carved). The harness now strips and re-materialises in isolation.\n  displaced centres        457/812 (56.3%)  ->  145/812 (17.9%)\n  of which ground-exhausted            145  ->  145, ALL of them\n  regions at their exact count     187/516  ->  401/516\nBefore, region 99 wanted 10 centres and got 0 with 47 candidate tiles free. After, every shortfall\nis a region wanting more cities than it has ground.\n\nAND THE CAUSAL CLAIM WAS TESTED AS AN EXPERIMENT, NOT AN ANECDOTE. Razing is as rare as designed\n(this seed razed 1 region; two more seeds razed none), so n=1 would have been worthless. The\nharness sacks 59 city-bearing regions in a COPY of the record and re-materialises the same world:\nsacked lose 73.3% of their cities (337 -> 90), untouched controls lose 2.4% (369 -> 360). The 2.4%\nis controls giving back BORROWED spill from neighbours that stopped overflowing - the binding\nworking - and the harness asserts it that way rather than tolerating it.\n\nDIGESTS ALL MOVED (centre tiles and per-centre scale assignment are the item), reported not\nre-blessed, and reproduced exactly in the main tree after merge. UNMOVED and this is the useful\npart: 50,901 tiles, 54 nations, 8 corps, deposits 5,303,910.684, era counters identical at both\nepochs. Everything upstream of materialisation is untouched - the change is downstream-only.\n\nNew harness centre_region_bind.cpp, 16 assertions. POPULATION.md § Generation rewritten: it still\ndescribed placement as body-wide and unbound, which the code had overtaken.",
+   "completed": "2026-09-06",
+   "resolved": "2026-09-06",
+   "_row_keys": [
+    "status",
+    "glyph",
+    "priority",
+    "difficulty",
+    "version_goal",
+    "sprint",
+    "written",
+    "author",
+    "requires",
+    "blocked_on",
+    "parked",
+    "id",
+    "short_name",
+    "category",
+    "title",
+    "authority_doc",
+    "files",
+    "design",
+    "completed",
+    "resolved"
+   ]
   }
  }
 }
