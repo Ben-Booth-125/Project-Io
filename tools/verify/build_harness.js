@@ -32,6 +32,35 @@ const { spawnSync } = require('child_process');
 const os = require('os');
 
 const ROOT = path.resolve(__dirname, '..', '..');
+
+// THE DEPENDENCY CACHE IS NOT ALWAYS UNDER ROOT, and assuming it was made this
+// builder unusable in exactly the place it is needed most. A git WORKTREE - which
+// is how every sub-agent runs - has no _deps_cache of its own, so the sol2 and
+// Lua include paths below pointed at nothing and every build died on
+// `Cannot open include file: 'sol/sol.hpp'`. That reads precisely like the
+// wrong-builder symptom this file refuses harnesses to prevent, except here the
+// builder is right and the headers are simply absent. Reported by a worktree
+// agent, 2026-09-06.
+//
+// Resolution order mirrors build_lua_harness.sh: an explicit IO_DEPS_CACHE, then
+// this checkout's own, then the MAIN checkout's - which a worktree finds through
+// git's common dir. CMakeLists honours the same env override.
+function resolveDepsCache() {
+  if (process.env.IO_DEPS_CACHE) return process.env.IO_DEPS_CACHE;
+  const local = path.join(ROOT, '_deps_cache');
+  if (fs.existsSync(local)) return local;
+  try {
+    const r = spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+                        { cwd: ROOT, encoding: 'utf8' });
+    if (r.status === 0) {
+      const main = path.dirname(r.stdout.trim());
+      const shared = path.join(main, '_deps_cache');
+      if (fs.existsSync(shared)) return shared;
+    }
+  } catch { /* fall through to the local path and let the compiler say so */ }
+  return local;
+}
+const DEPS = resolveDepsCache();
 const WORLD = path.join(ROOT, 'src', 'world');
 
 // The five sol2/Lua TUs io_world_obj excludes. Mirrored from CMakeLists
@@ -245,8 +274,8 @@ if (isWindows) {
   args = ['-std=c++20', debug ? '-O0' : '-O2', '-g',
     '-I', path.join(ROOT, 'src'), '-I', path.join(ROOT, 'tools', 'verify'),
     // See the MSVC branch above: a world TU reaches scripting/lua_state.hpp -> sol/sol.hpp.
-    '-I', path.join(ROOT, '_deps_cache', 'sol2_src', 'include'),
-    '-I', path.join(ROOT, '_deps_cache', 'lua_src'),
+    '-I', path.join(DEPS, 'sol2_src', 'include'),
+    '-I', path.join(DEPS, 'lua_src'),
     ...(debug ? ['-fsanitize=address,undefined'] : []),
     src, ...sources, '-o', exe];
   void jobs; // g++ compiles the TU set in one invocation; --jobs is the MSVC /MP knob
