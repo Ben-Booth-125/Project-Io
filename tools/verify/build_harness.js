@@ -255,7 +255,14 @@ if (isWindows) {
     // on C1083 before a single assertion runs, which is how main sat with the whole
     // verifier-headless tier unbuildable (2026-08-31). Third rot of this arg list;
     // this file's own header comment already warned about the first two.
-    '/I', '_deps_cache\\sol2_src\\include', '/I', '_deps_cache\\lua_src',
+    // RESOLVED, NOT RELATIVE (fixed 2026-09-06, BL-777's worktree). These were
+    // the literal strings `_deps_cache\sol2_src\include` and `_deps_cache\lua_src`,
+    // relative to cwd — so `resolveDepsCache()` above, added the same day to make
+    // a worktree find the MAIN checkout's cache, never reached the Windows branch
+    // at all and every worktree agent on Windows still died on C1083 'sol/sol.hpp'.
+    // Fifth rot of this arg list. Use DEPS, which is absolute.
+    '/I', JSON.stringify(path.join(DEPS, 'sol2_src', 'include')),
+    '/I', JSON.stringify(path.join(DEPS, 'lua_src')),
     JSON.stringify(path.relative(ROOT, src)),
     ...sources.map(s => JSON.stringify(path.relative(ROOT, s))),
     `/Fo:${path.relative(ROOT, objDir)}\\`, `/Fe:${path.relative(ROOT, exe)}`].join(' ');

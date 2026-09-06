@@ -201,6 +201,18 @@ save_envelope make_envelope()
     r0.centres              = 3;
     r0.centres_razed        = 0;
     r0.urban_population     = 31775;
+    // BL-777's field, at a DISTINCT NON-DEFAULT value on both regions, which is
+    // the whole point of setting it here: `region_domain::land` is the struct
+    // default and a default round-trips clean even through a writer that
+    // transposed the field or dropped it. r0 takes `coastal_water` and r1 takes
+    // `open_ocean` — the extreme of the range, so the `r_enum` bound
+    // (`max_region_dom`) is exercised at its edge rather than in its middle.
+    //
+    // That `open_ocean` is a value GENERATION no longer produces is not a
+    // contradiction: this harness asserts the SERIALISER carries every value of
+    // the type, and the generation-side claim (no region anchors on open ocean)
+    // is sim_water_census's to make.
+    r0.domain               = region_domain::coastal_water;
     region r1;
     r1.name                 = "Torrend Reach";
     r1.anchor               = 274;
@@ -210,6 +222,7 @@ save_envelope make_envelope()
     r1.centres              = 1;
     r1.centres_razed        = 5;
     r1.urban_population     = 12099;
+    r1.domain               = region_domain::open_ocean;
     be.settlement.regions.push_back(r0);
     be.settlement.regions.push_back(r1);
     be.settlement.lacunae                = 6;
@@ -333,9 +346,16 @@ int main()
             && le.report.bodies[0].settlement.regions[1].population == 19507
             && le.report.bodies[0].settlement.regions[1].centres == 1
             && le.report.bodies[0].settlement.regions[1].centres_razed == 5
-            && le.report.bodies[0].settlement.regions[1].urban_population == 12099;
+            && le.report.bodies[0].settlement.regions[1].urban_population == 12099
+            // BL-777, save_game_version 7: the appended domain byte, distinct
+            // and non-default on BOTH regions and different BETWEEN them.
+            && le.report.bodies[0].settlement.regions[0].domain
+                   == region_domain::coastal_water
+            && le.report.bodies[0].settlement.regions[1].domain
+                   == region_domain::open_ocean;
         check(settlement_ok,
-              "S3 the region urban record survives (centres / razed / urban heads, "
+              "S3 the region urban record and domain survive (centres / razed / urban heads "
+              "/ domain, "
               "each distinct, both regions)");
         check(le.report.bodies.size() == 1
                   && le.report.bodies[0].settlement.lacunae == 6
