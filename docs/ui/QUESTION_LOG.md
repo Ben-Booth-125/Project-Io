@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**49 surfaces** — 6 settled, 43 awaiting Ben's wording.
+**50 surfaces** — 6 settled, 44 awaiting Ben's wording.
 
 ---
 
@@ -373,6 +373,14 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 **Because:** Units had no on-canvas glyph at all before this (ICONS.md previously documented Unit as "(no glyph)"), reachable only by clicking the exact tile a unit stood on or cycling into it — a large province full of units was otherwise invisible on the map. BL-511 made a unit's command grain the PROVINCE (march_unit targets a province, not a tile), so the marker follows the same province-anchor convention the battle marker already established: drawn once per (province, owner) GROUP at the province's lowest-member-tile anchor, with a "+N" count badge for more than one unit in the group, rather than once per unit or per tile. The humanoid silhouette echoes the unit card's own placeholder glyph (glyph_soldier) so the canvas and the card read as one vocabulary. Carries a stub ring for contract-committed units (always false today; BL-573, a later wave of the same Sprint 16 batch, adds the real per-unit flag) so that later item needs no further UI plumbing change.
 
 *Demanded by BL-575, BL-511 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/ui_state.hpp` · id `unit_marker`*
+
+### Selection band — the water tile variant (owner / domain centre column)
+
+**Answers:** Who owns this water?
+
+**Because:** Coastal water and lakes carry an owner, derived from the shore that claims them; open ocean structurally does not (PROVINCES.md § Who owns water). That asymmetry is the load-bearing shape of the water model, and it was invisible on every surface the game had — the hover card reported terrain and habitability and said nothing about title, no lens colours ground by owning nation, and clicking water did not move the Selection band at all. A claim nobody can look at can only be trusted, which is not the standard this project holds a generated world to. It earns its space by reusing the tile element rather than adding one: same header, same hex ring (which is where a shoreline reads at all), same action grid; only the centre column forks, and it forks because four of the five ground sections — buildings, deposits, resources, population — ask questions about ground there is none of. The single most important word on it is 'Unowned', stated positively: an empty owner row and an owner row reading 'Unowned' cost the same pixels and mean opposite things, the first looking like the panel failed and the second being the model's central assertion.
+
+*Demanded by BL-785 · `src/ui/selection_panel.cpp` · id `water_tile_selection`*
 
 ---
 

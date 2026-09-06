@@ -39,6 +39,18 @@
     "Never hand-edit the mirror."
   ],
   "entries": {
+    "water_tile_selection": {
+      "surface": "Selection band — the water tile variant (owner / domain centre column)",
+      "answers": "Who owns this water?",
+      "because": "Coastal water and lakes carry an owner, derived from the shore that claims them; open ocean structurally does not (PROVINCES.md § Who owns water). That asymmetry is the load-bearing shape of the water model, and it was invisible on every surface the game had — the hover card reported terrain and habitability and said nothing about title, no lens colours ground by owning nation, and clicking water did not move the Selection band at all. A claim nobody can look at can only be trusted, which is not the standard this project holds a generated world to. It earns its space by reusing the tile element rather than adding one: same header, same hex ring (which is where a shoreline reads at all), same action grid; only the centre column forks, and it forks because four of the five ground sections — buildings, deposits, resources, population — ask questions about ground there is none of. The single most important word on it is 'Unowned', stated positively: an empty owner row and an owner row reading 'Unowned' cost the same pixels and mean opposite things, the first looking like the panel failed and the second being the model's central assertion.",
+      "backlog_item": [
+        "BL-785"
+      ],
+      "files": [
+        "src/ui/selection_panel.cpp"
+      ],
+      "status": "drafted"
+    },
     "balance_ledger": {
       "surface": "Balance Ledger",
       "answers": "Where is my money going, and how long do I have?",
