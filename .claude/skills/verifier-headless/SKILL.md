@@ -583,6 +583,37 @@ in `tools/verify/README.md`.
   population centre*, was written, measured and **fails at 64%**; it is deliberately non-gating and
   is the acceptance test for BL-463 (settlement count is seed-invariant).
 
+- **`continent_drift`** — The plate time axis (BL-763). Asserts that plate motion integrates over
+  the drift history rather than being read off the present landform, so a tile can be asked where
+  it was as well as where it is.
+
+- **`sim_water_census`** — **The instrument the whole water model is judged against.** Reports, per
+  seed, regions on water / on sea / on open ocean, the stored `region_domain` field against the
+  substrate, and the share of the sim's adjacency edges that cross sea. W1–W2 are the non-vacuity
+  gates (every seed generated and ran its era; edges were actually examined); the substantive rows
+  are that the stored domain disagrees with the substrate in **zero** cases, and that **no region
+  anchors on open ocean**. Run it either side of any change to the carve, the partition, or unit
+  traversal — the before/after pair is what a digest re-bless is described against
+  (`DELIVERY.md` § The digest re-bless is one act per WAVE).
+
+- **`market_saturation`** (the promoted saturation measure, BL-775) — `measure_completeness`
+  (terminals closed / terminals total, per market) and the recipe-margin computation, promoted out
+  of a harness anonymous namespace into `src/world/` so generation and the check share **one**
+  implementation. That sharing is the point: two callers on one implementation is what stops a
+  check measuring something different from the code it is checking.
+
+- **`deposit_origin`** — **The only thing asserting the resource-origin split holds** (BL-762). The
+  Body phase places geological deposits and the Life phase places biological ones; this asserts the
+  Body phase places **no** biological deposit. Nothing else can see that invariant.
+
+- **`landscape_score_harness`** — **The only thing that can tell whether phase 6 has anything to
+  search on** (BL-770). Scores candidate landscapes on the four terms of
+  `GENERATION_STRATEGY.md` § What the objective is made of and reports the **relative range** of
+  each across candidates. Carries a **positive control** — the same objective over three different
+  worlds — without which a flat result is indistinguishable from a broken scorer. Its first run
+  returned exactly that negative result (every term flat over five rosters, the control moving
+  1.0), which is what identified the missing roster-aware term.
+
 - **`battle_engagement_harness`** — The engagement trigger and the per-tick battle step (BL-467,
   Sprint C3, 2026-08-21). **45 checks** — 26 for the trigger and the step, plus B12b–B14f for the two surfaces (BL-468/BL-469, same day). **B1 is the row that could not have been written before the
   item**: it stands two hostile forces in one province and runs `run_economy_step` — the REAL tick

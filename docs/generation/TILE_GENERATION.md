@@ -680,9 +680,22 @@ rather than guarding it. At *d* = 7 the measured mean still matches its lattice
 prediction, which is the evidence that terrain and spacing set the size. 41 tiles
 against land's 8.6 is also "much larger" by nearly five times.
 
-**Sea provinces are addressable empty space.** Units are land-bound (`march_unit`
-refuses a water destination outright), buildings refuse water, and a sea province
-sustains zero buildings. They exist without a naval model to justify them.
+**Only OPEN OCEAN is addressable empty space, and only because nobody can hold
+it.** This paragraph read *"Sea provinces are addressable empty space. Units are
+land-bound… They exist without a naval model to justify them"* until 2026-09-06,
+when Ben's water-domain ruling gave them one. What is true now:
+
+| Domain | Held by | Occupied by | Builds |
+|---|---|---|---|
+| Coastal water, lake | the owner of the shore | coastal/naval units; land units where the water is **owned** | a **port**, and nothing else |
+| Open ocean | nobody, structurally | coastal/naval units only | nothing |
+
+`docs/generation/PROVINCES.md` § Who owns water owns the ownership rule and
+`docs/military/MILITARY.md` § Domains and traversal owns the traversal rule; this
+pass owns only the **partition** that gives them something to address. A coastal
+province is therefore no longer empty space — it is territory with an owner
+derived from its shore. Open ocean stays empty, deliberately: it is *crossed*
+rather than held, so what makes it matter is traffic and not title.
 
 **Open question for Ben:** a **lake** is partitioned on the coastal band, as its own
 province. Ben named lakes as a tile kind but did not rule what province a lake

@@ -207,6 +207,40 @@ horizontal columns (Ben, 2026-07-28):
    surface; supply routing is the Supply lens's subject, LENSES.md), plus **two reserved
    slots** so the grid's shape never changes when a fifth or sixth action arrives.
 
+### A water tile is selectable, and its selection answers ownership (Ben, 2026-09-06)
+
+**Water tiles are selectable.** Clicking water resolved to nothing at all until 2026-09-06 — the
+Selection panel did not update, which was defensible while water was a wall and indefensible once
+it became territory. A water tile selects exactly as a land tile does, through the same
+`focus_on_entity` path and into the same three-column band.
+
+**The reason it must be selectable is that it is the ONLY surface that can answer the water
+model's central claim.** Coastal water and lakes carry an owner, derived from the shore that
+claims them; open ocean structurally does not (`docs/generation/PROVINCES.md` § Who owns water).
+That is the load-bearing shape of the model, and it was invisible on every surface the game
+had — the hover card reported terrain and habitability and said nothing about title, and no lens
+colours ground by owning nation. A claim nobody can look at is one that can only be trusted, which
+is not the standard this project holds a generated world to.
+
+**What the band presents for water**, against the land layout above:
+
+| Column | Water tile |
+|---|---|
+| Left — hex neighbourhood | Unchanged. The ring reads a shoreline usefully; it is where the coast/ocean boundary is legible at all |
+| Centre — facts | **Owner** and **domain** are the headline pair — the nation holding it, or *unowned* stated **positively** for open ocean rather than left blank. Then the province, and habitability |
+| Right — actions | **Construct** is live only for a **port**, on **owned** coastal water; everything else is disabled, as on ground that refuses the type |
+
+**Unowned must READ as a fact, not as missing data.** An empty owner row and an owner row saying
+"unowned" are the same pixels' worth of effort and opposite in meaning: the first looks like the
+panel failed, the second is the design. Open ocean is unowned *structurally* — it is the assertion,
+not the absence of one.
+
+**What is deliberately not here.** The centre column does not gain a deposit, workforce or
+resource page for water — those read the ground, and there is none. And selecting water does not
+substitute for a territory lens: the panel answers *who holds this tile*, one tile at a time,
+where a lens would answer *who holds this region* at a glance. The lens stays unbuilt and
+unpromised.
+
 ### Multi-building tiles
 
 A tile can carry a heterogeneous set — several extraction stacks against different deposits,

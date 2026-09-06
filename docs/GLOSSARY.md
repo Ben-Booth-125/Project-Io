@@ -124,6 +124,15 @@ The centre scale ladder — Outpost / Settlement / Town / City / Metropolis (sca
 **Building**
 A surface installation placed on a tile. Buildings are either **extraction** (harvesting raw materials from tile deposits) or **processing** (consuming inputs and producing outputs via a recipe) or **infrastructure** (affecting logistical or economic capacity). Each building holds a `building_component` and a `stockpile_component`.
 
+**Domain**
+The three exclusive tile sets a province is partitioned over — **land**, **coastal water**, **open ocean** — and the axis a unit's traversal is declared against. A tile's substrate names exactly one, so the domains never mix and **a province never spans two of them**. Domain is derived from the substrate of any member tile, never stored. It answers *what kind of place is this*; ownership and traversal are separate questions asked of it. See `docs/generation/PROVINCES.md` § Who owns water and `docs/military/MILITARY.md` § Domains and traversal.
+
+**Coastal water**
+The `coast` and `lake` substrates — the shore's apron. **Owned**, by whoever owns the shore that claims it, with the owner derived from the tiles exactly as on land (`world::tile_to_nation`). Coastal and naval units may occupy it; a **land** unit may cross it only where its own polity owns it, which is the middle case that makes a held shoreline walkable and a rival's not. It is the only water a building may sit on, and the only building is a **port**.
+
+**Open ocean**
+The `ocean` substrate — the deep sea. **Unowned, structurally**: it is never territory, and no nation carve claims it. Only coastal and naval units may be there, and nothing may be built on it. The asymmetry against coastal water is deliberate — holding requires standing somewhere, and the deep sea is *crossed* rather than held, so what makes it matter is traffic rather than title. Its provinces are larger than any land province (80-tile guard, mean ~41) and exist as addressable empty space.
+
 **Road (Track / Road / Highway)**
 A per-tile land cost-reducer, not a building — the `tile_component.road_level` field (0 = none) discounts a tile's intra-body A* traversal cost. Three tiers form a ladder (BL-172): **Track** (`road_level` 1, ×0.67 traversal — minor / low-throughput), **Road** (2, ×0.50 — regular), **Highway** (3, ×0.40 — high-throughput backbone). "Throughput" is *cost-discount*, not a capacity cap. Roads are laid by world generation between cities (Highway/Road/Track by centre scale) and placed by the player from the build front door (any tier, upgrade-in-place). A **railroad** is a distinct transport *mode*, not a road tier (BL-173, railroad transport mode). See `docs/economy/LOGISTICS.md`.
 

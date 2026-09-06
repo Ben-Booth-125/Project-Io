@@ -326,33 +326,37 @@ specialists, Pass 6 fills in the rest of the home economy with **background corp
 `corporation_component.is_background = true` — using the same nation-assignment, focus, and
 asset-placement machinery as Passes 1–3, just run repeatedly rather than a fixed number of times.
 
-**Trigger and stop condition — calibrated, not authored.** Pass 6 keeps generating background
-firms and holdings, body by body, until the body's real production reaches a **target fraction of
-its real demand** for the tradeable resource set — **0.90** — or until a **per-resource firm cap**
-is reached, whichever comes first. Retuning recipes, deposits, or population moves how many firms
-Pass 6 places; the design does not author a count.
+**Density is the per-resource firm cap, and the cap is the design (Ben, 2026-09-06).** Pass 6
+generates background firms and holdings, body by body, up to a **per-resource firm cap**. The firm
+count is therefore exactly `specialists + cap × (number of goods with demand)`, and the property
+that follows is the one to carry: **density is set by the BREADTH of the demand baskets, not by
+how much is consumed.**
 
-> **Which of the two actually binds — measured, 2026-08-26 (BL-655), correcting this paragraph.**
-> On the worlds we generate today, **the 0.90 ratio never binds**. The cap does, on every demanded
-> resource, so the firm count is *exactly* `specialists + cap × (number of goods with demand)` —
-> which reproduced every observed number: 12 demanded goods gave 104 corps, 7 gave 64, 6 gave 56.
-> The consequence is the one worth carrying: **density is set by the BREADTH of the demand baskets,
-> not by how much is consumed.** Doubling `demand_scale` moved the corp count by zero. Adding one
-> good to the household basket moves it by the cap.
->
-> This paragraph previously said the ratio was "an emergent measurement rather than an injected
-> clearing constant" and "a stop condition, not a firm-count budget". Measurement says the opposite
-> of both, and the cap's own code comment still reads *"provisional — measure, then pin"* while
-> having quietly become the load-bearing shaping constraint. Whether that is the design anyone
-> wants is open (BL-656); what is settled is that the doc now describes what the code does.
+**There is no 0.90 production-to-demand ratio.** This section described one for months, as a
+"target fraction of real demand" reached before the cap, and called it *calibrated, not authored*.
+Measurement (2026-08-26) found the ratio **never binds on any world we generate** — the cap binds
+on every demanded resource, reproducing every observed count exactly: 12 demanded goods gave 104
+corps, 7 gave 64, 6 gave 56. Doubling `demand_scale` moved the count by zero; adding one good to
+the household basket moved it by the cap. Ben's ruling retires the ratio outright rather than
+raising the cap until it binds, so the shaping constraint is the one that was actually shaping,
+stated plainly and pinned deliberately.
 
-**Pass 6 recurs through the economic settle (Ben, 2026-09-03).** The settle —
-`GENERATION_STRATEGY.md` § Three passes of simulated history — runs the campaign economy tick
-before play until the field is operating-positive and steady, and Pass 6 is its spawn act: it is
-re-run at a fixed cadence through the settle against the demand the field has *now*, so a niche
-opened by an exit is re-filled by a fresh firm rather than left as a gap that never closes. Firm
-exit is the cull. The calibration rule above is unchanged; what changes is that it is applied
-repeatedly, and that the stop condition belongs to the settle, not to Pass 6.
+**What that commits to, said out loud.** Background density is a function of **how many different
+goods are wanted**, not of how much of them. A basket that grows in breadth grows the corp count;
+a world that consumes twice as much of the same goods gets the same firms. That is a legible rule
+and it is now the intended one — but it means the demand basket's breadth is a **density knob**,
+and anything editing that basket is editing the size of the background economy.
+
+**Pass 6 is a one-shot, and the economic settle it used to recur through no longer exists.** This
+section said Pass 6 was re-run at a fixed cadence through a settle, with firm exit as the cull.
+`GENERATION_STRATEGY.md` § The eight phases retires the warm start and the settle together and
+replaces them with **phase 6's directed static search** — a settle asks *what survives whatever
+generation happened to place*, a search asks *which placement is worth handing over*, and keeping
+both would pay twice for the weaker answer.
+
+So the background economy's source is the landscape phase 6 **selects**, and this pass is what
+produces the candidate rosters that search ranks. The cap above is what sizes a candidate; the
+search is what chooses among them.
 
 **Background firms are full participants, not a cheaper model.** Once placed, a background firm is
 otherwise ordinary: it runs the **full corp_ai scored-utility layer** — build, demolish, survey,

@@ -41,17 +41,22 @@ in the sandbox, so no float decides who wins.
 
 **Inputs.** Two `std::vector<army_stack_entry>`, two `doctrine_row`s, a terrain triple
 (`terrain_substrate` + `terrain_cover` + `cover_density`) plus a `terrain_landform`, a `season`,
-and two supply values 0..1000 (clamped). Nothing is rejected — an empty or all-naval stack
-resolves rather than erroring.
+and two supply values 0..1000 (clamped). Nothing is rejected — an empty stack resolves rather
+than erroring.
 
-> **The degenerate case that follows from "nothing is rejected", and what guards it.** Naval
-> entries score EXACTLY zero, and the victory test is a strict `>`. So a fight where BOTH sides
-> are empty or all-naval resolves as a **defender victory with 400/200 per-mille losses** —
-> casualties inflicted on forces that scored no power at all, in a shape indistinguishable from
-> a real outcome. The engagement trigger opens a battle on stance and position alone and never
+> **The degenerate case that follows from "nothing is rejected", and what guards it.** A stack
+> that scores zero power still resolves, and the victory test is a strict `>`, so a fight where
+> BOTH sides score nothing resolves as a **defender victory with 400/200 per-mille losses** —
+> casualties inflicted on forces that scored no power at all, in a shape indistinguishable from a
+> real outcome. The engagement trigger opens a battle on stance and position alone and never
 > inspects unit class, so nothing downstream would catch it; `battle_system.cpp`'s
-> `stack_can_fight` screens both stacks before opening. Unreachable with a land-only roster,
-> and guarded rather than left to be found by the first naval row.
+> `stack_can_fight` screens both stacks before opening.
+>
+> **An all-naval stack is no longer one of these cases**, and the change of status is worth
+> stating rather than absorbing. It used to be degenerate *by construction*, because the class
+> scored zero; under § Domains and traversal it scores like any other, so an all-naval fight is
+> an ordinary fight — the rare one the water model exists to make expressible. What the guard
+> still covers is the genuinely empty stack, which is a caller error in any era.
 
 An **`army_stack_entry`** is one unit type's contribution, already reduced to numbers:
 `{type_id, cls, count, type_power_mod}`. It is deliberately **not** a lookup key into a roster
@@ -59,11 +64,19 @@ table — the engine scores whatever stack it is handed and does not know which 
 `type_id` is carried for the caller's bookkeeping and never interpreted.
 
 **Unit classes** are five and coarse: infantry, cavalry, ranged, siege, naval. Base power per unit
-is 100 / 130 / 90 / 150 / 0.
+is authored in one table, and **naval is authored there like the other four** — it is a fighting
+class, not a tag.
 
-**Naval is strategic-only.** A naval entry contributes zero power *and* zero weight to the matchup
-average. Naval rows exist in the roster and naval entries are accepted; naval presence is strategic
-tagging, and there is no tactical naval resolution.
+**Naval scores, and it is the only class that may hold water.** A naval entry contributes power and
+weight to the matchup average exactly as a land class does. What separates it is not its arithmetic
+but its *domain*: naval rows are the only rows that may occupy open ocean, and the only rows that
+may contest coastal water a rival holds (§ Domains and traversal).
+
+> **This overturns "naval is strategic-only", which this section asserted until 2026-09-06.** The
+> earlier reading gave the class zero power and zero weight, and the matchup matrix carried a row
+> marked *unused*. That was coherent while water was a wall — there was nowhere for a fleet to be,
+> so there was nothing for it to do. Ben's water-domain ruling makes water a place, and a class that
+> is the sole occupant of a place has to be able to fight over it.
 
 The **class matchup matrix** is a rock-paper-scissors core: infantry beats ranged, ranged beats
 cavalry, cavalry beats infantry. Siege is uniformly weak in the open field, because there is no
@@ -336,13 +349,29 @@ water model exists so that the uncommon ones — a contested strait, a coastal p
 hands, a trade shore denied — are expressible at all. A model that made sea battles routine would
 be describing a different game.
 
-**Two things this does not settle**, and neither should be inherited by default:
+**Water gives 0 defence, and forages from the shore it is next to (Ben, 2026-09-06).** Zero cover
+at sea stands — there is nothing to stand behind. Forage does *not* stay at zero, and it is not a
+flat number either: **a fleet forages where it is adjacent to coastal water or land its own polity
+owns, and starves where it is not.**
 
-- **Terrain gives water 0 defence and 0 forage.** Zero cover at sea reads correct. Zero forage means
-  a fleet starves where it sits, which may be the right blockade pressure or may be an accident of a
-  table written for land; it is a decision to take, not a default to keep.
-- **Whether a coastal province can hold anything.** Ports are the obvious first occupant, and
-  buildings currently refuse water outright.
+That makes the supply of a fleet a question of *how far from home it is*, which is the same
+question the land supply model already asks, expressed in the only geography water has. It gives
+the blockade its pressure without inventing a blockade rule: a fleet parked on a rival's shore is
+sitting in the one place it cannot feed itself, and a fleet in open ocean is on a clock. And it
+inherits nothing by accident — a zero copied out of a table written for land would have starved
+every fleet equally, whether it sat in its own harbour or a thousand tiles away.
+
+**A coastal province holds a port, and nothing else (Ben, 2026-09-06).** Buildings refuse water
+outright today; the exception is the port and it is the only one. The reasoning is the same one
+that makes coastal water ownable at all — a shore you hold is a place you can build a thing that
+faces the sea, and a port is precisely that thing. Every other building type wants ground, workers
+and a deposit, and none of the three is on the water.
+
+**What that does NOT open.** A port on water is still gated by the ordinary placement seam
+(`placement_rules::can_place`) and still needs its tile owned; it is not a way to claim water by
+building on it, because ownership is derived from the shore and never from an installation
+(`docs/generation/PROVINCES.md` § Who owns water). Whether a water port differs from a land port
+in what it *does* is `docs/economy/LOGISTICS.md`'s question, not this document's.
 
 
 ## The muster interface
@@ -485,9 +514,16 @@ directly.
 (`scripts/economy.lua`), keyed by the roster row's `cls`. Spent per tick against the per-tile
 traversal-cost weight (`logistics::tile_traversal_cost`, the same plains=1.0/mountain=2.0 table
 road placement discounts), with fractional remainder banked in `order.progress` across ticks.
-Defaults: infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 (there is no naval movement
-model — `combat.hpp`'s own "strategic-only presence"). A composite unit (BL-472, formations) reads
-its **slowest** component's class entry.
+Defaults: infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, and **naval carries a real march
+rate** — a fleet crosses its domain as a land class crosses its own, and 0.0 was the movement
+half of the strategic-only reading § Combat overturned. A composite unit (BL-472, formations)
+reads its **slowest** component's class entry.
+
+**Traversal cost over water is uniform.** `logistics::tile_traversal_cost` prices land by
+landform, and water has no landform to price — so a sea leg costs the same per tile wherever it
+runs, and distance alone sets its length. The thing that varies over water is *legality*, not
+cost (§ Domains and traversal), which is the cheaper model to reason about and the one that
+cannot be tuned into meaninglessness.
 
 **Visit order — NR-344, "war flips the queue".** At peace, convoys claim the network first:
 `advance_convoys` runs in the sim loop *before* `run_economy_step` is called (`main.cpp`/`app.cpp`),
@@ -777,7 +813,9 @@ Headless harnesses under `tools/verify/`, run with the `verifier-headless` skill
 expected side, the exact-tie defender tie-break, and losses bounded as fractions. R3: doctrine is
 pure modifier data — the same phalanx wins on open ground and loses in mountain. R4: naval
 contributes zero power without crashing or branching, and the harness compiles against
-`combat.hpp` + `components.hpp` alone.
+`combat.hpp` + `components.hpp` alone — **R4 inverts with the water model**: what it must now
+assert is that a naval entry contributes REAL power, that an all-naval stack resolves without
+dividing by zero, and that the matrix row previously marked *unused* is exercised.
 
 **`campaign_battle_harness.cpp`** — `resolve_campaign_battle`. C1: replay determinism including the
 per-round trace, stepping matching the scripted wrapper, and the seed genuinely folding from the

@@ -279,6 +279,47 @@ concurrent tasks inside one batch. Close it at the task layer, where the failure
 It stays transient in `REFINED.md` (it concerns *this* batch's parallel tasks). Promote a genuinely
 item-level prerequisite to `waits_on` as usual; `provides`/`consumes` is the finer, within-batch layer.
 
+### The digest re-bless is one act per WAVE, and it is authorised, never absorbed
+
+A headless digest — `world_determinism`'s world metrics and deep digest, and the counters
+`history_sweep` reports beside them — is a **contract**, not a snapshot. The standing obligation is
+to **report movement and never re-bless without authorisation**; this section is how that
+obligation is honoured across a wave of items rather than item by item.
+
+**The failure it exists to prevent.** Where several items in one wave each move the generated
+world, landing them independently moves the digests four times and invites four re-blesses. Each
+is individually defensible and the result is that nobody ever asked whether the new world is
+**better** — the movement is absorbed one commit at a time and the contract quietly becomes a
+changelog. Four small authorisations are not one real one.
+
+**The rule.**
+
+1. **No intermediate item re-blesses anything.** An item in a world-moving wave reports its digest
+   movement and leaves the golden red. A red golden with a stated cause is a correct state to
+   commit in; that is what "report movement" means.
+2. **Every item measures its OWN before/after in isolation**, in its own worktree, at the time it
+   lands. This is what keeps causes **attributable** even though the final movement is combined,
+   and it is the whole reason a wave can be judged at all.
+3. **One item owns the re-bless**, and it is the last in the wave. It records the before and after
+   values, re-runs the measuring harnesses either side, and — the load-bearing part — states what
+   changed **in world SHAPE rather than in hash**: regions lost, territory gained, campaigns made
+   illegal, engagements that now occur.
+4. **Ben authorises against that description, not against the digest.** A hash is not a thing a
+   human can hold an opinion about; a shape is.
+5. **One commit**, carrying both values and the description.
+
+**The claim being re-blessed must have a committed check BEFORE the re-bless, not after.** A
+re-bless is the moment the old world stops being reproducible, so a claim that is only asserted by
+an ad-hoc probe becomes **unfalsifiable at exactly that point**. If the wave's headline is "X is
+now true of the world", something in `tools/verify/` asserts X first.
+
+**Where a wave has more than one cause, say so and name them all.** The single-judgement-point
+property is worth protecting but it is not always available — a wave carved for throughput can put
+independent world-movers alongside each other. That is a legitimate trade and the mitigation is
+rule 2: the description then owes **N named causes** with per-item attribution beside it, rather
+than one. What is never acceptable is a description that names one cause because the others were
+not noticed.
+
 ### Batch Delivery (barrier semantics)
 
 Delivering more than one item in a work block runs the steps as **barriers across the whole set**

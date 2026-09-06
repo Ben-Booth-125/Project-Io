@@ -349,7 +349,7 @@ work.
 | 3 | **The People** | Where people are, weighted toward ground that farms easily — drawn **before** history and evolved by it. | BL-766 (population map early) |
 | 4 | **The History** | Empires that form, grow and collapse; the roads that supplied them; the markets that emerged from their trade. | BL-767 (empires reliably form), BL-768 (roads and markets from history) |
 | 5 | **The map of consequence** | **Finalise** what the history produced, rather than invent it: the anchors of one polity fold into one nation, city states survive the size floor, and the tariff posture is enacted. City states and pseudo-national borders belong to phase 4. | BL-769 (consequence folds into history), BL-750 (tariff posture) |
-| 6 | **The economic substrate** | The Era 0 sim: search in parallel for a corporate landscape that is **viable but uneven**. Runs at the ordinary **quarterly tick** (Ben, 2026-09-03), so its SPAN is set by the budget rather than by the calendar — see BL-770 for the arithmetic. | BL-770 (Era 0 candidate search) |
+| 6 | **The economic substrate** | Search for a corporate landscape that is **viable but uneven**. A **static** search with no clock and therefore no span — see § Phase 6 is a STATIC SEARCH below. | BL-770 (Era 0 candidate search) |
 | 7 | **The rest** | The other bodies, the laws, the partitions. Expands as core systems land. | — |
 | 8 | ~~Warm start~~ | **Retired.** Its burden moves to phase 6. | BL-772 (retire warm start) |
 
@@ -404,8 +404,9 @@ loss-making. The cheap proxy is a per-resource supply-to-demand **ratio** per ma
 static, and it is what drives a price to the ceiling in the first place. The validation run is what
 confirms the proxy was good enough.
 
-**What the objective is made of (Ben, 2026-09-06).** Three terms, and the third is what makes it an
-*asymmetry* objective rather than a coverage one:
+**What the objective is made of (Ben, 2026-09-06).** **Four terms.** The third is what makes it an
+*asymmetry* objective rather than a coverage one, and the fourth is the only one that can see a
+candidate at all:
 
 1. **Chain completeness** — terminals closed over terminals total, per market. Does a chain reach a
    sink here at all.
@@ -417,6 +418,21 @@ confirms the proxy was good enough.
    scores worse than one with rich and poor markets at the same mean, because an even map is the
    outcome § Asymmetry is the deliverable exists to prevent, and a search that is merely neutral
    about evenness will drift toward it.
+4. **Realisation — actual closure over potential closure.** Of the terminals a market *could*
+   close, how many are closed by a building that actually exists in its catchment. A landscape
+   with rich ground and no firms scores near 0; one whose firms close every chain the ground
+   allows scores 1.
+
+**Why the fourth term is not optional, and why the first three could not do its job.** Terms 1–3
+are computed from tiles, markets and population — none of which a candidate changes. Phase 6
+chooses among **rosters**, so an objective made only of those three is blind to the choice it is
+being asked to make; scored over candidates that differ by corporation count and placement seed,
+every term comes back identical to the last digit. Realisation is what turns a measure of the
+*world's* saturation potential into a measure of **this roster's** use of it.
+
+Term 1 is kept rather than replaced, because it is the denominator: realisation without potential
+alongside it cannot distinguish a roster that closed everything available on poor ground from one
+that closed half of what rich ground offered. The pair is the reading; either alone is not.
 
 **Recipe margin is deliberately NOT a term.** It exists (the registry computes revenue minus inputs
 at base plus the wage per batch) and it stays the *authoring* check that every recipe can pay — but
@@ -430,11 +446,42 @@ them at all**. If completeness is flat across every candidate, the search has no
 and everything downstream of it is wasted — that is a result worth having in an afternoon rather
 than after the parallel harness is written.
 
-**The parallelism is not an optimisation, it is why the shape fits.** Six candidates at 53–71 s
-each is 5–7 minutes serially and breaks the 3–6 minute budget; run in parallel they cost about one
-candidate's wall clock. That makes determinism the binding constraint: each candidate must be a
-pure function of (shared world, candidate seed, candidate parameters), and the winner chosen by a
-deterministic argmax with an explicit tie-break — **never by which thread finished first**, and
+**How a candidate is PRODUCED — greedy refinement (Ben, 2026-09-06).** The objective says how to
+rank a landscape; this says where landscapes come from, and it was the half nothing owned.
+
+The search **starts from one seed candidate, scores it, perturbs the winner along one axis,
+re-scores, and keeps the better** — for a **fixed number of rounds**, never until convergence. The
+three axes are the ones point 3 above names and no others: corporation **rosters**, starting
+**placements**, and **road/infrastructure tiers**. A round proposes a perturbation on each axis,
+scores the proposals, and the argmax over {incumbent, proposals} becomes the next incumbent.
+
+**Fixed rounds, not convergence, and that is a determinism requirement rather than a budget one.**
+A convergence test makes the amount of work depend on the landscape, so two worlds do the same
+search for different lengths and a threshold becomes a hidden tuning knob. A fixed round count
+makes the search a pure function of (world, seed, round count) with a cost known before it starts.
+
+**What keeps it deterministic**, and every clause is load-bearing: perturbations are drawn from a
+seeded stream in a fixed axis order; a round's proposals are scored independently and never in
+completion order; the argmax runs over a **total** order with an explicit tie-break, so an exact
+tie resolves the same way on every machine and at every thread count; and the incumbent is
+replaced only on a **strict** improvement, so a tie leaves the incumbent standing rather than
+churning between equals.
+
+**Greedy is chosen knowing what it costs.** It will find a local optimum and not the global one —
+which is acceptable here in a way it would not be elsewhere, because the objective is
+*viable-but-uneven* rather than maximal. A landscape that is good enough and unevenly good is the
+deliverable; a search that ground toward the single best landscape would be re-introducing exactly
+the "most profitable" reading that point 4 rejects. The greedy walk also gives the search
+something the alternatives do not: a **path**, so what a round changed and what it bought is
+inspectable rather than being one draw among hundreds.
+
+**Determinism is the binding constraint, and it survived the collapse of the budget argument.**
+The parallelism was once load-bearing — six candidates at 53–71 s each is 5–7 minutes serially,
+about one candidate's wall clock in parallel. The static ruling above deleted that arithmetic
+along with the clock, so parallelism is now an optimisation and nothing rests on it. What does
+**not** change is the constraint it imposed: each candidate must be a pure function of (shared
+world, candidate seed, candidate parameters), and the winner chosen by a deterministic argmax
+with an explicit tie-break — **never by which thread finished first**, and
 never varying with thread count. BL-773 owns the budget as a whole.
 
 **Two of the eight points needed new machinery rather than a reorder**, and are filed at that size
