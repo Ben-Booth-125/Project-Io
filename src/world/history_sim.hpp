@@ -846,6 +846,24 @@ struct history_sim_state
     /// each change, and you have the map at any year. `owner_slice_at` does
     /// exactly that for a caller that wants one year materialised.
     std::vector<owner_change> owner_changes;
+
+    /// THE ANCIENT ROAD RECORD (BL-768) — every region-to-region corridor the
+    /// history actually moved along, deduplicated and counted.
+    ///
+    /// Two sources, and each is an event the sim already resolves rather than a
+    /// new concept: a CAMPAIGN records (staging holding -> objective), the line
+    /// an army was actually victualled along and the exact pair `campaign_supply`
+    /// prices; a SETTLE records (parent -> daughter), the line a founding party
+    /// walked. Consolidate and Invest have no spatial pair and contribute none.
+    ///
+    /// Sorted ascending by (a, b) with `uses` accumulated, so the stamping pass
+    /// is order-independent by construction. Region indices are stable for the
+    /// life of a run — Settle only ever appends — so an index recorded in year
+    /// -3900 still names the same region at the epoch.
+    ///
+    /// NOT gated on `trace_battles`: generation is its consumer, not a harness.
+    std::vector<history_corridor> supply_corridors;
+
     int      region_stride = 0; ///< Final region count (slice width for replay).
     int64_t  years           = 0; ///< Years simulated.
     int64_t  start_year      = 0; ///< First simulated year, for replay bounds.

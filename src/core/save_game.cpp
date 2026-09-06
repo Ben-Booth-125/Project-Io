@@ -439,6 +439,10 @@ void w_report(std::ostream& o, const generation_report& g)
     w_i64(o, g.prehistory_battles);
     w_i64(o, g.prehistory_conquests);
     w_i64(o, g.prehistory_foundings);
+    // save_game_version 8 (BL-768, the ancient road record) -- keep r_report in step.
+    w_i64(o, g.prehistory_corridors);
+    w_i64(o, g.prehistory_junctions);
+    w_i64(o, g.markets_from_trade);
 }
 
 bool r_report(std::istream& i, generation_report& g)
@@ -448,7 +452,10 @@ bool r_report(std::istream& i, generation_report& g)
         && r_vec(i, g.bodies, r_body_entry)
         && r_vec(i, g.stage_lines, [](std::istream& s, std::string& v) { return r_str(s, v); })
         && r_i64(i, g.prehistory_years) && r_i64(i, g.prehistory_battles)
-        && r_i64(i, g.prehistory_conquests) && r_i64(i, g.prehistory_foundings);
+        && r_i64(i, g.prehistory_conquests) && r_i64(i, g.prehistory_foundings)
+        // save_game_version 8 (BL-768) -- keep w_report in step.
+        && r_i64(i, g.prehistory_corridors) && r_i64(i, g.prehistory_junctions)
+        && r_i64(i, g.markets_from_trade);
 }
 
 // ---------------------------------------------------------------------------

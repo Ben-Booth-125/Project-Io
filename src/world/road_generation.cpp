@@ -170,6 +170,39 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
     return true;
 }
 
+// BL-768 — THE ANCIENT TIER RULE. Its own rule, not the industrial one: the
+// gates above read a nation's qualification percentile, a field derived from
+// industrialisation timing that does not exist in antiquity and has no spread to
+// read when it does. What an ancient corridor has instead is how hard it was
+// USED and what its two ends BUILT.
+//
+// kAncientRoadUses is MEASURED, not chosen, and the distribution turned out to
+// be genuinely bimodal rather than merely skewed. `history_sweep 8 --epoch 1960`
+// (2026-09-06) records 3,185 distinct corridors over eight worlds: 3,119 walked
+// exactly ONCE — a founding party reaches new ground and never comes back — then
+// six corridors in the whole sweep at two or three uses, then a tail of 60
+// walked four or more, the busiest 218 times. There is a real gap, so the
+// threshold is not a percentile dressed up as a constant: 4 is where the tail
+// begins, and a Road therefore means "this line carried repeat traffic" rather
+// than "this line existed". `history_sweep`'s BL-768 block prints the histogram,
+// so a re-measure is a row to read rather than an argument to reopen.
+constexpr int kAncientRoadUses = 4;
+
+/// Tier for one recorded corridor. Integer throughout, matching the sim's own
+/// fixed-point idiom rather than the float gates the modern pass uses.
+///
+/// The works promotion needs BOTH ends. A corridor is only as good as its worse
+/// terminus — a paved trunk with a station at one end and nothing at the other
+/// is a road that stops — and requiring both is what stops a single Way Station
+/// promoting every line radiating out of one region.
+std::uint8_t ancient_tier(int uses, int reach_a, int reach_b)
+{
+    std::uint8_t t = (uses >= kAncientRoadUses) ? kRoad : kTrack;
+    if (reach_a > 0 && reach_b > 0 && t < kHighway)
+        t = static_cast<std::uint8_t>(t + 1);
+    return t;
+}
+
 } // namespace
 
 void generate_roads(world& w, entity_id body)
@@ -538,6 +571,66 @@ void generate_roads(world& w, entity_id body)
     w.astar_cost_cache.clear();
     w.logistics_flood_fields.clear(); // the fields cache the same road-dependent answers
     // Roads change traversal cost, so they change reach too (BL-323 S2).
+    w.body_reach_cost.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Ancient roads, stamped from the history's record (BL-768)
+// ---------------------------------------------------------------------------
+
+void stamp_history_roads(world& w, entity_id body,
+                         const std::vector<history_road_node>& nodes,
+                         const std::vector<history_corridor>&  corridors)
+{
+    if (corridors.empty() || nodes.empty())
+        return; // A world with no Era -1 pass. The whole call is a no-op.
+
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return;
+    const int gw = std::max(1, bit->second.grid_width);
+    const int gh = std::max(1, bit->second.grid_height);
+
+    // grid_y*gw + grid_x -> tile, the same raster index the region anchors use
+    // (settlement.hpp § region::anchor) and the same one generate_roads' border
+    // pass reads. Built once here, not per corridor.
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (static_cast<int>(grid.size()) < gw * gh)
+        return;
+
+    auto tile_of = [&](const history_road_node& n) -> entity_id {
+        if (n.col < 0 || n.col >= gw || n.row < 0 || n.row >= gh)
+            return null_entity;
+        return grid[static_cast<std::size_t>(n.row) * gw + n.col];
+    };
+
+    // `corridors` arrives sorted by (a, b) and stamping takes the max per tile,
+    // so this walk is order-independent: a tile shared by two corridors ends at
+    // the higher of the two tiers whichever is stamped first.
+    for (const history_corridor& c : corridors)
+    {
+        if (c.a >= nodes.size() || c.b >= nodes.size())
+            continue; // A record written against a shorter node array.
+        const history_road_node& na = nodes[c.a];
+        const history_road_node& nb = nodes[c.b];
+
+        const entity_id ta = tile_of(na);
+        const entity_id tb = tile_of(nb);
+        if (ta == null_entity || tb == null_entity || ta == tb)
+            continue;
+
+        // A region anchored on coastal water is legitimate (BL-777, the water
+        // ownership ruling), and it simply carries no road: stamp_edge skips
+        // every water tile, and the strait rule refuses a route that crosses
+        // open ocean. Neither is special-cased here — the ancient network obeys
+        // the same land rule the national lattice does.
+        stamp_edge(w, body, ta, tb, ancient_tier(c.uses, na.reach_mod, nb.reach_mod));
+    }
+
+    // Same contract as generate_roads' tail: road_level moved, so every cache
+    // keyed on traversal cost is stale.
+    w.astar_cost_cache.clear();
+    w.logistics_flood_fields.clear();
     w.body_reach_cost.clear();
 }
 

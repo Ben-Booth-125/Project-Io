@@ -383,6 +383,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // --- Per-year war pressure, reset each tick ---------------------------
     std::vector<int> war_pressure(ss.regions.size(), 0);
 
+    // --- THE ANCIENT ROAD RECORD (BL-768) ---------------------------------
+    //
+    // Appended raw as events happen, then sorted and run-length-encoded into
+    // `out.supply_corridors` at the end of the run. A raw list plus one sort is
+    // deliberately preferred to a keyed map: the sort key is a pair of plain
+    // integers, so the result cannot depend on a container's layout, and the
+    // hot loop pays a push_back rather than a tree lookup.
+    //
+    // PURE OBSERVATION. Nothing below reads this back, so it cannot move a
+    // decision — the same contract `battle_trace` holds, and the reason both
+    // can be recorded unconditionally without a determinism argument.
+    std::vector<std::pair<uint16_t, uint16_t>> corridor_uses;
+    const auto note_corridor = [&](int a, int b) {
+        if (a < 0 || b < 0 || a == b) return;
+        if (a >= static_cast<int>(owner_index_limit)
+         || b >= static_cast<int>(owner_index_limit)) return;
+        const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
+        const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
+        corridor_uses.push_back({lo, hi});
+    };
+
     // --- Neighbour index --------------------------------------------------
     //
     // Campaign candidates are NEIGHBOURS ONLY, so the neighbourhood is built
@@ -1149,6 +1170,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int atk_supply = campaign_supply(src_d, ti, src);
                 const int def_supply = 1000;
 
+                // BL-768 — THE SUPPLY CORRIDOR, recorded where it is priced.
+                // `src` is the staging holding the army victualled from and
+                // `ti` the objective it marched on, so this pair is literally
+                // the line supply moved along, taken from the two indices
+                // `campaign_supply` was just handed rather than reconstructed.
+                // Recorded on LAUNCH, not on victory: the road was walked
+                // whether or not the battle was won, and a network that only
+                // remembered the winners would be a map of conquests rather
+                // than a map of routes.
+                note_corridor(src, static_cast<int>(ti));
+
                 // The stall, counted where it actually happens (BL-312). The
                 // first cut incremented this AFTER resolve_battle and only at
                 // exactly zero supply, so it counted launched battles rather
@@ -1439,6 +1471,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 war_pressure.push_back(0);
                 neighbours.emplace_back();
                 link_region(ss.regions.size() - 1); // Keep the index complete.
+
+                // BL-768 — the road a founding party walked. The daughter is
+                // reached FROM its parent and supplied from there until it can
+                // feed itself, so (parent, daughter) is the second and by far
+                // the commoner of the two corridor sources: a polity settles far
+                // more often than it campaigns, which is what gives a peaceful
+                // history a road network at all.
+                note_corridor(best_target, static_cast<int>(ss.regions.size()) - 1);
                 out.owner_changes.push_back(owner_change{
                     static_cast<int32_t>(y),
                     static_cast<uint16_t>(ss.regions.size() - 1),
@@ -1607,6 +1647,28 @@ history_sim_state run_history_sim(settlement_state&         ss,
     out.region_stride = static_cast<int>(ss.regions.size());
     out.years           = years;
     out.start_year      = params.start_year;
+
+    // --- The ancient road record, folded (BL-768) -------------------------
+    //
+    // Sort by (a, b) — a total order over two plain integers — then run-length
+    // encode. The corridor a region walked forty times and the one it walked
+    // once are the same edge with different traffic, and traffic is what the
+    // ancient tier rule reads, so the count has to survive the fold.
+    {
+        std::sort(corridor_uses.begin(), corridor_uses.end());
+        out.supply_corridors.reserve(corridor_uses.size());
+        for (const auto& e : corridor_uses)
+        {
+            if (!out.supply_corridors.empty()
+                && out.supply_corridors.back().a == e.first
+                && out.supply_corridors.back().b == e.second)
+            {
+                ++out.supply_corridors.back().uses;
+                continue;
+            }
+            out.supply_corridors.push_back(history_corridor{e.first, e.second, 1});
+        }
+    }
 
     // --- The world median furnace year (BL-748) ---------------------------
     //
