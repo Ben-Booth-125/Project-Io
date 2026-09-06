@@ -1,5 +1,6 @@
 #include "tile_generation.hpp"
 
+#include "continents.hpp"
 #include "planetology.hpp"
 
 #include <algorithm>
@@ -963,14 +964,22 @@ struct ore_field { int centre; float radius; };
 // Where each region-forming resource actually forms. Anything not listed here
 // keeps the flat endowment — a region model is only honest for resources with
 // a real concentrating mechanism.
+/// @param bearing Optional per-tile mask, 1 where this resource is actually
+///                placed. Required for the BIOLOGICAL specs (coal, petroleum)
+///                since BL-765: their placement is no longer a rule this
+///                function could restate, it is the palaeo record, so the only
+///                honest candidate set is the one the Life phase produced. A
+///                candidate test that restated the rule from the PRESENT map was
+///                exactly the thing BL-765 exists to remove — and it would now
+///                centre a coal region on ground the finished world gives no
+///                coal to.
 std::vector<ore_field> ore_fields_for(resource_type res, int n, int gw, int gh,
                                         const std::vector<float>& height,
                                         const std::vector<bool>& is_ocean,
-                                        const std::vector<terrain_cover>& cov,
                                         const std::vector<uint8_t>* convergent,
+                                        const std::vector<uint8_t>* bearing,
                                         std::mt19937& rng)
 {
-    using cv = terrain_cover;
     const int total = gw * gh;
     const bool have_conv = convergent != nullptr
                            && convergent->size() == static_cast<std::size_t>(total);
@@ -992,7 +1001,6 @@ std::vector<ore_field> ore_fields_for(resource_type res, int n, int gw, int gh,
         return land_h[k];
     };
     const float marine_cut = land_pct(0.40f); // lowest 40% of land: old shelf and basin
-    const float swamp_cut  = land_pct(0.55f); // a little higher: the coal measures
 
     std::vector<int> cand;
     for (int idx = 0; idx < total; ++idx)
@@ -1007,21 +1015,19 @@ std::vector<ore_field> ore_fields_for(resource_type res, int n, int gw, int gh,
             case resource_type::copper_ore:
                 ok = have_conv && (*convergent)[static_cast<std::size_t>(idx)] != 0u;
                 break;
-            // Oil and banded iron are MARINE legacies: they want ground that sat
-            // low — a shelf or an epicontinental basin — not today's uplands.
-            case resource_type::petroleum:
+            // Banded iron is a MARINE legacy: it wants ground that sat low —
+            // a shelf or an epicontinental basin — not today's uplands.
             case resource_type::iron_ore:
                 ok = height[idx] <= marine_cut;
                 break;
-            // Coal wants the swamp: low, wet, vegetated ground.
+            // BL-765: coal and petroleum are placed by the Life phase from the
+            // palaeo record, so their regions form where that record put them.
+            // The old tests restated the rule here from the PRESENT map — a
+            // swamp cut plus a marsh/forest/grass cover for coal, the marine cut
+            // for petroleum — and a restated rule is a rule that drifts.
             case resource_type::coal:
-                // "Vegetated" is a claim about the COVER (BL-519), and saying so
-                // is what the axis split buys here: the old list named three
-                // compositions to mean one thing. Scrub is excluded deliberately —
-                // sparse woody cover is not the swamp that lays down a seam.
-                ok = height[idx] <= swamp_cut
-                     && (cov[idx] == cv::marsh || cov[idx] == cv::forest
-                         || cov[idx] == cv::grass);
+            case resource_type::petroleum:
+                ok = bearing != nullptr && (*bearing)[static_cast<std::size_t>(idx)] != 0u;
                 break;
             default: break;
         }
@@ -1247,12 +1253,23 @@ std::array<float, resource_count> build_rarity_profile(uint32_t seed)
 // PROVABLY free of biological deposits, which is a structural fact a harness can
 // read (generation_record::body_phase_placed) rather than a claim in a comment.
 //
-// WHAT THIS IS NOT. The life half is still drawn from the PRESENT cover, not
-// from the paleo record — a coal seam still appears where the ground is barren
-// today rather than where a swamp stood in the tile's own past. Deriving it from
-// the past is BL-765's act, and BL-764 is what makes it askable. This item
-// builds the seam that act writes through; it does not write through it, and the
-// world is byte-identical because of that.
+// ---------------------------------------------------------------------------
+// BL-765 — AND NOW IT WRITES THROUGH IT: THE BODY PHASE PLACES NOTHING BIOTIC
+// ---------------------------------------------------------------------------
+//
+// `put` below still receives every biological row, and the draw behind each one
+// still HAPPENS — `roll(rng, ...)` is evaluated in the argument, before the
+// lambda body runs — but the value is discarded. That is deliberate and it is
+// the whole reason this shape was chosen over deleting the rows: `tile_rng` runs
+// on past this function into the endemic amount draw and into
+// derive_environment's hazard/habitability jitter, so a deleted draw would move
+// hazard and habitability on every tile of every world. Drawn, consumed,
+// discarded keeps this stream exactly where BL-762 left it, and the movement in
+// the digests is then attributable to PLACEMENT rather than to stream drift —
+// two different findings that must not be allowed to blur into one.
+//
+// Where the biological half is placed instead: `generate_life_deposits` below,
+// on its own per-tile stream, from the palaeo record.
 struct tile_deposits
 {
     /// Phase 1, the body: the lithosphere's — ores, aggregates, ice.
@@ -1284,8 +1301,11 @@ void generate_deposits(terrain_substrate sub, terrain_cover cov, std::uint8_t de
     // exactly as it did; the routing is a property of the resource.
     auto put = [&](resource_type res, float v)
     {
-        auto& dst = is_biological_resource(res) ? dep.biological : dep.geological;
-        dst[static_cast<std::size_t>(res)] = v;
+        // BL-765: the body phase writes ONLY the lithosphere's. `v` has already
+        // been drawn by the time we get here, which is the point — see the
+        // header comment above. The origin table decides, not the call site.
+        if (is_biological_resource(res)) return;
+        dep.geological[static_cast<std::size_t>(res)] = v;
     };
 
     const bool mountain = lf == terrain_landform::mountain;
@@ -1427,6 +1447,200 @@ void generate_deposits(terrain_substrate sub, terrain_cover cov, std::uint8_t de
     }
 }
 
+// ---------------------------------------------------------------------------
+// BL-765 — THE LIFE PHASE. Coal where the ancient swamps were, oil where the
+// ancient seas were, timber where the forest stands NOW.
+// ---------------------------------------------------------------------------
+//
+// THE CROSSING THIS MAKES. BL-762 gave the deposit pass two destinations decided
+// by the origin table; it did not change where anything was PLACED, and said so.
+// The consequence was that a coal seam landed wherever the ground happens to be
+// barren today, which is a statement about the modern map and not about the
+// carboniferous. BL-763 gave drift a clock and BL-764 gave the ground a frame,
+// and this is the pass that reads them: a tile is asked where it SAT when its
+// fossils formed, and the fossil is placed from the climate it sat in.
+//
+// THE FOSSIL / LIVING SPLIT IS THE SAME ONE PLANETOLOGY S8 ALREADY ENCODES.
+// There, fossils key off `st.peak` (a dead world keeps its coal) and living
+// resources off `st.stage` (a dead world loses its forests). Here the same line
+// falls between the epoch each row reads: coal and petroleum read the PAST;
+// timber, produce, fibre and peat read the PRESENT — because that is where they
+// are, not where they were.
+//
+// IT IS A CONSEQUENCE, NOT A ROLL (Ben, standing). The palaeo-climate predicate
+// REPLACES the rarity gate that used to decide whether a tile carried coal at
+// all: presence is now a fact about the world's history. The per-body rarity
+// scalar survives only as a magnitude term, which is what keeps the
+// rare-stays-rare ordering `build_rarity_profile` exists for.
+//
+// ITS OWN STREAM, for the reason BL-040's rare_rng has its own: `tile_rng` is
+// consumed past the deposit call by the endemic draw and by
+// derive_environment's jitter, so the life rows could not be re-cut in place
+// without moving hazard and habitability everywhere.
+
+/// What the palaeo record says about one tile, reduced to the two numbers the
+/// Life phase actually consumes. Computed once per tile, before the ore-field
+/// pre-pass replays the deposit rules, so `paleo_tile_at` is called exactly
+/// twice per tile for the whole generation.
+struct life_site
+{
+    /// How readily an everwet mire stacked here at the land-burial epoch.
+    /// 0 where no mire stacks: dry ground, ground off the grid (drifted over a
+    /// pole, where the moisture sample would be a guess), or a belt too cold.
+    float coal_belt = 0.0f;
+
+    /// How productive the shallow sea over this ground was at the marine-anoxic
+    /// epoch. 0 on ground that never sat low enough to be a shelf or a basin.
+    float oil_belt = 0.0f;
+};
+
+/// The mire term for one palaeo-climate. Everwet is the binding condition — ~90%
+/// of Earth's coal comes from one window whose cause is climate x tectonics, and
+/// the wet cutoff here is `moisture_column`'s own, not a second copy of it.
+/// The belt weighting says the rest: equatorial everwet mires are the type
+/// locality, the cool-temperate measures are real but thinner, and nothing
+/// stacks under a subpolar or polar sky.
+float coal_belt_of(const paleo_tile_state& past, bool basin)
+{
+    // THE BASIN IS HALF THE MECHANISM, and S7 already says so: the coal window
+    // is `greened_at x subsidence x climate`, and a world with no mobile lid
+    // gets a quarter of it because nothing subsides. That is the term stated
+    // per-body; this is the same term stated per-tile. Mires that do not stack
+    // over a subsiding basin rot rather than becoming a seam, which is why the
+    // ore-field candidate test has always wanted low ground for coal too.
+    if (!basin) return 0.0f;
+    if (!past.on_grid) return 0.0f;                        // no honest climate sample
+    if (moisture_column(past.moisture) != 2) return 0.0f;  // not everwet
+    switch (past.band)
+    {
+        case lat_band::tropical:    return 1.00f;
+        case lat_band::subtropical: return 0.85f;
+        case lat_band::temperate:   return 0.55f;
+        case lat_band::subpolar:
+        case lat_band::polar:       break;
+    }
+    return 0.0f;
+}
+
+/// The shelf term. Petroleum is a MARINE legacy — Type I/II kerogen under anoxic
+/// bottom water, which is why S8 gates it on oxygenation and not on land life —
+/// so the ground has to have sat low (a shelf or an epicontinental basin, the
+/// same reading `ore_fields_for` already uses for its regions) and under a
+/// productive sky. Warm water is the productive water; a polar shelf is not.
+float oil_belt_of(const paleo_tile_state& past, bool shelf)
+{
+    if (!shelf || !past.on_grid) return 0.0f;
+    switch (past.band)
+    {
+        case lat_band::tropical:
+        case lat_band::subtropical: return 1.00f;
+        case lat_band::temperate:   return 0.80f;
+        case lat_band::subpolar:    return 0.45f;
+        case lat_band::polar:       break;
+    }
+    return 0.0f;
+}
+
+/// Which drift epoch a fossil's window sits at, derived from the biosphere
+/// history rather than authored per resource.
+///
+/// Two facts set it, and both come out of the chain rather than out of this
+/// file. (1) WHICH window: coal is laid in the land-burial window and petroleum
+/// in the marine-anoxic one — `land_burial_gyr` and `marine_anoxia_gyr`, the two
+/// durations S7/S8 already compute and already spend on the endowment. (2) HOW
+/// DEEP in the drift record it sits: a window that ran long is one whose
+/// deposits reach further back, so the depth is the window's share of its own
+/// chain ceiling, mapped across the `continent_drift_epochs` the record spans.
+///
+/// The ordering falls out of the chain too, and the caller enforces it: marine
+/// anoxia opens at oxygenation, land burial only after land is colonised, so the
+/// oil epoch is never SHALLOWER than the coal epoch on the same body.
+///
+/// Past `continent_drift_epochs` a single straight-line drift vector stops being
+/// a reconstruction (CONTINENTS.md § The drift clock), so the depth is clamped
+/// there rather than extrapolated — the query answers at any depth and the
+/// caller owns it, and this is the caller.
+int epoch_for_window(float window_gyr, float ceiling_gyr)
+{
+    if (!(ceiling_gyr > 0.0f) || !(window_gyr > 0.0f)) return 0;
+    const float share = std::clamp(window_gyr / ceiling_gyr, 0.0f, 1.0f);
+    const int e = static_cast<int>(std::lround(share * static_cast<float>(continent_drift_epochs)));
+    return std::clamp(e, 0, continent_drift_epochs);
+}
+
+/// The Life phase's deposits for one tile. The mirror of `generate_deposits`:
+/// that one writes only the lithosphere's, this one only the biosphere's, and
+/// the origin table enforces both ends.
+void generate_life_deposits(terrain_substrate sub, terrain_cover cov, std::uint8_t density,
+                            terrain_landform lf, const life_site& site,
+                            tile_deposits& dep, std::mt19937& rng,
+                            const std::array<float, resource_count>& rarity)
+{
+    using su = terrain_substrate;
+    using cv = terrain_cover;
+    using r  = resource_type;
+
+    auto put = [&](resource_type res, float v)
+    {
+        // The mirror of the body phase's guard. Both ends are decided by the
+        // origin table, so the partition cannot be wrong by omission.
+        if (!is_biological_resource(res)) return;
+        dep.biological[static_cast<std::size_t>(res)] = v;
+    };
+
+    const bool valley = lf == terrain_landform::valley;
+    const float thickness = 0.6f + 0.55f * cover_fraction(density);
+
+    // --- LIVING: what grows here NOW ---------------------------------------
+    // Magnitudes and predicates carried over unchanged from the body phase's
+    // rows, so the world still feeds itself at the same scale. What moved is
+    // which stream they draw from, not what they say.
+    if (cov == cv::forest || cov == cv::marsh)
+        put(r::timber, roll(rng, 15.0f, 40.0f) * thickness);
+
+    // PEAT IS THE MARSH ITSELF, still accumulating — a living resource, gated on
+    // the CURRENT biosphere in S8 and read from the present cover here. The body
+    // phase reached it through `sedimentary + scrub`, the old tundra row; a peat
+    // bog is a marsh, and saying so is the axis split (BL-519) paying out again.
+    if (cov == cv::marsh)
+        put(r::peat, roll(rng, 5.0f, 15.0f));
+
+    if (sub == su::sedimentary)
+    {
+        switch (cov)
+        {
+            case cv::grass:
+                put(r::agricultural_produce,
+                    roll_mod(rng, 40.0f, 180.0f, valley ? 1.3f : 1.0f) * thickness);
+                put(r::fibre,
+                    roll_mod(rng, 30.0f, 140.0f, valley ? 1.3f : 1.0f) * thickness);
+                break;
+            case cv::forest:
+                put(r::agricultural_produce,
+                    roll_mod(rng, 10.0f, 80.0f, valley ? 1.15f : 1.0f) * thickness);
+                break;
+            case cv::marsh:
+                put(r::agricultural_produce, roll(rng, 40.0f, 200.0f) * thickness);
+                put(r::fibre, roll(rng, 30.0f, 150.0f) * thickness);
+                break;
+            default:
+                break;
+        }
+    }
+
+    // --- FOSSIL: what stood here THEN --------------------------------------
+    // Presence is the palaeo predicate, not a draw. The magnitude keeps the old
+    // range and the per-body rarity scalar, so a coal-poor campaign is still a
+    // coal-poor campaign; what changed is WHERE the seams are.
+    if (site.coal_belt > 0.0f)
+        put(r::coal, roll(rng, 30.0f, 140.0f)
+                     * rarity[static_cast<std::size_t>(r::coal)] * site.coal_belt);
+
+    if (site.oil_belt > 0.0f)
+        put(r::petroleum, roll_mod(rng, 0.0f, 120.0f, valley ? 1.2f : 1.0f)
+                          * rarity[static_cast<std::size_t>(r::petroleum)] * site.oil_belt);
+}
+
 // Hazard and habitability are not authored in the design tables; they are derived
 // here from the SUBSTRATE (a base ceiling), the COVER (what living there is
 // actually like) and the landform (a slope/exposure modifier).
@@ -1513,7 +1727,8 @@ std::vector<entity_id> generate_body_tiles(
     const planetology_state* pl,
     generation_record* record,
     const std::vector<float>* continent_bias,
-    const std::vector<uint8_t>* convergent)
+    const std::vector<uint8_t>* convergent,
+    const continent_state* continents)
 {
     const int total = gw * gh;
 
@@ -1835,6 +2050,82 @@ std::vector<entity_id> generate_body_tiles(
     // tiles, so each campaign varies while the rare-stays-rare ordering holds.
     const std::array<float, resource_count> rarity = build_rarity_profile(seed ^ 0x68E31DA4u);
 
+    // BL-765 — THE PALAEO PRE-PASS. Ask every tile where it SAT when its fossils
+    // formed, once, and reduce the answer to the two terms the Life phase
+    // consumes. Done here rather than inside the tile loop because the ore-field
+    // pre-pass below REPLAYS the deposit rules to build its bearing mask, and
+    // two of its four region-forming resources (coal, petroleum) are now placed
+    // from these terms — so both readers need the same array, and neither should
+    // pay for the query twice.
+    //
+    // CONSUMES NO RANDOMNESS. `paleo_tile_at` is a pure function of the plate set
+    // and the tile's present position, which is the property that let BL-764 add
+    // it at all; nothing here can shift a stream.
+    std::vector<life_site> sites(static_cast<std::size_t>(total));
+    {
+        // "Sat low" has to be a percentile of the LAND range, not an absolute
+        // height, for exactly the reason ore_fields_for gives: Pass 2 puts the
+        // ocean threshold at the water_fraction percentile, so every land tile
+        // sits above it and an absolute cutoff selects nothing. Same 40th
+        // percentile, same meaning — old shelf and epicontinental basin.
+        std::vector<float> land_h;
+        land_h.reserve(static_cast<std::size_t>(total));
+        for (int idx = 0; idx < total; ++idx)
+            if (!is_ocean[idx]) land_h.push_back(height[static_cast<std::size_t>(idx)]);
+        // The same two percentiles `ore_fields_for` names, and the same
+        // meanings: the lowest 40% of land is old shelf and epicontinental
+        // basin, a little higher is where the coal measures sit.
+        float marine_cut = 0.0f, swamp_cut = 0.0f;
+        if (!land_h.empty())
+        {
+            std::sort(land_h.begin(), land_h.end());
+            const auto pct = [&](float q) {
+                return land_h[static_cast<std::size_t>(q * static_cast<float>(land_h.size() - 1))];
+            };
+            marine_cut = pct(0.40f);
+            swamp_cut  = pct(0.55f);
+        }
+
+        // The two epochs, derived from the biosphere history. The ceilings are
+        // the chain's own clamps: S7 clamps the land-burial window at 0.6 Gyr and
+        // S6 clamps marine anoxia at 4.0 Gyr, so normalising against them asks
+        // "how much of the window this world COULD have had did it get?" rather
+        // than inventing a scale here.
+        const float coal_window_ceiling_gyr   = 0.6f;
+        const float marine_window_ceiling_gyr = 4.0f;
+        int coal_epoch = 0, oil_epoch = 0;
+        if (pl)
+        {
+            coal_epoch = epoch_for_window(pl->land_burial_gyr,   coal_window_ceiling_gyr);
+            oil_epoch  = epoch_for_window(pl->marine_anoxia_gyr, marine_window_ceiling_gyr);
+            // The chain's own ordering, made binding: marine anoxia opens at
+            // oxygenation and land burial only after land is colonised, so the
+            // oil is never YOUNGER than the coal on the same body.
+            if (oil_epoch < coal_epoch) oil_epoch = coal_epoch;
+        }
+
+        // A null continents result leaves the ground stationary at every epoch —
+        // `paleo_tile_at` with an empty plate set returns the present, which is
+        // the honest answer for a body with no drift history rather than a
+        // degraded one.
+        static const continent_state k_no_drift{};
+        const continent_state& cs = continents ? *continents : k_no_drift;
+
+        for (int row = 0; row < gh; ++row)
+            for (int col = 0; col < gw; ++col)
+            {
+                const int idx = col + row * gw;
+                if (is_ocean[idx]) continue; // no deposit pass runs on water
+                const paleo_tile_state coal_past =
+                    paleo_tile_at(cs, gw, gh, col, row, coal_epoch, profile.temperature, &moisture);
+                const paleo_tile_state oil_past =
+                    paleo_tile_at(cs, gw, gh, col, row, oil_epoch, profile.temperature, &moisture);
+                const float h = height[static_cast<std::size_t>(idx)];
+                sites[static_cast<std::size_t>(idx)].coal_belt = coal_belt_of(coal_past, h <= swamp_cut);
+                sites[static_cast<std::size_t>(idx)].oil_belt  = oil_belt_of(oil_past, h <= marine_cut);
+            }
+    }
+
     // ore fields (Open calls 4). Own RNG stream, so adding this pass leaves
     // every earlier draw untouched; skipped entirely without a planetology state,
     // which keeps the null-pl identity contract exact.
@@ -1868,11 +2159,18 @@ std::vector<entity_id> generate_body_tiles(
             if (is_ocean[idx]) continue;
             std::mt19937 tr(seed_deposit ^ (static_cast<uint32_t>(idx) * 2654435761u));
             std::mt19937 rr(seed_deposit ^ (static_cast<uint32_t>(idx) * 40503u) ^ 0x5BD1E995u);
-            // BOTH HALVES, deliberately: two of the four specs are biological
+            std::mt19937 lr(seed_deposit ^ (static_cast<uint32_t>(idx) * 2246822519u) ^ 0x1EAF10DEu);
+            // BOTH PHASES, deliberately: two of the four specs are biological
             // (coal, petroleum) and two geological, and the region budget is
             // conserved over the BEARING set regardless of which phase placed it.
+            // BL-765 made that literal — the two biological specs are no longer
+            // written by generate_deposits at all, so replaying only it would
+            // have handed the field builder an empty coal and petroleum mask and
+            // silently thrown both regions away.
             tile_deposits td{};
             generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], td, tr, rr, rarity);
+            generate_life_deposits(sub[idx], cov[idx], dens[idx], land[idx],
+                                   sites[static_cast<std::size_t>(idx)], td, lr, rarity);
             const std::array<float, resource_count> d = td.merged();
             for (std::size_t k = 0; k < 4; ++k)
                 if (d[static_cast<std::size_t>(k_specs[k].res)] > 0.0f)
@@ -1885,7 +2183,7 @@ std::vector<entity_id> generate_body_tiles(
             if (pl->endowment[static_cast<std::size_t>(s.res)] <= 0.0f)
                 continue; // the world's history never made this — nothing to place
             const auto prov = ore_fields_for(s.res, s.count, gw, gh, height, is_ocean,
-                                            cov, convergent, prov_rng);
+                                            convergent, &bears[k], prov_rng);
             if (prov.empty()) continue;
             ore_field_maps.emplace_back(s.res, ore_field_map(prov, gw, gh, bears[k], s.share));
         }
@@ -1910,12 +2208,24 @@ std::vector<entity_id> generate_body_tiles(
             // Independent stream for the full raw-set additions, so they cannot
             // perturb the calibrated subset draws or derive_environment (BL-040).
             std::mt19937 rare_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 40503u) ^ 0x5BD1E995u);
+            // BL-765: the LIFE phase's own stream, added for the reason rare_rng
+            // was added — tile_rng is consumed past the deposit call by the
+            // endemic draw and by derive_environment's jitter, so re-cutting the
+            // biological rows in place would move hazard and habitability on
+            // every tile of every world.
+            std::mt19937 life_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 2246822519u) ^ 0x1EAF10DEu);
 
-            // BL-762: the two phases are separate destinations, filled by one
-            // traversal so the stream past this point is exactly where it was.
+            // BL-762/BL-765: the two phases are separate destinations AND
+            // separate rules. The body traversal is untouched draw-for-draw (it
+            // still draws every biological row and discards it); the life
+            // traversal places the biosphere's residue from the palaeo record.
             tile_deposits phases{};
             if (!is_ocean[idx])
+            {
                 generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], phases, tile_rng, rare_rng, rarity);
+                generate_life_deposits(sub[idx], cov[idx], dens[idx], land[idx],
+                                       sites[static_cast<std::size_t>(idx)], phases, life_rng, rarity);
+            }
 
             for (std::size_t r = 0; r < resource_count; ++r)
             {

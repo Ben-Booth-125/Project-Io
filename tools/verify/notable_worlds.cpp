@@ -155,7 +155,7 @@ world_score score_seed(uint32_t campaign_seed, bool keep_map)
     const entity_id fb = w.create_entity();
     generation_record rec;
     const std::vector<entity_id> ids = generate_body_tiles(w, fb, gw, gh, st.profile,
-        chosen, 1.0f, &st, &rec, &cs.height_bias, &cs.convergent);
+        chosen, 1.0f, &st, &rec, &cs.height_bias, &cs.convergent, &cs);
     generate_rivers(w, ids, gw, gh, rec.height, campaign_seed ^ 0x52490001u);
 
     std::vector<char> ocean(static_cast<std::size_t>(k_cells), 0), land(static_cast<std::size_t>(k_cells), 0);

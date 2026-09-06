@@ -15,6 +15,12 @@
 // design authority and per-pass rules.
 // ---------------------------------------------------------------------------
 
+/// The Continents/Drift result (src/world/continents.hpp). FORWARD-DECLARED
+/// rather than included: continents.hpp includes planetology.hpp, which includes
+/// THIS header, so including it back would close a cycle. Pass 6's Life phase
+/// only ever holds a pointer to it.
+struct continent_state;
+
 /// Broad thermal class of a body. Shifts the latitude band widths in Pass 3:
 /// a scorching body has no polar band; a frozen body is all polar.
 enum class temperature_class : uint8_t { scorching, hot, temperate, cold, frozen };
@@ -189,6 +195,14 @@ struct generation_record
 ///                raised them instead of pooling on whatever ground is already high. A
 ///                null pointer falls back to the height/composition rule and reproduces
 ///                the earlier surface bit-for-bit.
+/// @param continents Optional full Continents/Drift result (BL-765). The LIFE phase of
+///                Pass 6 asks each tile where it SAT when its fossils formed, through
+///                `paleo_tile_at` — coal at the land-burial epoch, petroleum at the
+///                marine-anoxic one. A null pointer (or a stagnant lid, or a body with
+///                no plates) leaves the ground stationary at every epoch, so the palaeo
+///                answer collapses to the present and the fossil rules read today's
+///                climate. That is a correct fallback, not a degraded one: a world with
+///                no drift history has no palaeo-geography to read.
 /// @return        Tile entity IDs in raster order (index = row * gw + col).
 std::vector<entity_id> generate_body_tiles(
     world& w,
@@ -200,7 +214,8 @@ std::vector<entity_id> generate_body_tiles(
     const planetology_state* pl = nullptr,
     generation_record* record = nullptr,
     const std::vector<float>* continent_bias = nullptr,
-    const std::vector<uint8_t>* convergent = nullptr);
+    const std::vector<uint8_t>* convergent = nullptr,
+    const continent_state* continents = nullptr);
 
 /// Scan raster order and return the first @p n land (non-ocean) tile IDs. Used to
 /// pick building attachment points after a body's tiles are generated.

@@ -378,35 +378,38 @@ the approximate profiles in `docs/economy/TILES.md`. Amounts are randomised in a
 per-tile draw seeded from the body seed plus tile index, ensuring the same body
 always produces the same deposits.
 
-**The output is split by ORIGIN; the traversal is not.** Pass 6 has two consumers of
-its draws — a **Body phase** that seeds the lithosphere with the body, and a **Life
-phase** that carries the biosphere's residue — and each deposit goes to one of them
-according to the resource's origin (§ Origin in
-[RESOURCES.md](../economy/RESOURCES.md)), never according to which row of the table
-writes it. Since the origin table is total and compile-enforced, the Body phase's
-output is free of biological deposits **by construction**: a new resource is
-classified or the build fails.
+**The output is split by ORIGIN, and so is the rule.** Pass 6 has two phases — a
+**Body phase** that seeds the lithosphere with the body, and a **Life phase** that
+carries the biosphere's residue — and each deposit belongs to one of them according
+to the resource's origin (§ Origin in [RESOURCES.md](../economy/RESOURCES.md)),
+never according to which row of a table writes it. Since the origin table is total
+and compile-enforced, each phase's output is free of the other's **by
+construction**: a new resource is classified or the build fails.
 
-The split is a split of the *destination*, not of the pass. The rows below stay in
-one interleaved traversal, drawn in the order they are written, and the reason is a
-hard constraint rather than convenience: `tile_rng` runs on past the deposit block
-into the endemic amount draw and into the derived environment's hazard/habitability
-jitter, so cutting the rows into two sequential passes would reorder the stream and
-move hazard and habitability on **every tile of every world**. Any future change here
-is subject to the same rule — a draw may not be removed, added or reordered without
-that movement being the intended act.
+**The Body phase's traversal still draws every row, including the biological ones,
+and discards them.** That is deliberate, and it is the one constraint every future
+change here is subject to: `tile_rng` runs on past the deposit block into the
+endemic amount draw and into the derived environment's hazard/habitability jitter,
+so removing, adding or reordering a draw moves hazard and habitability on **every
+tile of every world**. Drawn-then-discarded keeps that stream where it is, which is
+what makes a change in *placement* attributable to placement rather than to stream
+drift — two different findings that must not be allowed to blur into one.
+
+**The Life phase runs on its own per-tile stream** (`life_rng`), for the same reason
+the full raw-set additions run on theirs: it could not be cut into the shared stream
+without moving the environment everywhere.
 
 **Ambient resources** are always generated on eligible compositions at a low fixed
 baseline before the main deposit draw. This guarantees every tile has at least one
 extractable resource.
 
-| Ambient resource | Eligible compositions | Base deposit |
-|---|---|---|
-| Stone | All non-ocean, non-icy | 10–30 |
-| Timber | Forest, Wetland | 15–40 |
-| Sand | Barren (plains/canyon landform) | 10–25 |
-| Clay | Wetland, any valley landform | 8–20 |
-| Peat | Tundra (plains/valley landform) | 5–15 |
+| Ambient resource | Phase | Eligible ground | Base deposit |
+|---|---|---|---|
+| Stone | Body | All non-ocean, non-icy | 10–30 |
+| Timber | Life | Forest or marsh cover | 15–40 |
+| Sand | Body | Barren (plains/canyon landform) | 10–25 |
+| Clay | Body | Marsh cover, any valley landform | 8–20 |
+| Peat | Life | Marsh cover | 5–15 |
 
 **Calibrated subset deposit table** — the seven-resource subset, authored on the
 per-tile `tile_rng` stream. These values are hand-calibrated and the economy is
@@ -415,25 +418,19 @@ tuned on them; the full-set pass below leaves them bit-for-bit unchanged.
 | Composition | Resource | Base range | Mountain mod | Rift mod | Valley mod |
 |---|---|---|---|---|---|
 | Barren | Iron ore | 0–150 | ×1.4 | ×1.2 | — |
-| Barren | Petroleum | 0–120 | — | — | ×1.2 |
 | Rocky | Iron ore | 0–200 | ×1.5 | — | — |
 | Volcanic | Iron ore | 0–150 | — | ×1.3 | — |
 | Icy | Water | 0–400 | — | — | — |
-| Grassland | Agricultural produce | 40–180 | — | — | ×1.3 |
-| Grassland | Fibre | 30–140 | — | — | ×1.3 |
-| Forest | Agricultural produce | 10–80 | — | — | ×1.15 |
-| Wetland | Agricultural produce | 40–200 | — | — | — |
-| Wetland | Fibre | 30–150 | — | — | — |
 | Tundra | Iron ore | 0–60 | ×1.3 | — | — |
 | Metallic | Iron ore | 50–250 | — | — | — |
 | Metallic | Regolith | 20–50 | — | — | — |
 | Regolith | Regolith | 20–50 | — | — | — |
 
-**Fibre (BL-586, 2026-08-24)** is the ordinary case, not the endemic one below: it grows by this
-same cover-based ambient/biotic mechanic agricultural produce uses, on the same grassland and
-wetland tiles, **additively** — a tile carries both deposits at once, not one instead of the
-other. It is a common crop, priced and gated the same as any other Tier 1 ambient good, with no
-planetology-endowment or endemic-scarcity gate on top.
+**Fibre (BL-586, fibre as an ordinary crop)** is the ordinary case, not the endemic one
+below: it grows by this same cover-based biotic mechanic agricultural produce uses, on the
+same grass and marsh tiles, **additively** — a tile carries both deposits at once, not one
+instead of the other. It is a common crop, priced and gated the same as any other Tier 1
+ambient good, with no planetology-endowment or endemic-scarcity gate on top.
 
 Modifiers apply multiplicatively to the upper bound of the base range. (The
 metallic row also authors regolith 20–50, same as the regolith composition — a
@@ -448,7 +445,6 @@ goods are sparse *and* small. Base ranges below are pre-scalar.
 
 | Composition | Resource | Base range (pre-scalar) |
 |---|---|---|
-| Barren | Coal | 30–140 |
 | Barren | Silica | 20–90 |
 | Rocky | Silica | 20–100 |
 | Rocky | Copper ore | 30–160 |
@@ -457,6 +453,71 @@ goods are sparse *and* small. Base ranges below are pre-scalar.
 | Volcanic | Rare earth ore | 20–100 |
 | Metallic | Iron-nickel ore | 60–260 |
 | Metallic | Platinum group metals | 20–120 |
+
+### The Life phase — the fossil / living split
+
+The biosphere's residue is placed by its own rules, on `life_rng`, and the line
+through it is the same one Planetology's endowment already draws: **fossils key off
+the peak biosphere, living resources off the current one**, which is why a dead
+world keeps its coal and loses its forests
+([PLANETOLOGY.md](PLANETOLOGY.md) § S8). Here that line falls between the epoch each
+row reads.
+
+**Living resources read the PRESENT.** Timber follows forest and marsh cover, peat
+the marsh itself, agricultural produce and fibre the cover on sedimentary ground —
+because that is where they are, not where they were.
+
+| Cover (on sedimentary) | Resource | Base range | Valley mod |
+|---|---|---|---|
+| Grass | Agricultural produce | 40–180 | ×1.3 |
+| Grass | Fibre | 30–140 | ×1.3 |
+| Forest | Agricultural produce | 10–80 | ×1.15 |
+| Marsh | Agricultural produce | 40–200 | — |
+| Marsh | Fibre | 30–150 | — |
+
+**Fossils read the PAST**, through the palaeo query
+([CONTINENTS.md](CONTINENTS.md) § The Lagrangian frame): a tile is asked where it
+*sat* when its material formed, and the deposit is placed from the climate it sat
+in. Presence is a **consequence, not a roll** — the palaeo predicate replaces the
+rarity gate that used to decide whether a tile carried coal at all, and the per-body
+rarity scalar survives only as a magnitude term, keeping the rare-stays-rare
+ordering.
+
+- **Coal** wants an everwet mire over a subsiding basin. All three halves are
+  stated: everwet is the moisture field's own wet cutoff, sampled at the palaeo
+  position; the belt weighting is the mire's — equatorial 1.00, subtropical 0.85,
+  cool-temperate 0.55, nothing under a subpolar or polar sky; and the basin is the
+  spatial statement of the same subsidence term S7 already spends on the coal
+  window, read as the lower 55% of the land-height range. Base range 30–140,
+  pre-scalar.
+- **Petroleum** wants a productive shallow sea. The ground has to have sat low —
+  the lower 40% of the land-height range, the same reading the ore-field regions
+  use for old shelf and epicontinental basin — and under a productive sky:
+  tropical and subtropical 1.00, temperate 0.80, subpolar 0.45, polar none. Base
+  range 0–120, ×1.2 in a valley.
+
+**The epoch each fossil reads is derived from the biosphere history, not authored
+per resource.** Two facts set it, and both come out of the chain: *which* window —
+coal is laid in the land-burial window and petroleum in the marine-anoxic one, the
+two durations S7/S8 already compute and already spend on the endowment — and *how
+deep in the drift record* it sits, which is the window's share of its own chain
+ceiling mapped across the epochs the record spans. The ordering falls out of the
+chain too and is binding: marine anoxia opens at oxygenation and land burial only
+after land is colonised, so the oil epoch is never shallower than the coal epoch on
+the same body. Depth is **clamped** at the record's stated span rather than
+extrapolated past it (CONTINENTS.md § The drift clock).
+
+**A body with no drift history reads the present, and that is the correct answer**
+rather than a degraded one. A stagnant lid never moved, and a body generated with no
+continents result has no plate set to wind back; in both cases every palaeo answer
+collapses to the present, which is exactly what the frame's epoch-0 identity
+guarantees.
+
+**The ore-field regions for coal and petroleum form where the Life phase put them.**
+Their candidate set is the tiles that actually bear the resource, not a restatement
+of the placement rule against the present map — a restated rule is a rule that
+drifts, and restating this one would centre a coal region on ground the finished
+world gives no coal to.
 
 ### Post-multiplies and endemic additions
 
