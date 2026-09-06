@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*4 entries — 3 open, 1 resolved.*
+*6 entries — 5 open, 1 resolved.*
 
 ---
 
@@ -88,6 +88,50 @@ The good news is in the same map: the sim already holds the coastline (sim_terra
 > **Recommendation:** The middle one. The measurement is cheap, it is needed for the before/after either way, and the answer to "how much is already happening" changes several of the five calls.
 
 *Files: `docs/development/backlog.json`, `src/world/history_sim.cpp`*
+
+### NR-787 — A stagnant lid is IMMOBILE in the paleo frame - taken on doc authority, and it made a red harness row green
+*decision taken on your behalf · raised 2026-09-06 · from BL-764 slice 1 (the paleo query), building it 2026-09-06. Found by implementing: the first pass wound stagnant ground back and P6 failed.*
+
+run_continents draws a position, direction and SPEED for every plate, and THEN early-returns when plate_count == 1. So a stagnant-lid body carries a drift vector that nothing consumes.
+
+The paleo query (BL-764) has to decide what that vector means. Winding stagnant ground back along it made harness row P6 FAIL. The implementer instead made a stagnant lid immobile in the paleo frame, on the authority of CONTINENTS.md ('interior locked into a single stagnant plate') and of continent_snapshot_at, which already early-returns for the same case.
+
+WHY IT IS FLAGGED RATHER THAN FILED QUIETLY: the shape 'a check went red, and the fix was to change the model so it goes green' is exactly the shape of weakening a test, even when it is not one. Here the reasoning is that the harness was asserting against a drift the design says does not exist - the vector is vestigial data, not a modelled motion. That reading looks right and it is not mine to confirm.
+
+The alternative reading: a stagnant lid DOES drift as one piece, the vector is meaningful, and P6 was correct to fail - in which case the paleo frame owes stagnant bodies a real wind-back.
+
+**Why it matters.** It decides whether ~a third of generated bodies (every stagnant lid) have a past position at all, which is the input BL-765 pins paleo deposits to. If stagnant lids are immobile and should not be, their coal and oil land in the wrong place and nothing will say so.
+
+- Confirm: a stagnant lid is immobile in the paleo frame (as built)
+- Overturn: a stagnant lid drifts as one piece, and the paleo frame must wind it back
+- Delete the vestigial vector instead, so nothing can read a motion that is not modelled
+
+> **Recommendation:** Confirm, and take the third option alongside it. The doc is unambiguous that a stagnant lid is locked, and continent_snapshot_at already agrees - so the model is consistent and the harness row was the outlier. But leaving an unconsumed drift vector on the plate is what created the ambiguity in the first place; deleting it makes the next reader unable to make the same mistake.
+
+*Files: `src/world/continents.cpp`, `docs/generation/CONTINENTS.md`, `tools/verify/continent_drift.cpp`*
+
+### NR-788 — Five harnesses are now ad hoc, waiting on Ben to name them as skills
+*question · raised 2026-09-06 · from Accumulated across sprint 32a and 32b wave 1. Authoring the check was ours; wrapping it as a skill is his call (CLAUDE.md § Tool creation is skill creation).*
+
+Each of these is a committed, working check that nothing can invoke by name, because .claude/skills/verifier-headless/SKILL.md does not list it. The rule is that authoring a check is ours and naming it as a skill needs Ben's permission, so they sit as 'ad hoc' until he says.
+
+  continent_drift          - the plate time axis (BL-763)
+  sim_water_census         - the water figures the whole water model is judged against
+  the promoted saturation measure - BL-775
+  deposit_origin           - BL-762, asserts the Body phase places no biological deposit
+  landscape_score_harness  - BL-770, the phase 6 objective's discrimination check
+
+The cost of leaving them unnamed is not zero: an unnamed check is one a later session does not know to run, which is the same failure mode as a check that does not exist.
+
+**Why it matters.** Two of these guard invariants that only they can see - deposit_origin is the only thing asserting the origin split holds, and landscape_score_harness is the only thing that can tell whether phase 6 has anything to search on.
+
+- Name all five in the verifier-headless skill
+- Name a subset
+- Leave them ad hoc and run them by hand
+
+> **Recommendation:** Name all five. They are already committed and already green; the skill entry is the only thing standing between them and being run by a session that does not know they exist.
+
+*Files: `.claude/skills/verifier-headless/SKILL.md`*
 
 ---
 
