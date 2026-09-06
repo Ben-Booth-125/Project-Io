@@ -614,34 +614,6 @@
    "status": "designed",
    "glyph": "✓",
    "priority": "A",
-   "difficulty": 4,
-   "version_goal": null,
-   "sprint": "32b",
-   "written": "2026-09-03",
-   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
-   "requires": [
-    "BL-757",
-    "BL-766"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-768",
-   "short_name": "ROADS_AND_MARKETS_FROM_HISTORY",
-   "category": "Generation",
-   "title": "Phase 4 - simple roads stamped FROM the history, and markets emerging at the end of it",
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/road_generation.cpp",
-    "src/world/hard_coded_world.cpp",
-    "scripts/works.lua"
-   ],
-   "design": "THE AIM (Ben, point 4): \"We should also be laying simple roads to supply provinces. And markets should begin to emerge towards the end of this phase.\"\n\nFEASIBILITY SAYS: DERIVE THEM FROM THE HISTORY, DO NOT LAY THEM INSIDE IT. Laying roads during the sim came back BLOCKED-NEEDS-NEW-MACHINERY for three independent reasons. (1) The sim has no write channel to the world - no world&, deliberately (history_sim.hpp:68-75). (2) It has no tile-grain route: its Dijkstra is region-to-region over the neighbour graph and returns a COST, never a tile list; the only thing that returns tiles takes world&. (3) generate_roads' node source is w.population_centre_tile, which is empty until after the sim. There is also a determinism idiom mismatch - the sim is integer fixed-point with no floats in the decision path, and edge_tier plus the redundancy rationing are float.\n\nSO THE SHAPE IS: the sim RECORDS what it built (the works roster's road rows - Way Station, Span Bridge, Cut Canal - already represent exactly this), and a pass immediately after it STAMPS ancient-tier roads from that record over the settlement set. Same for markets: carve them at the end of the history phase from where trade actually concentrated, rather than from population alone.\n\nTHIS ALSO GIVES THE WORKS ROSTER SOMETHING TO DO. BL-757 measured zero works raised across sixteen seeds because build_work never wins the scored contest. Roads that visibly persist into the campaign are the first real payoff for winning it, and the scorer should be re-weighted with that payoff in view.\n\nAN ERA-APPROPRIATE TIER RULE IS OWED: edge_tier and the rationing key off nation qualification percentile, a 1960-era field. Ancient roads need their own tier rule rather than borrowing the industrial one.\n\nDONE WHEN: a 1960 world opens with roads whose shape follows the history's trunk routes; markets sit where trade concentrated; works raised is non-zero and its roads are visible on the canvas."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
    "difficulty": 5,
    "version_goal": null,
    "sprint": "32b",

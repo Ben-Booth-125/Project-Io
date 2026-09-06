@@ -6208,6 +6208,58 @@
     "completed",
     "resolved"
    ]
+  },
+  "BL-768": {
+   "status": "complete",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "32b",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-757",
+    "BL-766"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-768",
+   "short_name": "ROADS_AND_MARKETS_FROM_HISTORY",
+   "category": "Generation",
+   "title": "Phase 4 - simple roads stamped FROM the history, and markets emerging at the end of it",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/road_generation.cpp",
+    "src/world/hard_coded_world.cpp",
+    "scripts/works.lua"
+   ],
+   "design": "THE AIM (Ben, point 4): \"We should also be laying simple roads to supply provinces. And markets should begin to emerge towards the end of this phase.\"\n\nFEASIBILITY SAYS: DERIVE THEM FROM THE HISTORY, DO NOT LAY THEM INSIDE IT. Laying roads during the sim came back BLOCKED-NEEDS-NEW-MACHINERY for three independent reasons. (1) The sim has no write channel to the world - no world&, deliberately (history_sim.hpp:68-75). (2) It has no tile-grain route: its Dijkstra is region-to-region over the neighbour graph and returns a COST, never a tile list; the only thing that returns tiles takes world&. (3) generate_roads' node source is w.population_centre_tile, which is empty until after the sim. There is also a determinism idiom mismatch - the sim is integer fixed-point with no floats in the decision path, and edge_tier plus the redundancy rationing are float.\n\nSO THE SHAPE IS: the sim RECORDS what it built (the works roster's road rows - Way Station, Span Bridge, Cut Canal - already represent exactly this), and a pass immediately after it STAMPS ancient-tier roads from that record over the settlement set. Same for markets: carve them at the end of the history phase from where trade actually concentrated, rather than from population alone.\n\nTHIS ALSO GIVES THE WORKS ROSTER SOMETHING TO DO. BL-757 measured zero works raised across sixteen seeds because build_work never wins the scored contest. Roads that visibly persist into the campaign are the first real payoff for winning it, and the scorer should be re-weighted with that payoff in view.\n\nAN ERA-APPROPRIATE TIER RULE IS OWED: edge_tier and the rationing key off nation qualification percentile, a 1960-era field. Ancient roads need their own tier rule rather than borrowing the industrial one.\n\nDONE WHEN: a 1960 world opens with roads whose shape follows the history's trunk routes; markets sit where trade concentrated; works raised is non-zero and its roads are visible on the canvas.\n--- DELIVERED 2026-09-06. MARKETS EMERGE FROM TRADE ON 4 OF 4 SEEDS ---\n\nTHE ARCHITECTURE HELD: the sim RECORDS, a later pass STAMPS. run_history_sim appends a\nhistory_corridor at the two sites where a region-to-region line actually exists - the campaign path\nrecords (staging holding, objective), the exact pair campaign_supply was handed, and the settle path\nrecords (parent, daughter). Sorted and run-length-encoded at the end. PURE OBSERVATION: nothing\nreads a corridor back, and the era counters are DIGIT-IDENTICAL either side (4/4/405, 76/0/391,\n248/107/516), which is the evidence that the record changed no decision.\n\nBOTH CONSTANTS ARE MEASURED, NOT CHOSEN, and the measurement is why they are trustworthy. Over 8\nseeds: 3185 corridors, of which 3119 walked EXACTLY ONCE, six at 2-3, then a tail of 60 at 4+\n(busiest 218). Genuinely bimodal, so kAncientRoadUses = 4 is where the tail starts rather than a\nround number. Region degree: 1297 at 0, 3236 at 1-2, 124 at >=3 - 2.7%, so kMarketJunctionDegree = 3\nis a crossing rather than a nudge.\n\nTHE ERA-APPROPRIATE TIER RULE the item owed: traffic, plus works at BOTH ends to promote a rung.\nNever the 1960 qualification percentile. Works promotion is the ONLY route to a Highway in\nantiquity, so a world that built nothing lays Tracks and Roads and no Highways - which is exactly\nLOGISTICS.md antiquity shape. The degradation is graceful rather than empty, and that is why the\nroads pass does NOT depend on works landing.\n\nORDERING, A CALL TAKEN AND ARGUED: the stamp runs AFTER generate_roads, not before. Before would\nlet the modern MST re-route onto cheapened ancient ground - historically truer, but it moves the\nentire national lattice for a reason unrelated to this item. After is purely additive (max per\ntile). Argued in the header if anyone wants to overturn it.\n\nMARKETS: a region incident on >=3 corridors is a trade junction; a centre standing in one is gated\nat the fracture gate rather than its nation. ONLY EVER LOWERS - this adds markets and removes none.\nMEASURED: seed 0 gives 411 corridors, 14 junctions, 2 markets opened by trade; markets open by\ntrade on 4 of 4 seeds (2/1/2/5). era_world_harness R6a-R6d all green in the merged tree.\n\nseedA/off UNMOVED is the load-bearing control: the pass is gated on a non-empty corridor record, so\nevery no_prehistory() harness is byte-identical. Corroborated independently rather than asserted -\nroad_generation_harness tier census digit-identical (track 2973, road 173, highway 0) and\nroad_reach_census C4 state_hash unchanged.\n\nWORKS RAISED IS STILL ZERO, WITH THE ARITHMETIC RATHER THAN A SHRUG. Invest scores a SUM over every\nheld region; a work scores ONE region plus the mean. At ~20 regions Invest is ~156 against a Way\nStation ~43; at 60 regions Invest is ~468 and the work is UNCHANGED. No weight closes a gap whose\ntwo sides scale differently in n_held. Closing it needs a SCORING change - Invest made marginal, or\nthe work reach term scored against the empire it serves with the local rows re-normalised - and\nthat is BL-757. The agent stopped rather than reaching for it, and did not touch\nwork_amortise_years, which is at its floor.\n\nSAVE FORMAT 7 -> 8 for the three report counters. Note this costs nothing extra: the strict-equality\ncontract already invalidated every save at 4->5, 5->6 and 6->7 earlier the same day, so 7->8 is not\na new break. The counters are kept because they are R6 only observable - without them the market\nhalf is unverifiable.\n\nOWED: R4 canvas half is UNVERIFIED. The headless evidence is strong (+320 roaded land tiles era-ON\nat seed 0, 3466 roaded tiles at R6c) but a clean compile is not evidence a surface renders. Someone\nmust open the app and look at the ancient roads.",
+   "completed": "2026-09-06",
+   "resolved": "2026-09-06",
+   "_row_keys": [
+    "status",
+    "glyph",
+    "priority",
+    "difficulty",
+    "version_goal",
+    "sprint",
+    "written",
+    "author",
+    "requires",
+    "blocked_on",
+    "parked",
+    "id",
+    "short_name",
+    "category",
+    "title",
+    "authority_doc",
+    "files",
+    "design",
+    "completed",
+    "resolved"
+   ]
   }
  }
 }

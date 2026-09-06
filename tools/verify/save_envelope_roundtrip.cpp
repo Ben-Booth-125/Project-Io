@@ -231,6 +231,20 @@ save_envelope make_envelope()
 
     e.report.bodies.push_back(be);
 
+    // BL-768's three report counters, at DISTINCT non-default values.
+    //
+    // ADDED ON MERGE, and that is now a pattern rather than an accident: this is
+    // the THIRD save-format change this sprint to land with its fields written
+    // and read but never ASSERTED, because no worktree agent can build this
+    // harness (it links imgui, so neither headless builder compiles it) and the
+    // authoring agent therefore cannot extend it. The field goes in, the version
+    // bumps, and the only thing standing between a transposition and a silent
+    // corrupt load is that somebody downstream noticed. Whoever owns the builder
+    // gap should treat this as its cost.
+    e.report.prehistory_corridors = 3187;
+    e.report.prehistory_junctions = 124;
+    e.report.markets_from_trade   = 41;
+
     e.balance_history     = { 1.5f, -2.25f, 3.125f };
     e.income_history      = { 10.5f, 11.75f };
     e.expenditure_history = { -4.5f };
@@ -324,6 +338,13 @@ int main()
         // swap symmetrically, so this pins them to their literal values.
         check(le.params.prehistory_years == 137 && le.params.industrial_years == 291,
               "S3 the two year fields land in the RIGHT slots (137/291, not swapped)");
+        // Pinned to literals, not compared to the original: three consecutive
+        // int64s of the same type are exactly the shape a symmetric writer/reader
+        // transposition survives.
+        check(le.report.prehistory_corridors == 3187
+                  && le.report.prehistory_junctions == 124
+                  && le.report.markets_from_trade == 41,
+              "S3 the BL-768 report counters survive (corridors / junctions / markets, each distinct)");
         check(le.report.bodies.size() == 1 && le.report.bodies[0].name == "Vhessari Prime"
                   && le.report.bodies[0].id == 41 && le.report.bodies[0].is_homeworld,
               "S3 the generation report's body entry survives (name, id, homeworld flag)");
