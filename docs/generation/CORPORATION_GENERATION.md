@@ -1,5 +1,15 @@
 # Project Io — Corporation Generation
 
+> **Settles:** how a corporation is assigned a nation, an industrial focus and an ownership
+> class · how a charter reaches the ground · where starting assets, HQ and border range are
+> placed · what finances and stockpile a corp opens with · how a corp is named, and how
+> background firms are produced · how the player's corp and its seat are chosen · what
+> generation deliberately declines to seed.
+> **Not here:** how a rival *decides* anything (../ai/AI_OPPONENT) · how the nation it
+> registers in was made (NATION_GENERATION) · what its money does thereafter
+> (../economy/FINANCE).
+> **Confused with:** ../ai/AI_OPPONENT.md, NATION_GENERATION.md, ../economy/FINANCE.md.
+
 Corporations are the primary actors in the simulation. They extract resources, build
 infrastructure, trade goods, and eventually project power off-world. At campaign start,
 all corporations — including the player's — are generated procedurally and are present

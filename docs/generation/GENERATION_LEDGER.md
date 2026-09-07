@@ -1,5 +1,13 @@
 # Project Io — Generation Ledger
 
+> **Settles:** how a tile's derivation is read back, pass by pass · what seam the per-pass
+> intermediates travel on · what a per-body summary is asked to report · how long that data
+> lives, and why it is regenerated rather than persisted · where the ledger surfaces, for
+> the developer tuning a pass and for the player.
+> **Not here:** what any pass actually computes (TILE_GENERATION) · what a field overlay
+> renders (../ui/LENSES) · what a body profile means (PLANETOLOGY).
+> **Confused with:** TILE_GENERATION.md, ../ui/LENSES.md, PLANETOLOGY.md.
+
 A tuning-and-analysis surface that explains **why a tile generated as it did**. It
 reads the per-pass intermediates of the deterministic tile-generation pipeline and
 presents them as a per-tile derivation breadcrumb and per-body summaries. Its

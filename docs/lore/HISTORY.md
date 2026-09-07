@@ -1,5 +1,15 @@
 # Kepler — Historical Foundations
 
+> **Settles:** which stages the institutional ladder runs through, and what each one
+> unlocks · to which epoch the run plays, and in how many spans · how the ladder pass and
+> settlement interleave · what drives the Era −1 sim · what the works roster is, what a row
+> does, and where its effect lands · why the campaign world ends up market-based and
+> non-hegemonic.
+> **Not here:** how a polity plays against its own doom, and how that doom resolves
+> (COLLAPSE) · how a battle in that sim is settled (../generation/MILITARY_HISTORY) · what
+> precedes the civilisation gate (../generation/PLANETOLOGY) · what a pantheon is (CREEDS).
+> **Confused with:** COLLAPSE.md, ../generation/MILITARY_HISTORY.md, ../generation/NATION_GENERATION.md.
+
 Why the campaign world is market-based and non-hegemonic, told as a stage ladder the
 generation stack hangs dated history lines off. Companion to `../generation/PLANETOLOGY.md`
 (which ends at the civilisation gate) and `../generation/NATION_GENERATION.md` /

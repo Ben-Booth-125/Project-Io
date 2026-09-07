@@ -1,5 +1,15 @@
 # Project Io — Tile Generation
 
+> **Settles:** what each of the six passes does to a tile, and in what order · how a body
+> profile turns solar parameters into terrain without body-specific code · how a biome
+> decomposes into the terrain axes · how deposits are placed, and how the fossil/living
+> split is decided · how a sibling pass extends the pipeline without changing the core ·
+> what a tile records for the ledger.
+> **Not here:** where the height bias comes from (CONTINENTS) · where the body profile comes
+> from (PLANETOLOGY) · how tiles are partitioned into provinces (PROVINCES) · what a
+> resource is and what it is worth (../economy/RESOURCES, ../economy/TILES).
+> **Confused with:** CONTINENTS.md, PROVINCES.md, ../economy/TILES.md.
+
 This document specifies the strategy and rules for procedural tile generation in
 `hard_coded_world.cpp`. Generation is **deterministic**: every body has a fixed
 seed and a solar-parameter profile — **derived by the Planetology chain**
