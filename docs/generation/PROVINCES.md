@@ -174,13 +174,35 @@ whole ownership rule, and it replaces the deferral this section used to carry.
 | **`coastal_water`** | **Yes** — derived from the shore that claims it | Coastal units, and land units crossing **owned** coastal water |
 | **`open_ocean`** | **No, structurally** | Coastal/naval units only; never a territory |
 
-**The ownership half is one predicate.** A province's owner is derived from its tiles
-(§ above — `world::tile_to_nation`, no field of its own), so a coastal province becomes owned the
-moment its tiles are claimed. Today the nation carve refuses every water tile, because it builds
-its ocean mask from `is_water` — which is coast, lake **and** ocean. Narrowing that to
-`is_open_ocean` claims the shoreline ring and the lakes and leaves the deep sea unclaimed, which
-is exactly the rule above. Nothing about the partition changes: the three domains still never mix,
-and growth still never leaves its domain.
+**The ownership half is DERIVED, and derived is not the same as claimed.** A province's owner comes
+from its tiles (§ above — `world::tile_to_nation`, no field of its own). The nation carve **never
+grows across water at all**; water ownership is worked out afterwards, from the shore:
+
+| Domain | How it gets an owner |
+|---|---|
+| **Coastal water** | The **shoreline ring**: a tile touching owned land takes that land's owner. Two nations on one strait → the lower owner index, a total and stable tie-break. It spreads no further. |
+| **Lake** | Filled **whole** by the shore enclosing it — a lake is bounded by its own coast, so ownership crossing it means something. |
+| **Open ocean** | Never. Structurally unowned, and it never conducts ownership between two coasts a deep sea separates. |
+
+**Water that touches no owned shore stays unowned**, which is the point: with most land unowned,
+much open coastline is unowned too, and *"you may walk your own shore, not someone else's"* meets
+shore belonging to nobody.
+
+> **This paragraph described the wrong mechanism until 2026-09-07 (NR-792).** It said the carve
+> narrowed its ocean mask to `is_open_ocean` and thereby "claims the shoreline ring". That is what
+> the code did, and it is not the same rule: letting the flood claim water made ownership a question
+> of which seed's growth arrived first, not of who owns the adjacent land. Measured, it gave **100%
+> of coastal water owned against 39% of land** — an apron derived from a shore that is itself mostly
+> unowned, which cannot be right.
+>
+> Worth recording that the first fix did not work either, and only measurement caught it: excluding
+> water from growth and then spreading ownership through **all** non-ocean water returned figures
+> **byte-identical** to the flood. The coastal band is globally connected, so one owned shore tile
+> conducts ownership around every landmass it touches. The sea is a ring because it is enclosed by
+> nothing; a lake fills because it is enclosed by its own shore.
+
+Nothing about the partition changes: the three domains still never mix, and growth still never
+leaves its domain.
 
 **Why unowned open ocean is the right asymmetry.** A territory is something a polity can hold, and
 holding requires standing somewhere. Coastal water is the shore's apron — reachable, contestable,

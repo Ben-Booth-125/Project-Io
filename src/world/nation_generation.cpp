@@ -329,6 +329,114 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
 /// unchanged.
 ///
 /// @param owner_map    Per-tile nation index (-1 = unclaimed/open ocean), mutated in place.
+/// Give coastal water and lakes the owner of the SHORE that claims them
+/// (NR-792; `docs/generation/PROVINCES.md` § Who owns water).
+///
+/// The carve never grows across water (`unclaimable`), so every water tile
+/// arrives here unowned. Ownership is then *derived*, which is what the
+/// authority doc has always said and what the flood was never doing:
+///
+///   1. A water tile touching OWNED land takes that land's owner. Where two
+///      nations share a strait, the LOWEST OWNER INDEX wins — arbitrary, but
+///      total and stable, which is what a tie-break has to be.
+///   2. A LAKE then fills: ownership spreads through lake tiles only, so a lake
+///      is owned WHOLE by the shore enclosing it. Coastal water does NOT
+///      spread — it is the shoreline RING and nothing more.
+///   3. Water that touches no owned shore stays UNOWNED — which is the whole
+///      point. With most land unowned, most open coastline is now unowned too,
+///      and "you may walk your own shore, not someone else's" finally meets
+///      shore that belongs to nobody.
+///
+/// WHY THE SEA IS A RING AND A LAKE IS NOT, and this was found by measuring
+/// rather than reasoned out in advance: the first cut spread ownership through
+/// ALL non-ocean water, and it changed nothing at all — coastal water came back
+/// 100% owned, byte-identical to the flood it replaced. The coastal band is
+/// GLOBALLY CONNECTED, so a single owned shore tile anywhere conducts ownership
+/// around every landmass it touches. A lake is genuinely enclosed by its own
+/// shore, so filling it is bounded and means what it says. The sea is not
+/// enclosed by anything, so on the sea only adjacency is meaningful.
+///
+/// OPEN OCEAN IS NEVER A SOURCE AND NEVER A DESTINATION. It is structurally
+/// unowned (§ Who owns water), so it neither carries ownership nor conducts it
+/// between two coasts that a deep sea separates.
+///
+/// DETERMINISM: a level-synchronous BFS seeded in ascending tile index and
+/// expanded in ascending index at every level. Equal-distance ties resolve to
+/// the lower index on every machine, and nothing reads a container's own order.
+void derive_water_ownership(std::vector<int>& owner_map,
+                            const std::vector<terrain_substrate>& sub,
+                            int gw, int gh)
+{
+    const int total = gw * gh;
+
+    auto is_conductive = [&](int idx) {
+        const terrain_substrate st = sub[static_cast<std::size_t>(idx)];
+        return is_water(st) && !is_open_ocean(st);
+    };
+
+    // --- Step 1: the shore ring -------------------------------------------
+    std::vector<int> frontier;
+    for (int idx = 0; idx < total; ++idx)
+    {
+        if (!is_conductive(idx) || owner_map[static_cast<std::size_t>(idx)] >= 0)
+            continue;
+
+        const int col = idx % gw;
+        const int row = idx / gw;
+        std::pair<int,int> nbrs[4];
+        int n = 0;
+        cardinal_neighbours(col, row, gw, gh, nbrs, n);
+
+        int best = -1;
+        for (int i = 0; i < n; ++i)
+        {
+            const int nidx = raster_idx(nbrs[i].first, nbrs[i].second, gw);
+            if (is_water(sub[static_cast<std::size_t>(nidx)]))
+                continue; // the shore is LAND: water never seeds water here
+            const int o = owner_map[static_cast<std::size_t>(nidx)];
+            if (o >= 0 && (best < 0 || o < best))
+                best = o;
+        }
+        if (best >= 0)
+        {
+            owner_map[static_cast<std::size_t>(idx)] = best;
+            frontier.push_back(idx);
+        }
+    }
+
+    // --- Step 2: fill LAKES only, level by level ---------------------------
+    // Coastal water stops at the ring seeded above. Only lake tiles conduct.
+    std::vector<int> next;
+    while (!frontier.empty())
+    {
+        next.clear();
+        for (const int idx : frontier)
+        {
+            if (sub[static_cast<std::size_t>(idx)] != terrain_substrate::lake)
+                continue; // sea is a ring: it never passes ownership on
+
+            const int owner = owner_map[static_cast<std::size_t>(idx)];
+            const int col   = idx % gw;
+            const int row   = idx / gw;
+            std::pair<int,int> nbrs[4];
+            int n = 0;
+            cardinal_neighbours(col, row, gw, gh, nbrs, n);
+
+            for (int i = 0; i < n; ++i)
+            {
+                const int nidx = raster_idx(nbrs[i].first, nbrs[i].second, gw);
+                if (sub[static_cast<std::size_t>(nidx)] != terrain_substrate::lake
+                 || owner_map[static_cast<std::size_t>(nidx)] >= 0)
+                    continue;
+                owner_map[static_cast<std::size_t>(nidx)] = owner;
+                next.push_back(nidx);
+            }
+        }
+        frontier.swap(next);
+    }
+}
+
+
 /// @param unclaimable  Per-tile open-ocean flag: ground no nation may hold.
 /// @param gw, gh       Grid dimensions.
 void assign_orphan_islands(std::vector<int>& owner_map,
@@ -777,12 +885,23 @@ std::vector<entity_id> generate_nations(
     //   `is_water_map` — ground a nation cannot be SEEDED on. A core is a place
     //                    people settled, so it is land, and the seed budget is
     //                    scaled to the landmass. Every kind of water fails this.
-    //   `unclaimable`  — ground a nation cannot HOLD. Only the OPEN OCEAN: the
-    //                    deep sea is crossed, not held. Coastal water and lakes
-    //                    are the shore's apron and fall to whoever owns the
-    //                    shore, so the carve claims them like any other tile.
+    //   `unclaimable`  — ground a nation cannot GROW ACROSS. EVERY kind of
+    //                    water. The deep sea is crossed, not held; and coastal
+    //                    water and lakes are held, but they are held BY THE
+    //                    SHORE rather than by the flood (see `derive_water_
+    //                    ownership` below).
     //
     // They coincided until the ruling, which is why one flag used to answer both.
+    //
+    // THE SUBTLETY THAT WAS WRONG HERE UNTIL 2026-09-07, and it is worth stating
+    // because the comment itself carried the error: this flag used to mark only
+    // open ocean, reasoning that coastal water "falls to whoever owns the shore,
+    // so the carve claims them like any other tile". Those are not the same
+    // thing. Letting the flood claim water made ownership a question of which
+    // seed's growth arrived first, not of who owns the adjacent land — and it
+    // measured out at 100% of coastal water owned against 39% of LAND, which
+    // cannot be derived from a shore that is itself mostly unowned (NR-792).
+    // Water is now excluded from growth entirely and derived afterwards.
     std::vector<terrain_substrate> sub(static_cast<std::size_t>(total),
                                        terrain_substrate::barren);
     std::vector<terrain_cover> cov(static_cast<std::size_t>(total), terrain_cover::none);
@@ -801,7 +920,9 @@ std::vector<entity_id> generate_nations(
         cov[static_cast<std::size_t>(idx)] = it->second.cover;
         if (is_water(it->second.substrate)) // BL-516
             is_water_map[static_cast<std::size_t>(idx)] = true;
-        if (is_open_ocean(it->second.substrate)) // BL-776
+        // NR-792: EVERY water kind is excluded from the growth. Coastal water
+        // and lakes get their owner from the shore in `derive_water_ownership`.
+        if (is_water(it->second.substrate))
             unclaimable[static_cast<std::size_t>(idx)] = true;
     }
 
@@ -894,6 +1015,12 @@ std::vector<entity_id> generate_nations(
 
     // --- Pass 2b: orphan-island assignment (claim sea-disconnected ground) ---
     assign_orphan_islands(owner_map, unclaimable, gw, gh);
+
+    // --- Pass 2c: water takes its owner from the shore (NR-792) -------------
+    // Must run AFTER the land carve and orphan islands (its sources are owned
+    // land tiles) and BEFORE the polity fold, so a water tile is remapped by
+    // the fold exactly as the shore it was derived from is.
+    derive_water_ownership(owner_map, sub, gw, gh);
 
     // --- Pass 2d: THE POLITY FOLD (BL-769) ---------------------------------
     //
