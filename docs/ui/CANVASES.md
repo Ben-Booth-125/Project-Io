@@ -2,7 +2,9 @@
 
 > **Settles:** which canvases exist and how the zoom ladder orders them · which
 > canvas is primary and which one the inset frames · which press moves between
-> rungs · what view and selection state the three rungs share.
+> rungs · how pan, zoom and minimap framing behave across the rungs · which canvas
+> takes a press when two overlap · what view and selection state the three rungs
+> share.
 > **Not here:** what any single rung draws (SOLAR, CIRCUMPLANETARY, PLANETARY) ·
 > the inset's own chrome (MINIMAP) · how the ground is rendered (RENDERING) · what
 > the ground is made of and how landform reads (PLANETARY) · what each lens shows
@@ -79,6 +81,27 @@ two clear directions:
 lower rungs (`active_body`) without forcing the primary to change rung except on
 an explicit descend. **Selecting** a body (single-click) is independent: it fills
 the Selection info element but changes neither the Active anchor nor the framing.
+
+### Shared view controls
+
+Pan and zoom belong to the **primary** slot. On the two upper rungs the middle
+mouse button pans and the scroll wheel zooms, anchored at the cursor so the point
+under it stays fixed, and a bottom-centre **scale bar + zoom slider**
+(`ui::draw_scale_zoom_overlay`, `src/ui/canvas_scale.hpp`) sets the same factor —
+dragging **right zooms in**, left zooms out. Framing scales; element sizes (body
+radii, labels, selection outlines) hold their pixel size.
+
+**A canvas in the minimap slot always renders its default framing.** Pan and zoom
+apply only while a canvas is primary, so the inset stays a stable piece of context
+rather than a second view the player has to keep. What a rung's default framing
+*is*, and which `ui_state` members carry its pan/zoom, is that rung's own business
+— see [SOLAR.md](SOLAR.md), [CIRCUMPLANETARY.md](CIRCUMPLANETARY.md) and
+[PLANETARY.md](PLANETARY.md).
+
+**Input precedence.** Exactly one canvas handles input per frame — the minimap
+when the cursor is over the inset, the primary otherwise — and neither handles it
+while an ImGui panel is capturing the mouse. The mechanism is `input_enabled`
+(§ Implementation approach).
 
 ### Keyboard navigation
 
