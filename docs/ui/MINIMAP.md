@@ -304,10 +304,19 @@ canvas holds the primary slot; the minimap always renders the default framing.
 
 ## Open questions
 
-- **Lens bar width ceiling.** Eight glyphs fitted the bar without widening the
-  minimap or adding a second row. The strip is now derived per rung and the
-  Planetary rung names nine ([LENSES.md](LENSES.md) § The strip rotates with the
-  rung), which is the case this ceiling was written to flag.
+- **Lens bar width ceiling — there is no rule, and nine is not one** (Ben,
+  2026-09-07). Eight glyphs fitted the bar without widening the minimap or adding
+  a second row; the strip is derived per rung and the Planetary rung names nine
+  ([LENSES.md](LENSES.md) § The strip rotates with the rung). Nine is **what fits
+  today**, not a ceiling anybody has set, and the roster is expected to grow past
+  it. What the bar does when it no longer fits — widen, wrap to a second row, or
+  scroll — is open.
+
+  **The strip is already per-canvas, and that is the lever.** Because each rung
+  derives its own set, a rung need never carry a glyph for a lens that says
+  nothing at its scale — so the pressure a growing roster puts on this bar is
+  bounded by the widest single rung, not by the whole roster. Read a rung's set as
+  an editorial choice about that canvas, not as a subset of one master list.
 - **Circumplanetary framing** for a planet with many vs. zero moons — how much
   local space to show, and at what scale, is for `CIRCUMPLANETARY.md`.
 - **Overlays.** Does the minimap mirror supply routes / units on the canvases,

@@ -603,7 +603,7 @@
   ],
   [
    "canvas.border_band_select",
-   "The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
+   "The national border band on the Planetary canvas — plain-canvas chrome, not a lens, and suppressed while any lens is up. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
   ],
   [
    "ledger.company_open",

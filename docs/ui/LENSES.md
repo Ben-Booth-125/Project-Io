@@ -284,8 +284,11 @@ lens."*
 
 **The lens dissolved rather than being deleted: its content became chrome.** A
 nation's identity colour sits at its frontier and falls off inwards over three
-tiles, drawn always — under every lens and on the plain canvas — exactly as
-roads are. The full render spec, the falloff table, and the
+tiles, drawn **on the plain canvas and suppressed while any lens is up** (Ben,
+2026-08-28, reaffirmed 2026-09-07). Roads are *not* the precedent here, and the
+difference is the point: a road is terrain a lens reads over, while a national
+wash is a second political answer competing with the one the lens was opened to
+ask. The full render spec, the falloff table, and the
 never-average-two-nations constraint that decides both halves of the pass are in
 [PLANETARY.md](PLANETARY.md) § The national border band.
 

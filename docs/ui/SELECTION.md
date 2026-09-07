@@ -757,7 +757,7 @@ the next section, which supersedes it.
 
 | Resolver | Answers | Used by |
 |---|---|---|
-| **Boundary** (`resolve_structure_hit`) | "am I on this structure's edge?" | The national border band — always-on chrome, not a lens |
+| **Boundary** (`resolve_structure_hit`) | "am I on this structure's edge?" | The national border band — plain-canvas chrome, not a lens, and suppressed with its hit corridor while any lens is up |
 | **Area** (`lens_structure_of_tile`) | "which structure is this ground part of?" | The active lens |
 
 **With no lens active, a marker outranks both, and a boundary outranks an area.** The order is not

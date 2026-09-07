@@ -10,7 +10,8 @@
 **Named individuals holding specific roles.** Io generates a world full of institutions; this
 document is what puts people in it, from Ben's ask (2026-08-22): *"we might also want to include a
 system whereby named people get specific roles."* Everything below § Precedent is a **proposal
-awaiting Ben's ruling** except where § Settled records one. § The questions as they were asked are
+awaiting Ben's ruling** except where § Settled records one — and § What must NOT happen, ruled 2026-09-07, which closed
+the last question this document's header names. § The questions as they were asked are
 the calls. Owned by BL-547 (named people and roles).
 
 ---
@@ -166,7 +167,11 @@ succession advance on the economy tick in sorted seat order. **No wall clock, no
 
 ---
 
-## What must NOT happen
+## What must NOT happen *(Ben, 2026-09-07 — ruled; this section is settled)*
+
+*The prohibitions below were the last open question in this document. They are now ruled and are
+not a proposal: each is binding, and each restates for people a rule the project already holds
+elsewhere — which is why ruling them cost nothing and leaving them open cost a false header.*
 
 - **A person must not be a second scorer.** BL-207's discipline is the model and it is
   non-negotiable: counsel **biases scoring, never bypasses validation** — no new verbs, no fog
@@ -179,7 +184,7 @@ succession advance on the economy tick in sorted seat order. **No wall clock, no
 
 ---
 
-## Settled — Ben's rulings, 2026-08-22
+## Settled — Ben's rulings, 2026-08-22, completed 2026-09-07
 
 All six questions answered from the design register. **One overturns the original proposal.**
 

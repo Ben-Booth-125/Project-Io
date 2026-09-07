@@ -146,9 +146,9 @@ surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
 | Hover card | The shared glance-then-stick hover card ([TOOLTIP.md](TOOLTIP.md)), content **lens-keyed** (`src/ui/hover_content.cpp`). A tile's default variant: `substrate · landform` header (plains unnamed), habitability, and the landform's movement-cost multiplier when not plains. Under the Resource lens: the selected resource's deposit richness; under Population: habitability + workforce cap. Buildings and market centres carry their own variants (rival buildings show type + owner only — the competitor-visibility rule, [DISCOVERY.md](DISCOVERY.md)). |
 | Body label | Canvas title bar shows the selected body name, type, and grid dimensions. As the Planetary screen is always primary (full size), the title is always shown. A **survey-status suffix** follows it: `UNSURVEYED`, `Survey en route`, or `Surveying k/N` — nothing once surveyed. |
 | Survey region mask | On a body whose survey is incomplete, tiles in **unrevealed regions** render as a flat dark "locked" fill `(12, 14, 20)` with no lens tint, borders, markers, selection outline, or hit-testing; revealed regions render normally. Regions reveal in deterministic raster (row-major) order as the survey scans ([DISCOVERY.md](DISCOVERY.md)). A fully surveyed body (the home planet, or a completed survey) shows everything. |
-| Settlement markers | Always-on civic chrome, not lens-gated: **every** generated population centre draws, and its **form follows the zoom** — the LOD ladder (BL-625, settlement tier glyphs). Far zoom (hex radius ≤ 7 px, the canvas's coarse-fill pivot): only scale ≥ 3 centres carry the tier skyline (`ui::icons::settlement`); everything smaller is a dim civic **density dot**, so a settled region reads as settled without glyph soup. Mid zoom (7–14 px): towns (scale 2) join the skylines. Close zoom (≥ 14 px, the texture pivot): every centre is a skyline, and **razed** centres (BL-624) surface as the ruin mark (`ui::icons::settlement_razed`) — a ruin is a tile-scale fact. Only **City+** centres (scale ≥ 4) carry a name label. Colour is **civic-neutral** (`palette::settlement`) under every lens — tier is carried by the glyph, and ownership is carried by the national border band, not by a settlement's colour. |
+| Settlement markers | Always-on civic chrome, not lens-gated: **every** generated population centre draws, and its **form follows the zoom** — the LOD ladder (BL-625, settlement tier glyphs). Far zoom (hex radius ≤ 7 px, the canvas's coarse-fill pivot): only scale ≥ 3 centres carry the tier skyline (`ui::icons::settlement`); everything smaller is a dim civic **density dot**, so a settled region reads as settled without glyph soup. Mid zoom (7–14 px): towns (scale 2) join the skylines. Close zoom (≥ 14 px, the texture pivot): every centre is a skyline, and **razed** centres (BL-624) surface as the ruin mark (`ui::icons::settlement_razed`) — a ruin is a tile-scale fact. Only **City+** centres (scale ≥ 4) carry a name label. Colour is **civic-neutral** (`palette::settlement`) under every lens — tier is carried by the glyph, and ownership is never carried by a settlement's colour. On the plain canvas ownership is read from the national border band; under a lens the band is suppressed, so ownership is not on the canvas at all and is read from the Selection panel. |
 | Home-cluster ring + HQ star | Always-on player-presence chrome on `home_body` only: a translucent ring (player-identity colour) encloses the player's holdings cluster on that body ("my region"), and an `ui::icons::hq` star marks the building nearest the cluster centroid ("my origin"). Composes with, does not duplicate, the per-tile ownership outline. |
-| National border band | **Always-on** political chrome (like roads, not a lens): a nation's identity colour sits at its frontier and falls off inwards over three tiles, and clicking the band selects the nation. See § The national border band below. |
+| National border band | **Plain-canvas** political chrome, **suppressed while any lens is up** (Ben, 2026-08-28, reaffirmed 2026-09-07): a nation's identity colour sits at its frontier and falls off inwards over three tiles, and clicking the band selects the nation. Unlike roads, it is not always-on — a lens asks one question, and a national wash competes with the answer. See § The national border band below. |
 | Rivers | Directed river lines drawn along tile edges with downstream chevrons, so a basin reads as flowing rather than as a static blue band. Terrain drawing, not a lens; always on. |
 
 ---
@@ -339,7 +339,7 @@ Only **Industry** carries a genuinely computed per-province reduction; the rest 
 with a reason, or lenses that paint no fill. That is deliberate: the province is the *selection*
 grain under every lens, but it is the *render* grain only where the field is continuous.
 
-**Country has no row because it is not a lens.** The national read is the border band below —
+**Country has no row because it is not a lens.** The national read is the border band below, which draws on the plain canvas only —
 always-on chrome, composited per tile *after* the blend has run. That siting is what retires the
 question the row used to answer: a nation's colour never enters the blended fill, so the mean of two
 nation colours — a third nation's colour — cannot be reached.
@@ -368,10 +368,19 @@ the card's contents — are in [SELECTION.md](SELECTION.md) § The province elem
 
 **A nation reads as a bordered region, not as a tinted field.** Its identity colour
 (`palette::nation_colour`) lives at the boundary and falls off inwards; the middle of a territory
-stays plain. That is what makes the read affordable **always-on**, under every lens and on the plain
-canvas — a full-territory tint would own the ground the terrain, the texture and the active lens
-need, and a band does not. Roads are the precedent: drawn always, because they are context rather
-than a mode the player enters.
+stays plain. That is what makes the read affordable at all — a full-territory tint would own the
+ground the terrain and the texture need, and a band does not.
+
+**The band draws on the plain canvas only, and is suppressed while any lens is up** (Ben,
+2026-08-28, reaffirmed 2026-09-07). Affordability is why the band is a band; it is not a licence to
+draw it under a lens. A lens asks one question, and nation ownership is a second political answer
+competing with it — so nation context is absent from a lens *by construction*, not merely absent
+from its fill. Roads are therefore **not** the precedent: a road is terrain a lens reads over.
+
+A consequence worth stating, because it removes a question rather than answering it: the band's
+click corridor cannot contend with a lens's own structure for a press, because the two are never on
+screen together. Under a lens, a click that misses every marker falls through to the province as it
+always did.
 
 Ben, 2026-08-24: *"National borders should not diffuse together, instead they should borders
 extending their colour inwards. With this, we can drop the nation lens."*
@@ -674,7 +683,7 @@ for i in 0..5:
 ## Interaction
 
 - **Hover** a tile: show the hover card. Hit-tested by distance to hex centre (< circumradius).
-- **Single-click** the surface: markers are hit-tested first, in the order **building → market → unit** (`body_surface_canvas.cpp`), so buildings, markets and units stay independently selectable. A click that misses every marker but lands in a **national border corridor** selects that nation (§ The national border band). Otherwise it selects the **province** (§ Province grain above) rather than the tile; the tile is one press away in the province card. Clicks do not change the view rung — the Planetary screen is the bottom of the ladder.
+- **Single-click** the surface: markers are hit-tested first, in the order **building → market → unit** (`body_surface_canvas.cpp`), so buildings, markets and units stay independently selectable. On the plain canvas, a click that misses every marker but lands in a **national border corridor** selects that nation (§ The national border band); under a lens the corridor does not exist, because it is built in the same pass as the stroke. Otherwise it selects the **province** (§ Province grain above) rather than the tile; the tile is one press away in the province card. Clicks do not change the view rung — the Planetary screen is the bottom of the ladder.
 - **Ascend:** clicking the minimap (which shows the Circumplanetary view) promotes it to primary.
 - **Middle mouse button drag:** pan. Horizontal panning is unbounded — the grid is a cylinder, so panning past the east or west edge wraps seamlessly to the opposite side. Each tile is drawn (and hit-tested) at every horizontal offset that falls within the canvas, so there is no visible seam and the column under the cursor is always correct.
 - **Scroll wheel:** zoom, anchored at the cursor position — **stepped**, one ×2 ladder

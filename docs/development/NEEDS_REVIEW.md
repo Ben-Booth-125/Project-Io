@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*9 entries — 9 open, 0 resolved.*
+*6 entries — 6 open, 0 resolved.*
 
 ---
 
@@ -152,43 +152,6 @@ It also echoes the slice-1 finding exactly, one level up. Slice 1 found the obje
 > **Recommendation:** The FIRST if phase 6 is meant to select infrastructure at all, otherwise the SECOND. What should NOT happen is leaving it as-is silently: Ben chose three axes on the assumption they discriminate, and one does not. Worth noting the third option would be the most faithful to what a road is FOR, but it changes the logistics model to serve a search, which is the tail wagging the dog.
 
 *Files: `src/world/landscape_score.cpp`, `src/world/landscape_search.cpp`, `docs/generation/GENERATION_STRATEGY.md`*
-
-### NR-794 — Does the national border band draw under a lens? The corpus says three things and two of them are undated
-*question · raised 2026-09-07 · from Sprint 33 UI boundary lane (BL-796), confirmed independently by its second cold reviewer, 2026-09-07.*
-
-THREE STATEMENTS, ALL LIVE, ALL PRE-EXISTING - the batch deliberately did not resolve them.
-
-(1) LENSES.md:172-175 - "National territory is the border band's job, and the band is SUPPRESSED while any lens is up (Ben, 2026-08-28)." DATED.
-(2) LENSES.md:286-288 - the band is "drawn always - under every lens and on the plain canvas - exactly as roads are." UNDATED.
-(3) PLANETARY.md:151 - "Always-on political chrome (like roads, not a lens)." UNDATED.
-
-(1) and (2) are in THE SAME DOC and contradict each other outright. Both were verified present at the batch base, so this is not damage the boundary work did; the UI lane found it, correctly declined to pick a side, and one of its agents then asserted an answer in SELECTION.md anyway - which the first cold review caught and the fix round removed.
-
-WHAT IS UNDECIDED, and both halves are yours:
-  (a) Does the band draw at all while a lens is up?
-  (b) When it does draw, does its hit corridor OUTRANK the lens's own structure for a click?
-
-WHY IT NEEDS YOU RATHER THAN A RULING FROM THE DATED LINE: newest-wins would hand it to (1), but (2) and (3) describe what two other surfaces are built to assume, and roads - the thing the band is twice compared to - are always-on. Picking by date alone would silently change what two docs promise.
-
-### NR-795 — Does a doc that settled MOST of its questions open with Settles: or Proposes:?
-*question · raised 2026-09-07 · from Sprint 33 proposes lane, raised by its second cold reviewer as the sharpest counter-argument to the revert, 2026-09-07.*
-
-THE SPEC HAS NO PARTIAL-CREDIT RULE. DEVELOPMENT_PRACTICES.md § The doc header says a doc that has not settled its questions opens with **Proposes:**. It does not say what a doc does when it has settled most of them.
-
-THE CASE THAT EXPOSED IT. PEOPLE.md and EVENTS.md were switched to Proposes:, then reverted to Settles: on evidence that both carry "## Settled - Ben's rulings, 2026-08-22 / All six questions answered". The revert is right. But one header question in EACH doc is still unruled: PEOPLE's "what must not become a person" (answered at § What must NOT happen, line 169) and EVENTS' "what must never be an event" (line 197) both sit BELOW § Precedent - inside the region each doc's own prose calls a proposal - and neither § Settled block rules on them.
-
-SO BOTH DOCS ASSERT **Settles:** over a list containing one question they have not settled.
-
-THE OPTIONS, and this is a rule choice rather than a per-doc fix: (a) the header word tracks the MAJORITY, and a doc drops the unruled question from its Settles: line until it is ruled; (b) any unruled question makes the whole header Proposes:, which would send both docs back and is probably too blunt; (c) a doc may carry both lines - Settles: for what is ruled, Proposes: for what is not.
-
-CHEAPEST HONEST FIX IF YOU WANT ONE NOW: rule the two outstanding questions. They are small, they are already written up in each doc's § What must NOT happen, and ruling them makes the question moot.
-
-### NR-796 — The lens bar's nine-glyph width ceiling is live again, and nobody has ruled on the number
-*decision · raised 2026-09-07 · from Sprint 33 UI boundary lane (BL-796) fix round, 2026-09-07.*
-
-The lens-bar width ceiling of nine glyphs was restored to MINIMAP.md during the boundary repair, under § Open questions, as a rewrite rather than a verbatim restore - the rewrite dropped the interrogative, so it now reads as a statement of the ceiling rather than a question about it.
-
-THE CALL: is nine the ceiling, or is nine simply what fits today? The distinction matters because the lens roster grows, and a number that reads as settled will be defended by the next session that meets it. Say either "nine is the rule" or "there is no rule yet", and the doc gets the matching wording.
 
 ---
 
