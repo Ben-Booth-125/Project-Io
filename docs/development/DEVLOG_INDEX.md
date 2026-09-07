@@ -197,7 +197,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-06-13 | [Layer 2: Primary canvases](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 1: ECS data model](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 0: Engine scaffolding](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
-| ? | [2026-09-07 (sprint 33 opens) — The corpus stops charging every session, and two tools are found lying](DEVLOG.md) | BL-079 BL-787 BL-788 BL-789 BL-790 BL-791 BL-792 BL-793 BL-794 BL-795 BL-796 BL-797 | DEVLOG.md |
+| ? | [2026-09-07 (sprint 33 opens) — The corpus stops charging every session, and two tools are found lying](DEVLOG.md) | BL-079 BL-787 BL-788 BL-789 BL-790 BL-791 BL-792 BL-793 BL-794 BL-795 BL-796 BL-797 BL-798 BL-799 BL-801 BL-806 | DEVLOG.md |
 | ? | [2026-09-06 (sprint 32b closes) — The world changes, and the instruments learn to see it](DEVLOG.md) | BL-750 BL-751 BL-754 BL-761 BL-765 BL-767 BL-768 BL-770 BL-772 BL-780 BL-783 BL-784 | DEVLOG.md |
 | ? | [2026-09-06 (sprint 32a closes) — The arc runs, and four instruments could not see](DEVLOG.md) | BL-714 BL-747 BL-749 BL-755 BL-756 BL-757 BL-758 BL-762 BL-763 BL-765 BL-771 BL-774 BL-775 | DEVLOG.md |
 | ? | [2026-09-03 (sprint 32 opens, wave 1) — The second span is free, and four instruments were pointing the wrong way](DEVLOG.md) | BL-462 BL-746 BL-747 BL-748 BL-749 BL-751 BL-754 BL-755 BL-756 BL-757 | DEVLOG.md |

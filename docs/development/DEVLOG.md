@@ -92,11 +92,71 @@ in `DELIVERY.md` resolved by keeping both bullets. `render_sprints`, `render_act
 that had been sitting in the hot file, all verified to rebuild byte-exact; the hot file holds 31 open
 items.
 
+### Block 2 — the batch, and what four failed reviews bought
+
+**Mode:** two Workflow runs — 20 agents, then 10. No compile: the only `src/` edits in the whole
+batch are comment pointers repointed at moved sections.
+
+Five lanes, each built from a settled instruction. **Four failed cold review**, and none of the four
+on style:
+
+- **tools** traded the false negative for a false positive. Widening the union admitted 204 cold
+  rows whose `status` field *lies* — the 2026-08 sweeps froze each row at its pre-purge status, so a
+  culled item still reads `designed`. `--grep market --open` returned 18 rows with **zero** on the
+  hot worklist. It also shipped a DELIVERY.md bullet and a `--help` line promising a behaviour its
+  own code did not have. The rule that fixed it: **a cold row's state comes from the file it is
+  archived in**, normalised once at the union so no caller can be fooled.
+- **generation** deleted the *accurate* half of a doubled claim. PROVINCES was left asserting the
+  one-domain invariant is "structural rather than checked" while
+  `province_partition_harness.cpp:203` checks it as P2b. One false statement where there had been
+  two, one of them true — the specific failure mode of consolidating a boundary.
+- **ui** claimed to have grepped for dangling citations and had not (TOOLTIP still cited a moved
+  CANVASES section), and asserted an answer in SELECTION.md on a question the same agent had told
+  the judge was Ben's.
+- **proposes** switched PEOPLE.md and EVENTS.md to `Proposes:` on a half-read sentence. Both carry
+  `## Settled — Ben's rulings, 2026-08-22`, and the disclaimer they were switched on is qualified:
+  *"except where § Settled records one."* **That half-read was mine** — it is the premise I gave Ben
+  when I asked the question. The variant itself stands, on nine genuine research and exploration
+  docs.
+
+The **second** review earned its keep too: it caught a fabricated `(Ben, 2026-09-07)` attribution on
+the cold-row rule. That rule was mine, off the review's own measurement. In this repo a dated Ben tag
+is load-bearing provenance, and it would have hardened an agent's design call into a settled human
+ruling.
+
+**The design panel changed an answer.** Two independent proposals per boundary — one arguing from
+CLAUDE.md's router, one licensed to say the router is wrong — split workforce differently from the
+way the backlog item suggested. A builder reading the item alone would have built the wrong split
+confidently.
+
+### What the completeness critic proved about scope
+
+The three boundary lanes were scoped off defects a header sweep *happened* to notice. The critic
+built the `Confused with:` graph properly — **72 docs, 59 mutual pairs, 89 one-way edges** — and
+found three overlaps no lane would have reached: LOGISTICS and SUPPLY both holding the travel-time
+model under the same ruling date (**BL-797**); the navigation model and per-rung lens table each
+asserted **three** times (**BL-798**); and CREEDS/NATION_GENERATION, which survived every sweep
+because it is a *one-way* edge (**BL-799**).
+
+BL-798 is the lesson worth keeping. BL-796 deleted copy two of the lens table on entirely correct
+grounds and left copies three and four, which were outside its write set. **A correct rule applied
+to a partial scope leaves the corpus more inconsistent than it found it.** That is what **BL-801**
+(the header graph checker) exists to prevent, and it is why the tool comes before the next boundary
+sweep rather than after it.
+
+### Verification, block 2
+
+Union **138 → 757** items. `--grep market` **0 → 101** matches; `--touches MARKETS.md` **1 → 29**.
+Non-terminal over the union is 36, and that set *is* the hot set. `next_id` BL-806, never lower.
+`backlog_lint` 0 fails throughout. `doc_owner`, `backlog_view` and `status.ps1` all unchanged or
+better. 72 docs carry a header; `docs/ui/DRILL_THROUGH.md` exists with its CLAUDE.md § 3 row. All
+five fix branches merged with no conflicts.
+
 ### Open for Ben
 
-- **BL-792 and BL-793 are both priority A and both are the same wound.** Until they land, a bare
-  `--touches` or `--grep` negative is not evidence that something was never built. Worth doing before
-  anything that greps the backlog for a subject.
+- **BL-792 and BL-793 landed in block 2**, so a bare `--touches` or `--grep` negative is evidence
+  again. It was not, for the whole life of this session before that point — worth knowing when
+  reading anything filed earlier today.
 - `--sprint` does not exist as a flag; unknown flags are ignored silently and the tool returns
   everything. Minor next to the two above, and not chased.
 - `PEOPLE.md` and `EVENTS.md` are proposal-stage but their headers say **Settles:** like every other
