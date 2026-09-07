@@ -143,7 +143,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | Store | Owns | Tool |
 |---|---|---|
 | `docs/development/DELIVERY.md` | The method: lifecycle, design state, depth verbs, batch, worktrees. Read before Full mode. | — |
-| `docs/development/DEVELOPMENT_PRACTICES.md` | Harness testing (no unit framework), naming, doc standards, release cutting. | — |
+| `docs/development/DEVELOPMENT_PRACTICES.md` | Harness testing (no unit framework), naming, doc standards, release cutting, the doc header. | `header_graph.js` (`--dangling --graph --coverage --state --doc --strict --json`); dangling citations and state-dependent headers fail, the boundary graph prints |
 | `docs/development/ROADMAP.md` | Milestone sequence through v1.0.0. The only place that says *when*. | — |
 | `docs/development/backlog.json` | **Open work only** — closed items, delivered or cancelled, are not here at all. **Query, never load.** | `backlog_query.js` (`--status --priority --version --touches --grep --full`), `backlog_view.js`, `next_id.js`, `backlog_lint.js` |
 | `docs/development/archive/backlog-design-*.json` | Closed items **whole** — row and prose. Amend anything closed **here**. The query tools union it automatically, so `--touches` still answers "is this built?", and `--status cancelled` finds work that was closed unbuilt. | `archive_landed.js` (rows, `--restore`), `archive_designs.js` (prose) |
