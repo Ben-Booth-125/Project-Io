@@ -2,12 +2,12 @@
 
 > **Settles:** which canvases exist and how the zoom ladder orders them · which
 > canvas is primary and which one the inset frames · which press moves between
-> rungs · what view and selection state the three rungs share · which terrain
-> channels the ground is composed from · where a lens is allowed to draw.
+> rungs · what view and selection state the three rungs share.
 > **Not here:** what any single rung draws (SOLAR, CIRCUMPLANETARY, PLANETARY) ·
 > the inset's own chrome (MINIMAP) · how the ground is rendered (RENDERING) · what
-> each lens shows (LENSES).
-> **Confused with:** MINIMAP.md, PLANETARY.md, LENSES.md.
+> the ground is made of and how landform reads (PLANETARY) · what each lens shows
+> and which rungs it draws at (LENSES).
+> **Confused with:** MINIMAP.md, PLANETARY.md.
 
 Three canvases form the main spatial UI, arranged as a single **zoom ladder**
 from the widest view to the narrowest:
@@ -124,9 +124,8 @@ The shared struct is `ui_state` in `src/ui/ui_state.hpp` — the code is the
 reference; no snippet is mirrored here. The load-bearing members for the
 canvases: the `active_body` navigation anchor, `selected_entity` (the Selection
 state, SELECTION.md), `primary_level` (`canvas_level` — which rung fills the
-window), `overlay` (`overlay_mode` — **fourteen** values: `none` plus thirteen
-lenses, LENSES.md; the nation lens is named **`country`**), and per-canvas
-pan/zoom. The struct also carries hover-card, construction, vision, and
+window), `overlay` (`overlay_mode` — the active lens, LENSES.md § Roster), and
+per-canvas pan/zoom. The struct also carries hover-card, construction, vision, and
 drill-down state — see the header itself.
 
 Selection, hover, and pinning are drawn through a shared **highlight convention**
@@ -146,71 +145,6 @@ jump-to affordance.
 parent if it is a moon — see `circumplanetary_anchor`), and the Planetary view
 draws `active_body`. `show_tile_ledger` is shared housekeeping for the left
 navigation pane; the canvases do not touch it.
-
----
-
-## Terrain channels — composition and landform
-
-This section is the **shared-ladder spec** for the landform render (BL-231, landform
-channels; BL-232, bridged runs) — it lives here, not in PLANETARY.md, because the
-implementation is `hex_render` and serves two surfaces (the canvas and the Selection band's
-neighbourhood view); PLANETARY.md § Layers points back here.
-
-A tile's character has two axes ([TILES.md](../economy/TILES.md)), and the Planetary
-canvas draws them on **two separate channels**. Both are **always-on chrome**, not an
-`overlay_mode`: terrain identity is not something the player opts into, and landform's
-movement-cost multiplier applies whether or not a lens is active.
-
-| Axis | Channel | Source |
-|---|---|---|
-| **Composition** (what it is made of) | **Hue** — the flat hex fill | `ui::terrain_colour` |
-| **Landform** (its physical shape) | **Relief tint** + **glyph** | `ui::landform_relief`, `ui::icons::landform` |
-
-**Why two channels rather than one.** Lens tints composite over the terrain hue at
-0.6–0.80 alpha, so a second signal carried *in that hue* is obliterated exactly when a
-lens is on. This is the rule the Continent lens's plate boundaries established and it
-applies here unchanged: the relief is composited **after** every lens branch, and the
-glyphs are drawn over the finished fill in a contrasting ink (`ui::contrast_ink`, picked
-by the fill's luminance so it reads over the whole palette).
-
-**Why the landform channel splits in two.** The measured mix (`world_audit` § S3) decided
-it. Plains and valley alone are ~95 % of land tiles, while every dramatic landform is
-≤ 1.5 %:
-
-- **Common ground — relief tint.** Plains is the untouched baseline; elevated ground lifts
-  toward a warm highlight and sunken ground toward a cool shadow, on a small signed
-  ordinal scale (mountain highest → canyon lowest). Deliberately subtle: it must read as
-  light on terrain, never as a change of composition.
-- **Dramatic landforms — glyph.** Mountain, canyon, crater and rift each draw a stroke-only
-  silhouette ([ICONS.md](ICONS.md) § Landform). These are the ≤ 1.5 % set whose movement cost
-  is ×1.3 or worse, so an invisible surprise there is expensive. A glyph on *every* tile
-  would be far denser than any other glyph family and would fight the building silhouette
-  for the hex centre.
-
-**Contiguous runs are bridged.** A run of the same linear landform draws as **one**
-spanning marker rather than the same glyph repeated per tile — mountain as a chain of peaks, rift
-as one continuous fissure, canyon as paired rims — reusing the road span/symmetry idiom (each
-tile draws its own half of the shared edge, so halves meet at the midpoint with no cross-tile state
-and the survey fog clips cleanly). A lone tile keeps its centred glyph, the role the road's centre
-cap plays. Crater never spans. Contiguity was measured before the render was designed
-(`world_audit` § S4): 71% of mountain and 81% of rift tiles have such a neighbour, so bridging
-fires on the majority — while **no** tile in the system has all four neighbours, which is why there
-is no "filled interior" case.
-
-**The glyphs are named where the player looks.** Every tile hover card states
-`composition · landform` and, on the plain canvas, the landform's movement cost — a glyph
-vocabulary learnable only by clicking each tile through to the Selection panel is not learnable.
-Plains stays unnamed: it is the untouched baseline in both channels.
-
-**Suppression rules.** The glyph is skipped on a **built** tile (which already carries an
-enlarged silhouette plus a corp emblem tag, and whose cost is already spent — elevation
-matters when *siting*) and under the **Population/Opportunity** lenses (which claim the hex
-centre for their own value mark). The relief tint is likewise skipped on a built
-tile, whose hex is swapped wholesale for its owner plate as an identity signal.
-
-Both channels also render in the Selection band's zoomed tile-neighbourhood view, which is
-why they live in `hex_render` rather than in the canvas — one implementation, so the two
-surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
 
 ---
 
@@ -248,18 +182,3 @@ frame — the minimap if the mouse is over the inset, the primary otherwise — 
 only when an ImGui panel isn't capturing the mouse (`WantCaptureMouse`). Each
 function still draws unconditionally; it just skips hover/click handling when
 `input_enabled` is false.
-
----
-
-## Where the lenses draw
-
-All thirteen lenses — Supply, Corporation, Country, Resource, Market, Population,
-Opportunity, Production, Scarcity, Industry, Reach, Continent, and Supply-routes —
-draw their geometry inside the canvas draw passes (`body_surface_canvas.cpp` and,
-for the Supply and Market lenses, the Solar and Circumplanetary canvases too),
-keyed on `ui_state::overlay` and catalogued in LENSES.md. The geometry lives in
-the canvas functions because per-tile compositing has to happen there; the
-`draw_canvas_overlay` pass in `overlay.cpp` renders nothing and is an unused
-extension point. The lens *controls* are the eight-glyph mode bar on the minimap
-(`draw_overlay_controls`, `src/ui/overlay.cpp`) plus keyboard cycling; no lens is
-active on load — the canvas opens unskinned.

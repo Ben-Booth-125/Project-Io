@@ -3,8 +3,9 @@
 > **Settles:** which three pointer states exist and what each one drives · which
 > press changes which of them · what this element offers for each kind of thing
 > selected, and where its deeper reference lives · what repeat-clicking the same
-> ground does · how an active lens narrows what a press may resolve to and which
-> ledger it drives · what this surface deliberately refuses to be.
+> ground does · how a stack of things under one pointer resolves to a single one ·
+> how an active lens narrows what a press may resolve to and which ledger it
+> drives · what this surface deliberately refuses to be.
 > **Not here:** the hover card itself (TOOLTIP) · what a lens shows (LENSES) ·
 > where the band sits in the shell (LAYOUT) · the ledgers it points at (MENU).
 > **Confused with:** TOOLTIP.md, LENSES.md, LAYOUT.md.
@@ -752,6 +753,17 @@ resolves to the tile, whose element carries its province), and a repeat click wa
 below (§ Tile repeat-click selection cycle). Under a lens the stack does not apply at all — see
 the next section, which supersedes it.
 
+**Two resolvers, and which wins.**
+
+| Resolver | Answers | Used by |
+|---|---|---|
+| **Boundary** (`resolve_structure_hit`) | "am I on this structure's edge?" | The national border band — always-on chrome, not a lens |
+| **Area** (`lens_structure_of_tile`) | "which structure is this ground part of?" | The active lens |
+
+**With no lens active, a marker outranks both, and a boundary outranks an area.** The order is not
+arbitrary: a marker and a border are things the player *aimed at*, while a catchment is ground they
+happen to be over.
+
 ### A lens collapses selection to ONE TIER (Ben, 2026-08-28)
 
 Owned by BL-664 (one tier under a lens). Three rules, and they hold for every lens without
@@ -799,8 +811,7 @@ no destination for.
 ### The lens names the ledger the selection drives
 
 Resolving the entity and choosing its 'go to' ledger are the *same* decision — the lens that
-validates the structure also routes it. [LENSES.md](LENSES.md) § Per-lens selection validity &
-routing owns the per-lens table; this is the shape it takes.
+validates the structure also routes it.
 
 | Active lens | Resolves to | Routes to |
 |---|---|---|
@@ -811,6 +822,10 @@ routing owns the per-lens table; this is the shape it takes.
 | **Market** / **Scarcity** | the **market catchment** under the pointer | Market Ledger |
 | **Continent** | the **plate** | History ledger, at its tectonic record |
 | **Population** / **Industry** / **Throughput** | nothing — inert | — |
+| **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
+
+**Country has no row because it is not a lens.** A nation is reached by its border band under
+*every* lens — [PLANETARY.md](PLANETARY.md) § Clicking the border selects the nation.
 
 **A tile group is a structure like any other.** Hovering one tile of a corporation's holdings
 lights **all** of them at once (Ben, 2026-08-28: "hovering one tile displays an outline around all
@@ -819,6 +834,8 @@ ledger. It is the same claim the market catchment's highlight makes — *all of 
 so it takes the same wash the catchment does rather than a walked boundary (Ben's 2026-08-24 ruling
 on that question, recorded in `body_surface_canvas.cpp`: a wash is per-tile and costs one test,
 and an area statement is the truer read anyway).
+
+**Check:** `scripts/verify/lens_structure_pivot.lua`.
 
 ### A deposit and a plate are cards, not just channels
 
