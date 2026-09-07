@@ -200,12 +200,33 @@ std::vector<const roster_row*> available_rows(const world& w, entity_id corp, ro
 std::vector<army_stack_entry> roster_stack(int64_t         manpower,
                                            const region& p,
                                            roster_band     band,
-                                           int             readiness_q)
+                                           int             readiness_q,
+                                           bool            allow_naval)
 {
     std::vector<army_stack_entry> stack;
     if (manpower <= 0) return stack;
 
-    const std::vector<const roster_row*> rows = available_rows(p, band);
+    std::vector<const roster_row*> rows = available_rows(p, band);
+
+    // NR-794: a campaign whose objective is inland fields NO SHIPS. Dropped
+    // here, BEFORE the weighting below, so the remaining land rows divide the
+    // whole manpower — a filtered fleet must not leave a hole in the army.
+    //
+    // WHY THIS EXISTS. The class scored zero until BL-779, so composing every
+    // available row cost nothing and read as honest: a coastal polity simply
+    // carried an inert galley entry. Giving naval real power turned that into a
+    // COMBAT BONUS FOR OWNING A PORT, applied in landlocked battles, with no
+    // cause anyone could point at in the world — and it was not rare: 84% of
+    // battles carried a naval contingent, against the 18% that actually reached
+    // over water. Rare is the design (MILITARY_HISTORY.md § Naval), and 84% is
+    // not rare.
+    if (!allow_naval)
+        rows.erase(std::remove_if(rows.begin(), rows.end(),
+                                  [](const roster_row* r) {
+                                      return r->cls == unit_class::naval;
+                                  }),
+                   rows.end());
+
     if (rows.empty()) return stack;
 
     // Later bands crowd out earlier ones rather than sitting beside them at

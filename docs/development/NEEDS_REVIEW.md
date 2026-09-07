@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*7 entries — 7 open, 0 resolved.*
+*6 entries — 6 open, 0 resolved.*
 
 ---
 
@@ -152,32 +152,6 @@ It also echoes the slice-1 finding exactly, one level up. Slice 1 found the obje
 > **Recommendation:** The FIRST if phase 6 is meant to select infrastructure at all, otherwise the SECOND. What should NOT happen is leaving it as-is silently: Ben chose three axes on the assumption they discriminate, and one does not. Worth noting the third option would be the most faithful to what a road is FOR, but it changes the logistics model to serve a search, which is the tail wagging the dog.
 
 *Files: `src/world/landscape_score.cpp`, `src/world/landscape_search.cpp`, `docs/generation/GENERATION_STRATEGY.md`*
-
-### NR-794 — Should a LAND campaign field naval rows at all? 84% of ancient battles carry a galley contingent, and the doc says they should
-*question · raised 2026-09-07 · from Lane A (BL-779), flagged as novelty and verified independently on main, 2026-09-07.*
-
-THE METRIC BL-779 ASKED FOR DOES NOT MEAN WHAT IT LOOKS LIKE. 'How often does naval combat occur' was first measured as 'battles with a naval entry present': 1264 of 1499, or 84%. That is not naval combat. roster_stack composes EVERY available row into a stack, so any polity clearing port_q 500 carries a galley contingent into INLAND fights. The figure measures how coastal the powers are, not how often anyone fights at sea.
-
-The sweep now prints both, with the distinction spelled out:
-  battles with a naval CONTINGENT present   1264 of 1499 (84%)
-  battles REACHED OVER A SEA LEG             274 of 1499 (18%)  <- naval combat
-
-The second is the honest answer and it sits close to the 'rare is the design' expectation.
-
-BUT THE FIRST NUMBER IS ITS OWN QUESTION. A galley in a landlocked battle contributes REAL power now that BL-779 gave the class 140 base - so coastal polities get a combat bonus inland, for owning a port, with no in-world cause. That is close to the pattern Ben rejects: a term inside the agent rather than a force in the world.
-
-**Why it matters.** THE DOC SAYS THE CURRENT BEHAVIOUR IS CORRECT, AND THAT SENTENCE WAS WRITTEN YESTERDAY. docs/generation/MILITARY_HISTORY.md § Naval: ships are 'rows in the same roster... composed into the same stack, scored in the same contest'. Filtering naval rows out at composition would contradict the doc as written.
-
-But the doc was authored BEFORE anyone could see what one stack produces. This is the doc-written-ahead-of-measurement case, and the measurement is now in. Left alone it means every coastal polity in every generated history fights its land battles with a fleet in the line.
-
-- Filter naval rows out of a stack whose objective is inland - ships fight only where the campaign crosses water. Contradicts MILITARY_HISTORY.md § Naval as written, so the doc changes with it.
-- Keep one stack, but give naval rows near-zero weight in a land contest rather than excluding them - composition stays honest and the inland bonus shrinks.
-- Accept it: a coastal polity IS militarily stronger, the galley crews are marines, and 84% is a feature. Then say so in the doc explicitly rather than leaving it a side effect.
-- Leave it and re-measure after NR-792 (the carve) - unowned coastal water may change which polities clear port_q at all.
-
-> **Recommendation:** The FIRST, and change the doc with it. 'Rare is the design' is the stated intent and 84% is not rare; a fleet in a landlocked battle reads as a bug to anyone who notices it. The third option is defensible but it should be a CHOICE, and right now it is an accident of roster_stack composing everything it can.
-
-*Files: `src/world/unit_roster.cpp`, `src/world/history_sim.cpp`, `docs/generation/MILITARY_HISTORY.md`*
 
 ---
 

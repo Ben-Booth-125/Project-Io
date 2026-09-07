@@ -278,10 +278,25 @@ std::vector<const roster_row*> available_rows(const world& w, entity_id corp, ro
 /// Compose an army stack from @p manpower over the rows @p p and @p band make
 /// available, scaled by @p readiness_q (1000 = full). Returns an empty stack
 /// for non-positive manpower.
+///
+/// @p allow_naval decides whether naval rows may be composed into this stack at
+/// all (NR-794, Ben 2026-09-07). A campaign whose objective is INLAND fields no
+/// ships: they are dropped before the weighting, so the land rows divide the
+/// whole manpower rather than sharing it with a fleet that cannot be there.
+///
+/// WHY IT IS A PARAMETER AND NOT A RULE INSIDE THIS FUNCTION: whether the
+/// objective is reachable only over water is a fact about the CAMPAIGN, and
+/// this function is handed a region and a band, never a route. The caller knows;
+/// this function must be told.
+///
+/// REQUIRED RATHER THAN DEFAULTED, for the reason the sim's band ceiling is:
+/// a new caller that omitted it would silently re-admit fleets to land battles,
+/// with no diagnostic and nothing able to see it.
 std::vector<army_stack_entry> roster_stack(int64_t     manpower,
                                            const region& p,
                                            roster_band     band,
-                                           int             readiness_q);
+                                           int             readiness_q,
+                                           bool            allow_naval);
 
 /// Map a polity's military capacity band (1-6, the ladder's own numbering) onto
 /// its roster band. This is the ONE place the two numberings meet.

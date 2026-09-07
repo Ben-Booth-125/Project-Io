@@ -197,11 +197,17 @@ void note_units_fielded(history_sim_state&        out,
 /// argument would silently un-apply the span cap, with no diagnostic and no
 /// harness able to see it (BL-760 (3)). Required rather than defaulted, so
 /// forgetting it is a compile error.
+///
+/// @p allow_naval carries NR-794 (Ben, 2026-09-07): ships are composed only into
+/// a stack whose campaign actually crosses water. Required for the same reason
+/// @p ceiling is — an omitted argument would silently re-admit fleets to land
+/// battles, and nothing downstream could tell.
 std::vector<army_stack_entry> build_stack(int64_t manpower,
                                           const region& home,
                                           const polity&   owner,
                                           int             readiness_q,
                                           roster_band     ceiling,
+                                          bool            allow_naval,
                                           roster_band*    band_out)
 {
     const int band_index = clampi(owner.capacity[static_cast<int>(sim_domain::military)], 1, 6);
@@ -218,7 +224,7 @@ std::vector<army_stack_entry> build_stack(int64_t manpower,
     const int cohesion = clampi(owner.cohesion_q, 0, 1000);
     const int effective_readiness = (readiness_q * cohesion) / 1000;
 
-    return roster_stack(manpower, home, band, effective_readiness);
+    return roster_stack(manpower, home, band, effective_readiness, allow_naval);
 }
 
 /// True iff the straight line between two regions crosses SEA (open ocean or
@@ -1351,13 +1357,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 roster_band atk_band = roster_band::classical;
                 std::vector<army_stack_entry> atk =
-                    build_stack(raised, home, q, 1000, sim_band_ceiling(params, y), &atk_band);
+                    build_stack(raised, home, q, 1000, sim_band_ceiling(params, y),
+                                !exec_dry, &atk_band);
                 note_units_fielded(out, params, y, atk_band, atk);
                 const int64_t def_want = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
                 const int64_t def_men  = raise_manpower(tgt, def_want);
                 roster_band def_band = roster_band::classical;
                 std::vector<army_stack_entry> def =
-                    build_stack(def_men, tgt, dq ? *dq : q, def_ready, sim_band_ceiling(params, y), &def_band);
+                    build_stack(def_men, tgt, dq ? *dq : q, def_ready, sim_band_ceiling(params, y),
+                                !exec_dry, &def_band);
                 note_units_fielded(out, params, y, def_band, def);
 
                 const battle_outcome bo = resolve_battle(

@@ -168,11 +168,30 @@ not as an oversight, but because nothing in the campaign has asked for it and a 
 consumer is a model nobody has tested.
 
 **They are not a separate system.** Coastal Galley, Broadside Ship and Ironclad are rows in the
-same roster, gated on the same `port_q` axis, composed into the same stack, scored in the same
-contest. What distinguishes them is **domain**: they are the only rows that may occupy open ocean,
-and the only rows that may contest coastal water a rival holds ([`PROVINCES.md`](PROVINCES.md)
-§ Who owns water). Until this ruling the class returned base power 0 and was skipped by the stack
-sum outright — authored, raisable, and worth nothing.
+same roster, gated on the same `port_q` axis, scored in the same contest by the same resolver.
+What distinguishes them is **domain**: they are the only rows that may occupy open ocean, and the
+only rows that may contest coastal water a rival holds ([`PROVINCES.md`](PROVINCES.md) § Who owns
+water). Until the water ruling the class returned base power 0 and was skipped by the stack sum
+outright — authored, raisable, and worth nothing.
+
+**A stack fields ships only where the campaign CROSSES WATER (Ben, 2026-09-07).** An inland
+objective composes no naval rows at all; they are dropped before the weighting, so the land rows
+divide the whole manpower rather than sharing it with a fleet that cannot be there.
+
+> **This section said the opposite until 2026-09-07, and measurement is what settled it.** It read
+> *"composed into the same stack"* — one roster, one composition, no filter — which was written
+> before anyone could see what one stack produces. `roster_stack` composes **every available row**,
+> so any polity clearing `port_q` carried a galley contingent into landlocked fights. Harmless
+> while the class scored zero; once it scored 140 it became a **combat bonus for owning a port**,
+> applied inland, with no cause anyone could point at in the world.
+>
+> The measurement: **84% of battles carried a naval contingent**, against the **18%** that actually
+> reached over water. "Rare is the design" and 84% is not rare. With the filter the two figures
+> converge — 273 of 1500 carry ships, 274 of 1500 cross water.
+>
+> **The one-battle gap is the model working, not a rounding error.** A sea leg with no naval
+> contingent is a polity crossing coastal water *it owns* with land units — the middle case of
+> `MILITARY.md` § Domains and traversal, showing up in the data on its own.
 
 **Rare is the design, not a shortfall.** Most contests stay on land. The water model exists so the
 uncommon ones — a contested strait, a coastal province changing hands, a trade shore denied — are
