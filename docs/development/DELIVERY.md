@@ -399,6 +399,15 @@ Consequences:
   there is a substantial wave of slice-able work a cold agent can execute from its brief alone;
   stay in the main session when the win is marginal (a short serial chain, co-evolving
   interfaces). State the call and its reason rather than asking permission each time.
+- **A sub-agent is a context compressor, not only a parallelism device.** Everything above
+  frames fan-out around concurrency and isolation. That is true and incomplete: the other reason
+  to spawn an agent is that it reads 40K of doc or code and returns 500 tokens of conclusion, and
+  the main session never pays the 40K. **The main session's context is the scarce resource, not
+  the agent's** — so a read-only question whose *answer* is short and whose *sources* are long is
+  a fan-out candidate on its own, with no parallelism at all and no second agent to run beside
+  it. The brief must then ask for the **conclusion**, not the excerpts: a report that pastes back
+  what it read has compressed nothing and has spent the context twice. Pairs with the rule above
+  that an agent stops once it has a decision.
 
 ### Parallel worktree coherence (keeping N sessions consistent)
 

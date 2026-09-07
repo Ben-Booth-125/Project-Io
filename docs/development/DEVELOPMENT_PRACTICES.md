@@ -411,6 +411,38 @@ All public interfaces are documented with **Doxygen-style comments**. This appli
 float resolve_price(float supply, float demand, float base_price);
 ```
 
+### The doc header — an index of questions (Ben, 2026-09-07)
+
+Every authority doc named in `CLAUDE.md` § 3 opens with a header block, immediately under the
+H1, before any prose. It exists so a traversal can pick the owning doc **from headers alone**,
+instead of opening a 40K doc to discover it wanted the sibling.
+
+```markdown
+# Markets
+
+> **Settles:** where a market centre is and what it covers · how an order book
+> clears · how a price resolves and what bounds it · who may place an order and on
+> what terms · what a market does when it cannot clear.
+> **Not here:** the money loop (FINANCE) · what moves the goods (SUPPLY) · what the
+> road costs (LOGISTICS).
+> **Confused with:** FINANCE.md, SUPPLY.md, PRODUCTION.md.
+```
+
+Three rules make it hold:
+
+- **It lists questions, never answers.** "How a price resolves and what bounds it" — not what
+  the bound is. A doc gains or loses a *question* far more rarely than it changes an *answer*,
+  so a header written this way survives the design changes that would make a précis stale.
+- **It never restates a rule, and it is never a summary.** If a line could be quoted as
+  authority, it is the wrong line. The header routes; the doc settles.
+- **State-independence applies unchanged.** A header never says landed, built, pending, or
+  shipped, and never carries a `BL-` id (see `.claude/rules/io-standing-rules.md` § Terms &
+  docs).
+
+Ten lines is the ceiling. `Not here` names the questions readers most often arrive with and
+should be sent elsewhere for; `Confused with` names the two or three sibling docs that near-miss
+against this one. Both are part of the routing job, not decoration.
+
 ### Design-direction Q&A (Batch Delivery)
 
 A **Batch Delivery** (multiple items in one block; see `DELIVERY.md` § Batch Delivery) that made
