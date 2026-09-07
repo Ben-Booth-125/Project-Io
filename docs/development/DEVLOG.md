@@ -222,21 +222,21 @@ the RECORD is honest — then an adjudicator that verified each blocker itself b
 Two blockers were raised; one survived.
 
 **NR-794 was minted twice, and the second mint was mine.** A prior session used it for a
-naval-composition ruling, cited it at three source sites (, ,
-) — and **never filed it**. So nothing in the review store could see the id was
-taken. This session minted NR-794 for the border-band question, and for a few hours three code
-comments resolved to a ruling about lens chrome: a visible gap converted into a confident wrong
-answer, which is the exact failure class these 61 commits spent the day removing. Renumbered to
-**NR-797**, with the collision recorded on that entry. **BL-811** widens , which guards
-BL ids and nothing else — and the guard must scan the tree, not the store, because this id was
-cited in code and never filed.
+naval-composition ruling and cited it at three source sites (`unit_roster.hpp:283`,
+`unit_roster.cpp:211`, `history_sim.cpp:201`) — and **never filed it**. So nothing in the review
+store could see the id was taken. This session minted NR-794 for the border-band question, and for
+a few hours three code comments resolved to a ruling about lens chrome: a visible gap converted
+into a confident wrong answer, which is the exact failure class these 61 commits spent the day
+removing. Renumbered to **NR-797**, with the collision recorded on that entry. **BL-811** widens
+`next_id.js`, which guards BL ids and nothing else — and the guard must scan the *tree*, not the
+store, because this id was cited in code and never filed.
 
 **The second blocker did not survive, and the adjudication is worth keeping.** Six docs derive
-km-per-tile from a 312-column grid the code retired at BL-424 (), so the
+km-per-tile from a 312-column grid the code retired at BL-424 (`home_grid_width = 261`), so the
 constant is ~20% wrong. Real — but the session did not cause it: BL-797 deleted the duplicate in
 SUPPLY, taking the corpus from seven false copies to six, and four of the five survivors were never
 touched. Filed as **BL-810**, with the aggravating detail that the re-authored line now cites
- beside the wrong number, so a false constant reads as code-verified.
+`body_km_per_tile` beside the wrong number, so a false constant reads as code-verified.
 
 The auditors also confirmed the load-bearing claim by the right method: today's checker run against
 an extracted base tree, diffing the *misses by citing site* rather than by count. **4 added, 4
