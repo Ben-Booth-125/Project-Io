@@ -273,7 +273,7 @@ authors the predicate.** One authority for what a gate requires.
 **Related authorities.** [`docs/politics/NATIONS.md`](politics/NATIONS.md) (laws, and the
 enforcement seam), [`SYSTEMS.md`](SYSTEMS.md) § Conditions (the one-paragraph overview this document
 expands), `docs/research/TECH_EFFECTS.md` (research scaffolding for what a tech should *do*),
-`docs/economy/MARKETS.md` § Procurement (where the embargo predicate is read),
+`docs/economy/CONTRACTS.md` § Procurement — the buy side (where the embargo predicate is read),
 [`EVENTS.md`](EVENTS.md) (the rule family that adds a trigger to a predicate and an effect).
 
 **Backlog.** BL-342 (condition evaluator) and BL-479 (tech effect union) own the two halves.

@@ -349,7 +349,7 @@ the factors that move it. Its emitters are the first writers into the Access dim
 **Related authorities.** [`NATIONS.md`](NATIONS.md) (the nation as an actor, and its read of a
 corp), `docs/military/MILITARY.md` (what hostility permits militarily),
 `docs/ui/DISCOVERY.md` (BL-068, the competitor-visibility rule both stance and standing obey),
-`docs/economy/MARKETS.md` (§ Procurement, where reputation is spent),
+`docs/economy/CONTRACTS.md` (§ Procurement — the buy side, where reputation is spent),
 `docs/ai/AI_OPPONENT.md` (the scorer that declares).
 
 **Owning items.** BL-545 (sentiment substrate) is the spine; BL-546 (reputation migration) is the

@@ -73,14 +73,14 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | Doc | Owns |
 |---|---|
 | `docs/economy/RESOURCES.md` | The resource list, tiers, terrain affinity, era split. |
-| `docs/economy/PRODUCTION.md` | Buildings, recipes, placement, workforce, stockpile flow. |
+| `docs/economy/PRODUCTION.md` | Buildings, recipes, placement, labour demand and shortfall, stockpile flow. |
 | `docs/economy/MARKETS.md` | Market centres, clearing, price resolution, the order book. |
 | `docs/economy/FINANCE.md` | The money loop: income, expenditure, maintenance, wages, interest, debt. |
-| `docs/economy/CONTRACTS.md` | Promises between named parties: procurement and the mercenary contract — the income loop. |
+| `docs/economy/CONTRACTS.md` | Promises between named parties: procurement, the buy side. |
 | `docs/economy/LOGISTICS.md` | The network: traversal cost, reach, roads, scale/travel time, interdiction, Logistic Points. *Logistics is the road.* |
 | `docs/economy/SUPPLY.md` | The flow: convoys — cargo, dispatch, cost, arrival. *Supply is the traffic.* |
 | `docs/economy/TILES.md` | Two-axis terrain, deposit profiles, amenity tiles. |
-| `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability. |
+| `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability, labour supply and contention. |
 | `docs/economy/ERAS.md` | The era ladder and the gate into space. |
 | `docs/economy/RESEARCH.md` | Research points and technology unlocks (stub). |
 | `docs/economy/SPACE_ASSETS.md` | Off-body assets (stub). |
