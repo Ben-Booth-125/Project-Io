@@ -338,7 +338,7 @@ settlement-density description with no consumer. The pass requires population ce
 exist — which is why `generate_population_centres` runs before `generate_nations` in
 `hard_coded_world.cpp` (see § Settlement generation below).
 
-### Pass 7 — Starting treasury (RULED, not yet built — Ben, 2026-08-24, NR-580)
+### Pass 7 — Starting treasury *(Ben, 2026-08-24)*
 
 `nation_component::treasury` is zero at generation by NATIONS.md's existing design — deliberate,
 since a treasury that started full would be a balance change smuggled in as a field. That rule

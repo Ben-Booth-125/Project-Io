@@ -946,6 +946,106 @@
         "docs/development/DELIVERY.md"
       ],
       "design": "THE FINDING (2026-09-07, surfaced while delivering BL-790 (source-to-doc index), confirmed independently in the main session). CLAUDE.md names backlog_query.js --touches <doc> as the way to answer \"is this built?\", and that answer is supposed to work BECAUSE the query tools union the cold archive. They do not union it. archive_store.js archiveFiles() globs /^backlog-design-.*\\.json$/ only.\n\nTHE NUMBERS, measured: the union sees 138 items. docs/development/archive/ holds 762. The 624 it cannot see live in files outside the glob - backlog-complete-2026-08-24.json (19), backlog-complete-2026-08-26.json (48), backlog-cancelled-2026-08-31.json (18), backlog-purged-2026-08-23.json (529), backlog-purged-2026-08-24.json (10). By status: 420 complete, 164 designed, 35 design-owed, 4 open, 1 cancelled. 590 of the 624 carry a files[] array, which is exactly the field --touches reads.\n\nWHAT IT MEANS IN PRACTICE: --touches docs/economy/MARKETS.md misses 35 items that name MARKETS.md or market_clearing.cpp, most of them complete. So the tool CLAUDE.md sends a session to for \"has this already been built\" returns a confident, silent, wrong NO on a large fraction of the project's finished work - the FALSE OPEN shape backlog_lint.js already hunts, but structural rather than per-item.\n\nWHY THE SHAPES DIVERGED: the complete/cancelled/purged files predate archive_landed.js and use a top-level `items` ARRAY. The design-* files archive_landed.js writes use a `records` OBJECT keyed by id, and landedItems() reconstructs rows from it. The glob was written for the second shape and nobody widened it for the first.\n\nTHE PURGE IS NOT AN OBJECTION. backlog-purged-2026-08-23.json says in its own _note that nothing in it is open work and that a purged item's prose is not lost. The purge shrank the HOT file, which is correct and stays. It did not intend to make 343 completed items unfindable by the question CLAUDE.md routes to them.\n\nTHE DESIGN: teach archive_store.js both shapes. archiveFiles() widens to backlog-(design|complete|cancelled|purged)-*.json; a loader normalises the `items` array form into the same reconstructed rows landedItems() already returns; de-duplication keeps HOT WINS, then design-* over the older sweeps, so a row that exists in two places resolves once and predictably. Do it in archive_store.js rather than in each caller - BL-790 worked around it locally in doc_owner.js, and that workaround is removed by this item.\n\nNEXT_ID IS THE CARE POINT. next_id.js unions landedIds() to decide an id is spent. Widening the glob can only ADD spent ids, so it makes next_id strictly safer - but it is the one caller where being wrong is expensive, so verify it explicitly: the highest id and the next safe id must not go DOWN, and the SCAN INCOMPLETE line must still fire when a ref cannot be read.\n\nVERIFY: union count goes 138 -> ~762; --touches on MARKETS.md, PRODUCTION.md and AI_OPPONENT.md each return the complete items they currently miss; next_id.js still says BL-793 or higher; backlog_lint.js stays 0 fails; backlog_view.js and status.ps1 both still render."
+    },
+    {
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "version_goal": null,
+      "sprint": "33",
+      "written": "2026-09-07",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Tooling",
+      "id": "BL-793",
+      "short_name": "GREP_DROPS_LANDED_WORK",
+      "difficulty": 2,
+      "author": "Claude (BL-788 delivery surfaced it)",
+      "title": "--grep returns nothing for a subject the project has already shipped",
+      "authority_doc": "docs/development/DELIVERY.md",
+      "files": [
+        "tools/session/backlog_query.js",
+        "docs/development/DELIVERY.md"
+      ],
+      "design": "THE FINDING (2026-09-07, surfaced delivering BL-788 (backlog query summary mode), reproduced in the main session). backlog_query.js --grep unions the cold archive, matches against it, and THEN drops terminal items in the default view - so the landed matches are found and thrown away. Measured: `--grep market` prints \"nothing matched\" and exits 1; `--grep market --all` returns 11 items, every one of them complete. `--grep convoy` is empty the same way.\n\nWHY IT MATTERS BEYOND TIDINESS: DELIVERY.md makes --grep the FIRST step before authoring an item (Ben, 2026-08-23, ruling on NR-556) - grep the SUBJECT, because next_id.js guards the id and nothing guards the subject. A grep that silently hides everything shipped is precisely blind to the case that rule exists for: authoring a fresh item for work that already landed. The tool's own source comment says a search that skipped everything shipped would be worse than no search, so intent and behaviour already disagree in writing.\n\nCOMPOUNDS BL-792 (the cold union misses 620 items). That item is about which items the union can SEE; this one is about which of the seen items survive the default view. Both end in the same silent, confident, wrong negative, and fixing either alone still leaves a subject search that lies.\n\nTHE DESIGN: --grep is a SEARCH, not a worklist view - it should match across the union and print what it matched, terminal items included, with the status column carrying the distinction (the summary mode from BL-788 makes that one legible line per hit). The terminal filter stays the default for the LIST views (--status, --priority, bare invocation), where the unit of output is open work. If a narrower default is wanted, it must be --grep --open, never a silent drop.\n\nVERIFY: --grep market returns the 11; --grep convoy returns its landed items; a bare invocation and --status designed are unchanged; backlog_lint stays 0 fails."
+    },
+    {
+      "status": "designed",
+      "glyph": "~",
+      "priority": "B",
+      "version_goal": null,
+      "sprint": "33",
+      "written": "2026-09-07",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Docs",
+      "id": "BL-794",
+      "short_name": "ECONOMY_DOC_BOUNDARIES",
+      "difficulty": 3,
+      "author": "Claude (BL-787 economy slice surfaced it)",
+      "title": "Two economy doc pairs claim and disclaim the same subject",
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "files": [
+        "docs/economy/PRODUCTION.md",
+        "docs/economy/POPULATION.md",
+        "docs/economy/MARKETS.md",
+        "docs/economy/CONTRACTS.md"
+      ],
+      "design": "THE FINDING (2026-09-07, surfaced writing the BL-787 headers - stating a boundary in one line is what exposed that two of them are not stated anywhere).\n\n(1) WORKFORCE IS CIRCULAR. PRODUCTION.md and POPULATION.md each carry a `## Workforce model` section, and each names the OTHER as the authority: PRODUCTION says the design rationale is POPULATION.md, POPULATION says it is specified in PRODUCTION.md. Both then restate the same supply derivation (1/3/10/30/100 by scale, share by building count) and both discuss contention. A reader routed to either is routed onward, and two copies of one derivation is the doc-truth defect the corpus rules exist to prevent.\n\n(2) PROCUREMENT SITS IN THE WRONG DOC. MARKETS.md carries `## Procurement - a layer over the market, not a second market` at ~70 lines, including what a contract is worth. CONTRACTS.md - the doc CLAUDE.md names as owning procurement - is 113 lines total. The doc named for the subject holds less of it than its neighbour.\n\nTHE WORK: pick one owner per subject and move the prose, do not cross-reference harder. Suggested, not settled: POPULATION owns where labour comes from and how it is contended for; PRODUCTION owns what a building demands and what a shortfall does. For procurement, CONTRACTS owns the promise between named parties and MARKETS keeps only how such an order meets the book. The BL-787 headers were written to the suggested split, so if the call goes the other way the two headers move with it.\n\nDONE WHEN: no subject has two owners, no doc points at another for something it also specifies, and the four headers agree with the bodies."
+    },
+    {
+      "status": "designed",
+      "glyph": "~",
+      "priority": "B",
+      "version_goal": null,
+      "sprint": "33",
+      "written": "2026-09-07",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Docs",
+      "id": "BL-795",
+      "short_name": "GENERATION_DOC_BOUNDARIES",
+      "difficulty": 3,
+      "author": "Claude (BL-787 generation slice surfaced it)",
+      "title": "Province and ancient-naval rules live in docs that point away from them",
+      "authority_doc": "docs/generation/PROVINCES.md",
+      "files": [
+        "docs/generation/PROVINCES.md",
+        "docs/generation/TILE_GENERATION.md",
+        "docs/lore/HISTORY.md",
+        "docs/generation/MILITARY_HISTORY.md"
+      ],
+      "design": "THE FINDING (2026-09-07, surfaced writing the BL-787 headers).\n\n(1) TILE_GENERATION.md carries `## Province partition` and `### Provinces over water` (~lines 600-730), while PROVINCES.md declares itself the home of a design \"spread across four documents\". CLAUDE.md routes province questions to PROVINCES, and the new headers do the same - which leaves those two sections as authority nothing points at any more. Orphaned authority is worse than duplicated authority: it is true, load-bearing, and unreachable.\n\n(2) HISTORY.md carries \"Regions carry a domain, and coastal units sail in the ancient sim\" (~line 351) - a force-model rule inside the institutional-ladder doc, when MILITARY_HISTORY.md owns how force works in the Era -1 sim by its own boundary table. Both docs speak on ancient naval.\n\nTHE WORK: move, do not cross-reference. Province partition rules go to PROVINCES.md; the ancient naval rule goes to MILITARY_HISTORY.md; the vacated sections leave a one-line pointer at most. Keep the generation/campaign split intact while doing it - MILITARY_HISTORY is the Era -1 sibling of military/MILITARY.md, not its parent.\n\nRELATED, ALREADY FIXED: NATION_GENERATION.md § Pass 7 carried \"(RULED, not yet built)\" in a heading - a state claim in an authority doc, which the standing rules forbid outright. Removed 2026-09-07 in the same pass that found it; recorded here so the sweep has one home.\n\nDONE WHEN: each of the two subjects has one owner, and no doc's header points away from a section that doc still holds."
+    },
+    {
+      "status": "designed",
+      "glyph": "~",
+      "priority": "B",
+      "version_goal": null,
+      "sprint": "33",
+      "written": "2026-09-07",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Docs",
+      "id": "BL-796",
+      "short_name": "UI_DOC_BOUNDARIES",
+      "difficulty": 3,
+      "author": "Claude (BL-787 UI slice surfaced it)",
+      "title": "The lens bar, the selection routing and the drill-through have no single owner",
+      "authority_doc": "docs/ui/LENSES.md",
+      "files": [
+        "docs/ui/LENSES.md",
+        "docs/ui/MINIMAP.md",
+        "docs/ui/SELECTION.md",
+        "docs/ui/LAYOUT.md",
+        "docs/ui/CANVASES.md",
+        "docs/ui/PLANETARY.md"
+      ],
+      "design": "THE FINDING (2026-09-07, surfaced writing the BL-787 headers). Four boundaries in the UI corpus that no doc states, so each header had to make a judgement the docs do not support.\n\n(1) MINIMAP vs LENSES. The lens mode bar lives on the minimap, so MINIMAP.md owns three lens sections (overlay controls, lens chrome, the strip's rung rotation) while LENSES.md also owns \"the strip rotates with the rung\". Genuine double ownership. The headers split it placement-to-MINIMAP, content-to-LENSES - a judgement, not something either doc claims.\n\n(2) SELECTION vs LENSES. Both carry a per-lens selection validity and routing section, dated the same and recut the same day. The headers gave SELECTION the click model and LENSES the routing; the sections still overlap in substance.\n\n(3) CANVASES vs PLANETARY. CANVASES.md owns \"terrain channels - composition and landform\" and \"where the lenses draw\", both of which read as Planetary-rung subject matter. The CANVASES header claims them, so if they belong to PLANETARY the header is right about the doc and wrong about the design.\n\n(4) LAYOUT § Drill-through is ~170 lines (three axes, takeover geometry, invariants, controls, surfaces, extension recipe) inside a doc whose stated job is where things sit. It is a system, not a layout note, and probably wants its own doc under docs/ui/ with a CLAUDE.md § 3 row. The LAYOUT header gives it one line, which under-serves it.\n\nTHE WORK: settle each of the four, move prose to the owner rather than adding cross-references, and update the affected BL-787 headers to match. (4) is the one that may add a doc; (1)-(3) are moves.\n\nDONE WHEN: no UI subject has two owners, and every header in the slice is a claim its own body supports."
     }
   ]
 }
