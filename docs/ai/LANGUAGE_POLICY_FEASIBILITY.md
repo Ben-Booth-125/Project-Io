@@ -11,7 +11,7 @@
 
 **A feasibility assessment — does the C-route compress, and does it run here?**
 
-Research note, 2026-08-08. Companion to [`AI_OPPONENT.md`](AI_OPPONENT.md) § 10.
+Research note, 2026-08-08 — not authority. Companion to [`AI_OPPONENT.md`](AI_OPPONENT.md) § 10.
 
 > **Ruled.** Ben adopted the recommendation in § 9 — the Cicero configuration — as Stage C's
 > concrete shape (2026-08-08, NR-094; `AI_OPPONENT.md` § 10g). `AI_OPPONENT.md` § 10d stays the

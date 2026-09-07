@@ -1,6 +1,6 @@
 # Project Io — People
 
-> **Proposes:** when a named individual exists at all · which roles are worth naming · what a
+> **Settles:** when a named individual exists at all · which roles are worth naming · what a
 > person holds that an institution cannot · how a person enters, changes and leaves a role ·
 > what must not become a person.
 > **Not here:** the institutions the roles sit inside (NATIONS, CONTRACTS) · the predicate/effect

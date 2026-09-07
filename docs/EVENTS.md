@@ -1,6 +1,6 @@
 # Project Io — Events
 
-> **Proposes:** what makes something an event rather than arithmetic or a decision · what "random"
+> **Settles:** what makes something an event rather than arithmetic or a decision · what "random"
 > is allowed to mean here · where an event may originate and what it may reach · how one is
 > presented and answered · what must never be an event.
 > **Not here:** the predicate/effect substrate an event is built from (META_LAYER) · a rival's
