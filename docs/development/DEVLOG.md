@@ -10,6 +10,102 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-07 (sprint 33 opens) — The corpus stops charging every session, and two tools are found lying
+
+**Mode:** Design (one question, two calls) → Corpus/Batch delivery in one wave → close.
+**Runtime:** one session; 7 sub-agents in worktrees, no compile — not one line of `src/` changed.
+
+### What started it
+
+Ben asked whether the query tools reading *both* the hot backlog and its archive defeats the
+archive's purpose, and whether reading the relevant docs was creating context creep.
+
+Half of that answer was easy and stayed easy. The archive exists to keep `backlog.json` meaning
+exactly one thing — open work — so the hot file never needs disambiguating. The union exists
+because `--touches` has to see closed items or it cannot answer "is this built?". Those two do not
+fight: the archive keeps the *file's meaning* clean, the union keeps the *question* answerable.
+
+The other half was the real cost, and it was somewhere else entirely: ~650K tokens of authority
+docs with no summary layer, so a nearly-right traversal opens a 40K doc to discover it wanted the
+sibling; `--full` prose resolving out of 1.9MB of archived designs; and `CLAUDE.md` plus the
+standing rules loading whole for a one-line doc tweak. Five items, filed as **sprint 33**; the
+market-viability sprint that held that number moved to **34** unchanged.
+
+### What was built
+
+**BL-787 (doc summary headers)** — every authority doc named in `CLAUDE.md` § 3 now opens with a
+header block. Ben chose the **index of questions** form over a précis and over questions-plus-stance:
+it lists the questions a doc settles and never the answers, so it survives a design change that
+alters one. 71 docs, five parallel slices. `ACTIONS.md` is regenerated whole, so its header lives in
+`render_actions.js`'s preamble instead.
+
+**BL-789 (standing rules split)** — `io-standing-rules.md` went **230 lines to 133**. The
+AI-behaviour grant register — BL-079 through the rival-network grant, 110 lines of dated precedent —
+moved verbatim into `AI_OPPONENT.md` § 11, diffed line-for-line with all 20 ids accounted for. The
+*gate* stayed, and was sharpened rather than summarised: a new widening is raised, never assumed.
+That was the item's whole risk — moving the history must not make the next widening cheaper to take.
+
+**BL-788** gave `--grep`/`--touches` a one-line-per-item default (33,072 bytes → 2,294 on one sweep,
+`--full` byte-identical). **BL-790** added `doc_owner.js`, which answers "which doc owns this file"
+from what work actually cited. **BL-791** put the fan-out-as-compression paragraph in `DELIVERY.md`.
+
+### What it found — the part worth keeping
+
+**The union does not union.** `archive_store.js` globs `backlog-design-*.json` only. It sees **138
+items; the archive directory holds 762.** The 624 it misses — 420 of them `complete`, 590 carrying
+the `files[]` array `--touches` reads — sit in `backlog-complete-*`, `backlog-cancelled-*` and
+`backlog-purged-*`, which predate `archive_landed.js` and use an `items` array instead of a `records`
+object. On `MARKETS.md` alone, 35 invisible items. **BL-792**, priority A.
+
+**And `--grep` throws away what it does find.** It matches across the union, then drops terminal
+items in the default view: `--grep market` prints "nothing matched" while `--grep market --all`
+returns 11 landed items. `DELIVERY.md` makes `--grep` the first step before authoring an item
+precisely to catch duplicate work, and it is blind to exactly that case. **BL-793**, priority A.
+
+Both fail the same way — a confident, silent NO — and both were surfaced by delivering something
+else. The session's opening answer needed its correction: the split is sound, the union is the right
+design, and the union as implemented has been answering wrong.
+
+**Six doc-truth defects, from writing one-line boundaries.** `PRODUCTION` and `POPULATION` each name
+the *other* as the workforce authority and both restate the derivation. `MARKETS` holds 70 lines of
+procurement; `CONTRACTS`, the doc named for it, is 113 lines total. `TILE_GENERATION` holds province
+rules the new headers now point away from — orphaned authority, which is worse than duplicated.
+`HISTORY` holds an ancient-naval rule `MILITARY_HISTORY` owns. Four UI subjects have no single owner,
+including `LAYOUT`'s 170-line drill-through system. **BL-794, BL-795, BL-796.** Fixed in place:
+`NATION_GENERATION` § Pass 7 carried "(RULED, not yet built)" in a heading — a state claim in an
+authority doc, forbidden outright.
+
+None of these are visible while each doc is read alone. Stating a boundary in one line is what
+exposes that it was never stated.
+
+### Method note
+
+BL-791 demonstrated by the sprint that filed it: five slices read the entire ~650K corpus and the
+main session paid for none of it. Every report came back as boundaries and findings, not excerpts.
+
+### Verification
+
+No compile — no `src/` change in the sprint. `backlog_lint`: **0 fails** throughout (warnings
+pre-existing). `next_id.js`: BL-797. All five agent branches merged in the main session, one conflict
+in `DELIVERY.md` resolved by keeping both bullets. `render_sprints`, `render_actions` and
+`devlog_index` re-run. `archive_landed` evicted the five closed items plus four already-terminal rows
+that had been sitting in the hot file, all verified to rebuild byte-exact; the hot file holds 31 open
+items.
+
+### Open for Ben
+
+- **BL-792 and BL-793 are both priority A and both are the same wound.** Until they land, a bare
+  `--touches` or `--grep` negative is not evidence that something was never built. Worth doing before
+  anything that greps the backlog for a subject.
+- `--sprint` does not exist as a flag; unknown flags are ignored silently and the tool returns
+  everything. Minor next to the two above, and not chased.
+- `PEOPLE.md` and `EVENTS.md` are proposal-stage but their headers say **Settles:** like every other
+  doc. A `Proposes:` variant would be more honest; I did not invent one without your say.
+- `research/ERA1_TECH_LANDSCAPE.md` and `TECH_EFFECTS.md` route readers to `economy/RESEARCH.md`,
+  which is a stub. Correct routing, empty destination.
+
+---
+
 ## 2026-09-06 (sprint 32b closes) — The world changes, and the instruments learn to see it
 
 **Mode:** Design (one elicitation form, eight calls) → Full batch delivery in three waves → two cold
