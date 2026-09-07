@@ -123,6 +123,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | Doc | Owns |
 |---|---|
 | `docs/ui/LAYOUT.md` | The application shell — how regions are arranged around the canvases. |
+| `docs/ui/DRILL_THROUGH.md` | The disclosure idiom every dense surface obeys — folded, expanded in place, full canvas. |
 | `docs/ui/CANVASES.md` → `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md`, `MINIMAP.md` | The zoom-ladder canvases and the minimap chrome. |
 | `docs/ui/RENDERING.md` | Canvas ground rendering: the baked-chunk mechanism, C-F direction, grid rule, installations-as-geometry, animation, LOD. |
 | `docs/ui/design/GLOBAL_STYLE_SHEET.md` | The visual-language exploration (owner: Joe) — style verdicts, palette, render iterations in `design/renders/`. Settled values promote into the authority docs. |

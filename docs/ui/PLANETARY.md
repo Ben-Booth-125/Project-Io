@@ -1,9 +1,10 @@
 # Project Io — Planetary Screen
 
 > **Settles:** what the surface rung communicates above the ground · how a building
-> marker reads, and how a tile carrying several of them does · at what grain the
-> surface is drawn and selected · how a national border reads without two
-> neighbours blending into a third · which layers draw in what order and what
+> marker reads, and a tile carrying several · at what grain the surface is drawn and
+> selected · how a national border reads without two neighbours blending into a
+> third, and what pressing it selects · which channels carry composition and
+> landform, and which tiles suppress them · which layers draw in what order and what
 > degrades at far zoom · how a press and a hover land on the hex grid.
 > **Not here:** how the ground itself is rendered (RENDERING) · the ladder and the
 > shared state (CANVASES) · what an overlay shows (LENSES) · what a click then
@@ -61,9 +62,7 @@ A tile's character has **three axes** ([TILES.md](../economy/TILES.md)):
 - **Landform** — the tile's physical shape. Seven values (`terrain_landform`): plains,
   highland, mountain, canyon, valley, crater, rift. Landform renders on its **own
   channels** — a subtle relief tint (`ui::landform_relief`) plus stroke-only glyphs for
-  the dramatic set, inked by luminance (`ui::contrast_ink`) — never in the hue. The full
-  render spec is [CANVASES.md](CANVASES.md) § Terrain channels, shared
-  with the Selection band's neighbourhood view via `hex_render`.
+  the dramatic set, inked by luminance (`ui::contrast_ink`) — never in the hue.
 
 Substrate and cover **share** the hex's hue: `ui::terrain_colour` (`src/ui/hex_render.{hpp,cpp}`)
 is the single colour source of truth, and it blends the substrate's own colour toward a
@@ -73,6 +72,64 @@ below necessary rather than decorative — two different tiles can arrive at the
 Ocean and landmass are derived from the **Continents/Drift tectonic-plate pass**
 (`docs/generation/CONTINENTS.md`; the Continent lens renders the plates). Ocean fraction is
 an outcome of the plate pass and the body's hydrological state, not a flood-fill target.
+
+### Terrain channels — composition and landform
+
+The three axes render on **two channels** (BL-231, landform channels; BL-232,
+bridged runs). Both are **always-on chrome**, not an `overlay_mode`: terrain
+identity is not something the player opts into, and landform's
+movement-cost multiplier applies whether or not a lens is active.
+
+| Axis | Channel | Source |
+|---|---|---|
+| **Composition** (substrate + cover) | **Hue** — the flat hex fill | `ui::terrain_colour` |
+| **Landform** (its physical shape) | **Relief tint** + **glyph** | `ui::landform_relief`, `ui::icons::landform` |
+
+**Why two channels rather than one.** Lens tints composite over the terrain hue at
+0.6–0.80 alpha, so a second signal carried *in that hue* is obliterated exactly when a
+lens is on. This is the rule the Continent lens's plate boundaries established and it
+applies here unchanged: the relief is composited **after** every lens branch, and the
+glyphs are drawn over the finished fill in a contrasting ink (`ui::contrast_ink`, picked
+by the fill's luminance so it reads over the whole palette).
+
+**Why the landform channel splits in two.** The measured mix (`world_audit` § S3) decided
+it. Plains and valley alone are ~95 % of land tiles, while every dramatic landform is
+≤ 1.5 %:
+
+- **Common ground — relief tint.** Plains is the untouched baseline; elevated ground lifts
+  toward a warm highlight and sunken ground toward a cool shadow, on a small signed
+  ordinal scale (mountain highest → canyon lowest). Deliberately subtle: it must read as
+  light on terrain, never as a change of composition.
+- **Dramatic landforms — glyph.** Mountain, canyon, crater and rift each draw a stroke-only
+  silhouette ([ICONS.md](ICONS.md) § Landform). These are the ≤ 1.5 % set whose movement cost
+  is ×1.3 or worse, so an invisible surprise there is expensive. A glyph on *every* tile
+  would be far denser than any other glyph family and would fight the building silhouette
+  for the hex centre.
+
+**Contiguous runs are bridged.** A run of the same linear landform draws as **one**
+spanning marker rather than the same glyph repeated per tile — mountain as a chain of peaks, rift
+as one continuous fissure, canyon as paired rims — reusing the road span/symmetry idiom (each
+tile draws its own half of the shared edge, so halves meet at the midpoint with no cross-tile state
+and the survey fog clips cleanly). A lone tile keeps its centred glyph, the role the road's centre
+cap plays. Crater never spans. Contiguity was measured before the render was designed
+(`world_audit` § S4): 71% of mountain and 81% of rift tiles have such a neighbour, so bridging
+fires on the majority — while **no** tile in the system has all four neighbours, which is why there
+is no "filled interior" case.
+
+**The glyphs are named where the player looks.** Every tile hover card states
+`composition · landform` and, on the plain canvas, the landform's movement cost — a glyph
+vocabulary learnable only by clicking each tile through to the Selection panel is not learnable.
+Plains stays unnamed: it is the untouched baseline in both channels.
+
+**Suppression rules.** The glyph is skipped on a **built** tile (which already carries an
+enlarged silhouette plus a corp emblem tag, and whose cost is already spent — elevation
+matters when *siting*) and under the **Population/Opportunity** lenses (which claim the hex
+centre for their own value mark). The relief tint is likewise skipped on a built
+tile, whose hex is swapped wholesale for its owner plate as an identity signal.
+
+Both channels also render in the Selection band's zoomed tile-neighbourhood view, which is
+why they live in `hex_render` rather than in the canvas — one implementation, so the two
+surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
 
 ---
 
@@ -377,7 +434,8 @@ mask would leak the political shape of ground the player has not paid to survey
 ### Clicking the border selects the nation
 
 **The band is a selection target, and it is the route the Country lens used to own.** With the lens
-retired ([LENSES.md](LENSES.md) § Structure-grain selection), the border is what carries a nation
+retired ([LENSES.md](LENSES.md) § The Country lens has retired — national borders are chrome), the
+border is what carries a nation
 on screen — so the border is what opens it. Ben's ruling of 2026-08-24, on where the nation ledger
 is reached: *"click the border itself."*
 
@@ -405,7 +463,7 @@ Beyond the base grid and the chrome in the table above, the draw pass
 (`body_surface_canvas.cpp`) composites, in broad order:
 
 - **Terrain channels** — substrate/cover hue + landform relief tint and glyph/spans.
-  Spec: [CANVASES.md](CANVASES.md) § Terrain channels.
+  Spec: § Terrain channels — composition and landform, above.
 - **Lens tints** — the lenses keyed on `ui_state::overlay`
   ([LENSES.md](LENSES.md)); relief composites *after* the lens tint so landform
   survives a saturated overlay.

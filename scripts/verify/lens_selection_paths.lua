@@ -10,7 +10,8 @@
 -- ledger is a worse failure than either half alone, and no single frame can show
 -- it. Captured as <lens>_hover then <lens>_selected, always in that order.
 --
--- Structures resolve at two grains here (LENSES.md § Structure-grain selection):
+-- Structures resolve at two grains here (SELECTION.md § Lens-driven hover &
+-- selection resolution, and § The lens names the ledger the selection drives):
 --   market / scarcity  -> the catchment      -> Market ledger, aimed at it
 --   corporation        -> the corp's holdings-> Balance ledger  (marker-resolved)
 --   resource           -> the DEPOSIT        -> Market ledger for that resource   (BL-659)

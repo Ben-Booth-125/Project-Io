@@ -156,7 +156,7 @@ bridging exists to fix.
 valley alone measure ~95 % of land tiles (`world_audit` § S3) — and are carried by the
 **relief tint** (`ui::landform_relief`), not by a glyph. Putting an icon on nearly every
 tile would be far denser than any other glyph family and would fight the building
-silhouette for the hex centre. See [CANVASES.md](CANVASES.md) § Terrain channels for the
+silhouette for the hex centre. See [PLANETARY.md](PLANETARY.md) § Terrain channels for the
 two-channel split and why the relief composites *after* the lens tints.
 
 Because the terrain palette spans near-white ice to dark forest, and any lens may

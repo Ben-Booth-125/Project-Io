@@ -461,7 +461,7 @@ independent channel: a subtle **relief tint** (`landform_relief`, `src/ui/hex_re
 the common ground and a **glyph** for the dramatic landforms. Mountains read as raised ground
 from the relief fill rather than from a glyph (BL-565, mountains read as elevation — relief
 +0.45 for mountain, +0.25 for highland); canyon, crater and rift — which sink or pit, and which
-relief serves far less well — keep their glyphs. The split is authored in `docs/ui/CANVASES.md`
+relief serves far less well — keep their glyphs. The split is authored in `docs/ui/PLANETARY.md`
 § Terrain channels; the glyph shapes are catalogued in `docs/ui/ICONS.md` § Landform glyphs.
 
 **Runs are bridged, not repeated** (BL-232, landform spans). A contiguous run of the same linear
