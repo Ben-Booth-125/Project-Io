@@ -609,10 +609,10 @@ monotonic descent / no cycles, discount ordering) and a bitmask-identity check f
 
 ## The province partition runs after this pipeline
 
-`build_province_partition` is not one of the six passes, and not a sibling pass either: it runs
-from `make_hard_coded_world` over the finished tile map. [`PROVINCES.md`](PROVINCES.md) owns what
-a province is and how the partition is grown; [`GENERATION_STRATEGY.md`](GENERATION_STRATEGY.md)
-owns where it sits in the pass order. What this pipeline owes it is Pass 1's normalised
+`build_province_partition` is not one of the six passes, and not a sibling pass either: it reads a
+body's finished tile map rather than building one. [`PROVINCES.md`](PROVINCES.md) owns what a
+province is and how the partition is grown; [`GENERATION_STRATEGY.md`](GENERATION_STRATEGY.md) owns
+where it sits in the pass order. What this pipeline owes it is Pass 1's normalised
 `tile_component::height`, retained for that consumer rather than discarded with the other
 intermediates (§ Pass 1 — Heightmap).
 

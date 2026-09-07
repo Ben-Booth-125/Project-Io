@@ -262,18 +262,18 @@ is true. The sim applies the rule; the table stays as it is.
 that produces *the extent of colonisation by major powers*, which is half of what a generated
 history is for.
 
-**The premise to correct before building it, because it inverts the item**
-(`tools/verify/sim_water_census.cpp`, 2026-09-03, three seeds of generation's own era). The sim
-does not currently *lack* overseas reach; it has too much. Region adjacency is a **water-blind
-Chebyshev radius**, so a polity already campaigns across up to nine tiles of open water for free:
-**43% of the sim's adjacency edges cross sea** at `neighbour_radius` 9, which means nearly half of
-every campaign target is already across water, reachable with no harbour and no fleet. It also
-already founds regions on ocean with no terrain test, where `terrain_combat` returns 0 defence —
-so such a region is silently undefendable. **1105 of 3819 regions sit on water at their anchor**,
-about 29%, of which **613 sit on open ocean**. Under the ownership rule (`PROVINCES.md` § Who owns
-water) those numbers split rather than being deleted wholesale — the ~492 coastal and lake regions
-become legitimate owned shoreline, and only the 613 anchored on open ocean have no owner to belong
-to.
+**The premise to correct before building it, because it inverts the item** — measured, not assumed
+(`tools/verify/sim_water_census.cpp`, 2026-09-03, three seeds of generation's own era). A sim
+without a water model does not *lack* overseas reach; it has too much. With region adjacency a
+**water-blind Chebyshev radius**, a polity campaigns across up to nine tiles of open water for
+free: **43% of the sim's adjacency edges crossed sea** at `neighbour_radius` 9, which means nearly
+half of every campaign target was already across water, reachable with no harbour and no fleet.
+The Settle verb applied no terrain test either, and `terrain_combat` returns 0 defence on every
+water kind — so a region founded there was silently undefendable. **1105 of 3819 regions sat on
+water at their anchor**, about 29%, of which **613 on open ocean**. Under the ownership rule
+(`PROVINCES.md` § Who owns water) those numbers split rather than being deleted wholesale — the
+~492 coastal and lake regions are legitimate owned shoreline, and only the 613 anchored on open
+ocean have no owner to belong to.
 
 The consequence is worth stating plainly: the "before" figure for any sea-leg measurement is **not
 zero**, and every tuning constant in `history_sim_params` was measured with free overseas conquest
@@ -284,9 +284,10 @@ land stack cannot enter unowned coastal water or open ocean at all, and may cros
 water its own polity owns. That is cheaper to reason about than a supply penalty and it cannot be
 tuned into meaninglessness. Naval rows carry force across everything else.
 
-**The Settle verb gains the test it never had.** Not "no water" — the ownership rule makes
+**The Settle verb's terrain test is a domain test.** Not "no water" — the ownership rule makes
 coastal founding legitimate — but no founding on open ocean, which has no owner to found under.
-That is the smaller and better-founded half of what BL-756 originally proposed deleting.
+That is the smaller and better-founded half of the blanket "no water" test the ownership rule
+replaced: ~613 regions anchored where nobody can own them, not the ~1105 sitting on water at all.
 
 **Five calls remain open**, and none should be guessed: which walk the range is measured along and
 how the four harbour rows map onto it; where the walk is anchored, since a region has no harbour

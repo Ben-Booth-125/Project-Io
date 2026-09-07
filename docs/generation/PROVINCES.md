@@ -106,7 +106,7 @@ river) + a seeded jitter of 0–4 (`k_province_edge_jitter`). The road-binding d
 ruling 2's supersession (BL-623) — roads are laid after the partition and are not an input. The
 height term reads `tile_component::height` — Pass 1's normalised heightmap, retained for this
 consumer (BL-517, retained height) — and never the seven landform classes, whose numeric order
-means nothing (`TILE_GENERATION.md` § Pass 1, `GENERATION_LEDGER.md` § Data lifetime).
+means nothing (`TILE_GENERATION.md` § Pass 1 — Heightmap, `GENERATION_LEDGER.md` § Data lifetime).
 Hinterland seeds are spaced `k_province_seed_spacing` = 3 apart, measured geodesically over
 land — and it is the spacing, not the budget, that sets hinterland size.
 
@@ -143,10 +143,12 @@ needs no threshold constant of its own, which is why the rule reads as terrain r
 
 **The hard cap is asserted, not imposed, and deliberately so.** Singleton absorption picks a
 tile's *cheapest* neighbour; choosing a costlier one to respect a size bound would contradict the
-cheapest-edge rule the whole growth model is expressed in. So the cap is **a claim about what the
-cost model produces, which breaks loudly if that stops being true.** (The prefer-room variant was
-measured at 241 provinces over the preference, max 14, and rejected; the breach was its only
-justification.)
+cheapest-edge rule the whole growth model is expressed in. Ben chose the bound (2026-08-21,
+NR-438) — *"we prefer up to 12 tiles, but up to 20 is permitted in rare cases"* — so the
+cheapest-edge rule survives intact, which is what the ruling protects. The cap is therefore **a
+claim about what the cost model produces, which breaks loudly if that stops being true.** (The
+prefer-room variant was measured at 241 provinces over the preference, max 14, and rejected; the
+breach was its only justification.)
 
 Measured headroom: the partition tops out at **16 tiles** across the six-seed sweep, four short of
 the cap. The over-12 share (4.9% at the ruling) is **reported by the harness, never asserted** —
@@ -216,10 +218,13 @@ against land's 8.6 is also "much larger" by nearly five times.
 `province_kind` is **derived from the substrate of any member tile**, never stored, so it cannot
 desynchronise from the tiles it describes.
 
-**A province never spans two domains.** Every land province is hex-connected land, and no province
-mixes land with water or a lake with the sea (the land-only invariant narrowed rather than deleted,
-NR-428). The domains are **exclusive by construction** — a tile's substrate names exactly one — so
-the claim is structural rather than checked.
+**A province never spans two domains.** The land-only invariant is narrowed, not deleted (NR-428):
+land provinces are hex-connected land that never spans water; the general claim — **asserted by the
+harness as P2b** — is that **a province holds exactly one domain**, which is strictly stronger,
+since it also forbids a lake joining the sea. The domains are **exclusive by construction** — a
+tile's substrate names exactly one — so construction is *why* the claim holds, and
+`province_partition_harness` P2b is what breaks loudly if it stops holding. Structural and checked,
+not one instead of the other.
 
 ### Who owns water (Ben, 2026-09-06)
 
@@ -295,8 +300,14 @@ not survive a repartition, and that is correct rather than a defect (NR-422).
 
 ### Storage and determinism
 
-The partition is built once at the end of `make_hard_coded_world` from the world seed and the
-finished tile map, and held in `world::provinces`. It is **derived but stored**, because a battle
+The partition is built inside `make_hard_coded_world` from the world seed and the finished tile
+map, and held in `world::provinces`. Where in the pass order it runs is
+[`GENERATION_STRATEGY.md`](GENERATION_STRATEGY.md)'s to state, and it is not a single call: the
+homeworld is partitioned before its roads, and the canonical whole-world partition is rebuilt once
+every body's tiles exist. The rebuild reproduces the first call byte-identically for the bodies
+that call covered — the fill reads no road data, none of its other inputs moves between the two,
+and the anchor centres founded in between are skipped as seeds — so *one partition* is a claim
+about the result, not about the number of calls. It is **derived but stored**, because a battle
 must not be re-identified by a lazy rebuild. It joins the flat-binary serialisation seam as the
 trailing section of the history-log stream, so an earlier stream is still a valid prefix.
 
@@ -421,8 +432,8 @@ one visual language across the whole map.
 | Building ceiling enforcement | `src/world/construction.cpp` |
 | The check | `tools/verify/province_partition_harness.cpp` § P5a, `province_capacity_probe` |
 
-**Related authorities.** [`GENERATION_STRATEGY.md`](GENERATION_STRATEGY.md) § the pass map
-(where the partition runs), [`../ui/PLANETARY.md`](../ui/PLANETARY.md) § Province grain (the
+**Related authorities.** [`GENERATION_STRATEGY.md`](GENERATION_STRATEGY.md) (the pass order —
+where the partition runs), [`../ui/PLANETARY.md`](../ui/PLANETARY.md) § Province grain (the
 rendered view), [`../ui/SELECTION.md`](../ui/SELECTION.md) § The province element (the selected view),
 [`../military/MILITARY.md`](../military/MILITARY.md) (what a battle does inside one),
 [`../GLOSSARY.md`](../GLOSSARY.md) (the spatial vocabulary).
