@@ -46,7 +46,11 @@ if (Test-Path $archiveDir) {
             $row
         }
     }
-    # Hot wins on any id held both places, matching archive_store.allItems().
+    # Hot wins on any id held both places, as archive_store.allItems() does. This union
+    # is deliberately NARROWER than that one: allItems() also folds in the older
+    # complete/cancelled/purged sweeps, and "DONE lately" is a question about the last
+    # few days, which those 2026-08 snapshots cannot answer. Counting them here would
+    # move "N done / N total / N% delivered" off the live worklist it reports on.
     $hotIds = [System.Collections.Generic.HashSet[string]]::new()
     $items | ForEach-Object { [void]$hotIds.Add($_.id) }
     $items = @($items) + @($landed | Where-Object { -not $hotIds.Contains($_.id) })
