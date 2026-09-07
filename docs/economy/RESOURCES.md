@@ -1,5 +1,13 @@
 # Project Io — Resources
 
+> **Settles:** what a good is, and which production tier and value track it sits in · what
+> put a deposit in the ground and how rare it is · which goods trade at all and what their
+> base price is derived from · which roster an era band exposes · what admits a value to
+> the roster in the first place.
+> **Not here:** the recipe that consumes a good (PRODUCTION) · what a listed good actually
+> fetches (MARKETS) · which ground carries which deposit (TILES).
+> **Confused with:** PRODUCTION.md, MARKETS.md, TILES.md.
+
 Resources are the goods that flow through the economy: extracted from tiles, refined by processing buildings, assembled into products, and bought and sold through markets. A tradeable resource has a base price derived from rarity; local supply and demand shift the market price each Tick (the clearing model is `docs/economy/MARKETS.md`; which resources carry a base price is § What trades below).
 
 The roster is **38** values of `resource_type` (`src/world/components.hpp`), and every one of them is held to the **admission rule** (`docs/economy/PRODUCTION.md`): a value earns its place by being consumed by an authored recipe or contracted for by a named actor, and nothing else gets in. A base price is not a behaviour — a good that is priced but produced by nothing and consumed by nothing is an orphan, and `tools/verify/chain_depth.cpp`'s R1 row (no orphan resources) and R1b row (producer and consumer reachable in the *same* era band) hold the line.

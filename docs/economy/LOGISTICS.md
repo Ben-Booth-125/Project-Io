@@ -1,5 +1,13 @@
 # Project Io — Logistics
 
+> **Settles:** what it costs to cross a tile and which path is taken · how far a placement may
+> reach · where roads come from and who may extend them · how physical scale becomes travel
+> time · what can cut a route · what caps how much may be in motion at once.
+> **Not here:** the convoy itself — its cargo, dispatch, trigger and arrival (SUPPLY) · what the
+> cargo is worth at either end (MARKETS) · what the ground is made of (TILES).
+> *Logistics is the road; Supply is the traffic.*
+> **Confused with:** SUPPLY.md, TILES.md, MARKETS.md.
+
 **The network.** How far anything is from anything else, what it costs to cross, how long it takes,
 and what the network permits. This document owns the **substrate**; `SUPPLY.md` owns the **flow that
 runs on it** (convoys).

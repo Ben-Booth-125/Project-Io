@@ -1,5 +1,13 @@
 # Project Io — Tile Design
 
+> **Settles:** which axes classify a tile and why there are three of them · which deposits a
+> substrate or cover may carry · what an amenity tile is and what an urban transform does to
+> ground · how tile character bears on traversal, habitability and combat.
+> **Not here:** the passes that generate a body's tiles (../generation/TILE_GENERATION.md) ·
+> what a deposited good is worth (RESOURCES) · what a building placed on the tile produces
+> (PRODUCTION) · what crossing the tile costs a route (LOGISTICS).
+> **Confused with:** ../generation/TILE_GENERATION.md, RESOURCES.md, LOGISTICS.md.
+
 Tiles are the smallest addressable unit of land. Every tile has a fixed character set at world generation — it does not change during play except through deliberate player development. The character has **three** independent axes: **terrain substrate** (what the ground is made of), **terrain cover** (what sits on it, which may be nothing), and **terrain landform** (its physical shape). Together they determine resource deposit potential, traversal cost, habitability ceiling, and visual identity.
 
 This document is the design authority for tile classification. The procedural generation rules that produce the world bodies are in `docs/generation/TILE_GENERATION.md` and implemented in `src/world/tile_generation.cpp`.

@@ -1,5 +1,14 @@
 # Project Io — Supply (Layer 5)
 
+> **Settles:** what a convoy is and what it carries · what triggers a dispatch and who may order
+> one · what a leg costs its owner and how long it takes · what arrival does to the destination
+> pool · what infrastructure a route demands before traffic runs on it.
+> **Not here:** the network beneath it — traversal cost, path, reach, roads, interdiction, and
+> the movement cap (LOGISTICS) · the price the cargo meets on arrival (MARKETS) · the promise a
+> shipment may be settling (CONTRACTS).
+> *Logistics is the road; Supply is the traffic.*
+> **Confused with:** LOGISTICS.md, MARKETS.md, CONTRACTS.md.
+
 > This document owns the **flow**: the convoy — its cargo, dispatch, cost, travel and arrival.
 > **[`LOGISTICS.md`](LOGISTICS.md) owns the network it runs on** — traversal cost, A\*, the reach
 > field, roads, physical scale, cache invalidation, interdiction, and Logistic Points. *Logistics
