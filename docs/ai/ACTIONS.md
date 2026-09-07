@@ -1,5 +1,13 @@
 # Project Io — the action dictionary
 
+> **Settles:** which controls exist at all · what pressing one does and what it
+> needs first · which of them a rival may issue as a `corp_verb` and which are
+> view-only · what arguments a press takes · how an AI player names an action.
+> **Not here:** how the surface holding a control looks or behaves (the `ui/` docs)
+> · what a rival *chooses* to press and why (AI_OPPONENT) · what the underlying
+> system does with the press (the system's own doc).
+> **Confused with:** ai/AI_OPPONENT.md, ui/LAYOUT.md, ui/SELECTION.md.
+
 Every control in the game: what pressing it does, and why you would. Readable
 mirror of [`ACTIONS.json`](ACTIONS.json), which is canonical — the JSON is the
 machine-consumable half an AI player reads (BL-270). Pair it with the corp
