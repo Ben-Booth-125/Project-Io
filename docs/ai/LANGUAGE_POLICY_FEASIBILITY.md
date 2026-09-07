@@ -1,5 +1,14 @@
 # One-Shot Generation of Actions for a Language-Driven 4X Opponent
 
+> **Settles:** nothing — a feasibility note, not authority. It *asks*: can a language-driven
+> policy for this game be compressed · will it run on the hardware to hand · what a constraint tax
+> costs · whether diplomacy is separable from action generation · whether reinforcement learning
+> is the better route · what would falsify the answer.
+> **Not here:** the rival architecture and the no-cloud invariant (AI_OPPONENT, the authority) ·
+> the meta such a policy would play (STRATEGIES, also research) · the control vocabulary a policy
+> emits (ACTIONS).
+> **Confused with:** ai/AI_OPPONENT.md, ai/STRATEGIES.md.
+
 **A feasibility assessment — does the C-route compress, and does it run here?**
 
 Research note, 2026-08-08. Companion to [`AI_OPPONENT.md`](AI_OPPONENT.md) § 10.

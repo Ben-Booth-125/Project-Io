@@ -1,5 +1,15 @@
 # Project Io — Relations
 
+> **Settles:** which quantity answers which question — how A *feels* about B (sentiment, derived) ·
+> what A has *declared* toward B (stance) · how an actor is rated at large (reputation) · who is
+> refused trade outright (embargo) · what a surface reads back as standing · how a nation reads a
+> corporation · which of these may become hostility and which may never do so on its own · what
+> each one gates.
+> **Not here:** what hostility permits militarily — interdiction, engagement, the march queue
+> (MILITARY) · what a nation holds and may enact (NATIONS) · how a rival *scores* a stance
+> (AI_OPPONENT).
+> **Confused with:** politics/NATIONS.md, military/MILITARY.md, ai/AI_OPPONENT.md.
+
 **How actors in Io feel about, rate, and gate each other.** This document owns the whole relational
 layer, and its first job is to say **which quantity answers which question** — because the code
 carries several, and three of them share overlapping names.

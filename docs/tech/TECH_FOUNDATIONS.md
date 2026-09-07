@@ -1,5 +1,15 @@
 # Project Io — Technical Foundations
 
+> **Settles:** what the prototype is and is not, and what therefore counts as in scope · which
+> engine, language and libraries are fixed · how the world is stored and the loop is ticked · which
+> rendering approach and view structure the UI rests on · which technical decisions were taken
+> and on what rationale.
+> **Not here:** when work happens and in what milestone order (ROADMAP) · the method by which work
+> is delivered and verified (DELIVERY, DEVELOPMENT_PRACTICES) · how the canvases actually draw the
+> ground (ui/RENDERING) · which properties would keep multiplayer cheap later
+> (MULTIPLAYER_PRINCIPLES, non-binding).
+> **Confused with:** development/ROADMAP.md, ui/RENDERING.md, multiplayer/MULTIPLAYER_PRINCIPLES.md.
+
 This document captures the decisions that must be in place before development begins. It is divided into three categories: **Direction** (scope and design intent), **Engine** (core technology and architecture), and **UI** (rendering approach and view structure). Where the rationale for a decision is non-obvious, it is stated briefly.
 
 ---

@@ -1,5 +1,15 @@
 # Project Io — AI Opponent
 
+> **Settles:** what plays a rival corporation and how it decides · where the boundary sits on what
+> a rival may legally do to a corp a human owns · which seam a rival acts through and what it may
+> read · why no cloud model sits in the runtime loop · how the word interface is assembled —
+> dictionary, blackboard, command seam, transport · what a rival may say and on what terms.
+> **Not here:** the control dictionary itself (ACTIONS) · whether a language policy compresses and
+> runs locally (LANGUAGE_POLICY_FEASIBILITY, research) · the meta a rival might play (STRATEGIES,
+> research) · how force resolves once a rival commits to it (MILITARY) · what a nation, rather
+> than a rival, may do (NATIONS).
+> **Confused with:** ai/ACTIONS.md, ai/STRATEGIES.md, politics/NATIONS.md.
+
 Authority doc for the AI-opponent thread (BL-199, AI opponent research). Ben's 2026-07-23 call:
 AI-opponent development proceeds **alongside** the basic mechanics rather than waiting. This
 document opens with the **state-of-the-art research** BL-199 mandates as its first activity; the
