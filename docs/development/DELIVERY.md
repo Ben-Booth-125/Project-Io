@@ -119,6 +119,11 @@ same subject differently:
   names files. `next_id.js` guards the *id*; nothing guarded the *subject*, and a new item was
   written for a defect a priority-A item already owned, naming the same divergence at the same line
   numbers. It costs a second, and the duplicate costs a session.
+- **A sweep prints one line per item; `--full` is what you ask for.** `--grep` and `--touches`
+  default to `--summary` — the index row plus the first sentence of `design` — because both
+  resolve prose out of the cold archive and a landed item's design block runs to thousands of
+  words. `--full` prints the whole record, so reach for it on the one item being built.
+  `requirements_query.js` carries the same `--summary`, over each group's `resolution`.
 - **Timestamp a new item** (the `written` field / a `*(Written YYYY-MM-DD, trigger)*` note).
 - **Newest wins on conflict, and a present timestamp is never ignored** — a dated item outranks
   undated prose; between two dated statements the later wins. Do not discount a timestamp because
