@@ -3,10 +3,11 @@
 > **Settles:** which rung the inset shows relative to the one being played · what a
 > press on it does and what happens at the top of the ladder · which chrome the
 > inset carries — its title bar, the lens mode bar on its edge, its lens header ·
-> how it and the lens chrome region above it are sized and placed · what view
-> state it shares with the primary canvas.
-> **Not here:** what each rung draws (SOLAR, CIRCUMPLANETARY, PLANETARY) · what a
-> lens shows once toggled and which lenses the strip carries at each rung
+> how it and the lens chrome region above it are sized and placed · how its level
+> is derived from the primary's rung.
+> **Not here:** what each rung draws (SOLAR, CIRCUMPLANETARY, PLANETARY) · the
+> descend rules, the shared view controls and the shared view state (CANVASES) ·
+> what a lens shows once toggled and which lenses the strip carries at each rung
 > (LENSES) · where the inset sits in the shell (LAYOUT).
 > **Confused with:** CANVASES.md, LENSES.md, LAYOUT.md.
 
@@ -56,22 +57,11 @@ The rule is deliberately asymmetric and simple:
   It is pure context — "where does the thing I'm looking at sit in the larger
   view." It is never the place you drill *into*.
 - **You descend by double-clicking a body in the primary canvas**, not by
-  clicking the minimap. A body double-click navigates the primary *down* one
-  rung (single-click selects — SELECTION.md owns the click model).
+  clicking the minimap. Which body opens which rung is the ladder's business, not
+  the inset's — [CANVASES.md](CANVASES.md) § Navigation — the zoom ladder holds
+  the descend cases, and SELECTION.md owns the click model.
 - **You ascend by clicking the minimap.** A minimap click promotes the zoom-out
   neighbour it is showing to primary.
-
-### Descending (double-click a body in the primary)
-
-| Primary | Double-click… | Primary becomes |
-|---|---|---|
-| Solar | a **planet** | that planet's **Circumplanetary** view |
-| Solar | a **moon** | the **parent planet's** Circumplanetary view, with the moon highlighted |
-| Circumplanetary | the **planet** or one of its **moons** | that body's **Planetary** surface |
-| Planetary | — | (bottom rung; nothing to descend into) |
-
-A solar→surface jump is always a two-step drill (system → local → surface) that
-reads the same way every time.
 
 ### Ascending (click the minimap)
 
@@ -282,23 +272,18 @@ The minimap box's geometry, with the chrome accounted for:
 
 ## Selection / view state
 
-A three-rung ladder needs a level, not a binary `surface_is_primary` flag.
-`ui_state` carries:
+The inset and the primary canvas read the **same** `ui_state` — there is no second
+copy of the view, so a selection made in one slot is the selection in the other.
+Which members they share, and how pan and zoom behave across the slots, is settled
+in [CANVASES.md](CANVASES.md) § Shared selection / view state and § Shared view
+controls; the consequence for the inset is that it always draws its rung's default
+framing.
 
-```cpp
-enum class canvas_level { solar, circumplanetary, planetary };
-
-canvas_level primary_level = canvas_level::solar; // which rung fills the window
-// active_body drives the lower rungs:
-//   circumplanetary → active_body's planet (active_body itself if it is a planet,
-//                      else active_body.parent if it is a moon — circumplanetary_anchor)
-//   planetary       → active_body
-```
-
-The minimap's level is derived as one rung *out* from `primary_level` (with the
-Solar top rung showing the galaxy instead of a canvas). Pan/zoom view fields
-stay per-canvas (`solar_*`, `circum_*`, `planetary_*`) and apply only when that
-canvas holds the primary slot; the minimap always renders the default framing.
+What is the minimap's own is that its level is **derived** — one rung *out* from
+the primary's, rather than stored. A three-rung ladder needs a level, not a binary
+`surface_is_primary` flag, and deriving it means the inset cannot disagree with the
+primary about where the player is. The top rung has no level to derive, which is
+why Solar's slot shows the galaxy rather than a canvas (§ The top rung).
 
 ---
 

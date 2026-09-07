@@ -2,7 +2,9 @@
 
 > **Settles:** which canvases exist and how the zoom ladder orders them · which
 > canvas is primary and which one the inset frames · which press moves between
-> rungs · what view and selection state the three rungs share.
+> rungs · how pan, zoom and minimap framing behave across the rungs · which canvas
+> takes a press when two overlap · what view and selection state the three rungs
+> share.
 > **Not here:** what any single rung draws (SOLAR, CIRCUMPLANETARY, PLANETARY) ·
 > the inset's own chrome (MINIMAP) · how the ground is rendered (RENDERING) · what
 > the ground is made of and how landform reads (PLANETARY) · what each lens shows
@@ -71,6 +73,8 @@ two clear directions:
   - Solar primary, double-click a **moon** → the **parent planet's** Circumplanetary view becomes primary, with the moon selected.
   - Circumplanetary primary, double-click the **planet or a moon** → that body's **Planetary** surface becomes primary.
   - Planetary is the bottom rung; tile clicks select a tile, they do not descend.
+  - A solar→surface jump is therefore always a two-step drill (system → local →
+    surface) that reads the same way every time.
 - **Ascend (zoom out) by clicking the minimap.** A minimap click promotes the
   zoom-out neighbour it is showing to primary (Planetary→Circumplanetary,
   Circumplanetary→Solar).
@@ -79,6 +83,30 @@ two clear directions:
 lower rungs (`active_body`) without forcing the primary to change rung except on
 an explicit descend. **Selecting** a body (single-click) is independent: it fills
 the Selection info element but changes neither the Active anchor nor the framing.
+
+### Shared view controls
+
+Pan and zoom belong to the **primary** slot. On the two upper rungs the middle
+mouse button pans and the scroll wheel zooms, anchored at the cursor so the point
+under it stays fixed, and a bottom-centre **scale bar + zoom slider**
+(`ui::draw_scale_zoom_overlay`, `src/ui/canvas_scale.hpp`) sets the same factor —
+dragging **right zooms in**, left zooms out. Framing scales; element sizes (body
+radii, labels, selection outlines) hold their pixel size.
+
+**A canvas in the minimap slot always renders its default framing.** Pan and zoom
+apply only while a canvas is primary, so the inset stays a stable piece of context
+rather than a second view the player has to keep. What a rung's default framing
+*is*, and which `ui_state` members carry its pan/zoom, is that rung's own business
+— see [SOLAR.md](SOLAR.md), [CIRCUMPLANETARY.md](CIRCUMPLANETARY.md) and
+[PLANETARY.md](PLANETARY.md).
+
+**Input precedence.** At most one canvas handles input per frame, and the two
+regions are not the same shape. The whole minimap **box** blocks the primary
+behind it, while only the **inset** canvas inside that box takes minimap input —
+so a press lands on the minimap over the inset, on the primary over the rest of
+the window, and on neither over the box's own chrome bands. An ImGui panel
+capturing the mouse suppresses both. The mechanism is `input_enabled`
+(§ Implementation approach).
 
 ### Keyboard navigation
 
@@ -177,8 +205,10 @@ edge, while the minimap's chrome title bar is always shown.
 
 **`input_enabled`** exists because the primary canvas fills the whole window
 *behind* the minimap. A click in the overlapping bottom-right corner would
-otherwise be handled twice. `render()` enables input for exactly one canvas per
-frame — the minimap if the mouse is over the inset, the primary otherwise — and
-only when an ImGui panel isn't capturing the mouse (`WantCaptureMouse`). Each
+otherwise be handled twice. `render()` enables input for at most one canvas per
+frame: the primary is disabled over the **whole** minimap box, and the minimap is
+enabled only over the **inset** canvas within it (the box minus its title bar and
+lens mode bar), so the chrome bands enable neither. Both stay disabled while an
+ImGui panel is capturing the mouse (`WantCaptureMouse`). Each
 function still draws unconditionally; it just skips hover/click handling when
 `input_enabled` is false.

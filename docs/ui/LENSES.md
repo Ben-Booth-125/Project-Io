@@ -1,13 +1,15 @@
 # Project Io — Map Lenses
 
 > **Settles:** which lenses exist and how many may be active at once · which rung
-> each applies to and how the strip changes with the rung · which key a lens draws
-> and whether it collapses · what each lens overlays and at what grain it selects ·
-> how opening a ledger arms a lens.
+> each applies to — the whole Lens × rung table, for every rung at once — and how
+> the strip changes with the rung · which key a lens draws and whether it collapses
+> · what each lens overlays and at what grain it selects · how opening a ledger
+> arms a lens.
 > **Not here:** where the lens bar and the lens chrome region sit (MINIMAP) · glyph
 > shapes (ICONS) and identity colours (`presentation.hpp`) · what a press under a
-> lens resolves to (SELECTION) · what the unlensed ground looks like (PLANETARY,
-> RENDERING).
+> lens resolves to (SELECTION) · what a rung draws that no lens gates, and what
+> each rung defers (SOLAR, CIRCUMPLANETARY, PLANETARY) · what the unlensed ground
+> looks like (PLANETARY, RENDERING).
 > **Confused with:** MINIMAP.md, SELECTION.md, ICONS.md.
 
 The **lens system** is the set of data overlays the player toggles over the
@@ -81,7 +83,11 @@ with a null state (re-selecting the active lens clears to plain terrain,
 `toggle_overlay`).
 
 The per-rung representation of every lens, on-bar or keyboard-only. "—" = no
-representation intended.
+representation intended. **This table is the only place a lens's rungs are
+stated.** The rung docs ([SOLAR.md](SOLAR.md), [CIRCUMPLANETARY.md](CIRCUMPLANETARY.md),
+[PLANETARY.md](PLANETARY.md)) point here rather than carrying a column of it: a
+column read off one rung at a time cannot show that Market and Supply span the
+ladder while the rest do not, and a copy drifts from the original silently.
 
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
