@@ -53,6 +53,10 @@ Read for **traversal**: find the doc that owns the question and read that one. T
 ~650K tokens (`node tools/doc_weight.js`); reading it all is not an instruction anyone can
 follow. Where a store has a query tool, use the tool, never load the file.
 
+Starting at the **code** rather than the subject? `node tools/session/doc_owner.js <path>` names the
+owning doc(s) for a source file, ranked by how often work on it cited each — the inverse of
+`backlog_query.js --touches`, derived from the backlog, and honest about a path nothing owns.
+
 ### Game — what it is
 | Doc | Owns |
 |---|---|
