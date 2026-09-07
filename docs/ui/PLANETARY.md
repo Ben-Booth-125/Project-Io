@@ -1,5 +1,15 @@
 # Project Io — Planetary Screen
 
+> **Settles:** what the surface rung communicates above the ground · how a building
+> marker reads, and how a tile carrying several of them does · at what grain the
+> surface is drawn and selected · how a national border reads without two
+> neighbours blending into a third · which layers draw in what order and what
+> degrades at far zoom · how a press and a hover land on the hex grid.
+> **Not here:** how the ground itself is rendered (RENDERING) · the ladder and the
+> shared state (CANVASES) · what an overlay shows (LENSES) · what a click then
+> offers (SELECTION).
+> **Confused with:** RENDERING.md, LENSES.md, CANVASES.md.
+
 The Planetary screen is the tile-grid view of the selected body's surface — the **bottom rung** of the canvas ladder, and the rung play opens on (the corporation's home planet — the app itself opens on the main menu first, see [STARTUP.md](STARTUP.md)). See [CANVASES.md](CANVASES.md) for layout rules shared across the three canvases (the zoom ladder, context minimap, region sizing, shared selection state, implementation approach).
 
 Because it is the bottom rung, the Planetary screen is **only ever primary** — it is never shown in the minimap. Reaching it is a descend click on the Circumplanetary screen; leaving it is a click on the minimap (which shows the Circumplanetary view) to ascend.

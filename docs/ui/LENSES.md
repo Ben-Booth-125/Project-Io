@@ -1,5 +1,14 @@
 # Project Io — Map Lenses
 
+> **Settles:** which lenses exist and how many may be active at once · which rung
+> each applies to and how the strip changes with the rung · where a legend reads ·
+> what each lens overlays and at what grain it selects · which press a lens permits
+> and which ledger it routes to · how opening a ledger arms a lens.
+> **Not here:** where the lens bar sits (MINIMAP) · glyph shapes (ICONS) and
+> identity colours (`presentation.hpp`) · the click model itself (SELECTION) · what
+> the unlensed ground looks like (PLANETARY, RENDERING).
+> **Confused with:** MINIMAP.md, SELECTION.md, ICONS.md.
+
 The **lens system** is the set of data overlays the player toggles over the
 canvases from the lens mode bar on the **minimap**
 ([`overlay.cpp`](../../src/ui/overlay.cpp), `draw_overlay_controls`; see

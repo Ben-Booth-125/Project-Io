@@ -1,5 +1,12 @@
 # Project Io — Profile
 
+> **Settles:** which question the identity tile answers · what identifies the
+> player's corporation on it and where each field is read from · how the emblem is
+> chosen and what makes it stable · what becomes of a name too long for the card.
+> **Not here:** the financial dashboard (HEADER) · the rail beneath it (MENU) ·
+> placement (LAYOUT) · what a corporation is (generation/CORPORATION_GENERATION).
+> **Confused with:** HEADER.md, LAYOUT.md, MENU.md.
+
 The **profile** is a compact identity card pinned to the top-left corner of the shell, above the navigation pane and aligned to its width. It identifies the player corporation. See `LAYOUT.md` for placement; implementation in `src/ui/profile_panel.cpp`.
 
 ---

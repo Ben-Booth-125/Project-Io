@@ -1,5 +1,15 @@
 # Project Io — UI Layout
 
+> **Settles:** which regions the application shell is divided into and where each
+> sits · which region owns the rect algebra and how the top and bottom bands share
+> their edges · what hosts a fold-out ledger and how wide that column gets · which
+> container vocabulary a new surface should reach for · what a drill-through takes
+> over and what it must not.
+> **Not here:** what any one panel says (HEADER, PROFILE, TIME_CONTROLS, CHAT) ·
+> which ledgers the rail holds (MENU) · what the canvases draw (CANVASES) · what a
+> click selects (SELECTION).
+> **Confused with:** MENU.md, CANVASES.md, SELECTION.md.
+
 Surface-level description of the application **shell** — the persistent chrome arranged around the canvases. This document covers *where things sit and what they are for*, not their internals. Each region below links to its own detailed specification where one exists. For the canvases themselves see **`CANVASES.md`**; for the tick model see `src/core/sim_loop.hpp`.
 
 The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything here is a debugging-grade layout that doubles as the functional specification for the eventual production shell.

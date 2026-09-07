@@ -1,5 +1,14 @@
 # Project Io — Primary Canvases
 
+> **Settles:** which canvases exist and how the zoom ladder orders them · which
+> canvas is primary and which one the inset frames · which press moves between
+> rungs · what view and selection state the three rungs share · which terrain
+> channels the ground is composed from · where a lens is allowed to draw.
+> **Not here:** what any single rung draws (SOLAR, CIRCUMPLANETARY, PLANETARY) ·
+> the inset's own chrome (MINIMAP) · how the ground is rendered (RENDERING) · what
+> each lens shows (LENSES).
+> **Confused with:** MINIMAP.md, PLANETARY.md, LENSES.md.
+
 Three canvases form the main spatial UI, arranged as a single **zoom ladder**
 from the widest view to the narrowest:
 

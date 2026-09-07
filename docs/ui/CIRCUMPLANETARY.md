@@ -1,5 +1,13 @@
 # Project Io — Circumplanetary Screen
 
+> **Settles:** what the middle rung shows and which body it anchors on · how the
+> anchor is resolved when the selection is a moon rather than a planet · whether a
+> moonless planet still has this view · how local positions map to the screen ·
+> what a press here does and what it descends to · which overlays belong on it.
+> **Not here:** the ladder and the shared state (CANVASES) · the rungs either side
+> (SOLAR, PLANETARY) · the inset's chrome (MINIMAP).
+> **Confused with:** SOLAR.md, CANVASES.md, MINIMAP.md.
+
 The Circumplanetary screen is the **middle rung** of the canvas ladder: a
 top-down view of a single planet and the space immediately around it — its
 moons, and stations and local traffic as overlays. It sits between the Solar

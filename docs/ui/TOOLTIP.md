@@ -1,5 +1,13 @@
 # Project Io — Hover Card
 
+> **Settles:** what the shared hover card is and which pointer state it serves ·
+> when it appears, how long it stays, and what makes it stick · what draws its
+> frame and what fills its content under a given lens · which surfaces get a hover
+> readout and which answer hovering some other way.
+> **Not here:** the click model and the three states themselves (SELECTION) · what
+> a lens overlays on the canvas (LENSES) · the glyphs the card reuses (ICONS).
+> **Confused with:** SELECTION.md, LENSES.md, LAYOUT.md.
+
 Authoritative spec for the **shared hover-card primitive** — the transient popup
 that shows a compact readout of whatever the player is hovering. It is the
 **Focus**-state surface in the three-state pointer model (see
