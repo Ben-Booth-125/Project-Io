@@ -75,8 +75,9 @@ an outcome of the plate pass and the body's hydrological state, not a flood-fill
 
 ### Terrain channels — composition and landform
 
-The three axes render on **two channels**. Both are **always-on chrome**, not an
-`overlay_mode`: terrain identity is not something the player opts into, and landform's
+The three axes render on **two channels** (BL-231, landform channels; BL-232,
+bridged runs). Both are **always-on chrome**, not an `overlay_mode`: terrain
+identity is not something the player opts into, and landform's
 movement-cost multiplier applies whether or not a lens is active.
 
 | Axis | Channel | Source |

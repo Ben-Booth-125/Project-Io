@@ -141,7 +141,7 @@ box's top edge anchors.
 │   [ inset canvas ]      │   ← the zoom-out neighbour, drawn at reduced scale
 │                         │
 ├─────────────────────────┤
-│ [·][·][·][·][·][·]      │   ← lens mode bar: one glyph per lens on this rung
+│ [·][·][·] … [·]         │   ← lens mode bar: one glyph per lens on this rung
 └─────────────────────────┘
 ```
 
@@ -304,14 +304,20 @@ canvas holds the primary slot; the minimap always renders the default framing.
 
 ## Open questions
 
+- **Lens bar width ceiling.** Eight glyphs fitted the bar without widening the
+  minimap or adding a second row. The strip is now derived per rung and the
+  Planetary rung names nine ([LENSES.md](LENSES.md) § The strip rotates with the
+  rung), which is the case this ceiling was written to flag.
 - **Circumplanetary framing** for a planet with many vs. zero moons — how much
   local space to show, and at what scale, is for `CIRCUMPLANETARY.md`.
+- **Overlays.** Does the minimap mirror supply routes / units on the canvases,
+  and is that what the lens mode bar selects?
 
 ---
 
 ## Related
 
-- `CANVASES.md` — the ladder overview, shared drawing path, sizing, and the navigation model.
+- `CANVASES.md` — the ladder overview, the shared drawing path, and the navigation model.
 - `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md` — the three rungs.
 - `LAYOUT.md` — placement in the shell.
 - `LENSES.md` — the full lens family, each mode's surface and key, and which of

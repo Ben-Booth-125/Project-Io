@@ -766,8 +766,11 @@ happen to be over.
 
 ### A lens collapses selection to ONE TIER (Ben, 2026-08-28)
 
-Owned by BL-664 (one tier under a lens). Three rules, and they hold for every lens without
-exception:
+Owned by BL-664 (one tier under a lens). The pivot it sharpens is Ben's earlier ruling,
+2026-08-24: *"When a lens reveals any large structure, the selection should pivot to the entire
+structure, and no longer provinces. So for the market lens, the entire market gets highlighted on
+mouse over, and clicking opens up our market ledger for that market."* Three rules, and they hold
+for every lens without exception:
 
 1. **The lens's structure is the only thing under the pointer.** Resolution asks the active lens
    what structure this ground belongs to and answers with that, or with nothing. It does not walk
@@ -824,16 +827,15 @@ validates the structure also routes it.
 | **Population** / **Industry** / **Throughput** | nothing — inert | — |
 | **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
 
-**Country has no row because it is not a lens.** A nation is reached by its border band under
-*every* lens — [PLANETARY.md](PLANETARY.md) § Clicking the border selects the nation.
-
 **A tile group is a structure like any other.** Hovering one tile of a corporation's holdings
 lights **all** of them at once (Ben, 2026-08-28: "hovering one tile displays an outline around all
 company buildings for that corporation/company"), and clicking any of them opens that owner's
 ledger. It is the same claim the market catchment's highlight makes — *all of this is one thing* —
 so it takes the same wash the catchment does rather than a walked boundary (Ben's 2026-08-24 ruling
 on that question, recorded in `body_surface_canvas.cpp`: a wash is per-tile and costs one test,
-and an area statement is the truer read anyway).
+and an area statement is the truer read anyway). It lands one frame behind the pointer,
+exactly as the hovered-province outline already does and for the same reason: the tile loop
+must know the answer before it has drawn the tile that produces it.
 
 **Check:** `scripts/verify/lens_structure_pivot.lua`.
 

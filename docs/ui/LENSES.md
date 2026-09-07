@@ -380,15 +380,17 @@ What a press under a lens resolves to, and which ledger it drives, is
 
 ## The other direction — a ledger opens, its lens arms
 
-The table above sends a **click on a lens** to a ledger. The reverse also holds for
-some slots: **opening the ledger arms the lens**, so the list and the map answer the
-same question in two registers rather than the player having to arm it themselves.
+That routing table — [SELECTION.md](SELECTION.md) § The lens names the
+ledger the selection drives — sends a **click on a lens** to a ledger. The
+reverse also holds for some slots: **opening the ledger arms the lens**, so the
+list and the map answer the same question in two registers rather than the player
+having to arm it themselves.
 Ben's preference is the general form — *"opening a menu usually should arm a lens"* —
 and 2026-08-30 settled the Market half of it by name: *"when we open the market
 ledger, we should also activate the market lens."*
 
 **A pair exists only where both directions name each other.** That is what keeps this
-from becoming a lens on every slot: the routing table above is the test, and most rail
+from becoming a lens on every slot: that routing table is the test, and most rail
 slots are not in it.
 
 | Rail slot | Ledger | Arms | The shared question |
@@ -432,7 +434,7 @@ inferred from the code, which is what NR-722 exists to prevent.
 **Three lenses have no ledger to pair with, and that is not an omission.**
 `Corporation` and `Company` route to *that corporation's* / *that company's* ledger —
 per-entity surfaces reached through Selection, not rail slots, so there is no slot to
-arm from. `Throughput` is **inert** in the routing table and has no ledger at all: it is
+arm from. `Throughput` is **inert** in that routing table and has no ledger at all: it is
 the surface half of `LOGISTICS.md` § Logistic Points, and no ledger surfaces LP.
 Logistics is the road and Supply is the traffic; the Convoys ledger is the traffic's, so
 throughput's twin would be a **Logistics ledger that does not exist**.
