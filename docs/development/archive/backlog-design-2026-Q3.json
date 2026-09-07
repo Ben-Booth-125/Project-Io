@@ -7180,6 +7180,52 @@
     "design",
     "completion"
    ]
+  },
+  "BL-801": {
+   "status": "complete",
+   "glyph": "x",
+   "priority": "A",
+   "version_goal": null,
+   "sprint": "33",
+   "written": "2026-09-07",
+   "author": "Claude (sprint 33 batch completeness critic)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Tooling",
+   "id": "BL-801",
+   "short_name": "HEADER_GRAPH_CHECKER",
+   "difficulty": 3,
+   "title": "A check over the doc headers: dangling citations, one-way edges, and pairs that both claim a subject",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/session/header_graph.js",
+    "docs/development/DEVELOPMENT_PRACTICES.md",
+    "CLAUDE.md"
+   ],
+   "design": "THE FINDING (2026-09-07). The sprint 33 batch scoped its three boundary lanes off defects a header-writing sweep HAPPENED to notice. That is not a search. The batch critic then built the Confused-with graph properly and immediately found a confirmed duplicate (BL-797, travel time doubled), a triple-assertion (BL-798, rung docs triple assert) and a one-way sprawl (BL-799, naming machinery sprawl) - none of which any lane would have reached.\n\nTOOL CREATION IS SKILL CREATION, and the critic's throwaway script is exactly the tool this class of defect needs standing. It measured: 72 docs carry a header, 59 MUTUAL pairs, 89 ONE-WAY edges. A sweep scoped off mutual pairs alone is blind to the 89 - which is how BL-799 survived.\n\nTHE CHECK, as tools/session/header_graph.js:\n  (a) DANGLING CITATIONS - every \"DOC.md § Heading\" reference in docs/ resolved against the target's actual headings. Two were found by hand in this batch (TOOLTIP citing a moved CANVASES section; SOLAR citing \"LENSES.md § rung table\", which does not exist). This half is objective and should FAIL, not warn.\n  (b) THE HEADER GRAPH - mutual pairs and one-way edges from the Confused with / Not here lines, printed so a boundary sweep can be scoped off the whole graph rather than off what somebody noticed.\n  (c) COVERAGE - every doc in CLAUDE.md § 3 carries a header; every doc carrying a header is in § 3. The orphan half is the router's staleness detector, exactly as ui_coverage.js orphans are the surface catalogue's.\n  (d) STATE-INDEPENDENCE - a header carrying \"landed\", \"built\", \"pending\", \"shipped\" or a BL- id as status is a fail.\n\nDo NOT try to detect a doubled SUBJECT automatically - that is judgement. The tool's job is to hand a human the candidate list and to fail hard on the objective half.\n\nWRAP IT IN A SKILL once it runs (needs Ben's permission per CLAUDE.md § Tool creation is skill creation).\n\nMORE FUEL FOR THE DANGLING-CITATION HALF (2026-09-07, found by the fix round's second cold reviewers, all confirmed independently). Beyond the two the batch repaired by hand, live references still name CONTRACTS headings the doc does not hold, in FOUR files across three kinds of artefact: src/world/corp_command.hpp, scripts/economy.lua, tools/verify/README.md and .claude/skills/verifier-headless/SKILL.md. And src/world/province.hpp:82 names \"PROVINCES.md § The partition\", a PREFIX of the real heading rather than the heading - resolvable by a human and by grep, invisible to an exact-match check.\n\nTWO CONSEQUENCES FOR THE TOOL'S SCOPE, both learned the expensive way here: (a) it must sweep src/, scripts/, tools/ and .claude/ as well as docs/ - a citation in a header comment rots exactly like one in prose, and three of the six live misses were outside docs/; (b) it must flag PREFIX matches separately from exact misses, or the province.hpp class passes silently. A boundary move is precisely when these break, and hand-grepping for them is what the first UI lane claimed to have done and had not.",
+   "completion": "DELIVERED 2026-09-07. tools/session/header_graph.js, four checks: --dangling (fails), --graph (prints), --coverage (both directions), --state (fails). Swept over docs/, src/, scripts/, tools/ and .claude/.\n\nFIRST MEASUREMENT OF THE CORPUS: 1119 doc-section citations - 729 OK, 310 PREFIX, 80 MISS, 0 NODOC. 72 docs carry a header; 264 edges, 83 mutual pairs, 98 one-way. 94 docs are routed in CLAUDE.md section 3, so 22 are routed with no header and 0 are headed without a route.\n\nTWO COLD REVIEWS REJECTED THE FIRST CUT, 11 blocking findings. The graph half was the worse: demarkup() stripped underscores along with markdown emphasis, so NATION_GENERATION.md resolved to nothing and NO doc with an underscore in its filename could ever be an edge TARGET - about a third of the corpus. The tool therefore could not report the defect it was built for; BL-799 (naming machinery sprawl) was absent from its output entirely. It measured 195 edges against a true 264. The resolver half had a FALSE PASS - a one-token anchor certified a citation to a heading that does not exist - plus two unswept citation shapes.\n\nAFTER THE REPAIR an independent parser agrees EDGE FOR EDGE: 264/83/98 over 72 headers, set difference zero in both directions, confirmed by a reviewer who wrote its own parser twice. The MISS class went 2.7% false-positive to 0%, audited exhaustively at 80 of 80 rows (76 real, 4 borderline of one shape the tool correctly declines).\n\nIT SHIPS WITH 27 SELF-TEST ASSERTIONS (--self-test), each pinned by a mutation test, because a check-tool with no check on itself is exactly what DEVELOPMENT_PRACTICES.md warns about.\n\nNO ALLOW-LIST in the coverage check, deliberately: an allow-list is a second catalogue to keep current, and the orphan list IS the router staleness detector - an entry suppressed is the detector switched off for that doc.\n\nSTILL TO DO, filed as BL-807 (the corpus citations) rather than folded in: the 80 dangling citations the tool now names.",
+   "_row_keys": [
+    "status",
+    "glyph",
+    "priority",
+    "version_goal",
+    "sprint",
+    "written",
+    "author",
+    "requires",
+    "blocked_on",
+    "parked",
+    "category",
+    "id",
+    "short_name",
+    "difficulty",
+    "title",
+    "authority_doc",
+    "files",
+    "design",
+    "completion"
+   ]
   }
  }
 }

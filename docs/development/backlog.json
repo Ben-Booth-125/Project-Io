@@ -781,30 +781,6 @@
     {
       "status": "designed",
       "glyph": "~",
-      "priority": "A",
-      "version_goal": null,
-      "sprint": "33",
-      "written": "2026-09-07",
-      "author": "Claude (sprint 33 batch completeness critic)",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "category": "Tooling",
-      "id": "BL-801",
-      "short_name": "HEADER_GRAPH_CHECKER",
-      "difficulty": 3,
-      "title": "A check over the doc headers: dangling citations, one-way edges, and pairs that both claim a subject",
-      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
-      "files": [
-        "tools/session/header_graph.js",
-        "docs/development/DEVELOPMENT_PRACTICES.md",
-        "CLAUDE.md"
-      ],
-      "design": "THE FINDING (2026-09-07). The sprint 33 batch scoped its three boundary lanes off defects a header-writing sweep HAPPENED to notice. That is not a search. The batch critic then built the Confused-with graph properly and immediately found a confirmed duplicate (BL-797, travel time doubled), a triple-assertion (BL-798, rung docs triple assert) and a one-way sprawl (BL-799, naming machinery sprawl) - none of which any lane would have reached.\n\nTOOL CREATION IS SKILL CREATION, and the critic's throwaway script is exactly the tool this class of defect needs standing. It measured: 72 docs carry a header, 59 MUTUAL pairs, 89 ONE-WAY edges. A sweep scoped off mutual pairs alone is blind to the 89 - which is how BL-799 survived.\n\nTHE CHECK, as tools/session/header_graph.js:\n  (a) DANGLING CITATIONS - every \"DOC.md § Heading\" reference in docs/ resolved against the target's actual headings. Two were found by hand in this batch (TOOLTIP citing a moved CANVASES section; SOLAR citing \"LENSES.md § rung table\", which does not exist). This half is objective and should FAIL, not warn.\n  (b) THE HEADER GRAPH - mutual pairs and one-way edges from the Confused with / Not here lines, printed so a boundary sweep can be scoped off the whole graph rather than off what somebody noticed.\n  (c) COVERAGE - every doc in CLAUDE.md § 3 carries a header; every doc carrying a header is in § 3. The orphan half is the router's staleness detector, exactly as ui_coverage.js orphans are the surface catalogue's.\n  (d) STATE-INDEPENDENCE - a header carrying \"landed\", \"built\", \"pending\", \"shipped\" or a BL- id as status is a fail.\n\nDo NOT try to detect a doubled SUBJECT automatically - that is judgement. The tool's job is to hand a human the candidate list and to fail hard on the objective half.\n\nWRAP IT IN A SKILL once it runs (needs Ben's permission per CLAUDE.md § Tool creation is skill creation).\n\nMORE FUEL FOR THE DANGLING-CITATION HALF (2026-09-07, found by the fix round's second cold reviewers, all confirmed independently). Beyond the two the batch repaired by hand, live references still name CONTRACTS headings the doc does not hold, in FOUR files across three kinds of artefact: src/world/corp_command.hpp, scripts/economy.lua, tools/verify/README.md and .claude/skills/verifier-headless/SKILL.md. And src/world/province.hpp:82 names \"PROVINCES.md § The partition\", a PREFIX of the real heading rather than the heading - resolvable by a human and by grep, invisible to an exact-match check.\n\nTWO CONSEQUENCES FOR THE TOOL'S SCOPE, both learned the expensive way here: (a) it must sweep src/, scripts/, tools/ and .claude/ as well as docs/ - a citation in a header comment rots exactly like one in prose, and three of the six live misses were outside docs/; (b) it must flag PREFIX matches separately from exact misses, or the province.hpp class passes silently. A boundary move is precisely when these break, and hand-grepping for them is what the first UI lane claimed to have done and had not."
-    },
-    {
-      "status": "designed",
-      "glyph": "~",
       "priority": "B",
       "version_goal": null,
       "sprint": "33",
@@ -916,6 +892,34 @@
         "docs/development/design/renders/README.md"
       ],
       "design": "THE FINDING (2026-09-07, the header-coverage audit at the end of the sprint 33 batch - a doc with no header is how it surfaced).\n\ndocs/development/design/GLOBAL_STYLE_SHEET.md is 55 lines and opens \"Status: **draft - iteration 0, nothing settled yet.**\". The LIVE doc is docs/ui/design/GLOBAL_STYLE_SHEET.md at 232 lines, which CLAUDE.md § 3 names, which carries the sprint 33 header, and which every inbound citation points at (ui/RENDERING.md twice, ui/ICONS.md, research/CANVAS_RENDERING.md twice).\n\nNOTHING POINTS AT THE DEVELOPMENT COPY. Its last touch is the commit that STARTED the ST1 style sprint; the work then moved to docs/ui/design/ and the original was never removed. docs/development/design/README.md and docs/development/design/renders/README.md are the same abandonment.\n\nWHY IT IS WORTH A ROW RATHER THAN A QUIET DELETE: the stale copy does not merely duplicate - it CONTRADICTS. It says nothing is settled, on a subject where things have since been settled and promoted. A reader or an agent that reaches it by filename (both files are called GLOBAL_STYLE_SHEET.md) gets a confident, dated-looking answer that is false. That is the same shape as BL-798 (rung docs triple assert), at file grain instead of section grain.\n\nTHE WORK, and the call is Ben's because it is a deletion: confirm nothing references docs/development/design/ (verified today: nothing does), then remove the directory - or, if the render history under it is worth keeping, leave the renders and delete only the prose, with a one-line pointer at the live doc. Do not simply header the stale copy; a header on a dead twin makes it look maintained.\n\nCHECK BEFORE DELETING: docs/development/design/renders/ against docs/ui/design/renders/ - if the older iterations exist only in the development copy, they are the reason to keep the directory."
+    },
+    {
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "version_goal": null,
+      "sprint": "33",
+      "written": "2026-09-07",
+      "author": "Claude (BL-801 first run)",
+      "requires": [
+        "BL-801"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Docs",
+      "id": "BL-807",
+      "short_name": "CORPUS_CITATIONS_DANGLE",
+      "difficulty": 3,
+      "title": "Eighty citations name a heading that is not there, and 310 more name only its opening",
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "files": [
+        "docs/",
+        "src/",
+        "scripts/",
+        "tools/verify/README.md",
+        ".claude/skills/"
+      ],
+      "design": "THE MEASUREMENT (2026-09-07, the first run of BL-801 (header graph checker) over the whole corpus). 1119 doc-section citations across docs/, src/, scripts/, tools/ and .claude/. 729 resolve. **80 MISS** - no heading in the target begins with the cited text. **310 PREFIX** - the citation names an OPENING of a real heading rather than the whole of it.\n\nTHE 80 ARE REAL. A cold reviewer audited all 80 exhaustively rather than by sample: 76 real, 4 borderline (one shape, where the heading CONTAINS the citation but does not open it - the tool correctly declines those under its stated prefix rule), ZERO false positives.\n\nWHERE THEY CLUSTER, and the clusters are the interesting part - each is a rename nobody swept after:\n  - 12 requirements.json rows plus components.hpp and a skill file cite BACKLOG.md sections. BACKLOG.md was drained in 2026-07 and holds seven pointer stubs; these name sections that went with the drain.\n  - 8 citations across src/, scripts/ and docs/ name \"GENERATION_STRATEGY.md § The resource ceiling\", from hard_coded_world, settlement, tile_generation and world_gen.lua. One heading, eight stale references.\n  - 5 name \"io-standing-rules.md § the player-corp exception\" / \"§ rival-corp exception\" from MARKETS, PRODUCTION, corp_ai.cpp and economy_system.cpp - these broke when BL-789 moved the grant register to AI_OPPONENT.md § 11 THIS SESSION. Our own move; the citations were not swept.\n  - 5 scripts/verify/*.lua name requirement-group sections in req/REQUIREMENTS.md.\n  - 5 name CONTRACTS.md headings (corp_command.hpp twice, economy.lua, tools/verify/README.md, verifier-headless SKILL.md) - the cluster the fix round found by hand and could not clear from inside one lane.\n\nTHE WORK, in that order: sweep cluster by cluster rather than file by file, because each cluster is one rename with many call sites and one decision settles all of them. Re-run `node tools/session/header_graph.js --dangling` after each; it exits non-zero while any remain.\n\nTHE 310 PREFIX HITS ARE NOT ALL DEFECTS and must not be swept blindly. A citation naming a heading without its parenthetical attribution is legitimate. What IS worth reading is the tool's [diverges] class - where the cited opening and the real heading have drifted apart in meaning, e.g. ICONS \"§ Nav-rail affordances\" against the real \"§ Nav-rail legibility rule\". Those are stale in substance, not just in form.\n\nDO THIS AFTER the boundary items (BL-797, BL-798, BL-799) land: a boundary move creates and clears citations, so sweeping first means sweeping twice."
     }
   ]
 }
