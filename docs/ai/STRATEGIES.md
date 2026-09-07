@@ -1,9 +1,9 @@
 # Strategies — the meta, authored ahead of the game
 
-> **Settles:** nothing — research scaffolding, the design conversation's home, not authority. It
-> *asks*: what a strategy is if it is data rather than weights · what a card must carry to be
-> playable · which hypotheses are worth seeding a deck with · how a rival would be read · how a
-> deck would be invented rather than authored · what compresses tightly enough to run locally.
+> **Proposes:** what a strategy is if it is data rather than weights · what a card must carry
+> to be playable · which hypotheses are worth seeding a deck with · how a rival would be read ·
+> how a deck would be invented rather than authored · what compresses tightly enough to run
+> locally.
 > **Not here:** what a rival actually is and may do (AI_OPPONENT, the authority) · the control
 > dictionary (ACTIONS) · whether the language route is tractable at all
 > (LANGUAGE_POLICY_FEASIBILITY, also research).

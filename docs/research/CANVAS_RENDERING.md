@@ -1,10 +1,9 @@
 # Research — Detailed Canvas Rendering (Sprint 29)
 
-> **Settles:** nothing — a feasibility study, not authority. It *asks*: what data a more detailed
-> renderer would have to eat · what the current backend can and cannot do · which options sit on
-> the ladder between vector and textured · which doctrinal rules a richer render collides with ·
-> what determinism and verification would cost · whether the end state is fixed-oblique 2.5D or
-> full 3D.
+> **Proposes:** what data a more detailed renderer would have to eat · what the current backend
+> can and cannot do · which options sit on the ladder between vector and textured · which
+> doctrinal rules a richer render collides with · what determinism and verification would cost ·
+> whether the end state is fixed-oblique 2.5D or full 3D.
 > **Not here:** how ground rendering actually works — baked chunks, the grid rule,
 > installations-as-geometry, LOD (ui/RENDERING, the authority) · the canvases themselves
 > (ui/CANVASES and its children) · the visual language (ui/design/GLOBAL_STYLE_SHEET).

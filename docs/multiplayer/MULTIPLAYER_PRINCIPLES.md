@@ -1,9 +1,8 @@
 # Project Io — Multiplayer Principles
 
-> **Settles:** nothing binding — a preservation note, not a plan and not a commitment to build. It
-> *asks*: which already-settled decisions keep multiplayer cheap later · which properties must not
-> be traded away for a local convenience now · what a lockstep target would demand of the tick and
-> the state hash · where floating-point determinism could bite.
+> **Proposes:** which already-settled decisions keep multiplayer cheap later · which properties
+> must not be traded away for a local convenience now · what a lockstep target would demand of
+> the tick and the state hash · where floating-point determinism could bite.
 > **Not here:** what the prototype scope actually is (TECH_FOUNDATIONS, the authority) · the
 > determinism rule as an in-force invariant (the standing rules) · the seam an out-of-process
 > actor speaks through (AI_OPPONENT).
