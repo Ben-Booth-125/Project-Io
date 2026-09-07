@@ -456,6 +456,34 @@ authority. It is the right opening for a proposal-stage doc whose own prose awai
 for a research note, which settles nothing by construction. `Settles:` is a claim; a doc must not
 make it on questions it is still asking.
 
+#### The check — `node tools/session/header_graph.js`
+
+The headers and the citations that cross them are checked by one tool, in four parts. Two are
+objective and **fail** (exit 1); two are judgement and only **print**.
+
+- **Dangling citations** — every `DOC.md § Heading` reference in `docs/`, `src/`, `scripts/`,
+  `tools/` and `.claude/` resolved against the target's real headings. A citation in a header
+  comment, a Lua script, a harness README or a skill file rots exactly like one in prose, which
+  is why the sweep is not doc-only. A heading here means a `#` line, a bold lead-in opening a
+  line or a sentence, or a table row's first cell — the corpus names sections all three ways.
+  **PREFIX hits are reported separately**: a citation naming only the opening of a longer
+  heading resolves for a human and is invisible to an exact-match check, so it is counted and
+  grouped rather than either passed or failed. Hand-grepping for these is what fails.
+- **The header graph** — mutual pairs and one-way edges built from the `Confused with` and
+  `Not here` lines. A boundary sweep scoped off mutual pairs alone is blind to the one-way half,
+  which is where a sprawl hides, so the one-way edges are ranked first, by how many docs point at
+  a target whose own header points back at none. The tool never guesses that two docs assert the
+  same *subject* — it hands over the candidate set and a human reads it.
+- **Coverage** — every doc in `CLAUDE.md` § 3 carries a header, and every doc carrying a header
+  is in § 3. Orphans both ways, no allow-list: the orphan list is the router's staleness
+  detector, and an entry suppressed is the detector switched off for that doc.
+- **State-independence** — a header saying landed, shipped, pending or not yet, or carrying a
+  `BL-` id at all.
+
+`--dangling`, `--graph`, `--coverage` and `--state` run one part; `--doc <NAME>` gives one doc's
+header, its edges, the broken citations into it and the ones it makes; `--json` dumps everything;
+`--strict` makes the prefix hits fail too.
+
 ### Design-direction Q&A (Batch Delivery)
 
 A **Batch Delivery** (multiple items in one block; see `DELIVERY.md` § Batch Delivery) that made
