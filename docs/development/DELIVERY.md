@@ -147,7 +147,7 @@ same subject differently:
   eviction store because two checks — that an eviction landed, and that a row is not hot and
   evicted at once — are about that store and nothing else.
 - **A cold row's state comes from the FILE it is archived in, not from its own `status` field**
-  (Ben, 2026-09-07). The sweeps froze each row as it stood when they took it and rewrote nothing,
+  (BL-792, the cold union). The sweeps froze each row as it stood when they took it and rewrote nothing,
   so a culled item still reads `designed`. `backlog-purged-*` and `backlog-cancelled-*` are closed
   by construction — the file is the assertion, and the frozen field is an artefact of the moment;
   `backlog-complete-*` is complete; only the hot file and the eviction store carry a status worth

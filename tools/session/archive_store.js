@@ -250,7 +250,7 @@ const sweepFiles = (root = ROOT) => coldDirFiles(root, SWEEP_RE)
 // search answering with 18 rows of work nobody is doing, which is the opposite
 // failure and just as silent.
 //
-// THE RULE (Ben, 2026-09-07, amending BL-792): a cold row's state comes from the FILE
+// THE RULE (BL-792, the cold union): a cold row's state comes from the FILE
 // it is archived in, not from its own status field. backlog-purged-* and
 // backlog-cancelled-* are CLOSED BY CONSTRUCTION — the file is the assertion, and the
 // frozen field is an artefact of the row at the moment it was swept. backlog-complete-*
