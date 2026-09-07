@@ -20,6 +20,10 @@
 //             archived: "docs/development/archive/backlog-design-2026-Q3.json" }
 //   cold  docs/development/archive/backlog-design-<bucket>.json
 //           { _schema, bucket, records: { "BL-008": { design, resolution, ... } } }
+//         docs/development/archive/backlog-{complete,cancelled,purged}-<date>.json
+//           { _schema, items: [ { id, status, files, ... }, ... ] }
+//         The second shape is older — the 2026-08 purge and sprint-close sweeps
+//         predate the eviction store. Both are read; see § TWO SHAPES below.
 //
 // Nothing is lost and nothing is rewritten: eviction is a move, and resolve() puts
 // the item back together for any reader that wants the whole thing.
@@ -171,33 +175,87 @@ function coldFraction(backlog) {
 // accessors are how a reader gets the landed half back; every one of the four calls
 // one of them.
 
-const archiveFiles = (root = ROOT) => {
+// --- TWO SHAPES, ONE COLD STORE ---------------------------------------------
+//
+// The archive holds backlog rows in two file shapes, because the filing convention
+// changed under it:
+//
+//   EVICTION STORE   backlog-design-<bucket>.json   { records: { "BL-008": {...} } }
+//     What archive_designs.js and archive_landed.js write, one record per id. A
+//     record carrying a `status` is a whole evicted ROW; one without is prose only.
+//
+//   SWEEPS           backlog-complete-<date>.json   { items: [ {...}, ... ] }
+//                    backlog-cancelled-<date>.json
+//                    backlog-purged-<date>.json
+//     Verbatim snapshots taken at the 2026-08 purge and the sprint-close sweeps,
+//     which predate archive_landed.js and use a top-level ARRAY. Every entry is a
+//     whole row, and most carry the `files` array --touches reads.
+//
+// Both shapes are the same evidence and a reader wants both: CLAUDE.md routes "is
+// this built?" at backlog_query --touches, and that question is answered by the
+// whole archive or it is answered wrongly. The normalisation belongs here rather
+// than in each caller.
+//
+// DE-DUPLICATION is by id, FIRST FILE WINS, and the order is fixed so the answer is
+// predictable rather than filesystem-dependent:
+//   1. the hot file        (allItems — a restore-in-progress or hand-edit lives there)
+//   2. the eviction store  (the current mechanism, and the newest record of a row)
+//   3. the sweeps, NEWEST FIRST (a later snapshot of an id is the later truth)
+
+const DESIGN_RE = /^backlog-design-.*\.json$/;
+const SWEEP_RE = /^backlog-(complete|cancelled|purged)-.*\.json$/;
+
+const coldDirFiles = (root, re) => {
     const dir = path.join(root, ARCHIVE_DIR);
     if (!fs.existsSync(dir)) return [];
-    return fs.readdirSync(dir)
-        .filter((f) => /^backlog-design-.*\.json$/.test(f))
-        .sort()
-        .map((f) => `${ARCHIVE_DIR}/${f}`);
+    return fs.readdirSync(dir).filter((f) => re.test(f)).sort();
 };
 
-// Every id the cold store knows, whole-row or prose-only. This is the set next_id
-// and the duplicate-id scan must union with the hot file: an id is SPENT whether or
-// not its row still sits in backlog.json.
+// The eviction store: the `records`-shaped files this module's writers own.
+const designFiles = (root = ROOT) => coldDirFiles(root, DESIGN_RE).map((f) => `${ARCHIVE_DIR}/${f}`);
+
+// The sweeps, NEWEST FIRST — ordered by the DATE in the name, not by the name, because
+// a plain reverse sort ranks the family word ahead of the date and would put a purge
+// snapshot above a later sprint close. On the same date a decision file (complete /
+// cancelled) outranks a purge, which is a raw snapshot of whatever the hot file held.
+// This is load-bearing: BL-599 and BL-600 name one pair of items in the 08-24 sweep and
+// a different pair in the 08-26 one — an id collision the project resolved in favour of
+// the later row, and the later row is what this order returns.
+const SWEEP_RANK = { complete: 0, cancelled: 1, purged: 2 };
+const sweepFiles = (root = ROOT) => coldDirFiles(root, SWEEP_RE)
+    .map((f) => ({
+        f,
+        date: (f.match(/(\d{4}-\d{2}-\d{2})/) || [''])[0],
+        rank: SWEEP_RANK[(f.match(/^backlog-([a-z]+)-/) || [])[1]] ?? 9,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date) || a.rank - b.rank || a.f.localeCompare(b.f))
+    .map(({ f }) => `${ARCHIVE_DIR}/${f}`);
+
+// Every cold backlog file, in de-duplication precedence order.
+const archiveFiles = (root = ROOT) => [...designFiles(root), ...sweepFiles(root)];
+
+// Every id the EVICTION STORE knows, whole-row or prose-only. Scoped to that store on
+// purpose: archive_landed.js proves an eviction landed by looking its ids up here, and
+// a sweep row is a historical snapshot, not proof that the write happened. Readers who
+// want the whole history want coldItems()/allItems() instead.
 function landedIds(root = ROOT) {
     const out = new Set();
-    for (const rel of archiveFiles(root)) {
+    for (const rel of designFiles(root)) {
         const store = loadArchive(rel, root);
         for (const id of Object.keys((store && store.records) || {})) out.add(id);
     }
     return out;
 }
 
-// Every landed item the cold store holds as a WHOLE ROW, reassembled. A record
+// Every landed item the EVICTION STORE holds as a WHOLE ROW, reassembled. A record
 // written by archive_designs.js alone carries prose and no `status`, so it is not an
-// item and is skipped — only rows evicted by archive_landed.js come back here.
+// item and is skipped — only rows evicted by archive_landed.js come back here. Also
+// scoped to that store: backlog_lint reads it to catch a row that is hot AND evicted,
+// which is an eviction fault; a row that is hot and also in a sweep is an item legitimately
+// re-opened after the purge, and is not.
 function landedItems(root = ROOT) {
     const out = [];
-    for (const rel of archiveFiles(root)) {
+    for (const rel of designFiles(root)) {
         const store = loadArchive(rel, root);
         for (const [id, rec] of Object.entries((store && store.records) || {})) {
             if (!rec || typeof rec !== 'object' || rec.status === undefined) continue;
@@ -214,17 +272,47 @@ function landedItems(root = ROOT) {
     return out;
 }
 
-// Hot items plus the landed rows that have left the hot file, de-duplicated with the
+// Every whole row the SWEEPS hold, newest sweep first. The rows are already items —
+// nothing is reconstructed and nothing is rewritten. In particular `archived` is left
+// exactly as filed: a swept row either points at its own prose in the eviction store
+// or carries that prose inline, and overwriting the pointer with the sweep's own path
+// would send resolve() to a file that has no record for it.
+function sweptItems(root = ROOT) {
+    const out = [];
+    for (const rel of sweepFiles(root)) {
+        const store = loadArchive(rel, root);
+        for (const row of (store && store.items) || []) {
+            if (!row || typeof row !== 'object') continue;
+            if (typeof row.id !== 'string' || row.status === undefined) continue;
+            out.push({ ...row });
+        }
+    }
+    return out;
+}
+
+// The whole cold half, both shapes, de-duplicated by id in precedence order.
+function coldItems(root = ROOT) {
+    const out = [];
+    const seen = new Set();
+    for (const it of landedItems(root).concat(sweptItems(root))) {
+        if (seen.has(it.id)) continue;
+        seen.add(it.id);
+        out.push(it);
+    }
+    return out;
+}
+
+// Hot items plus every cold row that has left the hot file, de-duplicated with the
 // HOT ROW WINNING. Hot wins because a restore-in-progress or a hand-edit lives there,
 // and a stale cold copy must never shadow it.
 function allItems(backlog, root = ROOT) {
     const hot = (backlog && backlog.items) || [];
     const seen = new Set(hot.map((i) => i.id));
-    return hot.concat(landedItems(root).filter((i) => !seen.has(i.id)));
+    return hot.concat(coldItems(root).filter((i) => !seen.has(i.id)));
 }
 
 module.exports = {
     ROOT, ARCHIVE_DIR, NARRATIVE, INDEX_KEEP, TERMINAL, CANCELLED, CLOSED,
     narrativeFieldsOf, isPointer, bucketFor, archivePath, loadArchive, newArchive, resolve, coldFraction,
-    archiveFiles, landedIds, landedItems, allItems,
+    designFiles, sweepFiles, archiveFiles, landedIds, landedItems, sweptItems, coldItems, allItems,
 };

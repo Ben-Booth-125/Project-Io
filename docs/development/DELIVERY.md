@@ -41,7 +41,8 @@ Prose has **three** homes, split by the item's lifecycle:
    file**, not in `backlog.json` — editing the hot copy silently diverges from what readers see.
 
 **Whether a thing is built is a backlog fact, never a doc fact.** `backlog_query.js --touches
-<doc>` answers "what here is still open"; the doc itself does not.
+<doc>` answers it, over the hot worklist and the whole cold archive together, with each hit's
+`status` saying which side of the line it falls on; the doc itself does not.
 
 `BACKLOG.md` is **finished as a drain** (completed 2026-07-31). It holds no prose — only a
 tombstone and seven stubs that surviving `@BACKLOG.md` pointers resolve to. Those pointers name an
@@ -130,6 +131,20 @@ same subject differently:
   lookup the other way, ranking the authority docs that work on that path has cited, with the count
   shown. It derives the ranking from every item's `authority_doc` and `files`, so it needs no
   upkeep; a path no item cites reports as unowned, which is a finding about the filing.
+- **A search is not a worklist view.** `--grep` and `--touches` print what they matched, landed
+  and cancelled work included, because each exists to catch work that already happened — a subject
+  the project has shipped, or a doc a delivered item names. `status` carries the distinction. The
+  list views (a bare invocation, `--status`, `--priority`) are the ones whose unit of output is
+  open work, and they drop terminal items. A narrower search is available by asking: `--grep
+  <subject> --open`.
+- **The cold half is the WHOLE archive, in two file shapes.** `archive_store.js` reads both the
+  `records`-keyed eviction files `archive_designs.js`/`archive_landed.js` write and the older
+  `items`-array sweeps (`backlog-complete-*`, `backlog-cancelled-*`, `backlog-purged-*`), and
+  hands every reader one de-duplicated union. Precedence on a duplicated id is fixed so the answer
+  is predictable: the hot row, then the eviction store, then the sweeps newest first. Read the
+  union through `allItems()`; the narrower `landedIds()`/`landedItems()` are scoped to the
+  eviction store because two checks — that an eviction landed, and that a row is not hot and
+  evicted at once — are about that store and nothing else.
 - **A sweep prints one line per item; `--full` is what you ask for.** `--grep` and `--touches`
   default to `--summary` — the index row plus the first sentence of `design` — because both
   resolve prose out of the cold archive and a landed item's design block runs to thousands of

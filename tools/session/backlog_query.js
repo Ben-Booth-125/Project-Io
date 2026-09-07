@@ -21,7 +21,9 @@
 //   node tools/session/backlog_query.js --priority S,SSS --open
 //   node tools/session/backlog_query.js --version v0.1.0
 //   node tools/session/backlog_query.js --category Canvas --touches src/ui/
-//   node tools/session/backlog_query.js --grep selection      id/short_name/title/summary match
+//   node tools/session/backlog_query.js --grep selection      id/short_name/title/summary match,
+//                                                             across landed work too (add --open for
+//                                                             only what is still on the worklist)
 //   node tools/session/backlog_query.js --summary             index fields + one line of design
 //   node tools/session/backlog_query.js BL-270 --full         one item, everything, prose resolved
 //   node tools/session/backlog_query.js --fields id,files,authority_doc
@@ -45,7 +47,7 @@ const val = (f) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : nu
 const list = (f) => { const v = val(f); return v ? v.split(',').map((s) => s.trim()).filter(Boolean) : null; };
 
 if (has('--help') || has('-h')) {
-    console.log(fs.readFileSync(__filename, 'utf8').split('\n').slice(1, 26).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
+    console.log(fs.readFileSync(__filename, 'utf8').split('\n').slice(1, 34).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
     process.exit(0);
 }
 
@@ -59,8 +61,19 @@ const categories = list('--category');
 const version = val('--version');
 const touches = val('--touches');
 const grep = val('--grep');
-const showAll = has('--all') || ids.size > 0;
 const openOnly = has('--open');
+
+// --grep AND --touches ARE SEARCHES, NOT WORKLIST VIEWS. The LIST views — a bare
+// invocation, --status, --priority — output open work, so they drop terminal items by
+// default. A search does not, and for the same reason in both cases: DELIVERY.md makes
+// --grep the first step before authoring an item, to catch a subject the project has
+// already shipped, and CLAUDE.md names --touches <doc> as the way to answer "is this
+// built?" — a question ABOUT landed work. A search that hides everything shipped is
+// blind to exactly the case each exists for. So both match across the union and print
+// what they matched, terminal items included, with `status` carrying the distinction.
+// A narrower search is available, but only by asking for it (--grep --open); it is
+// never a silent drop.
+const showAll = has('--all') || ids.size > 0 || ((!!grep || !!touches) && !openOnly);
 
 // --grep and --touches are the many-item sweeps, so they summarise unless asked not to.
 // --full and an explicit --fields both override; an explicit --summary turns it on anywhere.

@@ -37,7 +37,6 @@ const A = require('./archive_store');
 const P = (rel) => path.join(A.ROOT, rel);
 const BL_PATH = 'docs/development/backlog.json';
 const ELEMENTS = 'docs/ui/ui_elements.json';
-const ARCHIVE_DIR = 'docs/development/archive';
 
 const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
@@ -61,24 +60,13 @@ if (!query) { console.error('doc_owner: give a path or a path fragment.'); proce
 
 // --- the pool ---------------------------------------------------------------
 //
-// A.allItems is backlog_query.js's own union: the hot worklist plus the whole-row
-// evictions in archive/backlog-design-*.json. It is NOT the whole history — the
-// 2026-08 purge and complete/cancelled sweeps wrote their rows to sibling files
-// (backlog-complete-*, backlog-cancelled-*, backlog-purged-*) that archive_store's
-// design-file glob does not reach. Those rows are ~625 items of exactly the
-// evidence this index is built from, and leaving them out changes the answer (a
-// UI path resolves to the wrong doc without them), so they are read here too.
-// Deliberately additive and id-deduplicated: the hot row always wins.
+// A.allItems is backlog_query.js's own union, and it is the WHOLE history: the hot
+// worklist, the whole-row evictions in archive/backlog-design-*.json, and the older
+// complete/cancelled/purged sweeps, de-duplicated with the hot row winning. That
+// breadth is the whole evidence base this index is built from — without the sweeps a
+// UI path resolves to the wrong doc — so the union is read as it comes.
 const backlog = JSON.parse(fs.readFileSync(P(BL_PATH), 'utf8'));
-const pool = [];
-const seen = new Set();
-const add = (it) => { if (it && it.id && !seen.has(it.id)) { seen.add(it.id); pool.push(it); } };
-for (const it of A.allItems(backlog, A.ROOT)) add(it);
-for (const f of fs.readdirSync(P(ARCHIVE_DIR))) {
-  if (!/^backlog-(complete|cancelled|purged)-.*\.json$/.test(f)) continue;
-  const store = JSON.parse(fs.readFileSync(P(`${ARCHIVE_DIR}/${f}`), 'utf8'));
-  for (const it of store.items || []) add(it);
-}
+const pool = A.allItems(backlog, A.ROOT);
 
 // --- matching ---------------------------------------------------------------
 // A recorded `files` entry matches when it CONTAINS the query, so a full path, a bare
