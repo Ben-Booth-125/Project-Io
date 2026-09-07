@@ -1,5 +1,14 @@
 # Project Io — Time Controls
 
+> **Settles:** which questions the time panel answers about where the campaign
+> stands in its calendar and how fast it is moving · which rows it stacks and what
+> each reads · what shape the speed choices take · which clocks are layered and
+> which of them the player is actually steering.
+> **Not here:** the pacing constants (`src/core/sim_loop.hpp`) · what resolves on a
+> quarter boundary (economy/*) · placement (LAYOUT) · the session menu the panel
+> hosts (MENU).
+> **Confused with:** HEADER.md, LAYOUT.md, MENU.md.
+
 The **time panel** is a single panel in the top-right corner of the shell, the
 same width as the minimap so the right edge stays aligned (`tick_w = mm_w`). It
 is **four stacked full-width rows** (BL-138, compact time panel; legibility pass

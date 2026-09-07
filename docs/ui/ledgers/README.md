@@ -1,5 +1,14 @@
 # Ledger design Q&A
 
+> **Settles:** which five questions every ledger Q&A must answer · what these
+> working docs are for, and what standing they have against the authority docs they
+> feed · which settled decisions each Q&A must honour — the column host, the
+> no-two-surfaces-answer-the-same-question rule, the toggle rule, the Selection
+> band's exemption · which surfaces have a Q&A of their own.
+> **Not here:** any single ledger's answers (the sibling files here) · the rail and
+> the ledger set (MENU) · the column's geometry (LAYOUT).
+> **Confused with:** MENU.md, LAYOUT.md, SELECTION.md.
+
 Working design docs for the **ledger-mockup pass**: one 5-axis Q&A per fold-out surface, drafted as a
 **strawman for Ben to revise** before mocking each ledger in Power BI (data in `docs/ui/mockdata/`).
 Each doc answers the same five questions — **top question · sub-levels + default · lens on open · data

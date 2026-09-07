@@ -1,5 +1,14 @@
 # Global Style Sheet
 
+> **Settles:** nothing — this is an owner's exploration, and the question it holds
+> open is which visual language and UX direction Io should narrow to. It records
+> which iterations were rendered and what each was judged against · which colour and
+> global rules are proposed · which questions remain open for its owner · what a
+> proposal must clear before it may be promoted into an authority doc.
+> **Not here:** any settled surface rule (LAYOUT, MENU, ICONS) · the settled ground
+> art direction (RENDERING) · the glyph vocabulary in force (ICONS).
+> **Confused with:** RENDERING.md, ICONS.md, LAYOUT.md.
+
 Status: **draft — first surface (tech tree panel) in active exploration, nothing SETTLED yet.**
 Owner: Joe. Sprint: none currently — the doc's original "ST1" pointer was to a sprint that
 was never opened and was deleted outright in the 2026-08-24 unstarted-plans purge

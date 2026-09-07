@@ -1,5 +1,14 @@
 # Project Io — Solar Screen
 
+> **Settles:** what the system-wide rung shows and how a body's orbit maps to a
+> screen position · what the star is as an entity and how it is drawn · how the
+> asteroid belt reads against the bodies within it · which reference a distance on
+> this rung is measured from · what a press on this canvas does · which lenses
+> surface here.
+> **Not here:** the ladder and the shared state (CANVASES) · the rung below
+> (CIRCUMPLANETARY) · what the inset frames (MINIMAP).
+> **Confused with:** CANVASES.md, CIRCUMPLANETARY.md, MINIMAP.md.
+
 The Solar screen is the top-down 2D view of the solar system — the **top rung**
 of the canvas ladder. See [CANVASES.md](CANVASES.md) for layout rules shared
 across the three canvases (the zoom ladder, context minimap, region sizing,

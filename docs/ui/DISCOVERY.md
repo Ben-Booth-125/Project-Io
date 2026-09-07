@@ -1,5 +1,14 @@
 # Discovery & Intelligence
 
+> **Settles:** what the player is allowed to know and what must be earned · which
+> fogs are layered, what each governs, and at what grain · how a survey is paid for
+> and what it reveals · what is readable about a rival and what is only inferable
+> from the market · what a trade route contributes to what is known · how any of it
+> survives a save.
+> **Not here:** how the fog is drawn (SOLAR, PLANETARY, LENSES) · what a click on
+> a revealed thing offers (SELECTION) · the market model (economy/MARKETS).
+> **Confused with:** LENSES.md, PLANETARY.md, SELECTION.md.
+
 The authority for how the player *learns about the world* — the two layered "fogs" that gate what
 is known, and the competitor-information rules that make that knowledge a strategic resource. The
 owning items are BL-067 (survey), BL-068 (competitor visibility), BL-088 (persistent trade

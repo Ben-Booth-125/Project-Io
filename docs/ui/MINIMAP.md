@@ -1,5 +1,13 @@
 # Project Io — Minimap
 
+> **Settles:** which rung the inset shows relative to the one being played · what a
+> press on it does and what happens at the top of the ladder · which chrome the
+> inset carries — its title bar, the lens mode bar on its edge, its lens header ·
+> how it is sized and placed · what view state it shares with the primary canvas.
+> **Not here:** what each rung draws (SOLAR, CIRCUMPLANETARY, PLANETARY) · what a
+> lens shows once toggled (LENSES) · where the inset sits in the shell (LAYOUT).
+> **Confused with:** CANVASES.md, LENSES.md, LAYOUT.md.
+
 The **minimap** is a fixed inset in the bottom-right corner of the shell. It shows
 a **neighbouring canvas at reduced scale** and is the player's "you are here, in
 the bigger picture" readout and the control for stepping *out* one zoom level.

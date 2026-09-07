@@ -1,5 +1,14 @@
 # Project Io — Icon Vocabulary
 
+> **Settles:** what the glyph vocabulary is for and what each family of glyph
+> means · which conventions every glyph honours and where its colour is decided ·
+> where a new glyph goes and which collisions it must avoid · which of doc, header
+> contract and code wins when they disagree (`src/ui/icons.*` is the source of
+> truth for shape and signature).
+> **Not here:** identity colours (`presentation.hpp`) · what a lens shows once its
+> glyph is pressed (LENSES) · where markers are drawn (CANVASES, PLANETARY).
+> **Confused with:** LENSES.md, PLANETARY.md, design/GLOBAL_STYLE_SHEET.md.
+
 The **icon set** is the project's library of small vector glyphs drawn directly
 into ImGui draw lists — the building markers on the Planetary canvas, the resource
 pips in ledgers and strips, the navigation-rail glyphs, and the map-lens buttons.

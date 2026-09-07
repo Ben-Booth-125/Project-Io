@@ -1,5 +1,14 @@
 # Project Io — Comms Chat Log
 
+> **Settles:** why coordination between corporations is visible rather than hidden
+> state · where the comms dock sits and what its size costs the surfaces around it ·
+> which channels exist and who may speak on one · what generates a message, and what
+> becomes of the log across a session.
+> **Not here:** how a rival decides what to say (ai/AI_OPPONENT) · the band beside
+> the dock (SELECTION) · the shell's rect algebra (LAYOUT) · the placeholder it
+> replaced (EXPLORER).
+> **Confused with:** EXPLORER.md, LAYOUT.md, SELECTION.md.
+
 The **comms log** is the channel-based chat panel docked **bottom-left** of the shell (`src/ui/chat_panel.{hpp,cpp}`; placement below). The panel is BL-205 (comms chat log); its dock placement is BL-227 (comms dock bottom-left). `EXPLORER.md` records the placeholder surface it replaced.
 
 It is the surface of the **diplomacy-as-communication principle** (`docs/ai/AI_OPPONENT.md` § 7, Ben 2026-07-26): since every rival corporation is AI, inter-corp coordination happens in a visible communication medium — corps message publicly or in private groups to form plans — rather than in hidden state. In multiplayer the same channels carry human players; the medium is actor-agnostic.

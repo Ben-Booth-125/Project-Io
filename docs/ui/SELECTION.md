@@ -1,5 +1,14 @@
 # Project Io — Selection Info Element
 
+> **Settles:** which three pointer states exist and what each one drives · which
+> press changes which of them · what this element offers for each kind of thing
+> selected, and where its deeper reference lives · what repeat-clicking the same
+> ground does · how an active lens narrows what a press may resolve to and which
+> ledger it drives · what this surface deliberately refuses to be.
+> **Not here:** the hover card itself (TOOLTIP) · what a lens shows (LENSES) ·
+> where the band sits in the shell (LAYOUT) · the ledgers it points at (MENU).
+> **Confused with:** TOOLTIP.md, LENSES.md, LAYOUT.md.
+
 The **Selection info element** is a pinned **action surface** that answers one
 question about the **current selection** — whatever entity the player last
 single-clicked: **"what's my move here?"** It is the opposite of a ledger: a
