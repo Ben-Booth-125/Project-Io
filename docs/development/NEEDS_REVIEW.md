@@ -129,7 +129,7 @@ It is defensible and it is still AUTHORED. A different mapping - a fixed epoch, 
 
 *Files: `src/world/tile_generation.cpp`, `docs/generation/TILE_GENERATION.md`*
 
-### NR-793 — Road tier LOOKS invisible to the phase 6 objective - but the fixture it was measured on has 2 markets and a composite of exactly zero, so the finding is not yet safe
+### NR-793 — Road tier is INVISIBLE to the phase 6 objective - confirmed on a live ten-market world; the cause is a saturated resource-coverage boolean
 *question · raised 2026-09-07 · from Lane C (BL-770 slice 3, the search), measured by tools/verify/landscape_search_harness.cpp, 2026-09-07.*
 
 ROAD TIER 1, 2 AND 3 SCORE BIT-IDENTICALLY on every term of the objective. Verified independently on the harness here: every road_tier proposal in a four-round walk returned the incumbent's exact composite (0.007301, then 0.008397), never once differing in the last digit.
@@ -161,6 +161,19 @@ The search and both axis tests run on ONE fixture world, and on that world:
 
 So term 2 is dead and term 3 is nearly dead ON THIS FIXTURE, and the composite the axis test compares is identically zero. Concluding 'the road axis is invisible to the objective' from a world where the objective evaluates to zero for every input is not sound. The search still ranked and improved (realised 0.326 -> 0.500) only because compare_landscape is LEXICOGRAPHIC and fell through to the realisation term.
 
+--- CONFIRMED ON A LIVE WORLD 2026-09-07 (Ben: 're-run the axis test on a 10-market world'). THE FINDING STANDS ---
+
+Seed ABCDEF01, ten markets, every term alive - balance 0.05238, spread 0.36781, composite 0.010256174, none of them zero:
+
+  tier=1  mkts=10  IN_REACH=25658  raws=122  composite=0.010256174
+  tier=3  mkts=10  IN_REACH=26024  raws=122  composite=0.010256174
+
+IN_REACH moves +366 tiles. Every scored term is bit-identical. So the degenerate fixture was NOT what hid the axis - the objective genuinely cannot see a road tier, on a world where it can see everything else.
+
+THE CAUSE IS NOW PINNED, and it is one number: raws_in_reach is 122 either side. The objective asks a per-resource COVERAGE question - is there any reachable deposit of resource R in this catchment - and with 122 resource-market pairs already covered across 25,658 reachable tiles, 366 more tiles introduce no pair that was not already covered. The coverage boolean is SATURATED, so a cost discount can never reach the score.
+
+THE FIXTURE PROBLEM IS SEPARATE AND STILL REAL. The default-seed fixture (2 markets, balance and composite identically zero) is not a sound basis for any phase 6 measurement, and slice 1's negative result and slice 2's discrimination figure were both taken on it. That is now its own question rather than a confound on this one.
+
 **Why it matters.** A third of every round's work is spent proposing a change that cannot be scored. That is not just waste: it makes the search look like it explores three dimensions when it explores two, and a later session reading the doc would believe road tier is being optimised.
 
 It also echoes the slice-1 finding exactly, one level up. Slice 1 found the objective blind to ROSTERS and the fix was a new term (realisation). This is the same shape - an axis the objective cannot see - and the same two exits are available.
@@ -174,7 +187,9 @@ The road-axis question is now SECOND in line. The first question is why the phas
 - Drop road tier as a candidate axis and say so in GENERATION_STRATEGY.md - two axes, honestly, rather than three where one is inert.
 - Change what a road tier DOES so it can flip a boolean - e.g. tier affects catchment reach, not only cost. Largest blast radius; touches LOGISTICS.md.
 
-> **Recommendation:** THE FIRST, and it now precedes the others rather than sitting beside them. The measurement did its job: it refuted the explanation I gave (the frontier does move) and exposed that the fixture cannot support the conclusion either way. Re-measure on a live world, then choose between option 2 and option 3 - and note that option 2 is now KNOWN VIABLE, where before it was assumed impossible.
+> **Recommendation:** OPTION 2 or OPTION 3, and the measurement now supports choosing between them rather than guessing. Option 2 is VIABLE - the reach field moves by 366 tiles, so a continuous term (mean traversal cost to market, or in-reach tile COUNT rather than coverage) would see the axis immediately. Option 3 is the honest cheap answer if infrastructure is not something phase 6 should be selecting at all. What is now ruled OUT is 'leave it as-is': the axis costs a third of every round and provably buys nothing, on a live world as much as on a degenerate one.
+
+SEPARATELY AND FIRST: the 2-market fixture should stop being the phase 6 measuring world, whatever is decided about roads.
 
 *Files: `src/world/landscape_score.cpp`, `src/world/landscape_search.cpp`, `docs/generation/GENERATION_STRATEGY.md`*
 
