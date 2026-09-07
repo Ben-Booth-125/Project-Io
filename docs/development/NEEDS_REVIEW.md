@@ -129,7 +129,7 @@ It is defensible and it is still AUTHORED. A different mapping - a fixed epoch, 
 
 *Files: `src/world/tile_generation.cpp`, `docs/generation/TILE_GENERATION.md`*
 
-### NR-793 — One of phase 6's three candidate axes buys NOTHING - road tier is invisible to the objective, and costs a third of every round
+### NR-793 — Road tier LOOKS invisible to the phase 6 objective - but the fixture it was measured on has 2 markets and a composite of exactly zero, so the finding is not yet safe
 *question · raised 2026-09-07 · from Lane C (BL-770 slice 3, the search), measured by tools/verify/landscape_search_harness.cpp, 2026-09-07.*
 
 ROAD TIER 1, 2 AND 3 SCORE BIT-IDENTICALLY on every term of the objective. Verified independently on the harness here: every road_tier proposal in a four-round walk returned the incumbent's exact composite (0.007301, then 0.008397), never once differing in the last digit.
@@ -140,16 +140,41 @@ THE CAUSE IS STRUCTURAL. A road tier scales traversal COST (x0.67 / x0.50 / x0.4
 
 Ben's point 3 named three axes: rosters, placements, road tiers. On this world only PLACEMENT actually moved the winner (+15.0% composite, entirely through that axis). SECONDARY, from the same run: corps=10 scores bit-identically to corps=8, while corps=6 and corps=7 differ - so the roster axis is live but COARSE, and extra corps close no additional terminals past a point.
 
+--- MEASURED 2026-09-07 (Ben: 'run it'), AND IT SPLIT THE FINDING IN TWO ---
+
+THE DECISIVE NUMBER, summed over every market's row, either side of the tier-3 uplift:
+
+  road_tier=1   catchment=31581   IN_REACH=22875   raws_in_reach=32
+  road_tier=3   catchment=31581   IN_REACH=23148   raws_in_reach=32
+
+SO THE REACH FRONTIER DOES MOVE: +273 tiles, +1.2%. That REFUTES the first explanation offered - that roads sit where the economy already is and the 24.0 budget's frontier is out where there are no roads to upgrade. The tier genuinely pulls ground inside the budget.
+
+WHAT DOES NOT MOVE IS WHAT THOSE TILES CONTAIN. raws_in_reach is 32 before and 32 after. The objective's closure question is per-resource and BOOLEAN - 'is there ANY reachable deposit of resource R in this catchment' - and with 32 resources already found across 22,875 reachable tiles, 273 more tiles cannot introduce a 33rd. The axis moves a continuous quantity that the objective reads only through a saturated boolean.
+
+--- BUT THE FIXTURE IS DEGENERATE, AND THAT UNDERMINES THE WHOLE FINDING ---
+
+The search and both axis tests run on ONE fixture world, and on that world:
+  markets            2      (the control worlds carry 10, 10 and 15)
+  balance            0.00000 on EVERY candidate - the harness itself prints 'ALL CANDIDATES ZERO - the term is DEAD, not flat'
+  composite          0.000000 on every candidate, seed and winner alike
+  spread             0.04348 flat (against 0.368, 0.788, 0.408 on the controls)
+
+So term 2 is dead and term 3 is nearly dead ON THIS FIXTURE, and the composite the axis test compares is identically zero. Concluding 'the road axis is invisible to the objective' from a world where the objective evaluates to zero for every input is not sound. The search still ranked and improved (realised 0.326 -> 0.500) only because compare_landscape is LEXICOGRAPHIC and fell through to the realisation term.
+
 **Why it matters.** A third of every round's work is spent proposing a change that cannot be scored. That is not just waste: it makes the search look like it explores three dimensions when it explores two, and a later session reading the doc would believe road tier is being optimised.
 
 It also echoes the slice-1 finding exactly, one level up. Slice 1 found the objective blind to ROSTERS and the fix was a new term (realisation). This is the same shape - an axis the objective cannot see - and the same two exits are available.
 
-- Give the objective a term that can see a cost discount - something continuous like mean traversal cost to market, rather than a boolean closure count. Mirrors the slice-2 fix that made rosters visible.
-- Drop road tier as a candidate axis and say so in GENERATION_STRATEGY.md - two axes, honestly, rather than three where one is inert.
-- Change what a road tier DOES to a candidate so it can flip a boolean - e.g. tier affects catchment reach, not only cost. Largest blast radius; touches LOGISTICS.md.
-- Accept for now, record it in the doc as a known-inert axis, and revisit when the objective next changes.
+--- WHAT THE 2026-09-07 MEASUREMENT CHANGES ---
 
-> **Recommendation:** The FIRST if phase 6 is meant to select infrastructure at all, otherwise the SECOND. What should NOT happen is leaving it as-is silently: Ben chose three axes on the assumption they discriminate, and one does not. Worth noting the third option would be the most faithful to what a road is FOR, but it changes the logistics model to serve a search, which is the tail wagging the dog.
+The road-axis question is now SECOND in line. The first question is why the phase 6 fixture is a 2-market world on which two of four terms evaluate to zero, when three control worlds at other seeds carry 10-15 markets and a live composite. Every phase 6 finding so far - slice 1's flat negative, slice 2's discrimination figure, and this axis test - was taken on that fixture.
+
+- FIRST fix the fixture: re-run the axis test on a world with 10-15 markets and a non-zero composite, then re-read the road finding. Nothing should be ruled until the objective is non-degenerate.
+- Give the objective a term that can see a cost discount - it WOULD see this one, now that +273 in-reach tiles are measured. The earlier 'no term could see it' reading was wrong.
+- Drop road tier as a candidate axis and say so in GENERATION_STRATEGY.md - two axes, honestly, rather than three where one is inert.
+- Change what a road tier DOES so it can flip a boolean - e.g. tier affects catchment reach, not only cost. Largest blast radius; touches LOGISTICS.md.
+
+> **Recommendation:** THE FIRST, and it now precedes the others rather than sitting beside them. The measurement did its job: it refuted the explanation I gave (the frontier does move) and exposed that the fixture cannot support the conclusion either way. Re-measure on a live world, then choose between option 2 and option 3 - and note that option 2 is now KNOWN VIABLE, where before it was assumed impossible.
 
 *Files: `src/world/landscape_score.cpp`, `src/world/landscape_search.cpp`, `docs/generation/GENERATION_STRATEGY.md`*
 

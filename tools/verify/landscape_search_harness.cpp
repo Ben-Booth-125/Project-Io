@@ -21,6 +21,7 @@
 #include "scripting/lua_state.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/landscape_search.hpp"
+#include "world/market_saturation.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -292,6 +293,35 @@ int main()
         check(at_top[3] > at_top[1], "R5.0",
               "the tier axis was actually APPLIED - the highway count moves between "
               "tier 1 and tier 3, so a flat score is about the objective, not a no-op");
+
+        // NR-793, THE DECISIVE MEASUREMENT (Ben, 2026-09-07: "run it").
+        //
+        // A flat score has two possible causes and they call for opposite
+        // fixes. Either (a) the tier moves the REACH FIELD and the objective
+        // then fails to read the difference — a blind objective, fixed by a new
+        // term; or (b) the tier does not move the reach field AT ALL, because
+        // roads sit where the economy already is and the 24.0 budget's frontier
+        // is out where there are no roads to upgrade — in which case no term
+        // could see it and the axis itself is the wrong one.
+        //
+        // `in_reach_tiles` is the boolean the objective actually consumes:
+        // tiles inside `max_logistics_reach` of their market. Summing it either
+        // side of the uplift separates (a) from (b) in one number.
+        for (std::uint8_t t = 1; t <= 3; t += 2)
+        {
+            world w = base;
+            apply_landscape_candidate(w, reg, landscape_candidate{ 8, 0xC0FFEEu, t });
+            const auto rows = measure_market_completeness(w, reg, classify_resources(w, reg));
+            long long catch_sum = 0, reach_sum = 0, raws_sum = 0;
+            for (const auto& r : rows)
+            {
+                catch_sum += r.catchment_tiles;
+                reach_sum += r.in_reach_tiles;
+                raws_sum  += r.raws_in_reach;
+            }
+            std::printf("    road_tier=%u  catchment=%lld  IN_REACH=%lld  raws_in_reach=%lld\n",
+                        static_cast<unsigned>(t), catch_sum, reach_sum, raws_sum);
+        }
 
         const bool road_seen = !same_score(at[1], at[3]);
         std::printf("    FINDING: the road/infrastructure axis is %s\n",
