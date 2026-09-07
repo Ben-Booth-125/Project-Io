@@ -73,6 +73,8 @@ two clear directions:
   - Solar primary, double-click a **moon** → the **parent planet's** Circumplanetary view becomes primary, with the moon selected.
   - Circumplanetary primary, double-click the **planet or a moon** → that body's **Planetary** surface becomes primary.
   - Planetary is the bottom rung; tile clicks select a tile, they do not descend.
+  - A solar→surface jump is therefore always a two-step drill (system → local →
+    surface) that reads the same way every time.
 - **Ascend (zoom out) by clicking the minimap.** A minimap click promotes the
   zoom-out neighbour it is showing to primary (Planetary→Circumplanetary,
   Circumplanetary→Solar).
@@ -98,9 +100,12 @@ rather than a second view the player has to keep. What a rung's default framing
 — see [SOLAR.md](SOLAR.md), [CIRCUMPLANETARY.md](CIRCUMPLANETARY.md) and
 [PLANETARY.md](PLANETARY.md).
 
-**Input precedence.** Exactly one canvas handles input per frame — the minimap
-when the cursor is over the inset, the primary otherwise — and neither handles it
-while an ImGui panel is capturing the mouse. The mechanism is `input_enabled`
+**Input precedence.** At most one canvas handles input per frame, and the two
+regions are not the same shape. The whole minimap **box** blocks the primary
+behind it, while only the **inset** canvas inside that box takes minimap input —
+so a press lands on the minimap over the inset, on the primary over the rest of
+the window, and on neither over the box's own chrome bands. An ImGui panel
+capturing the mouse suppresses both. The mechanism is `input_enabled`
 (§ Implementation approach).
 
 ### Keyboard navigation
@@ -200,8 +205,10 @@ edge, while the minimap's chrome title bar is always shown.
 
 **`input_enabled`** exists because the primary canvas fills the whole window
 *behind* the minimap. A click in the overlapping bottom-right corner would
-otherwise be handled twice. `render()` enables input for exactly one canvas per
-frame — the minimap if the mouse is over the inset, the primary otherwise — and
-only when an ImGui panel isn't capturing the mouse (`WantCaptureMouse`). Each
+otherwise be handled twice. `render()` enables input for at most one canvas per
+frame: the primary is disabled over the **whole** minimap box, and the minimap is
+enabled only over the **inset** canvas within it (the box minus its title bar and
+lens mode bar), so the chrome bands enable neither. Both stay disabled while an
+ImGui panel is capturing the mouse (`WantCaptureMouse`). Each
 function still draws unconditionally; it just skips hover/click handling when
 `input_enabled` is false.
