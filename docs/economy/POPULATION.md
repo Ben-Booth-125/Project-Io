@@ -353,7 +353,7 @@ with no centres falls back to the authored `world::workforce_supply` figure (def
 
 ### Contention
 
-**Contention** clears by **wage competition** (BL-614, wage competition). Uncontended
+**Contention** clears by **wage competition** (Ben, 2026-08-25; BL-614, wage competition). Uncontended
 (`demand ≤ supply`), every building is staffed at request. Contended, scarce labour allocates **per building** — offered wage
 descending, building id ascending on a tie, each building granted up to its demand until the
 pool is spent — so the marginal building runs partial and those below it idle, superseding the
@@ -367,7 +367,8 @@ BL-613) clears against its national pool by the same rule, before the ordinary p
 labour at habitability ≥ 0.6, ramping linearly to 0.5× at 0. Effective workforce =
 `workforce_assigned × grant`. A corporation that over-builds relative to its labour force must
 outbid itself and its neighbours, so labour scarcity is priced instead of silently averaged. The
-player never hand-assigns headcount; they express intent and the pool resolves it.
+player never hand-assigns headcount; they express intent and the pool resolves it. Building counts
+lean on available land (§ Land use, the province ceiling), not on the pool alone.
 
 ### Wages
 
