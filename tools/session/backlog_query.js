@@ -10,6 +10,11 @@
 // that have been moved to the cold store (see archive_store.js), so an archived item
 // reads exactly like a hot one.
 //
+// --summary sits between the two: the index fields plus the FIRST SENTENCE of design,
+// one line of prose per item. It is the DEFAULT for --grep and --touches, the two
+// sweeps that match many items at once and so would otherwise resolve thousands of
+// words of cold design prose to answer a one-line question. --full overrides it.
+//
 // USAGE:
 //   node tools/session/backlog_query.js                       every open item, index fields
 //   node tools/session/backlog_query.js --status designed
@@ -17,6 +22,7 @@
 //   node tools/session/backlog_query.js --version v0.1.0
 //   node tools/session/backlog_query.js --category Canvas --touches src/ui/
 //   node tools/session/backlog_query.js --grep selection      id/short_name/title/summary match
+//   node tools/session/backlog_query.js --summary             index fields + one line of design
 //   node tools/session/backlog_query.js BL-270 --full         one item, everything, prose resolved
 //   node tools/session/backlog_query.js --fields id,files,authority_doc
 //   node tools/session/backlog_query.js --count               how many match, nothing else
@@ -46,6 +52,7 @@ if (has('--help') || has('-h')) {
 const ids = new Set(argv.filter((a) => /^BL-\d+$/i.test(a)).map((a) => a.toUpperCase()));
 const full = has('--full');
 const wantFields = list('--fields');
+const summaryFlag = has('--summary');
 const statuses = list('--status');
 const priorities = list('--priority');
 const categories = list('--category');
@@ -54,6 +61,10 @@ const touches = val('--touches');
 const grep = val('--grep');
 const showAll = has('--all') || ids.size > 0;
 const openOnly = has('--open');
+
+// --grep and --touches are the many-item sweeps, so they summarise unless asked not to.
+// --full and an explicit --fields both override; an explicit --summary turns it on anywhere.
+const summary = !full && !wantFields && (summaryFlag || !!grep || !!touches);
 
 const backlog = JSON.parse(fs.readFileSync(BL_PATH, 'utf8'));
 const cache = new Map();
@@ -104,11 +115,29 @@ if (has('--count')) {
 }
 
 // --fields naming a cold field (summary, design ...) resolves too, not only --full.
-const needsCold = full || (wantFields || []).some((f) => A.NARRATIVE.includes(f));
+const needsCold = full || summary || (wantFields || []).some((f) => A.NARRATIVE.includes(f));
 if (needsCold) hits = hits.map((it) => A.resolve(it, A.ROOT, cache));
 
-const fields = wantFields || (full ? null : INDEX_FIELDS);
-const project = (it) => (fields ? Object.fromEntries(fields.filter((f) => it[f] !== undefined).map((f) => [f, it[f]])) : it);
+// First sentence of the design block. Falls back to summary, then title, then nothing —
+// a stub item with no prose still prints its row rather than an empty field.
+const firstSentence = (it) => {
+    // A cold field can still be an unresolved '@path' pointer into a second archive
+    // file; that is a location, not prose, so fall past it to the next best source.
+    const usable = (v) => typeof v === 'string' && v.trim() && !v.trim().startsWith('@');
+    const src = [it.design, it.summary, it.title].find(usable);
+    if (!src) return null;
+    const text = src.trim().replace(/\s+/g, ' ');
+    const m = text.match(/^.*?[.!?]["'”’)\]]?(?=\s|$)/);
+    const line = m ? m[0] : text;                 // no terminator: the whole (short) text
+    return line.length > 240 ? `${line.slice(0, 237)}...` : line;
+};
+
+const SUMMARY_FIELDS = [...INDEX_FIELDS, 'line'];
+const fields = wantFields || (full ? null : summary ? SUMMARY_FIELDS : INDEX_FIELDS);
+const project = (it) => {
+    const src = summary ? { ...it, line: firstSentence(it) } : it;
+    return fields ? Object.fromEntries(fields.filter((f) => src[f] !== undefined).map((f) => [f, src[f]])) : src;
+};
 const out = hits.map(project);
 
 if (!out.length) {

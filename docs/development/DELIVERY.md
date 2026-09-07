@@ -123,6 +123,11 @@ same subject differently:
   lookup the other way, ranking the authority docs that work on that path has cited, with the count
   shown. It derives the ranking from every item's `authority_doc` and `files`, so it needs no
   upkeep; a path no item cites reports as unowned, which is a finding about the filing.
+- **A sweep prints one line per item; `--full` is what you ask for.** `--grep` and `--touches`
+  default to `--summary` — the index row plus the first sentence of `design` — because both
+  resolve prose out of the cold archive and a landed item's design block runs to thousands of
+  words. `--full` prints the whole record, so reach for it on the one item being built.
+  `requirements_query.js` carries the same `--summary`, over each group's `resolution`.
 - **Timestamp a new item** (the `written` field / a `*(Written YYYY-MM-DD, trigger)*` note).
 - **Newest wins on conflict, and a present timestamp is never ignored** — a dated item outranks
   undated prose; between two dated statements the later wins. Do not discount a timestamp because

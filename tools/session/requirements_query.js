@@ -7,10 +7,15 @@
 // resolves groups whose rows/resolution moved to the cold store (req_store.js),
 // so an archived group reads exactly like a hot one.
 //
+// --summary sits between the two: the index fields plus the FIRST SENTENCE of the
+// group's resolution, one line of prose per group. It is the DEFAULT for --grep,
+// the sweep that matches many groups at once. --full overrides it.
+//
 // USAGE:
 //   node tools/session/requirements_query.js                       in-flight groups, index fields
 //   node tools/session/requirements_query.js --status complete
 //   node tools/session/requirements_query.js --grep lens           brief/title/resolution/row text
+//   node tools/session/requirements_query.js --summary             index fields + one line of resolution
 //   node tools/session/requirements_query.js scarcity-lens-render  one group, everything, prose resolved
 //   node tools/session/requirements_query.js --failed              row-level: failed/partial rows
 //   node tools/session/requirements_query.js --class visual        row-level: rows by verification class
@@ -38,7 +43,7 @@ if (has('--help') || has('-h')) {
     process.exit(0);
 }
 
-const flags = new Set(['--full', '--all', '--count', '--table', '--failed',
+const flags = new Set(['--full', '--all', '--count', '--table', '--failed', '--summary',
     '--status', '--grep', '--class', '--fields', '--batch']);
 const takesValue = new Set(['--status', '--grep', '--class', '--fields', '--batch']);
 const briefs = new Set();
@@ -58,6 +63,23 @@ const rowMode = failedOnly || !!cls;
 // Row-level queries (--failed, --class) are historical analytics: they sweep the
 // whole ledger unless a --status narrows them.
 const showAll = has('--all') || briefs.size > 0 || rowMode;
+// --grep is the many-group sweep, so it summarises unless asked not to. --full and an
+// explicit --fields both override; --summary turns it on anywhere. Never in row mode,
+// where the unit of output is a requirement row, not a group.
+const summary = !full && !wantFields && !rowMode && (has('--summary') || !!grep);
+
+// First sentence of the group's resolution. A group with no resolution yet simply has
+// no line — brief, title and status already carry it, so a fallback would only repeat them.
+const firstSentence = (g) => {
+    // An unresolved '@path' pointer into a second archive file is a location, not prose.
+    const src = [g.resolution].find((v) => typeof v === 'string' && v.trim() && !v.trim().startsWith('@'));
+    if (!src) return undefined;
+    const text = src.trim().replace(/\s+/g, ' ');
+    const m = text.match(/^.*?[.!?]["'”’)\]]?(?=\s|$)/);
+    const line = m ? m[0] : text;
+    return line.length > 240 ? `${line.slice(0, 237)}...` : line;
+};
+const SUMMARY_FIELDS = [...INDEX_FIELDS, 'line'];
 
 const data = JSON.parse(fs.readFileSync(R.REQ_PATH, 'utf8'));
 const cache = new Map();
@@ -97,9 +119,12 @@ if (rowMode) {
     }
     if (wantFields) out = out.map((r) => Object.fromEntries(wantFields.filter((f) => r[f] !== undefined).map((f) => [f, r[f]])));
 } else {
-    if (full) hits = hits.map((g) => resolved(g));
-    const fields = wantFields || (full ? null : INDEX_FIELDS);
-    out = hits.map((g) => (fields ? Object.fromEntries(fields.filter((f) => g[f] !== undefined).map((f) => [f, g[f]])) : g));
+    if (full || summary) hits = hits.map((g) => resolved(g));
+    const fields = wantFields || (full ? null : summary ? SUMMARY_FIELDS : INDEX_FIELDS);
+    out = hits.map((g) => {
+        const src = summary ? { ...g, line: firstSentence(g) } : g;
+        return fields ? Object.fromEntries(fields.filter((f) => src[f] !== undefined).map((f) => [f, src[f]])) : src;
+    });
 }
 
 if (has('--count')) {
