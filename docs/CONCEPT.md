@@ -1,5 +1,11 @@
 # Project Io — Concept Summary
 
+> **Settles:** who the player is and what it may not do · what the core loop asks of them ·
+> how a campaign is shaped and paced · what the era arc is for · how the game should feel.
+> **Not here:** how any system works (SYSTEMS) · what a word means (GLOSSARY) · which theme
+> comes next (ROADMAP).
+> **Confused with:** SYSTEMS.md, GLOSSARY.md, MANUAL.md.
+
 ## Player — identity
 ### Player identity
 The player is a **mercenary company** (Ben, 2026-08-12, NR-177 — the two-arcs split, `docs/development/ROADMAP.md` § The two arcs). It is armed and for hire but it is not the state: it does not legislate, tax, or research. It **procures** force rather than producing it — raising and fielding units, buying equipment from private companies that are counterparties, not its own economic arm — and it is paid for outcomes.

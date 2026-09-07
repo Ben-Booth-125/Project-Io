@@ -1,5 +1,12 @@
 # Project Io — The Meta Layer
 
+> **Settles:** what a rule is made of · what the predicate vocabulary may test · what the effect
+> vocabulary may change · why the two halves are not symmetric · what it takes to admit a new
+> condition or modifier. Read before adding any rule family.
+> **Not here:** what any one rule family says (laws, events, contracts — their own docs) · what a
+> rule is worth in play (the owning system).
+> **Confused with:** EVENTS.md, SYSTEMS.md, politics/NATIONS.md.
+
 **The predicate and effect substrate** that laws, technologies, quests and embargoes are all built
 out of. Two closed vocabularies and about four hundred lines of code, under every rule the game can
 express.

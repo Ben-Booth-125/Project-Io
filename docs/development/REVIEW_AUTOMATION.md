@@ -1,5 +1,12 @@
 # Review & Merge Automation — general practice
 
+> **Settles:** why author and reviewer must differ · how much rigour a change of a given size
+> earns · what stages the review loop runs · what stays a human decision · how to port the loop
+> to another repo.
+> **Not here:** the standards a reviewer checks against (DEVELOPMENT_PRACTICES) · where review
+> sits in the lifecycle (DELIVERY).
+> **Confused with:** DELIVERY.md, DEVELOPMENT_PRACTICES.md.
+
 How to automate the PR review/accept loop **without losing the human as the design
 authority**. Written to be **repo-agnostic** — copy this file (and the two artifacts it
 names) into any project and adjust the anchors. The Project-Io specifics are quarantined

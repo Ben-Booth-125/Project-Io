@@ -1,5 +1,12 @@
 # Project Io — Delivery Method
 
+> **Settles:** how work moves from intent to a committed, verified change · what earns Full mode
+> over Light · how far to take an item · when work splits across sub-agents and worktrees · what
+> makes pausing a group a clean outcome.
+> **Not here:** the craft standards a change is held to (DEVELOPMENT_PRACTICES) · which theme
+> comes next (ROADMAP) · what the open work is (the backlog, through its query tools).
+> **Confused with:** DEVELOPMENT_PRACTICES.md, ROADMAP.md, REVIEW_AUTOMATION.md.
+
 How work flows from intent to a committed, verified change. This is the long-form authority for
 the backlog model and the **Delivery** lifecycle; `CLAUDE.md` carries the condensed reference and
 `.claude/rules/io-standing-rules.md` the always-on summary.

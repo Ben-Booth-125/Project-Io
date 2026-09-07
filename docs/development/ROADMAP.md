@@ -1,5 +1,11 @@
 # Project Io — Roadmap
 
+> **Settles:** which theme comes next · what *finished* means for it · how milestones sequence
+> against each other · what is still owed before a cut. The only place that says *when*.
+> **Not here:** the individual items (the backlog, through its query tools) · how an item is
+> delivered (DELIVERY) · what was built and when (the devlog).
+> **Confused with:** DELIVERY.md, DEVELOPMENT_PRACTICES.md, economy/ERAS.md.
+
 This document owns the **milestone sequence**: which theme comes next, and what *finished* means
 for it. It does **not** list items — the backlog does — and it does **not** record what was built
 or when — [`DEVLOG.md`](DEVLOG.md) and [`SPRINTS.md`](SPRINTS.md) do.
