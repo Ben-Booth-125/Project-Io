@@ -1,5 +1,15 @@
 # Project Io — Nation Generation
 
+> **Settles:** how a nation comes to exist — where a seed is placed, how territory expands,
+> what the size floor merges away · how a resource profile and a political character are
+> derived from the ground a nation holds · how history's ruptures redraw the carve · how a
+> nation is named · what treasury and substrate density it opens with · how settlements are
+> placed alongside.
+> **Not here:** what a nation *does* once the campaign runs (../politics/NATIONS) · how
+> corporations attach to one (CORPORATION_GENERATION) · which ladder produced the history it
+> inherits (../lore/HISTORY).
+> **Confused with:** ../politics/NATIONS.md, CORPORATION_GENERATION.md, ../lore/HISTORY.md.
+
 Nations are the political and territorial layer overlaid on the tile map. They define the
 geopolitical backdrop at campaign start: who controls what land, what the diplomatic starting
 positions are, and what legal context corporations operate within.

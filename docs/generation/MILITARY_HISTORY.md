@@ -1,5 +1,16 @@
 # Project Io — Military history
 
+> **Settles:** how force works **inside the Era −1 sim**, which is a generation pass and not
+> the game — how `resolve_battle` settles a war at nation scale · how a polity's roster
+> advances up the band ladder as its institutions do · how naval is scored and exercised
+> here · what forage simplifies, and what it is a simplification *of* · how sea legs produce
+> colonisation.
+> **Not here:** how force works in the **campaign** — `resolve_campaign_battle`, muster and
+> hire, march, upkeep, and the roster table itself — all `../military/MILITARY.md`, a
+> **sibling and not a parent** · why a polity chooses to fight (../lore/COLLAPSE).
+> **Confused with:** `../military/MILITARY.md` above all — the two resolvers are constantly
+> mistaken for one another; also ../lore/HISTORY.md, ../lore/COLLAPSE.md.
+
 **How force works INSIDE THE ERA −1 SIM**, which is a generation pass and not the game. This
 document owns the ancient half of the military model: the nation-scale resolver the sim runs
 millions of times, the band ladder a polity climbs as its institutions do, what the sim does with

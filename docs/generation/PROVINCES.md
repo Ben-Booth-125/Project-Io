@@ -1,5 +1,14 @@
 # Project Io — Provinces
 
+> **Settles:** what a province is, and what it deliberately is not · how the partition is
+> grown, and what stops it · what size band it targets and why that takes three numbers ·
+> how the three domains stay unmixed, and who owns water · what contracts downstream code
+> may depend on · what reads a province, and at what grain.
+> **Not here:** how a tile got its terrain or its deposit (TILE_GENERATION) · what a plate
+> did (CONTINENTS) · who owns the territory a province falls inside (NATION_GENERATION) ·
+> what a battle in one costs (../military/MILITARY).
+> **Confused with:** TILE_GENERATION.md, CONTINENTS.md, NATION_GENERATION.md.
+
 **The province is the game's spatial unit of consequence.** A tile is where a building stands; a
 province is where a battle happens, where a unit *is*, what the map is coloured by, and what a
 building ceiling counts against.

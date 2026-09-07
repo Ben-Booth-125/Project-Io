@@ -1,5 +1,15 @@
 # Project Io — Planetology
 
+> **Settles:** how a body's atmosphere, chemistry and hydrology come to be derived rather
+> than authored · how the chain from system to civilisation gate is staged, and what each
+> stage gates · how a biosphere history is simulated and how a line is dated · how a
+> homeworld's inputs are constrained without touching the gates · how the derivation is
+> presented as a biography · what keeps the chain deterministic and cheap.
+> **Not here:** how terrain is laid down from the resulting profile (TILE_GENERATION) ·
+> where the land ends up (CONTINENTS) · what happens after the civilisation gate
+> (../lore/HISTORY).
+> **Confused with:** TILE_GENERATION.md, CONTINENTS.md, ../lore/HISTORY.md.
+
 This document is the authority for BL-167 (Planetology — generated atmosphere, chemistry,
 and a simulated evolution history): a chemical model of the full chain from an input solar
 system to a human civilisation, researched across 13 domains with an adversarial fact-check on

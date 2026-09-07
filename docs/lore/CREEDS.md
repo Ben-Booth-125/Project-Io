@@ -1,5 +1,13 @@
 # Kepler — Creeds
 
+> **Settles:** how a cradle culture rolls its own phonology, and how every proper noun it
+> coins is drawn from it · why one pantheon per culture · what a creed's drives do at the
+> tribal-conflict stage · where a pantheon sits on the ground · how globalisation renders
+> the record into a common tongue.
+> **Not here:** the stage ladder this pass interleaves with (HISTORY) · how the political
+> map is drawn (../generation/NATION_GENERATION) · how a polity narrates its doom (COLLAPSE).
+> **Confused with:** HISTORY.md, COLLAPSE.md, ../generation/NATION_GENERATION.md.
+
 One pantheon per cradle-culture, each in its own generated tongue, and the
 globalisation that renders the record in the player's language. The pass is
 `src/world/creeds.{hpp,cpp}` (BL-235, creeds), verified by

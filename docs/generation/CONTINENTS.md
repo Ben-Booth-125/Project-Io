@@ -1,5 +1,14 @@
 # Project Io — Continents / Drift
 
+> **Settles:** how plates are derived from Planetology's Engine result · how drift is
+> simulated, and on what clock · how a plate's drift history sets the `height_bias` handed
+> to the tile pipeline · how a rift basin becomes sea · what the pass retains for downstream
+> code, `plate_id` included · what the Continent lens is asked to show.
+> **Not here:** what the biased heightmap becomes (TILE_GENERATION) · how tiles are grouped
+> into the unit of consequence (PROVINCES) · where the thermal budget came from
+> (PLANETOLOGY).
+> **Confused with:** TILE_GENERATION.md, PROVINCES.md, PLANETOLOGY.md.
+
 The plate-drift pass answers "where did the land end up, and why?" by simulating a
 small number of drifting plates rather than reading noise. Code:
 `src/world/continents.{hpp,cpp}` (`run_continents`). This document is the design
