@@ -10,6 +10,101 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-07 (sprints 32b and 32c both close) — What we wrote down, and what measuring it said instead
+
+**Runtime.** Long session, Full — doc reconciliation, then a four-lane batch delivery, then a scope cut.
+
+**Sprint 32b was already closed on 2026-09-06** with eleven items delivered and the 0 CE digests
+deliberately unblessed. **Sprint 32c closes here**, with nine more and both of its chains met. The
+generation pass is being set down for now; Ben's call, to be revisited with a narrower focus.
+
+### The session did not start by building
+
+Scoping the two chains found **three pairs of authority docs contradicting each other**, and all
+three for one reason: a ruling dated 2026-09-06 had landed in the doc that owned it and not in its
+siblings. `MILITARY.md` contradicted *itself* — § Unit classes still said naval was strategic-only
+while § Domains and traversal made ships the only occupants of water. `TILE_GENERATION.md` still
+carried the exact deferral `PROVINCES.md` quotes as lifted. `CORPORATION_GENERATION.md` still ran
+Pass 6 through an economic settle `GENERATION_STRATEGY.md` retires the same day.
+
+Briefing four implementers off those docs would have built the contradiction into code. Eight design
+calls were taken on one elicitation form, six more conflicts resolved on newest-dated-wins, and the
+whole corpus reconciled before any agent was launched.
+
+### `MILITARY_HISTORY.md` split out of `MILITARY.md`
+
+Ben: those answers *"apply specifically to generation, and more specifically to ancient history"*.
+So everything the Era −1 sim does with force moved to `docs/generation/` — a generation doc that
+happens to be about force, not a military doc that happens to be about the past.
+
+**The split paid for itself immediately.** The forage rule written the day before — a fleet forages
+beside shore it owns and starves elsewhere — was false as a general claim (nations supplied overseas
+perfectly well) *and* unbuildable as written, because `terrain_combat`'s table is read by **both**
+resolvers. It now lives in the sim's caller, labelled as the simplification it is.
+
+### Four lanes, in worktrees
+
+| Lane | Delivered |
+|---|---|
+| A | BL-778 traversal domains, BL-779 naval real |
+| B | BL-785 water tile selection |
+| C | BL-770 slice 3, the greedy-refinement search |
+| D | the missing water-ownership assertion |
+
+Every lane measured its own before/after in isolation and **re-blessed nothing** — BL-780 took the
+digests in one act, against a description of what changed in world *shape*, with four named causes.
+
+### What measurement overturned — four times, and this is the entry's point
+
+Every one of these was written by us, in good faith, and caught only by running something.
+
+1. **Forage.** Authored as a general rule; false as one, and unbuildable at the shared table.
+2. **"Coastal water belongs to whoever owns the shore."** Doc truth since the ruling. The carve was
+   claiming water by *flood*: **100% of coastal water owned against 39% of land**. Fixed (NR-792) so
+   water derives from its shore — and the first fix changed *nothing*, because the coastal band is
+   globally connected and one owned shore tile flooded the whole ring. The sea is a ring; a lake
+   fills. 1,169 tiles of neutral coastal water now exist where there were none.
+3. **"Ships are composed into the same stack."** Written 2026-09-06, before anyone could see what
+   one stack produces: **84% of battles carried a galley**, including landlocked ones, worth real
+   power once BL-779 landed. Filtered (NR-794); the figure fell to 18% and converged with the sea-leg
+   count. The one-battle gap between them is a land stack crossing water it owns — BL-778's middle
+   case appearing in the data unprompted.
+4. **The road axis.** Explained here as a frontier that does not move. **The frontier moves by 366
+   tiles.** What is saturated is the resource-coverage boolean: `raws_in_reach` is 122 either side.
+   Confirmed on a live ten-market world after the first measurement was found to have been taken on
+   a degenerate 2-market fixture.
+
+### Phase 6 finally has a caller
+
+`landscape_score` had no caller outside its own harness — which is why BL-772 and BL-773 were
+blocked on an item already reported as landed. `start_new_game` now searches: fixed rounds,
+deterministic argmax, winner applied.
+
+**What varies is narrower than the harness, for a hard reason.** `generate_corporations` *appends*
+and has already run by the time the registry loads, so re-running it would double every specialist.
+The live seam searches the background economy's placement and the road tier. Widening it to the
+roster axis is BL-772's restructure — now written down rather than guessed at.
+
+**Cost, measured:** 1 candidate 70.8 s of startup, 19 candidates 90.8 s. The search costs **~20 s**,
+a regression until BL-772 removes the 72 s warm start beside it. A third of those evaluations are
+the road axis NR-793 proved inert.
+
+### The scope cut
+
+Ben, mid-flight: *"I fear we have begun to touch on too many items."* The count was less bad than it
+looked — only 13 of 26 open items were ever this sprint's — but the instinct was right, and findings
+were breeding findings. Sprint 29, sprint 33 and ownerless items were **archived unstarted**
+(cancelled, kept whole, `--restore`-able). The hot backlog went from 28 items to **12**, all of them
+this generation pass.
+
+### Left open, deliberately
+
+NR-793 (road axis inert), BL-786 (the port seam — `can_place` refuses all water before the type is
+considered), and the **2-market phase 6 fixture**, which is the one to take first: slice 1's negative
+result and slice 2's discrimination figure were both measured on it.
+
+---
+
 ## 2026-09-06 (sprint 32b closes) — The world changes, and the instruments learn to see it
 
 **Mode:** Design (one elicitation form, eight calls) → Full batch delivery in three waves → two cold
