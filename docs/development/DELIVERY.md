@@ -119,6 +119,10 @@ same subject differently:
   names files. `next_id.js` guards the *id*; nothing guarded the *subject*, and a new item was
   written for a defect a priority-A item already owned, naming the same divergence at the same line
   numbers. It costs a second, and the duplicate costs a session.
+- **Starting from a file instead of a subject** — `node tools/session/doc_owner.js <path>` runs the
+  lookup the other way, ranking the authority docs that work on that path has cited, with the count
+  shown. It derives the ranking from every item's `authority_doc` and `files`, so it needs no
+  upkeep; a path no item cites reports as unowned, which is a finding about the filing.
 - **Timestamp a new item** (the `written` field / a `*(Written YYYY-MM-DD, trigger)*` note).
 - **Newest wins on conflict, and a present timestamp is never ignored** — a dated item outranks
   undated prose; between two dated statements the later wins. Do not discount a timestamp because
