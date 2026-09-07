@@ -1,5 +1,15 @@
 # Project Io — Nations
 
+> **Settles:** what a nation is once generation has finished making it · what it holds — territory,
+> treasury, budget weights, law · how a law reaches the market · what an import tariff does and
+> which direction it points · what a nation may do, what it does each tick, and in what order it
+> spends · what a nation wants.
+> **Not here:** how a nation comes to exist — territory placement, resource profile, character,
+> naming (NATION_GENERATION) · which quantity says how a nation reads a corporation (RELATIONS) ·
+> the predicate/effect substrate a law is composed from (META_LAYER) · a corporation's own money loop
+> (FINANCE).
+> **Confused with:** generation/NATION_GENERATION.md, politics/RELATIONS.md, META_LAYER.md.
+
 **The nation as an actor** — what a nation *is* once generation has finished making it, what it
 holds, what it may do, and what it does each tick. This document is the authority for that
 question, and it is the one `docs/generation/NATION_GENERATION.md` explicitly declines:

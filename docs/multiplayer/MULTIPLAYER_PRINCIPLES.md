@@ -1,5 +1,14 @@
 # Project Io — Multiplayer Principles
 
+> **Settles:** nothing binding — a preservation note, not a plan and not a commitment to build. It
+> *asks*: which already-settled decisions keep multiplayer cheap later · which properties must not
+> be traded away for a local convenience now · what a lockstep target would demand of the tick and
+> the state hash · where floating-point determinism could bite.
+> **Not here:** what the prototype scope actually is (TECH_FOUNDATIONS, the authority) · the
+> determinism rule as an in-force invariant (the standing rules) · the seam an out-of-process
+> actor speaks through (AI_OPPONENT).
+> **Confused with:** tech/TECH_FOUNDATIONS.md, ai/AI_OPPONENT.md.
+
 > **Status: forward-looking, non-binding.** Multiplayer is **not** in the prototype scope
 > (`docs/tech/TECH_FOUNDATIONS.md` § Direction) and is **not** on the backlog. Nothing here is a
 > commitment to build, and no item should be promoted on the strength of this doc. Its purpose is
