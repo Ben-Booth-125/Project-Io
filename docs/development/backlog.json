@@ -892,6 +892,30 @@
         "CLAUDE.md"
       ],
       "design": "TWO LOOSE ENDS LEFT BY BL-792 (the cold union), both raised by its second cold reviewer (2026-09-07) as notes rather than blockers.\n\n(1) DEAD EXPORT. archiveFiles() now has zero callers anywhere in tools/ - archive_landed.js's two call sites moved to designFiles() - yet it stays exported under a comment that reads like a live contract. Either delete it or say in the comment that it is kept for external callers.\n\n(2) A ROUTER PROMISE IS NOW HALF TRUE. CLAUDE.md says of the archive that \"--status cancelled finds work that was closed unbuilt\". The 186-row 2026-08-23 purge now reads status `purged`, not `cancelled`, so that search returns the 36 genuinely-cancelled rows and not the purge. The new state is more honest - a purge and a cancellation are different acts - but the router still describes the old one. Either widen the sentence to name both, or give the query a way to ask for closed-unbuilt across both.\n\nAlso worth one line while in there: the SWEEP_RE comment says the old allow-list \"cost the union 620 rows\"; measured it is 609 net, 625 raw."
+    },
+    {
+      "status": "designed",
+      "glyph": "~",
+      "priority": "B",
+      "version_goal": null,
+      "sprint": "33",
+      "written": "2026-09-07",
+      "author": "Claude (header-coverage audit)",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Docs",
+      "id": "BL-806",
+      "short_name": "ORPHANED_STYLE_SHEET_TWIN",
+      "difficulty": 1,
+      "title": "A stale twin of the style sheet sits in docs/development/design/, saying nothing is settled",
+      "authority_doc": "docs/ui/design/GLOBAL_STYLE_SHEET.md",
+      "files": [
+        "docs/development/design/GLOBAL_STYLE_SHEET.md",
+        "docs/development/design/README.md",
+        "docs/development/design/renders/README.md"
+      ],
+      "design": "THE FINDING (2026-09-07, the header-coverage audit at the end of the sprint 33 batch - a doc with no header is how it surfaced).\n\ndocs/development/design/GLOBAL_STYLE_SHEET.md is 55 lines and opens \"Status: **draft - iteration 0, nothing settled yet.**\". The LIVE doc is docs/ui/design/GLOBAL_STYLE_SHEET.md at 232 lines, which CLAUDE.md § 3 names, which carries the sprint 33 header, and which every inbound citation points at (ui/RENDERING.md twice, ui/ICONS.md, research/CANVAS_RENDERING.md twice).\n\nNOTHING POINTS AT THE DEVELOPMENT COPY. Its last touch is the commit that STARTED the ST1 style sprint; the work then moved to docs/ui/design/ and the original was never removed. docs/development/design/README.md and docs/development/design/renders/README.md are the same abandonment.\n\nWHY IT IS WORTH A ROW RATHER THAN A QUIET DELETE: the stale copy does not merely duplicate - it CONTRADICTS. It says nothing is settled, on a subject where things have since been settled and promoted. A reader or an agent that reaches it by filename (both files are called GLOBAL_STYLE_SHEET.md) gets a confident, dated-looking answer that is false. That is the same shape as BL-798 (rung docs triple assert), at file grain instead of section grain.\n\nTHE WORK, and the call is Ben's because it is a deletion: confirm nothing references docs/development/design/ (verified today: nothing does), then remove the directory - or, if the render history under it is worth keeping, leave the renders and delete only the prose, with a one-line pointer at the live doc. Do not simply header the stale copy; a header on a dead twin makes it look maintained.\n\nCHECK BEFORE DELETING: docs/development/design/renders/ against docs/ui/design/renders/ - if the older iterations exist only in the development copy, they are the reason to keep the directory."
     }
   ]
 }
