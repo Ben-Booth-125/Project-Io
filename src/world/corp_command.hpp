@@ -86,22 +86,32 @@ enum class corp_verb : uint8_t
     // Appended AFTER withdraw_from_battle, same append-only rule.
     // CONTRACTS.md § The mercenary contract: "a contract is a condition_set
     // the client will pay to have become true, by a deadline". These two
-    // verbs are the whole player/agent surface onto it — accepting an OFFER
+    // verbs were the whole player/agent surface onto it — accepting an OFFER
     // (BL-572) with a named force, and walking away from a live one early.
     //
-    // ── DORMANT: THE MERCENARY CONTRACT IS RETIRED (BL-693) ──────────────────
+    // ── TOMBSTONES: THE MERCENARY CONTRACT IS RETIRED (BL-693) ────────────────
     // Ben, 2026-08-29: "I don't think mercenary contracts is the correct
-    // system." No surface reaches these two verbs any more — the Contracts
-    // ledger and its rail slot are deleted — and no scorer candidate issues
-    // them. They remain callable, and they still apply, ONLY because the
-    // enum is APPEND-ONLY: removing a verb renumbers every verb below it and
-    // breaks the ACTIONS.json dictionary and every recorded command. They are a
-    // dormant record, not a live mechanism; see `mercenary_offer` in world.hpp.
+    // system." The system is gone — its records, its passes, its serialisation,
+    // the Contracts ledger and its rail slot — and no scorer candidate issues
+    // either verb.
+    //
+    // THE TWO SLOTS SURVIVE THE SYSTEM, ONLY because the enum is APPEND-ONLY:
+    // deleting a value renumbers every verb below it and silently re-points the
+    // ACTIONS.json dictionary and every recorded command. That is the whole
+    // reason they are still here, and it binds every verb appended after them.
+    //
+    // THEY REMAIN CALLABLE, AND THEY ARE REJECTED. `apply_corp_command` answers
+    // `rejected_invalid` for both and mutates nothing — deliberately, rather
+    // than falling through to a default, so a caller is told No instead of being
+    // quietly ignored (the AI-facing-seam rule, io-standing-rules.md). They are
+    // a dormant record of a retired system, not a live mechanism: the
+    // `mercenary_offer` and `mercenary_contract` records they once named exist
+    // nowhere in the world. See corp_command.cpp's matching tombstone note.
     //
     // The `request_quote` / `accept_quote` / `cancel_contract` trio — PROCUREMENT,
     // the BUY side — is a different system and is fully live. Do not confuse them.
-    accept_offer,      ///< Convert live offer `order` (a mercenary_offer id) into a mercenary_contract, committing `units` (the corp's own). `counterparty` names the offer's client NATION for this verb, not a corp — the seam's counterparty check forks on verb; see corp_command.cpp.
-    abandon_contract,  ///< `corp` (the contractor) walks away from live contract `order` early. Same money outcome as a failure (deposit only); a distinct, lesser sentiment magnitude (CONTRACTS.md § Q2).
+    accept_offer,      ///< RETIRED (BL-693), REJECTED. Converted the live mercenary offer named by `order` into a contract, committing `units`. The slot is kept by the append-only rule; nothing accepts the verb.
+    abandon_contract,  ///< RETIRED (BL-693), REJECTED. Walked away early from the live mercenary contract named by `order`. The slot is kept by the append-only rule; nothing accepts the verb.
     // --- BL-616: razing joins the seam (2026-08-25) ---
     // Appended AFTER abandon_contract, same append-only rule. The deliberate
     // destruction act POPULATION.md § Growth, decline and razing reserves for
@@ -137,15 +147,14 @@ inline constexpr uint8_t corp_verb_count =
 /// `rejected_state` at the cap rather than silently dropping the order.
 inline constexpr std::size_t max_sell_orders_per_corp = 64;
 
-/// Fixed capacity of a mercenary contract's committed force
-/// (`mercenary_contract::units`, world.hpp — BL-573) and of this command's own
-/// `units` field below, which mirrors it exactly: a wire-safe fixed-size array
-/// is what the untrusted-input rule can range-check field by field, the same
-/// reason `corp_command` itself carries no `std::vector`. Eight is far above
-/// any single contract's real force at the prototype's roster scale. Defined
-/// here (not in world.hpp, where `mercenary_contract` lives) because
-/// `world.hpp` includes THIS header, not the reverse — a single definition
-/// both sides reach without a cycle.
+/// Fixed capacity of this command's `units` field below. It once mirrored a
+/// `mercenary_contract`'s committed force exactly; that record retired with the
+/// system (BL-693) and exists nowhere, so this constant now sizes ONE array and
+/// nothing else. It survives for the reason the two verb slots do — the record's
+/// byte shape is what a stored command and a wire caller agree on, and shrinking
+/// it would re-interpret both. A wire-safe fixed-size array is also what the
+/// untrusted-input rule can range-check field by field, the same reason
+/// `corp_command` itself carries no `std::vector`.
 inline constexpr std::size_t mercenary_contract_max_units = 8;
 
 /// BL-511: "no province named" for `corp_command::province`. Deliberately
@@ -185,10 +194,11 @@ struct corp_command
     float    floor_price = 0.0f; ///< place_sell_order: minimum unit price (>= 0; 0 = market price).
     uint32_t order       = 0;    ///< remove_sell_order: the sell_order::id to erase. Also accept_quote /
                                   ///< cancel_contract: the procurement_quote / procurement_contract id.
-                                  ///< BL-573 reuses it again: accept_offer's mercenary_offer id,
-                                  ///< abandon_contract's mercenary_contract id — the same "an id
-                                  ///< names the thing this verb acts on" reading every prior reuse
-                                  ///< carries, never two ids in flight on one command.
+                                  ///< The retired pair (accept_offer / abandon_contract, BL-693)
+                                  ///< named their mercenary offer and contract here too — the
+                                  ///< same "an id names the thing this verb acts on" reading
+                                  ///< every reuse carries, never two ids in flight on one
+                                  ///< command. Both verbs are rejected, so nothing reads it now.
 
     // --- BL-350 procurement args ---
     /// request_quote: the supplier corp being asked. `subject` names the body
@@ -232,13 +242,12 @@ struct corp_command
     /// the value fits, and fitting is not existing.
     uint32_t province = no_province;
 
-    // --- BL-573: the mercenary-contract seam (2026-08-23) -------------------
+    // --- BL-573: the mercenary-contract seam (2026-08-23), RETIRED (BL-693) --
     /// accept_offer's committed force — the corp's OWN units, named by the
-    /// caller. Unused slots are `null_entity`; the seam counts a slot as
-    /// "named" iff it is not `null_entity`, so a caller need not also send a
-    /// count. "The player chooses the force, the contract never does"
-    /// (CONTRACTS.md Q1) — this field is the whole mechanism that ruling
-    /// rests on. Ignored by every other verb.
+    /// caller, unused slots `null_entity`. That verb is rejected now, so NO VERB
+    /// READS THIS FIELD. It is kept, and inert, because the record's byte shape
+    /// is what a stored command and a wire caller agree on; dropping it would
+    /// re-interpret every command already recorded.
     std::array<entity_id, mercenary_contract_max_units> units{};
 };
 
@@ -290,8 +299,8 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 ///
 /// **WHAT THIS CANNOT SEE, stated because it changes what the price means.** A
 /// filed return records the MONEY LOOP only (FINANCE.md § The quarterly return).
-/// National transfers and mercenary-contract payouts land after `apply_budget`
-/// in the same tick (`app.cpp`: `apply_budget` then `run_nation_step`), so a
+/// National transfers land after `apply_budget` in the same tick
+/// (`app.cpp`: `apply_budget` then `run_nation_step`), so a
 /// corporation earning through contracts reads as less profitable on its own
 /// returns than it is, and THIS VERB UNDERVALUES IT BY EXACTLY THAT GAP. Closing
 /// it is owed work filed as NR-655, deliberately not papered over here: the price

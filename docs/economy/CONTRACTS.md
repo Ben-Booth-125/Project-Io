@@ -65,8 +65,9 @@ over anonymous asks; it has no representation for a named counterparty or a lead
 the same `corp_command` seam the order book does, for the same reason: the player's press and the
 AI's command are one implementation.
 
-- **Three verbs** (`corp_verb::request_quote` / `accept_quote` / `cancel_contract`, `world.hpp`
-  §11–14, append-only after `set_workforce_auto`). `request_quote` evaluates four decline
+- **Three verbs** (`corp_verb::request_quote` / `accept_quote` / `cancel_contract`, declared in
+  `src/world/corp_command.hpp` and appended after `set_workforce_auto` — the enum is append-only,
+  so their values are fixed; `world.hpp` holds no `corp_verb`). `request_quote` evaluates four decline
   conditions in order — no capacity (the supplier holds no completed building that produces the
   good), no input access (the supplier's local market cannot supply its recipe's inputs), embargo
   (`world::corp_embargo_conditions`, a `condition_set` per supplier — the generic predicate
@@ -152,9 +153,9 @@ in this section.
 
 | Concern | File |
 |---|---|
-| Procurement records, quotes, contracts | `src/world/components.hpp`, `world.hpp` |
+| Procurement records, quotes, contracts | `src/world/components.hpp` (the records), `world.hpp` (the world's containers) |
 | Procurement serialisation | `src/world/procurement.{hpp,cpp}` |
-| The three procurement verbs | `src/world/corp_command.cpp` |
+| The three procurement verbs | `src/world/corp_command.hpp` (declared), `corp_command.cpp` (applied) |
 | The predicate a decline is evaluated with | `src/world/condition_set.{hpp,cpp}` |
 
 **Related authorities.** [`MARKETS.md`](MARKETS.md) (the anonymous alternative),
