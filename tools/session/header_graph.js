@@ -49,8 +49,12 @@
 //                  or the gate stops being read)
 //   --json         machine-readable dump of all four checks
 //   --quiet        suppress the per-hit listings; counts only
-// EXIT:   1 if a dangling citation or a state-independence violation is found,
-//         else 0. The graph and the coverage halves never change the exit code.
+//   --self-test    run the parser against a fixture of a dozen headings — every
+//                  citation and header SHAPE the corpus contains, pinned. No corpus,
+//                  no filesystem. A check-tool needs a check on itself.
+// EXIT:   1 if a dangling citation or a state-independence violation is found by a
+//         check that ACTUALLY RAN. --graph and --coverage print judgement and never
+//         fail; asked for on their own, they exit 0.
 //
 // Zero dependencies (fs only). Companion to ui_coverage.js and backlog_lint.js.
 
@@ -85,7 +89,14 @@ const has = (f) => argv.includes(f);
 const val = (f) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : null; };
 
 if (has('--help') || has('-h')) {
-    console.log(fs.readFileSync(__filename, 'utf8').split('\n').slice(1, 52).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
+    // Read to the END OF THE COMMENT, not to a hard-coded line number — a line added to
+    // the usage block above used to be silently cut off the bottom of --help.
+    const head = [];
+    for (const l of fs.readFileSync(__filename, 'utf8').split('\n').slice(1)) {
+        if (!/^\/\//.test(l.trim()) && l.trim() !== '') break;
+        head.push(l.replace(/^\s*\/\/ ?/, ''));
+    }
+    console.log(head.join('\n').trimEnd());
     process.exit(0);
 }
 
@@ -96,7 +107,14 @@ if (has('--help') || has('-h')) {
 // emphasis, code ticks, link syntax, the three dash characters, smart quotes.
 const demarkup = (s) => s
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')      // [text](link) -> text
-    .replace(/[*_~`]/g, '')
+    .replace(/[*~`]/g, '')
+    // AN UNDERSCORE INSIDE A WORD IS PART OF A FILENAME, NOT EMPHASIS. Stripping it
+    // unconditionally turned `NATION_GENERATION.md` into `NATIONGENERATION.md`, which
+    // resolves to nothing — so NO doc whose filename carries an underscore could ever be
+    // an edge TARGET, and a third of the corpus was invisible to the graph. An underscore
+    // flanked by alphanumerics on BOTH sides is an identifier; any other one is emphasis.
+    .replace(/_+/g, (m, i, whole) =>
+        (/[A-Za-z0-9]/.test(whole[i - 1] || '') && /[A-Za-z0-9]/.test(whole[i + m.length] || '') ? m : ''))
     .replace(/[‐-―−]/g, '-')       // – — ‒ − -> -
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')
@@ -285,10 +303,25 @@ function resolveDoc(name, fromFile) {
 //   docs/SYSTEMS.md § Trade / § Supply          (the second § chains to the first doc)
 //   AI_OPPONENT.md § 10i                        (a section number, not a phrase)
 //   io-standing-rules § Terms & docs            (no extension)
+//   docs/ui/SELECTION.md (§ Polymorphism)       (the § is inside its own parenthesis)
 // A § whose target is a SOURCE file (world.hpp §, economy.lua §) is a code-section
 // marker, not a doc citation, and is skipped rather than reported.
-const DOC_REF = /(?:\[[^\]]*\]\()?([A-Za-z0-9_][A-Za-z0-9_.\/-]*|(?:\.\.\/)+[A-Za-z0-9_][A-Za-z0-9_.\/-]*)(?:\.md)?['"`)\]]{0,3}\)?\s*$/;
+//
+// THE TRAILING `[(\[]?` IS LOAD-BEARING. `X.md (§ Heading)` puts an OPENING bracket
+// between the doc name and the §; without it the anchor failed, the whole shape went
+// unswept — 13 citations, 5 of them dangling, including two in src/ui/ — and the tool
+// reported the SAME citation when it was written without the parenthesis.
+const DOC_REF = /(?:\[[^\]]*\]\()?([A-Za-z0-9_][A-Za-z0-9_.\/-]*|(?:\.\.\/)+[A-Za-z0-9_][A-Za-z0-9_.\/-]*)(?:\.md)?['"`)\]]{0,3}\)?\s*([(\[])?\s*$/;
 const SRC_EXT = /\.(cpp|hpp|h|lua|js|json|bat|ps1|py|txt|png)$/i;
+// Across the OPENING bracket the name has to LOOK like a doc. "own corporation (§ Always
+// open)" is prose, but `corporation` is also the basename of a ledger doc, so admitting a
+// bare lowercase word across the bracket invents a citation out of an ordinary sentence.
+// A real one carries an extension, a directory, or a capital.
+const DOC_SHAPED = (n) => /\.md$/i.test(n) || n.includes('/') || /[A-Z]/.test(n);
+// A CHAIN IS SHORT. "SYSTEMS.md § Trade / § Supply" puts the second § a few characters
+// after the first; a backlog record is one 4000-character JSON line on which a doc named
+// at the start would otherwise adopt every stray § in the paragraph.
+const CHAIN_SPAN = 40;
 
 // A CITATION WRAPS. An 80-column comment splits one reference across two lines, and
 // reading only the first leaves the cited heading as the word "The" — a false miss,
@@ -308,7 +341,12 @@ function continuation(lines, ln) {
     if (mine && theirs !== mine) return '';
     const t = next.replace(MARKER, '').trim();
     if (!t || /^[-*+|=]/.test(t) || /^[{}[\]]/.test(t)) return '';
-    if (!/^[a-z(]|^[A-Z][a-z]/.test(t)) return '';    // a new sentence in caps is not a wrap
+    if (/^\d+[.)]\s/.test(t)) return '';              // an ordered-list item is not a wrap
+    // A DIGIT OPENS A WRAP AS READILY AS A LETTER. "`COLLAPSE.md` § The\n4000-year
+    // problem" is one citation split by an 80-column rule; refusing the borrow left the
+    // cited heading as the word "The" and reported a false MISS against a heading the
+    // tool resolves correctly wherever the same citation happens to fit on one line.
+    if (!/^[a-z(0-9]|^[A-Z][a-z]/.test(t)) return '';  // a new sentence in caps is not a wrap
     return ' ' + t.slice(0, 90);
 }
 
@@ -316,7 +354,19 @@ function continuation(lines, ln) {
 // the RESOLVE direction — the test there is "does a real heading start this text" —
 // so only hard delimiters cut it. The PREFIX direction gets the tighter trim below.
 function candidateAfter(line, at) {
-    let s = line.slice(at + 1);
+    // \r first: this tree is CRLF, lines are split on \n, and a regex `.` does not match
+    // the carriage return left behind — a `$`-anchored match silently never fires.
+    let s = line.slice(at + 1).replace(/\r/g, '').replace(/^[\s:]+/, '');
+    // A QUOTED HEADING IS SELF-DELIMITING, NOT A DEAD END. `§ "The goal"` used to hit the
+    // double quote as a hard delimiter, leave an empty candidate, and get dropped before
+    // it was ever classified — a whole shape swept and silently discarded, one instance of
+    // it a citation pointing at the wrong document entirely. The backslash is for a
+    // citation living inside a JSON string (backlog.json, requirements.json).
+    const q = s.match(/^\\?["“](.*)$/);
+    if (q) {
+        const close = q[1].search(/\\?["”]/);
+        return (close >= 0 ? q[1].slice(0, close) : q[1]).trim();
+    }
     const hard = /[`"|\]\n]|\\n|§/;
     const m = s.match(hard);
     if (m) s = s.slice(0, m.index);
@@ -341,22 +391,109 @@ function citedAt(lines, ln, at) {
     return joined.length > first.length ? joined : first;
 }
 
+// A BOLD LEAD-IN OR A TABLE CELL IS A WEAK ANCHOR. It is one row of a table or the
+// opening of a sentence, not a section — and a weak anchor of a SINGLE COMMON WORD
+// certifies almost anything: "SPRINTS.md § Sprint 16" passed as OK against the word
+// "Sprint", though SPRINTS.md has no Sprint 16 heading; "LENSES.md § rung table" passed
+// against the cell "Rung"; "RESOURCES.md § Mercantile value track" against "Mercantile".
+// That is the most dangerous failure this tool has, because a false PASS prints nowhere.
+// So a one-token weak anchor certifies a citation only when the citation IS that token.
+// A one-token `#` heading is trusted: an H2 named "Overview" really is a section.
+const weakOneToken = (head, aTok, tightLen) => head.bold && aTok.length < 2 && tightLen > 1;
+
+// The section-id shape: "10i", "5", "3a" — and "Q1", the question ids ERA1_TECH_LANDSCAPE
+// and the ledger Q&As number their sections with. An id is distinctive enough to match on
+// its own, which is what a phrase-length floor cannot do for a one-token name.
+const SECTION_ID = /^[a-z]{0,2}[0-9]+[a-z]?$/;
+
+// Classify one cited phrase against one document's headings. Pure — it takes the two
+// strings and nothing else, which is what makes --self-test possible.
+function classifyCitation(cited, headings) {
+    const ctok = tokens(cited);
+    if (!ctok.length) return { cls: 'EMPTY' };
+    const tight = tokens(trimTight(cited));
+
+    // 1. a real heading (or one of its aliases) opens the cited text
+    let best = null, weak = null;
+    for (const head of headings) {
+        for (const a of head.aliases) {
+            if (!startsWith(ctok, a.tok)) continue;
+            if (weakOneToken(head, a.tok, tight.length)) { weak = weak || { head }; continue; }
+            if (!best || a.tok.length > best.tok.length) best = { head, tok: a.tok };
+        }
+    }
+    if (best) return { cls: 'OK', matched: best.head.text };
+
+    // 2. a bare section id: "§ 10i", "§ 10c.6-7", "§ 5", "§ Q1"
+    if (SECTION_ID.test(ctok[0])) {
+        const n = headings.find((x) => tokens(x.text)[0] === ctok[0] && SECTION_ID.test(tokens(x.text)[0]));
+        if (n) return { cls: 'OK', matched: n.text };
+    }
+
+    // 3. THE CITATION IS SHORTER THAN THE HEADING IT NAMES — the province.hpp
+    //    class: it names "The partition" where PROVINCES.md's heading reads
+    //    "The partition - grown from settlement, stopped by terrain".
+    //    Resolvable by a human,
+    //    invisible to an exact-match check, and so reported in its own block
+    //    rather than folded into either the passes or the misses.
+    //
+    //    The cited text runs on into prose far more often than it stops
+    //    cleanly, so the search walks the citation's opening words from longest
+    //    to shortest and takes the first opening a real heading begins with. A
+    //    hit is marked `truncated` when the whole cited phrase is inside the
+    //    heading (a clean short form) and `diverges` when the citation carries
+    //    on past the part that matched — which is either run-on prose or a tail
+    //    that is simply wrong, and only a human can say which. Two tokens is
+    //    the floor, or one of at least four characters; below that a short
+    //    citation would match half the file.
+    let pre = null, took = 0;
+    for (let k = Math.min(ctok.length, 12); k >= 1; k--) {
+        const open = ctok.slice(0, k);
+        if (k === 1 && open[0].length < 4) break;
+        let best2 = null;
+        for (const head of headings) {
+            for (const a of head.aliases) {
+                if (weakOneToken(head, a.tok, tight.length)) continue;
+                if (startsWith(a.tok, open) && (!best2 || a.tok.length < best2.tok.length)) best2 = { head, tok: a.tok };
+            }
+        }
+        if (best2) { pre = best2; took = k; break; }
+    }
+    if (pre) {
+        return {
+            cls: 'PREFIX', matched: pre.head.text, tight: trimTight(cited),
+            shape: took >= tight.length ? 'truncated' : 'diverges',
+        };
+    }
+    // A weak one-token anchor may not CERTIFY a citation, but it is not nothing either:
+    // "ICONS.md § hq glyph" names the glyph table's `HQ` cell and one word more. Demoting
+    // it to MISS would trade one false pass for one false failure, so it lands in the
+    // block that exists for exactly this — resolvable by a human, invisible to a match.
+    if (weak) return { cls: 'PREFIX', matched: weak.head.text, tight: trimTight(cited), shape: 'diverges' };
+    return { cls: 'MISS' };
+}
+
 function scanCitations() {
     const hits = [];
     for (const f of allFiles) {
         if (!SCAN_EXT.has(path.extname(f))) continue;
         const r = rel(f);
         if (r.startsWith('Project-Rival/') || isHistorical(r)) continue;
+        // THIS FILE SPELLS THE CITATION SHAPE BY EXAMPLE, over and over, and an example
+        // is not a citation. Sweeping itself made the tool report its own documentation.
+        if (r === 'tools/session/header_graph.js') continue;
         let text;
         try { text = fs.readFileSync(f, 'utf8'); } catch { continue; }
         if (!text.includes('§')) continue;
         const lines = text.split('\n');
         for (let ln = 0; ln < lines.length; ln++) {
             const line = lines[ln];
-            let at = -1, lastDoc = null;
+            let at = -1, lastDoc = null, lastAt = -1;
+            const chained = () => lastDoc && at - lastAt <= CHAIN_SPAN;
             while ((at = line.indexOf('§', at + 1)) >= 0) {
                 const before = line.slice(0, at).replace(/\s*$/, '');
-                const m = before.match(DOC_REF);
+                let m = before.match(DOC_REF);
+                if (m && m[2] && !DOC_SHAPED(m[1])) m = null;   // prose across a "(§" bracket
                 let target = null, named = null;
                 if (m) {
                     named = m[1];
@@ -365,7 +502,7 @@ function scanCitations() {
                     // shape when it describes it, this file included. Not a citation.
                     if (/^DOC\.md$/i.test(named)) { lastDoc = null; continue; }
                     const res = resolveDoc(named, f);
-                    if (res.path) { target = res.path; lastDoc = res.path; }
+                    if (res.path) { target = res.path; lastDoc = res.path; lastAt = at; }
                     else if (res.miss === 'ambiguous') {
                         hits.push({ file: r, line: ln + 1, named, cls: 'AMBIGUOUS', cands: res.cands, cited: citedAt(lines, ln, at) });
                         lastDoc = null; continue;
@@ -375,12 +512,19 @@ function scanCitations() {
                         // prose ("the ladder §") and is dropped.
                         if (/\.md$/i.test(named)) hits.push({ file: r, line: ln + 1, named, cls: 'NODOC', cited: citedAt(lines, ln, at) });
                         lastDoc = null; continue;
+                    } else if (chained()) {
+                        // A PROSE WORD DOES NOT BREAK THE CHAIN. "FINANCE.md § Disclosure
+                        // and § Whole-firm acquisition" puts the word "and" before the
+                        // second §; treating that as a failed doc dropped the second
+                        // section, which is the chaining the shape exists to express.
+                        target = lastDoc; named = null;
                     } else { lastDoc = null; continue; }
-                } else if (lastDoc) {
+                } else if (chained()) {
                     target = lastDoc;                 // "SYSTEMS.md § Trade / § Supply"
                 } else continue;
 
                 const cited = citedAt(lines, ln, at);
+                lastAt = at;                          // a chain walks: § A / § B / § C
                 if (!cited) continue;
                 hits.push({ file: r, line: ln + 1, named: named || path.basename(target), target, cited });
             }
@@ -390,62 +534,7 @@ function scanCitations() {
     // classify
     for (const h of hits) {
         if (h.cls) continue;
-        const d = docs.get(h.target);
-        const ctok = tokens(h.cited);
-        if (!ctok.length) { h.cls = 'EMPTY'; continue; }
-
-        // 1. a real heading (or one of its aliases) opens the cited text
-        let best = null;
-        for (const head of d.headings) {
-            for (const a of head.aliases) {
-                if (startsWith(ctok, a.tok) && (!best || a.tok.length > best.tok.length)) best = { head, tok: a.tok, text: a.text };
-            }
-        }
-        if (best) { h.cls = 'OK'; h.matched = best.head.text; continue; }
-
-        // 2. a bare section number: "§ 10i", "§ 10c.6-7", "§ 5"
-        if (/^[0-9]+[a-z]?$/.test(ctok[0])) {
-            const n = d.headings.find((x) => tokens(x.text)[0] === ctok[0] && /^[0-9]+[a-z]?$/.test(tokens(x.text)[0]));
-            if (n) { h.cls = 'OK'; h.matched = n.text; continue; }
-        }
-
-        // 3. THE CITATION IS SHORTER THAN THE HEADING IT NAMES — the province.hpp
-        //    class: it names "The partition" where PROVINCES.md's heading reads
-        //    "The partition - grown from settlement, stopped by terrain".
-        //    Resolvable by a human,
-        //    invisible to an exact-match check, and so reported in its own block
-        //    rather than folded into either the passes or the misses.
-        //
-        //    The cited text runs on into prose far more often than it stops
-        //    cleanly, so the search walks the citation's opening words from longest
-        //    to shortest and takes the first opening a real heading begins with. A
-        //    hit is marked `truncated` when the whole cited phrase is inside the
-        //    heading (a clean short form) and `diverges` when the citation carries
-        //    on past the part that matched — which is either run-on prose or a tail
-        //    that is simply wrong, and only a human can say which. Two tokens is
-        //    the floor, or one of at least four characters; below that a short
-        //    citation would match half the file.
-        const tight = tokens(trimTight(h.cited));
-        let pre = null, took = 0;
-        for (let k = Math.min(ctok.length, 12); k >= 1; k--) {
-            const open = ctok.slice(0, k);
-            if (k === 1 && open[0].length < 4) break;
-            let best2 = null;
-            for (const head of d.headings) {
-                for (const a of head.aliases) {
-                    if (startsWith(a.tok, open) && (!best2 || a.tok.length < best2.tok.length)) best2 = { head, tok: a.tok };
-                }
-            }
-            if (best2) { pre = best2; took = k; break; }
-        }
-        if (pre) {
-            h.cls = 'PREFIX';
-            h.matched = pre.head.text;
-            h.tight = trimTight(h.cited);
-            h.shape = took >= tight.length ? 'truncated' : 'diverges';
-            continue;
-        }
-        h.cls = 'MISS';
+        Object.assign(h, classifyCitation(h.cited, docs.get(h.target).headings));
     }
     return hits;
 }
@@ -456,31 +545,156 @@ const misses = cite('MISS');
 const prefixes = cite('PREFIX');
 const nodocs = cite('NODOC');
 const ambiguous = cite('AMBIGUOUS');
+const empties = cite('EMPTY');
 
 // --- (b) the header graph --------------------------------------------------
 
-// Confused with: a plain list of doc names.
-// Not here:      questions, each naming its owner in parentheses — "the money loop
-//                (FINANCE)", "(AI_OPPONENT, the authority)". The owner is the leading
-//                DOC-SHAPED token inside the parens; a parenthetical that names no
-//                doc contributes no edge.
+// Confused with: a plain list of doc names, each of which MAY be followed by prose —
+//                "`../military/MILITARY.md` above all — the two resolvers are constantly
+//                mistaken for one another; also ../lore/HISTORY.md".
+// Not here:      questions, each naming its owner(s) in parentheses — "the money loop
+//                (FINANCE)", "(AI_OPPONENT, the authority)", "what any one panel says
+//                (HEADER, PROFILE, TIME_CONTROLS, CHAT)". EVERY name in the parenthetical
+//                is an owner, not just the first: a question with four owners draws four
+//                boundaries, and reading only the first hid three of them.
+//
+// A doc name is one unspaced token, optionally relative-pathed. A RELATIVE PATH IS THE
+// CORPUS'S NORMAL CROSS-DIRECTORY FORM (`../military/MILITARY`), so it must be admitted;
+// requiring a leading letter rejected every cross-directory owner there is. Prose words
+// are lowercase and resolve to nothing, so the case test is what keeps the parser honest.
+const DOC_TOKEN = /^(?:\.{1,2}\/)*[A-Za-z0-9_][A-Za-z0-9_.\/-]*$/;
+function docTokensIn(chunk) {
+    const out = [];
+    for (const w of demarkup(chunk).split(/\s+/)) {
+        const t = w.replace(/^[("'[]+/, '').replace(/[.,;:)"'\]]+$/, '');
+        if (t.length < 3 || !DOC_TOKEN.test(t)) continue;
+        if (!/[A-Z]/.test(t) && !/\.md$/i.test(t)) continue;   // prose is lowercase
+        out.push(t);
+    }
+    return out;
+}
+// The first token of a chunk that is a real document. Scanning rather than anchoring is
+// what lets "also ../lore/HISTORY.md" and "`MILITARY.md` above all — prose" both resolve.
+function firstDocIn(chunk, fromFile) {
+    for (const t of docTokensIn(chunk)) {
+        const r = resolveDoc(t, fromFile);
+        if (r.path) return r.path;
+    }
+    return null;
+}
+const confusedChunks = (s) => String(s || '').split(/[,·;]/);
+const notHereChunks = (s) => [...String(s || '').matchAll(/\(([^)]*)\)/g)].flatMap((m) => m[1].split(/[,;·]/));
 function edgesOf(d) {
     const out = [];
     if (!d.header) return out;
-    for (const n of (d.header.confusedWith || '').split(/[,·;]/)) {
-        const t = demarkup(n).replace(/[.\s]+$/, '').trim();
-        if (!t) continue;
-        const r = resolveDoc(t, P(d.path));
-        if (r.path && r.path !== d.path) out.push({ to: r.path, kind: 'confused' });
+    const from = P(d.path);
+    for (const chunk of confusedChunks(d.header.confusedWith)) {
+        const to = firstDocIn(chunk, from);
+        if (to && to !== d.path) out.push({ to, kind: 'confused' });
     }
-    for (const m of (d.header.notHere || '').matchAll(/\(([^)]*)\)/g)) {
-        const first = demarkup(m[1]).split(/[,;]/)[0].trim();
-        if (!/^[A-Za-z][A-Za-z0-9_./-]*$/.test(first)) continue;
-        if (!/[A-Z]/.test(first) || first.length < 3) continue;
-        const r = resolveDoc(first, P(d.path));
-        if (r.path && r.path !== d.path) out.push({ to: r.path, kind: 'nothere' });
+    for (const part of notHereChunks(d.header.notHere)) {
+        const to = firstDocIn(part, from);
+        if (to && to !== d.path) out.push({ to, kind: 'nothere' });
     }
     return out;
+}
+
+// --- self-test -------------------------------------------------------------
+
+// A CHECK-TOOL WITH NO CHECK ON ITSELF IS THE THING THE PROJECT'S RULES WARN ABOUT. Two
+// cold reviews found eleven defects in this file, every one of them a citation or header
+// SHAPE the corpus contains and the parser did not handle. So each shape is pinned here
+// against a fixture of a dozen headings — no corpus, no filesystem, nothing to keep in
+// step — and a regression in any of them fails loudly instead of quietly narrowing the
+// sweep. A tool that is quietly incomplete applies a correct rule to a partial write set,
+// which is the exact failure this tool exists to stop.
+if (has('--self-test')) {
+    const FIXTURE = [
+        '# Fixture', '',
+        '## Q1 — quest shape: mostly a binary tree, some dead-end leaves',
+        '## The 4000-year problem — making the run affordable',
+        '## Rung applicability',
+        '### Water kinds: lake, coast and ocean',
+        '## Design state — the two open states',
+        '## 10i. The wire protocol',
+        '## Mercantile — endemic trade goods',
+        '## Pass 7 — Starting treasury *(Ben, 2026-08-24)*', '',
+        '| Rung | On the strip |', '| --- | --- |',
+        '| Sprint | a weak anchor |', '| HQ | the glyph |', '',
+        '- **Design** — design depth only', '',
+    ].join('\n');
+    const H = headingsOf(FIXTURE);
+    const cls = (s) => classifyCitation(s, H).cls;
+    const shape = (s) => classifyCitation(s, H).shape;
+    let pass = 0; const fail = [];
+    const ok = (name, got, want) => {
+        if (JSON.stringify(got) === JSON.stringify(want)) pass++;
+        else fail.push(`${name}\n      got  ${JSON.stringify(got)}\n      want ${JSON.stringify(want)}`);
+    };
+    const line = (s) => { const a = s.indexOf('§'); return citedAt([s, ''], 0, a); };
+
+    // (1) a filename's underscore survives demarkup; an emphasis underscore does not
+    ok('1  demarkup keeps NATION_GENERATION', demarkup('`../generation/NATION_GENERATION.md`'), '../generation/NATION_GENERATION.md');
+    ok('1b demarkup strips _emphasis_', demarkup('the _emphatic_ word'), 'the emphatic word');
+    ok('1c demarkup keeps DEVELOPMENT_PRACTICES', demarkup('**DEVELOPMENT_PRACTICES.md**'), 'DEVELOPMENT_PRACTICES.md');
+
+    // (3) EVERY owner in a Not-here parenthetical, not just the first
+    ok('3  four owners in one parenthetical',
+        notHereChunks('what any one panel says (HEADER, PROFILE, TIME_CONTROLS, CHAT) · x (MENU)').map((c) => docTokensIn(c)[0]),
+        ['HEADER', 'PROFILE', 'TIME_CONTROLS', 'CHAT', 'MENU']);
+    ok('3b a parenthetical naming no doc yields none',
+        notHereChunks('the money loop (AI_OPPONENT, the authority)').map((c) => docTokensIn(c)[0] || null),
+        ['AI_OPPONENT', null]);
+
+    // (4) a relative path is the corpus's normal cross-directory owner
+    ok('4  relative-path owner admitted',
+        notHereChunks('a battle in one costs (../military/MILITARY) · x (../economy/RESOURCES, ../economy/TILES)')
+            .map((c) => docTokensIn(c)[0] || null),
+        ['../military/MILITARY', '../economy/RESOURCES', '../economy/TILES']);
+
+    // (5) a Confused-with entry followed by prose still names its doc
+    ok('5  doc name ahead of prose',
+        confusedChunks('`../military/MILITARY.md` above all — the two resolvers are mistaken for one another; also ../lore/HISTORY.md, ../lore/COLLAPSE.md.')
+            .map((c) => docTokensIn(c)[0] || null),
+        ['../military/MILITARY.md', '../lore/HISTORY.md', '../lore/COLLAPSE.md']);
+
+    // (7) a one-token section id followed by run-on prose
+    ok('7  Q1 + run-on prose resolves', cls('Q1. The motive behind Q1 survives: the'), 'OK');
+    ok('7b a numeric section id still resolves', cls('10i'), 'OK');
+
+    // (8) a wrap whose continuation opens with a digit
+    ok('8  digit opens a wrap', continuation(['// `COLLAPSE.md` § The', '// 4000-year problem. A run'], 0).trim(), '4000-year problem. A run');
+    ok('8b an ordered-list item is not a wrap', continuation(['// x § The', '// 1. a list item'], 0), '');
+    ok('8c the borrowed citation then resolves', cls('The 4000-year problem. A settle-dominated run'), 'PREFIX');
+
+    // (9) an opening paren between the doc name and the §
+    const named = (before) => (before.match(DOC_REF) || [])[1] || null;
+    ok('9  "(§" keeps the doc', named('docs/ui/SELECTION.md ('), 'docs/ui/SELECTION.md');
+    ok('9b the plain shape is unaffected', named('`docs/ui/SELECTION.md`'), 'docs/ui/SELECTION.md');
+    ok('9c a bare prose word across "(§" is not a doc', DOC_SHAPED(named('own corporation (') || ''), false);
+
+    // (10) a quoted heading is self-delimiting, not a dead end
+    ok('10  quoted heading survives', line('X.md § "Availability is cash-free; spending is not").'), 'Availability is cash-free; spending is not');
+    ok('10b quoted heading inside a JSON string', line('X.md § \\"Travel time - distance costs time\\", and'), 'Travel time - distance costs time');
+
+    // (11) a one-token WEAK anchor may not certify a citation
+    ok('11  Sprint 16 is not OK', cls('Sprint 16 is open. The item is closed inside'), 'PREFIX');
+    ok('11b rung table is not OK', cls('rung table'), 'PREFIX');
+    ok('11c Mercantile value track is not OK', cls('Mercantile value track'), 'PREFIX');
+    ok('11d a weak anchor still demotes to PREFIX, never to MISS', cls('hq glyph'), 'PREFIX');
+    ok('11e the citation that IS the weak anchor stays OK', cls('HQ'), 'OK');
+    ok('11f a one-token "#" heading is trusted', cls('Rung applicability and what follows'), 'OK');
+
+    // the behaviour the reviews confirmed was already right, pinned so it stays right
+    ok('R1 truncated vs diverges', [shape('Water kinds'), shape('Design state'), shape('rung table')],
+        ['truncated', 'truncated', 'diverges']);
+    ok('R2 a genuinely absent heading still MISSes', cls('Polymorphism'), 'MISS');
+    ok('R3 an attribution tail is an alias', cls('Pass 7 - Starting treasury'), 'OK');
+    ok('R4 a citation that tokenises to nothing is EMPTY, not OK', cls('  '), 'EMPTY');
+
+    console.log(`\nheader_graph --self-test: ${pass} passed, ${fail.length} failed`);
+    for (const f of fail) console.log(`  FAIL  ${f}`);
+    process.exit(fail.length ? 1 : 0);
 }
 
 const headed = [...docs.values()].filter((d) => d.header && !d.rival);
@@ -584,6 +798,11 @@ function blockDangling() {
     console.log(`  MISS      ${String(misses.length).padStart(5)}   no heading in the target doc begins with the cited text  ** FAIL **`);
     console.log(`  NODOC     ${String(nodocs.length).padStart(5)}   names a .md that does not exist`);
     if (ambiguous.length) console.log(`  AMBIGUOUS ${String(ambiguous.length).padStart(5)}   a duplicated basename, not resolvable to one file`);
+    // THE ARITHMETIC MUST CLOSE. A citation that tokenises to nothing used to be neither
+    // passed nor reported nor counted, so the buckets quietly summed two short of the
+    // total — a class that fails silently is the one defect this tool cannot carry.
+    if (empties.length) console.log(`  EMPTY     ${String(empties.length).padStart(5)}   the cited text tokenises to nothing — not classifiable, listed here so the tally closes`);
+    if (empties.length && !quiet) for (const h of empties) console.log(`      ${h.file}:${h.line}  -> ${h.target}`);
 
     if (misses.length && !quiet) {
         console.log(`\n  MISSES (${misses.length}) — the heading is not there:`);
@@ -728,7 +947,12 @@ if (show('graph')) blockGraph();
 if (show('coverage')) blockCoverage();
 if (show('state')) blockState();
 
-const failed = misses.length + stateHits.length + (has('--strict') ? prefixes.length : 0);
+// THE EXIT CODE ANSWERS THE QUESTION THAT WAS ASKED. `--graph` and `--coverage` print a
+// judgement and report no problem, but the code was computed over every check regardless
+// of which one ran, so both exited 1 for a reason that view never showed — and anything
+// wiring them to a gate got a red light with no finding behind it.
+const failed = (show('dangling') ? misses.length + (has('--strict') ? prefixes.length : 0) : 0)
+    + (show('state') ? stateHits.length : 0);
 console.log(`\nheader_graph: ${citations.length} citations · ${headed.length} headers · ${mutual.length} mutual · ${oneWay.length} one-way`);
 console.log(`  ${misses.length} dangling, ${prefixes.length} prefix, ${stateHits.length} state-dependent -> ${failed ? 'FAIL' : 'pass'}`);
 process.exit(failed ? 1 : 0);

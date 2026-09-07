@@ -480,9 +480,24 @@ objective and **fail** (exit 1); two are judgement and only **print**.
 - **State-independence** — a header saying landed, shipped, pending or not yet, or carrying a
   `BL-` id at all.
 
-`--dangling`, `--graph`, `--coverage` and `--state` run one part; `--doc <NAME>` gives one doc's
-header, its edges, the broken citations into it and the ones it makes; `--json` dumps everything;
-`--strict` makes the prefix hits fail too.
+A **weak anchor** — a table cell or a bold lead-in, as against a `#` heading — of a single common
+word does not certify a citation. A citation of a *Sprint 16* section must not pass on the table
+cell "Sprint", and one naming a *rung table* must not pass on the cell "Rung"; both are reported
+as prefix hits, where a human sees the heading they actually name. A false PASS is the worst
+outcome available to a checker, because it prints nowhere.
+
+`--dangling`, `--graph`, `--coverage` and `--state` run one part, and the exit code answers only
+the part that ran; `--doc <NAME>` gives one doc's header, its edges, the broken citations into it
+and the ones it makes; `--json` dumps everything; `--strict` makes the prefix hits fail too.
+
+`--self-test` runs the parser against a fixture of a dozen headings, with no corpus and no
+filesystem, pinning every citation and header shape the corpus is known to contain: an underscored
+filename, a Not-here parenthetical naming four owners, a relative-path owner, a doc name followed
+by prose, a one-token section id, a line-wrapped citation, a citation whose section marker sits
+inside its own parenthesis, one whose heading is in double quotes, and the weak-anchor rule. Each
+shape is there because a parser once dropped it silently, and a
+sweep scoped off a graph that silently drops a third of its edges is how a correct rule gets
+applied to a partial write set. **Run it after touching the tool.**
 
 ### Design-direction Q&A (Batch Delivery)
 
