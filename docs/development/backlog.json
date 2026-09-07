@@ -921,6 +921,31 @@
         "docs/development/DELIVERY.md"
       ],
       "design": "THE FINDING (2026-09-07). DELIVERY.md section Sub-agents and worktrees frames fan-out around PARALLELISM and isolation - concurrent agents, separate worktrees, the collision map as a splitting heuristic. That is true and incomplete. The other reason to fan out is COMPRESSION: an agent reads 40K of doc or code and returns 500 tokens of conclusion, and the main session never pays the 40K. On that reading a fan-out is worth doing for a SINGLE question, with no parallelism at all - which the current framing does not suggest.\n\nTHE DESIGN: a short paragraph in that section saying the main session context is the scarce resource, not the agent context; that a read-only question whose answer is short and whose sources are long is a fan-out candidate on its own; and that the brief should ask for the CONCLUSION, not the excerpts, since a report that pastes what it read has compressed nothing. Pairs with the existing rule that an agent blocks on its own long waits and stops once it has a decision.\n\nDONE WHEN: the paragraph is in DELIVERY.md. Doc-only."
+    },
+    {
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 3,
+      "version_goal": null,
+      "sprint": "33",
+      "written": "2026-09-07",
+      "author": "Claude (BL-790 delivery surfaced it)",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-792",
+      "short_name": "ARCHIVE_UNION_MISSES_620_ITEMS",
+      "category": "Tooling",
+      "title": "--touches cannot answer \"is this built?\" - the cold union sees 138 items of 762",
+      "authority_doc": "docs/development/DELIVERY.md",
+      "files": [
+        "tools/session/archive_store.js",
+        "tools/session/backlog_query.js",
+        "tools/session/next_id.js",
+        "docs/development/DELIVERY.md"
+      ],
+      "design": "THE FINDING (2026-09-07, surfaced while delivering BL-790 (source-to-doc index), confirmed independently in the main session). CLAUDE.md names backlog_query.js --touches <doc> as the way to answer \"is this built?\", and that answer is supposed to work BECAUSE the query tools union the cold archive. They do not union it. archive_store.js archiveFiles() globs /^backlog-design-.*\\.json$/ only.\n\nTHE NUMBERS, measured: the union sees 138 items. docs/development/archive/ holds 762. The 624 it cannot see live in files outside the glob - backlog-complete-2026-08-24.json (19), backlog-complete-2026-08-26.json (48), backlog-cancelled-2026-08-31.json (18), backlog-purged-2026-08-23.json (529), backlog-purged-2026-08-24.json (10). By status: 420 complete, 164 designed, 35 design-owed, 4 open, 1 cancelled. 590 of the 624 carry a files[] array, which is exactly the field --touches reads.\n\nWHAT IT MEANS IN PRACTICE: --touches docs/economy/MARKETS.md misses 35 items that name MARKETS.md or market_clearing.cpp, most of them complete. So the tool CLAUDE.md sends a session to for \"has this already been built\" returns a confident, silent, wrong NO on a large fraction of the project's finished work - the FALSE OPEN shape backlog_lint.js already hunts, but structural rather than per-item.\n\nWHY THE SHAPES DIVERGED: the complete/cancelled/purged files predate archive_landed.js and use a top-level `items` ARRAY. The design-* files archive_landed.js writes use a `records` OBJECT keyed by id, and landedItems() reconstructs rows from it. The glob was written for the second shape and nobody widened it for the first.\n\nTHE PURGE IS NOT AN OBJECTION. backlog-purged-2026-08-23.json says in its own _note that nothing in it is open work and that a purged item's prose is not lost. The purge shrank the HOT file, which is correct and stays. It did not intend to make 343 completed items unfindable by the question CLAUDE.md routes to them.\n\nTHE DESIGN: teach archive_store.js both shapes. archiveFiles() widens to backlog-(design|complete|cancelled|purged)-*.json; a loader normalises the `items` array form into the same reconstructed rows landedItems() already returns; de-duplication keeps HOT WINS, then design-* over the older sweeps, so a row that exists in two places resolves once and predictably. Do it in archive_store.js rather than in each caller - BL-790 worked around it locally in doc_owner.js, and that workaround is removed by this item.\n\nNEXT_ID IS THE CARE POINT. next_id.js unions landedIds() to decide an id is spent. Widening the glob can only ADD spent ids, so it makes next_id strictly safer - but it is the one caller where being wrong is expensive, so verify it explicitly: the highest id and the next safe id must not go DOWN, and the SCAN INCOMPLETE line must still fire when a ref cannot be read.\n\nVERIFY: union count goes 138 -> ~762; --touches on MARKETS.md, PRODUCTION.md and AI_OPPONENT.md each return the complete items they currently miss; next_id.js still says BL-793 or higher; backlog_lint.js stays 0 fails; backlog_view.js and status.ps1 both still render."
     }
   ]
 }
