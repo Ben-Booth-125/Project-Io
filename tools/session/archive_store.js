@@ -207,7 +207,7 @@ const DESIGN_RE = /^backlog-design-.*\.json$/;
 // ANY cold backlog file that is not the eviction store is a SWEEP. Deliberately open
 // rather than a list of the three families that exist today: the glob this block
 // replaced was itself a one-word allow-list that fell behind the filing convention and
-// cost the union 620 rows, and a `backlog-superseded-2026-*.json` filed next quarter
+// cost the union 625 cold rows (609 net of ids the hot file still held), and a `backlog-superseded-2026-*.json` filed next quarter
 // would repeat that failure exactly — gone from the union with no error and no test.
 // An unrecognised family is CLASSIFIED below, loudly, rather than dropped or believed.
 const SWEEP_RE = /^backlog-(?!design-)[a-z]+-.*\.json$/;
@@ -285,7 +285,11 @@ function sweepStateFor(rel) {
     return UNKNOWN_SWEEP_STATE;
 }
 
-// Every cold backlog file, in de-duplication precedence order.
+// Every cold backlog file, in de-duplication precedence order. NO IN-TREE CALLER
+// since the sweep families were split out - designFiles() and sweepFiles() are what
+// the accessors below use, and archive_landed.js is deliberately scoped to the
+// eviction store alone. Kept exported as the composed view a reader reaches for
+// first; delete it only if nothing outside this repo has taken it up.
 const archiveFiles = (root = ROOT) => [...designFiles(root), ...sweepFiles(root)];
 
 // Every id the EVICTION STORE knows, whole-row or prose-only. Scoped to that store on

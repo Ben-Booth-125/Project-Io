@@ -691,215 +691,6 @@
       "version_goal": null,
       "sprint": "33",
       "written": "2026-09-07",
-      "author": "Claude (sprint 33 batch completeness critic)",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "category": "Docs",
-      "id": "BL-797",
-      "short_name": "TRAVEL_TIME_DOUBLED",
-      "difficulty": 2,
-      "title": "LOGISTICS and SUPPLY both hold the travel-time model, and neither knows it",
-      "authority_doc": "docs/economy/SUPPLY.md",
-      "files": [
-        "docs/economy/LOGISTICS.md",
-        "docs/economy/SUPPLY.md"
-      ],
-      "design": "THE FINDING (2026-09-07, the sprint 33 batch critic - a systematic pass the three boundary lanes were not). LOGISTICS.md § 5 \"Physical scale and travel time\" (~line 260) and SUPPLY.md § \"Travel time - distance costs time, not only money\" (~line 49) carry the SAME MODEL under the same ruling date (Ben, 2026-08-12): R proportional to M^0.27, ~128 km per tile at Earth mass on the 312-column grid, land ~25 km/day against sea ~130 km/day (BL-188, \"which makes coastal trade worth designing\"), terrain cost doubling as a time multiplier so no parallel table is needed, and quantisation to whole econ ticks. Both headers claim it - LOGISTICS says \"how physical scale becomes travel time\", SUPPLY says \"what a leg costs its owner and how long it takes\".\n\nWHY IT IS PRIORITY A DESPITE NOTHING BEING WRONG YET: the two copies do not contradict each other TODAY. That is precisely the state PRODUCTION/POPULATION was in before it drifted into two docs each naming the other as the authority. A duplicate is a defect at the moment it is written, not at the moment it diverges - and this one sits on the boundary CLAUDE.md italicises on both sides (Logistics is the road; Supply is the traffic).\n\nTHE WORK: SUPPLY holds the fuller copy - it names body_km_per_tile, src/world/logistics.hpp, and gives the days/ticks algebra. Decide the owner on the reader's question (how long does MY convoy take, versus what does the network cost to cross), move the prose, leave one line. Both headers change.\n\nREPRODUCE: diff <(sed -n '260,281p' docs/economy/LOGISTICS.md) <(sed -n '49,74p' docs/economy/SUPPLY.md)"
-    },
-    {
-      "status": "designed",
-      "glyph": "~",
-      "priority": "A",
-      "version_goal": null,
-      "sprint": "33",
-      "written": "2026-09-07",
-      "author": "Claude (sprint 33 batch completeness critic)",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "category": "Docs",
-      "id": "BL-798",
-      "short_name": "RUNG_DOCS_TRIPLE_ASSERT",
-      "difficulty": 3,
-      "title": "The navigation model and the per-rung lens table are each asserted three times",
-      "authority_doc": "docs/ui/CANVASES.md",
-      "files": [
-        "docs/ui/CANVASES.md",
-        "docs/ui/SOLAR.md",
-        "docs/ui/CIRCUMPLANETARY.md",
-        "docs/ui/LENSES.md"
-      ],
-      "design": "THE FINDING (2026-09-07, the sprint 33 batch critic). Two separate triple-assertions across the zoom-ladder docs, neither endpoint touched by BL-796 (UI doc boundaries) because SOLAR and CIRCUMPLANETARY were not in its write set.\n\n(1) THE NAVIGATION MODEL, three copies. CANVASES.md:68-72 owns the descend rules. SOLAR.md:107-110 restates them almost verbatim - a planet opens its own view, a moon opens its parent planet's view with the moon selected. CIRCUMPLANETARY.md:105-112 carries the third copy, plus a third copy of pan/zoom, the input-precedence rule, and \"the minimap always renders the default framing\".\n\n(2) THE PER-RUNG LENS TABLE, three copies. LENSES.md:84 holds the authoritative Lens x Solar x Circumplanetary x Planetary table. SOLAR.md:129 (§ Lens surfaces on this rung) and CIRCUMPLANETARY.md:114 (§ Overlays on this rung) each hold a column of it.\n\nAND IT IS ALREADY DIVERGING. SOLAR's copy carries content LENSES' table does not (\"plus the convoy vision beams\"). SOLAR.md:133 cites \"LENSES.md § rung table\", a heading that does not exist - the real one is \"## Rung applicability\".\n\nTHE SHARP EDGE: BL-796 deleted CANVASES.md § \"Where the lenses draw\" on the grounds that LENSES owns the subject. That reasoning is right and it applies equally to copies three and four, which are still standing. The corpus is now MORE inconsistent on this subject than before the batch, not less - a partial application of a correct rule.\n\nTHE WORK: CANVASES owns the descend rules and the rung docs point at it; LENSES owns the rung table whole and the rung docs point at it. Fix the dangling § rung table citation. Both rung docs' headers change."
-    },
-    {
-      "status": "designed",
-      "glyph": "~",
-      "priority": "B",
-      "version_goal": null,
-      "sprint": "33",
-      "written": "2026-09-07",
-      "author": "Claude (sprint 33 batch completeness critic)",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "category": "Docs",
-      "id": "BL-799",
-      "short_name": "NAMING_MACHINERY_SPRAWL",
-      "difficulty": 2,
-      "title": "CREEDS claims every coined proper noun; three generation docs hold the machinery",
-      "authority_doc": "docs/lore/CREEDS.md",
-      "files": [
-        "docs/lore/CREEDS.md",
-        "docs/generation/NATION_GENERATION.md",
-        "docs/generation/PLANETOLOGY.md"
-      ],
-      "design": "THE FINDING (2026-09-07, the sprint 33 batch critic). CREEDS.md's header makes the broadest ownership claim in the corpus - \"how a cradle culture rolls its own phonology, and how every proper noun it coins is drawn from it\". The machinery is documented elsewhere: NATION_GENERATION.md:275-325 (§ Pass 5 - Naming) holds world/tongue.{hpp,cpp}, culture::speech, coin_lexicon and its pure-function-of-the-tongue property, plus region names (:307) and city names (:320); PLANETOLOGY.md:764 asserts a third consumer, body names from tongue.hpp.\n\nWHY IT SURVIVED EVERY SWEEP, and this is the part worth keeping: it is a ONE-WAY edge. CREEDS names NATION_GENERATION in its header; NATION_GENERATION does not name CREEDS. A boundary check scoped off MUTUAL \"Confused with\" pairs cannot see it, and the critic counted 89 one-way edges of which this is the clearest live overlap. Any tooling built for this class of defect (see BL-801, the header graph checker) must walk one-way edges, not just pairs.\n\nTHE WORK: decide whether CREEDS owns the tongue and the generation docs consume it, or CREEDS owns only the pantheon and the tongue belongs to generation. Then make the header match. Real history is never a name source - that rule is not at issue here, only the address of the machinery that enforces it."
-    },
-    {
-      "status": "designed",
-      "glyph": "~",
-      "priority": "B",
-      "version_goal": null,
-      "sprint": "33",
-      "written": "2026-09-07",
-      "author": "Claude (sprint 33 batch completeness critic)",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "category": "Docs",
-      "id": "BL-800",
-      "short_name": "LEDGER_README_MISCOUNTS",
-      "difficulty": 1,
-      "title": "The ledgers README lists six Q&A docs; eight are on disk, and it contradicts itself forty lines later",
-      "authority_doc": "docs/ui/ledgers/README.md",
-      "files": [
-        "docs/ui/ledgers/README.md"
-      ],
-      "design": "THE FINDING (2026-09-07, the sprint 33 batch critic; the header made it visible but the defect predates it). docs/ui/ledgers/README.md:9 claims it settles \"which surfaces have a Q&A of their own\". Its § The docs table lists SIX. `ls docs/ui/ledgers/` shows EIGHT: acquisitions, balance, construction, convoys, corporation, market, selection, tile_ledger. convoys.md and acquisitions.md are missing from the table - and the README's own § Cross-doc findings, about forty lines below the table, says of convoys \"it... now has its own doc\". The header, the table and the prose disagree inside one file.\n\nTHE WORK: reconcile the table against the directory. Small. Worth doing next to BL-801 (header graph checker), because a hand-maintained index of files that exist on disk is the thing a check should own."
-    },
-    {
-      "status": "designed",
-      "glyph": "~",
-      "priority": "B",
-      "version_goal": null,
-      "sprint": "33",
-      "written": "2026-09-07",
-      "author": "Claude (sprint 33 fix round, second cold reviews)",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "category": "Code",
-      "id": "BL-802",
-      "short_name": "DORMANT_VERBS_COMMENT_LIES",
-      "difficulty": 1,
-      "title": "corp_command.hpp says two dormant verbs \"still apply\"; the implementation rejects them",
-      "authority_doc": "docs/ai/AI_OPPONENT.md",
-      "files": [
-        "src/world/corp_command.hpp"
-      ],
-      "design": "THE FINDING (2026-09-07, found by the economy lane's second cold reviewer while checking a pointer, confirmed independently). src/world/corp_command.hpp:96 says of accept_offer and abandon_contract that \"They remain callable, and they still apply, ONLY because the enum is APPEND-ONLY\". The implementation rejects them.\n\nWHY IT IS WORTH A ROW RATHER THAN A SILENT EDIT: that comment is the HOME of the append-only invariant - the reason the two verbs may never be deleted is written there and nowhere else. A reader who tests the claim and finds it false has reason to distrust the invariant beside it, and the invariant is real: removing a verb renumbers every verb below it and breaks ACTIONS.json and every recorded command.\n\nTHE WORK: correct \"they still apply\" to what is true - they remain CALLABLE and are REJECTED, a dormant record and not a live mechanism - without weakening the append-only rule stated next to it. One comment. Also fix CONTRACTS.md:68, which names world.hpp for the three procurement verbs; the enum is in corp_command.hpp:30 and world.hpp holds no corp_verb."
-    },
-    {
-      "status": "designed",
-      "glyph": "~",
-      "priority": "B",
-      "version_goal": null,
-      "sprint": "33",
-      "written": "2026-09-07",
-      "author": "Claude (sprint 33 fix round, second cold reviews)",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "category": "Economy",
-      "id": "BL-803",
-      "short_name": "FINANCE_MAINTENANCE_FLOOR_STALE",
-      "difficulty": 1,
-      "title": "FINANCE says material maintenance is a fixed 30%; the code reads an authored parameter",
-      "authority_doc": "docs/economy/FINANCE.md",
-      "files": [
-        "docs/economy/FINANCE.md",
-        "src/world/budget_system.cpp"
-      ],
-      "design": "THE FINDING (2026-09-07, raised by the economy lane's first cold reviewer and confirmed independently by its second). FINANCE.md:140-141 says \"Material maintenance - a fixed 30 % floor of the building's maintenance constant\". src/world/budget_system.cpp:41-46 says \"Material cost: the authored idle floor (BL-739 - was a hard-coded 30%)\" and computes `e.maintenance * idle_floor`. The 30% is gone from the code and survives in the doc.\n\nWHY IT MATTERS MORE NOW THAN IT DID: pre-existing, but BL-794 (economy doc boundaries) routes both PRODUCTION and POPULATION readers to this section for the cost half of the workforce question. A stale figure two lines from where two docs now send everyone costs more than it did sitting alone.\n\nTHE WORK: state the floor as the authored parameter it is, naming BL-739 as the owner of the change rather than the number. One or two lines."
-    },
-    {
-      "status": "designed",
-      "glyph": "~",
-      "priority": "B",
-      "version_goal": null,
-      "sprint": "33",
-      "written": "2026-09-07",
-      "author": "Claude (sprint 33 fix round, second cold reviews)",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "category": "Generation",
-      "id": "BL-804",
-      "short_name": "PROVINCE_HARNESS_RED",
-      "difficulty": 2,
-      "title": "Two province-partition assertions are red, and the doc quotes a distribution the instrument no longer produces",
-      "authority_doc": "docs/generation/PROVINCES.md",
-      "files": [
-        "tools/verify/province_partition_harness.cpp",
-        "docs/generation/PROVINCES.md"
-      ],
-      "design": "TWO FINDINGS, both from the generation lane's second cold reviewer (2026-09-07), both pre-existing and neither caused by the boundary move - but both now sit under PROVINCES, which the move made the sole owner.\n\n(1) THE HARNESS IS RED. Two assertions in tools/verify/province_partition_harness.cpp fail in this tree. The reviewer flagged them precisely because it was asked to confirm P2b is GREEN, found that it is, and would not let a green single assertion imply a green harness. A broken check is worse than a failing one, and a partly-red harness that nobody reports reads as absent.\n\n(2) THE MEASURED TABLE IS STALE. The distribution table the lane moved into PROVINCES no longer matches the instrument it names, and the pre-existing prose that reads the table is stale with it. It was carried across faithfully - the move is not the defect; the number is.\n\nTHE WORK: run the harness, establish whether the two red assertions are the code drifting or the check rotting, fix whichever is wrong, then re-measure the distribution and update the table and the prose that reads it together. Do not update the table from the failing harness without settling (1) first."
-    },
-    {
-      "status": "designed",
-      "glyph": "~",
-      "priority": "C",
-      "version_goal": null,
-      "sprint": "33",
-      "written": "2026-09-07",
-      "author": "Claude (sprint 33 fix round, second cold reviews)",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "category": "Docs",
-      "id": "BL-805",
-      "short_name": "ARCHIVE_STORE_TIDY",
-      "difficulty": 1,
-      "title": "archiveFiles() has no callers, and --status cancelled no longer finds the 2026-08 purge",
-      "authority_doc": "docs/development/DELIVERY.md",
-      "files": [
-        "tools/session/archive_store.js",
-        "CLAUDE.md"
-      ],
-      "design": "TWO LOOSE ENDS LEFT BY BL-792 (the cold union), both raised by its second cold reviewer (2026-09-07) as notes rather than blockers.\n\n(1) DEAD EXPORT. archiveFiles() now has zero callers anywhere in tools/ - archive_landed.js's two call sites moved to designFiles() - yet it stays exported under a comment that reads like a live contract. Either delete it or say in the comment that it is kept for external callers.\n\n(2) A ROUTER PROMISE IS NOW HALF TRUE. CLAUDE.md says of the archive that \"--status cancelled finds work that was closed unbuilt\". The 186-row 2026-08-23 purge now reads status `purged`, not `cancelled`, so that search returns the 36 genuinely-cancelled rows and not the purge. The new state is more honest - a purge and a cancellation are different acts - but the router still describes the old one. Either widen the sentence to name both, or give the query a way to ask for closed-unbuilt across both.\n\nAlso worth one line while in there: the SWEEP_RE comment says the old allow-list \"cost the union 620 rows\"; measured it is 609 net, 625 raw."
-    },
-    {
-      "status": "designed",
-      "glyph": "~",
-      "priority": "B",
-      "version_goal": null,
-      "sprint": "33",
-      "written": "2026-09-07",
-      "author": "Claude (header-coverage audit)",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "category": "Docs",
-      "id": "BL-806",
-      "short_name": "ORPHANED_STYLE_SHEET_TWIN",
-      "difficulty": 1,
-      "title": "A stale twin of the style sheet sits in docs/development/design/, saying nothing is settled",
-      "authority_doc": "docs/ui/design/GLOBAL_STYLE_SHEET.md",
-      "files": [
-        "docs/development/design/GLOBAL_STYLE_SHEET.md",
-        "docs/development/design/README.md",
-        "docs/development/design/renders/README.md"
-      ],
-      "design": "THE FINDING (2026-09-07, the header-coverage audit at the end of the sprint 33 batch - a doc with no header is how it surfaced).\n\ndocs/development/design/GLOBAL_STYLE_SHEET.md is 55 lines and opens \"Status: **draft - iteration 0, nothing settled yet.**\". The LIVE doc is docs/ui/design/GLOBAL_STYLE_SHEET.md at 232 lines, which CLAUDE.md § 3 names, which carries the sprint 33 header, and which every inbound citation points at (ui/RENDERING.md twice, ui/ICONS.md, research/CANVAS_RENDERING.md twice).\n\nNOTHING POINTS AT THE DEVELOPMENT COPY. Its last touch is the commit that STARTED the ST1 style sprint; the work then moved to docs/ui/design/ and the original was never removed. docs/development/design/README.md and docs/development/design/renders/README.md are the same abandonment.\n\nWHY IT IS WORTH A ROW RATHER THAN A QUIET DELETE: the stale copy does not merely duplicate - it CONTRADICTS. It says nothing is settled, on a subject where things have since been settled and promoted. A reader or an agent that reaches it by filename (both files are called GLOBAL_STYLE_SHEET.md) gets a confident, dated-looking answer that is false. That is the same shape as BL-798 (rung docs triple assert), at file grain instead of section grain.\n\nTHE WORK, and the call is Ben's because it is a deletion: confirm nothing references docs/development/design/ (verified today: nothing does), then remove the directory - or, if the render history under it is worth keeping, leave the renders and delete only the prose, with a one-line pointer at the live doc. Do not simply header the stale copy; a header on a dead twin makes it look maintained.\n\nCHECK BEFORE DELETING: docs/development/design/renders/ against docs/ui/design/renders/ - if the older iterations exist only in the development copy, they are the reason to keep the directory."
-    },
-    {
-      "status": "designed",
-      "glyph": "~",
-      "priority": "A",
-      "version_goal": null,
-      "sprint": "33",
-      "written": "2026-09-07",
       "author": "Claude (BL-801 first run)",
       "requires": [
         "BL-801"
@@ -919,7 +710,31 @@
         "tools/verify/README.md",
         ".claude/skills/"
       ],
-      "design": "THE MEASUREMENT (2026-09-07, the first run of BL-801 (header graph checker) over the whole corpus). 1119 doc-section citations across docs/, src/, scripts/, tools/ and .claude/. 729 resolve. **80 MISS** - no heading in the target begins with the cited text. **310 PREFIX** - the citation names an OPENING of a real heading rather than the whole of it.\n\nTHE 80 ARE REAL. A cold reviewer audited all 80 exhaustively rather than by sample: 76 real, 4 borderline (one shape, where the heading CONTAINS the citation but does not open it - the tool correctly declines those under its stated prefix rule), ZERO false positives.\n\nWHERE THEY CLUSTER, and the clusters are the interesting part - each is a rename nobody swept after:\n  - 12 requirements.json rows plus components.hpp and a skill file cite BACKLOG.md sections. BACKLOG.md was drained in 2026-07 and holds seven pointer stubs; these name sections that went with the drain.\n  - 8 citations across src/, scripts/ and docs/ name \"GENERATION_STRATEGY.md § The resource ceiling\", from hard_coded_world, settlement, tile_generation and world_gen.lua. One heading, eight stale references.\n  - 5 name \"io-standing-rules.md § the player-corp exception\" / \"§ rival-corp exception\" from MARKETS, PRODUCTION, corp_ai.cpp and economy_system.cpp - these broke when BL-789 moved the grant register to AI_OPPONENT.md § 11 THIS SESSION. Our own move; the citations were not swept.\n  - 5 scripts/verify/*.lua name requirement-group sections in req/REQUIREMENTS.md.\n  - 5 name CONTRACTS.md headings (corp_command.hpp twice, economy.lua, tools/verify/README.md, verifier-headless SKILL.md) - the cluster the fix round found by hand and could not clear from inside one lane.\n\nTHE WORK, in that order: sweep cluster by cluster rather than file by file, because each cluster is one rename with many call sites and one decision settles all of them. Re-run `node tools/session/header_graph.js --dangling` after each; it exits non-zero while any remain.\n\nTHE 310 PREFIX HITS ARE NOT ALL DEFECTS and must not be swept blindly. A citation naming a heading without its parenthetical attribution is legitimate. What IS worth reading is the tool's [diverges] class - where the cited opening and the real heading have drifted apart in meaning, e.g. ICONS \"§ Nav-rail affordances\" against the real \"§ Nav-rail legibility rule\". Those are stale in substance, not just in form.\n\nDO THIS AFTER the boundary items (BL-797, BL-798, BL-799) land: a boundary move creates and clears citations, so sweeping first means sweeping twice."
+      "design": "THE MEASUREMENT (2026-09-07, the first run of BL-801 (header graph checker) over the whole corpus). 1119 doc-section citations (the count moves with the backlog rows, which are themselves citers) across docs/, src/, scripts/, tools/ and .claude/. 729 resolve. **83 MISS** - no heading in the target begins with the cited text. **310 PREFIX** - the citation names an OPENING of a real heading rather than the whole of it.\n\nTHE 80 ARE REAL. A cold reviewer audited all 80 exhaustively rather than by sample: 76 real, 4 borderline (one shape, where the heading CONTAINS the citation but does not open it - the tool correctly declines those under its stated prefix rule), ZERO false positives.\n\nWHERE THEY CLUSTER, and the clusters are the interesting part - each is a rename nobody swept after:\n  - 12 requirements.json rows plus components.hpp and a skill file cite BACKLOG.md sections. BACKLOG.md was drained in 2026-07 and holds seven pointer stubs; these name sections that went with the drain.\n  - 8 citations across src/, scripts/ and docs/ name \"GENERATION_STRATEGY.md § The resource ceiling\", from hard_coded_world, settlement, tile_generation and world_gen.lua. One heading, eight stale references.\n  - 5 name \"io-standing-rules.md § the player-corp exception\" / \"§ rival-corp exception\" from MARKETS, PRODUCTION, corp_ai.cpp and economy_system.cpp - these broke when BL-789 moved the grant register to AI_OPPONENT.md § 11 THIS SESSION. Our own move; the citations were not swept.\n  - 5 scripts/verify/*.lua name requirement-group sections in req/REQUIREMENTS.md.\n  - 5 name CONTRACTS.md headings (corp_command.hpp twice, economy.lua, tools/verify/README.md, verifier-headless SKILL.md) - the cluster the fix round found by hand and could not clear from inside one lane.\n\nTHE WORK, in that order: sweep cluster by cluster rather than file by file, because each cluster is one rename with many call sites and one decision settles all of them. Re-run `node tools/session/header_graph.js --dangling` after each; it exits non-zero while any remain.\n\nTHE 310 PREFIX HITS ARE NOT ALL DEFECTS and must not be swept blindly. A citation naming a heading without its parenthetical attribution is legitimate. What IS worth reading is the tool's [diverges] class - where the cited opening and the real heading have drifted apart in meaning, e.g. ICONS \"§ Nav-rail affordances\" against the real \"§ Nav-rail legibility rule\". Those are stale in substance, not just in form.\n\nDO THIS AFTER the boundary items (BL-797, BL-798, BL-799) land: a boundary move creates and clears citations, so sweeping first means sweeping twice.\n\nBASELINE CORRECTED 2026-09-07: 83, not 80. The 80 was captured before BL-806 and BL-807 were filed, and backlog.json is itself a citer - two independent reviewers measured 83 at the sweep base. After the sweep the count is unchanged at 83, which is the point: five lanes moved prose between docs and created no net dangling citation. Re-measure before starting rather than trusting any figure written here."
+    },
+    {
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "version_goal": null,
+      "sprint": "33",
+      "written": "2026-09-07",
+      "author": "Claude (BL-799 cold review)",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "id": "BL-808",
+      "short_name": "ERA_MINUS_ONE_REACH_IS_ENGLISH",
+      "difficulty": 2,
+      "title": "A region founded in the Era -1 sim is named by appending the English word \"Reach\"",
+      "authority_doc": "docs/generation/MILITARY_HISTORY.md",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/settlement.cpp",
+        "docs/lore/HISTORY.md"
+      ],
+      "design": "THE FINDING (2026-09-07, surfaced by a cold reviewer checking BL-799 (naming machinery sprawl) against the code - a doc claim was too broad, and this is WHY it was too broad).\n\nsrc/world/history_sim.cpp:1564, inside the Era -1 Settle verb:\n    np.name = src.name + \" Reach\";\nA region founded during the history sim takes its parent's name with the ENGLISH word \"Reach\" concatenated. Those regions enter the live settlement record, so the name ships.\n\nTHIS IS A STANDING-RULE VIOLATION, not a style preference. Every generated name in Io is sci-fi/fantasy, produced by the seeded template banks and phoneme tables, never Earth-flavoured (.claude/rules/io-standing-rules.md § Terms & docs).\n\nAND THE PROJECT HAS ALREADY FIXED THIS EXACT DEFECT ONCE. src/world/settlement.cpp:272-283 carries the post-mortem in its own words: \"Before BL-290 the whole name was Earth-flavoured, which was at least consistent. After it, the culture half was coined from the region's own phonology and this half was still English - 'MelethWorirUlael Reach' put two naming systems side by side in one string, which reads as a bug rather than a style.\" BL-348 fixed it in settlement.cpp by coining the quarter word from the tongue. history_sim.cpp was not swept, so the same string shape is still generated - by a different pass, from a different file, for regions the sim founds rather than ones the settlement pass draws.\n\nTHE FIX IS ALREADY WRITTEN, one file over: `quarter_word(lexicon_for(culture), ...)` in settlement.cpp coins the place-word from the region's own tongue, and coin_lexicon is a pure function of the tongue, so asking for it in the sim needs no shared RNG stream and cannot vary the generated world by ordering. The daughter region already carries `np.culture` and `np.founding_culture` at the assignment site, so the tongue is in hand.\n\nDETERMINISM: the sim is seeded and replayable and must stay so. coin_lexicon is pure and takes no rng, which is what makes this safe - but the name is part of the generated world, so re-blessing whatever goldens carry region names is expected and should be one deliberate re-bless with provenance, not a dribble.\n\nCHECK IT CANNOT COME BACK: after the fix, `grep -rnE '\\.name *(=|\\+=) *[a-z_.]+ *\\+ *\"' src/world/*.cpp` should return nothing. That grep is what found it."
     }
   ]
 }
