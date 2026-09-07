@@ -1,5 +1,12 @@
 # Project Io — Contracts
 
+> **Settles:** what makes a promise a contract rather than a market trade · who the named
+> parties are and what either of them may refuse · what a procurement deliverable is, how it is
+> priced, and what marks it complete · what is deliberately out of scope for the form.
+> **Not here:** the anonymous, instant, price-only exchange (MARKETS) · what carries a promised
+> cargo (SUPPLY) · what the payment does to the balance (FINANCE).
+> **Confused with:** MARKETS.md, SUPPLY.md, FINANCE.md.
+
 **A contract is a promise between two named parties, priced, paced, and refusable.** It is the
 alternative to the market: where the market is anonymous, instant and price-only, a contract has a
 counterparty who can say no.

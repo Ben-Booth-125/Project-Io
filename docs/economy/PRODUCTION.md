@@ -1,5 +1,14 @@
 # Project Io — Production
 
+> **Settles:** what a building is and what a recipe consumes and yields · how extraction and
+> processing throughput are shaped · how much labour a building demands and what a shortfall
+> does to its output · how construction and power are paid for · what a fresh corporation can
+> build on day one.
+> **Not here:** what a good is and what it is worth (RESOURCES) · where the labour comes from
+> and how it is contended for (POPULATION) · what a building costs the balance each tick
+> (FINANCE) · where the output goes to be sold (MARKETS).
+> **Confused with:** RESOURCES.md, POPULATION.md, FINANCE.md.
+
 Production converts tile resource deposits into tradeable goods through two stages: **extraction**, which harvests raw materials from tiles, and **processing**, which refines or manufactures higher-tier goods from those inputs. Workforce shapes throughput at both stages.
 
 See **`docs/economy/RESOURCES.md`** for the full resource list, tier definitions, and prototype subset. The market model production sells into — clearing, price resolution, the order book — is **`docs/economy/MARKETS.md`**. The network goods move over — reach, roads, travel time, throughput — is **`docs/economy/LOGISTICS.md`**.

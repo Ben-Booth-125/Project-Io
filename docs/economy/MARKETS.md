@@ -1,5 +1,13 @@
 # Project Io — Markets
 
+> **Settles:** where a market centre is and what it covers · how an order book clears · how a
+> price resolves and what bounds it · where a demand want comes from · who may place an order
+> and on what terms · what a market does when it cannot clear.
+> **Not here:** the money loop the proceeds land in (FINANCE) · what physically moves the goods
+> (SUPPLY) · what the road costs (LOGISTICS) · a priced promise between named parties
+> (CONTRACTS).
+> **Confused with:** FINANCE.md, CONTRACTS.md, SUPPLY.md.
+
 The market model: `src/world/market_clearing.cpp`, the market/order components in
 `src/world/components.hpp`, and the seeding in `src/world/hard_coded_world.cpp`. Production's side
 of the exchange is `docs/economy/PRODUCTION.md` § Stockpile and output flow; which resources trade

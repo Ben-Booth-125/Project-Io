@@ -1,5 +1,12 @@
 # Corporate Finance
 
+> **Settles:** what moves a corporation's balance each tick, and in which order · which costs
+> recur, in credits and in goods · what a quarterly return reports and who may read it · what
+> becomes of a firm that is bought, dissolved, or cannot pay.
+> **Not here:** what a good sells for and how that clears (MARKETS) · what a building yields for
+> its cost (PRODUCTION) · what a nation does with the money it levies (../politics/NATIONS.md).
+> **Confused with:** MARKETS.md, PRODUCTION.md, ../politics/NATIONS.md.
+
 The money loop: how a corporation's balance moves each economy tick, where the costs come
 from, and which surfaces read it. The authority for the *market* half of the cash flows is
 `docs/economy/MARKETS.md`; the authority for the law object behind the levy is

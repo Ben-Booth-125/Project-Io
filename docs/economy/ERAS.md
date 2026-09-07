@@ -1,5 +1,14 @@
 # Project Io — Eras
 
+> **Settles:** what an Era is and what separates one rung of the ladder from the next · what
+> moves an Era, and what merely gates access within one · which catastrophe a rung is played to
+> avoid and how nearness to it is read · what territory, resources and buildings a rung opens.
+> **Not here:** what those resources are or how they are made (RESOURCES, PRODUCTION) · the
+> strain and hazard model a later rung's catastrophe rests on (../CLIMATE.md) · what technology
+> unlocks and what pays for it (RESEARCH) · the pre-campaign history
+> (../generation/GENERATION_STRATEGY.md).
+> **Confused with:** ../CLIMATE.md, RESEARCH.md, RESOURCES.md.
+
 An **Era** is a named phase in the game's industrial arc, defined by the accessible territory, available buildings, and the dominant strategic challenge. Eras are a formal game system: each has a defined entry, a distinct resource profile, and a characteristic question for the player to answer. An Era changes as a **gear shift that changes what the game is about**, each Era necessitating the one before — and each poses **one catastrophe the player is playing to avoid**.
 
 Only Era 1 is designed in any depth; Era 2 has its territory and its catastrophe named and little

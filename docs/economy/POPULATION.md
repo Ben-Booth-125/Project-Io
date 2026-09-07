@@ -1,5 +1,14 @@
 # Project Io — Population and Development
 
+> **Settles:** what a population centre is, how it is placed, and how it grows, declines or is
+> razed · what a centre consumes and what its habitability rests on · where labour supply comes
+> from and how contention over it resolves · what wages are paid and what development does to a
+> region.
+> **Not here:** what a building does with the labour it is allocated (PRODUCTION) · what the
+> goods a centre consumes cost (MARKETS) · the body-level strain and hazard behind habitability
+> (../CLIMATE.md) · the ground the centre stands on (TILES).
+> **Confused with:** PRODUCTION.md, ../CLIMATE.md, TILES.md.
+
 Population is the human layer of the economy — the source of workforce, the driver of consumer demand, and the reason habitability matters. Development is the act of improving a tile or region in ways that affect population, efficiency, or amenity rather than raw extraction. Population centres produce workforce supply and demand, carry a habitability feedback, and grow; the full model is designed here so each implementation step extends it rather than replacing it.
 
 ---
