@@ -6,8 +6,9 @@
 > does, and where its effect lands · why the campaign world ends up market-based and
 > non-hegemonic.
 > **Not here:** how a polity plays against its own doom, and how that doom resolves
-> (COLLAPSE) · how a battle in that sim is settled (../generation/MILITARY_HISTORY) · what
-> precedes the civilisation gate (../generation/PLANETOLOGY) · what a pantheon is (CREEDS).
+> (COLLAPSE) · how a battle in that sim is settled, what domain a region carries, and what
+> that gates (../generation/MILITARY_HISTORY) · what precedes the civilisation gate
+> (../generation/PLANETOLOGY) · what a pantheon is (CREEDS).
 > **Confused with:** COLLAPSE.md, ../generation/MILITARY_HISTORY.md, ../generation/NATION_GENERATION.md.
 
 Why the campaign world is market-based and non-hegemonic, told as a stage ladder the
@@ -358,45 +359,6 @@ across a seed spread, and that is where every magnitude in this layer is argued.
 
 ---
 
-## Regions carry a domain, and coastal units sail in the ancient sim (Ben, 2026-09-06)
-
-The sim's regions are water-blind, and it shows in two measured ways
-(`tools/verify/sim_water_census.cpp`, 2026-09-03, three seeds of generation's own era):
-
-- **1105 of 3819 regions sit on water at their anchor** — about 29% — of which **613 sit on open
-  ocean**. The Settle verb applies no terrain test, so this is blind placement rather than a choice.
-- **43% of the sim's adjacency edges cross sea**, at `neighbour_radius` 9. So nearly half of every
-  campaign target is already across water, reachable for free, with no harbour and no fleet.
-
-**A region therefore carries its domain**, the same three-way split the province layer already uses
-and for the same reason: a domain is a fact about ground, and the sim is the first pass that acts on
-it. Under the ownership rule (`../generation/PROVINCES.md` § Who owns water) the measured numbers
-split cleanly rather than being deleted wholesale — the ~492 coastal and lake regions become
-legitimate owned shoreline, and only the **613 anchored on open ocean** have no owner to belong to.
-
-**Coastal units join the ancient roster alongside every other class.** They are not a separate
-system: they are rows in the same `unit_roster`, scored in the same contest, and they make the rare
-cases expressible — a strait contested, a coastal province changing hands, a shore denied to a
-rival's trade. `../military/MILITARY.md` § Domains and traversal owns the traversal rule; this
-section owns only that the ancient sim uses it.
-
-**They gate on `region::domain`, NOT on `port_q`**, and this sentence exists because the earlier
-draft said the opposite. `port_q` is not sea access: `survey_endowment` counts `is_water` tiles —
-**lakes included** — over a neighbourhood window, and a region founded by the Settle verb inherits
-0.7× its parent's without ever re-surveying. So it is a decayed wetness fraction, and a landlocked
-region beside a big lake can carry more of it than a genuine harbour. The domain field is the real
-`is_sea` test, exclusive by construction, and it is what any coastal gate reads.
-
-**The Settle verb gains the test it never had.** Not "no water" — the ownership rule makes coastal
-founding legitimate — but no founding on open ocean, which has no owner to found under. That is the
-smaller and better-founded half of what BL-756 originally proposed deleting.
-
-**This moves every generated world, and that is understood rather than discovered.** Domain-gating
-campaigns changes the decision set, so the argmax, so the world; and claiming the shoreline grows
-every nation's territory. The 0 CE digests move deliberately when it lands, as a stated re-bless
-rather than an absorbed drift.
-
-
 ## The Era −1 sim
 
 Ben's steer, 2026-08-02: the one-shot settlement becomes a **running year-tick simulation** to the
@@ -414,6 +376,11 @@ replayable, never a planner. Its objective weights (`w_farm`, `w_ore`, `w_port`,
 `free_holdings` (`holdings_burden_q`, the burden of breadth), and the strain that burden feeds,
 how it resolves, and the strategies that play it are `COLLAPSE.md`'s. Region demography
 (BL-273), era-keyed unit rosters (BL-274) and the sweep (BL-275) are its siblings.
+
+Two of those verbs are gated by the ground's domain — where a Settle may found, and what a
+Campaign may cross. [`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md)
+§ Regions carry a domain owns both, together with the coastal rows that carry a stack over
+water.
 
 The registry of works below is a **parameter, not a global**: `run_history_sim` takes
 `const works_registry*`, null meaning works disabled. The app passes its startup-loaded table; a

@@ -1,10 +1,10 @@
 # Project Io — Military history
 
-> **Settles:** how force works **inside the Era −1 sim**, which is a generation pass and not
-> the game — how `resolve_battle` settles a war at nation scale · how a polity's roster
-> advances up the band ladder as its institutions do · how naval is scored and exercised
-> here · what forage simplifies, and what it is a simplification *of* · how sea legs produce
-> colonisation.
+> **Settles:** how force works **inside the Era −1 sim**, a generation pass and not the game
+> — how `resolve_battle` settles a war at nation scale · how a polity's roster advances up
+> the band ladder as its institutions do · what domain a region carries, and what it gates ·
+> how naval is scored and exercised here · what forage simplifies, and what it is a
+> simplification *of* · how sea legs produce colonisation, and where a Settle may found.
 > **Not here:** how force works in the **campaign** — `resolve_campaign_battle`, muster and
 > hire, march, upkeep, and the roster table itself — all `../military/MILITARY.md`, a
 > **sibling and not a parent** · why a polity chooses to fight (../lore/COLLAPSE).
@@ -168,6 +168,16 @@ constraint nobody had asked the generated history to honour.
 
 ---
 
+## Regions carry a domain (Ben, 2026-09-06)
+
+**A region carries its domain**, the same three-way split the province layer already uses and
+for the same reason: a domain is a fact about ground, and the sim is the first pass that acts
+on it. `region::domain` is the real `is_sea` test — exclusive by construction — and it is what
+any coastal gate reads. [`../lore/HISTORY.md`](../lore/HISTORY.md) owns the sim's polity loop
+and its five scored verbs; this document owns what the domain gates.
+
+---
+
 ## Naval — real here, and nowhere else yet
 
 **Ben's ruling was framed at this grain (2026-09-06):** *"We can also use coastal units in the
@@ -179,11 +189,19 @@ not as an oversight, but because nothing in the campaign has asked for it and a 
 consumer is a model nobody has tested.
 
 **They are not a separate system.** Coastal Galley, Broadside Ship and Ironclad are rows in the
-same roster, gated on the same `port_q` axis, scored in the same contest by the same resolver.
-What distinguishes them is **domain**: they are the only rows that may occupy open ocean, and the
-only rows that may contest coastal water a rival holds ([`PROVINCES.md`](PROVINCES.md) § Who owns
-water). Until the water ruling the class returned base power 0 and was skipped by the stack sum
-outright — authored, raisable, and worth nothing.
+same roster, raisable on the same `port_q` endowment axis as every other row, scored in the same
+contest by the same resolver. What distinguishes them is **domain**: they are the only rows that
+may occupy open ocean, and the only rows that may contest coastal water a rival holds
+([`PROVINCES.md`](PROVINCES.md) § Who owns water). Until the water ruling the class returned base
+power 0 and was skipped by the stack sum outright — authored, raisable, and worth nothing.
+
+**`port_q` says whether ships can be RAISED; `region::domain` says whether they may be
+THERE**, and the distinction is stated because an earlier draft ran the two together. `port_q`
+is not sea access: `survey_endowment` counts `is_water` tiles — **lakes included** — over a
+neighbourhood window, and a region founded by the Settle verb inherits 0.7× its parent's
+without ever re-surveying. So it is a decayed wetness fraction, and a landlocked region beside
+a big lake can carry more of it than a genuine harbour. The endowment axis is what
+`available_rows` reads; the domain field is what any coastal gate reads.
 
 **A stack fields ships only where the campaign CROSSES WATER (Ben, 2026-09-07).** An inland
 objective composes no naval rows at all; they are dropped before the weighting, so the land rows
@@ -244,11 +262,18 @@ is true. The sim applies the rule; the table stays as it is.
 that produces *the extent of colonisation by major powers*, which is half of what a generated
 history is for.
 
-**The premise to correct before building it, because it inverts the item.** The sim does not
-currently *lack* overseas reach; it has too much. Region adjacency is a **water-blind Chebyshev
-radius**, so a polity already campaigns across up to nine tiles of open water for free, and **43%
-of the sim's adjacency edges cross sea**. It also already founds regions on ocean with no terrain
-test, where `terrain_combat` returns 0 defence — so such a region is silently undefendable.
+**The premise to correct before building it, because it inverts the item** — measured, not assumed
+(`tools/verify/sim_water_census.cpp`, 2026-09-03, three seeds of generation's own era). A sim
+without a water model does not *lack* overseas reach; it has too much. With region adjacency a
+**water-blind Chebyshev radius**, a polity campaigns across up to nine tiles of open water for
+free: **43% of the sim's adjacency edges crossed sea** at `neighbour_radius` 9, which means nearly
+half of every campaign target was already across water, reachable with no harbour and no fleet.
+The Settle verb applied no terrain test either, and `terrain_combat` returns 0 defence on every
+water kind — so a region founded there was silently undefendable. **1105 of 3819 regions sat on
+water at their anchor**, about 29%, of which **613 on open ocean**. Under the ownership rule
+(`PROVINCES.md` § Who owns water) those numbers split rather than being deleted wholesale — the
+~492 coastal and lake regions are legitimate owned shoreline, and only the 613 anchored on open
+ocean have no owner to belong to.
 
 The consequence is worth stating plainly: the "before" figure for any sea-leg measurement is **not
 zero**, and every tuning constant in `history_sim_params` was measured with free overseas conquest
@@ -258,6 +283,11 @@ happening.
 land stack cannot enter unowned coastal water or open ocean at all, and may cross only coastal
 water its own polity owns. That is cheaper to reason about than a supply penalty and it cannot be
 tuned into meaninglessness. Naval rows carry force across everything else.
+
+**The Settle verb's terrain test is a domain test.** Not "no water" — the ownership rule makes
+coastal founding legitimate — but no founding on open ocean, which has no owner to found under.
+That is the smaller and better-founded half of the blanket "no water" test the ownership rule
+replaced: ~613 regions anchored where nobody can own them, not the ~1105 sitting on water at all.
 
 **Five calls remain open**, and none should be guessed: which walk the range is measured along and
 how the four harbour rows map onto it; where the walk is anchored, since a region has no harbour

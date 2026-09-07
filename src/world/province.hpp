@@ -79,7 +79,7 @@
 //
 // THE PARTITION IS PART OF WORLD GENERATION AND VERSIONS WITH IT. It is never
 // patched in place: a change to the algorithm re-rolls every battle in every
-// world. Authority: docs/generation/TILE_GENERATION.md § Province partition,
+// world. Authority: docs/generation/PROVINCES.md § The partition,
 // docs/GLOSSARY.md (the spatial vocabulary) and BL-515.
 // ---------------------------------------------------------------------------
 
@@ -190,7 +190,7 @@ inline constexpr std::size_t k_sea_province_max_tiles = 80;
 /// running into the ceiling instead of meeting its neighbours, the measured mean
 /// falls away from that prediction and provinces pile up on the cap exactly.
 /// The sweep (6 seeds, `province_partition_harness` section W) is in
-/// docs/generation/TILE_GENERATION.md § Provinces over water; at d = 8 one
+/// docs/generation/PROVINCES.md § Three domains, never mixed; at d = 8 one
 /// province in nine sits exactly on 80 and the mean has already broken from its
 /// prediction, while at d = 7 the measured mean still MATCHES the lattice —
 /// which is the evidence that terrain and spacing set the size, not the cap.
