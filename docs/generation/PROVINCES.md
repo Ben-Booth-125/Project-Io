@@ -78,7 +78,12 @@ independent of how the shapes are drawn.
 1. **Provinces grow from population centres**, and seed strength scales with the centre's scale
    (1–5): *a metropolis draws a larger province than a village does* — a growth budget of 7
    tiles at scale 1 up to 12 at scale 5, with every centre growing simultaneously as one
-   multi-source fill.
+   multi-source fill. **The budget is what scales; the finished size need not.** Because the fill
+   is simultaneous, and a large centre stands in a denser neighbourhood than a village does,
+   competition can take back what the budget granted. The harness measures the mean province size
+   by seed scale and **asserts the ordering** (`P9c`, over the seed set only — an anchor founding
+   under ruling 3 is not a seed), so any divergence between the ruling's wording and what the fill
+   produces is loud rather than reported away.
 2. **Boundaries are rivers and elevation difference.** *Superseded half (Ben, 2026-08-25;
    BL-623, provinces before roads): roads were a binding input — tiles a road links tended to
    share a province, never divide one. Overturned with the ordering: the partition now runs
@@ -150,33 +155,44 @@ claim about what the cost model produces, which breaks loudly if that stops bein
 prefer-room variant was measured at 241 provinces over the preference, max 14, and rejected; the
 breach was its only justification.)
 
-Measured headroom: the partition tops out at **16 tiles** across the six-seed sweep, four short of
-the cap. The over-12 share (4.9% at the ruling) is **reported by the harness, never asserted** —
-*"rare" is Ben's judgement to make against a number*, and no threshold for it has been chosen. The
-preferred ceiling is therefore advisory in a way the hard cap is not.
+Measured headroom: the partition tops out at **18 tiles** across the six-seed sweep, two short of
+the cap. The over-12 share is **reported by the harness, never asserted** — *"rare" is Ben's
+judgement to make against a number*, and no threshold for it has been chosen (it stood at 4.9%
+when the ceiling was ruled). The preferred ceiling is therefore advisory in a way the hard cap is
+not.
 
 **The measured distribution, 6 seeds** (`tools/verify/province_partition_harness.cpp`,
 sections C and D — which is also the re-pinning instrument for the two
-measurement-pinned coefficients):
+measurement-pinned coefficients). The land domain only; water has its own table
+below. Re-read it off the instrument whenever generation moves — these are
+measurements, not targets, and nothing may be tuned to chase them:
 
 | Partition | provinces | min | max | mean | < 7 | < 3 | > 12 | % in 7–12 |
 |---|---|---|---|---|---|---|---|---|
-| Organic, pre-absorption | 24,498 | 1 | 12 | 7.87 | 6,195 | 3,008 | 0 | 74.71% |
-| Organic, **with absorption** | 22,390 | 1 | **16** | 8.61 | 4,098 | 913 | 1,096 | 76.80% |
+| Organic, **with absorption** | 22,153 | 1 | **18** | 8.70 | 4,630 | 1,621 | 1,690 | 71.47% |
+| Frozen BL-515 pre-absorption baseline | 24,498 | 1 | 12 | 7.87 | 6,195 | 3,008 | 0 | 74.71% |
+
+The second row is a **frozen comparison the harness carries as a literal**, not a
+re-measurement: it says what the growth passes produced before absorption existed,
+so the pass can be read as a delta. Only the first row moves when generation does.
 
 The spread is wide **on purpose** and is reported rather than tuned: organic
 borders are irregular, and the sub-floor tail is the pockets a ceiling leaves
 behind — kept by ruling, not repaired.
 
-Read the absorption row against the hard cap, not against 12. **Max 16 against a cap
-of 20**, so the bound holds with four tiles of headroom, and **4.90% sit above the
-preferred 12**. Absorption is what moves every one of those numbers: it converts
-2,098 one-tile provinces into member tiles of their cheapest neighbour, which is
-why the count falls, the mean rises, and the sub-floor tail more than halves. The
-harness asserts the cap and the accounting identity (every tile above 12 arrived
-by absorption, so growth's own clamp is still proven separately) and **reports**
-the 4.90% — whether that counts as "rare" is Ben's judgement against a number, and
-no threshold for it has been chosen.
+Read the absorption row against the hard cap, not against 12. **Max 18 against a cap
+of 20**, so the bound holds with two tiles of headroom, and **7.63% sit above the
+preferred 12**. Absorption is what moves every one of those numbers: across the sweep
+the growth passes leave **3,625** one-tile provinces and the pass takes **3,463** of
+them into the cheapest neighbour each has, which is why the count falls, the mean
+rises, and the sub-floor tail thins. **A one-tile province has three fates, not two** —
+absorbed; kept as one of the **107** true islands, with no same-domain, same-nation
+neighbour to join; or **grown**, because another singleton chose it as ITS cheapest
+neighbour, which is where the remaining 55 went. (Those figures span all three
+domains, where the size columns above are land's.) The harness asserts the cap and the
+accounting identity (every tile above 12 arrived by absorption, so growth's own clamp
+is still proven separately) and **reports** the 7.63% — whether that counts as "rare"
+is Ben's judgement against a number, and no threshold for it has been chosen.
 
 ### Three domains, never mixed
 

@@ -625,12 +625,24 @@ int main()
     // tile-derived plurality by construction (the nation-locked fill).
     {
         std::map<entity_id, int> centre_tile_scale;
+        // SEEDS ONLY, kept separate (BL-611). `build_province_partition` skips a
+        // centre flagged `province_anchor` when it gathers its seed set — such a
+        // centre was FOUNDED AFTER the partition shipped, to anchor a pocket the
+        // fill left over, so its province's size owes nothing to its scale. P9c
+        // asks about SEED STRENGTH, so it must ask over the seed set the
+        // partition actually used; every other row here wants all centres.
+        std::map<entity_id, int> seed_tile_scale;
+        std::size_t anchor_foundings = 0;
         for (const auto& [cid, tid] : w.population_centre_tile)
         {
             const auto pit = w.population_centres.find(cid);
             if (pit == w.population_centres.end())
                 continue;
             centre_tile_scale[tid] += pit->second.scale;
+            if (pit->second.province_anchor)
+                ++anchor_foundings;
+            else
+                seed_tile_scale[tid] += pit->second.scale;
         }
 
         // Which bodies are SETTLED (hold any centre) — the anchor rule is a
@@ -656,6 +668,13 @@ int main()
                 continue;
             }
             ++province_centres[pid];
+            (void)scale;
+        }
+        for (const auto& [tid, scale] : seed_tile_scale)
+        {
+            const uint32_t pid = part.province_of(tid);
+            if (pid == 0)
+                continue;
             const province* p = part.find(pid);
             if (p != nullptr)
             {
@@ -747,7 +766,9 @@ int main()
                   "A3  no water province holds a population centre (water domains unchanged)");
         }
 
-        std::printf("        centre-seeded province size by centre scale:");
+        std::printf("        %zu anchor foundings excluded (not seeds, BL-611)\n",
+                    anchor_foundings);
+        std::printf("        centre-seeded province size by SEED scale:");
         for (const auto& [scale, row] : by_scale)
             std::printf(" s%d:%d@%.2f", scale, row.first,
                         row.first ? double(row.second) / double(row.first) : 0.0);
@@ -757,6 +778,21 @@ int main()
         // at scale 1 to 12 at scale 5, so the mean province of the largest scale
         // present must beat the mean of the smallest. Terrain can stop any one
         // of them short; it cannot invert the whole population.
+        //
+        // WHEN THIS IS RED, READ THE SCALE ROW ABOVE IT. The row is over the SEED
+        // SET the partition actually used — anchor foundings excluded, which is
+        // the population this claim is about and which the row did not always
+        // report. What it shows is that realised size does NOT track scale: the
+        // top bucket is often a single centre, so one terrain-stopped
+        // seed inverts the comparison, and the buckets that do carry a population
+        // are not ordered either. The BUDGET does scale — `province.cpp` sets
+        // `r.target` from the clamped scale, exactly 7 to 12 — but growth is a
+        // SIMULTANEOUS multi-source fill, and a large centre sits in a denser
+        // neighbourhood than a village, so competition takes back what the budget
+        // granted. Whether the realised size is meant to track scale, or the
+        // budget is the whole of the ruling, is a design call and not a threshold
+        // this harness may invent: the row stays asserted rather than demoted to
+        // a report, so the question stays visible.
         if (by_scale.size() >= 2)
         {
             const auto& lo = *by_scale.begin();
@@ -765,6 +801,11 @@ int main()
                                        ? double(lo.second.second) / double(lo.second.first) : 0.0;
             const double hi_mean = hi.second.first
                                        ? double(hi.second.second) / double(hi.second.first) : 0.0;
+            if (hi_mean <= lo_mean)
+                std::printf("        scale %d (n=%d, mean %.2f) does not beat scale %d"
+                            " (n=%d, mean %.2f) — see P9c's note\n",
+                            hi.first, hi.second.first, hi_mean,
+                            lo.first, lo.second.first, lo_mean);
             check(hi_mean > lo_mean,
                   "P9c a larger centre draws a larger province (seed strength scales with scale)");
         }
@@ -1012,6 +1053,23 @@ int main()
         // A1 — the absorption ledger balances. Every size-1 province that
         // existed is accounted for exactly once: absorbed, or kept as a true
         // island (no land neighbour, so nothing to absorb into).
+        //
+        // WHEN THIS IS RED, READ THE REMAINDER LINE FIRST. `province.hpp`'s
+        // `province_absorption_stats` states the identity as two-way, and the
+        // pass has a THIRD outcome it does not count: a pass-0 singleton that
+        // another singleton chose as its cheapest neighbour GREW, so it was
+        // never absorbed and is no longer an island. The ledger is short by
+        // exactly that population. This is an accounting gap in the tally, not
+        // a defect in the partition — nothing else in the harness moves with
+        // it. Closing it needs a third counter in `province_absorption_stats`,
+        // incremented in `province.cpp` where the chosen neighbour still holds
+        // one tile; the identity then reads
+        // `singletons_before == absorbed + true_islands + grew_by_absorbing`.
+        if (!sums_ok)
+            std::printf("        ledger short by %zu of %zu singletons — see A1's note:"
+                        " a singleton that BECAME AN ABSORBER is neither absorbed nor an"
+                        " island, and the tally counts no third outcome\n",
+                        all_singles - (all_absorbed + all_islands), all_singles);
         check(sums_ok, "A1  every size-1 province was absorbed or is a true island");
         // A2 — the pass finished. No singleton survives that had somewhere to go.
         check(all_singles == 0 || all_absorbed > 0,

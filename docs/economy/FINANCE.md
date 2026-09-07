@@ -138,10 +138,17 @@ per-building profitability estimate (`building_profit.hpp`, BL-074 building
 profitability) both call it, so they cannot drift. The wage/maintenance split is
 BL-049 (wage/maintenance split).
 
-- **Material maintenance** — a fixed 30 % floor of the building's maintenance constant,
-  charged even when decommissioned.
+- **Material maintenance** — the **idle floor**, `economy.thresholds.idle_maintenance_floor`
+  (`scripts/economy.lua`, reached in code as `recipe_registry::idle_maintenance_floor`): the
+  fraction of the building's maintenance constant charged even at workforce 0 or decommissioned.
+  It is an **authored parameter, not a constant** — BL-739 (idle floor to data) owns the move out
+  of code, and the loader rejects a value outside [0, 1] rather than clamping it. Every call site
+  passes the registry's value into `compute_building_opex`, which takes it undefaulted so a new
+  one cannot fall back to a stale copy. Non-zero deliberately: holding land is never free.
 - **Labour maintenance** — the remainder, scaled by `workforce_target` (0–200 %,
-  `wt_scalar` clamped [0, 2]); zero when decommissioned.
+  `wt_scalar` clamped [0, 2]); zero when decommissioned, and floored at zero rather than going
+  negative where `wt_scalar` falls below the idle floor — there the floor already covers more
+  than the scaled total, and maintenance is the floor alone.
 - **Wages** — `workforce_assigned × contention_scalar × base_wage × (1 + wage_bid) × wt_scalar
   × hab`. `contention_scalar` is the building's own grant from the wage-competition allocation
   (BL-614, wage competition), not a uniform pool throttle — a building pays for the labour it
