@@ -450,6 +450,12 @@ Ten lines is the ceiling. `Not here` names the questions readers most often arri
 should be sent elsewhere for; `Confused with` names the two or three sibling docs that near-miss
 against this one. Both are part of the routing job, not decoration.
 
+**A doc that has not settled its questions opens with `Proposes:` instead** (Ben, 2026-09-07).
+Same block, same rules, one word changed — the reader learns in that word that nothing below is
+authority. It is the right opening for a proposal-stage doc whose own prose awaits a ruling, and
+for a research note, which settles nothing by construction. `Settles:` is a claim; a doc must not
+make it on questions it is still asking.
+
 ### Design-direction Q&A (Batch Delivery)
 
 A **Batch Delivery** (multiple items in one block; see `DELIVERY.md` § Batch Delivery) that made
