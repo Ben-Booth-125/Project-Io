@@ -55,7 +55,25 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 33 — Long-term market viability, the growth half - the field that keeps producing
+### Sprint 33 — Context economy - the corpus stops charging every session for what one session needs
+*Open · opened 2026-09-07*
+
+**Goal.** A session pays for what it reads, not for the corpus. The backlog hot/cold split already does its job - backlog_query.js unions the archive deliberately, so "is this built?" stays answerable while backlog.json keeps meaning exactly one thing. The cost that remains is elsewhere: ~650K tokens of authority docs with no summary layer, so traversal opens whole docs to discover it wanted a different one; --full prose now resolving against 1.9MB of archived designs; and CLAUDE.md plus the standing rules loading in full for a one-line doc tweak, the AI-behaviour grant history included. The felt goal is that a Light-mode session costs Light-mode context.
+
+**Planned.**
+- BL-787 (doc summary headers) - a 10-line "what this doc settles" block at the head of every authority doc, so traversal can read headers until it knows which doc it actually needs. The highest-value item: it attacks the 650K directly.
+- BL-788 (backlog query summary mode) - --summary on backlog_query.js/requirements_query.js: row, short_name and a one-line precis, never full prose. --full becomes opt-in for the one item being built.
+- BL-789 (standing rules split by mode) - the AI-behaviour grant history is load-bearing only when touching corp_ai.cpp. Move it to its authority doc, leave a one-line pointer, and every Light session stops paying for a dozen dated precedents.
+- BL-790 (source-to-doc index) - --touches answers "what work touched this doc"; nothing answers "which doc owns this file". A generated src/ -> doc index lets traversal start from the code.
+- BL-791 (fan-out as compression, in DELIVERY.md) - record the practice already in the method and underused: a sub-agent reads 40K and returns 500 tokens. The main session's context is the scarce resource, not the agent's.
+
+**Done when.** Every authority doc in CLAUDE.md section 3 carries a header block; backlog_query.js defaults to summary output; the standing rules fit on one screen with the grant history reachable in one hop; a src/ -> doc lookup exists and is named in CLAUDE.md; DELIVERY.md states the fan-out practice. No src/ change in the whole sprint.
+
+**Risk.** A summary header is a second place the doc says what it is, and a second place is a place to drift. Headers must be derived-feeling and short enough that a doc edit obviously touches them; if a header can be stale without looking stale, it is worse than nothing. The standing-rules split has the sharper risk: the AI-behaviour grants exist BECAUSE they were raised rather than assumed (the NR-517 precedent), so moving them must not make the next widening easier to take quietly - the pointer has to read as a gate, not a footnote.
+
+FILED 2026-09-07 out of the session that asked whether querying both stores defeats the archive. Answer recorded there and not repeated: the archive keeps the HOT FILE's meaning clean, the union keeps the QUESTION answerable, and those do not fight. This sprint is the other half - the creep that is real. The previous sprint 33 (long-term market viability) is renumbered 34 and is untouched.
+
+### Sprint 34 — Long-term market viability, the growth half - the field that keeps producing
 *Open · opened 2026-09-02*
 
 **Goal.** A field that keeps producing over thirty years. Sprint 31 ended with a majority of corps operating-positive and debtors a tenth of the field - and valued production still falling across the run (x0.2 on seed 0, x0.6 on seed 1 from a level ten to twenty times the old baseline), with most buildings sitting at the new supply floor for want of power and the remaining debt entries being processors that buy at the ceiling and convert at a loss. The felt goal is unchanged from sprint 31 - every player can make a steady profit - with the emphasis moved from "not going broke" to "still growing at year 30".
@@ -72,7 +90,7 @@ and/or a version goal (v0.1.1 etc.).
 
 **Risk.** The generation bootstrap is a design change to a channel that was authored to be systemic (power as a grid good); exempting generators or gating the draw on a priced market could hide the very scarcity the grid is meant to express. Measure the supply factor trend and the power price together, so a fix that only silences the draw reads as one. And every retune moves the goldens and the sweep baselines - one deliberate re-bless with provenance, not a dribble.
 
-THE BASELINE THIS OPENS ON (2026-09-02, final-ind-s0/s1, standard lapse): corps 86 -> 61 / 71 -> 55; debtors 13 -> 6 / 7 -> 4; op-positive at 200: 46 of 61 / 31 of 55; median op net +16.9 / +1.7 per quarter; median balance 4,424 / 3,797; active buildings 224 -> 140 / 122 -> 85; valued production 20,761 -> 4,364 / 5,775 -> 3,531; convoys 156 -> 131 / 194 -> 79; interest share of net loss 5% / 70%; mean supply factor ~0.57. Sprint 32 is not skipped by accident: Ben named this 33.
+THE BASELINE THIS OPENS ON (2026-09-02, final-ind-s0/s1, standard lapse): corps 86 -> 61 / 71 -> 55; debtors 13 -> 6 / 7 -> 4; op-positive at 200: 46 of 61 / 31 of 55; median op net +16.9 / +1.7 per quarter; median balance 4,424 / 3,797; active buildings 224 -> 140 / 122 -> 85; valued production 20,761 -> 4,364 / 5,775 -> 3,531; convoys 156 -> 131 / 194 -> 79; interest share of net loss 5% / 70%; mean supply factor ~0.57. Sprint 32 is not skipped by accident: Ben named this 33. RENUMBERED 33 -> 34 on 2026-09-07 (Ben) to free 33 for the context-economy housekeeping sprint; nothing about the goal, baseline or planned set changed.
 
 ### Sprint 32c — Gamified generation, 32c - the water model finishes, and phase 6 gets its search
 *Open · opened 2026-09-06*
@@ -176,11 +194,12 @@ SIX FURTHER CONFLICTS NEEDED NO RULING and were resolved on newest-dated-wins or
 | 31 | Long-term market viability - every recipe pays at base price | CLOSED 2026-09-02 on Ben's call, stage one a SUCCESS: the field ends the standard thirty-year lapse with a majority of corps operating-positive (46 of 61, 31 of 55) where it began with four and none, debtors a tenth of the field, median balances climbing, buildings running. The growth half - valued production still declines over the run - is sprint 33. |
 | 32a | Gamified generation, 32a - the arc runs, and the instruments that measure it are honest | CLOSED 2026-09-06 at a natural boundary. Five items delivered - the two-span sim, the sweep that measures the real run, the continent time axis, the tick-length audit, and the saturation measure promoted where generation can call it. The remaining 29 carry to 32b, led by the water model. |
 | 32b | Gamified generation, 32b - the water model, and the reorder that 32a built the instruments for | CLOSED 2026-09-06. ELEVEN ITEMS DELIVERED in three waves - the market batch (BL-774, BL-759, BL-760, BL-770 slices 1-2), wave 1 (BL-776, BL-766, BL-767, BL-748, BL-762, BL-764 slice 1) and wave 2 (BL-777, BL-783, BL-765, BL-750, BL-769, BL-768, BL-754 partial). The world CHANGED, on purpose, and the digests are moved and DELIBERATELY UNBLESSED - BL-780 owns that and now carries four attributed causes rather than one. The remaining 28 carry to 32c. |
-| 33 | Long-term market viability, the growth half - the field that keeps producing | OPENED 2026-09-02 on Ben's call as sprint 31's second half. Sprint 31 made the field solvent; this sprint makes it grow. The instrument is campaign_lapse with its debt columns, and the two levers are already filed. |
+| 33 | Context economy - the corpus stops charging every session for what one session needs | OPENED 2026-09-07 on Ben's call, out of the backlog-archive scope question. The archive split is working; the creep is in the DOC corpus and in unconditional session load. Five filed items, no src/ changes, one batch delivery. |
+| 34 | Long-term market viability, the growth half - the field that keeps producing | OPENED 2026-09-02 (as sprint 33; renumbered to 34 on 2026-09-07) on Ben's call as sprint 31's second half. Sprint 31 made the field solvent; this sprint makes it grow. The instrument is campaign_lapse with its debt columns, and the two levers are already filed. |
 | 32c | Gamified generation, 32c - the water model finishes, and phase 6 gets its search | OPENED 2026-09-06 as 32b continuation. 28 items carried. Two chains lead: the water model to its single re-bless (BL-778 -> BL-779 -> BL-780), and phase 6 to an actual search (BL-770 -> BL-772 -> BL-773). |
 
-**Next up.** SPRINT 32a CLOSED 2026-09-06 (5 of 34 delivered - the arc runs and its instruments are honest). SPRINT 32b IS OPEN and carries the remaining 29, led by the water model. Sprint 33 (long-term market viability, the growth half) is also open and untouched by this session. THE NEXT NEW SPRINT IS 34.
+**Next up.** SPRINT 32a CLOSED 2026-09-06 (5 of 34 delivered - the arc runs and its instruments are honest). SPRINT 32b IS OPEN and carries the remaining 29, led by the water model. SPRINT 33 IS NOW THE CONTEXT-ECONOMY HOUSEKEEPING SPRINT (opened 2026-09-07); the long-term market viability sprint that held that number is RENUMBERED 34 and is otherwise unchanged. THE NEXT NEW SPRINT IS 35.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*47 sprints archived cold; 2 open/gated in the hot store.*
+*47 sprints archived cold; 3 open/gated in the hot store.*
