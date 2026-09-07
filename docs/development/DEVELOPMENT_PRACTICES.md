@@ -1,5 +1,12 @@
 # Project Io — Development Practices
 
+> **Settles:** how a check is written and run without a unit-test framework · what naming, style
+> and comments should look like · what a doc must carry · how the save format is versioned · how
+> a release is cut.
+> **Not here:** how work is scoped, sequenced and committed (DELIVERY) · which theme comes next
+> (ROADMAP) · who reviews a change and how (REVIEW_AUTOMATION).
+> **Confused with:** DELIVERY.md, REVIEW_AUTOMATION.md, ROADMAP.md.
+
 This document defines the coding standards, documentation conventions, and testing approach for Project Io. Apply these consistently across all code written or reviewed. Where code deviates from these standards, note it and suggest a correction — but do not refuse to proceed or treat it as a blocker. The note rides along with the work.
 
 ---

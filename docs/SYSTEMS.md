@@ -1,5 +1,12 @@
 # Project Io — Systems Overview
 
+> **Settles:** which systems exist and how they relate · which are load-bearing and which are
+> flavour · what test a system must pass to earn its place · which doc owns each system's
+> detail.
+> **Not here:** who the player is and how it should feel (CONCEPT) · the rules of any one system
+> (its own doc) · what a term means (GLOSSARY).
+> **Confused with:** CONCEPT.md, MANUAL.md, META_LAYER.md.
+
 ## Structure
 
 Two pillars define the game's end goals: **Trade** and **Conflict**. Every other system creates the conditions, constraints, or capabilities that flow into one or both.

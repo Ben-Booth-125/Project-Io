@@ -1,5 +1,11 @@
 # Project Io — Phantom Features
 
+> **Settles:** what makes a piece of design a phantom · which kinds of undocumented design there
+> are · how a phantom is measured and found · which design session a given gap points at.
+> **Not here:** any phantom's actual design (the subject's authority doc) · the work to close one
+> (the backlog, through its query tools).
+> **Confused with:** SYSTEMS.md, DELIVERY.md.
+
 > **Status: scan output, 2026-08-22. Not authority, and not work.** Written from Ben's ask:
 > *"we have a lot of game design that hasn't been given proper space and attention in
 > documentation — do a scan for these phantom features."* Every row below is a pointer to a

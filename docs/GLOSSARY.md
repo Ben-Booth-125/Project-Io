@@ -1,5 +1,11 @@
 # Project Io — Glossary
 
+> **Settles:** which word Io uses for a thing · whether two terms name the same thing · what a
+> term's canonical scope is and where it stops.
+> **Not here:** how the thing behaves or what it is worth (its owning doc) · why it exists at all
+> (CONCEPT, SYSTEMS).
+> **Confused with:** CONCEPT.md, SYSTEMS.md.
+
 **Asset**
 Any owned entity with economic or military value: a building, installation, unit, or vehicle. A corporation persists as long as it holds at least one asset; total elimination also requires destroying the parent nation.
 

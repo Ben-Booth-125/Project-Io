@@ -1,5 +1,12 @@
 # Project Io — People
 
+> **Settles:** when a named individual exists at all · which roles are worth naming · what a
+> person holds that an institution cannot · how a person enters, changes and leaves a role ·
+> what must not become a person.
+> **Not here:** the institutions the roles sit inside (NATIONS, CONTRACTS) · the predicate/effect
+> substrate a role's rule is built from (META_LAYER).
+> **Confused with:** EVENTS.md, META_LAYER.md, politics/NATIONS.md.
+
 **Named individuals holding specific roles.** Io generates a world full of institutions; this
 document is what puts people in it, from Ben's ask (2026-08-22): *"we might also want to include a
 system whereby named people get specific roles."* Everything below § Precedent is a **proposal
