@@ -274,6 +274,30 @@ regardless of ideology.
 
 ### Pass 5 — Naming
 
+**The register of naming sites.** A tongue is coined in [CREEDS.md](../lore/CREEDS.md); this
+section owns which passes *consume* one. The register is here rather than beside the tongue
+because consumption is a generation fact, and because a claim that every name is drawn from a
+tongue is **not true of every site** — the exceptions are the reason a register exists at all.
+
+| Site | Source | Draws on a tongue |
+|---|---|---|
+| Star and body names | `body_names.cpp` | Yes — its own `roll_tongue` sky tongue, distinct from any culture's |
+| Nation names | `make_nation_name`, `nation_generation.cpp` | Yes — `tongue_word` over the culture's `speech` |
+| Region names | `settlement.cpp` | Yes, **both halves** — the culture half and the quarter word |
+| City names | `city_names.cpp` | Yes — `coin_lexicon` over the founding culture's tongue |
+| Culture and god names | `creeds.cpp` | Yes — the tongue's own word builder |
+| **Corporation names** | `make_corp_name`, `corporation_generation.cpp` | **Partly.** The identifier half is invented or borrowed from the home nation's leading syllable, so it inherits that tongue; the **type** half is one of twelve English structural words (`k_corp_types`). See [CORPORATION_GENERATION.md](CORPORATION_GENERATION.md) § Pass 5 — Naming. |
+
+**The corporation type word is the one sanctioned English survival in generation**, and it is
+deliberate: a corporation is a modern institution the player reads as one, and "Holdings" does
+the work a coined syllable would not. Nothing else in the register may acquire an exception by
+resembling it.
+
+**A tongue with no phoneme inventory cannot coin**, so `quarter_word` keeps an English fallback
+table for that case alone — a region with no name at all would be worse than one out of
+register. That is a degenerate-input guard, not a second naming system.
+
+
 **There is no name bank** (BL-290, native nation names). A nation is named in the **tongue of the
 culture that settled the region its seed grew from** — the same phoneme inventory the creeds pass
 (BL-235) coined that culture's own name and its gods from. Naming *consumes* the phonology the
