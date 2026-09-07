@@ -1,19 +1,20 @@
 # Project Io — Supply (Layer 5)
 
 > **Settles:** what a convoy is and what it carries · what triggers a dispatch and who may order
-> one · what a leg costs its owner and how long it takes · what arrival does to the destination
-> pool · what infrastructure a route demands before traffic runs on it.
-> **Not here:** the network beneath it — traversal cost, path, reach, roads, interdiction, and
-> the movement cap (LOGISTICS) · the price the cargo meets on arrival (MARKETS) · the promise a
-> shipment may be settling (CONTRACTS).
+> one · what a leg costs its owner · what arrival does to the destination pool · what
+> infrastructure a route demands before traffic runs on it.
+> **Not here:** the network beneath it — traversal cost, path, reach, roads, physical scale and
+> how long a leg takes, interdiction, and the movement cap (LOGISTICS) · the price the cargo
+> meets on arrival (MARKETS) · the promise a shipment may be settling (CONTRACTS).
 > *Logistics is the road; Supply is the traffic.*
 > **Confused with:** LOGISTICS.md, MARKETS.md, CONTRACTS.md.
 
-> This document owns the **flow**: the convoy — its cargo, dispatch, cost, travel and arrival.
+> This document owns the **flow**: the convoy — its cargo, dispatch, cost and arrival.
 > **[`LOGISTICS.md`](LOGISTICS.md) owns the network it runs on** — traversal cost, A\*, the reach
-> field, roads, physical scale, cache invalidation, interdiction, and Logistic Points. *Logistics
-> is the road; Supply is the traffic.* Where the two overlap (travel time, logistical cost), this
-> document keeps the convoy-facing statement and LOGISTICS.md keeps the network-facing one.
+> field, roads, physical scale and travel time, cache invalidation, interdiction, and Logistic
+> Points. *Logistics is the road; Supply is the traffic.* **Travel time is the network's**: how
+> long a leg takes is a property of the ground crossed and the medium that crosses it, not of the
+> cargo, and a marching unit reads the same model a convoy does.
 
 Layer 5 of the economy is the **logistics / convoy layer** — the mechanism that physically moves goods between markets and bodies, coupling otherwise-isolated price pools through cargo movement. A convoy is the unit of flow; there is no abstract price-coupling term between bodies: the convoy *is* the coupling. The layer is BL-039 (supply convoys); `src/world/supply_system.{hpp,cpp}` is the implementation.
 
@@ -38,6 +39,8 @@ A convoy is a world ECS component. Each active convoy carries:
 
 The coupling is **market-to-market**, not body-to-body. A convoy is created when goods are dispatched toward a destination shortfall. It advances `progress` by `speed` each Tick (linear; no orbital mechanics in the prototype). On arrival (`progress >= 1.0`) it credits the destination `(corp, body)` pool, then is retired; the cargo reaches the destination market's supply through the ordinary auto-surplus path at the next clear. There is no direct supply write on arrival — the clearing pass would zero it before pricing read it.
 
+`speed` is fixed at dispatch from the leg's travel time, which [`LOGISTICS.md`](LOGISTICS.md) § 5 (physical scale and travel time) settles: the body's tile scale, the terrain weighting the path already carries, and the medium's rate, quantised to whole econ ticks.
+
 Cargo leaves the source pool at **dispatch**, not arrival. Goods in transit are committed — the source pool shrinks immediately when a convoy departs.
 
 **Trade-route recording** (BL-088, persistent trade routes). Before retiring an arrived convoy, `credit_arrived_convoys` (`src/world/supply_system.cpp`) also upserts a persistent `trade_route` into `world.trade_routes` — keyed on the unordered `(body_a, body_b)` pair + `corp`, with `last_tick` set to the completion Tick and `convoy_count` incremented. Intra-body lanes (source and destination collapse to the same body) are excluded — they light nothing. A route is never erased once recorded; staleness is a **read-time** concern owned by the activity fog, not a write-time one here. See `docs/ui/DISCOVERY.md` (BL-089, activity fog) for the fog that reads this substrate.
@@ -45,35 +48,6 @@ Cargo leaves the source pool at **dispatch**, not arrival. Goods in transit are 
 **Convoys are outside `world::state_hash`.** Their determinism check is `tools/verify/convoy_command.cpp` R5 (identical convoy sets across two runs) rather than the hash; folding them in would move the byte-identity baseline `spectator_determinism.cpp` pins.
 
 ---
-
-## Travel time — distance costs time, not only money (Ben, 2026-08-12)
-
-**A tile has a physical size, and it is derived rather than authored.** Planetology generates
-`home_mass`; a rocky planet's radius follows its mass as roughly R ∝ M^0.27, so radius →
-circumference → `circumference / grid_width` gives kilometres per tile. At Earth mass on the
-312-column grid that is **~128 km per tile** (`body_km_per_tile`, `src/world/logistics.hpp`).
-
-Without it, convoy speed would be `1 / distance_in_AU` — an interplanetary calibration —
-and since `body_distance_au` returns 0 for two markets on the same body, **every intra-body
-convoy would arrive in exactly one econ tick (90 days)** whether it crossed one tile or the whole
-map. Distance would cost money and never time, and a bigger map would only mean the same 90 days
-buys more reach.
-
-**Travel time reuses the terrain weighting the pathfinder already computes.** `logistics_path::cost`
-is terrain-weighted (plains ×1.0 … mountain ×2.0), so it is a count of *effective* tiles — and
-terrain cost is already a time multiplier. No parallel table is needed:
-
-```
-days   = path.cost × km_per_tile ÷ km_per_day
-ticks  = ceil(days ÷ 90)          # the economy clears quarterly
-```
-
-Two modes, differing by roughly five times, which is what makes coastal trade worth designing
-(BL-188, coastal ports): **land ~25 km/day** (an ox-and-cart caravan) and **sea ~130 km/day**
-(a coasting vessel). A short regional haul lands in one quarter; a long one takes several.
-
-The space lane keeps its own ~1-tick-per-AU calibration — it is the only leg the AU model is right
-for, and it belongs to the space arc on `era/space`.
 
 ## Logistical cost
 
