@@ -71,8 +71,11 @@ const openOnly = has('--open');
 // built?" — a question ABOUT landed work. A search that hides everything shipped is
 // blind to exactly the case each exists for. So both match across the union and print
 // what they matched, terminal items included, with `status` carrying the distinction.
-// A narrower search is available, but only by asking for it (--grep --open); it is
-// never a silent drop.
+// `status` can carry it because archive_store.js normalises a cold row's state from
+// the FILE it is archived in (§ THE FILE IS THE ASSERTION) — the sweeps froze the field
+// at the moment they took the row, so believing it would make --open answer with work
+// nobody is doing. A narrower search is available, but only by asking for it
+// (--grep --open); it is never a silent drop.
 const showAll = has('--all') || ids.size > 0 || ((!!grep || !!touches) && !openOnly);
 
 // --grep and --touches are the many-item sweeps, so they summarise unless asked not to.

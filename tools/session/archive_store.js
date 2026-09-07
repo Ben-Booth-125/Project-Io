@@ -203,7 +203,15 @@ function coldFraction(backlog) {
 //   3. the sweeps, NEWEST FIRST (a later snapshot of an id is the later truth)
 
 const DESIGN_RE = /^backlog-design-.*\.json$/;
-const SWEEP_RE = /^backlog-(complete|cancelled|purged)-.*\.json$/;
+
+// ANY cold backlog file that is not the eviction store is a SWEEP. Deliberately open
+// rather than a list of the three families that exist today: the glob this block
+// replaced was itself a one-word allow-list that fell behind the filing convention and
+// cost the union 620 rows, and a `backlog-superseded-2026-*.json` filed next quarter
+// would repeat that failure exactly — gone from the union with no error and no test.
+// An unrecognised family is CLASSIFIED below, loudly, rather than dropped or believed.
+const SWEEP_RE = /^backlog-(?!design-)[a-z]+-.*\.json$/;
+const familyOf = (f) => (path.basename(f).match(/^backlog-([a-z]+)-/) || [])[1] || '';
 
 const coldDirFiles = (root, re) => {
     const dir = path.join(root, ARCHIVE_DIR);
@@ -226,10 +234,56 @@ const sweepFiles = (root = ROOT) => coldDirFiles(root, SWEEP_RE)
     .map((f) => ({
         f,
         date: (f.match(/(\d{4}-\d{2}-\d{2})/) || [''])[0],
-        rank: SWEEP_RANK[(f.match(/^backlog-([a-z]+)-/) || [])[1]] ?? 9,
+        rank: SWEEP_RANK[familyOf(f)] ?? 9,
     }))
     .sort((a, b) => b.date.localeCompare(a.date) || a.rank - b.rank || a.f.localeCompare(b.f))
     .map(({ f }) => `${ARCHIVE_DIR}/${f}`);
+
+// --- THE FILE IS THE ASSERTION, NOT THE FROZEN FIELD -------------------------
+//
+// A swept row's `status` is FROZEN at the instant the sweep took it, and no sweep
+// rewrote it on the way out. backlog-purged-2026-08-23.json holds 156 rows reading
+// `designed` and 31 reading `design-owed` while its own _note says "Nothing here is
+// open work"; backlog-cancelled-2026-08-31.json holds 17 more under "CANCELLED, NOT
+// COMPLETED. Nothing here shipped." Believing those fields turns the false negative
+// this module was widened to fix into a false positive of the same size: a `--open`
+// search answering with 18 rows of work nobody is doing, which is the opposite
+// failure and just as silent.
+//
+// THE RULE (Ben, 2026-09-07, amending BL-792): a cold row's state comes from the FILE
+// it is archived in, not from its own status field. backlog-purged-* and
+// backlog-cancelled-* are CLOSED BY CONSTRUCTION — the file is the assertion, and the
+// frozen field is an artefact of the row at the moment it was swept. backlog-complete-*
+// is complete. Only the hot file and the eviction store carry a status worth reading.
+//
+// It is applied HERE, at the union, exactly once. Not in a view: the whole point of
+// the widening is that callers trust the union, and a rule enforced in backlog_query.js
+// alone leaves backlog_lint.js and doc_owner.js reading raw rows.
+//
+// A row that ALREADY reads closed keeps its own value: `complete` and `cancelled` are
+// honest statements of HOW it closed, and overwriting them would move an item between
+// the delivered count and the culled one. Only a row still claiming to be open is
+// corrected — and the value it claimed is preserved as `status_filed`, beside an
+// `archived_in` naming the file that made the call, so the frozen history stays
+// readable and no row is normalised without provenance.
+const SWEEP_STATE = { complete: 'complete', cancelled: 'cancelled', purged: 'purged' };
+
+// A family SWEEP_STATE does not name is still cold, so it is read as CLOSED-not-built:
+// wrong about HOW it closed is recoverable, wrong about WHETHER it is open is the
+// defect above. It says so on stderr rather than deciding quietly.
+const UNKNOWN_SWEEP_STATE = 'cancelled';
+const warnedFamilies = new Set();
+function sweepStateFor(rel) {
+    const fam = familyOf(rel);
+    if (SWEEP_STATE[fam]) return SWEEP_STATE[fam];
+    if (!warnedFamilies.has(fam)) {
+        warnedFamilies.add(fam);
+        process.stderr.write(`archive_store: cold file family "${fam}" (${rel}) is not named in `
+            + `SWEEP_STATE — its rows read as "${UNKNOWN_SWEEP_STATE}". Name it to say how it closed.
+`);
+    }
+    return UNKNOWN_SWEEP_STATE;
+}
 
 // Every cold backlog file, in de-duplication precedence order.
 const archiveFiles = (root = ROOT) => [...designFiles(root), ...sweepFiles(root)];
@@ -272,19 +326,25 @@ function landedItems(root = ROOT) {
     return out;
 }
 
-// Every whole row the SWEEPS hold, newest sweep first. The rows are already items —
-// nothing is reconstructed and nothing is rewritten. In particular `archived` is left
-// exactly as filed: a swept row either points at its own prose in the eviction store
-// or carries that prose inline, and overwriting the pointer with the sweep's own path
-// would send resolve() to a file that has no record for it.
+// Every whole row the SWEEPS hold, newest sweep first, with its STATE taken from the
+// file per the rule above. Nothing else is reconstructed. In particular `archived` is
+// left exactly as filed: a swept row either points at its own prose in the eviction
+// store or carries that prose inline, and overwriting the pointer with the sweep's own
+// path would send resolve() to a file that has no record for it.
 function sweptItems(root = ROOT) {
     const out = [];
     for (const rel of sweepFiles(root)) {
+        const state = sweepStateFor(rel);
         const store = loadArchive(rel, root);
         for (const row of (store && store.items) || []) {
             if (!row || typeof row !== 'object') continue;
             if (typeof row.id !== 'string' || row.status === undefined) continue;
-            out.push({ ...row });
+            const it = { ...row, archived_in: rel };
+            if (!CLOSED.has(it.status)) {
+                it.status_filed = it.status;
+                it.status = state;
+            }
+            out.push(it);
         }
     }
     return out;
@@ -314,5 +374,5 @@ function allItems(backlog, root = ROOT) {
 module.exports = {
     ROOT, ARCHIVE_DIR, NARRATIVE, INDEX_KEEP, TERMINAL, CANCELLED, CLOSED,
     narrativeFieldsOf, isPointer, bucketFor, archivePath, loadArchive, newArchive, resolve, coldFraction,
-    designFiles, sweepFiles, archiveFiles, landedIds, landedItems, sweptItems, coldItems, allItems,
+    designFiles, sweepFiles, sweepStateFor, archiveFiles, landedIds, landedItems, sweptItems, coldItems, allItems,
 };

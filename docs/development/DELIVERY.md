@@ -133,10 +133,11 @@ same subject differently:
   upkeep; a path no item cites reports as unowned, which is a finding about the filing.
 - **A search is not a worklist view.** `--grep` and `--touches` print what they matched, landed
   and cancelled work included, because each exists to catch work that already happened — a subject
-  the project has shipped, or a doc a delivered item names. `status` carries the distinction. The
-  list views (a bare invocation, `--status`, `--priority`) are the ones whose unit of output is
-  open work, and they drop terminal items. A narrower search is available by asking: `--grep
-  <subject> --open`.
+  the project has shipped, or a doc a delivered item names. `status` carries the distinction, and
+  the bullet below is what makes that true of a cold row. The list views (a bare invocation,
+  `--status`, `--priority`) are the ones whose unit of output is open work, and they drop terminal
+  items. A narrower search is available by asking: `--grep <subject> --open`, which is the hot
+  worklist and nothing else.
 - **The cold half is the WHOLE archive, in two file shapes.** `archive_store.js` reads both the
   `records`-keyed eviction files `archive_designs.js`/`archive_landed.js` write and the older
   `items`-array sweeps (`backlog-complete-*`, `backlog-cancelled-*`, `backlog-purged-*`), and
@@ -145,6 +146,17 @@ same subject differently:
   union through `allItems()`; the narrower `landedIds()`/`landedItems()` are scoped to the
   eviction store because two checks — that an eviction landed, and that a row is not hot and
   evicted at once — are about that store and nothing else.
+- **A cold row's state comes from the FILE it is archived in, not from its own `status` field**
+  (Ben, 2026-09-07). The sweeps froze each row as it stood when they took it and rewrote nothing,
+  so a culled item still reads `designed`. `backlog-purged-*` and `backlog-cancelled-*` are closed
+  by construction — the file is the assertion, and the frozen field is an artefact of the moment;
+  `backlog-complete-*` is complete; only the hot file and the eviction store carry a status worth
+  reading. `archive_store.js` applies this at the union, once, so no caller can be fooled: a row
+  still claiming to be open takes the file's state, one already reading closed keeps its own value
+  (`complete` and `cancelled` say *how* it closed), and the frozen value survives as
+  `status_filed` beside an `archived_in` naming the file. Believing the frozen field instead is
+  the mirror of the defect the union was widened to fix — a search for open work answering with
+  work nobody is doing, and just as silent.
 - **A sweep prints one line per item; `--full` is what you ask for.** `--grep` and `--touches`
   default to `--summary` — the index row plus the first sentence of `design` — because both
   resolve prose out of the cold archive and a landed item's design block runs to thousands of
