@@ -152,6 +152,74 @@ Non-terminal over the union is 36, and that set *is* the hot set. `next_id` BL-8
 better. 72 docs carry a header; `docs/ui/DRILL_THROUGH.md` exists with its CLAUDE.md § 3 row. All
 five fix branches merged with no conflicts.
 
+### Block 3 — the checker, and the sweep it scoped
+
+**Mode:** three Workflow runs — 3 agents, then 3, then 15. Still no application compile: the only
+`src/` edits are comment pointers and one harness correction.
+
+**BL-801 (header graph checker) came first, deliberately.** Three boundary lanes in block 2 had been
+scoped off defects a header sweep *happened* to notice, and sweeping again by hand would repeat that.
+`tools/session/header_graph.js` now checks four things: dangling citations (fails the run), the
+header graph (prints), router coverage both directions, and state-independence (fails).
+
+**It failed both its cold reviews on the first cut, and the graph half was badly wrong.**
+`demarkup()` stripped underscores along with markdown emphasis, so `NATION_GENERATION.md` resolved
+to nothing and **no doc with an underscore in its filename could ever be an edge target** — about a
+third of the corpus. The consequence is the one that matters: **the defect it was built to catch
+(BL-799, a one-way edge) was absent from its output entirely.** It measured 195 edges against a true
+264. The resolver half carried a *false pass* — a one-token anchor certifying a citation to a
+heading that does not exist — plus two citation shapes it never swept at all.
+
+After repair, an independent parser agrees **edge for edge**: 264 edges, 83 mutual pairs, 98 one-way,
+72 headers, set difference zero both ways. The dangling class went 2.7% false-positive → **0%**,
+audited at 80 of 80 rows. It ships with 27 self-test assertions, each pinned by a mutation test.
+
+First measurement of the corpus: **1119 citations — 729 OK, 310 prefix, 83 dangling.** The dangling
+cluster by *rename*, not by file, and one cluster was ours: five references named
+`io-standing-rules § the player-corp exception`, which BL-789 had moved that morning without
+sweeping. Filed as **BL-807**.
+
+### The sweep — and the item that repeated itself
+
+Five lanes; three passed, two failed.
+
+**BL-798 failed in exactly the way it was filed to fix.** It consolidated copies two and three of
+the pan/zoom claim and left a verbatim **fourth** at `MINIMAP.md:301`, outside its write set — and
+its completeness evidence was *false* when the reviewer re-ran it. Widening the write set and
+requiring the search be pasted in full, empty results included, is what fixed it. `"primary slot"`
+now appears once in the corpus.
+
+**BL-799 failed twice, identically**, and was finished in the main session by reading the code site
+by site. Both agents wrote the tidy universal rule; the truth has an exception the corpus had
+already recorded elsewhere — `make_corp_name` pairs a tongue-inheriting identifier with one of
+twelve **English structural type words**. When two independent attempts fail the same way, the
+brief is wrong, not the agent.
+
+**BL-804 fixed the harness rather than quieting it.** Both red assertions were the *check* rotting:
+P9c asks about seed strength, and `build_province_partition` skips `province_anchor` centres when
+gathering seeds — those are founded *after* the partition ships, so their size owes nothing to their
+scale. The assertion was counting anchor foundings as seeds.
+
+### The defect the docs were hiding
+
+**BL-808**, priority A. `history_sim.cpp:1564` names a sim-founded region `src.name + " Reach"` — an
+English literal in a name that ships, against the standing rule that every generated name is
+sci-fi/fantasy.
+
+**The project fixed this exact defect once already.** `settlement.cpp:272` carries the post-mortem in
+its own words — *"'MelethWorirUlael Reach' put two naming systems side by side in one string, which
+reads as a bug rather than a style"* — and BL-348 coined the quarter word from the tongue. The second
+pass was never swept. It surfaced because a doc claim was too broad: **the tidy rule was wrong
+because the code was wrong.**
+
+### Verification, block 3
+
+Dangling **83 → 81** across the whole sweep: five lanes moved prose between docs and created no net
+dangling citation. `header_graph --self-test` 27/27. `backlog_lint` 0 fails throughout. `next_id`
+monotonic. Nine items closed and evicted, all verified to rebuild byte-exact; the hot file holds 28.
+`docs/development/design/` deleted after three independent checks, `--doc GLOBAL_STYLE_SHEET` now
+resolving where two files had shared the basename.
+
 ### Open for Ben
 
 - **BL-792 and BL-793 landed in block 2**, so a bare `--touches` or `--grep` negative is evidence
