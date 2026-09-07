@@ -36,7 +36,9 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
 |---|---|---|---|
 | [corporation.md](corporation.md) | Standings | one table + Selection drill (Profiles proposed) | `corporation`, fixed (proposed) |
 | [balance.md](balance.md) | Treasury | Treasury / Cashflow / Assets (proposed) | **none** (money has no map field) |
+| [acquisitions.md](acquisitions.md) | Purchasable / Possible groups (no tabs) | one flat column, plus the Profitability full-canvas fold-out | **none** — the pairing runs inward: the Company lens arms *this* ledger |
 | [market.md](market.md) | Goods | Goods (the flattened price table) / Trades | `market`, fixed |
+| [convoys.md](convoys.md) | Convoys in flight | one flat view (Routes and History proposed, neither backed by a store) | `supply_routes` |
 | [construction.md](construction.md) | Buildings | Buildings (estate by type) / Construction (queue + build bar) | **none** — `opportunity` is refused, see below |
 | [selection.md](selection.md) | — (polymorphic by kind) | tile / province / body / building / unit / battle / market / corp / nation | contextual (none) |
 | [tile_ledger.md](tile_ledger.md) | last-left view | Story / Chain / Ages / Tectonics | none |
@@ -56,4 +58,5 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
   row simply IS the move. Market prices rank; build sites do not.
 - Clean, well-surfaced overlaps: standing orders belong to the Market ledger (where they live), not
   Construction; the History ledger carries no market section. **Convoys belonged to neither** — it
-  is cargo in transit, `SUPPLY.md`'s subject rather than `MARKETS.md`'s, and now has its own doc.
+  is cargo in transit, `SUPPLY.md`'s subject rather than `MARKETS.md`'s, and it is a rail ledger of
+  its own ([convoys.md](convoys.md), rail slot 7).
