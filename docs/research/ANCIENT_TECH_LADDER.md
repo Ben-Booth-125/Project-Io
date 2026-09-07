@@ -1,9 +1,9 @@
 # Ancient Tech Ladder — Mockup (0 CE → campaign epoch)
 
-> **Settles:** nothing — research scaffolding, a mockup basis, not authority. It *asks*: what shape
-> a ladder from the ancient world to the campaign epoch takes · at what grain its neighbourhoods
-> should be drawn · what a nation's unevenness realistically looks like by the campaign epoch · how
-> the pre-history sim would acquire rungs · which compressions are acceptable.
+> **Proposes:** what shape a ladder from the ancient world to the campaign epoch takes · at what
+> grain its neighbourhoods should be drawn · what a nation's unevenness realistically looks like
+> by the campaign epoch · how the pre-history sim would acquire rungs · which compressions are
+> acceptable.
 > **Not here:** what the pre-history ladder actually produces (lore/HISTORY, the authority) · what
 > a tech *does* once acquired (TECH_EFFECTS, also research) · the era ladder and the gate into
 > space (economy/ERAS).

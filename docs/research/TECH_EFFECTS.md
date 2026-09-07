@@ -1,9 +1,8 @@
 # Tech Effects — what a tech *does*
 
-> **Settles:** nothing — research scaffolding, the design conversation's home, not authority. It
-> *asks*: what an effect is if it is a (kind, target) pair · which kinds close the set and which
-> targets they may name · what retirement does to that model · how the taxonomy maps onto real
-> buildings and units · which categories the docs imply but the taxonomy omits.
+> **Proposes:** what an effect is if it is a (kind, target) pair · which kinds close the set and
+> which targets they may name · what retirement does to that model · how the taxonomy maps onto
+> real buildings and units · which categories the docs imply but the taxonomy omits.
 > **Not here:** the predicate/effect substrate every rule is actually composed from (META_LAYER, the
 > authority) · research points and technology unlocks (economy/RESEARCH) · the era ladder
 > (economy/ERAS) · the pre-campaign ladder (ANCIENT_TECH_LADDER, also research).

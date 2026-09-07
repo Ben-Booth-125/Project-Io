@@ -1,9 +1,8 @@
 # Era 1 Tech — Research Landscape (2000–2040)
 
-> **Settles:** nothing — research scaffolding pointing toward a design, not authority. It *asks*:
-> what research is *for* in this game · which threads a tech system would be spun from · whether a
-> gate, a quest and a tech are the same object · how a tech record would be itemised and queried ·
-> what comparable games got right and wrong.
+> **Proposes:** what research is *for* in this game · which threads a tech system would be spun
+> from · whether a gate, a quest and a tech are the same object · how a tech record would be
+> itemised and queried · what comparable games got right and wrong.
 > **Not here:** the era ladder and the gate into space (economy/ERAS, the authority) · research
 > points and technology unlocks as a system (economy/RESEARCH) · what an effect *is*
 > (TECH_EFFECTS, also research) · the pre-campaign ladder (ANCIENT_TECH_LADDER, also research).

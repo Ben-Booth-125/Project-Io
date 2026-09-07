@@ -1,6 +1,6 @@
 # Project Io — Phantom Features
 
-> **Settles:** what makes a piece of design a phantom · which kinds of undocumented design there
+> **Proposes:** what makes a piece of design a phantom · which kinds of undocumented design there
 > are · how a phantom is measured and found · which design session a given gap points at.
 > **Not here:** any phantom's actual design (the subject's authority doc) · the work to close one
 > (the backlog, through its query tools).
