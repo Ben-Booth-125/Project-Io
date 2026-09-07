@@ -1,0 +1,282 @@
+#include "landscape_search.hpp"
+
+#include "corporation_generation.hpp"
+#include "logistics.hpp"
+#include "planetology.hpp"   // checkpoint_rng — the project's one splitmix64 sub-stream
+#include "recipe_registry.hpp"
+#include "world.hpp"
+
+#include <algorithm>
+#include <thread>
+
+namespace
+{
+
+/// Deterministic sub-stream for one (round, axis) pair.
+///
+/// KEYED, NOT SEQUENCED, and that is the whole reason a round's proposals can be
+/// scored in any order. A sequential stream would make the placement axis's draw
+/// depend on whether the roster axis drew first, so a reordering (or a thread)
+/// would silently change WHICH candidates exist rather than merely when they are
+/// scored. The stage tag folds both coordinates so no two (round, axis) pairs
+/// collide within a search.
+checkpoint_rng axis_rng(std::uint32_t seed, int round, landscape_axis axis)
+{
+    const std::uint32_t tag =
+        static_cast<std::uint32_t>(round) * static_cast<std::uint32_t>(landscape_axis_count)
+        + static_cast<std::uint32_t>(static_cast<int>(axis));
+    return checkpoint_rng(seed, tag);
+}
+
+/// Strict weak ordering on one term, folded into the lexicographic chain below.
+/// Returns 0 when the two are bit-identical, which is the only thing that lets
+/// `compare_landscape` report a genuine tie.
+int cmp_double(double a, double b)
+{
+    if (a < b) return -1;
+    if (a > b) return  1;
+    return 0;
+}
+
+/// Perturb the incumbent along one axis. Pure in (incumbent, params, rng).
+landscape_candidate perturb(const landscape_candidate& in, landscape_axis axis,
+                            const landscape_search_params& p, checkpoint_rng& rng)
+{
+    landscape_candidate out = in;
+    switch (axis)
+    {
+    case landscape_axis::roster:
+    {
+        // A ladder of signed steps rather than a uniform redraw: greedy
+        // refinement wants a NEIGHBOURHOOD of the incumbent, and a redraw over
+        // the whole range would make each round an independent sample and throw
+        // away the walk. The wide steps are kept so the walk can still cross a
+        // flat stretch.
+        static const int steps[] = { -4, -2, -1, 1, 2, 4 };
+        const int d = steps[rng.index(static_cast<int>(sizeof steps / sizeof steps[0]))];
+        out.corporation_count = std::clamp(in.corporation_count + d,
+                                           p.min_corporations, p.max_corporations);
+        break;
+    }
+    case landscape_axis::placement:
+    {
+        // Placement has no neighbourhood — a seed one apart stakes a wholly
+        // different set of holdings — so this axis is a redraw by construction,
+        // not by choice. Folded from the incumbent's own seed so the walk's
+        // history is carried rather than discarded.
+        const std::uint32_t draw = static_cast<std::uint32_t>(rng.index(1 << 30));
+        out.placement_seed = in.placement_seed * 1664525u + 1013904223u + draw;
+        break;
+    }
+    case landscape_axis::road_tier:
+    {
+        const int d = (rng.index(2) == 0) ? -1 : 1;
+        const int t = std::clamp(static_cast<int>(in.road_tier) + d,
+                                 static_cast<int>(p.min_road_tier),
+                                 static_cast<int>(p.max_road_tier));
+        out.road_tier = static_cast<std::uint8_t>(t);
+        break;
+    }
+    }
+    return out;
+}
+
+/// One scored proposal, held by index so the argmax never reads completion order.
+struct scored
+{
+    landscape_candidate cand{};
+    landscape_score     score{};
+};
+
+void score_one(const world& base, const recipe_registry& reg,
+               const landscape_search_params& p, scored& s)
+{
+    world w = base;                       // its OWN world — score_landscape memoises into it
+    apply_landscape_candidate(w, reg, s.cand);
+    s.score = score_landscape(w, reg, p.score);
+}
+
+} // namespace
+
+const char* landscape_axis_name(landscape_axis a)
+{
+    switch (a)
+    {
+    case landscape_axis::roster:    return "roster";
+    case landscape_axis::placement: return "placement";
+    case landscape_axis::road_tier: return "road_tier";
+    }
+    return "?";
+}
+
+bool candidate_key_less(const landscape_candidate& a, const landscape_candidate& b)
+{
+    if (a.corporation_count != b.corporation_count)
+        return a.corporation_count < b.corporation_count;
+    if (a.placement_seed != b.placement_seed)
+        return a.placement_seed < b.placement_seed;
+    return a.road_tier < b.road_tier;
+}
+
+int compare_landscape(const landscape_score& a, const landscape_score& b)
+{
+    // THE TOTAL ORDER, EXPLICIT AND LEXICOGRAPHIC. `composite` already carries
+    // the ruled objective; the terms below it exist so that two landscapes
+    // reaching the same composite by different routes still order the same way
+    // on every machine. Their sequence is the objective's own priority:
+    // realisation (the only roster-aware term) before potential, potential
+    // before unevenness, unevenness before the balance level.
+    int c = cmp_double(a.composite, b.composite);           if (c) return c;
+    c = cmp_double(a.realisation, b.realisation);           if (c) return c;
+    c = cmp_double(a.mean_actual, b.mean_actual);           if (c) return c;
+    c = cmp_double(a.mean_completeness, b.mean_completeness); if (c) return c;
+    c = cmp_double(a.spread, b.spread);                     if (c) return c;
+    c = cmp_double(a.mean_balance, b.mean_balance);         if (c) return c;
+    // Market count last: a landscape scoring identically over more markets is
+    // the better-founded reading of the same number.
+    if (a.market_count != b.market_count)
+        return a.market_count < b.market_count ? -1 : 1;
+    return 0;
+}
+
+void apply_landscape_candidate(world& w, const recipe_registry& reg,
+                               const landscape_candidate& c)
+{
+    // --- ROAD TIER axis -----------------------------------------------------
+    // Purely additive and idempotent: a road already at a higher tier is never
+    // downgraded, and a tile with no road never gains one. So the walk cannot
+    // demolish infrastructure by proposing a lower tier — it can only decline to
+    // develop it, which is what "infrastructure tier" means as an axis.
+    //
+    // The walk is over an unordered_map and that is safe HERE, unlike a sum:
+    // every write is `max` on an integer field of the tile it is keyed by, so
+    // neither the visit order nor floating-point associativity can reach it.
+    bool moved = false;
+    for (auto& kv : w.tiles)
+    {
+        tile_component& t = kv.second;
+        if (t.road_level > 0 && t.road_level < c.road_tier)
+        {
+            t.road_level = c.road_tier;
+            moved = true;
+        }
+    }
+    if (moved)
+    {
+        // The reach field, the A* cache and the flood fields are all functions of
+        // road_level. Leaving them warm would score the new tier against the old
+        // network — and, worse, would do so only for a world that had already been
+        // scored, which is exactly the order-dependence this search must not have.
+        invalidate_logistics_caches(w);
+    }
+
+    // --- ROSTER and PLACEMENT axes ------------------------------------------
+    // The same two calls, in the same order, that the slice-1/2 harness measured
+    // discrimination on — so the search walks the fixture the objective was shown
+    // to be able to see, not a second one invented here.
+    assign_default_recipes(w, reg);
+
+    corporation_params cp;
+    cp.corporation_count = c.corporation_count;
+    generate_corporations(w, cp, c.placement_seed);
+    generate_background_firms(w, reg, c.placement_seed);
+}
+
+landscape_search_result search_landscape(const world& base, const recipe_registry& reg,
+                                         const landscape_search_params& p)
+{
+    landscape_search_result out;
+    out.seed_candidate = p.start;
+
+    // --- the seed candidate -------------------------------------------------
+    {
+        scored s;
+        s.cand = p.start;
+        score_one(base, reg, p, s);
+        out.seed_score   = s.score;
+        out.winner       = s.cand;
+        out.winner_score = s.score;
+        out.evaluations  = 1;
+    }
+
+    const int threads = std::max(1, p.thread_count);
+    const int rounds  = std::max(0, p.rounds);
+
+    for (int r = 0; r < rounds; ++r)
+    {
+        // --- propose, one per axis, in the fixed axis order ------------------
+        std::vector<scored> props(landscape_axis_count);
+        for (int a = 0; a < landscape_axis_count; ++a)
+        {
+            const landscape_axis axis = static_cast<landscape_axis>(a);
+            checkpoint_rng rng = axis_rng(p.seed, r, axis);
+            props[static_cast<std::size_t>(a)].cand = perturb(out.winner, axis, p, rng);
+        }
+
+        // --- score them INDEPENDENTLY ---------------------------------------
+        // Results land at their own index, so nothing downstream can observe
+        // which finished first. Each worker copies `base` itself: score_landscape
+        // memoises into the world it scores, so a shared world would be both a
+        // race and an ordering hazard (landscape_score.hpp § the consequence).
+        if (threads <= 1)
+        {
+            for (scored& s : props)
+                score_one(base, reg, p, s);
+        }
+        else
+        {
+            const int n = static_cast<int>(props.size());
+            const int spawn = std::min(threads, n);
+            std::vector<std::thread> pool;
+            pool.reserve(static_cast<std::size_t>(spawn));
+            for (int t = 0; t < spawn; ++t)
+            {
+                pool.emplace_back([&, t]
+                {
+                    for (int i = t; i < n; i += spawn)
+                        score_one(base, reg, p, props[static_cast<std::size_t>(i)]);
+                });
+            }
+            for (std::thread& th : pool)
+                th.join();
+        }
+        out.evaluations += landscape_axis_count;
+
+        // --- argmax over the proposals, by the TOTAL order -------------------
+        // Proposal-vs-proposal ties are broken by `candidate_key_less`, so an
+        // exact tie between two proposals resolves identically everywhere. This
+        // key is deliberately NOT consulted against the incumbent below.
+        std::size_t best = 0;
+        for (std::size_t i = 1; i < props.size(); ++i)
+        {
+            const int c = compare_landscape(props[i].score, props[best].score);
+            if (c > 0 || (c == 0 && candidate_key_less(props[i].cand, props[best].cand)))
+                best = i;
+        }
+
+        // --- replace only on a STRICT improvement ----------------------------
+        // A tie leaves the incumbent standing. Consulting the candidate key here
+        // would make an equal-scoring proposal unseat the incumbent and let the
+        // walk churn between equals for the rest of its fixed rounds.
+        const bool accept = compare_landscape(props[best].score, out.winner_score) > 0;
+        if (accept)
+        {
+            out.winner       = props[best].cand;
+            out.winner_score = props[best].score;
+            ++out.accepted;
+        }
+
+        for (std::size_t i = 0; i < props.size(); ++i)
+        {
+            landscape_search_step step;
+            step.round    = r;
+            step.axis     = static_cast<landscape_axis>(static_cast<int>(i));
+            step.proposal = props[i].cand;
+            step.score    = props[i].score;
+            step.accepted = accept && i == best;
+            out.path.push_back(step);
+        }
+    }
+
+    return out;
+}

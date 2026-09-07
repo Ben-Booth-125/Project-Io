@@ -629,6 +629,25 @@ target_link_libraries(landscape_score_harness PRIVATE io_world_obj lua54)
 target_compile_features(landscape_score_harness PRIVATE cxx_std_20)
 target_compile_options(landscape_score_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# landscape_search_harness (BL-770 slice 3) — same shape and same reason as
+# landscape_score_harness directly above: a live lua_state, load_from_lua, and
+# parsed_gen_config, all three of whose TUs are excluded from io_world_obj.
+# Hand-declared so the generic foreach below does not emit a target that fails
+# to link and stops every target after it under `nmake all`.
+add_executable(landscape_search_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/landscape_search_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(landscape_search_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(landscape_search_harness PRIVATE io_world_obj lua54)
+target_compile_features(landscape_search_harness PRIVATE cxx_std_20)
+target_compile_options(landscape_search_harness PRIVATE ${IO_WARNING_FLAGS})
+
 # persona_counsel_harness (BL-207) needs a live sol2/Lua state too — it loads
 # the real scripts/personas/*.lua packs through src/scripting/persona_pack.cpp.
 # Same shape as pregame_balance_harness above: add back the sol2/Lua TU +
