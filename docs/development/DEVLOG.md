@@ -195,10 +195,13 @@ already recorded elsewhere — `make_corp_name` pairs a tongue-inheriting identi
 twelve **English structural type words**. When two independent attempts fail the same way, the
 brief is wrong, not the agent.
 
-**BL-804 fixed the harness rather than quieting it.** Both red assertions were the *check* rotting:
-P9c asks about seed strength, and `build_province_partition` skips `province_anchor` centres when
-gathering seeds — those are founded *after* the partition ships, so their size owes nothing to their
-scale. The assertion was counting anchor foundings as seeds.
+**BL-804 corrected the harness’s MEASUREMENT, and left it red.** P9c asks about seed strength, and
+`build_province_partition` skips `province_anchor` centres when gathering seeds — those are founded
+*after* the partition ships, so their size owes nothing to their scale, and the row was pooling 1,011
+of them. On the corrected measurement **P9c still fails** (s1: 458 @ 7.51 · s4: 1 @ 3.00), and so does
+A1. Rebuilt and rerun in the main session to confirm: **42 PASS, 2 FAIL, exit 1.** Neither was
+weakened to pass, and the surviving question is sharper than the one BL-804 answered — a monotone
+claim over four buckets decided by a single scale-4 sample may not be answerable as written. **BL-809**.
 
 ### The defect the docs were hiding
 
