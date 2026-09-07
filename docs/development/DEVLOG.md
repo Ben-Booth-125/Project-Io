@@ -215,6 +215,34 @@ reads as a bug rather than a style"* — and BL-348 coined the quarter word from
 pass was never swept. It surfaced because a doc claim was too broad: **the tidy rule was wrong
 because the code was wrong.**
 
+### The pre-push audit, and what it caught
+
+Three cold auditors over the finished state — corpus coherence, doc-versus-code truth, and whether
+the RECORD is honest — then an adjudicator that verified each blocker itself before accepting it.
+Two blockers were raised; one survived.
+
+**NR-794 was minted twice, and the second mint was mine.** A prior session used it for a
+naval-composition ruling, cited it at three source sites (, ,
+) — and **never filed it**. So nothing in the review store could see the id was
+taken. This session minted NR-794 for the border-band question, and for a few hours three code
+comments resolved to a ruling about lens chrome: a visible gap converted into a confident wrong
+answer, which is the exact failure class these 61 commits spent the day removing. Renumbered to
+**NR-797**, with the collision recorded on that entry. **BL-811** widens , which guards
+BL ids and nothing else — and the guard must scan the tree, not the store, because this id was
+cited in code and never filed.
+
+**The second blocker did not survive, and the adjudication is worth keeping.** Six docs derive
+km-per-tile from a 312-column grid the code retired at BL-424 (), so the
+constant is ~20% wrong. Real — but the session did not cause it: BL-797 deleted the duplicate in
+SUPPLY, taking the corpus from seven false copies to six, and four of the five survivors were never
+touched. Filed as **BL-810**, with the aggravating detail that the re-authored line now cites
+ beside the wrong number, so a false constant reads as code-verified.
+
+The auditors also confirmed the load-bearing claim by the right method: today's checker run against
+an extracted base tree, diffing the *misses by citing site* rather than by count. **4 added, 4
+removed — zero citations broken by this session**, and three of the four additions are BL-807's own
+prose quoting the broken forms it exists to fix.
+
 ### Verification, block 3
 
 Dangling **83 → 81** across the whole sweep: five lanes moved prose between docs and created no net
