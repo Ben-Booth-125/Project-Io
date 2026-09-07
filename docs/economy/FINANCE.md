@@ -142,9 +142,10 @@ BL-049 (wage/maintenance split).
   charged even when decommissioned.
 - **Labour maintenance** — the remainder, scaled by `workforce_target` (0–200 %,
   `wt_scalar` clamped [0, 2]); zero when decommissioned.
-- **Wages** — `workforce_assigned × contention_scalar × base_wage × wt_scalar × hab`.
-  `contention_scalar` is the (corp, body) labour throttle from the economy step — a
-  building pays for the labour it actually used, not its target. `hab` is the body's
+- **Wages** — `workforce_assigned × contention_scalar × base_wage × (1 + wage_bid) × wt_scalar
+  × hab`. `contention_scalar` is the building's own grant from the wage-competition allocation
+  (BL-614, wage competition), not a uniform pool throttle — a building pays for the labour it
+  actually won, not the labour it requested, and at the rate it offered. `hab` is the body's
   mean population-centre habitability, clamped [0.1, 2.0] (`body_mean_habitability`).
 
 Maintenance and wage constants per building type load from the recipe registry

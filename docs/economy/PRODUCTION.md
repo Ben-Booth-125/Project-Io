@@ -480,43 +480,17 @@ version bump and no per-array edit (BL-107, save-format header).
 
 ---
 
-## Workforce model
+## Labour demand and the shortfall
 
-The per-`(corp, body)` pool model, as `run_economy_step` in `src/world/economy_system.cpp` and
-`compute_building_opex` in `src/world/budget_system.cpp` implement it; the design rationale is
-POPULATION.md § Workforce model.
-
-**Supply** derives from the body's population centres (BL-042, workforce supply derivation):
-each centre contributes labour by scale — `labour_by_scale` = 1 / 3 / 10 / 30 / 100 units for
-scale 1–5. A corp's share of that body supply is its share of the building count there; a body
-with no centres falls back to the authored `world::workforce_supply` figure (default 3.0).
+The pool this demand draws on — how much labour a body's centres yield, who wins it when it is
+scarce, and what it is paid — is [`POPULATION.md`](POPULATION.md) § Workforce model.
 
 **Demand** is the sum of `workforce_assigned` over the corp's producing buildings on the body
 (extraction and processing only; ports and hubs demand no labour), capped by the body's
 habitability cap `min(1, mean_hab / 0.6)` (BL-041, habitability gates workforce).
 
-**Contention** clears by **wage competition** (BL-614, wage competition; the ruling and its
-rationale are POPULATION.md § Contention). Uncontended (`demand ≤ supply`), every building is
-staffed at request. Contended, scarce labour allocates **per building** — offered wage
-descending, building id ascending on a tie, each building granted up to its demand until the
-pool is spent — so the marginal building runs partial and those below it idle, superseding the
-old uniform proportional scalar. The offered wage is `base_wage × (1 + wage_bid)`
-(`building_component.wage_bid`, a per-building premium fraction — the first-cut dial, data-only,
-no UI yet; NR-629 flags the shape for overturn). The pool aggregate `min(1, supply/demand)`
-survives in `economy_report.workforce_contention` as the report figure; the per-building grant
-is `economy_report.building_labour`. A recipe's **qualified** requirement (§ POPULATION.md
-§ Qualification, BL-613) clears against its national pool by the same rule, before the ordinary
-pool; a building's factor is the product of the two grants. Every grant is then multiplied by
-`workforce_efficiency(hab)` (`src/world/workforce.hpp`, BL-069 workforce efficiency): full
-labour at habitability ≥ 0.6, ramping linearly to 0.5× at 0. Effective workforce =
-`workforce_assigned × grant`.
-
-**Cost** follows the wage/maintenance split (`compute_building_opex`, BL-049): maintenance
-carries a fixed **30 % material floor** charged even when decommissioned, plus a labour
-remainder scaled by the workforce target (zero when decommissioned); wages are
-`workforce_assigned × grant × base_wage × (1 + wage_bid) × wt_scalar × hab` — paid **at the
-offered rate** on the labour actually allocated, not the request (BL-614): a building that
-outbid its siblings pays the premium it offered. `docs/economy/FINANCE.md` owns the money side.
+What a building's labour and maintenance cost the balance each tick is
+[`FINANCE.md`](FINANCE.md) § Building operating cost.
 
 `workforce_assigned` itself is an authored constant set at placement (0.5 for producing types,
 0 for passive infrastructure) and is never player-edited. The **player lever is

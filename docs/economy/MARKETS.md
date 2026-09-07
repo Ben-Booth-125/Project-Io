@@ -727,110 +727,12 @@ potential trade sorted by margin is information the player must still weigh agai
 competition and what the price does next — so ordering it does not decide the game. Ordering
 *tiles to build on* by margin does, and is refused.
 
-## Procurement — a layer over the market, not a second market
+## Procurement is not the order book
 
-> **[`CONTRACTS.md`](CONTRACTS.md) is the authority for contracting** — both the buy side
-> (procurement, BL-350) and the sell side (the mercenary contract, BL-377). This section is the
-> **market-facing** account: how procurement sits against the market rather than replacing it. The
-> counterparty model, the terminal states, the reputation axis and the whole sell side live there.
-
-A procurement contract is **a build order placed with someone else**: the commit-on-affordability,
-draw-materials-per-tick, pay-across-the-build shape of construction pacing, with the materials
-drawn against the **supplier's** market and the output delivered to the **buyer's** pool. The
-counterparty is a NAMED corp with a price, a lead time, and a possible refusal — not a purchase
-order against an unlimited market, and not an order-book entry (the book is price-time priority
-over anonymous asks; it has no representation for a named counterparty or a lead time). It joins
-the same `corp_command` seam the order book does, for the same reason: the player's press and the
-AI's command are one implementation.
-
-- **Three verbs** (`corp_verb::request_quote` / `accept_quote` / `cancel_contract`, `world.hpp`
-  §11–14, append-only after `set_workforce_auto`). `request_quote` evaluates four decline
-  conditions in order — no capacity (the supplier holds no completed building that produces the
-  good), no input access (the supplier's local market cannot supply its recipe's inputs), embargo
-  (`world::corp_embargo_conditions`, a `condition_set` per supplier — the generic predicate
-  machinery of BL-342 reaching procurement for free), reputation floor
-  (`world::procurement_reputation`, a **view** of the relational substrate — see below) — and
-  returns a distinguishable `corp_command_result` for each.
-
-  > **Authoring a `market` condition: it measures the WORLD, not a market (NR-114).**
-  > `condition_subject::market` resolves to the **mean resolved price across every market in the
-  > world**, summed in ascending entity-id order for determinism — not the price in the local
-  > market, and not the corp's own markets. There is no market qualifier on `condition`, because
-  > a law or tech asking "is this good expensive yet?" is asking a world-level question, and a
-  > mean is harder to game than a max. The consequence to author around: **a corp trading in one
-  > expensive market cannot satisfy a market condition on its own.** If a per-market predicate is
-  > ever wanted, add a qualifier to `condition` rather than changing what this subject means.
-  > `evaluate` also takes a **subject corp** (`condition_set::evaluate(set, world, subject_corp)`),
-  > since every consumer — a levy charged to a corp, a tech earned per corp — is per-corporation;
-  > pass `null_entity` for a genuinely world-level predicate and the corp-scoped subjects measure
-  > zero.
-- **Split payment.** A deposit (`economy.procurement.deposit_fraction`, 0.25) debits at
-  `accept_quote`; the remainder is drawn evenly across the quote's `lead_time_ticks`
-  (`economy_system.cpp`'s contract-pacing pass, right after the capability-points pass). The pace
-  is fixed rather than market-gated (stretch/pause on the supplier's live throughput) — a known
-  simplification against construction pacing's own model.
-- **Lead time is derived, not authored**: `base_lead_ticks × ceil(quantity / supplier_throughput)`
-  — a bigger order takes longer, a capable supplier is faster, and the quote is incidentally an
-  intelligence channel (legitimate under BL-068, competitor visibility: the supplier volunteers
-  its own throughput in the price it quotes).
-- **Reputation moves only on completion (+) or cancellation (−)** — narrow by design: it shifts
-  price/tie-breaking, never gates access beyond the decline floor above.
-- **Reputation is NOT procurement's store.** It is a **view** of `world::sentiment` — the
-  relational substrate, `src/world/sentiment.{hpp,cpp}` — on its **Trust** dimension at (buyer,
-  supplier) grain (BL-546, reputation as a sentiment view). The two moves above are one
-  occurrence each of authored conduct (`contract_completed`, `contract_cancelled`) folded into
-  that table at weights seeded from `economy.procurement.reputation_on_*`. Two consequences the
-  market side cares about: the floor is **not permanent** (the row decays toward neutral, so a
-  refusal is a condition of today rather than a verdict), and there is **no second table** the
-  axis can disagree with. [`../politics/RELATIONS.md`](../politics/RELATIONS.md) § 2 is the
-  authority.
-- **Persistence.** `procurement.{hpp,cpp}`, magic `IOPC` + version 3: `world::procurement_quotes`
-  and `procurement_contracts` round-trip in stored order, and no relational value crosses this
-  stream at all. The substrate carries its own leg of the seam (`IOSN`, `write_sentiment` /
-  `read_sentiment`), and the whole-world snapshot (`IOSV`, BL-536) carries the per-pair record.
-  A bad stream is refused rather than reinterpreted, and strict version equality is what keeps an
-  older stream's trailing block from being misread as quote records. Every stream carries the
-  header BL-107 (save-format header) specifies.
-- **The militia's own demand.** `spacecraft_components` carries no background demand — a
-  militia's contracts are its only buyer, which is what makes the coupling between the
-  processing roster and procurement real rather than thematic.
-
-### What a contract is actually worth
-
-The seam is only half the deal; the other half is the terms, and three of them are load-bearing
-(BL-392, contract terms).
-
-1. **Goods land on the BUYER's body.** A contract carries a **`delivery_body`** — the buyer's own
-   body, taken as the body of the lowest-id building they own (lowest id, not first-in-`assets`,
-   because a demolish permutes that list and the quote must be reproducible). It degrades to the
-   supplier's fulfilment body only when the buyer owns nothing anywhere. Delivering to the
-   supplier's body instead would land goods on a body where the buyer holds no processor
-   reservation, and the auto-surplus path would liquidate the whole delivery the tick it arrived.
-2. **A commitment buys a discount.** The quote is spot less a **volume discount**, asymptotic in
-   the order size — `volume_discount_max × q / (q + volume_discount_half_quantity)`, authored in
-   `scripts/economy.lua` under `economy.procurement` — so no order however large drives the price
-   to zero, and the terms improve monotonically with the size of the commitment. A quote at the
-   live spot price would settle at break-even minus friction, strictly worse than buying on the
-   market.
-3. **Lead time reads the SUPPLIER.** The throughput divisor is that supplier's real per-tick
-   output of that good — extraction sites targeting it at their own rate, processing facilities
-   at their recipe's yield of it times theirs, summed in ascending building id (a float sum needs
-   a fixed order). Floored at 1 tick: a contract completing in zero ticks is a spot purchase
-   wearing a contract's name.
-
-**Freight is the price of the distance.** Delivering across bodies costs
-`offbody_freight_fraction` of the order's pre-discount goods value, carried on the contract as
-`freight_cost` and included in the total the deposit and the instalments are computed from. It is
-set **below** `volume_discount_max` on purpose, so a genuine volume order still beats spot after
-carriage; a same-body delivery pays nothing.
-
-**Every credit this seam moves is a TRANSFER.** The supplier is credited exactly what the buyer is
-debited, in the same statement, deposit, instalments and freight alike — the supplier arranges the
-carriage, so paying them for it keeps the flow closed. On completion the goods are **drawn from
-the supplier's pool** at the fulfilment body as far as their stock goes, with any shortfall built
-to order (which is what a build order placed with someone else means).
-
-Verified by `tools/verify/money_conservation.cpp`.
+A procurement contract is a **named counterparty** with a lead time and a refusal. The order
+book is price-time priority over anonymous asks, and it has no representation for either of
+those. The form itself — its verbs, its terms, its pricing and its reputation axis — is
+[`CONTRACTS.md`](CONTRACTS.md).
 
 ## Tariffs — the first flow that pays a nation
 
@@ -889,6 +791,19 @@ Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are
 of it. Untradeable resources (`base_price ≤ 0`) keep their prior price. A resource pegged at the
 ceiling is a generation-calibration signal (background production absent or under-target — see
 `docs/generation/CORPORATION_GENERATION.md` § Pass 6), not a legitimate "lucrative fillable gap".
+
+> **Authoring a `market` condition: it measures the WORLD, not a market (NR-114).**
+> `condition_subject::market` resolves to the **mean resolved price across every market in the
+> world**, summed in ascending entity-id order for determinism — not the price in the local
+> market, and not the corp's own markets. There is no market qualifier on `condition`, because
+> a law or tech asking "is this good expensive yet?" is asking a world-level question, and a
+> mean is harder to game than a max. The consequence to author around: **a corp trading in one
+> expensive market cannot satisfy a market condition on its own.** If a per-market predicate is
+> ever wanted, add a qualifier to `condition` rather than changing what this subject means.
+> `evaluate` also takes a **subject corp** (`condition_set::evaluate(set, world, subject_corp)`),
+> since every consumer — a levy charged to a corp, a tech earned per corp — is per-corporation;
+> pass `null_entity` for a genuinely world-level predicate and the corp-scoped subjects measure
+> zero.
 
 ### Where the band lives
 
