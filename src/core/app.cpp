@@ -57,6 +57,7 @@
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/landscape_search.hpp"
 
 #include <chrono> // poll_wizard_surface's zero-wait future probe
 #include "world/logistics.hpp"
@@ -978,7 +979,41 @@ void app::start_new_game_prelude()
     // rationale). Run BEFORE the pre-game warm start below so the new firms'
     // opening balances/pools get the same simulated operating history every
     // other generated corp receives.
-    generate_background_firms(m_world, m_registry, m_active_world_params.seed ^ 0x8A21F00Du);
+    // BL-770 PHASE 6 — the landscape is SEARCHED, not simply generated.
+    //
+    // This is the caller `landscape_score` never had: until now it existed only
+    // inside its own harness, which is why BL-772 (retire the warm start) and
+    // BL-773 (the budget) were both blocked on an item that had already
+    // "landed". Phase 6 scores candidate landscapes statically — no clock, no
+    // ticks — and applies the winner by a deterministic argmax
+    // (GENERATION_STRATEGY.md § The eight phases).
+    //
+    // WHAT VARIES HERE IS NARROWER THAN THE HARNESS, and the reason is a hard
+    // constraint rather than a choice. `generate_corporations` APPENDS and has
+    // already run inside make_hard_coded_world by this point, so re-running it
+    // would double every specialist — `regenerate_specialists = false` keeps the
+    // world-gen roster and searches over the BACKGROUND economy's placement and
+    // the road tier instead. Widening it to the roster axis means moving the
+    // specialist pass behind the registry load, which is BL-772's restructure
+    // and not this wiring's.
+    //
+    // The seed is the same one the bare pass used, so a single-candidate search
+    // reproduces the old world exactly.
+    {
+        landscape_search_params sp;
+        sp.regenerate_specialists = false;
+        sp.seed                   = m_active_world_params.seed ^ 0x8A21F00Du;
+        sp.start.placement_seed   = sp.seed;
+        // MEASURED 2026-09-07: 1 candidate 70.8 s of startup, 19 candidates
+        // 90.8 s — so the search costs ~20 s, about 1.1 s per evaluation. That
+        // is affordable against BL-773's 3-6 minute budget and is a REGRESSION
+        // until BL-772 removes the 72 s warm start it sits beside. Note also
+        // that a third of those evaluations are the ROAD axis, which NR-793
+        // measured as provably inert on a live ten-market world — resolving
+        // that entry gets this cost down without touching anything else.
+        const landscape_search_result r = search_landscape(m_world, m_registry, sp);
+        apply_landscape_candidate(m_world, m_registry, r.winner, false);
+    }
     mark("background_firms");
 
     // AGAIN, and this one is not belt-and-braces (2026-08-17). load_economy's
