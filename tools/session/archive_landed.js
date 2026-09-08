@@ -14,10 +14,12 @@
 // A different blast radius deserves a different command and its own dry run.
 //
 // The four, and what was done about each (all now resolve through archive_store):
-//   next_id.js     — unions archive_store.landedIds() into its max-id scan, on the
-//                    working tree AND every ref. Its header records BL-326..BL-333
-//                    each landing twice when this defence failed open; a dropped id
-//                    it cannot see is an id it re-mints.
+//   next_id.js     — scans the cold archive itself, on the working tree AND every
+//                    ref, with its own glob rather than through archive_store (it
+//                    reads a file out of a git ref, not off disk, so it cannot share
+//                    this module's accessors). Its header records BL-326..BL-333 each
+//                    landing twice when this defence failed open; a dropped id it
+//                    cannot see is an id it re-mints.
 //   backlog_query  — unions landedItems() whenever a query could match landed work
 //                    (--all, --status, --touches, explicit ids).
 //   backlog_lint   — unions for the duplicate-id scan and `requires` resolution.
@@ -82,9 +84,11 @@ if (restore) {
     const hot = new Set(backlog.items.map((i) => i.id));
     // RAW records, not A.landedItems(): that accessor strips `_row_keys` (it is this
     // tool's bookkeeping, not item data) and normalises key order for querying. Restore
-    // needs exactly what it strips, so it reads the stores directly.
+    // needs exactly what it strips, so it reads the stores directly. designFiles(), not
+    // archiveFiles(): this tool is the inverse of its OWN eviction, and the sweeps it
+    // did not write hold no `records` for it to restore.
     const coming = [];
-    for (const rel of A.archiveFiles(ROOT)) {
+    for (const rel of A.designFiles(ROOT)) {
         const store = A.loadArchive(rel, ROOT);
         for (const [id, rec] of Object.entries((store && store.records) || {})) {
             if (!rec || typeof rec !== 'object' || rec.status === undefined) continue;
@@ -225,7 +229,7 @@ if (lost.length) {
 
 const wasById = new Map(moving.map((i) => [i.id, JSON.stringify(i)]));
 const mismatched = [];
-for (const rel of A.archiveFiles(ROOT)) {
+for (const rel of A.designFiles(ROOT)) {
     const store = A.loadArchive(rel, ROOT);
     for (const [id, rec] of Object.entries((store && store.records) || {})) {
         if (!wasById.has(id) || !Array.isArray(rec._row_keys)) continue;

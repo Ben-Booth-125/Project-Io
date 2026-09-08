@@ -1,8 +1,17 @@
 # One-Shot Generation of Actions for a Language-Driven 4X Opponent
 
+> **Proposes:** whether a language-driven policy for this game can be compressed · whether it
+> will run on the hardware to hand · what a constraint tax costs · whether diplomacy is separable
+> from action generation · whether reinforcement learning is the better route · what would
+> falsify the answer.
+> **Not here:** the rival architecture and the no-cloud invariant (AI_OPPONENT, the authority) ·
+> the meta such a policy would play (STRATEGIES, also research) · the control vocabulary a policy
+> emits (ACTIONS).
+> **Confused with:** ai/AI_OPPONENT.md, ai/STRATEGIES.md.
+
 **A feasibility assessment — does the C-route compress, and does it run here?**
 
-Research note, 2026-08-08. Companion to [`AI_OPPONENT.md`](AI_OPPONENT.md) § 10.
+Research note, 2026-08-08 — not authority. Companion to [`AI_OPPONENT.md`](AI_OPPONENT.md) § 10.
 
 > **Ruled.** Ben adopted the recommendation in § 9 — the Cicero configuration — as Stage C's
 > concrete shape (2026-08-08, NR-094; `AI_OPPONENT.md` § 10g). `AI_OPPONENT.md` § 10d stays the

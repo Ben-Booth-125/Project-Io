@@ -1,5 +1,16 @@
 # Project Io — Minimap
 
+> **Settles:** which rung the inset shows relative to the one being played · what a
+> press on it does and what happens at the top of the ladder · which chrome the
+> inset carries — its title bar, the lens mode bar on its edge, its lens header ·
+> how it and the lens chrome region above it are sized and placed · how its level
+> is derived from the primary's rung.
+> **Not here:** what each rung draws (SOLAR, CIRCUMPLANETARY, PLANETARY) · the
+> descend rules, the shared view controls and the shared view state (CANVASES) ·
+> what a lens shows once toggled and which lenses the strip carries at each rung
+> (LENSES) · where the inset sits in the shell (LAYOUT).
+> **Confused with:** CANVASES.md, LENSES.md, LAYOUT.md.
+
 The **minimap** is a fixed inset in the bottom-right corner of the shell. It shows
 a **neighbouring canvas at reduced scale** and is the player's "you are here, in
 the bigger picture" readout and the control for stepping *out* one zoom level.
@@ -46,22 +57,11 @@ The rule is deliberately asymmetric and simple:
   It is pure context — "where does the thing I'm looking at sit in the larger
   view." It is never the place you drill *into*.
 - **You descend by double-clicking a body in the primary canvas**, not by
-  clicking the minimap. A body double-click navigates the primary *down* one
-  rung (single-click selects — SELECTION.md owns the click model).
+  clicking the minimap. Which body opens which rung is the ladder's business, not
+  the inset's — [CANVASES.md](CANVASES.md) § Navigation — the zoom ladder holds
+  the descend cases, and SELECTION.md owns the click model.
 - **You ascend by clicking the minimap.** A minimap click promotes the zoom-out
   neighbour it is showing to primary.
-
-### Descending (double-click a body in the primary)
-
-| Primary | Double-click… | Primary becomes |
-|---|---|---|
-| Solar | a **planet** | that planet's **Circumplanetary** view |
-| Solar | a **moon** | the **parent planet's** Circumplanetary view, with the moon highlighted |
-| Circumplanetary | the **planet** or one of its **moons** | that body's **Planetary** surface |
-| Planetary | — | (bottom rung; nothing to descend into) |
-
-A solar→surface jump is always a two-step drill (system → local → surface) that
-reads the same way every time.
 
 ### Ascending (click the minimap)
 
@@ -131,7 +131,7 @@ box's top edge anchors.
 │   [ inset canvas ]      │   ← the zoom-out neighbour, drawn at reduced scale
 │                         │
 ├─────────────────────────┤
-│ [Co][Ctr][Rs][Mk][Pop][Cn]         │ ← lens mode bar: 6 glyph buttons
+│ [·][·][·] … [·]         │   ← lens mode bar: one glyph per lens on this rung
 └─────────────────────────┘
 ```
 
@@ -158,19 +158,17 @@ The lens toggles live on the minimap (BL-093, Selection element redesign + lens
 strip on the minimap) as a **lens mode bar** running along the bottom of the
 minimap box, under the inset canvas.
 
-The bar is a single row of **6 lens glyphs**: **Corp, Country, Resource,
-Market, Population, Continent** — single-select with a null state (clicking the
-active glyph clears the lens). This is a curated subset of the full lens family in
-[LENSES.md](LENSES.md); **Scarcity** and **Industry** are keyboard-cycle only,
-joining **Supply**, **Reach** and **Supply-routes** off the strip — the off-strip
-status is purely a width call, not a data gate. The **resource/good selector** —
-needed by the Resource, Market and Scarcity lenses — lives in the lens chrome
+The bar is a single row of lens glyphs, **single-select with a null state**
+(clicking the active glyph clears the lens). Which lenses the strip carries at a
+given rung is [LENSES.md](LENSES.md) § The strip rotates with the rung; the bar
+draws whatever that set is, and the keyboard cycle reaches every lens from every
+rung. The **resource/good selector** — needed by the Resource, Market and
+Scarcity lenses — lives in the lens chrome
 region, not on this bar, so the bar carries glyphs only.
 
 The row is sized by the roster, not by a written count: `draw_overlay_controls`
 deduces the array extent, so a lens leaving the bar re-numbers the rest with
-nothing to keep in step. The bar was eight wide before Opportunity and Production
-were retired (LENSES.md § Rung applicability).
+nothing to keep in step.
 
 The bar is `draw_overlay_controls(ui, x, top_y, w)` in `src/ui/overlay.hpp`,
 called from the minimap block in `src/core/app.cpp` rather than from a
@@ -191,17 +189,39 @@ draws. Ben, 2026-08-24: *"This selection element for lenses should always fit in
 the header for the minimap, at the top right corner."* One region serves the whole
 roster, since a lens draws at most one key.
 
-The region takes the minimap's x and width, so the two read as one stack of chrome
-flush to the right screen edge. Its **bottom edge is the minimap's top edge** and
-it grows **upward** into the column's otherwise-unused space, stopping one margin
-below the time panel. `ui::lens_chrome_rect` (`shell_metrics.hpp`) owns that
-algebra; nothing here re-derives it, and no legend is handed a position.
+**The rect.** Same x and width as the minimap (`ui::minimap_rect`), so the two read
+as one stack of chrome flush to the right screen edge; **bottom edge on the
+minimap's top edge**, growing **upward** into the column's otherwise-unused space
+and ceilinged one margin below the time panel's foot. `ui::lens_chrome_rect`
+(`shell_metrics.hpp`) owns that algebra and every legend asks it — no key takes a
+position argument, so there is no second derivation to drift.
 
-Growing upward from a fixed bottom is what keeps a collapsible key's header — and
-therefore its toggle — sitting on the minimap's edge whether the list is open or
-shut. [LENSES.md](LENSES.md) § Legend placement owns the rest: which keys collapse,
-which draw open, and why the z-order patch that used to prop one of them up is no
-longer needed.
+**Bottom-anchored, and that is load-bearing.** A box that grows upward from a fixed
+top takes its own header, and therefore its toggle, with it: opening the list moved
+the control a third of the screen and the second press landed on the canvas instead
+of closing it, so the toggle worked exactly once. Anchoring the **bottom** keeps a
+collapsible key's header — and therefore its toggle — on the minimap's edge whether
+the list is open or shut, and the list reads as a drawer sliding up out of the
+minimap.
+
+**Z-order is a placement consequence, not a patch.** The gradient keys used to
+anchor flush-**left** of the minimap, vertically centred — inside the rect the
+always-open Selection band occupies — so they drew as ghosts through the band at
+roughly a tenth of their contrast, and only the Continent key escaped by taking
+ImGui's foreground draw list with an opaque fill (BL-376, continent key z-order).
+One of seven was fixed and the collision was never generalised. In the region the
+keys no longer overlap any window, so every key draws on the shared background
+list and the foreground special case is gone. An **input blocker** over the whole
+region is what remains necessary: a draw list paints pixels and registers no
+window, so without it a press on the legend would also select the tile underneath.
+
+Ben ruled on 2026-08-25 that a legend "takes the minimap space", then saw the region
+above in the merged build and preferred it: *"Looks fantastic, probably better than
+my direct instruction to fill minimap space."* The ruling is superseded by its own
+author; the minimap keeps its rect and the legend keeps the header.
+
+[LENSES.md](LENSES.md) § Legend placement owns the rest: which keys collapse and
+which draw open.
 
 ```
 ┌───────────────────────┐
@@ -233,7 +253,7 @@ is in the same invented register as every other body name.
 
 ## Sizing and placement
 
-Unchanged from `CANVASES.md` (authoritative there), with the chrome accounted for:
+The minimap box's geometry, with the chrome accounted for:
 
 - `mm_w = max(336, 0.28 × min(window width, height))`; `mm_h = mm_w × 0.75` (4:3)
   governs the minimap box; the title bar and lens mode bar each take a
@@ -252,31 +272,36 @@ Unchanged from `CANVASES.md` (authoritative there), with the chrome accounted fo
 
 ## Selection / view state
 
-A three-rung ladder needs a level, not a binary `surface_is_primary` flag.
-`ui_state` carries:
+The inset and the primary canvas read the **same** `ui_state` — there is no second
+copy of the view, so a selection made in one slot is the selection in the other.
+Which members they share, and how pan and zoom behave across the slots, is settled
+in [CANVASES.md](CANVASES.md) § Shared selection / view state and § Shared view
+controls; the consequence for the inset is that it always draws its rung's default
+framing.
 
-```cpp
-enum class canvas_level { solar, circumplanetary, planetary };
-
-canvas_level primary_level = canvas_level::solar; // which rung fills the window
-// active_body drives the lower rungs:
-//   circumplanetary → active_body's planet (active_body itself if it is a planet,
-//                      else active_body.parent if it is a moon — circumplanetary_anchor)
-//   planetary       → active_body
-```
-
-The minimap's level is derived as one rung *out* from `primary_level` (with the
-Solar top rung showing the galaxy instead of a canvas). Pan/zoom view fields
-stay per-canvas (`solar_*`, `circum_*`, `planetary_*`) and apply only when that
-canvas holds the primary slot; the minimap always renders the default framing.
+What is the minimap's own is that its level is **derived** — one rung *out* from
+the primary's, rather than stored. A three-rung ladder needs a level, not a binary
+`surface_is_primary` flag, and deriving it means the inset cannot disagree with the
+primary about where the player is. The top rung has no level to derive, which is
+why Solar's slot shows the galaxy rather than a canvas (§ The top rung).
 
 ---
 
 ## Open questions
 
-- **Lens bar width ceiling.** Eight glyphs fitted the bar without widening the
-  minimap or adding a second row, so the six it now carries have room to spare. A
-  *ninth* on-screen lens reopens the question.
+- **Lens bar width ceiling — there is no rule, and nine is not one** (Ben,
+  2026-09-07). Eight glyphs fitted the bar without widening the minimap or adding
+  a second row; the strip is derived per rung and the Planetary rung names nine
+  ([LENSES.md](LENSES.md) § The strip rotates with the rung). Nine is **what fits
+  today**, not a ceiling anybody has set, and the roster is expected to grow past
+  it. What the bar does when it no longer fits — widen, wrap to a second row, or
+  scroll — is open.
+
+  **The strip is already per-canvas, and that is the lever.** Because each rung
+  derives its own set, a rung need never carry a glyph for a lens that says
+  nothing at its scale — so the pressure a growing roster puts on this bar is
+  bounded by the widest single rung, not by the whole roster. Read a rung's set as
+  an editorial choice about that canvas, not as a subset of one master list.
 - **Circumplanetary framing** for a planet with many vs. zero moons — how much
   local space to show, and at what scale, is for `CIRCUMPLANETARY.md`.
 - **Overlays.** Does the minimap mirror supply routes / units on the canvases,
@@ -286,9 +311,9 @@ canvas holds the primary slot; the minimap always renders the default framing.
 
 ## Related
 
-- `CANVASES.md` — the ladder overview, shared drawing path, sizing, and the navigation model.
+- `CANVASES.md` — the ladder overview, the shared drawing path, and the navigation model.
 - `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md` — the three rungs.
 - `LAYOUT.md` — placement in the shell.
-- `LENSES.md` — the full lens family, each mode's surface and key; the minimap
-  bar surfaces a curated subset of it.
+- `LENSES.md` — the full lens family, each mode's surface and key, and which of
+  them the minimap bar carries at each rung.
 - `SELECTION.md` — the Selection element (BL-093).

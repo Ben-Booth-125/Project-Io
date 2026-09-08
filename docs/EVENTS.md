@@ -1,10 +1,18 @@
 # Project Io — Events
 
+> **Settles:** what makes something an event rather than arithmetic or a decision · what "random"
+> is allowed to mean here · where an event may originate and what it may reach · how one is
+> presented and answered · what must never be an event.
+> **Not here:** the predicate/effect substrate an event is built from (META_LAYER) · a rival's
+> scored decisions (ai/AI_OPPONENT).
+> **Confused with:** META_LAYER.md, CLIMATE.md, ai/AI_OPPONENT.md.
+
 **Things that happen to the player rather than because of them.** Without an event system every
 change in the world is either a player action, a rival's scored decision, or arithmetic. This
 document is the event system, from Ben's ask (2026-08-22): *"we also want to begin including random
-events."* Everything below § Precedent is a **proposal awaiting Ben's ruling** except where
-§ Settled records one. § The questions as they were asked are the calls. Owned by BL-548 (event
+events."* Everything below § Precedent is a **proposal
+awaiting Ben's ruling** except where § Settled records one — and § What must NOT happen, ruled 2026-09-07, which closed
+the last question this document's header names. § The questions as they were asked are the calls. Owned by BL-548 (event
 system).
 
 ---
@@ -187,7 +195,11 @@ consequence layer, not the metagame's engine.
 
 ---
 
-## What must NOT happen
+## What must NOT happen *(Ben, 2026-09-07 — ruled; this section is settled)*
+
+*The prohibitions below were the last open question in this document. They are now ruled and are
+not a proposal: each is binding, and each restates for events a rule the project already holds
+elsewhere — which is why ruling them cost nothing and leaving them open cost a false header.*
 
 - **No event may be unavoidable and unsignalled.** A player must be able to see, in advance, that a
   *class* of thing can happen — even if not which or when. Otherwise an event reads as the game
@@ -204,7 +216,7 @@ consequence layer, not the metagame's engine.
 
 ---
 
-## Settled — Ben's rulings, 2026-08-22
+## Settled — Ben's rulings, 2026-08-22, completed 2026-09-07
 
 All six questions answered from the design register.
 

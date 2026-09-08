@@ -1,5 +1,12 @@
 # Project Io — The Meta Layer
 
+> **Settles:** what a rule is made of · what the predicate vocabulary may test · what the effect
+> vocabulary may change · why the two halves are not symmetric · what it takes to admit a new
+> condition or modifier. Read before adding any rule family.
+> **Not here:** what any one rule family says (laws, events, contracts — their own docs) · what a
+> rule is worth in play (the owning system).
+> **Confused with:** EVENTS.md, SYSTEMS.md, politics/NATIONS.md.
+
 **The predicate and effect substrate** that laws, technologies, quests and embargoes are all built
 out of. Two closed vocabularies and about four hundred lines of code, under every rule the game can
 express.
@@ -266,7 +273,7 @@ authors the predicate.** One authority for what a gate requires.
 **Related authorities.** [`docs/politics/NATIONS.md`](politics/NATIONS.md) (laws, and the
 enforcement seam), [`SYSTEMS.md`](SYSTEMS.md) § Conditions (the one-paragraph overview this document
 expands), `docs/research/TECH_EFFECTS.md` (research scaffolding for what a tech should *do*),
-`docs/economy/MARKETS.md` § Procurement (where the embargo predicate is read),
+`docs/economy/CONTRACTS.md` § Procurement — the buy side (where the embargo predicate is read),
 [`EVENTS.md`](EVENTS.md) (the rule family that adds a trigger to a predicate and an effect).
 
 **Backlog.** BL-342 (condition evaluator) and BL-479 (tech effect union) own the two halves.

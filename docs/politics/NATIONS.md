@@ -1,5 +1,15 @@
 # Project Io — Nations
 
+> **Settles:** what a nation is once generation has finished making it · what it holds — territory,
+> treasury, budget weights, law · how a law reaches the market · what an import tariff does and
+> which direction it points · what a nation may do, what it does each tick, and in what order it
+> spends · what a nation wants.
+> **Not here:** how a nation comes to exist — territory placement, resource profile, character,
+> naming (NATION_GENERATION) · which quantity says how a nation reads a corporation (RELATIONS) ·
+> the predicate/effect substrate a law is composed from (META_LAYER) · a corporation's own money loop
+> (FINANCE).
+> **Confused with:** generation/NATION_GENERATION.md, politics/RELATIONS.md, META_LAYER.md.
+
 **The nation as an actor** — what a nation *is* once generation has finished making it, what it
 holds, what it may do, and what it does each tick. This document is the authority for that
 question, and it is the one `docs/generation/NATION_GENERATION.md` explicitly declines:
@@ -113,7 +123,7 @@ indexed by them):
 | `military_research` | force-side research, and a nation's own garrison upkeep (MILITARY.md § Nation garrisons) |
 | `academic_research` | the civil tech ladder — `science` is reached, not spent, and this is the debit BL-478 (ancient research spend) is shaped around |
 | `public_exploration` | state-funded survey — DISCOVERY.md's geographic fog |
-| `contracted_force` | buying force the nation does not raise — CONTRACTS.md § Where offers come from (BL-572) derives an offer from this line's spendable share |
+| `contracted_force` | buying force the nation does not raise — BL-572 (contract offers) derives an offer from this line's spendable share; the contract form itself carries no sell side to buy through (CONTRACTS.md § Explicitly out of scope) |
 | `strategic_reserve` | buying goods to **hold** — through BL-350's procurement seam from a named supplier, never on the market. Distinct from `reserve_fraction`, which withholds credits; this line spends them |
 | `public_works` | works a corporation builds and the nation pays for |
 | `charters` | paying a corporation to exist somewhere it otherwise would not |
@@ -609,8 +619,8 @@ harness must say so where a reader would otherwise assume the channel's rule.
 **Related authorities.** `docs/generation/NATION_GENERATION.md` (how a nation is made),
 `docs/economy/FINANCE.md` (the money loop the levy is accounted in), `docs/economy/MARKETS.md`
 (§ Tariffs, the clearing-tick half), `docs/politics/RELATIONS.md` (sentiment, the substrate
-nation→corp stance reads), `docs/economy/CONTRACTS.md` (§ Where offers come from, the
-`contracted_force` line's consumer), `docs/military/MILITARY.md` (§ Nation garrisons, the
+nation→corp stance reads), `docs/economy/CONTRACTS.md` (§ Explicitly out of scope, the sell side
+the `contracted_force` line would buy through), `docs/military/MILITARY.md` (§ Nation garrisons, the
 `military_research` line's other consumer), `docs/SYSTEMS.md` (§ Policy, § Conditions),
 `.claude/rules/io-standing-rules.md` (the grant's exact terms).
 

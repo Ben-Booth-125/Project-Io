@@ -53,6 +53,10 @@ Read for **traversal**: find the doc that owns the question and read that one. T
 ~650K tokens (`node tools/doc_weight.js`); reading it all is not an instruction anyone can
 follow. Where a store has a query tool, use the tool, never load the file.
 
+Starting at the **code** rather than the subject? `node tools/session/doc_owner.js <path>` names the
+owning doc(s) for a source file, ranked by how often work on it cited each — the inverse of
+`backlog_query.js --touches`, derived from the backlog, and honest about a path nothing owns.
+
 ### Game — what it is
 | Doc | Owns |
 |---|---|
@@ -69,14 +73,14 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | Doc | Owns |
 |---|---|
 | `docs/economy/RESOURCES.md` | The resource list, tiers, terrain affinity, era split. |
-| `docs/economy/PRODUCTION.md` | Buildings, recipes, placement, workforce, stockpile flow. |
+| `docs/economy/PRODUCTION.md` | Buildings, recipes, placement, labour demand and shortfall, stockpile flow. |
 | `docs/economy/MARKETS.md` | Market centres, clearing, price resolution, the order book. |
 | `docs/economy/FINANCE.md` | The money loop: income, expenditure, maintenance, wages, interest, debt. |
-| `docs/economy/CONTRACTS.md` | Promises between named parties: procurement and the mercenary contract — the income loop. |
+| `docs/economy/CONTRACTS.md` | Promises between named parties: procurement, the buy side. |
 | `docs/economy/LOGISTICS.md` | The network: traversal cost, reach, roads, scale/travel time, interdiction, Logistic Points. *Logistics is the road.* |
 | `docs/economy/SUPPLY.md` | The flow: convoys — cargo, dispatch, cost, arrival. *Supply is the traffic.* |
 | `docs/economy/TILES.md` | Two-axis terrain, deposit profiles, amenity tiles. |
-| `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability. |
+| `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability, labour supply and contention. |
 | `docs/economy/ERAS.md` | The era ladder and the gate into space. |
 | `docs/economy/RESEARCH.md` | Research points and technology unlocks (stub). |
 | `docs/economy/SPACE_ASSETS.md` | Off-body assets (stub). |
@@ -107,7 +111,7 @@ follow. Where a store has a query tool, use the tool, never load the file.
 ### AI & tech
 | Doc | Owns |
 |---|---|
-| `docs/ai/AI_OPPONENT.md` | The whole AI direction: scored-utility rivals, the word interface, the local-model goal, the no-cloud invariant, the MCP server. |
+| `docs/ai/AI_OPPONENT.md` | The whole AI direction: scored-utility rivals, the word interface, the local-model goal, the no-cloud invariant, the MCP server. **§ 11 is the grant register** — every dated exception to the AI-behaviour prohibition; read it before touching `corp_ai.cpp`. |
 | `docs/ai/ACTIONS.json` → `ACTIONS.md` | The action dictionary — every control as press/args/preconditions. Query with `tools/session/actions_query.js`; never hand-edit the mirror. **Any control change updates its entry.** |
 | `docs/ai/STRATEGIES.md` | The meta, authored ahead of the game — research, not authority. |
 | `docs/ai/LANGUAGE_POLICY_FEASIBILITY.md` | Research note: does a language-driven opponent compress and run locally. |
@@ -119,6 +123,7 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | Doc | Owns |
 |---|---|
 | `docs/ui/LAYOUT.md` | The application shell — how regions are arranged around the canvases. |
+| `docs/ui/DRILL_THROUGH.md` | The disclosure idiom every dense surface obeys — folded, expanded in place, full canvas. |
 | `docs/ui/CANVASES.md` → `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md`, `MINIMAP.md` | The zoom-ladder canvases and the minimap chrome. |
 | `docs/ui/RENDERING.md` | Canvas ground rendering: the baked-chunk mechanism, C-F direction, grid rule, installations-as-geometry, animation, LOD. |
 | `docs/ui/design/GLOBAL_STYLE_SHEET.md` | The visual-language exploration (owner: Joe) — style verdicts, palette, render iterations in `design/renders/`. Settled values promote into the authority docs. |
@@ -138,10 +143,10 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | Store | Owns | Tool |
 |---|---|---|
 | `docs/development/DELIVERY.md` | The method: lifecycle, design state, depth verbs, batch, worktrees. Read before Full mode. | — |
-| `docs/development/DEVELOPMENT_PRACTICES.md` | Harness testing (no unit framework), naming, doc standards, release cutting. | — |
+| `docs/development/DEVELOPMENT_PRACTICES.md` | Harness testing (no unit framework), naming, doc standards, release cutting, the doc header. | `header_graph.js` (`--dangling --graph --coverage --state --doc --strict --json`); dangling citations and state-dependent headers fail, the boundary graph prints |
 | `docs/development/ROADMAP.md` | Milestone sequence through v1.0.0. The only place that says *when*. | — |
 | `docs/development/backlog.json` | **Open work only** — closed items, delivered or cancelled, are not here at all. **Query, never load.** | `backlog_query.js` (`--status --priority --version --touches --grep --full`), `backlog_view.js`, `next_id.js`, `backlog_lint.js` |
-| `docs/development/archive/backlog-design-*.json` | Closed items **whole** — row and prose. Amend anything closed **here**. The query tools union it automatically, so `--touches` still answers "is this built?", and `--status cancelled` finds work that was closed unbuilt. | `archive_landed.js` (rows, `--restore`), `archive_designs.js` (prose) |
+| `docs/development/archive/backlog-design-*.json` | Closed items **whole** — row and prose. Amend anything closed **here**. The query tools union it automatically, so `--touches` still answers "is this built?", and `--status cancelled` finds work that was closed unbuilt. **A cold row takes its state from the FILE it sits in, not its own `status` field** — the 2026-08 sweeps froze theirs mid-flight — so the purge reads `purged` and is distinct from `cancelled`. | `archive_landed.js` (rows, `--restore`), `archive_designs.js` (prose) |
 | `docs/development/REFINED.md` | The active worklist — promoted tasks. Empty between work blocks. | — |
 | `docs/development/req/requirements.json` | Requirements and their verification record. | `requirements_query.js`, `archive_requirements.js` |
 | `docs/development/NEEDS_REVIEW.json` → `.md` | Ben's review queue: questions, decisions taken on his behalf, observations, novelty flags. Write **as things arise**, not at close. Resolved entries go cold in `archive/needs-review-<quarter>.json`. | `render_needs_review.js`, `archive_reviews.js` |

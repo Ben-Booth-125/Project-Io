@@ -254,7 +254,7 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 *Demanded by BL-687 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp` · id `market_ledger_trades`*
 
-### National border band (Planetary canvas, always-on chrome)
+### National border band (Planetary canvas, plain-canvas chrome)
 
 **Answers:** Whose ground is this, and where does it stop?
 

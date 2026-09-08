@@ -1,5 +1,13 @@
 # Project Io — the action dictionary
 
+> **Settles:** which controls exist at all · what pressing one does and what it
+> needs first · which of them a rival may issue as a `corp_verb` and which are
+> view-only · what arguments a press takes · how an AI player names an action.
+> **Not here:** how the surface holding a control looks or behaves (the `ui/` docs)
+> · what a rival *chooses* to press and why (AI_OPPONENT) · what the underlying
+> system does with the press (the system's own doc).
+> **Confused with:** ai/AI_OPPONENT.md, ui/LAYOUT.md, ui/SELECTION.md.
+
 Every control in the game: what pressing it does, and why you would. Readable
 mirror of [`ACTIONS.json`](ACTIONS.json), which is canonical — the JSON is the
 machine-consumable half an AI player reads (BL-270). Pair it with the corp
@@ -759,7 +767,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ### `canvas.select` — The primary canvas (Solar, Circumplanetary, or Planetary rung — whichever fills the window).
 
-**Press.** Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a TILE or marker on the Planetary surface. A LIVE BATTLE OUTRANKS ALL OF THEM (BL-469): if a fight stands in the clicked tile's province, the click selects the battle. UNDER A LENS THIS ALL CHANGES (BL-664, Ben 2026-08-28). A lens collapses selection to ONE TIER: the press resolves to the active lens's structure or to NOTHING, markers take no part ('markers do not outrank lenses'), and there is no repeat-click cycle. Corporation resolves the owner's tile group on this body, Company the same for a background firm, Resource the deposit, Market and Scarcity the catchment, Continent the plate. Population, Industry and Throughput draw a value field with no structure grain and are INERT — a press does nothing and clears the Selection band to resting, as does a press on any ground the active lens has no answer for (unowned ground under Corporation, a tile without the selected resource under Resource). The national border band is outside the rule and stays clickable under every lens (canvas.border_band_select). Everything above this sentence describes the canvas with NO lens active.
+**Press.** Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a TILE or marker on the Planetary surface. A LIVE BATTLE OUTRANKS ALL OF THEM (BL-469): if a fight stands in the clicked tile's province, the click selects the battle. UNDER A LENS THIS ALL CHANGES (BL-664, Ben 2026-08-28). A lens collapses selection to ONE TIER: the press resolves to the active lens's structure or to NOTHING, markers take no part ('markers do not outrank lenses'), and there is no repeat-click cycle. Corporation resolves the owner's tile group on this body, Company the same for a background firm, Resource the deposit, Market and Scarcity the catchment, Continent the plate. Population, Industry and Throughput draw a value field with no structure grain and are INERT — a press does nothing and clears the Selection band to resting, as does a press on any ground the active lens has no answer for (unowned ground under Corporation, a tile without the selected resource under Resource). The national border band is NOT an exception: it is suppressed while any lens is up (Ben, 2026-08-28, reaffirmed 2026-09-07), and its hit corridor goes with it - the corridor is built in the same pass as the stroke, and a border that is invisible but still clickable is worse than either state. Everything above this sentence describes the canvas with NO lens active.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -864,7 +872,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Move closer to or further from a specific spot — cursor anchoring means you aim the zoom at the thing you are interested in.
 
-### `canvas.border_band_select` — The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths.
+### `canvas.border_band_select` — The national border band on the Planetary canvas — plain-canvas chrome, not a lens, and suppressed while any lens is up. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths.
 
 **Press.** Single left-click inside the band, on the boundary between two territories (or between a territory and unclaimed ground).
 

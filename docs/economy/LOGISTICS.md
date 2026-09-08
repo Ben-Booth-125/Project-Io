@@ -1,5 +1,14 @@
 # Project Io — Logistics
 
+> **Settles:** what it costs to cross a tile and which path is taken · how far a placement may
+> reach · where roads come from and who may extend them · how physical scale becomes travel
+> time and how long a leg takes · what can cut a route · what caps how much may be in motion at
+> once.
+> **Not here:** the convoy itself — its cargo, dispatch, trigger and arrival (SUPPLY) · what the
+> cargo is worth at either end (MARKETS) · what the ground is made of (TILES).
+> *Logistics is the road; Supply is the traffic.*
+> **Confused with:** SUPPLY.md, TILES.md, MARKETS.md.
+
 **The network.** How far anything is from anything else, what it costs to cross, how long it takes,
 and what the network permits. This document owns the **substrate**; `SUPPLY.md` owns the **flow that
 runs on it** (convoys).
@@ -251,23 +260,38 @@ nothing — the network's failure state remains insolvency, not decay.
 
 ### 5. Physical scale and travel time (Ben, 2026-08-12)
 
-**Scale is derived, not authored.** Planetology generates `home_mass`; a rocky planet's radius
-follows roughly `R ∝ M^0.27`, so tile width falls out of a scalar the generation chain has already
-settled. At Earth mass on the 312-column grid that is **~128 km per tile** — which puts a day's
-march at about a fifth of a tile and makes a tile **a region-sized unit rather than a field.**
+**A tile has a physical size, and it is derived rather than authored.** Planetology generates
+`home_mass`; a rocky planet's radius follows its mass as roughly `R ∝ M^0.27`, so radius →
+circumference → `circumference / grid_width` gives kilometres per tile — tile width falls out of a
+scalar the generation chain has already settled. At Earth mass on the 312-column grid that is
+**~128 km per tile** (`body_km_per_tile`, `src/world/logistics.hpp`), which puts a day's march at
+about a fifth of a tile and makes a tile **a region-sized unit rather than a field.**
 
-Without a tile scale, convoy speed would be an *interplanetary* calibration (`1 / distance_in_AU`)
-and every intra-body convoy would arrive in one econ tick whether it crossed one tile or all 312 —
-distance would cost money and never cost time, and tripling the map could not make distance feel
-bigger.
+Without a tile scale, speed on this network would be `1 / distance_in_AU` — an *interplanetary*
+calibration — and since `body_distance_au` returns 0 for two markets on the same body, **every
+intra-body haul would arrive in exactly one econ tick (90 days)** whether it crossed one tile or all
+312. Distance would cost money and never cost time, and a bigger map would only mean the same 90
+days buys more reach.
 
-**Two speeds, and the gap between them is a design lever:** caravan **25 km/day**, coastal vessel
-**130 km/day**. Roughly five times, *"and that difference is the whole reason coastal trade is worth
-designing"* — BL-188 (coastal ports) owns the sea-trade design that reaches the faster speed.
+**Travel time reuses the terrain weighting the pathfinder already computes.** `logistics_path::cost`
+is weighted by § 1's one weight function (plains ×1.0 … mountain ×2.0), so it is a count of
+*effective* tiles — and terrain cost is already a time multiplier. The A\* weights do double duty
+rather than needing a parallel table:
 
-**Terrain cost doubles as a time multiplier** — the A\* weights do double duty rather than needing a
-parallel table. Travel is quantised to whole econ ticks (minimum 1), because the economy resolves
-quarterly.
+```
+days   = path.cost × km_per_tile ÷ km_per_day
+ticks  = ceil(days ÷ 90)          # the economy clears quarterly; minimum 1
+```
+
+**Two speeds, and the gap between them is a design lever:** **land ~25 km/day** (an ox-and-cart
+caravan) against **sea ~130 km/day** (a coasting vessel). Roughly five times, *"and that difference
+is the whole reason coastal trade is worth designing"* — BL-188 (coastal ports) owns the sea-trade
+design that reaches the faster speed. A short regional haul lands in one quarter; a long one takes
+several.
+
+The **space leg** is the one leg the AU calibration is right for: it keeps its own ~1-tick-per-AU
+rate over the Euclidean body-centre distance of § 8, while the tile scale above governs everything
+that crosses a body's ground.
 
 ### 6. Cache invalidation — narrowed, for a real reason
 

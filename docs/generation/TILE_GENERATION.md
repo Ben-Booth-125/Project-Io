@@ -1,5 +1,15 @@
 # Project Io — Tile Generation
 
+> **Settles:** what each of the six passes does to a tile, and in what order · how a body
+> profile turns solar parameters into terrain without body-specific code · how a biome
+> decomposes into the terrain axes · how deposits are placed, and how the fossil/living
+> split is decided · how a sibling pass extends the pipeline without changing the core ·
+> what a tile records for the ledger.
+> **Not here:** where the height bias comes from (CONTINENTS) · where the body profile comes
+> from (PLANETOLOGY) · how tiles are partitioned into provinces (PROVINCES) · what a
+> resource is and what it is worth (../economy/RESOURCES, ../economy/TILES).
+> **Confused with:** CONTINENTS.md, PROVINCES.md, ../economy/TILES.md.
+
 This document specifies the strategy and rules for procedural tile generation in
 `hard_coded_world.cpp`. Generation is **deterministic**: every body has a fixed
 seed and a solar-parameter profile — **derived by the Planetology chain**
@@ -139,8 +149,8 @@ The same heightmap on an airless body still generates and drives landform
 assignment — a crater-heavy moon still has elevation structure.
 
 The normalised heightmap is **retained** on `tile_component::height` and serialised,
-because the province partition reads it (§ Province partition); every other
-intermediate is disposable (`GENERATION_LEDGER.md` § Data lifetime).
+because the province partition reads it ([`PROVINCES.md`](PROVINCES.md) § The partition);
+every other intermediate is disposable (`GENERATION_LEDGER.md` § Data lifetime).
 
 ---
 
@@ -597,133 +607,14 @@ monotonic descent / no cycles, discount ordering) and a bitmask-identity check f
 
 ---
 
-## Province partition
+## The province partition runs after this pipeline
 
-> **[`PROVINCES.md`](PROVINCES.md) is the authority for the province as a game object** — what
-> it is, the three size constants and why there are three, the three domains, what reads it, and
-> the rulings behind all of it. This section keeps the **generation-pass** view: where the
-> partition sits in the pipeline and what it consumes. The partition is BL-515 (province
-> partition); the water domains are BL-516 (water provinces).
-
-The last generation pass over a body's land: `build_province_partition`
-(`src/world/province.{hpp,cpp}`), run from `make_hard_coded_world` after nations,
-corporations, population centres, rivers and roads exist — because it reads all of
-them. It is organic rather than a regular block partition by ruling (Ben, 2026-08-21):
-*"packing each province perfectly looks nice, but it is scarcely how borders were
-defined in history."*
-
-**Provinces grow from settlement and are stopped by terrain.** Four rulings
-(Ben, 2026-08-21) define it, and `province.hpp` is the authority for the mechanics:
-
-| Ruling | How the pass realises it |
-|---|---|
-| Seeds are population centres, strength scaling with scale 1–5 | Each centre seeds one region with a growth budget of 7 tiles (village) to 12 (metropolis); all centres grow simultaneously as one multi-source fill |
-| Boundaries are rivers, elevation difference, and sometimes roads — but **a road binds** | Integer edge cost `base 10 + river 40 + round(\|Δheight\| × 683) + jitter 0–4`, the whole sum divided by 4 when both tiles are roaded |
-| Identity is the **lowest-id member tile** | Derived, never allocated — so an id cannot be handed out in the wrong order, and nothing new is serialised |
-| Country no centre reaches becomes **hinterland** | Seeds chosen from the least-accessible tile onward at a minimum spacing of 3, all chosen before any grows |
-| 7–12 soft, 3–12 hard, boundaries win ties; **tiny provinces are kept** | A region takes its first 3 tiles at any cost, then grows to its budget, then annexes only ground no harder to reach than what it already holds. Nothing is ever merged away |
-| **12 is a PREFERENCE; 20 is the hard cap** (Ben, 2026-08-21, NR-438) | Growth clamps at 12, but singleton absorption can carry a full region past it. The bound that is *asserted* is 20 (`k_province_hard_cap_tiles`); the over-12 share is **reported**, never asserted |
-
-**Why the cap is 20 and not 12.** Pass 3 absorbs a one-tile province into its
-**cheapest** neighbour, and that neighbour may already hold 12. The three ways out
-are clamping (dishonest), preferring a roomier neighbour (which contradicts the
-cheapest-edge rule the growth model is *expressed in*), or a higher bound. Ben chose
-the bound — *"we prefer up to 12 tiles, but up to 20 is permitted in rare cases"* — so
-the cheapest-edge rule survives intact, which is what the ruling protects. (The
-prefer-room variant was measured at 241 over the preference, max 14, and rejected;
-the breach was its only justification.)
-
-**Elevation is read from the retained heightmap.** The pass reads
-`tile_component::height` — Pass 1's normalised heightmap, retained for this
-consumer (BL-517, retained height) — not the seven landform classes, whose numeric
-order means nothing (`GENERATION_LEDGER.md` § Data lifetime).
-
-### Provinces over water
-
-Ben: *"We can also draw provinces over the ocean, using 3-12 size coastal tile
-provinces. Ocean provinces should be much larger, but not larger than say 80
-tiles."* The partition runs **the same algorithm three times**, over three
-exclusive tile sets, and a province never spans two of them:
-
-| Domain | Tiles | Growth clamp | Hard cap | Seed spacing | Seeded by |
-|---|---|---|---|---|---|
-| Land | everything not water | 12 (preferred) | 20 | 3 | population centres, then hinterland |
-| Coastal water | `coast` + `lake` | 12 (preferred) | 20 | 3 | hinterland only |
-| Open ocean | `ocean` | **80** | — (see below) | 7 | hinterland only |
-
-**The land-only invariant is narrowed, not deleted** (NR-428). Land provinces are
-hex-connected land that never spans water; the general claim — asserted by the
-harness as P2b — is that **a province holds exactly one domain**, which is strictly
-stronger, since it also forbids a lake joining the sea.
-
-**Open ocean has no separate hard cap, deliberately.** Land needed one because Ben
-ruled a preference (12) and a bound (20) as two different numbers; for the sea he
-named one number. Inventing a second would invent a threshold nobody chose, so
-what carries the 80 instead is the exact identity the harness asserts: *every tile
-above it arrived by singleton absorption, never by growth.*
-
-**The sea spacing is measurement-pinned, and the pin rule is "the cap must stay a
-guard, not a clamp."** Seeds at separation *d* tile a plane in cells of area
-(√3/2)·*d*², so the lattice predicts a mean size; where growth is running into the
-ceiling instead of meeting its neighbours, the measured mean falls away from that
-prediction and provinces pile up on the clamp exactly:
-
-| d | ideal cell | measured mean | max | exactly on the 80 | provinces |
-|---|---|---|---|---|---|
-| 6 | 31.2 | 32.17 | 75 | 0 (0.0%) | 2,901 |
-| **7** | **42.4** | **41.07** | **82** | **26 (1.1%)** | **2,272** |
-| 8 | 55.4 | 49.29 | 83 | 207 (10.9%) | 1,893 |
-| 9 | 70.1 | 55.25 | 83 | 507 (30.0%) | 1,689 |
-
-At *d* = 8 one province in nine sits exactly on 80 — the clamp is drawing the size
-rather than guarding it. At *d* = 7 the measured mean still matches its lattice
-prediction, which is the evidence that terrain and spacing set the size. 41 tiles
-against land's 8.6 is also "much larger" by nearly five times.
-
-**Only OPEN OCEAN is addressable empty space, and only because nobody can hold
-it.** This paragraph read *"Sea provinces are addressable empty space. Units are
-land-bound… They exist without a naval model to justify them"* until 2026-09-06,
-when Ben's water-domain ruling gave them one. What is true now:
-
-| Domain | Held by | Occupied by | Builds |
-|---|---|---|---|
-| Coastal water, lake | the owner of the shore | coastal/naval units; land units where the water is **owned** | a **port**, and nothing else |
-| Open ocean | nobody, structurally | coastal/naval units only | nothing |
-
-`docs/generation/PROVINCES.md` § Who owns water owns the ownership rule and
-`docs/military/MILITARY.md` § Domains and traversal owns the traversal rule; this
-pass owns only the **partition** that gives them something to address. A coastal
-province is therefore no longer empty space — it is territory with an owner
-derived from its shore. Open ocean stays empty, deliberately: it is *crossed*
-rather than held, so what makes it matter is traffic and not title.
-
-**Open question for Ben:** a **lake** is partitioned on the coastal band, as its own
-province. Ben named lakes as a tile kind but did not rule what province a lake
-belongs to (its own, the surrounding land province, or a coastal one). Its own was
-chosen because it invents no new size rule and keeps the one-domain invariant.
-
-**The measured distribution, 6 seeds** (`tools/verify/province_partition_harness.cpp`,
-sections C and D — which is also the re-pinning instrument for the two
-measurement-pinned coefficients):
-
-| Partition | provinces | min | max | mean | < 7 | < 3 | > 12 | % in 7–12 |
-|---|---|---|---|---|---|---|---|---|
-| Organic, pre-absorption | 24,498 | 1 | 12 | 7.87 | 6,195 | 3,008 | 0 | 74.71% |
-| Organic, **with absorption** | 22,390 | 1 | **16** | 8.61 | 4,098 | 913 | 1,096 | 76.80% |
-
-The spread is wide **on purpose** and is reported rather than tuned: organic
-borders are irregular, and the sub-floor tail is the pockets a ceiling leaves
-behind — kept by ruling, not repaired.
-
-Read the absorption row against the hard cap, not against 12. **Max 16 against a cap
-of 20**, so the bound holds with four tiles of headroom, and **4.90% sit above the
-preferred 12**. Absorption is what moves every one of those numbers: it converts
-2,098 one-tile provinces into member tiles of their cheapest neighbour, which is
-why the count falls, the mean rises, and the sub-floor tail more than halves. The
-harness asserts the cap and the accounting identity (every tile above 12 arrived
-by absorption, so growth's own clamp is still proven separately) and **reports**
-the 4.90% — whether that counts as "rare" is Ben's judgement against a number, and
-no threshold for it has been chosen.
+`build_province_partition` is not one of the six passes, and not a sibling pass either: it reads a
+body's finished tile map rather than building one. [`PROVINCES.md`](PROVINCES.md) owns what a
+province is and how the partition is grown; [`GENERATION_STRATEGY.md`](GENERATION_STRATEGY.md) owns
+where it sits in the pass order. What this pipeline owes it is Pass 1's normalised
+`tile_component::height`, retained for that consumer rather than discarded with the other
+intermediates (§ Pass 1 — Heightmap).
 
 ---
 

@@ -1,63 +1,49 @@
-# Next session — sprint 35, the startup budget
+# Next session — re-planning from a clean sheet
 
-Sprints 32, 33 and 34 all closed. They were **one sprint carrying six independent bodies of work**,
-split twice in flight as 32a/32b/32c; Ben renumbered them to plain 32, 33 and 34 on 2026-09-08 and
-opened **sprint 35** on the first strand alone. `docs/development/SPRINTS.md` § Sprint 35 is the
-plan; this note is the handoff.
+**The whole board was cleared on 2026-09-08.** Ben's call: too many items hung off sprint plans
+that should have been better planned. The live backlog (**31 items**), the review queue (**6
+entries**) and the sprint list (**32c, 33, 34**) were all archived. **Nothing below is an open
+commitment.** It is kept as the input to the next planning pass — the findings are real, the item
+numbers are not live work. Cancelled rows are whole and cold in `archive/backlog-design-2026-Q3.json`
+(`backlog_query.js --status cancelled --full`, or `archive_landed.js --restore`); the queue entries
+are in `archive/needs-review-2026-Q3.json`; the sprints in `archive/sprints-2026-Q3.json`.
 
-> **A bare "sprint 33" written before 2026-09-08 means the DELETED market-viability sprint**, not
-> the water-model sprint that now holds the number. That sprint never executed — all five of its
-> items were cancelled unstarted — and it was deleted under the unstarted-plans rule.
+Sprint 32b closed 2026-09-06 with **eleven items delivered**; 32c had carried the remaining 28.
+`docs/development/SPRINTS.md` § Sprint 32c was the plan.
 
-## Start here — one number
+## Start here — two independent chains
 
-The wait between pressing *new game* and playing. Measured 2026-09-03 in the **release** play build:
+**1. The water model reaches its judgement point.** BL-776 and BL-777 landed: coastal water and
+lakes are owned, open ocean is not, and no region anchors on open ocean. Remaining:
 
-| | warm start | convoys | `run_economy_step` |
-|---|---|---|---|
-| epoch 1960 (two-span) | 73,167 ms | 14,763.9 | 57,023.9 |
-| epoch 0 (ancient) | 72,088 ms | 28,321.1 | 42,361.6 |
+- **BL-778** (unit traversal domains) — a roster row declares which domains it crosses; land units
+  may cross **owned** coastal water, the deliberate middle case. **Gate on `region::domain`, never
+  on `port_q`** — that is a decayed wetness fraction that counts lakes and is inherited at 0.7×
+  without re-surveying. `HISTORY.md` now says so explicitly.
+- **BL-779** (naval rows become real) — `unit_class::naval` returns base power 0 and `sum_stack`
+  skips the class, so three authored port-gated rows are worth nothing.
+- **BL-780** (the ONE re-bless) — read the warning below before touching it.
 
-Generation end to end is ~8 s. The Era −1 sim this whole arc has been optimising is 197–323 ms —
-**under half a percent** of what the player waits through.
+**2. Phase 6 gets its search.** The objective can finally see a roster (BL-770 slices 1–2). What is
+missing is candidate generation, parallel evaluation and a deterministic argmax —
+`landscape_score.cpp` still has **no caller outside its own harness**. Building it unblocks BL-772
+(retire the warm start) and BL-773 (the 3–6 minute budget).
 
-- **BL-761** (warm start is 72 seconds) — first, because it is the profile every later decision is
-  taken on. 530–710 ms **per tick**, which is also what the player pays per tick at speed once
-  playing. This is a play-speed problem wearing a loading-screen costume.
-- **BL-772** (retire the warm start) — the headline, and **its blocker is gone**: `landscape_search`
-  now has a caller in `app.cpp` (landed in sprint 34). What remains is the restructure the sprint 34
-  retro named — `generate_corporations` appends and runs **before** the registry loads, so phase 6
-  cannot vary the specialist roster at the live seam.
-- **BL-773** (3–6 minute budget) — keeps the arithmetic true as each piece lands. Phase 6 already
-  costs **+20 s** of measured startup: a regression until BL-772 removes the 72 s beside it.
-- **BL-754** (generation budget) — the **on-screen** half, still owed. The console half was proved
-  2026-09-06; R1 is deliberately not complete because nobody has opened the app and looked at the
-  generating screen.
+## BL-780 carries two problems it did not create
 
-## The one risk worth reading before starting
+**FOUR CAUSES, NOT ONE.** BL-780 was designed as the single point where the *water model* moves the
+world once and a human asks whether the new world is better. Wave 1 ran three reorder items
+alongside it, so the movement is now the water carve **plus** the population map **plus** the empire
+forces **plus** the paleo deposits. Every item measured its own before/after in isolation, so the
+causes stay attributable — but the question is no longer simple, and the description Ben authorises
+against must name all four.
 
-**Phase 6's objective is partly blind — NR-793, open, confirmed on a live world.** Road tier is
-invisible to it, because the resource-coverage boolean is saturated. BL-772 hands that same
-objective the warm start's whole burden. Sprint 34 already refused this trade once and was right to;
-if the restructure does not land clean, taking the block again is the correct outcome.
-
-That is why **roads is the strongest candidate to run next**, and it may turn out to be a
-precondition rather than a neighbour. Decide it on a measurement, not in advance.
-
-## The other four strands — backlog items, not sprints
-
-Deliberately not authored as sprints: authoring five at once re-creates the sprawl that split sprint
-32 three ways, and an unstarted plan is a stale reference.
-
-| Strand | Items |
-|---|---|
-| **Roads mean traffic** | BL-784 (one nation roaded solid) + NR-793 |
-| **Instruments** | BL-753 (generation scoreboard), BL-758 (1960 demography), BL-781 (query ignores unknown flags) |
-| **Maritime close-out** | BL-786 (port on owned coastal water), BL-749 (sea-leg campaign), BL-752 (colonial ties) |
-| **Deep time** | BL-764 (the Lagrangian frame) — difficulty 5, splits at promotion |
-
-BL-786 is buildable now. BL-749 is held on three NR-785 calls, and BL-752 sits behind it.
-BL-753 was repointed off cancelled BL-751 on 2026-09-08 and is **unblocked**.
+**AND THE CENTRAL CLAIM CANNOT BE SEEN — NR-791.** The hover card over water reports terrain and
+habitability and says nothing about an owner; clicking water does not update the Selection panel; no
+lens colours territory by owner. BL-780 asks for a judgement *by looking* at a change that is
+currently invisible on every surface the game has. **Close that before the re-bless, not after** —
+the recommendation on the entry is to put ownership on the water hover card, since the card already
+reads the tile.
 
 ## What Ben spotted that no harness could — BL-784
 
@@ -75,31 +61,54 @@ The design question underneath is not a tuning one: **is a founding line a trade
 A parent settling a daughter walked that ground once; a supply line walked forty times is a road.
 Weight or exclude the settle corridors rather than raising the threshold — but that is a call.
 
-## Open calls waiting on Ben
+## Calls that were waiting on Ben — all archived unanswered 2026-09-07
+
+None of these is a live queue entry any more. They are here as the questions the re-plan inherits.
 
 | | |
 |---|---|
-| **NR-793** | Road tier is invisible to the phase 6 objective — bears directly on sprint 35 |
+| **NR-791** | Coastal ownership is invisible — blocks BL-780's own done-when |
 | **NR-785** | Three surviving sea-leg calls; hold BL-749 and through it BL-752 |
 | **NR-783** | Span boundary: authored at epoch − 400, or derived from the first furnace |
 | **NR-784** | Cap the ancient arc at medieval? BL-760's counters can now answer it — nothing above medieval is ever fielded |
 | **NR-787** | Stagnant lid immobile in the paleo frame — a modelling call that turned a red row green |
 | **NR-790** | The fossil epoch derivation — authored, and every later paleo consumer copies its shape |
-| **BL-758** | Era-seeded demography at 1960; `era_world_harness` R2 is deliberately **red** since 2026-09-03 |
+| **NR-788** | **Six** harnesses now ad hoc, awaiting skill names: `continent_drift`, `sim_water_census`, the saturation measure, `deposit_origin`, `landscape_score_harness`, `centre_region_bind` |
+| **BL-758** | Era-seeded demography at 1960; `era_world_harness` R2 is deliberately **red** |
 
-## Standing hazards, learned the hard way
+Two more from 32b, both about the furnace: is **1–4 crossers of 12** the intended outcome (BL-748's
+own done-when asked for a *wide* distribution), and is **within-world tariff flatness** enough to
+open BL-488's verb form?
 
-- **`build/` is Debug.** Its timings are not comparable to BL-761's Release figures. The Debug warm
-  start is **~11 minutes**, which makes the Debug play loop barely usable — a sharper argument for
-  BL-772 than the Release number is.
+## Standing hazards, learned the hard way this sprint
+
 - **Exactly one item per wave may bump `save_game_version`.** Two agents bumped 4→5 independently
   and produced two layouts under one version number. It is at **8**.
-- **A worktree agent cannot build `save_envelope_roundtrip`** (imgui). Budget for the integrating
-  session writing the check.
+- **A worktree agent cannot build `save_envelope_roundtrip`** (imgui). Every save-format change this
+  sprint arrived unasserted and the integrating session had to write the check. Budget for it.
 - **Any tooling fix for worktree agents must be tested FROM a worktree.** Three builder fixes landed
-  and the first two verifications ran in the main checkout, where the bug could not appear.
-- **Agents' worktree bases are stale by default.** Every one last sprint was; all had to merge main
+  and the first two verifications were run in the main checkout, where the bug could not appear.
+- **`build/` is Debug.** Its generation and warm-start timings are not comparable to BL-761's
+  Release figures. The Debug warm start is ~11 minutes, which makes the Debug play loop barely
+  usable — a sharper argument for BL-772 than the Release number.
+- **Agents' worktree bases are stale by default.** Every one this session was; all had to merge main
   before starting.
-- **A green check is not evidence that it looked.** Sprint 32 found four instruments measuring
-  something other than their subject, and one let a real regression through a wave already called
-  verified.
+
+## The sprint list went too — all three, 2026-09-08
+
+**Sprint 33 was NOT the sprint Ben named.** The market-viability sprint opened 2026-09-02 as 33 was
+**renumbered to 34** on 2026-09-07; sprint 33 became the context-economy housekeeping sprint, which
+then ran to **16 items delivered** across three blocks. So:
+
+| Sprint | Closed as | Why |
+|---|---|---|
+| **33** context economy | `retro-recorded` | It ran. Its retro is real history and stands unchanged. |
+| **34** market viability | `superseded` | Never worked. The sprint Ben meant by "remove sprint 33". |
+| **32c** gamified generation | `superseded` | Its water-model chain largely landed; the remainder was cancelled, not re-promoted. |
+
+Two records are worth keeping and are cold, not gone. Sprint **34**'s `notes` carry the measured
+2026-09-02 field baseline — corps 86→61 / 71→55, valued production 20,761→4,364 / 5,775→3,531, mean
+supply factor ~0.57 — which costs a full lapse run to re-measure. Sprint **33**'s retro says what
+the context-economy work actually delivered.
+
+The next new sprint is **35**, planned fresh.

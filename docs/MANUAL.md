@@ -1,5 +1,11 @@
 # Project Io — User Manual
 
+> **Settles:** what the game asks of a player arriving cold · how to start a campaign · what each
+> control does · which doc owns each system.
+> **Not here:** why a system is designed the way it is (its authority doc) · how the game should
+> feel (CONCEPT) · how a surface is arranged (ui/LAYOUT).
+> **Confused with:** CONCEPT.md, SYSTEMS.md, ui/LAYOUT.md.
+
 ## Preface
 
 Project Io is a single-player grand strategy game about running a **mercenary company** in a

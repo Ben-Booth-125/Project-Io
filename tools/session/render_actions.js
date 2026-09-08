@@ -83,6 +83,17 @@ function entryMd(e) {
 const md = [];
 md.push('# Project Io — the action dictionary');
 md.push('');
+// The doc header BL-787 gives every authority doc lives HERE and not in the mirror:
+// this file is regenerated whole, so a hand-edited header would survive exactly until
+// the next run. Spec: DEVELOPMENT_PRACTICES.md § The doc header — an index of questions.
+md.push('> **Settles:** which controls exist at all · what pressing one does and what it');
+md.push('> needs first · which of them a rival may issue as a `corp_verb` and which are');
+md.push('> view-only · what arguments a press takes · how an AI player names an action.');
+md.push('> **Not here:** how the surface holding a control looks or behaves (the `ui/` docs)');
+md.push('> · what a rival *chooses* to press and why (AI_OPPONENT) · what the underlying');
+md.push('> system does with the press (the system\'s own doc).');
+md.push('> **Confused with:** ai/AI_OPPONENT.md, ui/LAYOUT.md, ui/SELECTION.md.');
+md.push('');
 md.push('Every control in the game: what pressing it does, and why you would. Readable');
 md.push('mirror of [`ACTIONS.json`](ACTIONS.json), which is canonical — the JSON is the');
 md.push('machine-consumable half an AI player reads (BL-270). Pair it with the corp');

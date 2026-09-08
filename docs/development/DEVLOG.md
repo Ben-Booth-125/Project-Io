@@ -10,111 +10,271 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## 2026-09-07 (sprints 33 and 34 both close) — What we wrote down, and what measuring it said instead
+## 2026-09-07 (sprint 33 opens) — The corpus stops charging every session, and two tools are found lying
 
-**Runtime.** Long session, Full — doc reconciliation, then a four-lane batch delivery, then a scope cut.
+**Mode:** Design (one question, two calls) → Corpus/Batch delivery in one wave → close.
+**Runtime:** one session; 7 sub-agents in worktrees, no compile — not one line of `src/` changed.
 
-**Sprint 33 was already closed on 2026-09-06** with eleven items delivered and the 0 CE digests
-deliberately unblessed. **Sprint 34 closes here**, with nine more and both of its chains met. The
-generation pass is being set down for now; Ben's call, to be revisited with a narrower focus.
+### What started it
 
-### The session did not start by building
+Ben asked whether the query tools reading *both* the hot backlog and its archive defeats the
+archive's purpose, and whether reading the relevant docs was creating context creep.
 
-Scoping the two chains found **three pairs of authority docs contradicting each other**, and all
-three for one reason: a ruling dated 2026-09-06 had landed in the doc that owned it and not in its
-siblings. `MILITARY.md` contradicted *itself* — § Unit classes still said naval was strategic-only
-while § Domains and traversal made ships the only occupants of water. `TILE_GENERATION.md` still
-carried the exact deferral `PROVINCES.md` quotes as lifted. `CORPORATION_GENERATION.md` still ran
-Pass 6 through an economic settle `GENERATION_STRATEGY.md` retires the same day.
+Half of that answer was easy and stayed easy. The archive exists to keep `backlog.json` meaning
+exactly one thing — open work — so the hot file never needs disambiguating. The union exists
+because `--touches` has to see closed items or it cannot answer "is this built?". Those two do not
+fight: the archive keeps the *file's meaning* clean, the union keeps the *question* answerable.
 
-Briefing four implementers off those docs would have built the contradiction into code. Eight design
-calls were taken on one elicitation form, six more conflicts resolved on newest-dated-wins, and the
-whole corpus reconciled before any agent was launched.
+The other half was the real cost, and it was somewhere else entirely: ~650K tokens of authority
+docs with no summary layer, so a nearly-right traversal opens a 40K doc to discover it wanted the
+sibling; `--full` prose resolving out of 1.9MB of archived designs; and `CLAUDE.md` plus the
+standing rules loading whole for a one-line doc tweak. Five items, filed as **sprint 33**; the
+market-viability sprint that held that number moved to **34** unchanged.
 
-### `MILITARY_HISTORY.md` split out of `MILITARY.md`
+### What was built
 
-Ben: those answers *"apply specifically to generation, and more specifically to ancient history"*.
-So everything the Era −1 sim does with force moved to `docs/generation/` — a generation doc that
-happens to be about force, not a military doc that happens to be about the past.
+**BL-787 (doc summary headers)** — every authority doc named in `CLAUDE.md` § 3 now opens with a
+header block. Ben chose the **index of questions** form over a précis and over questions-plus-stance:
+it lists the questions a doc settles and never the answers, so it survives a design change that
+alters one. 71 docs, five parallel slices. `ACTIONS.md` is regenerated whole, so its header lives in
+`render_actions.js`'s preamble instead.
 
-**The split paid for itself immediately.** The forage rule written the day before — a fleet forages
-beside shore it owns and starves elsewhere — was false as a general claim (nations supplied overseas
-perfectly well) *and* unbuildable as written, because `terrain_combat`'s table is read by **both**
-resolvers. It now lives in the sim's caller, labelled as the simplification it is.
+**BL-789 (standing rules split)** — `io-standing-rules.md` went **230 lines to 133**. The
+AI-behaviour grant register — BL-079 through the rival-network grant, 110 lines of dated precedent —
+moved verbatim into `AI_OPPONENT.md` § 11, diffed line-for-line with all 20 ids accounted for. The
+*gate* stayed, and was sharpened rather than summarised: a new widening is raised, never assumed.
+That was the item's whole risk — moving the history must not make the next widening cheaper to take.
 
-### Four lanes, in worktrees
+**BL-788** gave `--grep`/`--touches` a one-line-per-item default (33,072 bytes → 2,294 on one sweep,
+`--full` byte-identical). **BL-790** added `doc_owner.js`, which answers "which doc owns this file"
+from what work actually cited. **BL-791** put the fan-out-as-compression paragraph in `DELIVERY.md`.
 
-| Lane | Delivered |
-|---|---|
-| A | BL-778 traversal domains, BL-779 naval real |
-| B | BL-785 water tile selection |
-| C | BL-770 slice 3, the greedy-refinement search |
-| D | the missing water-ownership assertion |
+### What it found — the part worth keeping
 
-Every lane measured its own before/after in isolation and **re-blessed nothing** — BL-780 took the
-digests in one act, against a description of what changed in world *shape*, with four named causes.
+**The union does not union.** `archive_store.js` globs `backlog-design-*.json` only. It sees **138
+items; the archive directory holds 762.** The 624 it misses — 420 of them `complete`, 590 carrying
+the `files[]` array `--touches` reads — sit in `backlog-complete-*`, `backlog-cancelled-*` and
+`backlog-purged-*`, which predate `archive_landed.js` and use an `items` array instead of a `records`
+object. On `MARKETS.md` alone, 35 invisible items. **BL-792**, priority A.
 
-### What measurement overturned — four times, and this is the entry's point
+**And `--grep` throws away what it does find.** It matches across the union, then drops terminal
+items in the default view: `--grep market` prints "nothing matched" while `--grep market --all`
+returns 11 landed items. `DELIVERY.md` makes `--grep` the first step before authoring an item
+precisely to catch duplicate work, and it is blind to exactly that case. **BL-793**, priority A.
 
-Every one of these was written by us, in good faith, and caught only by running something.
+Both fail the same way — a confident, silent NO — and both were surfaced by delivering something
+else. The session's opening answer needed its correction: the split is sound, the union is the right
+design, and the union as implemented has been answering wrong.
 
-1. **Forage.** Authored as a general rule; false as one, and unbuildable at the shared table.
-2. **"Coastal water belongs to whoever owns the shore."** Doc truth since the ruling. The carve was
-   claiming water by *flood*: **100% of coastal water owned against 39% of land**. Fixed (NR-792) so
-   water derives from its shore — and the first fix changed *nothing*, because the coastal band is
-   globally connected and one owned shore tile flooded the whole ring. The sea is a ring; a lake
-   fills. 1,169 tiles of neutral coastal water now exist where there were none.
-3. **"Ships are composed into the same stack."** Written 2026-09-06, before anyone could see what
-   one stack produces: **84% of battles carried a galley**, including landlocked ones, worth real
-   power once BL-779 landed. Filtered (NR-794); the figure fell to 18% and converged with the sea-leg
-   count. The one-battle gap between them is a land stack crossing water it owns — BL-778's middle
-   case appearing in the data unprompted.
-4. **The road axis.** Explained here as a frontier that does not move. **The frontier moves by 366
-   tiles.** What is saturated is the resource-coverage boolean: `raws_in_reach` is 122 either side.
-   Confirmed on a live ten-market world after the first measurement was found to have been taken on
-   a degenerate 2-market fixture.
+**Six doc-truth defects, from writing one-line boundaries.** `PRODUCTION` and `POPULATION` each name
+the *other* as the workforce authority and both restate the derivation. `MARKETS` holds 70 lines of
+procurement; `CONTRACTS`, the doc named for it, is 113 lines total. `TILE_GENERATION` holds province
+rules the new headers now point away from — orphaned authority, which is worse than duplicated.
+`HISTORY` holds an ancient-naval rule `MILITARY_HISTORY` owns. Four UI subjects have no single owner,
+including `LAYOUT`'s 170-line drill-through system. **BL-794, BL-795, BL-796.** Fixed in place:
+`NATION_GENERATION` § Pass 7 carried "(RULED, not yet built)" in a heading — a state claim in an
+authority doc, forbidden outright.
 
-### Phase 6 finally has a caller
+None of these are visible while each doc is read alone. Stating a boundary in one line is what
+exposes that it was never stated.
 
-`landscape_score` had no caller outside its own harness — which is why BL-772 and BL-773 were
-blocked on an item already reported as landed. `start_new_game` now searches: fixed rounds,
-deterministic argmax, winner applied.
+### Method note
 
-**What varies is narrower than the harness, for a hard reason.** `generate_corporations` *appends*
-and has already run by the time the registry loads, so re-running it would double every specialist.
-The live seam searches the background economy's placement and the road tier. Widening it to the
-roster axis is BL-772's restructure — now written down rather than guessed at.
+BL-791 demonstrated by the sprint that filed it: five slices read the entire ~650K corpus and the
+main session paid for none of it. Every report came back as boundaries and findings, not excerpts.
 
-**Cost, measured:** 1 candidate 70.8 s of startup, 19 candidates 90.8 s. The search costs **~20 s**,
-a regression until BL-772 removes the 72 s warm start beside it. A third of those evaluations are
-the road axis NR-793 proved inert.
+### Verification
 
-### The scope cut
+No compile — no `src/` change in the sprint. `backlog_lint`: **0 fails** throughout (warnings
+pre-existing). `next_id.js`: BL-797. All five agent branches merged in the main session, one conflict
+in `DELIVERY.md` resolved by keeping both bullets. `render_sprints`, `render_actions` and
+`devlog_index` re-run. `archive_landed` evicted the five closed items plus four already-terminal rows
+that had been sitting in the hot file, all verified to rebuild byte-exact; the hot file holds 31 open
+items.
 
-Ben, mid-flight: *"I fear we have begun to touch on too many items."* The count was less bad than it
-looked — only 13 of 26 open items were ever this sprint's — but the instinct was right, and findings
-were breeding findings. Sprint 29, the market-viability sprint 33 and ownerless items were **archived unstarted**
-(cancelled, kept whole, `--restore`-able). The hot backlog went from 28 items to **12**, all of them
-this generation pass.
+### Block 2 — the batch, and what four failed reviews bought
 
-### Left open, deliberately
+**Mode:** two Workflow runs — 20 agents, then 10. No compile: the only `src/` edits in the whole
+batch are comment pointers repointed at moved sections.
 
-NR-793 (road axis inert), BL-786 (the port seam — `can_place` refuses all water before the type is
-considered), and the **2-market phase 6 fixture**, which is the one to take first: slice 1's negative
-result and slice 2's discrimination figure were both measured on it.
+Five lanes, each built from a settled instruction. **Four failed cold review**, and none of the four
+on style:
+
+- **tools** traded the false negative for a false positive. Widening the union admitted 204 cold
+  rows whose `status` field *lies* — the 2026-08 sweeps froze each row at its pre-purge status, so a
+  culled item still reads `designed`. `--grep market --open` returned 18 rows with **zero** on the
+  hot worklist. It also shipped a DELIVERY.md bullet and a `--help` line promising a behaviour its
+  own code did not have. The rule that fixed it: **a cold row's state comes from the file it is
+  archived in**, normalised once at the union so no caller can be fooled.
+- **generation** deleted the *accurate* half of a doubled claim. PROVINCES was left asserting the
+  one-domain invariant is "structural rather than checked" while
+  `province_partition_harness.cpp:203` checks it as P2b. One false statement where there had been
+  two, one of them true — the specific failure mode of consolidating a boundary.
+- **ui** claimed to have grepped for dangling citations and had not (TOOLTIP still cited a moved
+  CANVASES section), and asserted an answer in SELECTION.md on a question the same agent had told
+  the judge was Ben's.
+- **proposes** switched PEOPLE.md and EVENTS.md to `Proposes:` on a half-read sentence. Both carry
+  `## Settled — Ben's rulings, 2026-08-22`, and the disclaimer they were switched on is qualified:
+  *"except where § Settled records one."* **That half-read was mine** — it is the premise I gave Ben
+  when I asked the question. The variant itself stands, on nine genuine research and exploration
+  docs.
+
+The **second** review earned its keep too: it caught a fabricated `(Ben, 2026-09-07)` attribution on
+the cold-row rule. That rule was mine, off the review's own measurement. In this repo a dated Ben tag
+is load-bearing provenance, and it would have hardened an agent's design call into a settled human
+ruling.
+
+**The design panel changed an answer.** Two independent proposals per boundary — one arguing from
+CLAUDE.md's router, one licensed to say the router is wrong — split workforce differently from the
+way the backlog item suggested. A builder reading the item alone would have built the wrong split
+confidently.
+
+### What the completeness critic proved about scope
+
+The three boundary lanes were scoped off defects a header sweep *happened* to notice. The critic
+built the `Confused with:` graph properly — **72 docs, 59 mutual pairs, 89 one-way edges** — and
+found three overlaps no lane would have reached: LOGISTICS and SUPPLY both holding the travel-time
+model under the same ruling date (**BL-797**); the navigation model and per-rung lens table each
+asserted **three** times (**BL-798**); and CREEDS/NATION_GENERATION, which survived every sweep
+because it is a *one-way* edge (**BL-799**).
+
+BL-798 is the lesson worth keeping. BL-796 deleted copy two of the lens table on entirely correct
+grounds and left copies three and four, which were outside its write set. **A correct rule applied
+to a partial scope leaves the corpus more inconsistent than it found it.** That is what **BL-801**
+(the header graph checker) exists to prevent, and it is why the tool comes before the next boundary
+sweep rather than after it.
+
+### Verification, block 2
+
+Union **138 → 757** items. `--grep market` **0 → 101** matches; `--touches MARKETS.md` **1 → 29**.
+Non-terminal over the union is 36, and that set *is* the hot set. `next_id` BL-806, never lower.
+`backlog_lint` 0 fails throughout. `doc_owner`, `backlog_view` and `status.ps1` all unchanged or
+better. 72 docs carry a header; `docs/ui/DRILL_THROUGH.md` exists with its CLAUDE.md § 3 row. All
+five fix branches merged with no conflicts.
+
+### Block 3 — the checker, and the sweep it scoped
+
+**Mode:** three Workflow runs — 3 agents, then 3, then 15. Still no application compile: the only
+`src/` edits are comment pointers and one harness correction.
+
+**BL-801 (header graph checker) came first, deliberately.** Three boundary lanes in block 2 had been
+scoped off defects a header sweep *happened* to notice, and sweeping again by hand would repeat that.
+`tools/session/header_graph.js` now checks four things: dangling citations (fails the run), the
+header graph (prints), router coverage both directions, and state-independence (fails).
+
+**It failed both its cold reviews on the first cut, and the graph half was badly wrong.**
+`demarkup()` stripped underscores along with markdown emphasis, so `NATION_GENERATION.md` resolved
+to nothing and **no doc with an underscore in its filename could ever be an edge target** — about a
+third of the corpus. The consequence is the one that matters: **the defect it was built to catch
+(BL-799, a one-way edge) was absent from its output entirely.** It measured 195 edges against a true
+264. The resolver half carried a *false pass* — a one-token anchor certifying a citation to a
+heading that does not exist — plus two citation shapes it never swept at all.
+
+After repair, an independent parser agrees **edge for edge**: 264 edges, 83 mutual pairs, 98 one-way,
+72 headers, set difference zero both ways. The dangling class went 2.7% false-positive → **0%**,
+audited at 80 of 80 rows. It ships with 27 self-test assertions, each pinned by a mutation test.
+
+First measurement of the corpus: **1119 citations — 729 OK, 310 prefix, 83 dangling.** The dangling
+cluster by *rename*, not by file, and one cluster was ours: five references named
+`io-standing-rules § the player-corp exception`, which BL-789 had moved that morning without
+sweeping. Filed as **BL-807**.
+
+### The sweep — and the item that repeated itself
+
+Five lanes; three passed, two failed.
+
+**BL-798 failed in exactly the way it was filed to fix.** It consolidated copies two and three of
+the pan/zoom claim and left a verbatim **fourth** at `MINIMAP.md:301`, outside its write set — and
+its completeness evidence was *false* when the reviewer re-ran it. Widening the write set and
+requiring the search be pasted in full, empty results included, is what fixed it. `"primary slot"`
+now appears once in the corpus.
+
+**BL-799 failed twice, identically**, and was finished in the main session by reading the code site
+by site. Both agents wrote the tidy universal rule; the truth has an exception the corpus had
+already recorded elsewhere — `make_corp_name` pairs a tongue-inheriting identifier with one of
+twelve **English structural type words**. When two independent attempts fail the same way, the
+brief is wrong, not the agent.
+
+**BL-804 corrected the harness’s MEASUREMENT, and left it red.** P9c asks about seed strength, and
+`build_province_partition` skips `province_anchor` centres when gathering seeds — those are founded
+*after* the partition ships, so their size owes nothing to their scale, and the row was pooling 1,011
+of them. On the corrected measurement **P9c still fails** (s1: 458 @ 7.51 · s4: 1 @ 3.00), and so does
+A1. Rebuilt and rerun in the main session to confirm: **42 PASS, 2 FAIL, exit 1.** Neither was
+weakened to pass, and the surviving question is sharper than the one BL-804 answered — a monotone
+claim over four buckets decided by a single scale-4 sample may not be answerable as written. **BL-809**.
+
+### The defect the docs were hiding
+
+**BL-808**, priority A. `history_sim.cpp:1564` names a sim-founded region `src.name + " Reach"` — an
+English literal in a name that ships, against the standing rule that every generated name is
+sci-fi/fantasy.
+
+**The project fixed this exact defect once already.** `settlement.cpp:272` carries the post-mortem in
+its own words — *"'MelethWorirUlael Reach' put two naming systems side by side in one string, which
+reads as a bug rather than a style"* — and BL-348 coined the quarter word from the tongue. The second
+pass was never swept. It surfaced because a doc claim was too broad: **the tidy rule was wrong
+because the code was wrong.**
+
+### The pre-push audit, and what it caught
+
+Three cold auditors over the finished state — corpus coherence, doc-versus-code truth, and whether
+the RECORD is honest — then an adjudicator that verified each blocker itself before accepting it.
+Two blockers were raised; one survived.
+
+**NR-794 was minted twice, and the second mint was mine.** A prior session used it for a
+naval-composition ruling and cited it at three source sites (`unit_roster.hpp:283`,
+`unit_roster.cpp:211`, `history_sim.cpp:201`) — and **never filed it**. So nothing in the review
+store could see the id was taken. This session minted NR-794 for the border-band question, and for
+a few hours three code comments resolved to a ruling about lens chrome: a visible gap converted
+into a confident wrong answer, which is the exact failure class these 61 commits spent the day
+removing. Renumbered to **NR-797**, with the collision recorded on that entry. **BL-811** widens
+`next_id.js`, which guards BL ids and nothing else — and the guard must scan the *tree*, not the
+store, because this id was cited in code and never filed.
+
+**The second blocker did not survive, and the adjudication is worth keeping.** Six docs derive
+km-per-tile from a 312-column grid the code retired at BL-424 (`home_grid_width = 261`), so the
+constant is ~20% wrong. Real — but the session did not cause it: BL-797 deleted the duplicate in
+SUPPLY, taking the corpus from seven false copies to six, and four of the five survivors were never
+touched. Filed as **BL-810**, with the aggravating detail that the re-authored line now cites
+`body_km_per_tile` beside the wrong number, so a false constant reads as code-verified.
+
+The auditors also confirmed the load-bearing claim by the right method: today's checker run against
+an extracted base tree, diffing the *misses by citing site* rather than by count. **4 added, 4
+removed — zero citations broken by this session**, and three of the four additions are BL-807's own
+prose quoting the broken forms it exists to fix.
+
+### Verification, block 3
+
+Dangling **83 → 81** across the whole sweep: five lanes moved prose between docs and created no net
+dangling citation. `header_graph --self-test` 27/27. `backlog_lint` 0 fails throughout. `next_id`
+monotonic. Nine items closed and evicted, all verified to rebuild byte-exact; the hot file holds 28.
+`docs/development/design/` deleted after three independent checks, `--doc GLOBAL_STYLE_SHEET` now
+resolving where two files had shared the basename.
+
+### Open for Ben
+
+- **BL-792 and BL-793 landed in block 2**, so a bare `--touches` or `--grep` negative is evidence
+  again. It was not, for the whole life of this session before that point — worth knowing when
+  reading anything filed earlier today.
+- `--sprint` does not exist as a flag; unknown flags are ignored silently and the tool returns
+  everything. Minor next to the two above, and not chased.
+- `PEOPLE.md` and `EVENTS.md` are proposal-stage but their headers say **Settles:** like every other
+  doc. A `Proposes:` variant would be more honest; I did not invent one without your say.
+- `research/ERA1_TECH_LANDSCAPE.md` and `TECH_EFFECTS.md` route readers to `economy/RESEARCH.md`,
+  which is a stub. Correct routing, empty destination.
 
 ---
 
-## 2026-09-06 (sprint 33 closes) — The world changes, and the instruments learn to see it
+## 2026-09-06 (sprint 32b closes) — The world changes, and the instruments learn to see it
 
 **Mode:** Design (one elicitation form, eight calls) → Full batch delivery in three waves → two cold
 reviews → live check → close.
 **Runtime:** one long session; ~40 harness builds, three play builds, 10 sub-agents in worktrees,
 two cold adversarial reviews.
 
-Sprint 33 closed with **eleven items delivered** across three waves; **34 opened** for the
-remaining 28. The distinction from 32 is the whole point: 32 delivered instruments and moved no
-world on purpose; 33 moved every world four separate times and kept the causes attributable.
+Sprint 32b closed with **eleven items delivered** across three waves; **32c opened** for the
+remaining 28. The distinction from 32a is the whole point: 32a delivered instruments and moved no
+world on purpose; 32b moved every world four separate times and kept the causes attributable.
 
 ### The design pass that set the scope
 
@@ -190,7 +350,7 @@ different region and moved on — an aggregate cannot see a distribution. **BL-7
 
 ---
 
-## 2026-09-06 (sprint 32 closes) — The arc runs, and four instruments could not see
+## 2026-09-06 (sprint 32a closes) — The arc runs, and four instruments could not see
 
 **Mode:** Design → Full (batch, then hand-built slices) → three design rulings → close.
 **Runtime:** one long session across several days; ~25 harness builds, one play build, 12 sub-agent
@@ -200,9 +360,9 @@ launches of which **zero** succeeded.
 
 Sprint 32 opened with 8 items on "three passes of simulated history". Ben's eight-phase reorder
 added 12, the water-domain ruling added 5, and findings added the rest — **34 items, 5 delivered**.
-Closed as **32** at a natural boundary rather than pushed on: everything delivered is one coherent
+Closed as **32a** at a natural boundary rather than pushed on: everything delivered is one coherent
 thing (*the arc runs, and the instruments that measure it are honest*), and everything remaining
-moves the generated world, which wants its own before/after. 33 carries the other 29.
+moves the generated world, which wants its own before/after. 32b carries the other 29.
 
 ### Delivered
 
@@ -316,7 +476,7 @@ ties as preferred sellers — and a seed-sweep scoreboard reads the SPREAD, neve
 
 The branch was cut before 2026-09-02 and collided on all three shared numbering spaces. Main had
 minted **BL-746** (upkeep starvation cliff) while this branch filed BL-746 (two-span prehistory);
-**sprint 31 closed** mid-session and the market-viability sprint 33 opened; and the sprint number itself moved twice —
+**sprint 31 closed** mid-session and sprint 33 opened; and the sprint number itself moved twice —
 renumbered to 34 by reading `next_up`, then corrected back to **32** by Ben, who reads 32 as a gap
 to fill rather than a number to skip. `next_up` is corrected so the next session does not re-derive
 34. Resolution took main's stores whole and re-applied this branch's additions on top, so nothing
@@ -413,7 +573,7 @@ re-blessed, because re-blessing inside this commit would bury the signal.
 ### Left open, deliberately
 
 BL-749 (sea legs) is held out of wave 1: its premise is inverted by BL-755/BL-756 and five design
-calls on it are open (NR-785). BL-751 (economic settle) is gated on the market-viability sprint 33's growth half — sprint
+calls on it are open (NR-785). BL-751 (economic settle) is gated on sprint 33's growth half — sprint
 31 made the field solvent, but valued production still falls, and a settle over a shrinking field
 culls toward a smaller economy rather than a steady one. **NR-783** asks whether the span boundary
 should be derived from the first furnace rather than authored at epoch − 400; **NR-784** records the
@@ -422,7 +582,7 @@ all — a 400 BCE polity can currently reach the gunpowder band and nobody has m
 
 ---
 
-## 2026-09-02 (sprint 31 closes, market-viability sprint 33 opens) — A field that can pay, and the one that must grow
+## 2026-09-02 (sprint 31 closes, sprint 33 opens) — A field that can pay, and the one that must grow
 
 **Mode:** the whole arc in one session — Design → Full → measure → rule → fix → measure — closed on
 Ben's call. **Runtime:** one long session; ~10 full builds, ~40 harness builds, ~20 lapse runs, one

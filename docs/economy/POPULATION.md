@@ -1,5 +1,15 @@
 # Project Io — Population and Development
 
+> **Settles:** what a population centre is, how it is placed, and how it grows, declines or is
+> razed · what a centre consumes and what its habitability rests on · where labour supply comes
+> from and how contention over it resolves · what wages are paid and what development does to a
+> region.
+> **Not here:** what a building does with the labour it is allocated (PRODUCTION) · what the
+> goods a centre consumes cost (MARKETS) · what the wage bill does to the balance (FINANCE) ·
+> the body-level strain and hazard behind habitability (../CLIMATE.md) · the ground the centre
+> stands on (TILES).
+> **Confused with:** PRODUCTION.md, ../CLIMATE.md, TILES.md.
+
 Population is the human layer of the economy — the source of workforce, the driver of consumer demand, and the reason habitability matters. Development is the act of improving a tile or region in ways that affect population, efficiency, or amenity rather than raw extraction. Population centres produce workforce supply and demand, carry a habitability feedback, and grow; the full model is designed here so each implementation step extends it rather than replacing it.
 
 ---
@@ -320,7 +330,8 @@ constraint**, and migration is the only lever that moves one of them.
 
 ## Workforce model
 
-The per-`(corp, body)` pool with contention and the population-derived supply feeding it are specified in PRODUCTION.md § Workforce model. `building_component.workforce_assigned` is an authored constant in `[0, 1]` — the *request* the contention scalar throttles.
+What labour a body's population centres yield, how it is shared between corporations, who wins it
+when it is scarce, and what it is paid.
 
 ### The labour pool
 
@@ -335,49 +346,37 @@ Each pool has:
   and
 - a **demand** — the sum of the labour its buildings on that body want this Tick.
 
-Supply **derives from the population centres on the body** (BL-042, workforce supply
-derivation): centre scale → labour units (1 / 3 / 10 / 30 / 100 for scale 1–5), with a
-corp's share set by its share of the body's building count. The fixed authored figure
-(`world::workforce_supply`, default 3.0) survives only as the fallback for bodies with no
-centres.
+**Supply** derives from the body's population centres (BL-042, workforce supply derivation):
+each centre contributes labour by scale — `labour_by_scale` = 1 / 3 / 10 / 30 / 100 units for
+scale 1–5. A corp's share of that body supply is its share of the building count there; a body
+with no centres falls back to the authored `world::workforce_supply` figure (default 3.0).
 
 ### Contention
 
-When **demand ≤ supply**, every building is fully staffed and runs at its requested level.
-When **demand > supply**, labour clears by **wage competition** (Ben, 2026-08-25; BL-614, wage
-competition): scarce labour goes to the buildings offering the higher wage, in deterministic
-order (wage, then building id), rather than being rationed proportionally. A corporation that
-over-builds relative to its labour force must outbid itself and its neighbours, so labour
-scarcity is priced instead of silently averaged. The proportional `supply / demand` scalar it
-supersedes remains the right mental model for the *fully-uncontended* case — everyone staffed at
-request — and building counts lean on available land (§ Land use, the province ceiling), not on
-the pool alone.
-
-The contention scalar multiplies the existing linear `workforce_assigned` term, so the
-production arithmetic gains a factor rather than changing shape:
-`effective_workforce = workforce_assigned × contention_scalar`.
-
-### Player-set vs. system-allocated
-
-The split, stated once — the player lever is **not** `workforce_assigned`:
-
-- **The player sets** the *target* staffing of each building via
-  `building_component.workforce_target` (0–200 % of nominal), which by default is
-  **auto-solved** each tick to maximise the building's profit (BL-181, workforce auto-solver);
-  a manual choice pins it, opting out. `workforce_assigned` is an authored constant set at
-  placement (0.5 producing, 0 passive) and is never player-edited.
-- **The system allocates** the actual labour: it computes pool supply from population,
-  sums demand from the assigned requests, derives the contention scalar, and applies it.
-  The player never hand-assigns headcount; they express intent and the pool resolves it.
+**Contention** clears by **wage competition** (Ben, 2026-08-25; BL-614, wage competition). Uncontended
+(`demand ≤ supply`), every building is staffed at request. Contended, scarce labour allocates **per building** — offered wage
+descending, building id ascending on a tie, each building granted up to its demand until the
+pool is spent — so the marginal building runs partial and those below it idle, superseding the
+old uniform proportional scalar. The offered wage is `base_wage × (1 + wage_bid)`
+(`building_component.wage_bid`, a per-building premium fraction — the first-cut dial, data-only,
+no UI yet; NR-629 flags the shape for overturn). The pool aggregate `min(1, supply/demand)`
+survives in `economy_report.workforce_contention` as the report figure; the per-building grant
+is `economy_report.building_labour`. A recipe's **qualified** requirement (§ Qualification,
+BL-613) clears against its national pool by the same rule, before the ordinary pool; a building's factor is the product of the two grants. Every grant is then multiplied by
+`workforce_efficiency(hab)` (`src/world/workforce.hpp`, BL-069 workforce efficiency): full
+labour at habitability ≥ 0.6, ramping linearly to 0.5× at 0. Effective workforce =
+`workforce_assigned × grant`. A corporation that over-builds relative to its labour force must
+outbid itself and its neighbours, so labour scarcity is priced instead of silently averaged. The
+player never hand-assigns headcount; they express intent and the pool resolves it. Building counts
+lean on available land (§ Land use, the province ceiling), not on the pool alone.
 
 ### Wages
 
 Wages are paid from the pool's **effective** (allocated) workforce, not the requested
-target — a throttled building pays for the labour it actually used. The per-building wage
-is `effective_workforce × base_wage × (1 + wage_bid)` (the budget term, FINANCE.md) — paid
-**at the offered rate** (BL-614, wage competition): a building that outbid its siblings for
-scarce labour pays the premium it offered. `wage_bid` is the first-cut wage dial — a
-per-building premium fraction (`building_component.wage_bid`, default 0, data-only, no UI;
+target — a throttled building pays for the labour it actually used — and **at the offered
+rate** (BL-614, wage competition): a building that outbid its siblings for scarce labour pays
+the premium it offered. The expression itself is [`FINANCE.md`](FINANCE.md) § Building
+operating cost. `wage_bid` is the first-cut wage dial — a per-building premium fraction (`building_component.wage_bid`, default 0, data-only, no UI;
 NR-629 flags the shape for overturn). `base_wage` is an authored constant; wage *level*
 tracks body habitability and population pressure (higher demand for scarce labour raises
 the clearing wage), and the unit wage reference that anchors it is BL-544 (unit wage

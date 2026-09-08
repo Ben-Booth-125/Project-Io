@@ -4598,20 +4598,20 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-774 - Sprint 33",
-   "batch": "sprint-33-market-batch",
+   "promoted_from": "backlog.json BL-774 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "1960-baselines-rebased",
-   "title": "BL-759 - the sprint 33 (2026-09-02, since deleted) baselines are restated against the world HEAD actually builds",
+   "title": "BL-759 - the sprint 33 baselines are restated against the world HEAD actually builds",
    "difficulty": 2,
    "importance": null,
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-759 - Sprint 33",
-   "batch": "sprint-33-market-batch",
+   "promoted_from": "backlog.json BL-759 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4622,8 +4622,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-760 - Sprint 33",
-   "batch": "sprint-33-market-batch",
+   "promoted_from": "backlog.json BL-760 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4634,8 +4634,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-770 - Sprint 33",
-   "batch": "sprint-33-market-batch",
+   "promoted_from": "backlog.json BL-770 - Sprint 32b",
+   "batch": "sprint-32b-market-batch",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4646,8 +4646,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-776 - Sprint 33",
-   "batch": "sprint-33-wave-1",
+   "promoted_from": "backlog.json BL-776 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4658,8 +4658,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-762, BL-764 - Sprint 33",
-   "batch": "sprint-33-wave-1",
+   "promoted_from": "backlog.json BL-762, BL-764 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4670,8 +4670,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-748, BL-767 - Sprint 33",
-   "batch": "sprint-33-wave-1",
+   "promoted_from": "backlog.json BL-748, BL-767 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4682,8 +4682,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-766 - Sprint 33",
-   "batch": "sprint-33-wave-1",
+   "promoted_from": "backlog.json BL-766 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4694,8 +4694,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-770 - Sprint 33",
-   "batch": "sprint-33-wave-1",
+   "promoted_from": "backlog.json BL-770 - Sprint 32b",
+   "batch": "sprint-32b-wave-1",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4706,8 +4706,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-765 - Sprint 33",
-   "batch": "sprint-33-wave-2a",
+   "promoted_from": "backlog.json BL-765 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4718,8 +4718,8 @@
    "evaluated_difficulty": null,
    "status": "partial",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-754, BL-772 - Sprint 33",
-   "batch": "sprint-33-wave-2a",
+   "promoted_from": "backlog.json BL-754, BL-772 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
    "archived": false,
    "rows": [
     {
@@ -4784,8 +4784,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-777 - Sprint 33",
-   "batch": "sprint-33-wave-2a",
+   "promoted_from": "backlog.json BL-777 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4796,8 +4796,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-783 - Sprint 33",
-   "batch": "sprint-33-wave-2a",
+   "promoted_from": "backlog.json BL-783 - Sprint 32b",
+   "batch": "sprint-32b-wave-2a",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
@@ -4808,8 +4808,8 @@
    "evaluated_difficulty": null,
    "status": "partial",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-768 - Sprint 33",
-   "batch": "sprint-33-wave-2b",
+   "promoted_from": "backlog.json BL-768 - Sprint 32b",
+   "batch": "sprint-32b-wave-2b",
    "archived": false,
    "rows": [
     {
@@ -4873,8 +4873,8 @@
    "evaluated_difficulty": null,
    "status": "complete",
    "resolved": "2026-09-06",
-   "promoted_from": "backlog.json BL-750, BL-769 - Sprint 33",
-   "batch": "sprint-33-wave-2b",
+   "promoted_from": "backlog.json BL-750, BL-769 - Sprint 32b",
+   "batch": "sprint-32b-wave-2b",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
   }
  ]

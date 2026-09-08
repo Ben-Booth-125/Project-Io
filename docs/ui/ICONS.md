@@ -1,5 +1,14 @@
 # Project Io — Icon Vocabulary
 
+> **Settles:** what the glyph vocabulary is for and what each family of glyph
+> means · which conventions every glyph honours and where its colour is decided ·
+> where a new glyph goes and which collisions it must avoid · which of doc, header
+> contract and code wins when they disagree (`src/ui/icons.*` is the source of
+> truth for shape and signature).
+> **Not here:** identity colours (`presentation.hpp`) · what a lens shows once its
+> glyph is pressed (LENSES) · where markers are drawn (CANVASES, PLANETARY).
+> **Confused with:** LENSES.md, PLANETARY.md, design/GLOBAL_STYLE_SHEET.md.
+
 The **icon set** is the project's library of small vector glyphs drawn directly
 into ImGui draw lists — the building markers on the Planetary canvas, the resource
 pips in ledgers and strips, the navigation-rail glyphs, and the map-lens buttons.
@@ -147,7 +156,7 @@ bridging exists to fix.
 valley alone measure ~95 % of land tiles (`world_audit` § S3) — and are carried by the
 **relief tint** (`ui::landform_relief`), not by a glyph. Putting an icon on nearly every
 tile would be far denser than any other glyph family and would fight the building
-silhouette for the hex centre. See [CANVASES.md](CANVASES.md) § Terrain channels for the
+silhouette for the hex centre. See [PLANETARY.md](PLANETARY.md) § Terrain channels for the
 two-channel split and why the relief composites *after* the lens tints.
 
 Because the terrain palette spans near-white ice to dark forest, and any lens may

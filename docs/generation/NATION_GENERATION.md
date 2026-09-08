@@ -1,5 +1,15 @@
 # Project Io — Nation Generation
 
+> **Settles:** how a nation comes to exist — where a seed is placed, how territory expands,
+> what the size floor merges away · how a resource profile and a political character are
+> derived from the ground a nation holds · how history's ruptures redraw the carve · how a
+> nation is named · what treasury and substrate density it opens with · how settlements are
+> placed alongside.
+> **Not here:** what a nation *does* once the campaign runs (../politics/NATIONS) · how
+> corporations attach to one (CORPORATION_GENERATION) · which ladder produced the history it
+> inherits (../lore/HISTORY).
+> **Confused with:** ../politics/NATIONS.md, CORPORATION_GENERATION.md, ../lore/HISTORY.md.
+
 Nations are the political and territorial layer overlaid on the tile map. They define the
 geopolitical backdrop at campaign start: who controls what land, what the diplomatic starting
 positions are, and what legal context corporations operate within.
@@ -264,6 +274,30 @@ regardless of ideology.
 
 ### Pass 5 — Naming
 
+**The register of naming sites.** A tongue is coined in [CREEDS.md](../lore/CREEDS.md); this
+section owns which passes *consume* one. The register is here rather than beside the tongue
+because consumption is a generation fact, and because a claim that every name is drawn from a
+tongue is **not true of every site** — the exceptions are the reason a register exists at all.
+
+| Site | Source | Draws on a tongue |
+|---|---|---|
+| Star and body names | `body_names.cpp` | Yes — its own `roll_tongue` sky tongue, distinct from any culture's |
+| Nation names | `make_nation_name`, `nation_generation.cpp` | Yes — `tongue_word` over the culture's `speech` |
+| Region names | `settlement.cpp` | Yes, **both halves** — the culture half and the quarter word |
+| City names | `city_names.cpp` | Yes — `coin_lexicon` over the founding culture's tongue |
+| Culture and god names | `creeds.cpp` | Yes — the tongue's own word builder |
+| **Corporation names** | `make_corp_name`, `corporation_generation.cpp` | **Partly.** The identifier half is invented or borrowed from the home nation's leading syllable, so it inherits that tongue; the **type** half is one of twelve English structural words (`k_corp_types`). See [CORPORATION_GENERATION.md](CORPORATION_GENERATION.md) § Pass 5 — Naming. |
+
+**The corporation type word is the one sanctioned English survival in generation**, and it is
+deliberate: a corporation is a modern institution the player reads as one, and "Holdings" does
+the work a coined syllable would not. Nothing else in the register may acquire an exception by
+resembling it.
+
+**A tongue with no phoneme inventory cannot coin**, so `quarter_word` keeps an English fallback
+table for that case alone — a region with no name at all would be worse than one out of
+register. That is a degenerate-input guard, not a second naming system.
+
+
 **There is no name bank** (BL-290, native nation names). A nation is named in the **tongue of the
 culture that settled the region its seed grew from** — the same phoneme inventory the creeds pass
 (BL-235) coined that culture's own name and its gods from. Naming *consumes* the phonology the
@@ -328,7 +362,7 @@ settlement-density description with no consumer. The pass requires population ce
 exist — which is why `generate_population_centres` runs before `generate_nations` in
 `hard_coded_world.cpp` (see § Settlement generation below).
 
-### Pass 7 — Starting treasury (RULED, not yet built — Ben, 2026-08-24, NR-580)
+### Pass 7 — Starting treasury *(Ben, 2026-08-24)*
 
 `nation_component::treasury` is zero at generation by NATIONS.md's existing design — deliberate,
 since a treasury that started full would be a balance change smuggled in as a field. That rule

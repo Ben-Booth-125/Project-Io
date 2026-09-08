@@ -1,5 +1,15 @@
 # Project Io — Military
 
+> **Settles:** how force works in the campaign — what resolves a campaign battle · how terrain
+> defends and attrits · what a unit is and which domains it may traverse · where units are raised
+> and on what roster · how a march is queued and what turns stance plus position into a fight ·
+> what standing force costs each tick · why economic reach is military reach.
+> **Not here:** how force works inside the Era −1 sim — its own resolver, band ladder, naval and
+> forage rules (MILITARY_HISTORY, a generation doc) · how a rival *decides* to use force
+> (AI_OPPONENT) · what hostility and friendship *are* as quantities (RELATIONS) · what a nation
+> may declare or hold (NATIONS).
+> **Confused with:** generation/MILITARY_HISTORY.md, politics/RELATIONS.md, ai/AI_OPPONENT.md.
+
 The military layer is **how force works**, as opposed to how a rival *decides* to use it — that
 stays in [`docs/ai/AI_OPPONENT.md`](../ai/AI_OPPONENT.md). Its parts are: two battle resolvers
 and the calibration they share; a terrain model; a unit that is a group token on a tile; a muster

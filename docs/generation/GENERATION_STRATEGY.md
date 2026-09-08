@@ -1,5 +1,14 @@
 # Project Io — Generation Strategy
 
+> **Settles:** which generation doc owns which question, and in what order the passes
+> compose · what each pass hands the next · what economic premise the campaign start is
+> derived from · what a world descriptor carries · which passes the player may watch ·
+> where real history may be borrowed from, and where a name may not.
+> **Not here:** what any single pass computes — each subject doc settles its own ·
+> what the world does once generation ends.
+> **Confused with:** TILE_GENERATION.md, PLANETOLOGY.md, ../lore/HISTORY.md.
+> *Start here when the question spans more than one generation doc.*
+
 This document is the **map of the generation layer** — the strategy that ties the
 per-subject generation docs together — and the home of the **economic premise** the whole
 campaign setup derives from. Each subject below has its own authoritative doc; this one
