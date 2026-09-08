@@ -735,9 +735,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
         for (const region& p : kepler_settlement.regions)
         {
             if (p.anchor < 0) continue;
+            // BL-826 — PLURALITY. A nation is named in ONE tongue, so the
+            // distribution has to collapse to a single answer here, and the
+            // largest people on the core is it. The same rule city_names.cpp
+            // applies to a town, applied to the realm grown from that ground.
+            const int pc = p.culture.plurality();
             kepler_np.seed_tongues.push_back(
-                p.culture >= 0 && p.culture < static_cast<int>(kepler_creeds.cultures.size())
-                    ? kepler_creeds.cultures[static_cast<std::size_t>(p.culture)].speech
+                pc >= 0 && pc < static_cast<int>(kepler_creeds.cultures.size())
+                    ? kepler_creeds.cultures[static_cast<std::size_t>(pc)].speech
                     : tongue{});
         }
 

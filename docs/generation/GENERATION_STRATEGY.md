@@ -713,7 +713,25 @@ passes before the search runs, not an axis the search trades against.
 
 **What crosses each handoff, and nothing else.**
 
-- Pass 1 → pass 2: the region table, cultures, works, the strain accumulators. Nothing is reset.
+- Pass 1 → pass 2: the region table, cultures, works, the strain accumulators, the **grudges**,
+  and the **provinces each polity holds**. Nothing is reset.
+
+  **The list is a struct, not a promise.** `pass_one_output` is the whole of what crosses, and
+  every consumer takes it rather than reaching into the sim's live state — so this clause and
+  the struct's fields are the same list, and a validator checks them rather than a reader
+  trusting the sentence. What that buys is the take-back: **cultures cross as SHARES**, a
+  per-mille distribution over a small number of peoples rather than one index, so a conquest
+  arrives half-digested and says how far; and **grudges cross as directed, decaying, named
+  causes**, so a nation can be asked *why* it resents its neighbour rather than only *how much*.
+
+  A grudge is an **input to sentiment at world setup**, never a fifth quantity beside sentiment,
+  stance, reputation and standing (`../politics/RELATIONS.md`).
+
+  **Cultural shares are also the first anti-hegemony lever that is a force rather than a cap.**
+  Holding foreign ground shifts its shares toward the holder slowly, so the foreign-ground
+  discount on a conquest fades over centuries instead of at the instant the border moves — a
+  realm that expands fast carries a long tail of ground still charging it, and a realm that
+  expands slowly does not. Nothing is clamped; the cost is in the world.
 - Pass 2 → the political map: the same outputs `generate_nations` reads today, plus the
   **polity map itself** — which polity held each region at the epoch, so a realm arrives as one
   nation rather than as a Voronoi cell per region — plus a nation's **tariff posture**, enacted

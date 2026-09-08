@@ -174,7 +174,64 @@ struct history_sim_params
     int w_ring = 400; ///< Weight on ENCLOSED-SEA RING CLOSURE — see `ring_closure_q`.
     int w_dist = 120; ///< Penalty per tile of supply distance from the capital.
     int w_def  = 500; ///< Penalty on the defender's fielded power.
-    int w_cult = 150; ///< Penalty for taking ground of a foreign culture.
+    /// Penalty for taking ground of a foreign culture. BL-826 made it a
+    /// question about the SHARES rather than an equality test — see
+    /// `culture_shares` — so the discount fades as ground stops being foreign.
+    int w_cult = 150;
+
+    // --- Assimilation (BL-826) --------------------------------------------
+    //
+    // THE FIRST ANTI-HEGEMONY LEVER MADE REAL. Before this, a conquest replaced
+    // the region's culture at the instant the border moved, so `w_cult` charged
+    // a conqueror once and then never again: the second region of a foreign
+    // people cost the same as the first, and a realm digested a continent for
+    // free. Now foreign ground shifts toward its holder SLOWLY, so a conquest
+    // is paid for over centuries — a wide realm carries a long tail of ground
+    // that is still charging its owner the foreign-ground discount.
+    //
+    // A RATE, so the stepped clock multiplies it by the step (see § The stepped
+    // decision clock). Proportional to the foreign remainder, so it never
+    // completes: a conquered people is never arithmetically erased.
+    //
+    // 2/1000 a year leaves roughly 45% of a conquest still foreign after four
+    // centuries and roughly 82% after one, which is the "long-held is digested,
+    // recent is not" separation the harness binds to.
+    int assimilation_per_year_q = 2;
+
+    // --- Grudges (BL-827) --------------------------------------------------
+    //
+    // A grudge is a DIRECTED, SPARSE, DECAYING integer from one polity to
+    // another, raised by NAMED EVENTS carrying a place and a date. It is an
+    // INPUT TO SENTIMENT at world setup (docs/politics/RELATIONS.md § What each
+    // quantity was before — "Era -1 grudges, with nowhere to live | seeded
+    // nation->nation sentiment"), NOT a fifth quantity beside sentiment,
+    // stance, reputation and standing. Nothing in this sim reads a grudge to
+    // make a decision; it is a record, and the moment it became an input to the
+    // scorer it would be an agent term rather than an in-world force.
+    //
+    // Magnitudes are PLACEHOLDERS on the same footing as the `w_*` weights.
+    int grudge_ground_taken     = 300; ///< A region changed hands.
+    int grudge_seat_sacked      = 700; ///< And it was the loser's capital.
+    int grudge_border_raided    = 60;  ///< A battle that transferred nothing.
+    int grudge_realm_ended      = 900; ///< The kin of an extinguished realm.
+
+    /// Per-mille of the standing score shed PER YEAR. A rate, so the stepped
+    /// clock multiplies it by the step.
+    ///
+    /// WITHOUT DECAY A 4000-YEAR RUN REACHES THE EPOCH WITH EVERY PAIR
+    /// MAXIMALLY AGGRIEVED, which carries no information at all — every nation
+    /// would seed identical sentiment and the whole record would be a constant.
+    /// 3/1000 is a half-life near 230 years: a single old wrong is gone by the
+    /// epoch, a running feud is not.
+    int grudge_decay_per_year_q = 3;
+
+    /// Ceiling on a single pair's score, so a millennium of border war does not
+    /// run away past every other pair in the world.
+    int grudge_cap = 10000;
+
+    /// Scores at or below this are dropped from the sparse table entirely.
+    /// Sparse is the point: most pairs never meet.
+    int grudge_floor = 4;
 
     // --- Force commitment (BL-277 Q2) -------------------------------------
     /// Power lost per tile between the STAGING HOLDING and the objective, in
@@ -778,6 +835,66 @@ struct verb_contest_trace
     sim_verb winner = sim_verb::none;
 };
 
+// ---------------------------------------------------------------------------
+// Grudges (BL-827)
+// ---------------------------------------------------------------------------
+
+/// WHAT was done. Every kind here is an event this sim actually resolves —
+/// nothing is invented to fill the enum.
+///
+/// TWO OF THE ITEM'S NAMED KINDS ARE OWED, NOT FORGOTTEN, and they are recorded
+/// as owed for the same reason `polity::protection_q` records its colony term:
+/// "a union refused" and "an ally abandoned" have NO INPUT in this codebase.
+/// Era -1 has no unions and no alliances — a polity has holdings, a doctrine
+/// and neighbours, and nothing else. Proxying them from adjacency would invent
+/// a diplomatic layer inside a data-model change, which is exactly the scope
+/// growth the standing rules forbid. They are two more rows on this enum and
+/// two more `raise_grudge` calls once a diplomacy layer exists.
+enum class grudge_kind : uint8_t
+{
+    ground_taken = 0,  ///< A region changed hands.
+    seat_sacked,       ///< And it was the loser's capital.
+    border_raided,     ///< A battle was fought that transferred nothing.
+    realm_ended,       ///< An extinguished realm's kin resent its killer.
+};
+inline constexpr int grudge_kind_count = 4;
+
+/// Contributing events kept per pair. Fixed and small: the rest falls into the
+/// scalar, which is the sparse/bounded half of the design.
+inline constexpr int grudge_events_kept = 3;
+
+/// ONE NAMED CAUSE — what, where, when, and how much it was worth when it
+/// happened. A number a player cannot ask about is a modifier, not a story.
+struct grudge_event
+{
+    int32_t     year      = 0;
+    uint16_t    region    = 0xFFFFu; ///< `owner_none` where the event has no place.
+    grudge_kind kind      = grudge_kind::ground_taken;
+    int32_t     magnitude = 0;       ///< Score added at the time, before decay.
+};
+
+/// A directed pair. DIRECTED because resentment is not symmetric and that
+/// asymmetry is the flavour: the realm that lost the province and the realm
+/// that took it do not feel the same way about each other.
+struct grudge
+{
+    uint16_t from = 0; ///< The aggrieved polity.
+    uint16_t to   = 0; ///< The polity it resents.
+    /// The standing, decayed score. What seeds sentiment at world setup.
+    int32_t  score = 0;
+    /// The highest the score ever reached. Kept because decay makes the epoch
+    /// figure alone misleading — a pair that fought for six centuries and then
+    /// held a quiet millennium reads as nothing without it.
+    int32_t  peak = 0;
+    /// Every event ever raised on this pair, including the ones that fell out
+    /// of `events`. The denominator `events` is a top-N of.
+    int32_t  event_count = 0;
+    /// The largest contributing events, sorted descending by magnitude, ties on
+    /// the later year, then the lower kind. Bounded by construction.
+    int32_t  events_kept = 0;
+    grudge_event events[grudge_events_kept]{};
+};
+
 struct history_sim_state
 {
     std::vector<polity> polities;
@@ -863,6 +980,28 @@ struct history_sim_state
     ///
     /// NOT gated on `trace_battles`: generation is its consumer, not a harness.
     std::vector<history_corridor> supply_corridors;
+
+    /// THE SPARSE, DIRECTED, DECAYING GRUDGE TABLE (BL-827).
+    ///
+    /// Sorted ascending by (from, to) and searched by binary search, so the
+    /// order cannot depend on a container's layout — an unordered map keyed on
+    /// a pair would have been the obvious first cut and is exactly the
+    /// non-determinism this repo has been bitten by before.
+    ///
+    /// Sparse because most pairs never meet: an entry exists only where an
+    /// event was actually raised, and is dropped once decay takes it under
+    /// `history_sim_params::grudge_floor`.
+    ///
+    /// A DEAD POLITY'S GRUDGES ARE LOST, IN BOTH DIRECTIONS, and that is a
+    /// deliberate call rather than a consequence of how ids happen to be
+    /// reused. This sim has no successor concept — polity ids are seeded once
+    /// from cultures and never re-created — so "the successor inherits" could
+    /// only be decided by id arithmetic, which is precisely the accident that
+    /// would make the record meaningless. What survives an extinction instead
+    /// is a NEW named event: `grudge_kind::realm_ended`, raised from every
+    /// surviving polity that shares the dead realm's culture toward its killer.
+    /// The dead leave a grudge in their kin, never in an heir.
+    std::vector<grudge> grudges;
 
     int      region_stride = 0; ///< Final region count (slice width for replay).
     int64_t  years           = 0; ///< Years simulated.
@@ -1101,3 +1240,100 @@ inline era_timelapse as_timelapse(const history_sim_state& s)
 }
 
 std::vector<uint16_t> owner_slice_at(const history_sim_state& s, int64_t year);
+
+// ---------------------------------------------------------------------------
+// Grudge reads (BL-827)
+// ---------------------------------------------------------------------------
+
+/// The standing score @p from holds against @p to, or 0 where no entry exists.
+/// Binary search over the sorted sparse table.
+int grudge_between(const history_sim_state& s, int from, int to);
+
+/// The @p n strongest pairs, sorted descending by `score`, ties on `peak`, then
+/// on (from, to). A TOTAL order with an explicit tie-break, so the listing is
+/// identical on every machine — the same discipline the scorer's argmax uses.
+std::vector<grudge> top_grudges(const history_sim_state& s, int n);
+
+/// One line naming a grudge event: what, where, when. The printable half of
+/// "it must carry its cause".
+std::string grudge_event_line(const grudge_event& e, const settlement_state& ss);
+
+// ---------------------------------------------------------------------------
+// The pass 1 -> pass 2 handoff (BL-828)
+// ---------------------------------------------------------------------------
+
+/// The provinces one polity holds at the handoff. `regions` is ascending, so
+/// the set is a value rather than a walk order.
+struct polity_holdings
+{
+    int              polity = -1;
+    std::vector<int> regions;
+};
+
+/// THE WHOLE OF WHAT PASS 1 HANDS FORWARD, AND NOTHING ELSE (BL-828).
+///
+/// `GENERATION_STRATEGY.md` § What crosses each handoff already names the list
+/// — "the region table, cultures, works, the strain accumulators. Nothing is
+/// reset." That clause was a promise in prose with nothing enforcing it: every
+/// consumer reached into `history_sim_state` and `settlement_state` and took
+/// whatever it found, so the list and the code could drift without either
+/// noticing. This struct makes the doc's list and the struct's fields the same
+/// list, and `pass_one_output_valid` is the check that they still agree.
+///
+/// A VALUE, not a view. Copies rather than pointers, because a handoff whose
+/// members alias the live sim state is not a handoff — a consumer could mutate
+/// the producer through it, and "nothing is reset" would stop being checkable.
+///
+/// WHERE EACH ITEM ON THE DOC'S LIST LIVES, so the mapping is explicit rather
+/// than inferred:
+///   - the region table          -> `regions`
+///   - cultures                  -> `region::culture` (shares) + `culture_count`
+///   - works                     -> `region::works_built` and the five
+///                                  `work_*_mod` fields, plus `works_by_span_band`
+///   - the strain accumulators   -> `region::contest_q` and `polity::cohesion_q`
+///   - grudges (BL-827)          -> `grudges`
+///   - the provinces each polity holds -> `holdings`
+struct pass_one_output
+{
+    /// The region table, carrying culture shares, works, the urban record and
+    /// the per-region strain accumulator (`contest_q`).
+    std::vector<region> regions;
+
+    /// The polities, carrying the per-polity strain accumulator (`cohesion_q`),
+    /// the capacity ladder and the derived tariff posture.
+    std::vector<polity> polities;
+
+    /// How many cultures the shares above index into. Carried so a consumer can
+    /// bound-check a share without holding a `creed_state`.
+    int culture_count = 0;
+
+    /// Works raised, cross-tabulated [span][band] exactly as the sim counts them.
+    std::array<std::array<int64_t, roster_band_count>, 2> works_by_span_band{};
+
+    /// The directed grudge table (BL-827) — an input to sentiment at world
+    /// setup, never a quantity of its own.
+    std::vector<grudge> grudges;
+
+    /// Which provinces each polity holds, one entry per LIVING polity, sorted
+    /// ascending by polity id. The political map as a set rather than as a
+    /// field to be re-derived.
+    std::vector<polity_holdings> holdings;
+
+    /// The recorded time-lapse and the span it covers.
+    era_timelapse timelapse;
+    int64_t start_year = 0;
+    int64_t stop_year  = 0;
+};
+
+/// Fold the live sim state and settlement state into the handoff value.
+/// @param culture_count Cultures the shares index into; 0 when unknown.
+pass_one_output make_pass_one_output(const settlement_state&  ss,
+                                     const history_sim_state& hs,
+                                     int                      culture_count);
+
+/// The enforcement half of the struct above. Checks what the doc's clause
+/// actually claims: every region's shares sum to exactly 1000 and name only
+/// cultures in range; every holding names a living polity and an existing
+/// region, with no region held twice; every grudge names polities in range and
+/// carries at least one event. Writes the first failure into @p why.
+bool pass_one_output_valid(const pass_one_output& o, std::string* why);

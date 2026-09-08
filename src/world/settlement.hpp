@@ -105,6 +105,115 @@ constexpr region_domain region_domain_of(terrain_substrate s)
     return region_domain::land;
 }
 
+// ---------------------------------------------------------------------------
+// Culture shares (BL-826)
+// ---------------------------------------------------------------------------
+
+/// Cultures a region may carry EXPLICITLY. Fixed width on purpose: the region
+/// stays POD-ish, the playback record stays bounded, and the flat-binary seam
+/// stays a fixed field count rather than a length-prefixed list.
+inline constexpr int culture_share_slots = 3;
+
+/// WHOSE PEOPLE LIVE HERE, AS A DISTRIBUTION (BL-826).
+///
+/// This replaces `region::culture`, which was a single index — a region was
+/// wholly one people or wholly another, and there was no way to say a conquest
+/// was half digested. Two things ride on the change:
+///
+///   1. It is the TAKE-BACK. A cultural mix is a fact pass 1 hands forward that
+///      a downstream pass could not have re-derived, because it is the residue
+///      of who walked where over four thousand years.
+///   2. It is an ANTI-HEGEMONY LEVER MADE REAL. Foreign ground shifts toward
+///      its holder SLOWLY (`history_sim_params::assimilation_per_year_q`), so a
+///      conquest is digested over centuries rather than at the instant the
+///      border moves — and `w_cult` becomes a question about the distribution
+///      rather than an equality test, so the discount on foreign ground fades
+///      as the ground stops being foreign.
+///
+/// INTEGER PER-MILLE, AND THE SUM IS EXACTLY 1000. No floats: this accumulates
+/// over four thousand years of decision rounds, which is precisely how a float
+/// invariant is lost. `slots` carry the largest cultures, sorted DESCENDING by
+/// weight with ties broken on the lower culture index, and `other_q` is the
+/// tail bucket holding everything that fell off the end. `total_q()` is 1000
+/// always, including for an unsettled region — which is all tail.
+struct culture_shares
+{
+    /// Culture index into `creed_state::cultures`; -1 for an unused slot.
+    /// Sorted descending by `weight_q`, ties on the lower index.
+    int16_t id[culture_share_slots] = {-1, -1, -1};
+    /// Per-mille weight of the matching slot. 0 exactly where `id` is -1.
+    int16_t weight_q[culture_share_slots] = {0, 0, 0};
+    /// The remainder — peoples too small to name. Never negative.
+    int16_t other_q = 1000;
+
+    /// A region nobody has settled: no named culture at all, all tail.
+    bool empty() const { return id[0] < 0; }
+
+    /// The largest named culture, or -1. THE PLURALITY, not the majority — use
+    /// `majority` where a bare plurality should not be enough.
+    int plurality() const { return id[0] >= 0 ? static_cast<int>(id[0]) : -1; }
+
+    /// Per-mille of this region that is culture @p c. 0 for -1 and for any
+    /// culture that has fallen into the tail — the tail is deliberately NOT
+    /// attributable, which is what makes it cheap.
+    int share_of(int c) const
+    {
+        if (c < 0) return 0;
+        for (int i = 0; i < culture_share_slots; ++i)
+            if (id[i] == static_cast<int16_t>(c)) return static_cast<int>(weight_q[i]);
+        return 0;
+    }
+
+    /// Strictly more than half the region. The test an institution that cannot
+    /// survive on a plurality should use.
+    bool majority(int c) const { return share_of(c) > 500; }
+
+    /// Always 1000. Exposed so callers and harnesses can assert it rather than
+    /// trust this comment.
+    int total_q() const
+    {
+        int t = static_cast<int>(other_q);
+        for (int i = 0; i < culture_share_slots; ++i) t += static_cast<int>(weight_q[i]);
+        return t;
+    }
+
+    /// A region wholly one people. `pure(-1)` is the unsettled default.
+    static culture_shares pure(int c)
+    {
+        culture_shares s;
+        if (c < 0) return s;
+        s.id[0] = static_cast<int16_t>(c);
+        s.weight_q[0] = 1000;
+        s.other_q = 0;
+        return s;
+    }
+
+    /// ASSIMILATION. Move @p amount_q per-mille OF THE FOREIGN REMAINDER toward
+    /// culture @p c, conserving the 1000 total exactly.
+    ///
+    /// Proportional rather than flat, for the reason `w_cult` had to become
+    /// proportional (history_sim.hpp § The corollary): a flat transfer converts
+    /// the last sliver of a minority at the same speed as the first half of a
+    /// majority, so it reads as a deadline rather than as a force. Proportional
+    /// means the same thing at any starting mix, and it never reaches 1000, so
+    /// a conquered people is never arithmetically erased.
+    ///
+    /// Integer throughout. The floor losses of the proportional take are
+    /// redistributed deterministically (largest component first, ties on the
+    /// lower slot, tail last), so the total is conserved to the unit and the
+    /// result cannot depend on iteration order.
+    void shift_toward(int c, int amount_q);
+
+    bool operator==(const culture_shares& o) const
+    {
+        if (other_q != o.other_q) return false;
+        for (int i = 0; i < culture_share_slots; ++i)
+            if (id[i] != o.id[i] || weight_q[i] != o.weight_q[i]) return false;
+        return true;
+    }
+    bool operator!=(const culture_shares& o) const { return !(*this == o); }
+};
+
 /// One settled region — the unit of settlement history, and the unit BL-219
 /// reads a corporation's focus from.
 struct region
@@ -124,9 +233,17 @@ struct region
     /// default ground `sub_at` hands out, which is dry.
     region_domain domain = region_domain::land;
 
-    /// Index into `creed_state::cultures` — WHOSE GODS this region keeps.
-    /// Starts as the nearest cradle's and can be overwritten by conquest.
-    int culture = -1;
+    /// WHOSE GODS THIS REGION KEEPS, as a DISTRIBUTION (BL-826).
+    ///
+    /// Was a single `int` index; a region was wholly one people. It starts as
+    /// the nearest cradle's, pure, and conquest then shifts it SLOWLY toward
+    /// the holder rather than flipping it — see `culture_shares` above and
+    /// `history_sim_params::assimilation_per_year_q`.
+    ///
+    /// EVERY former `p.culture == q.culture` test had to be answered
+    /// deliberately as plurality, majority or share-weighted; the type change
+    /// is what forced each one to be answered rather than defaulted.
+    culture_shares culture;
     /// The culture that FOUNDED it. Never overwritten, so a conquered region
     /// still records who built it — the erasure is of the record, not of this.
     int founding_culture = -1;

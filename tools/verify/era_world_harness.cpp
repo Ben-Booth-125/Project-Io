@@ -56,7 +56,7 @@ bool regions_identical(const std::vector<region>& a, const std::vector<region>& 
     {
         const region& x = a[i];
         const region& y = b[i];
-        if (x.anchor != y.anchor || x.name != y.name || x.culture != y.culture
+        if (x.anchor != y.anchor || x.name != y.name || x.culture != y.culture // BL-826: culture_shares::operator==
             || x.founded_year != y.founded_year || x.industrial_year != y.industrial_year
             || x.population != y.population || x.manpower_stock != y.manpower_stock
             || x.farm_q != y.farm_q || x.ore_q != y.ore_q || x.energy_q != y.energy_q

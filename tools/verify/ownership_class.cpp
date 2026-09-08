@@ -176,7 +176,7 @@ region make_region(int col, int row, int culture, int port_q = 0)
     region p;
     p.col     = col;
     p.row     = row;
-    p.culture = culture;
+    p.culture = culture_shares::pure(culture);
     p.port_q  = port_q;
     return p;
 }
