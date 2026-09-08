@@ -10,6 +10,85 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-08/09 (sprint 35) — Generation gets two more rounds, and the measurements refute nearly everything
+
+**Mode:** Design → Batch delivery in waves → paused mid-sprint on Ben's call → review barrier and close.
+**Runtime:** one long session; 5 sub-agents in worktrees; 3 lanes merged, built and verified in the main session.
+
+### What started it
+
+Ben: *"everything up to the planetology looks great"* — and nothing after it is visible at all.
+The wizard is the one generation surface that works, and it stops at phase 1. The two passes a
+player would most want to have watched — the ancient history and the industrial economy — happen
+behind a loading bar. Sprint 35, opened that morning on the startup budget, was repurposed.
+
+### What was settled
+
+The wizard grows to **five rounds**. Round 4 is the **history**: a 2D map replaces the globe and
+runs a time-lapse of 4000 years to 1200 CE, with an ordered **top-sixteen scoreboard** on the left.
+Round 5 is the **economy pass, 1560 → 1960**, its own page with its own run and reroll. `Begin`
+moves to the last round; the 4000 years can be rerolled, which is what forces the wait to be
+genuinely affordable rather than merely tolerable. Ben: *a watched wait needs no budget* — which
+dropped the startup-budget chain the sprint had opened on.
+
+That fixed the calendar: 4000 years to 1200 CE, a deliberate **coast** to 1560, then 1560 → 1960,
+epoch 1960. An industrial-band campaign, where the 0 CE default gave an ancient one.
+
+### Three measurements, and every one of them said no
+
+This is the session's actual content. Wave 0 existed to stop the sprint being planned on a guess,
+and it did exactly that — three times over.
+
+**4000 years is not free.** I had read the sim and concluded the span was probably already
+affordable: it works on the region graph, the O(N²) neighbour build sits outside the year loop, and
+the stepped decision clock already amortises decisions. Wrong. Per-year cost at 4000 years is
+**6–9× its cost at 400**. Reach is **66–86%** of the run, and `rebuild_reach` caches into a *single
+shared slot* — so twelve polities evict each other every round, 12,000 rebuilds over 1,000 rounds.
+Its own comment claims the cache survives until a capital moves. With more than one polity it does
+not survive one iteration (BL-834).
+
+**Most of the war is not war.** An R5 regression after the culture-shares merge was first diagnosed
+as a fragile fixture, and then by me as a scoring reorder. Both wrong. All 258 battles of the
+seed-0 fixture are **the same region** — zero population, zero defenders — taken and retaken for
+four thousand years. `battles == conquests == 258`, exactly 1:1, which the shipped harness had been
+printing unread all along. Culture shares were exonerated by direct experiment: the pre-change
+equality test gives identical counts (BL-835).
+
+**And the batch was about to close green on five real defects.** The step 4a barrier — one cold
+review across the whole integrated set — returned five confirmed findings, including an
+out-of-bounds write in the `--autostart-windowed` driver, which indexed a `uint32_t[3]` with a
+round counter the wizard had just widened to 0..4. The Reroll button was gated when the wizard
+grew; the driver was missed, and it is the path nobody eyeballs. Fixed here; BL-840–843 filed for
+the rest, two of which mean headline behaviours of the grudge and share systems do not actually
+occur in the sim.
+
+### What landed
+
+Wizard rounds 4 and 5 with labelled placeholders, verified by a live click-through on the release
+build (BL-816, BL-824). The span-cost harness and its profiling counters (BL-825). Culture shares,
+the grudge ledger and the `pass_one_output` handoff (BL-826, BL-827, BL-828 — the last half done by
+the author's own admission; its consumers are not rewired).
+
+### What Ben settled when development paused
+
+**Population is civilian, armies are distinct, and stage 4 does not simulate total warfare.** That
+is the root fix for the dead region: war stops *producing* empty ground, so the pathology has no
+cause rather than a block. It also gives culture shares their subject back, since conquest now
+transfers people. The scorer gains two questions — *can I keep it* (logistics and ancient roads) and
+*will others attack me for fear of being next*, which is what finally makes the balancing-coalition
+lever admissible: fear reads a **behaviour**, not a rank. And **turbulence is round 4's lean** —
+roll for a world with fewer or more countries, tuning forces and never clamping a count.
+
+### Left open
+
+Six review-queue entries, the sharpest being NR-807: `CONCEPT.md` still names the ancient arc as
+the live product. I fixed the generation-side citation and deliberately did not touch that one —
+it names who the player is, which is a product call rather than a reconciliation.
+
+Sprint 35 is **paused, not closed**, with `NEXT_SESSION.md` as the handoff.
+
+---
+
 ## 2026-09-07 (sprint 33 opens) — The corpus stops charging every session, and two tools are found lying
 
 **Mode:** Design (one question, two calls) → Corpus/Batch delivery in one wave → close.

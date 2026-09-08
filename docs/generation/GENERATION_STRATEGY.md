@@ -27,7 +27,7 @@ The subject docs:
 - **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map,
   driven by the pre-national history ladder.
 - **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
-  market-based and non-hegemonic. **The campaign epoch is 0 CE (Ben, 2026-08-12, NR-177)**, and
+  market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the ancient arc's epoch (Ben, 2026-08-12, NR-177)** — § Pass 2 is the economy pass owns the calendar — and
   generation runs a stepped 4000 BCE → 0 CE prehistory. Stages 5–6 (the energy transition and
   saturation) fall *past* the epoch entirely and are DLC-era material (BL-223, averted rupture,
   owns their reshaping).

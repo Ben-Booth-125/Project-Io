@@ -197,6 +197,28 @@
         "docs/generation/MILITARY_HISTORY.md"
       ],
       "resolution": "RULED by Ben, 2026-09-08, and the ruling went past all three options offered. First: a region emptied by war is immediately resettled by the attacker. Then, decisively: POPULATION IS CIVILIAN, ARMIES ARE DISTINCT FROM IT, AND STAGE 4 DOES NOT SIMULATE TOTAL WARFARE - so war stops producing empty regions at all, and the pathology has no cause rather than a block. That also dissolves the assimilation-bypass worry I raised against the first answer: with no war route to emptiness there is no massacre-and-resettle fast path. Written into GENERATION_STRATEGY.md § Population is civilian, and armies are distinct from it. Work is BL-835, re-authored around the split."
+    },
+    {
+      "id": "NR-807",
+      "title": "CONCEPT.md still names the ancient arc as the live product, and the epoch moved to 1960",
+      "raised": "2026-09-09",
+      "kind": "question",
+      "status": "open",
+      "source": "The doc-contradiction sweep at the close of sprint 35.",
+      "what": "CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch is 0 CE, the player a mercenary company. Your 2026-09-08 calendar makes the epoch 1960, and era_band_for_epoch flips to industrial at 1700 - so generation now runs the INDUSTRIAL arc.",
+      "why_it_matters": "I fixed the generation-side citation because the calendar is that doc subject. I did NOT touch this one, because it is not a date - it names WHO THE PLAYER IS and which product is live. Changing the live arc from ancient to industrial in the doc that owns player identity is a product call, not a reconciliation, and CONCEPT.md is the authority the rest of the corpus reads for it.",
+      "options": [
+        "The live product is now the industrial arc; CONCEPT.md is updated and the mercenary-company framing revisited with it.",
+        "The ancient arc stays the live product and 1560-1960 is generation own arc for this work, with both supported.",
+        "The epoch move was about generation calendar only and CONCEPT.md is correct as written."
+      ],
+      "recommendation": "The second, provisionally - both arcs already exist in the code (era_band_for_epoch branches on the epoch, and HISTORY.md was already written arc-aware), so nothing forces a product choice yet. But it should be YOUR sentence, not mine, and it is the kind of thing that quietly becomes true by being left alone.",
+      "files": [
+        "docs/CONCEPT.md",
+        "docs/generation/GENERATION_STRATEGY.md",
+        "src/world/era_band.hpp"
+      ],
+      "resolution": null
     }
   ]
 }

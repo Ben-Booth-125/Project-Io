@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*7 entries — 5 open, 2 resolved.*
+*8 entries — 6 open, 2 resolved.*
 
 ---
 
@@ -100,6 +100,21 @@ BL-825 added history_sim_profile / history_sim_last_profile() - a report-only wa
 > **Recommendation:** Write it down. The constraints are already clear from the two instances, and a stated rule is cheaper than a third argument.
 
 *Files: `src/world/history_sim.hpp`, `src/world/era_minus_one.hpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-807 — CONCEPT.md still names the ancient arc as the live product, and the epoch moved to 1960
+*question · raised 2026-09-09 · from The doc-contradiction sweep at the close of sprint 35.*
+
+CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch is 0 CE, the player a mercenary company. Your 2026-09-08 calendar makes the epoch 1960, and era_band_for_epoch flips to industrial at 1700 - so generation now runs the INDUSTRIAL arc.
+
+**Why it matters.** I fixed the generation-side citation because the calendar is that doc subject. I did NOT touch this one, because it is not a date - it names WHO THE PLAYER IS and which product is live. Changing the live arc from ancient to industrial in the doc that owns player identity is a product call, not a reconciliation, and CONCEPT.md is the authority the rest of the corpus reads for it.
+
+- The live product is now the industrial arc; CONCEPT.md is updated and the mercenary-company framing revisited with it.
+- The ancient arc stays the live product and 1560-1960 is generation own arc for this work, with both supported.
+- The epoch move was about generation calendar only and CONCEPT.md is correct as written.
+
+> **Recommendation:** The second, provisionally - both arcs already exist in the code (era_band_for_epoch branches on the epoch, and HISTORY.md was already written arc-aware), so nothing forces a product choice yet. But it should be YOUR sentence, not mine, and it is the kind of thing that quietly becomes true by being left alone.
+
+*Files: `docs/CONCEPT.md`, `docs/generation/GENERATION_STRATEGY.md`, `src/world/era_band.hpp`*
 
 ---
 

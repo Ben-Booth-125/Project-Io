@@ -59,7 +59,7 @@ slider you cannot judge.
 
 ## New World wizard — `draw_generation_screen`
 
-The wizard is BL-167 (planetology pass). Its first **three rounds** (`wizard_round_count`),
+The wizard is BL-167 (planetology pass). Its first **three rounds** (`wizard_planetology_round_count`),
 batched thematically from the ten-stage Planetology chain (Ben, 2026-07-22: fewer
 rounds, too slow otherwise). Each round stacks its stages' charts and
 explanations, then takes that round's preferences. Two further rounds carry the history and the economic substrate — § Rounds 4 and 5 below.
