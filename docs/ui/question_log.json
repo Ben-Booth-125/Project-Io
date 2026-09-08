@@ -736,6 +736,33 @@
         "src/ui/ui_state.hpp"
       ],
       "status": "drafted"
+    },
+    "wizard_round_history": {
+      "surface": "New World wizard - round 4, The History",
+      "answers": "Who claimed this ground, and who lost it, over four thousand years?",
+      "because": "The wizard's first three rounds settle what the world IS; round 4 settles who was on it. The frontier is the round's whole subject, so it earns a page rather than a line in a report the player reads after generation. Currently an honest labelled placeholder: the round exists in the wizard's chrome, the pass it will run does not.",
+      "backlog_item": [
+        "BL-816",
+        "BL-829"
+      ],
+      "files": [
+        "src/ui/startup_screens.cpp"
+      ],
+      "status": "drafted"
+    },
+    "wizard_round_substrate": {
+      "surface": "New World wizard - round 5, The Substrate",
+      "answers": "What does that ground produce, and who trades it?",
+      "because": "Round 4 settles who holds what ground; what that ground produces is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Currently an honest labelled placeholder.",
+      "backlog_item": [
+        "BL-816",
+        "BL-819",
+        "BL-824"
+      ],
+      "files": [
+        "src/ui/startup_screens.cpp"
+      ],
+      "status": "drafted"
     }
   }
 }

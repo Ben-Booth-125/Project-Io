@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**50 surfaces** — 6 settled, 44 awaiting Ben's wording.
+**52 surfaces** — 6 settled, 46 awaiting Ben's wording.
 
 ---
 
@@ -381,6 +381,22 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 **Because:** Coastal water and lakes carry an owner, derived from the shore that claims them; open ocean structurally does not (PROVINCES.md § Who owns water). That asymmetry is the load-bearing shape of the water model, and it was invisible on every surface the game had — the hover card reported terrain and habitability and said nothing about title, no lens colours ground by owning nation, and clicking water did not move the Selection band at all. A claim nobody can look at can only be trusted, which is not the standard this project holds a generated world to. It earns its space by reusing the tile element rather than adding one: same header, same hex ring (which is where a shoreline reads at all), same action grid; only the centre column forks, and it forks because four of the five ground sections — buildings, deposits, resources, population — ask questions about ground there is none of. The single most important word on it is 'Unowned', stated positively: an empty owner row and an owner row reading 'Unowned' cost the same pixels and mean opposite things, the first looking like the panel failed and the second being the model's central assertion.
 
 *Demanded by BL-785 · `src/ui/selection_panel.cpp` · id `water_tile_selection`*
+
+### New World wizard - round 4, The History
+
+**Answers:** Who claimed this ground, and who lost it, over four thousand years?
+
+**Because:** The wizard's first three rounds settle what the world IS; round 4 settles who was on it. The frontier is the round's whole subject, so it earns a page rather than a line in a report the player reads after generation. Currently an honest labelled placeholder: the round exists in the wizard's chrome, the pass it will run does not.
+
+*Demanded by BL-816, BL-829 · `src/ui/startup_screens.cpp` · id `wizard_round_history`*
+
+### New World wizard - round 5, The Substrate
+
+**Answers:** What does that ground produce, and who trades it?
+
+**Because:** Round 4 settles who holds what ground; what that ground produces is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Currently an honest labelled placeholder.
+
+*Demanded by BL-816, BL-819, BL-824 · `src/ui/startup_screens.cpp` · id `wizard_round_substrate`*
 
 ---
 
