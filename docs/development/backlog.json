@@ -18,7 +18,7 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": null,
-   "sprint": "32b",
+   "sprint": "33",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
@@ -48,7 +48,7 @@
    "priority": "A",
    "difficulty": 2,
    "version_goal": null,
-   "sprint": "32b",
+   "sprint": "33",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
@@ -75,11 +75,11 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "32b",
+   "sprint": "33",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
-    "BL-751"
+    "BL-770"
    ],
    "blocked_on": null,
    "parked": false,
@@ -95,7 +95,7 @@
     "tools/verify/history_sweep.cpp",
     "tools/verify/run_sweep.cmake"
    ],
-   "design": "\"GAMIFYING GENERATION\" MEANS A SCOREBOARD, NOT A TARGET. Ben, 2026-08-31: no start is clamped up to viability or down to fairness; generation owes the SPREAD. The three passes are tuned by moving a force (a weight in history_sim_params, a tariff threshold, the settle's spawn cadence) and reading how the DISTRIBUTION across a seed spread moves. The instruments exist and are read one at a time; this item puts them on one sheet.\n\nTHE WORK. A sweep target (run_sweep.cmake already fans harnesses over seeds) that, per seed, records: chain-completeness spread (demand_census R5 - min, median, max, tails); the lapse four at handoff (mean operating net, operating-positive corps, valued production, debtors); the haulage baseline (convoy count and cargo vs the 1055/802 reference - goldens cannot see trade); and history_sweep's pass-1/pass-2 outputs (nation count, furnace years, overseas holdings, tariffed nations). One table, seeds as rows, printed and diffable. No assertion beyond \"the spread is not zero\" - the instrument reports, the sprint argues.\n\nDONE WHEN: the sheet exists, runs over the standard seed spread in one command, and sprint 32's retro cites it."
+   "design": "\"GAMIFYING GENERATION\" MEANS A SCOREBOARD, NOT A TARGET. Ben, 2026-08-31: no start is clamped up to viability or down to fairness; generation owes the SPREAD. The three passes are tuned by moving a force (a weight in history_sim_params, a tariff threshold, the settle's spawn cadence) and reading how the DISTRIBUTION across a seed spread moves. The instruments exist and are read one at a time; this item puts them on one sheet.\n\nTHE WORK. A sweep target (run_sweep.cmake already fans harnesses over seeds) that, per seed, records: chain-completeness spread (demand_census R5 - min, median, max, tails); the lapse four at handoff (mean operating net, operating-positive corps, valued production, debtors); the haulage baseline (convoy count and cargo vs the 1055/802 reference - goldens cannot see trade); and history_sweep's pass-1/pass-2 outputs (nation count, furnace years, overseas holdings, tariffed nations). One table, seeds as rows, printed and diffable. No assertion beyond \"the spread is not zero\" - the instrument reports, the sprint argues.\n\nDONE WHEN: the sheet exists, runs over the standard seed spread in one command, and sprint 32's retro cites it.\n\n--- REQUIRES REPOINTED 2026-09-08 (consequence of BL-751 being cancelled) ---\n\nThis item required BL-751 (economic settle pass) for the field the scoreboard reads. BL-751 is\ncancelled superseded, so the require moves to BL-770 (Era 0 candidate search) - the SAME repoint\nBL-752 (colonial ties) and BL-754 (generation budget) took on 2026-09-06. This row was missed in\nthat pass and was still pointing at a cancelled item, so the sheet read as blocked when it is not.\nBL-770 is complete, so this item is UNBLOCKED. Nothing about the scoreboard design changes."
   },
   {
    "status": "designed",
@@ -103,7 +103,7 @@
    "priority": "A",
    "difficulty": 2,
    "version_goal": null,
-   "sprint": "32b",
+   "sprint": "35",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
@@ -121,7 +121,7 @@
     "src/core/app.cpp",
     "tools/verify/history_sweep.cpp"
    ],
-   "design": "BEN, 2026-09-03: \"I am interested to see if this can be done cheaply. This is in fact a difficult abstraction problem.\" The budget is the generating screen's wait (~25-38 s generation + ~6 s warm start today, per app.cpp). Pass 1 is already the most expensive pass; pass 2 doubles it and pass 3 lengthens the settle by an order of magnitude at 4 ticks a year. Cost tracks the province table, not the fighting (COLLAPSE.md § The 4000-year problem).\n\nTHE WORK. (1) Instrument the wait per pass on the loading screen's progress sink and in history_sweep, so every sprint-32 item records its cost on this item as it lands. (2) The affordability rungs in COLLAPSE.md § The 4000-year problem - kill the O(provinces) scans, quiet-province fast path, banded year grain, record on change - were purged with the ancient pivot and are NOT re-filed here in advance. Re-file the one the measurement points at, when it does, in that order. (3) The abstraction question Ben names is the handoff between two engines, not either engine: keep the handoff a struct of plain outputs (regions, works, strain, ties, posture) so pass 3 never reads pass 2's internals.\n\nDONE WHEN: a 1960 world with all three passes generates inside a budget Ben has stated on this item; if it cannot, the item records which rung buys it back and that rung is filed.\n\n--- MEASURED 2026-09-03, the instrumentation half landed with BL-747 ---\n\n  0 CE, 400 y      total 8200 ms = pre-settlement 443 + settlement 4 + ERA-1 323 + post-era 7428\n  0 CE, no era     total 6661 ms = pre-settlement 455 + settlement 3 + ERA-1   0 + post-era 6202\n  1960, two-span   total 7996 ms = pre-settlement 465 + settlement 2 + ERA-1 197 + post-era 7331\n\nTHE ANSWER TO BEN'S QUESTION IS YES, AND BY A WIDER MARGIN THAN EXPECTED. The second span is not merely affordable, it is FREE: 800 simulated years at epoch 1960 cost 197 ms against 323 ms for 400 years at 0 CE, and the whole 1960 world builds FASTER than the 0 CE one. The reason is the one COLLAPSE.md § The 4000-year problem already states - cost tracks the province/region table, not the fighting or the years - and at 1960 the settlement pass has already founded most regions, so the sim founds 506 where the ancient arc founds 833.\n\nTHE SECOND FINDING IS THE ONE THAT CHANGES BUDGETING. The era pass costs about FOUR TIMES its own wall clock. Era on versus off at 0 CE is a ~1.5 s difference, of which only 323 ms is the sim itself; the remaining ~1.2 s is every pass after it working over the 833 regions the era founded. A budget taken off the era's own timer is wrong by 4x, and the affordability rungs in COLLAPSE.md are aimed at the 323 ms rather than the 1.2 s.\n\nWHAT THIS MEANS FOR THE REMAINING RUNGS. None of them is needed yet. The 4000-year ladder (BL-494) is the case that would test them, and the right next measurement is a 4000-year ancient span at epoch 1960 rather than any optimisation. Do not re-file a rung until a measurement points at it.\n\nSTILL OPEN on this item: the budget Ben will actually state, and the settle pass's own cost (BL-751), which is gated on sprint 33.\n\n--- TWO GAPS FOUND IN THE PLAY BUILD, 2026-09-03 ---\n\n(1) THE GAME NEVER REPORTS ITS OWN GENERATION BUDGET. The \"[gen budget]\" line added with this item is inside the \"if (fixture)\" branch in hard_coded_world.cpp, and the app passes fixture = nullptr. So every number this item quotes is a HARNESS number, and the loading screen - which work item (1) explicitly named as the place to instrument - still says nothing about where its wait goes. Remaining work on this item, not a completed half.\n\n(2) THE BUDGET IS NOT WHERE THIS ITEM WAS LOOKING. Measured in the release play build, the warm start is 72-73 s on BOTH arcs against generation's ~8 s. The pass this item exists to price (197-323 ms) is under half a percent of the startup wait. That does not make the era measurement wrong, but it does mean \"can generation afford more complexity\" is the wrong question to ask of the startup budget: generation is not what the player is waiting for. BL-761 owns the warm start.\n--- REQUIRES REPOINTED 2026-09-06 (consequence of BL-751 being cancelled) ---\n\nThis item required BL-751 (economic settle pass) because the settle was the pass whose wall\nclock it had to budget. BL-751 is cancelled superseded, so the require moves to BL-770 (Era 0\ncandidate search), which is the pass that now carries that burden.\n\nAND ITS PREMISE IS PARTLY OVERTAKEN. The item says \"the app still never prints its own\ngeneration budget\" - but world_determinism already emits a [gen budget] line per generated\nworld (total ms, split pre-settlement / settlement / era-1 / post-era), observed 2026-09-06\nat ~6.5 s total with post-era dominating at 5.9 s. So the MEASUREMENT exists in the harness\ntier; what is still missing is the APP printing it on its own generating screen. Re-scope to\nthat half before building.\n--- DELIVERED 2026-09-06 (console half proved; on-screen half UNVERIFIED) ---\n\ngeneration_progress gains five atomic budget fields plus a release-stored budget_ready. That\nstruct is ALREADY the app-to-generation seam, already atomic, and already a write-only tap with NO\nsave-format presence - which is why the clock goes there rather than on generation_report (which\nis serialised) or era_minus_one_fixture (a heavy capture the app never asks for). NO SERIALISATION\nSEAM IS OWED, and that is a design consequence rather than an omission.\n\nThe stderr [gen budget] line stays gated on `fixture`, so harness-tier output is unchanged.\napp::begin_new_game CLEARS the budget - without that a second campaign would show the previous\nworld split, which is the kind of stale-read nobody notices until it misleads someone.\n\nMEASURED FROM THE WORKTREE: [gen budget] total 53005 ms (pre-settlement 2016, settlement 48,\nera-1 7365, post-era 43575).\n\nR1 IS NOT MARKED COMPLETE. The console half is proved; the ON-SCREEN half is not. The agent could\nnot take a live look - computer-use access was denied and the granted path resolved to a DIFFERENT\nworktree exe, which is the known granted-path trap. A clean compile is not evidence that a surface\nrenders, and the standing rule is that a UI requirement needs a live click. OWED: open the built\napp and look at the generating screen."
+   "design": "BEN, 2026-09-03: \"I am interested to see if this can be done cheaply. This is in fact a difficult abstraction problem.\" The budget is the generating screen's wait (~25-38 s generation + ~6 s warm start today, per app.cpp). Pass 1 is already the most expensive pass; pass 2 doubles it and pass 3 lengthens the settle by an order of magnitude at 4 ticks a year. Cost tracks the province table, not the fighting (COLLAPSE.md § The 4000-year problem).\n\nTHE WORK. (1) Instrument the wait per pass on the loading screen's progress sink and in history_sweep, so every sprint-32 item records its cost on this item as it lands. (2) The affordability rungs in COLLAPSE.md § The 4000-year problem - kill the O(provinces) scans, quiet-province fast path, banded year grain, record on change - were purged with the ancient pivot and are NOT re-filed here in advance. Re-file the one the measurement points at, when it does, in that order. (3) The abstraction question Ben names is the handoff between two engines, not either engine: keep the handoff a struct of plain outputs (regions, works, strain, ties, posture) so pass 3 never reads pass 2's internals.\n\nDONE WHEN: a 1960 world with all three passes generates inside a budget Ben has stated on this item; if it cannot, the item records which rung buys it back and that rung is filed.\n\n--- MEASURED 2026-09-03, the instrumentation half landed with BL-747 ---\n\n  0 CE, 400 y      total 8200 ms = pre-settlement 443 + settlement 4 + ERA-1 323 + post-era 7428\n  0 CE, no era     total 6661 ms = pre-settlement 455 + settlement 3 + ERA-1   0 + post-era 6202\n  1960, two-span   total 7996 ms = pre-settlement 465 + settlement 2 + ERA-1 197 + post-era 7331\n\nTHE ANSWER TO BEN'S QUESTION IS YES, AND BY A WIDER MARGIN THAN EXPECTED. The second span is not merely affordable, it is FREE: 800 simulated years at epoch 1960 cost 197 ms against 323 ms for 400 years at 0 CE, and the whole 1960 world builds FASTER than the 0 CE one. The reason is the one COLLAPSE.md § The 4000-year problem already states - cost tracks the province/region table, not the fighting or the years - and at 1960 the settlement pass has already founded most regions, so the sim founds 506 where the ancient arc founds 833.\n\nTHE SECOND FINDING IS THE ONE THAT CHANGES BUDGETING. The era pass costs about FOUR TIMES its own wall clock. Era on versus off at 0 CE is a ~1.5 s difference, of which only 323 ms is the sim itself; the remaining ~1.2 s is every pass after it working over the 833 regions the era founded. A budget taken off the era's own timer is wrong by 4x, and the affordability rungs in COLLAPSE.md are aimed at the 323 ms rather than the 1.2 s.\n\nWHAT THIS MEANS FOR THE REMAINING RUNGS. None of them is needed yet. The 4000-year ladder (BL-494) is the case that would test them, and the right next measurement is a 4000-year ancient span at epoch 1960 rather than any optimisation. Do not re-file a rung until a measurement points at it.\n\nSTILL OPEN on this item: the budget Ben will actually state, and the settle pass's own cost (BL-751), which is gated on sprint 33 (2026-09-02, the market-viability sprint - deleted 2026-09-08, and NOT the water-model sprint that now holds the number).\n\n--- TWO GAPS FOUND IN THE PLAY BUILD, 2026-09-03 ---\n\n(1) THE GAME NEVER REPORTS ITS OWN GENERATION BUDGET. The \"[gen budget]\" line added with this item is inside the \"if (fixture)\" branch in hard_coded_world.cpp, and the app passes fixture = nullptr. So every number this item quotes is a HARNESS number, and the loading screen - which work item (1) explicitly named as the place to instrument - still says nothing about where its wait goes. Remaining work on this item, not a completed half.\n\n(2) THE BUDGET IS NOT WHERE THIS ITEM WAS LOOKING. Measured in the release play build, the warm start is 72-73 s on BOTH arcs against generation's ~8 s. The pass this item exists to price (197-323 ms) is under half a percent of the startup wait. That does not make the era measurement wrong, but it does mean \"can generation afford more complexity\" is the wrong question to ask of the startup budget: generation is not what the player is waiting for. BL-761 owns the warm start.\n--- REQUIRES REPOINTED 2026-09-06 (consequence of BL-751 being cancelled) ---\n\nThis item required BL-751 (economic settle pass) because the settle was the pass whose wall\nclock it had to budget. BL-751 is cancelled superseded, so the require moves to BL-770 (Era 0\ncandidate search), which is the pass that now carries that burden.\n\nAND ITS PREMISE IS PARTLY OVERTAKEN. The item says \"the app still never prints its own\ngeneration budget\" - but world_determinism already emits a [gen budget] line per generated\nworld (total ms, split pre-settlement / settlement / era-1 / post-era), observed 2026-09-06\nat ~6.5 s total with post-era dominating at 5.9 s. So the MEASUREMENT exists in the harness\ntier; what is still missing is the APP printing it on its own generating screen. Re-scope to\nthat half before building.\n--- DELIVERED 2026-09-06 (console half proved; on-screen half UNVERIFIED) ---\n\ngeneration_progress gains five atomic budget fields plus a release-stored budget_ready. That\nstruct is ALREADY the app-to-generation seam, already atomic, and already a write-only tap with NO\nsave-format presence - which is why the clock goes there rather than on generation_report (which\nis serialised) or era_minus_one_fixture (a heavy capture the app never asks for). NO SERIALISATION\nSEAM IS OWED, and that is a design consequence rather than an omission.\n\nThe stderr [gen budget] line stays gated on `fixture`, so harness-tier output is unchanged.\napp::begin_new_game CLEARS the budget - without that a second campaign would show the previous\nworld split, which is the kind of stale-read nobody notices until it misleads someone.\n\nMEASURED FROM THE WORKTREE: [gen budget] total 53005 ms (pre-settlement 2016, settlement 48,\nera-1 7365, post-era 43575).\n\nR1 IS NOT MARKED COMPLETE. The console half is proved; the ON-SCREEN half is not. The agent could\nnot take a live look - computer-use access was denied and the granted path resolved to a DIFFERENT\nworktree exe, which is the known granted-path trap. A clean compile is not evidence that a surface\nrenders, and the standing rule is that a UI requirement needs a live click. OWED: open the built\napp and look at the generating screen."
   },
   {
    "status": "designed",
@@ -129,7 +129,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "32b",
+   "sprint": "33",
    "written": "2026-09-03",
    "author": "Cold review of the BL-747 diff, 2026-09-03",
    "requires": [],
@@ -154,7 +154,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "32b",
+   "sprint": "35",
    "written": "2026-09-03",
    "author": "Claude (measured in the play build, 2026-09-03)",
    "requires": [],
@@ -171,7 +171,7 @@
     "src/world/supply_system.cpp",
     "tools/verify/campaign_lapse.cpp"
    ],
-   "design": "MEASURED 2026-09-03 in the RELEASE play build (build_rel), running the app twice with --autostart:\n\n  epoch 1960 (two-span)   warm_start_80_ticks  73167 ms   convoys 14763.9 | run_economy_step 57023.9\n  epoch 0    (ancient)    warm_start_80_ticks  72088 ms   convoys 28321.1 | run_economy_step 42361.6\n\nTHE HEADLINE: THE TWO ARCS COST THE SAME, so this is NOT caused by BL-747. The 0 CE arc is byte-identical across that change (digests unmoved), and it pays 72.1 s where the new two-span 1960 arc pays 73.2 s. The warm start was already this expensive; running the sim at 1960 added roughly a second. Filed separately from BL-754 for exactly that reason - it is the startup cost the player actually waits through, and it belongs to the economy tick, not to generation.\n\nTHE SCALE OF THE MISMATCH. app.cpp's own comment budgets \"the ~25-38 s generation plus ~6 s warm start that follow it\". The warm start is running at 12x that. And it dwarfs the thing this sprint has been optimising: the Era -1 sim is 197-323 ms, generation end to end is ~8 s in the Release harness path, and the warm start is 72 s. Any conversation about whether generation can afford more complexity is answered by this number - generation is not where the startup budget goes.\n\nWHERE IT GOES, and the two arcs split differently, which is the useful part:\n  * run_economy_step dominates both, but MORE on the industrial band (57.0 s vs 42.4 s) - more recipes, more buildings, deeper chains.\n  * convoys are the reverse (14.8 s industrial vs 28.3 s ancient), which is worth understanding on its own: the ancient arc spends nearly twice as long moving goods. Candidate cause is the ancient chain being shallower, so more raw tonnage moves further, but that is a hypothesis and not a measurement.\n  * Everything else is noise: clear_markets ~0.11 s, apply_budget ~0.77 s, history_recorders ~0.39 s.\n\nTHE WORK, in order. (1) Profile run_economy_step across the 80 warm ticks and find what is O(n^2) or rebuilding per tick - 42-57 s over 80 ticks is 530-710 ms PER TICK, which is also what the player pays per tick at speed once playing, so this is a play-speed problem wearing a loading-screen costume. (2) Same for the convoy pass. (3) Only then consider reducing pre_game_ticks, which would be treating the symptom - the settle wants MORE ticks, not fewer (BL-751 makes the warm start a real generation pass).\n\nWHY IT MATTERS BEYOND THE WAIT: BL-751 (economic settle pass) proposes lengthening this pass by an order of magnitude so firms spawn and exit until the field is steady. At 0.9 s a tick that is not affordable, and BL-751's gate should read this item as well as sprint 33's growth half."
+   "design": "MEASURED 2026-09-03 in the RELEASE play build (build_rel), running the app twice with --autostart:\n\n  epoch 1960 (two-span)   warm_start_80_ticks  73167 ms   convoys 14763.9 | run_economy_step 57023.9\n  epoch 0    (ancient)    warm_start_80_ticks  72088 ms   convoys 28321.1 | run_economy_step 42361.6\n\nTHE HEADLINE: THE TWO ARCS COST THE SAME, so this is NOT caused by BL-747. The 0 CE arc is byte-identical across that change (digests unmoved), and it pays 72.1 s where the new two-span 1960 arc pays 73.2 s. The warm start was already this expensive; running the sim at 1960 added roughly a second. Filed separately from BL-754 for exactly that reason - it is the startup cost the player actually waits through, and it belongs to the economy tick, not to generation.\n\nTHE SCALE OF THE MISMATCH. app.cpp's own comment budgets \"the ~25-38 s generation plus ~6 s warm start that follow it\". The warm start is running at 12x that. And it dwarfs the thing this sprint has been optimising: the Era -1 sim is 197-323 ms, generation end to end is ~8 s in the Release harness path, and the warm start is 72 s. Any conversation about whether generation can afford more complexity is answered by this number - generation is not where the startup budget goes.\n\nWHERE IT GOES, and the two arcs split differently, which is the useful part:\n  * run_economy_step dominates both, but MORE on the industrial band (57.0 s vs 42.4 s) - more recipes, more buildings, deeper chains.\n  * convoys are the reverse (14.8 s industrial vs 28.3 s ancient), which is worth understanding on its own: the ancient arc spends nearly twice as long moving goods. Candidate cause is the ancient chain being shallower, so more raw tonnage moves further, but that is a hypothesis and not a measurement.\n  * Everything else is noise: clear_markets ~0.11 s, apply_budget ~0.77 s, history_recorders ~0.39 s.\n\nTHE WORK, in order. (1) Profile run_economy_step across the 80 warm ticks and find what is O(n^2) or rebuilding per tick - 42-57 s over 80 ticks is 530-710 ms PER TICK, which is also what the player pays per tick at speed once playing, so this is a play-speed problem wearing a loading-screen costume. (2) Same for the convoy pass. (3) Only then consider reducing pre_game_ticks, which would be treating the symptom - the settle wants MORE ticks, not fewer (BL-751 makes the warm start a real generation pass).\n\nWHY IT MATTERS BEYOND THE WAIT: BL-751 (economic settle pass) proposes lengthening this pass by an order of magnitude so firms spawn and exit until the field is steady. At 0.9 s a tick that is not affordable, and BL-751's gate should read this item as well as the growth half of sprint 33 (2026-09-02, since deleted)."
   },
   {
    "status": "designed",
@@ -179,7 +179,7 @@
    "priority": "A",
    "difficulty": 5,
    "version_goal": null,
-   "sprint": "32b",
+   "sprint": "33",
    "written": "2026-09-03",
    "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
    "requires": [
@@ -207,7 +207,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "32b",
+   "sprint": "35",
    "written": "2026-09-03",
    "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
    "requires": [
@@ -234,7 +234,7 @@
    "priority": "A",
    "difficulty": 2,
    "version_goal": null,
-   "sprint": "32b",
+   "sprint": "35",
    "written": "2026-09-03",
    "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
    "requires": [
@@ -261,7 +261,7 @@
    "priority": "B",
    "difficulty": 1,
    "version_goal": null,
-   "sprint": "32b",
+   "sprint": "33",
    "written": "2026-09-06",
    "author": "Claude (relied on the flag all session before noticing)",
    "requires": [],
@@ -277,7 +277,7 @@
     "tools/session/requirements_query.js",
     "tools/session/actions_query.js"
    ],
-   "design": "FOUND 2026-09-06, after relying on it repeatedly. `backlog_query.js --sprint 32b` returns BL-714 (sprint null) and BL-733 (sprint \"29\") among its rows. `--sprint` is not in the supported filter set - the help lists --status, --priority, --version, --category, --touches, --grep, --fields, --count, --all - so it is parsed as nothing, ignored, and the tool prints EVERY open item. A caller reading the output sees a plausible, shorter-looking list and takes it for a filtered one.\n\nWHY IT MATTERS MORE THAN ITS SIZE. This is the same class as the four instruments 32a turned up: an output that looks like an answer to the question asked, and is an answer to a different one. It is worse than an error, because an unknown flag that errors costs five seconds and an unknown flag that is ignored costs a wrong conclusion. In this session it was caught only because two items whose sprint I happened to know appeared in a list they could not belong to.\n\nTHE FIX IS ONE LINE OF DISCIPLINE, not a feature: reject an unrecognised argument and name it, rather than ignoring it. Apply to the sibling query tools at the same time - requirements_query.js and actions_query.js take the same shape and are likely to have the same hole.\n\nWORTH CONSIDERING WHILE THERE: --sprint is a filter people evidently expect to exist (this session assumed it three times), and every item carries a sprint field. Adding it is cheap; but the rejection is the actual bug and should land even if the filter does not.\n\nDONE WHEN: an unknown flag exits non-zero naming the flag; the three query tools share that behaviour."
+   "design": "FOUND 2026-09-06, after relying on it repeatedly. `backlog_query.js --sprint 33` returns BL-714 (sprint null) and BL-733 (sprint \"29\") among its rows. `--sprint` is not in the supported filter set - the help lists --status, --priority, --version, --category, --touches, --grep, --fields, --count, --all - so it is parsed as nothing, ignored, and the tool prints EVERY open item. A caller reading the output sees a plausible, shorter-looking list and takes it for a filtered one.\n\nWHY IT MATTERS MORE THAN ITS SIZE. This is the same class as the four instruments 32 turned up: an output that looks like an answer to the question asked, and is an answer to a different one. It is worse than an error, because an unknown flag that errors costs five seconds and an unknown flag that is ignored costs a wrong conclusion. In this session it was caught only because two items whose sprint I happened to know appeared in a list they could not belong to.\n\nTHE FIX IS ONE LINE OF DISCIPLINE, not a feature: reject an unrecognised argument and name it, rather than ignoring it. Apply to the sibling query tools at the same time - requirements_query.js and actions_query.js take the same shape and are likely to have the same hole.\n\nWORTH CONSIDERING WHILE THERE: --sprint is a filter people evidently expect to exist (this session assumed it three times), and every item carries a sprint field. Adding it is cheap; but the rejection is the actual bug and should land even if the filter does not.\n\nDONE WHEN: an unknown flag exits non-zero naming the flag; the three query tools share that behaviour."
   },
   {
    "status": "designed",
@@ -285,7 +285,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "32c",
+   "sprint": "34",
    "written": "2026-09-06",
    "author": "Ben (spotted live, 2026-09-06); Claude (itemisation)",
    "requires": [],
@@ -309,7 +309,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "32c",
+   "sprint": "34",
    "written": "2026-09-07",
    "author": "Claude (found by lane B against MILITARY.md § Domains and traversal, 2026-09-07)",
    "requires": [

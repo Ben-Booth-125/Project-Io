@@ -1,7 +1,7 @@
 # REFINED — active worklist
 
-**Empty.** Sprint 32b closed 2026-09-06; sprint 32c is open and unpromoted.
+**Empty.** Sprint 34 closed 2026-09-07; sprint 35 is open and unpromoted.
 
-See `docs/development/NEXT_SESSION.md` for the handoff and `SPRINTS.md` § Sprint 32c for the plan.
-The two chains to promote from are the water model (BL-778 → BL-779 → BL-780) and phase 6 (BL-770
-search → BL-772 → BL-773).
+See `docs/development/NEXT_SESSION.md` for the handoff and `SPRINTS.md` § Sprint 35 for the plan.
+The chain to promote from is the startup budget: BL-761 (profile) → BL-772 (retire the warm start)
+→ BL-773 (the 3–6 minute budget), with BL-754's on-screen half owed alongside.

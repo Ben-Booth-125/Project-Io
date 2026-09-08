@@ -4,7 +4,8 @@
   "The session had refocused hard onto sprint 26 (watch the AI play) and sprint 27 (demand). Everything outside those two was cancelled rather than carried, on the same reasoning as the 2026-08-23 purge: an item left standing because it was once relevant is a stale reference, not a plan.",
   "CANCELLED, NOT COMPLETED. Nothing here shipped. A cancelled item's intent returns to the backlog only by being re-authored fresh against the docs as they stand, per the cull's own resurrection rule - never by copying this record back.",
   "Ids are retired and never reused.",
-  "What was KEPT: sprint 27 (the demand work, deliberately held for the next session) and the five sprint-26 AI items carried out of that sprint's wave-1 close."
+  "What was KEPT: sprint 27 (the demand work, deliberately held for the next session) and the five sprint-26 AI items carried out of that sprint's wave-1 close.",
+  "SPRINT FIELD DISAMBIGUATED 2026-09-08. Six rows here carried sprint \"33\" - the long-term-market-viability sprint opened 2026-09-02, whose five planned items are among them. That sprint was DELETED on 2026-09-08 under the 2026-08-24 unstarted-plans rule: it never executed, and every item it planned was cancelled unstarted. The number 33 was re-taken the same day by the renumber of sprint 32b. These rows now read \"33 (2026-09-02)\", the date-qualified form the sprints archive already uses for colliding keys, so they cannot be mistaken for the water-model sprint that now holds the number."
  ],
  "cancelled_date": "2026-08-31",
  "count": 18,
@@ -477,7 +478,7 @@
    "priority": "B",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "33",
+   "sprint": "33 (2026-09-02)",
    "written": "2026-09-01",
    "author": "Claude (success-lever session, Ben's instruction)",
    "requires": [
@@ -502,7 +503,7 @@
    "priority": "B",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "33",
+   "sprint": "33 (2026-09-02)",
    "written": "2026-09-01",
    "author": "Claude (success-lever session, Ben's instruction)",
    "requires": [
@@ -676,7 +677,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "33",
+   "sprint": "33 (2026-09-02)",
    "written": "2026-09-01",
    "author": "Claude (operating-loss methods, Ben's rulings)",
    "requires": [
@@ -704,7 +705,7 @@
    "priority": "B",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "33",
+   "sprint": "33 (2026-09-02)",
    "written": "2026-09-02",
    "author": "Claude (BL-744 stage 2 field re-measure)",
    "requires": [
@@ -732,7 +733,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "33",
+   "sprint": "33 (2026-09-02)",
    "written": "2026-09-02",
    "author": "Claude (campaign_lapse debt instrumentation, Ben's instruction to track every balance)",
    "requires": [],
@@ -759,7 +760,7 @@
    "priority": "B",
    "difficulty": 2,
    "version_goal": null,
-   "sprint": "33",
+   "sprint": "33 (2026-09-02)",
    "written": "2026-09-06",
    "author": "Ben (market-work form, 2026-09-06); Claude (itemisation)",
    "requires": [

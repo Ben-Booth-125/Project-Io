@@ -10,12 +10,12 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## 2026-09-07 (sprints 32b and 32c both close) — What we wrote down, and what measuring it said instead
+## 2026-09-07 (sprints 33 and 34 both close) — What we wrote down, and what measuring it said instead
 
 **Runtime.** Long session, Full — doc reconciliation, then a four-lane batch delivery, then a scope cut.
 
-**Sprint 32b was already closed on 2026-09-06** with eleven items delivered and the 0 CE digests
-deliberately unblessed. **Sprint 32c closes here**, with nine more and both of its chains met. The
+**Sprint 33 was already closed on 2026-09-06** with eleven items delivered and the 0 CE digests
+deliberately unblessed. **Sprint 34 closes here**, with nine more and both of its chains met. The
 generation pass is being set down for now; Ben's call, to be revisited with a narrower focus.
 
 ### The session did not start by building
@@ -93,7 +93,7 @@ the road axis NR-793 proved inert.
 
 Ben, mid-flight: *"I fear we have begun to touch on too many items."* The count was less bad than it
 looked — only 13 of 26 open items were ever this sprint's — but the instinct was right, and findings
-were breeding findings. Sprint 29, sprint 33 and ownerless items were **archived unstarted**
+were breeding findings. Sprint 29, the market-viability sprint 33 and ownerless items were **archived unstarted**
 (cancelled, kept whole, `--restore`-able). The hot backlog went from 28 items to **12**, all of them
 this generation pass.
 
@@ -105,16 +105,16 @@ result and slice 2's discrimination figure were both measured on it.
 
 ---
 
-## 2026-09-06 (sprint 32b closes) — The world changes, and the instruments learn to see it
+## 2026-09-06 (sprint 33 closes) — The world changes, and the instruments learn to see it
 
 **Mode:** Design (one elicitation form, eight calls) → Full batch delivery in three waves → two cold
 reviews → live check → close.
 **Runtime:** one long session; ~40 harness builds, three play builds, 10 sub-agents in worktrees,
 two cold adversarial reviews.
 
-Sprint 32b closed with **eleven items delivered** across three waves; **32c opened** for the
-remaining 28. The distinction from 32a is the whole point: 32a delivered instruments and moved no
-world on purpose; 32b moved every world four separate times and kept the causes attributable.
+Sprint 33 closed with **eleven items delivered** across three waves; **34 opened** for the
+remaining 28. The distinction from 32 is the whole point: 32 delivered instruments and moved no
+world on purpose; 33 moved every world four separate times and kept the causes attributable.
 
 ### The design pass that set the scope
 
@@ -190,7 +190,7 @@ different region and moved on — an aggregate cannot see a distribution. **BL-7
 
 ---
 
-## 2026-09-06 (sprint 32a closes) — The arc runs, and four instruments could not see
+## 2026-09-06 (sprint 32 closes) — The arc runs, and four instruments could not see
 
 **Mode:** Design → Full (batch, then hand-built slices) → three design rulings → close.
 **Runtime:** one long session across several days; ~25 harness builds, one play build, 12 sub-agent
@@ -200,9 +200,9 @@ launches of which **zero** succeeded.
 
 Sprint 32 opened with 8 items on "three passes of simulated history". Ben's eight-phase reorder
 added 12, the water-domain ruling added 5, and findings added the rest — **34 items, 5 delivered**.
-Closed as **32a** at a natural boundary rather than pushed on: everything delivered is one coherent
+Closed as **32** at a natural boundary rather than pushed on: everything delivered is one coherent
 thing (*the arc runs, and the instruments that measure it are honest*), and everything remaining
-moves the generated world, which wants its own before/after. 32b carries the other 29.
+moves the generated world, which wants its own before/after. 33 carries the other 29.
 
 ### Delivered
 
@@ -316,7 +316,7 @@ ties as preferred sellers — and a seed-sweep scoreboard reads the SPREAD, neve
 
 The branch was cut before 2026-09-02 and collided on all three shared numbering spaces. Main had
 minted **BL-746** (upkeep starvation cliff) while this branch filed BL-746 (two-span prehistory);
-**sprint 31 closed** mid-session and sprint 33 opened; and the sprint number itself moved twice —
+**sprint 31 closed** mid-session and the market-viability sprint 33 opened; and the sprint number itself moved twice —
 renumbered to 34 by reading `next_up`, then corrected back to **32** by Ben, who reads 32 as a gap
 to fill rather than a number to skip. `next_up` is corrected so the next session does not re-derive
 34. Resolution took main's stores whole and re-applied this branch's additions on top, so nothing
@@ -413,7 +413,7 @@ re-blessed, because re-blessing inside this commit would bury the signal.
 ### Left open, deliberately
 
 BL-749 (sea legs) is held out of wave 1: its premise is inverted by BL-755/BL-756 and five design
-calls on it are open (NR-785). BL-751 (economic settle) is gated on sprint 33's growth half — sprint
+calls on it are open (NR-785). BL-751 (economic settle) is gated on the market-viability sprint 33's growth half — sprint
 31 made the field solvent, but valued production still falls, and a settle over a shrinking field
 culls toward a smaller economy rather than a steady one. **NR-783** asks whether the span boundary
 should be derived from the first furnace rather than authored at epoch − 400; **NR-784** records the
@@ -422,7 +422,7 @@ all — a 400 BCE polity can currently reach the gunpowder band and nobody has m
 
 ---
 
-## 2026-09-02 (sprint 31 closes, sprint 33 opens) — A field that can pay, and the one that must grow
+## 2026-09-02 (sprint 31 closes, market-viability sprint 33 opens) — A field that can pay, and the one that must grow
 
 **Mode:** the whole arc in one session — Design → Full → measure → rule → fix → measure — closed on
 Ben's call. **Runtime:** one long session; ~10 full builds, ~40 harness builds, ~20 lapse runs, one
