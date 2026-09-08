@@ -1,4 +1,11 @@
-# Next session — re-planning from a clean sheet
+# Next session — sprint 35
+
+**The planning pass happened, and it opened sprint 35** — the startup budget, plus Ben's ruling
+that a road tier must be visible to the phase 6 objective. Four items: BL-812, BL-813, BL-814,
+BL-815. `SPRINTS.md` § Sprint 35 is the plan. **Everything below this line is the INPUT to that
+pass, not open work** — the findings are real and worth reading, the item numbers are not live.
+
+---
 
 **The whole board was cleared on 2026-09-08.** Ben's call: too many items hung off sprint plans
 that should have been better planned. The live backlog (**31 items**), the review queue (**6

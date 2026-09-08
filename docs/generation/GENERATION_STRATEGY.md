@@ -413,9 +413,9 @@ loss-making. The cheap proxy is a per-resource supply-to-demand **ratio** per ma
 static, and it is what drives a price to the ceiling in the first place. The validation run is what
 confirms the proxy was good enough.
 
-**What the objective is made of (Ben, 2026-09-06).** **Four terms.** The third is what makes it an
-*asymmetry* objective rather than a coverage one, and the fourth is the only one that can see a
-candidate at all:
+**What the objective is made of (Ben, 2026-09-06; the fifth term, Ben, 2026-09-08).** **Five
+terms.** The third is what makes it an *asymmetry* objective rather than a coverage one, and the
+fourth and fifth are the ones that can see a candidate at all:
 
 1. **Chain completeness** — terminals closed over terminals total, per market. Does a chain reach a
    sink here at all.
@@ -431,6 +431,41 @@ candidate at all:
    close, how many are closed by a building that actually exists in its catchment. A landscape
    with rich ground and no firms scores near 0; one whose firms close every chain the ground
    allows scores 1.
+5. **Reach quality — at what traversal cost a market's catchment is actually crossed.** Not
+   *whether* a resource is reachable, which terms 1 and 4 already read as a boolean, but how
+   dearly. This is the only term a **road tier** can move, and it is read per market so that its
+   spread feeds term 3 like the others.
+
+**Why the fifth term exists, and why roads are invisible without it (Ben, 2026-09-08: “roads
+should be visible in phase 6 too”).** A road tier scales traversal **cost** — a continuous
+quantity. Terms 1 and 4 read reach through a **per-resource coverage boolean**: is there any
+reachable deposit of resource R in this catchment. That boolean saturates. Once a catchment
+already covers every resource it is ever going to cover, pulling more ground inside the reach
+budget introduces no pair that was not already covered, and the score cannot move however much
+cheaper the ground became. So an objective built only of terms 1–4 ranks every road tier
+identically while the world underneath it genuinely changes — and the search then spends a third
+of every round proposing a change it cannot score, looking like it explores three axes when it
+explores two.
+
+This is the **same shape** as the fourth term's own reason for existing, one level down: an axis
+the objective is asked to choose along, and cannot see. The fix is the same — a term that reads
+the axis in the currency the axis moves in.
+
+**The constraint that makes it hard, and it must not be dodged.** Cheaper traversal everywhere is
+trivially “better”, so a reach-quality term entered as a flat viability bonus would reward a
+uniformly well-connected map — which is precisely the evenness § Asymmetry is the deliverable
+and term 3 exist to prevent. A landscape where every market is equally cheap to cross must not
+beat one with a well-served core and an expensive frontier at the same mean. The term is
+therefore a **per-market reading whose spread is scored**, exactly like terms 1 and 2, never a
+single global number added to the composite.
+
+**What the term reads is left open, deliberately, and settled by measurement rather than by
+argument.** Two candidates answer the axis: the mean traversal cost from a market to the tiles
+in its catchment, and the in-reach tile **count** rather than the coverage boolean. Both are
+continuous and both move when a tier does. The first slice's job is the one § The first slice is
+the scorer already states — score candidates that differ only in road tier and ask whether the
+chosen reading **discriminates between them at all**. A reading that does not is not worth
+keeping, and finding that out is cheaper than building the rest on it.
 
 **Why the fourth term is not optional, and why the first three could not do its job.** Terms 1–3
 are computed from tiles, markets and population — none of which a candidate changes. Phase 6

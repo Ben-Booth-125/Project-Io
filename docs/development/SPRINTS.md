@@ -53,9 +53,42 @@ and/or a version goal (v0.1.1 etc.).
 
 **The active-sprint cap is deliberately exceeded, as PROPOSED not open (Ben, 2026-08-28: "Let's make a sprint for each batch").** The 3-sprint cap counts sprints being worked; 23-27 are a decomposition of one agreed body of work, authored together so the batch boundaries are settled once rather than re-argued five times. Only one is worked at a time. If that reads as cap-breaking later, close them back down to a single sprint with a batch list — the content is the value, not the numbering.
 
+**Sprint-number ceiling advanced to 35 (Ben, 2026-09-08: “We will open sprint 35 looking at the startup budget”).** The 2026-08-24 ceiling stands in spirit — author no sprint past the one Ben opens — with 35 now the horizon. One sprint is open, well inside the three-sprint cap. This is the first sprint authored after the same day's board clear, and it is deliberately four items: the board was emptied because too many items hung off sprint plans that should have been better planned, so the corrective is fewer items with their preconditions stated, not the same list under a new number.
+
 ## Open now
 
-*Nothing open.*
+### Sprint 35 — The startup budget, and the axis phase 6 could not see
+*Open · opened 2026-09-08*
+
+**Goal.** THE STARTUP WAIT BECOMES A NUMBER THE PROJECT CHOSE. The last recorded measurement puts the warm start at 72-73 SECONDS on both arcs against the ~6 s app.cpp budgets for it, with generation itself at ~8 s. If that still holds on this base, it is the largest single win available anywhere in the project - and it is not a loading-screen problem, because 530-710 ms per tick is also what the player pays per tick at speed once playing.
+
+THE SHAPE. Re-measure first, because the figures on record were taken on a different line of history (BL-813). Then retire the warm start into phase 6, whose search already exists and is already called from app.cpp; the real work is the generate_corporations ordering restructure (BL-814). Then make the game state its own budget and check the total against Ben's 3-6 minutes (BL-815).
+
+AND THE SECOND CHAIN, WHICH IS NOT A DIGRESSION. Ben, 2026-09-08: "Roads should be visible in phase 6 too." A road tier moves the reach frontier by hundreds of tiles and moves no scored term at all, because the objective reads reach through a saturated coverage boolean. BL-812 gives it a fifth term. It belongs in THIS sprint rather than a later one because BL-814 promotes phase 6 to being the ONLY judge of the position play opens on - a blind axis matters more once the search is the whole answer.
+
+**Planned.**
+- BL-812 (phase 6 sees roads) - Ben's ruling, already written into GENERATION_STRATEGY.md as the objective's fifth term. Slice 1 is a MEASUREMENT that decides what the term reads - mean traversal cost, or in-reach tile count - and a reading that does not discriminate is not worth keeping. Independent of the other three; can run alongside them.
+- BL-813 (re-measure the warm start) - FIRST of the budget chain, because every later decision is taken on this number and the number on record predates this base. Release build, both arcs, and profile the split.
+- BL-814 (retire the warm start) - the headline. Its blocker is known and narrow: generate_corporations appends and runs before the registry loads. Taking the block again is a legitimate outcome if the restructure does not land clean.
+- BL-815 (the budget, stated and on screen) - closes on a LIVE LOOK at the generating screen, not on a clean compile.
+
+**Done when.** The startup wait is measured on this base and then materially reduced, with the figure quoted against the build it was taken in; a world handed to play is settled by phase 6 rather than by 80 undirected ticks; the app states its own generation budget on the generating screen, confirmed by opening the game and looking; and road tiers 1, 2 and 3 produce different composites on a 10-15 market world, per market rather than globally, without an even-reach landscape beating an uneven one at the same mean.
+
+**Risk.** THE FIGURES THIS SPRINT OPENS ON WERE MEASURED ELSEWHERE. 72-73 s, the +20 s phase 6 cost, the 4x era multiplier - all recorded on a line of history this base does not share. BL-813 exists to reproduce them here first. If they do not hold, the sprint is re-argued on the new numbers rather than carried on the old ones.
+
+RETIRING THE WARM START HANDS PHASE 6 A BURDEN IT MAY NOT BE READY FOR. Play must open on a settled position; a faster start onto an unsettled one is a loss, not a win. This trade was refused once before and the refusal was correct.
+
+AND THE OBJECTIVE THAT INHERITS THAT BURDEN HAS A KNOWN BLIND AXIS - which is why BL-812 is in this sprint and not a later one. The two chains are independent in their code and coupled in their consequence.
+
+BL-812 IS WORLD-MOVING. A fifth term changes every ranking and therefore the selected landscape. It owes the digest discipline in DELIVERY.md § The digest re-bless is one act per WAVE - one deliberate re-bless against a stated description of what changed, never an absorbed drift.
+
+THE EVENNESS TRAP IS THE REAL DESIGN RISK IN BL-812. Cheaper traversal everywhere is trivially better, so the obvious implementation - a flat bonus on the composite - would reward a uniformly well-connected map and quietly undo term 3. The term must be per-market with its spread scored. This is stated in the item and in the authority doc because it is the mistake the cheap version makes.
+
+THIS IS THE FIRST SPRINT AFTER THE 2026-09-08 BOARD CLEAR, and it is deliberately four items. The board was emptied because too many items hung off sprint plans that should have been better planned; the corrective is fewer items with their preconditions stated, not the same list under a new number.
+
+USE A 10-15 MARKET WORLD FOR ANY PHASE 6 MEASUREMENT. The default-seed fixture is a two-market world on which balance and composite evaluate to zero for every candidate, and the harness itself prints "ALL CANDIDATES ZERO - the term is DEAD, not flat". Findings taken on it have already had to be re-run once.
+
+BUILD DISCIPLINE FOR THIS SPRINT SPECIFICALLY: build/ is Debug and its timings are not comparable - the Debug warm start was recorded at ~11 minutes. Every figure quoted here must name the build it came from.
 
 ## Where things stand
 
@@ -113,9 +146,10 @@ and/or a version goal (v0.1.1 etc.).
 | 32c | Gamified generation, 32c - the water model finishes, and phase 6 gets its search | CLOSED 2026-09-07. GOAL MET ON BOTH CHAINS. The water model is complete and blessed ONCE against a stated shape description; phase 6 has a real search WITH a generation caller. Nine items delivered. The remaining 28 were cut to 12 on Ben's call - sprint 29, 33 and ownerless items archived unstarted, to be revisited with a narrower focus. |
 | 32c | Gamified generation, 32c - the water model finishes, and phase 6 gets its search | OPENED 2026-09-06 as the 32b continuation, carrying 28 items. Much of its water-model chain landed (BL-776 through BL-780, BL-783, BL-785, BL-786) and the phase 6 chain reached its search. SUPERSEDED 2026-09-08 on Ben's board-clearing call: the carried remainder was cancelled into the backlog archive rather than re-promoted. What landed under it is recorded in the devlog, not here. |
 | 33 | Context economy - the corpus stops charging every session for what one session needs | OPENED 2026-09-07 and ran hard: THREE blocks, 16 items delivered, retro recorded below. CLOSED 2026-09-08 on Ben's call clearing the board - "let's approach the next task with a fresh mindset" - NOT because it failed. Its unfinished remainder (BL-807 the corpus citations, BL-808 the reach defect, BL-809 the red province assertions, plus BL-810 and BL-811 filed on the way past) was cancelled into the backlog archive the same day. The retro is the record of what this sprint actually delivered and stands unchanged. |
+| 35 | The startup budget, and the axis phase 6 could not see | OPENED 2026-09-08 on the cleared board, the first sprint of the fresh planning pass. Two chains: the startup wait the player actually sits through, and Ben's ruling that a road tier must be something the phase 6 objective can see. Four items, deliberately few. |
 
-**Next up.** THE BOARD IS CLEAR. The live backlog (31 items), the review queue (6 entries) and the sprint list (32c, 33, 34) were all emptied on 2026-09-08 on Ben's call - too many items hung off sprint plans that should have been better planned, so nothing carries forward as a commitment. There is no open or proposed sprint. THE NEXT NEW SPRINT IS 35, and it starts from a fresh planning pass, not from this history.
+**Next up.** SPRINT 35 IS OPEN (2026-09-08) and is the only open sprint — the first of the fresh planning pass that followed the same day's board clear. Two chains. The startup budget: re-measure the warm start on this base (BL-813), retire it into phase 6 (BL-814), then state the budget on screen and check it against Ben's 3–6 minutes (BL-815). And Ben's ruling that a road tier must be visible to the phase 6 objective (BL-812), which is written into `GENERATION_STRATEGY.md` as the objective's fifth term. BL-812 is independent in its code and can run alongside the budget chain; it sits in this sprint because BL-814 promotes phase 6 to being the only judge of the position play opens on. THE NEXT NEW SPRINT IS 36.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*52 sprints archived cold; 0 open/gated in the hot store.*
+*52 sprints archived cold; 1 open/gated in the hot store.*
