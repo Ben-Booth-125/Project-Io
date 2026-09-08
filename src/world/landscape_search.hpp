@@ -116,6 +116,21 @@ struct landscape_search_params
     //     identical proposal is a legal no-op that simply loses its round.
     int          min_corporations = 4;
     int          max_corporations = 24;
+    /// Whether applying a candidate re-runs `generate_corporations` (the
+    /// SPECIALIST roster) as well as the background firms.
+    ///
+    /// FALSE AT THE LIVE GENERATION SEAM, and the reason is a hard constraint
+    /// rather than a preference: `generate_corporations` APPENDS — it does not
+    /// clear what is already there — and by the time the registry is loaded it
+    /// has already run inside `make_hard_coded_world`. Re-running it on the live
+    /// world would double every specialist. So the live caller varies the
+    /// candidate's PLACEMENT and ROAD axes over the background economy, and
+    /// leaves the specialists world-gen placed.
+    ///
+    /// TRUE in the harness, whose base world has no corporations yet, so the
+    /// roster axis is genuinely free there.
+    bool regenerate_specialists = true;
+
     std::uint8_t min_road_tier    = 1;
     std::uint8_t max_road_tier    = 3;
 
@@ -153,6 +168,13 @@ struct landscape_search_result
 /// Applies the road tier, invalidates the logistics caches the tier moves, then
 /// layers the roster and its background firms. Deterministic in the candidate
 /// alone.
+/// Apply a candidate, choosing whether the specialist roster is regenerated.
+/// See `landscape_search_params::regenerate_specialists` for why the live
+/// generation seam passes false.
+void apply_landscape_candidate(world& w, const recipe_registry& reg,
+                               const landscape_candidate& c,
+                               bool regenerate_specialists);
+
 void apply_landscape_candidate(world& w, const recipe_registry& reg,
                                const landscape_candidate& c);
 

@@ -19,8 +19,10 @@
 
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
+#include "world/corporation_generation.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/landscape_search.hpp"
+#include "world/market_saturation.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -292,6 +294,80 @@ int main()
         check(at_top[3] > at_top[1], "R5.0",
               "the tier axis was actually APPLIED - the highway count moves between "
               "tier 1 and tier 3, so a flat score is about the objective, not a no-op");
+
+        // NR-793, THE DECISIVE MEASUREMENT (Ben, 2026-09-07: "run it").
+        //
+        // A flat score has two possible causes and they call for opposite
+        // fixes. Either (a) the tier moves the REACH FIELD and the objective
+        // then fails to read the difference — a blind objective, fixed by a new
+        // term; or (b) the tier does not move the reach field AT ALL, because
+        // roads sit where the economy already is and the 24.0 budget's frontier
+        // is out where there are no roads to upgrade — in which case no term
+        // could see it and the axis itself is the wrong one.
+        //
+        // `in_reach_tiles` is the boolean the objective actually consumes:
+        // tiles inside `max_logistics_reach` of their market. Summing it either
+        // side of the uplift separates (a) from (b) in one number.
+        for (std::uint8_t t = 1; t <= 3; t += 2)
+        {
+            world w = base;
+            apply_landscape_candidate(w, reg, landscape_candidate{ 8, 0xC0FFEEu, t });
+            const auto rows = measure_market_completeness(w, reg, classify_resources(w, reg));
+            long long catch_sum = 0, reach_sum = 0, raws_sum = 0;
+            for (const auto& r : rows)
+            {
+                catch_sum += r.catchment_tiles;
+                reach_sum += r.in_reach_tiles;
+                raws_sum  += r.raws_in_reach;
+            }
+            std::printf("    road_tier=%u  catchment=%lld  IN_REACH=%lld  raws_in_reach=%lld\n",
+                        static_cast<unsigned>(t), catch_sum, reach_sum, raws_sum);
+        }
+
+        // NR-793 PART 2 (Ben, 2026-09-07): re-run the axis on a LIVE world.
+        //
+        // Everything above runs on the default-seed fixture, which carries TWO
+        // markets, a balance term of exactly 0 and therefore a composite of
+        // exactly 0 for every candidate. A conclusion about what the objective
+        // can SEE cannot rest on a world where the objective evaluates to zero
+        // for every input. Seed ABCDEF01 carries ten markets and a live
+        // composite, and it is one of the same control worlds the score
+        // harness already uses — same construction, so nothing new is invented
+        // here to make the number come out.
+        std::printf("\n    -- the same axis on a TEN-MARKET world (seed ABCDEF01) --\n");
+        {
+            landscape_score live[4];
+            for (std::uint8_t t = 1; t <= 3; t += 2)
+            {
+                world_params lp = wp;
+                lp.seed = 0xABCDEF01u;
+                world w = make_hard_coded_world(lp, nullptr, gen_cfg);
+                assign_default_recipes(w, reg);
+                corporation_params cp;
+                cp.corporation_count = 8;
+                generate_corporations(w, cp, 0xC0FFEEu);
+                generate_background_firms(w, reg, 0xC0FFEEu);
+
+                apply_landscape_candidate(w, reg, landscape_candidate{ 8, 0xC0FFEEu, t });
+                const auto rows = measure_market_completeness(w, reg, classify_resources(w, reg));
+                long long reach_sum = 0, raws_sum = 0;
+                for (const auto& r : rows)
+                {
+                    reach_sum += r.in_reach_tiles;
+                    raws_sum  += r.raws_in_reach;
+                }
+                live[t] = score_landscape(w, reg);
+                std::printf("    tier=%u  mkts=%d  IN_REACH=%lld  raws=%lld  potential=%.5f  "
+                            "ACTUAL=%.5f  balance=%.5f  spread=%.5f  composite=%.9f\n",
+                            static_cast<unsigned>(t), live[t].market_count, reach_sum, raws_sum,
+                            live[t].mean_completeness, live[t].mean_actual,
+                            live[t].mean_balance, live[t].spread, live[t].composite);
+            }
+            std::printf("    VERDICT ON A LIVE OBJECTIVE: the road axis is %s\n",
+                        same_score(live[1], live[3])
+                            ? "STILL INVISIBLE - the fixture was not what hid it"
+                            : "SEEN - the earlier finding was an artefact of a degenerate fixture");
+        }
 
         const bool road_seen = !same_score(at[1], at[3]);
         std::printf("    FINDING: the road/infrastructure axis is %s\n",

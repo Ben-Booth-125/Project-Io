@@ -92,7 +92,7 @@ void score_one(const world& base, const recipe_registry& reg,
                const landscape_search_params& p, scored& s)
 {
     world w = base;                       // its OWN world — score_landscape memoises into it
-    apply_landscape_candidate(w, reg, s.cand);
+    apply_landscape_candidate(w, reg, s.cand, p.regenerate_specialists);
     s.score = score_landscape(w, reg, p.score);
 }
 
@@ -142,6 +142,13 @@ int compare_landscape(const landscape_score& a, const landscape_score& b)
 void apply_landscape_candidate(world& w, const recipe_registry& reg,
                                const landscape_candidate& c)
 {
+    apply_landscape_candidate(w, reg, c, /*regenerate_specialists=*/true);
+}
+
+void apply_landscape_candidate(world& w, const recipe_registry& reg,
+                               const landscape_candidate& c,
+                               bool regenerate_specialists)
+{
     // --- ROAD TIER axis -----------------------------------------------------
     // Purely additive and idempotent: a road already at a higher tier is never
     // downgraded, and a tile with no road never gains one. So the walk cannot
@@ -176,9 +183,12 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     // to be able to see, not a second one invented here.
     assign_default_recipes(w, reg);
 
-    corporation_params cp;
-    cp.corporation_count = c.corporation_count;
-    generate_corporations(w, cp, c.placement_seed);
+    if (regenerate_specialists)
+    {
+        corporation_params cp;
+        cp.corporation_count = c.corporation_count;
+        generate_corporations(w, cp, c.placement_seed);
+    }
     generate_background_firms(w, reg, c.placement_seed);
 }
 

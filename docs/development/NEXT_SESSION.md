@@ -1,7 +1,15 @@
-# Next session — sprint 32c
+# Next session — re-planning from a clean sheet
 
-Sprint 32b closed 2026-09-06 with **eleven items delivered**. 32c carries the remaining **28**.
-`docs/development/SPRINTS.md` § Sprint 32c is the plan; this note is the handoff.
+**The whole board was cleared on 2026-09-08.** Ben's call: too many items hung off sprint plans
+that should have been better planned. The live backlog (**31 items**), the review queue (**6
+entries**) and the sprint list (**32c, 33, 34**) were all archived. **Nothing below is an open
+commitment.** It is kept as the input to the next planning pass — the findings are real, the item
+numbers are not live work. Cancelled rows are whole and cold in `archive/backlog-design-2026-Q3.json`
+(`backlog_query.js --status cancelled --full`, or `archive_landed.js --restore`); the queue entries
+are in `archive/needs-review-2026-Q3.json`; the sprints in `archive/sprints-2026-Q3.json`.
+
+Sprint 32b closed 2026-09-06 with **eleven items delivered**; 32c had carried the remaining 28.
+`docs/development/SPRINTS.md` § Sprint 32c was the plan.
 
 ## Start here — two independent chains
 
@@ -53,7 +61,9 @@ The design question underneath is not a tuning one: **is a founding line a trade
 A parent settling a daughter walked that ground once; a supply line walked forty times is a road.
 Weight or exclude the settle corridors rather than raising the threshold — but that is a call.
 
-## Open calls waiting on Ben
+## Calls that were waiting on Ben — all archived unanswered 2026-09-07
+
+None of these is a live queue entry any more. They are here as the questions the re-plan inherits.
 
 | | |
 |---|---|
@@ -84,7 +94,21 @@ open BL-488's verb form?
 - **Agents' worktree bases are stale by default.** Every one this session was; all had to merge main
   before starting.
 
-## Sprint 33 is untouched and still open
+## The sprint list went too — all three, 2026-09-08
 
-Its six: BL-746 → BL-745 → BL-782, plus BL-738, BL-725, and BL-726 — **whose premise 32b voided**
-(seed-1 interest is 7%, not 70%, so the sprint's interest done-when is already met).
+**Sprint 33 was NOT the sprint Ben named.** The market-viability sprint opened 2026-09-02 as 33 was
+**renumbered to 34** on 2026-09-07; sprint 33 became the context-economy housekeeping sprint, which
+then ran to **16 items delivered** across three blocks. So:
+
+| Sprint | Closed as | Why |
+|---|---|---|
+| **33** context economy | `retro-recorded` | It ran. Its retro is real history and stands unchanged. |
+| **34** market viability | `superseded` | Never worked. The sprint Ben meant by "remove sprint 33". |
+| **32c** gamified generation | `superseded` | Its water-model chain largely landed; the remainder was cancelled, not re-promoted. |
+
+Two records are worth keeping and are cold, not gone. Sprint **34**'s `notes` carry the measured
+2026-09-02 field baseline — corps 86→61 / 71→55, valued production 20,761→4,364 / 5,775→3,531, mean
+supply factor ~0.57 — which costs a full lapse run to re-measure. Sprint **33**'s retro says what
+the context-economy work actually delivered.
+
+The next new sprint is **35**, planned fresh.
