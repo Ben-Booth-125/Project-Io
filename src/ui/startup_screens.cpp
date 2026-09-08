@@ -737,8 +737,18 @@ void app::draw_generation_screen()
         // seed's resolved family and misses every reroll-dependent world.
         if (m_autostart_wizard % 20 == 10)
         {
-            ++m_pending_world_params.preferences.roll[m_wiz_round];
-            m_wiz_dirty = true;
+            // GATED ON THE PLANETOLOGY ROUNDS, exactly as the Reroll button is.
+            // `roll` is uint32_t[3] and is the last member of world_preferences,
+            // itself the last member of world_params — so indexing it with a
+            // round of 3 or 4 wrote past the end of m_pending_world_params into
+            // whatever followed it. The Reroll path was gated when the wizard
+            // grew to five rounds (BL-816); this driver was missed, and it is
+            // the path nobody eyeballs, which is why it survived.
+            if (m_wiz_round < wizard_planetology_round_count)
+            {
+                ++m_pending_world_params.preferences.roll[m_wiz_round];
+                m_wiz_dirty = true;
+            }
         }
         if (m_autostart_wizard % 20 == 0)
         {

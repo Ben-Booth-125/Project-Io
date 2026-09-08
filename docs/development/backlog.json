@@ -641,6 +641,95 @@
     "src/ui/startup_screens.cpp"
    ],
    "design": "BEN, 2026-09-08: \"we are really looking to encourage historical turbulence as a parameter - so that players can roll for worlds which have fewer countries at this step, or more countries at this step\".\n\nTHIS SUPERSEDES BL-818's PLACEHOLDER AXES. That item said the axes were the design work and were not settled; this is the settlement, and it is a better axis than any of the four guessed at, because the player can WATCH it resolve on the very map round 4 is showing them. A lean whose effect is invisible on its own round is not worth offering.\n\nIT TUNES FORCES AND NEVER CLAMPS A COUNT. A turbulence lean moves the SPREAD of culture aggression, how sharply neighbours coalesce against a riser (BL-838), and how fast reach decays with distance (BL-837). It does not target a number of nations, and it must not acquire a post-hoc correction that does. The 2026-07-30 emergent-nation-count ruling, BL-224's non-hegemony invariant and GENERATION_STRATEGY.md § Asymmetry is the deliverable all survive intact: fragmented or consolidated is an OUTCOME, not a quota.\n\nCULTURE AGGRESSION IS WHERE THE TUNING LANDS. polity::aggression_q already exists, derived from the culture's own aggression_q (BL-277 Q5). Two archetypes are worth having and they are not the same shape: one that EXPANDS AND INCORPORATES, absorbing the conquered and growing large and durable; one that CYCLES - unifying, stabilising, fragmenting and re-unifying on a rhythm. The same engine produces different turbulence signatures from them, which is why a SPREAD of aggression profiles is worth more than a single dial.\n\nTHE STANDING RULE APPLIES AND IS NOT SOFTENED. Both archetypes are drawn from real history as MECHANISMS, exactly as HISTORY.md's institutional ladder is. What transfers is the mechanism; a proper noun never does. No generated name in Io is Earth-derived, and this item must not become a name bank - see GENERATION_STRATEGY.md § Real history in, invented names out.\n\nDONE WHEN: the lean moves the epoch nation-count DISTRIBUTION across a seed sweep in the expected direction, at both settings, with no term targeting a count; and a world at either setting is still a legitimate world."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "36",
+   "written": "2026-09-09",
+   "author": "The sprint 35 step 4a review barrier (2026-09-08); Claude",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-840",
+   "short_name": "REALM_ENDED_IS_DEAD_CODE",
+   "priority": "A",
+   "difficulty": 2,
+   "category": "Generation",
+   "title": "The realm-ended grudge can never fire - its predicate is unsatisfiable",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "requires": [],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "design": "FOUND BY THE STEP 4a REVIEW BARRIER, and it is the exact defect a barrier exists to catch: a harness green on a feature that does not exist.\n\nextinguish_polity (history_sim.cpp:602) raises grudge_kind::realm_ended only from surviving polities that SHARE THE DEAD REALM'S CULTURE. But polities are seeded ONE PER DISTINCT CULTURE (lines 396-427, deduped with std::find) and polities.push_back occurs at line 427 and nowhere else in the file. So for any surviving kin, kin.culture != dead_culture is ALWAYS true and the loop body is never reached.\n\nCONSEQUENCES. params.grudge_realm_ended = 900 - the LARGEST magnitude in the whole table - is never applied. grudge_event_line's \"a realm ended\" string is unreachable. And the documented behaviour in history_sim.hpp - \"the dead leave a grudge in their kin, never in an heir\" - is unimplemented prose. The seed-0 fixture extinguishes several realms and produces zero realm_ended events.\n\ntools/verify/pass_one_handoff.cpp ASSERTS NOTHING ABOUT realm_ended, which is why it passed 0 failures over a dead branch. Whatever the fix, it owes an assertion that this kind actually fires.\n\nTHE FIX IS A DESIGN CALL, not a repair, because the original ruling was reasoned FROM the one-polity-per-culture fact: the dead leave a grudge in their kin rather than an heir, precisely because there are no heirs. If kin cannot exist either, the choice is between dropping the kind outright and giving it a different bearer - the dead realm's NEIGHBOURS, say, who watched it happen, which is also the natural feed for BL-838 (fear of being next).\n\nDONE WHEN: either the kind is removed with its magnitude and its string, or it fires on a real run and a harness asserts that it does."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "36",
+   "written": "2026-09-09",
+   "author": "The sprint 35 step 4a review barrier (2026-09-08); Claude",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-841",
+   "short_name": "ASSIMILATION_LOST_TO_THE_TAIL",
+   "priority": "A",
+   "difficulty": 3,
+   "category": "Generation",
+   "title": "A holder with no free culture slot loses its assimilation into the anonymous tail",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [],
+   "files": [
+    "src/world/settlement.cpp"
+   ],
+   "design": "FOUND BY THE STEP 4a REVIEW BARRIER. It silently disables the anti-hegemony lever BL-826 exists to build, on exactly the ground where that lever matters most.\n\nTHE PATH. All three named slots hold A, B, C; a fourth culture D takes the region. shift_toward(D, ...) finds no slot for D (settlement.cpp:96), the displacement test taken > cw[smallest] fails while the smallest slot is bigger than one round's take, and line 112 puts the gain into other_q. share_of(D) reads the TAIL as 0, so the w_cult term (history_sim.cpp:1190) charges D the FULL foreign discount forever. The ground never digests.\n\nAND THE ACCUMULATED GAIN IS PERMANENTLY LOST. When D finally does claim a slot it restarts from one round's take; the reviewer measured roughly 240 per-mille of assimilation stranded in a tail that is foreign to every culture and never re-attributed. The tail is documented as \"peoples too small to name\"; this path makes it a one-way sink for the HOLDER'S OWN share.\n\nTHIS IS THE COMMON CASE, NOT A CORNER. A frontier region changing hands three times is ordinary - and on the current fixture one region changes hands 258 times (BL-835).\n\nSHAPE OF A FIX, not prescribed: the holder's share is the one share that must be nameable, since it is the one every downstream reader asks about. Either the holder always claims a slot on first gain, or the tail tracks the holder separately from the anonymous remainder. Whichever, the invariant to state and then assert is that a share the sim is actively accruing is never written somewhere share_of cannot read it back.\n\nDONE WHEN: a holder with three foreign slots digests its ground at the same rate as one with a free slot, and a harness asserts no accrued share is unreadable."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "36",
+   "written": "2026-09-09",
+   "author": "The sprint 35 step 4a review barrier (2026-09-08); Claude",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-842",
+   "short_name": "SMALL_GRUDGES_FREEZE",
+   "priority": "B",
+   "difficulty": 2,
+   "category": "Generation",
+   "title": "Integer truncation freezes small grudges forever, falsifying both decay and sparsity",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "requires": [],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "design": "FOUND BY THE STEP 4a REVIEW BARRIER. Two of the grudge design's stated properties are false in the code, and both were argued for in prose rather than measured.\n\nTHE ARITHMETIC. g.score -= (g.score * shed) / 1000 (history_sim.cpp:770) truncates to a ZERO decrement once score < 1000/shed. shed = grudge_decay_per_year_q (3) x step_years, so in the -20..0 band (step 5) shed is 15 and any score below 67 decrements by exactly nothing, forever. At the 4000-year span the -400..-100 band (step 20, shed 60) freezes everything below 17; the -100..-20 band (step 10, shed 30) freezes everything below 34.\n\nSO A SINGLE border_raided (magnitude 60) raised late in a run is frozen at 60 for the rest of it. It never reaches grudge_floor (4), so it is never erased, and it crosses the handoff as a permanent row.\n\nBOTH DESIGN CLAIMS FALL. The comment's \"a half-life near 230 years, so a single old wrong is gone by the epoch\" is true only for LARGE scores. And the sparse table the design is built on is not sparse: every pair that ever skirmished keeps a permanent row. Sparsity was one of the three reasons the ledger was affordable at 4000 years.\n\nThe usual fix is a minimum decrement of one where score is above the floor, but that changes the half-life at the bottom of the range and should be measured rather than assumed.\n\nDONE WHEN: no score above grudge_floor is stationary across a round at any step_years in use, and a 4000-year run's grudge count is measured rather than asserted."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "36",
+   "written": "2026-09-09",
+   "author": "The sprint 35 step 4a review barrier (2026-09-08); Claude",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-843",
+   "short_name": "SEAM_SKIPS_ITS_OWN_VALIDATOR",
+   "priority": "B",
+   "difficulty": 2,
+   "category": "Generation",
+   "title": "The save seam checks the shares sum but not their structure, and a stricter checker already exists",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "requires": [],
+   "files": [
+    "src/core/save_game.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "FOUND BY THE STEP 4a REVIEW BARRIER. r_region (save_game.cpp:351) enforces total_q() == 1000 and per-field ranges, but NOT the structural invariants every culture_shares accessor depends on: weight 0 exactly where id is -1, descending sort, no duplicate ids, ids in range.\n\nTHE FAILURE. A truncated or bit-flipped save carrying id = {-1, 5, -1}, weight_q = {1000, 0, 0}, other_q = 0 passes every current check and loads clean. The region then reports empty() == true and plurality() == -1 while carrying 1000 per-mille on an unnamed slot, and share_of(5) == 0 although slot 1 names culture 5. Every downstream reader - city_names.cpp:76, hard_coded_world.cpp:742, the polity seed at history_sim.cpp:399 - silently treats the region as uncultured.\n\nTHE PART THAT MAKES THIS CHEAP AND SLIGHTLY EMBARRASSING: pass_one_output_valid() ALREADY CHECKS ALL FOUR (history_sim.cpp:2337-2379). The stricter checker exists and the load path does not call it. Two callers sharing one implementation is the discipline that stops a check measuring something different from the code - the same argument BL-775 was filed on.\n\nNOTE THE SEVERITY HONESTLY: this is a corrupt-input hardening issue on a local single-player save, not a live exploit, and the save seam is not the untrusted wire boundary the standing rules govern. It is filed because the fix is small and the checker is already written.\n\nDONE WHEN: the load path enforces the same four structural invariants as pass_one_output_valid, through one shared implementation rather than a second copy."
   }
  ]
 }
