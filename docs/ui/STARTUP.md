@@ -129,6 +129,17 @@ age.* A run that reaches 1200 CE without that shape has failed even if every num
 plausible. **Asymmetry is completely fine and expected** — it is the deliverable, not a
 defect (GENERATION_STRATEGY.md § Asymmetry is the deliverable).
 
+**The 4000 years can be rerolled** (Ben, 2026-09-08). Round 4 keeps the wizard's
+`Reroll`, and rerolling re-runs the pass rather than re-drawing a cached one — which is
+the whole reason § The wait is the round has to be affordable rather than merely
+tolerable. A history you cannot reject is a history you were assigned.
+
+**And the focused 400 years is its own page** (Ben, 2026-09-08). Pass 2 — the
+**1560 → 1960 economy pass** — is round 5, a page in its own right with its own run and
+its own reroll, not a coda to round 4. Round 4 settles who holds what ground; round 5
+settles what that ground produces and trades. Phase 6's substrate selection folds in at
+the final `Begin`, after round 5 is accepted.
+
 **Begin becomes Next.** The wizard's commit press moves to the last round; rounds 3 and
 4 advance rather than commit.
 
