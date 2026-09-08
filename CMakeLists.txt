@@ -1203,6 +1203,16 @@ set(IO_TEST_SWEEP_HARNESSES
     history_sim_harness
     history_sweep
 
+    # CATEGORY (1), added 2026-09-08 with BL-825. history_span_cost prices the
+    # Era -1 span: it builds a world per seed and then re-runs the era at 400 /
+    # 1000 / 2000 / 4000 years plus a step_years sweep, so its runtime is the
+    # measurement rather than an overhead to trim. Minutes per seed on Release,
+    # and it asserts only that its re-run IS generation's era — nothing timed is
+    # ever asserted, because a wall clock differs on every machine. The generic
+    # glob above already declares the target; this only keeps it out of the 60 s
+    # gate. Run it by name when the span or the clock is in question.
+    history_span_cost
+
     # CATEGORY (1), added 2026-08-13. seed_sweep_probe generates a full world PER
     # SEED across a spread, to catch a seed-dependent generation failure — the
     # instrument written to chase the startup "crash" (NR-209). Its cost is the

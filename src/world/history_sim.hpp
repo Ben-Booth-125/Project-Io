@@ -1015,6 +1015,32 @@ inline constexpr std::size_t owner_index_limit = 0xFFFEu;
 ///                verification. The app passes its startup-loaded registry, a
 ///                harness hand-builds one, and a caller that does not care
 ///                passes nothing and pays nothing.
+/// REPORT-ONLY wall-clock split of the last `run_history_sim` call (BL-825).
+///
+/// NOT SIM STATE, AND NEVER READ BY THE SIM. These are nanosecond accumulators
+/// written at four sites inside the year loop so a measurement harness can say
+/// where the span's cost actually goes. Nothing in `history_sim.cpp` reads them
+/// back, nothing branches on them, and they must NEVER enter `state_hash` or any
+/// digest — a wall clock differs every run, which is the one thing this layer
+/// may not do (see era_minus_one.hpp on why the generation budget lives off the
+/// save seam for exactly this reason).
+///
+/// Process-global and reset at the top of each `run_history_sim`, so a caller
+/// reads the split of the run it just made. Not thread-safe, and does not need
+/// to be: generation runs the era on one thread.
+struct history_sim_profile
+{
+    int64_t ns_demography = 0; ///< The per-year demography/urban pass.
+    int64_t ns_decisions  = 0; ///< The whole polity-decision round (battles and reach INCLUDED).
+    int64_t ns_battles    = 0; ///< `resolve_battle` alone, a subset of `ns_decisions`.
+    int64_t ns_reach      = 0; ///< `rebuild_reach` (the heapless Dijkstra), also a subset.
+    int64_t decision_rounds = 0; ///< Years on which the decision gate opened.
+    int64_t reach_rebuilds  = 0; ///< Calls to `rebuild_reach`.
+};
+
+/// The accumulators above, for the run that just finished.
+history_sim_profile& history_sim_last_profile();
+
 history_sim_state run_history_sim(settlement_state&         ss,
                                   const creed_state*        cs,
                                   const sim_terrain_view&   terrain,

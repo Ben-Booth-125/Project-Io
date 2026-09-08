@@ -4,6 +4,7 @@
 #include "terrain_combat.hpp" // BL-384 trace: the defence term the scorer never sees
 
 #include <algorithm>
+#include <chrono>
 
 // ---------------------------------------------------------------------------
 // The Era -1 history sim (BL-277 + BL-271's first slice). See history_sim.hpp
@@ -332,6 +333,38 @@ int step_for_year(const history_sim_params& p, int64_t y)
 
 // ---------------------------------------------------------------------------
 
+// --- BL-825: the REPORT-ONLY cost split ------------------------------------
+//
+// Four wall-clock accumulators, written and never read by this file. They exist
+// so a measurement harness can say where a 4000-year span's time goes without
+// having to guess it from differential runs. The sim does not branch on them,
+// they are not part of `history_sim_state`, and they must never reach a digest
+// or a save — see the type comment in history_sim.hpp.
+history_sim_profile& history_sim_last_profile()
+{
+    static history_sim_profile prof;
+    return prof;
+}
+
+namespace
+{
+using prof_clock = std::chrono::steady_clock;
+
+/// Adds its own lifetime to one accumulator. Construction and destruction only;
+/// no control flow of the sim depends on it.
+struct scoped_ns
+{
+    int64_t*               sink;
+    prof_clock::time_point t0;
+    explicit scoped_ns(int64_t& s_) : sink(&s_), t0(prof_clock::now()) {}
+    ~scoped_ns()
+    {
+        *sink += std::chrono::duration_cast<std::chrono::nanoseconds>(
+                     prof_clock::now() - t0).count();
+    }
+};
+} // namespace
+
 history_sim_state run_history_sim(settlement_state&         ss,
                                   const creed_state*        cs,
                                   const sim_terrain_view&   terrain,
@@ -342,6 +375,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                   std::atomic<int>*         year_progress,
                                   const works_registry*     works)
 {
+    history_sim_profile& prof = history_sim_last_profile();
+    prof = history_sim_profile{}; // this run's split, never the last one's.
+
     history_sim_state out;
     if (ss.regions.empty() || params.stop_year <= params.start_year)
         return out;
@@ -512,6 +548,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
     };
 
     const auto rebuild_reach = [&](int capital) {
+        const scoped_ns prof_reach(prof.ns_reach); // BL-825, report-only
+        ++prof.reach_rebuilds;
         reach.assign(ss.regions.size(), 1 << 28);
         if (capital < 0 || capital >= static_cast<int>(ss.regions.size())) return;
         reach[static_cast<std::size_t>(capital)] = 0;
@@ -573,6 +611,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
         // ---- Demography -------------------------------------------------
         int64_t total_pop = 0;
+        {
+        const scoped_ns prof_demo(prof.ns_demography); // BL-825, report-only
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {
             advance_region_demography(ss.regions[i], 1, war_pressure[i]);
@@ -582,6 +622,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             war_pressure[i] = 0;
             total_pop += ss.regions[i].population;
         }
+        } // BL-825 demography timer
         if (total_pop > out.peak_population)
         {
             out.peak_population = total_pop;
@@ -602,6 +643,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
         next_decision = y + step_years;
 
         // ---- Each polity acts, in id order (deterministic) ---------------
+        const scoped_ns prof_dec(prof.ns_decisions); // BL-825, report-only
+        ++prof.decision_rounds;
         for (polity& q : out.polities)
         {
             if (!q.alive) continue;
@@ -1368,6 +1411,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                 !exec_dry, &def_band);
                 note_units_fielded(out, params, y, def_band, def);
 
+                const prof_clock::time_point prof_bat0 = prof_clock::now(); // BL-825
                 const battle_outcome bo = resolve_battle(
                     atk, doctrine_for(q),
                     def, dq ? doctrine_for(*dq) : doctrine_for(q),
@@ -1375,6 +1419,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     den_at(terrain, tgt.anchor), lf_at(terrain, tgt.anchor),
                     best_winter ? season::winter : season::summer,
                     atk_supply, def_supply);
+                prof.ns_battles += std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    prof_clock::now() - prof_bat0).count(); // BL-825, report-only
 
                 ++out.battles;
                 // BL-779's calibration reading: how often naval combat actually
