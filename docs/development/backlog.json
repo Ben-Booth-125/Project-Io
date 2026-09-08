@@ -109,7 +109,8 @@
     "src/world/history_sim.cpp",
     "src/ui/startup_screens.cpp"
    ],
-   "design": "BEN'S CALL (2026-09-08): yes, leans per pass - the wizard's preferences model extended past planetology.\n\nTHE MODEL IS UNCHANGED AND MUST STAY UNCHANGED: a lean is a NAMED LEAN on an axis, resolved against the seed by a resolve_* function, and no raw generated value is editable. It names a FORCE, never an outcome - the tune-the-forces-never-the-outcome rule is not relaxed for being player-facing, and 'guarantee me an empire' is exactly the reading it forbids.\n\nWHAT THE AXES ARE IS THE DESIGN WORK OF THIS ITEM, and it is NOT settled. Each candidate axis must map onto a scalar the sim ALREADY reads, or it is a new mechanism wearing a lean's clothes. The obvious candidates to test: consolidation pressure (fractious vs consolidating) and sea legs (insular vs seafaring) for pass 1; industrialisation timing (late vs early) and tariff posture (open vs protective) for pass 2. A lean whose effect is not visible on the round's own globe is not worth offering.\n\nDONE WHEN: each shipped axis moves a measurable outcome across a SEED SWEEP - not one seed - and none of them clamps."
+   "design": "BEN'S CALL (2026-09-08): yes, leans per pass - the wizard's preferences model extended past planetology.\n\nTHE MODEL IS UNCHANGED AND MUST STAY UNCHANGED: a lean is a NAMED LEAN on an axis, resolved against the seed by a resolve_* function, and no raw generated value is editable. It names a FORCE, never an outcome - the tune-the-forces-never-the-outcome rule is not relaxed for being player-facing, and 'guarantee me an empire' is exactly the reading it forbids.\n\nWHAT THE AXES ARE IS THE DESIGN WORK OF THIS ITEM, and it is NOT settled. Each candidate axis must map onto a scalar the sim ALREADY reads, or it is a new mechanism wearing a lean's clothes. The obvious candidates to test: consolidation pressure (fractious vs consolidating) and sea legs (insular vs seafaring) for pass 1; industrialisation timing (late vs early) and tariff posture (open vs protective) for pass 2. A lean whose effect is not visible on the round's own globe is not worth offering.\n\nDONE WHEN: each shipped axis moves a measurable outcome across a SEED SWEEP - not one seed - and none of them clamps.",
+   "notes": "SUPERSEDED IN ITS AXES by BL-839 (2026-09-08): Ben named the axis he actually wants - HISTORICAL TURBULENCE, fewer or more countries at the epoch. The four axes guessed at here (consolidation, sea legs, industrialisation timing, tariff posture) were explicitly unsettled and are now second to that one. Keep this item for the round 5 / pass 2 leans; round 4 lean is BL-839."
   },
   {
    "status": "designed",
@@ -527,18 +528,19 @@
    "blocked_on": null,
    "version_goal": null,
    "id": "BL-835",
-   "short_name": "DEAD_REGION_PINGPONG",
+   "short_name": "CIVILIAN_POPULATION_ARMIES_APART",
    "priority": "A",
-   "difficulty": 3,
+   "difficulty": 5,
    "category": "Generation",
-   "title": "A zero-population region is a perpetual battle target, and it is most of the war in the sim",
+   "title": "Population is civilian and armies are distinct - the root fix for the dead-region ping-pong",
    "authority_doc": "docs/generation/MILITARY_HISTORY.md",
    "requires": [],
    "files": [
     "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
     "src/world/settlement.cpp"
    ],
-   "design": "FOUND WHILE CLEARING BL-826, AND IT IS NOT BL-826's DOING. The seed-0 fixture reports 258 battles over 4000 years. All 258 are THE SAME REGION - ti=348 - taken and retaken by its neighbours, with manpower_stock == 0 on every flip. battles == conquests == 258, exactly 1:1, which the shipped harness prints without any probe: every battle is a conquest because no target ever defends.\n\nmanpower_stock is capped by manpower_ceiling(population, ...) (settlement.cpp:1580), so a permanent zero means POPULATION ZERO. A depopulated but OWNED region can never resist, so it tops the candidate score forever: zero defence both zeroes the defence cost term AND drives p_win_q to ~1000, so it dominates every defended candidate on two axes at once. Two neighbours then ping-pong it for four thousand years.\n\nWHY THIS MATTERS FAR BEYOND ONE CHECK. The battle count is the headline statistic for whether the history sim produces a believable world, and on this fixture it is almost entirely noise from one dead tile. Sprint 35 plans to SHOW this history to the player as a time-lapse with a scoreboard - a border flickering 258 times on one region would be the most visible thing on the map, and it is an artefact. It also means the recent 1 -> 258 battle jump was never a richer history, so nothing should be tuned against it.\n\nTHE CALL IS BEN'S, and it is a design question rather than a bug fix. Candidates: a region with no population is not a battle target at all (there is nobody there to fight - walking in is an occupation, not a war); or depopulated ground is released rather than held; or a floor on what makes ground worth campaigning for. Each says something different about what the sim thinks war is.\n\nDONE WHEN: no fixture spends its whole span fighting over one region, and the battle count reflects contested ground rather than a dead tile."
+   "design": "BEN'S RULING, 2026-09-08: \"population as a civilian thing - where armies are distinct from population, and we don't simulate total warfare in stage 4\".\n\nTHIS IS A ROOT FIX, NOT THE PATCH THE ITEM WAS FILED AS. The measured pathology was an OWNED REGION WITH ZERO POPULATION: manpower_stock is capped by manpower_ceiling(population, ...) (settlement.cpp:1580), so no population meant no manpower, no manpower meant no defence, and a permanently undefendable region outscored every real objective forever. All 258 battles of the seed-0 fixture were that one region, battles == conquests == 258 exactly.\n\nUNDER A CIVILIAN POPULATION THAT WAR DOES NOT CONSUME, THE EMPTY REGION STOPS BEING PRODUCED. That is why this supersedes the three options originally offered (no-battle-target / release / value floor): each of those blocked the symptom, and this removes the cause.\n\nTHE MODEL. Population is civilian - it moves on demography, habitability, famine and plague. An ARMY is a separate pool, raised from population at a cost and tracked apart. Battles destroy armies, not the people living on the ground. A region's defence reads THE ARMY STANDING ON IT, so an undefended region is a normal and TEMPORARY state (an army marched away, a levy not raised) rather than a permanent property of dead ground. Walking in is cheap exactly once, and the ground is worth holding because the people are still there.\n\nAND IT GIVES CULTURE SHARES THEIR SUBJECT BACK. Conquest transfers PEOPLE, and the people transferred are what BL-826 then digests. An emptied region had nobody to assimilate, which is exactly why conquest had become free of the cohesion cost the lever depends on.\n\nWHAT IT ASKS OF THE SCORER: question A sharpens from 'can I take this' to 'can I keep an army there'. That is what makes BL-837 (logistics and roads) load-bearing rather than decorative.\n\nBLAST RADIUS IS REAL AND MUST BE PLANNED, NOT DISCOVERED. manpower_stock, manpower_ceiling, replenish_manpower, the defence term, the campaign candidate score and the battle resolution all currently read population as if it were the army. Each needs a deliberate answer. The save seam moves again (it went 8 -> 9 for culture shares).\n\nDONE WHEN: no fixture spends its span fighting one region; battles no longer equal conquests 1:1; a conquered region keeps its people and its shares are digested afterwards; and armies can be raised, paid for and destroyed without the civilian count moving."
   },
   {
    "status": "designed",
@@ -563,6 +565,82 @@
     "src/world/history_sim.cpp"
    ],
    "design": "THE SEASON AXIS IS DECIDED BY A STRICT COMPARISON. Summer is evaluated first (w = 0) and winter guards on s > best_score - strictly greater - so an EXACT TIE always keeps summer.\n\nWINTER'S ONLY BENEFIT IN THE SCORE is that def_ready drops 1000 -> 750, shrinking the defence term (params.w_def * def_eff) / 2000. That is integer division, so on a weak defender the winter advantage TRUNCATES TO ZERO and the two seasons tie exactly - at which point the strict comparison silently discards winter. Measured: def_scaled must reach about 4 before the winter delta survives the divide at all.\n\nAgainst a zero-defence target both terms are 0, so winter is unreachable BY CONSTRUCTION, not by a hair. That is why R5 reports 0 winter campaigns out of 258 with the winter premium set to 0 to make winter freely competitive. The scoring itself is healthy where a defender exists - probed candidates show winter strictly ahead (s=70 vs 67, s=83 vs 81) - the argmax simply never reaches them while a dead region outranks everything.\n\nSO THIS IS THE SECOND-ORDER HALF AND IT IS SEQUENCED DELIBERATELY. Fixing BL-835 may make R5 pass on its own by removing the dominating candidate. Fix BL-835 first, RE-MEASURE, and only then decide whether the tie-break also wants changing - a tie-break altered while a bigger distortion is still in play is a change nobody can evaluate.\n\nAND THE TIE-BREAK IS A DESIGN CALL, not a defect to silently flip. Preferring summer on a tie may be exactly right. What is wrong is that it is UNSTATED and that truncation manufactures the ties.\n\nDONE WHEN: BL-835 is fixed and R5 re-measured; the tie-break is then either stated as deliberate in MILITARY_HISTORY.md or changed on Ben's ruling."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "36",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, on the holistic scorer: diplomacy, logistics, turbulence); Claude",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-837",
+   "short_name": "ANCIENT_LOGISTICS_AND_ROADS",
+   "priority": "A",
+   "difficulty": 5,
+   "category": "Generation",
+   "title": "Simple logistics and ancient roads - so that holding ground has a cost that falls off with distance",
+   "authority_doc": "docs/generation/MILITARY_HISTORY.md",
+   "requires": [
+    "BL-835"
+   ],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/logistics.cpp"
+   ],
+   "design": "BEN, 2026-09-08: \"this is also why we need basic logistics and ancient roads\". It is the answer to the scorer's question A - CAN I KEEP THIS REGION - and under BL-835's civilian/army split that sharpens to CAN I KEEP AN ARMY THERE.\n\nWITHOUT A REACH COST THAT FALLS OFF WITH DISTANCE OVER REAL TERRAIN, HOLDING IS FREE, and the only limit on an empire is how fast it can walk. That is the whole of why the non-hegemony invariant currently has to be defended by other means.\n\nA ROAD IS THEN THE THING THAT MAKES A FRONTIER STAY WHERE IT IS. Ancient roads extend sustainable reach along their line, so an empire's shape becomes a consequence of its infrastructure rather than of a radius - which is the mechanism that makes a strait, a mountain range or an unroaded interior stall a frontier WITHOUT any of them being special-cased.\n\nSOME OF THIS EXISTS. rebuild_reach already computes terrain-weighted distance from a capital by Dijkstra, using logistics.cpp landform ratios. What it does not do is BIND that reach to whether force can be sustained - it is an input to scoring, not a constraint on holding. Read BL-834 first: that cache is rebuilt 12,000 times in a 4000-year run and reach is already 66-86% of the run, so anything that makes reach load-bearing must be built on the fixed cache, not the current one.\n\nDONE WHEN: an army beyond sustainable reach cannot be maintained; a road tier visibly changes where a frontier settles; and an unroaded interior stalls expansion without a radius rule."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "36",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, on the holistic scorer: diplomacy, logistics, turbulence); Claude",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-838",
+   "short_name": "FEAR_OF_BEING_NEXT",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Generation",
+   "title": "Neighbours coalesce against a riser out of fear of being next - the scorer second question",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "requires": [
+    "BL-827",
+    "BL-835"
+   ],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "design": "BEN, 2026-09-08, giving the balancing-coalition lever the cause it was missing: the scorer must ask \"will others attack me for fear of being wiped out next?\"\n\nTHIS IS WHAT MAKES THE LEVER ADMISSIBLE, and the distinction is the whole point rather than a technicality. GENERATION_STRATEGY.md marked balancing coalitions the DANGEROUS lever, because a term that reads a polity's RANK and pushes back is an agent handicap in a diplomacy costume - precisely the shape the standing rule against agent handicaps forbids. Fear of annihilation reads a BEHAVIOUR instead: what this polity has actually done, to whom, on ground a player can point at.\n\nTHE RECORD IT READS ALREADY EXISTS. BL-827's grudge ledger is directed, decaying, and carries named events with a place and a date. A coalition forming against a riser is therefore explicable on the map - the player can ask WHY and get a list of what that polity did - which is the bar every in-world force in this project has to clear.\n\nIT MUST NOT BECOME A RANK TERM BY THE BACK DOOR. 'Largest polity' is not the trigger; 'the polity that has been doing this to people like me' is. A quiet reimplementation as a size coefficient would pass every test here and violate the rule the item exists to satisfy - so the check must be that a large but peaceful polity attracts NO coalition, while a smaller aggressive one does.\n\nAND IT IS BASIC, DELIBERATELY. This is a fear response inside the Era -1 sim, not a diplomacy layer: no treaties, no negotiation, no alliance objects. Two of BL-827's four grudge kinds ('a union refused', 'an ally abandoned') remain unbuilt for exactly that reason and stay unbuilt here.\n\nDONE WHEN: a large peaceful polity attracts no coalition and a smaller aggressive one does; the coalition's cause is printable as the events behind it; and hegemony frequency falls across a seed sweep without any term reading size."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "36",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, on the holistic scorer: diplomacy, logistics, turbulence); Claude",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-839",
+   "short_name": "TURBULENCE_LEAN",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Generation",
+   "title": "Historical turbulence as the round 4 lean - roll for a world with fewer or more countries",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-837",
+    "BL-838"
+   ],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/ui/startup_screens.cpp"
+   ],
+   "design": "BEN, 2026-09-08: \"we are really looking to encourage historical turbulence as a parameter - so that players can roll for worlds which have fewer countries at this step, or more countries at this step\".\n\nTHIS SUPERSEDES BL-818's PLACEHOLDER AXES. That item said the axes were the design work and were not settled; this is the settlement, and it is a better axis than any of the four guessed at, because the player can WATCH it resolve on the very map round 4 is showing them. A lean whose effect is invisible on its own round is not worth offering.\n\nIT TUNES FORCES AND NEVER CLAMPS A COUNT. A turbulence lean moves the SPREAD of culture aggression, how sharply neighbours coalesce against a riser (BL-838), and how fast reach decays with distance (BL-837). It does not target a number of nations, and it must not acquire a post-hoc correction that does. The 2026-07-30 emergent-nation-count ruling, BL-224's non-hegemony invariant and GENERATION_STRATEGY.md § Asymmetry is the deliverable all survive intact: fragmented or consolidated is an OUTCOME, not a quota.\n\nCULTURE AGGRESSION IS WHERE THE TUNING LANDS. polity::aggression_q already exists, derived from the culture's own aggression_q (BL-277 Q5). Two archetypes are worth having and they are not the same shape: one that EXPANDS AND INCORPORATES, absorbing the conquered and growing large and durable; one that CYCLES - unifying, stabilising, fragmenting and re-unifying on a rhythm. The same engine produces different turbulence signatures from them, which is why a SPREAD of aggression profiles is worth more than a single dial.\n\nTHE STANDING RULE APPLIES AND IS NOT SOFTENED. Both archetypes are drawn from real history as MECHANISMS, exactly as HISTORY.md's institutional ladder is. What transfers is the mechanism; a proper noun never does. No generated name in Io is Earth-derived, and this item must not become a name bank - see GENERATION_STRATEGY.md § Real history in, invented names out.\n\nDONE WHEN: the lean moves the epoch nation-count DISTRIBUTION across a seed sweep in the expected direction, at both settings, with no term targeting a count; and a world at either setting is still a legitimate world."
   }
  ]
 }

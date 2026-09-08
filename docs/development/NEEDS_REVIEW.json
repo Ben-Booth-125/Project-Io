@@ -181,7 +181,7 @@
       "title": "Most of the war in the history sim is two neighbours ping-ponging one dead region",
       "raised": "2026-09-08",
       "kind": "question",
-      "status": "open",
+      "status": "resolved",
       "source": "Chasing an R5 failure after the culture-shares merge. The check was right; my hypothesis about its cause was wrong, and so was the first diagnosis.",
       "what": "On the seed-0 fixture all 258 battles of a 4000-year run are the same region, ti=348, with zero population and therefore zero defenders, taken and retaken by two neighbours. battles == conquests == 258 exactly - the shipped harness prints that 1:1 ratio without any instrumentation.",
       "why_it_matters": "The battle count is how anyone judges whether the history sim produced a believable world, and here it is almost entirely one dead tile. This sprint is about SHOWING that history to the player: a border flickering 258 times over one region would be the single most visible thing on the time-lapse map, and it is an artefact. It also means the 1 -> 258 battle jump was never a richer history, so nothing should be tuned against it.",
@@ -196,7 +196,7 @@
         "src/world/settlement.cpp",
         "docs/generation/MILITARY_HISTORY.md"
       ],
-      "resolution": null
+      "resolution": "RULED by Ben, 2026-09-08, and the ruling went past all three options offered. First: a region emptied by war is immediately resettled by the attacker. Then, decisively: POPULATION IS CIVILIAN, ARMIES ARE DISTINCT FROM IT, AND STAGE 4 DOES NOT SIMULATE TOTAL WARFARE - so war stops producing empty regions at all, and the pathology has no cause rather than a block. That also dissolves the assimilation-bypass worry I raised against the first answer: with no war route to emptiness there is no massacre-and-resettle fast path. Written into GENERATION_STRATEGY.md § Population is civilian, and armies are distinct from it. Work is BL-835, re-authored around the split."
     }
   ]
 }

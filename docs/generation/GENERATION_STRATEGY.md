@@ -359,6 +359,88 @@ last. Both facts compound; neither is the span's fault.
 `step_years` is the clean lever, at a true 1/step: it halves the cost and it also halves the
 battles, so it trades fidelity, not waste. It is the fallback, not the fix.
 
+### The scorer asks two more questions (Ben, 2026-09-08)
+
+The campaign scorer today asks *can I take this region?* — and on empty ground the answer is
+always yes, which is how one dead region came to be four thousand years of war. Two further
+questions make the answer holistic rather than local:
+
+**A. Can I keep it?** Not "can I reach it once", but can it be *held* — supplied, garrisoned,
+governed at that distance. This is why **simple logistics and ancient roads are load-bearing rather
+than flavour**: without a reach cost that falls off with distance over real terrain, holding is free
+and the only limit on an empire is how fast it can walk. A road is then the thing that makes a
+frontier *stay* where it is.
+
+**B. Will others attack me for it?** A polity that advances rapidly, and especially one that empties
+ground and resettles it, teaches its neighbours what losing to it means. They move against it out of
+**fear of being next**.
+
+**This is what makes the balancing-coalition lever admissible**, and the distinction is the whole
+point. § Round 4's levers marked it the dangerous one, because a term that reads a polity's *rank*
+and pushes back is an agent handicap wearing a diplomacy costume. Fear of annihilation reads a
+**behaviour** instead — what this polity has actually done, to whom, on ground the player can point
+at. It is an in-world cause with a visible history, which is exactly the bar the standing rule sets.
+The grudge ledger is already the record it reads.
+
+### Population is civilian, and armies are distinct from it (Ben, 2026-09-08)
+
+**Stage 4 does not simulate total warfare.** Population is a **civilian** quantity — it grows and
+thins on demography, habitability, famine and plague — and an **army is a distinct pool**, raised
+from that population at a cost and tracked apart from it. Battles destroy armies. They do not
+annihilate the people living on the ground.
+
+**This dissolves the dead-region loop at its root rather than patching it.** The pathology in
+§ Round 4's levers came from an *owned region with zero population*: no population meant no
+manpower, no manpower meant no defence, and a permanently undefendable region outscored every real
+objective forever. Under a civilian population that war does not consume, war stops producing empty
+regions at all. A conquered region keeps its people.
+
+**A region's defence reads the army standing on it**, not its population directly. So an undefended
+region is a normal and *temporary* state — an army marched away, a levy not yet raised — rather
+than a permanent property of dead ground. Walking into it is cheap exactly once, and the ground is
+worth holding afterwards because the people are still there.
+
+**And conquest transfers people, which is what culture shares are for.** The population that changes
+hands is the population that must then be digested — so § Round 4's lever 1 gets its subject back.
+An emptied region had nobody to assimilate, which is precisely why conquest had become free.
+
+**Repopulation-by-settle survives, narrowed.** Ground can still be genuinely empty from plague,
+famine or demographic collapse, and the existing `sim_verb::settle` resettling it — paid out of the
+settler's own population, never minted — is the right answer there. What is gone is the *war* route
+to emptiness, and with it the massacre-and-resettle fast path around slow assimilation. That worry
+does not need a counterweight; it needs the model above, which is Ben's.
+
+**What this asks of the scorer** is question A in a sharper form: an army is a thing you must
+**raise, pay for and move**, so *can I keep this region?* becomes *can I keep an army there?* That
+is what makes logistics and ancient roads load-bearing rather than decorative — reach is the limit
+on where force can be sustained, and it is the honest brake on an empire's size.
+
+### Turbulence is the parameter, and it is round 4's lean (Ben, 2026-09-08)
+
+**What the player rolls for is historical turbulence** — worlds that arrive at the epoch with fewer
+countries, or with more. That is the axis round 4's lean sets (`../ui/STARTUP.md` § Leans per pass),
+and it is the clearest one the wizard could offer, because the player can *watch* it resolve on the
+map they are being shown.
+
+It **tunes forces and never clamps a count.** A turbulence lean moves the spread of culture
+aggression, how sharply neighbours coalesce against a riser, and how fast reach decays with
+distance. It does not target a number of nations. The 2026-07-30 emergent-nation-count ruling,
+BL-224's non-hegemony invariant and § Asymmetry is the deliverable all survive intact — a world that
+comes out fragmented or consolidated is an outcome, not a quota.
+
+**Culture aggression is where the tuning lands.** `polity::aggression_q` already exists, derived
+from the culture's own `aggression_q`. Two archetypes are worth having and they are not the same
+shape: one that **expands and incorporates** — absorbing the conquered into itself, growing large
+and durable — and one that **cycles**, unifying, stabilising, fragmenting and re-unifying on a
+rhythm. Those produce different turbulence signatures from the same engine, which is what makes a
+spread of aggression profiles worth more than a single dial.
+
+**A note the standing rules make necessary.** Both archetypes above are drawn from real history as
+*mechanisms*, exactly as `../lore/HISTORY.md`'s ladder is. **What transfers is the mechanism; a
+proper noun never does.** Nothing in the generated world is named after an Earth polity, and a
+future session reading this section must not turn either archetype into a name bank — see § Real
+history in, invented names out, which is not softened here.
+
 **Research is PARKED, and the placeholder is stated rather than designed (Ben, 2026-09-08).**
 Research points accumulate in proportion to a culture's population. Nothing else: no tree, no
 rates, no unlocks in this pass.

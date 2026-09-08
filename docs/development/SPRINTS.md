@@ -60,7 +60,7 @@ and/or a version goal (v0.1.1 etc.).
 ## Open now
 
 ### Sprint 35 — Watching the world be made
-*Open · opened 2026-09-08*
+*Gated · opened 2026-09-08*
 
 **Goal.** THE PLAYER WATCHES THE WORLD BE MADE, and generation hands the campaign a world whose trade and grudges have a cause.
 
@@ -109,6 +109,18 @@ THE DOC-COVERAGE MAP, determined up front as the method requires. Docs this batc
 THE DOC THAT IS ALREADY WRONG AND IS THE FIRST THING TO FIX: lore/HISTORY.md carries the campaign epoch as 0 CE on Ben’s own NR-177 ruling. The epoch is now 1960. That is a doc and a ruling disagreeing with a later ruling, which is the exact case the newest-dated-wins rule exists for - but it must be EDITED, not left to the rule.
 
 WHAT THIS SPRINT MUST NOT DO: start wave 1 before wave 0 returns a number. Every span decision in here is taken on a measurement nobody has made, and the whole reason wave 0 is one item and two points of difficulty is so that it cannot be skipped.
+
+--- PAUSED 2026-09-08, AND WHY IT IS THE RIGHT CALL ---
+
+Ben: "Let us pause development in this session, and write these into design documentation. Then we can resume stage 4 history generation in another session." See docs/development/NEXT_SESSION.md.
+
+WHAT THE PAUSE IS ACTUALLY FOR. Waves 0-2 did what a batch is supposed to do - they measured before building and they found two things nobody knew. 4000 years costs 6-9x per year what 400 does, and reach is 66-86% of it (BL-834). And the sim battle count is one dead region flipping 258 times, not a history (BL-835). The second finding then pulled the whole stage 4 model open: population is civilian, armies are distinct, no total warfare - which is a bigger change than anything this sprint planned, and it is upstream of the time-lapse and the scoreboard that were meant to show it off.
+
+SO THE SURFACES WAIT ON THE SIM, DELIBERATELY. Building the time-lapse now would have rendered an artefact beautifully. The map would have shown one border flickering 258 times and it would have been the most visible thing on screen.
+
+FIVE ITEMS ARE NEW SINCE THE SPRINT OPENED and belong to stage 4 rather than to this sprint: BL-834 reach cache, BL-835 civilian population, BL-836 winter tie, BL-837 logistics and roads, BL-838 fear of being next, BL-839 turbulence lean. BL-837-839 are marked sprint 36 already.
+
+STILL OWED ON WHAT LANDED: the step 4a review barrier has never run. One verifier-review pass across the whole integrated set, before any of it is called finished.
 
 ## Where things stand
 
@@ -166,9 +178,9 @@ WHAT THIS SPRINT MUST NOT DO: start wave 1 before wave 0 returns a number. Every
 | 32c | Gamified generation, 32c - the water model finishes, and phase 6 gets its search | CLOSED 2026-09-07. GOAL MET ON BOTH CHAINS. The water model is complete and blessed ONCE against a stated shape description; phase 6 has a real search WITH a generation caller. Nine items delivered. The remaining 28 were cut to 12 on Ben's call - sprint 29, 33 and ownerless items archived unstarted, to be revisited with a narrower focus. |
 | 32c | Gamified generation, 32c - the water model finishes, and phase 6 gets its search | OPENED 2026-09-06 as the 32b continuation, carrying 28 items. Much of its water-model chain landed (BL-776 through BL-780, BL-783, BL-785, BL-786) and the phase 6 chain reached its search. SUPERSEDED 2026-09-08 on Ben's board-clearing call: the carried remainder was cancelled into the backlog archive rather than re-promoted. What landed under it is recorded in the devlog, not here. |
 | 33 | Context economy - the corpus stops charging every session for what one session needs | OPENED 2026-09-07 and ran hard: THREE blocks, 16 items delivered, retro recorded below. CLOSED 2026-09-08 on Ben's call clearing the board - "let's approach the next task with a fresh mindset" - NOT because it failed. Its unfinished remainder (BL-807 the corpus citations, BL-808 the reach defect, BL-809 the red province assertions, plus BL-810 and BL-811 filed on the way past) was cancelled into the backlog archive the same day. The retro is the record of what this sprint actually delivered and stands unchanged. |
-| 35 | Watching the world be made | OPEN, re-authored 2026-09-08 and now running as a BATCH DELIVERY in four waves. Generation visibility: two more wizard rounds, the 4000-year pass 1 behind round 4, and the 1560-1960 economy pass behind round 5. |
+| 35 | Watching the world be made | PAUSED 2026-09-08 mid-batch on Ben call: get the design down first, resume stage 4 in another session. Waves 0-2 landed and are verified; the stage 4 sim design was settled the same day and is much larger than the sprint assumed. |
 
-**Next up.** SPRINT 35 IS OPEN and running as a BATCH DELIVERY in five waves (2026-09-08). Wave 0 measures whether 4000 years of pass 1 is affordable and nothing proceeds until it returns. Wave 1 is the sim - cultural mixes, grudges, the handoff, the anti-hegemon levers. Wave 2 is the playback record and the wizard shell. Wave 3 is the surfaces - the time-lapse map and the ordered top sixteen. Wave 4 is pass 2, the 1560-1960 economy pass. The calendar is now stated: 4000 years to 1200 CE, a deliberate coast to 1560, then 1560-1960, epoch 1960 - an INDUSTRIAL-band campaign. THE NEXT NEW SPRINT IS 36.
+**Next up.** SPRINT 35 IS PAUSED (2026-09-08), not closed. Waves 0-2 landed and are verified in the main session: the wizard runs five rounds with labelled placeholders, the 4000-year span is measured, and culture shares, grudges and the handoff type are built. Two findings redirected the sprint - reach is 66-86% of a long run and rebuilds 12,000 times (BL-834), and the sim war is one dead region flipping 258 times (BL-835). Ben then settled stage 4 model: population is civilian, armies are distinct, no total warfare; the scorer asks can I keep it and will others fear me; turbulence is the round 4 lean. RESUME AT docs/development/NEXT_SESSION.md. The step 4a review barrier is still owed. THE NEXT NEW SPRINT IS 36.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
