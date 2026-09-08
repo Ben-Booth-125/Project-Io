@@ -68,11 +68,11 @@
    "blocked_on": null,
    "version_goal": null,
    "id": "BL-817",
-   "short_name": "POLITY_PLAYBACK_GLOBE",
+   "short_name": "HISTORY_TIMELAPSE_MAP",
    "priority": "A",
    "difficulty": 4,
    "category": "Generation",
-   "title": "Round 4 - polity colour per region on the wizard globe, advanced across the history span",
+   "title": "Round 4 - a 2D map running a time-lapse of the first 4000 years to 1200 CE",
    "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
    "requires": [
     "BL-816"
@@ -81,7 +81,7 @@
     "src/world/history_sim.cpp",
     "src/ui/startup_screens.cpp"
    ],
-   "design": "WHAT BEN CHOSE TO WATCH (2026-09-08, visibility form): polity colours on the globe. Empires form, spread, stall at a strait and collapse in view.\n\nTHE THING THAT DOES NOT EXIST YET is the record it draws from. The sim carries the region table forward and hands the political map across at the epoch; it does not emit WHO HELD WHAT AT EACH STEP. That per-step ownership record is the actual work here, and it is a generation-layer change, not a UI one. Keep it small: a region-count-sized array of polity ids per recorded step, at a step granularity coarse enough that the record does not rival the world in size.\n\nPASS 1 AND PASS 2 SHARE THE ROUND. They are one engine (GENERATION_STRATEGY.md, Three passes of simulated history); the boundary year is a MARK ON THE TIMELINE, never a screen break.\n\nDETERMINISM: the record is an output of a deterministic sim and must not perturb it. Recording must not consume from the sim's stream.\n\nDONE WHEN: a full span plays back on the globe in the built app, watched live, with the boundary year marked; and the same seed produces a bit-identical record twice."
+   "design": "WHAT BEN CHOSE (2026-09-08, describing the round against the live app): the globe is REPLACED by a 2D MAP in the same pane, and the map runs a TIME-LAPSE of the first 4000 years, ENDING AT 1200 CE. A globe shows a world; a map shows a frontier, and the frontier is the whole subject of the round.\n\nTWO COLLISIONS WITH THE CODE, both real and both named before anyone starts. prehistory_years defaults to 400, not 4000 (src/world/hard_coded_world.hpp:73). epoch_year defaults to 0 CE and era_band_for_epoch flips to industrial at 1700. A 4000-year pass 1 ending at 1200 CE is a TENFOLD span increase on the most expensive pass in the project, and Ben's other requirement for this round is that it be RAPID. Those two pull against each other and the resolution is a MEASUREMENT, not a preference. If 4000 years cannot be had at watchable speed, the honest answers are a coarser step or a cheaper step - never a shorter history quietly relabelled.\n\nTHE ARC IS THE ACCEPTANCE CRITERION, not a description: origin -> communication -> conquest or diplomatic union -> a stable dark age. A run that reaches 1200 CE with plausible numbers and none of that shape has FAILED, and it fails as a sim result rather than as a rendering bug. Asymmetry is completely fine and expected.\n\nTHE RECORD IT DRAWS FROM DOES NOT EXIST YET. The sim carries the region table forward and hands the political map across at the end; it does not emit WHO HELD WHAT AT EACH STEP. That per-step ownership record is the actual work here and it is a generation-layer change, not a UI one. Keep it small - a region-count-sized array of polity ids per recorded step, at a step granularity coarse enough that the record does not rival the world in size - and it must not perturb the sim it records or consume from its stream.\n\nDONE WHEN: the full span plays back as a 2D map in the built app, watched live end to end; the arc above is legible in the playback without being narrated; and the same seed produces a bit-identical record twice."
   },
   {
    "status": "designed",
@@ -160,6 +160,101 @@
     "src/world/hard_coded_world.cpp"
    ],
    "design": "THE STRUCTURAL PROBLEM THIS ITEM EXISTS FOR. The planetology rounds re-run their chain as a pure throwaway preview on EVERY control move. The history sim is the most expensive pass in the project and cannot be previewed that way at any budget - so rounds 4 and 5 invert the wizard's own mechanism, and that inversion needs stating rather than discovering.\n\nTHE SHAPE: the player sets the leans, presses Run, and the pass runs INSIDE the round with its output drawn as it computes. Accept moves on; reroll runs it again. The generation_progress sink already exists for the loading screen and is the natural feed; what changes is that generation stops being one call behind a bar and becomes calls the player initiates.\n\nBEN'S RULING THAT LICENSES IT (2026-09-08): 'a watched wait needs no budget' - which is why the whole startup-budget chain was dropped rather than deferred.\n\nAND THE OBLIGATION THAT REPLACES THE BUDGET IS SHARPER, NOT LOOSER. A watched wait must be WORTH WATCHING. A round that shows a still globe for ninety seconds is worse than the bar it replaced, because the bar at least admitted it was a wait. If the playback has dead stretches, the answer is to make them move - never to hide them behind a caption.\n\nSTART_NEW_GAME IS THE SEAM THAT MOVES. The one-and-only generation call splits, and the clock rebase at handoff must still hold: wall time spent watching must not land as elapsed in-game days.\n\nDONE WHEN: a live click-through from the menu to play, timed, with no stretch longer than a few seconds in which nothing on the globe changes."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, describing round 4 against the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-821",
+   "short_name": "CULTURE_LEADERBOARD",
+   "priority": "A",
+   "difficulty": 3,
+   "category": "UI",
+   "title": "Round 4 leaderboard - how cultures grew and fell, on four metrics",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [
+    "BL-817"
+   ],
+   "files": [
+    "src/ui/startup_screens.cpp"
+   ],
+   "design": "BEN'S FOUR METRICS (2026-09-08): military might, research speed, population, and share of the world owned. It sits on the LEFT, where the planetology rounds stack their charts, and it moves with the map - it is the round's chart surface, not a side panel.\n\nTHE ONE TRAP, and it is a chart-honesty problem rather than a layout one. Research is PARKED and its placeholder accrues points in proportion to population (BL-822). So under the placeholder, RESEARCH SPEED AND POPULATION ARE THE SAME NUMBER IN TWO COLUMNS, and the board would show a perfect correlation it never measured. Either the column is LABELLED as population-derived while the placeholder stands, or it is not shown until research is real. An unlabelled duplicate column is a chart that lies, and it would lie to Ben while he is using this very board to judge whether the levers work.\n\nSHARE OF THE WORLD OWNED is share of the homeworld's LAND, not its surface - an ocean nobody can hold would otherwise cap every culture at a fraction and compress the whole axis.\n\nDONE WHEN: the board moves in step with the time-lapse on a live watch, cultures enter and leave it as they rise and fall, and the research column is either honestly labelled or absent."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, describing round 4 against the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-822",
+   "short_name": "RESEARCH_FROM_POPULATION",
+   "priority": "B",
+   "difficulty": 1,
+   "category": "Generation",
+   "title": "Research points accrue from population - the parked placeholder, stated as one",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "design": "BEN PARKED THE DESIGN AND NAMED THE STUB (2026-09-08): \"We want to simulate research as well, however we will have to park that. Instead of designing it, allow research points to accumulate based on that culture's population.\"\n\nSO THIS ITEM IS DELIBERATELY TINY AND MUST STAY TINY. Points accrue in proportion to population. No tree, no rates, no unlocks, no per-culture modifier - every one of those is the design that was parked, and adding any of them here is how a placeholder quietly becomes the system nobody chose.\n\nIT MUST BE LABELLED AS A PLACEHOLDER wherever it surfaces - in the code and on BL-821's leaderboard. An unlabelled placeholder is a lie the next session will believe.\n\nDONE WHEN: research points exist, accrue from population, and every surface showing them says what they are."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, describing round 4 against the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-823",
+   "short_name": "ANTI_HEGEMON_LEVERS",
+   "priority": "A",
+   "difficulty": 5,
+   "category": "Generation",
+   "title": "The levers that keep round 4 multipolar - culture, logistics, communication, succession",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-817"
+   ],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp"
+   ],
+   "design": "BEN ASKED FOR LEVERS THAT STOP A TOTAL HEGEMON and named two - cultures in region, and a simple logistics implementation - leaving the rest to judgement. They serve BL-224's non-hegemony invariant, and the constraint on every one of them is the standing rule: a lever is a FORCE WITH A VISIBLE CAUSE ON THE MAP, never a term inside an actor and never a penalty that scales with a polity's rank.\n\nTHE SIX, with what exists today. (1) CULTURES IN A REGION - foreign-culture ground costs cohesion to hold and assimilates slowly, so conquest buys unrest rather than strength. PARTLY BUILT: w_cult = 150 and a per-region culture index are already in history_sim.hpp, so this is calibration more than construction. (2) SIMPLE LOGISTICS - reach falls with distance from the seat along real terrain, so a campaign past reach cannot be sustained. This is the lever that makes a strait or a mountain stall a frontier WITHOUT special-casing either, which is why it is worth more than its cost. OWED. (3) COMMUNICATION - a polity cannot act on ground it cannot hear from until a communication rung is reached. OWED, and it is also the second rung of Ben's own arc, so it earns its place twice. (4) SUCCESSION - a large polity fractures on a leadership transition, weighted by cohesion; this is the dark-age rung. COLLAPSE.md already owns culmination. (5) STRAIN - already built, and its accumulators already cross the pass 1 -> pass 2 handoff. (6) BALANCING COALITIONS - neighbours' stance moves against the largest polity.\n\nLEVER 6 IS THE DANGEROUS ONE and is called out rather than dropped. It is one step from an agent handicap: a coefficient that reads a polity's rank and pushes back is exactly the shape the standing rule forbids. It is admissible ONLY as a STANCE the player can read on the map (RELATIONS.md), arrived at by an in-world cause. If it cannot be built that way, it is not built.\n\nDONE WHEN: across a SEED SWEEP - not one seed - a single polity holding the great majority of the world's land at 1200 CE is rare rather than typical, and each shipped lever demonstrably moves that distribution when varied. A world that does produce a near-hegemon stays a legitimate outcome; the levers tune the forces, they do not clamp the result."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, describing round 4 against the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-824",
+   "short_name": "WIZARD_BEGIN_BECOMES_NEXT",
+   "priority": "A",
+   "difficulty": 1,
+   "category": "UI",
+   "title": "Begin becomes Next on rounds 3 and 4 - the commit press moves to the last round",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [
+    "BL-816"
+   ],
+   "files": [
+    "src/ui/startup_screens.cpp"
+   ],
+   "design": "SMALL, AND BEN NAMED IT FIRST when he looked at the live app: \"In place of begin we should see next.\"\n\nThe wizard's commit press belongs on the LAST round. Round 3 currently reads Reroll / Back / Begin because it is last today; once rounds 4 and 5 exist it advances like any other round, and only round 5 commits.\n\nDONE WHEN: rounds 3 and 4 read Next, round 5 reads Begin, and Begin is the only press in the wizard that generates anything."
   }
  ]
 }

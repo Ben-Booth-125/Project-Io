@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*2 entries — 2 open, 0 resolved.*
+*3 entries — 3 open, 0 resolved.*
 
 ---
 
@@ -57,6 +57,21 @@ STARTUP.md has said since BL-167 that NOTHING is generated in the wizard - every
 > **Recommendation:** Keep what I wrote. The second option gives the player a lean whose effect they cannot see when they set it, which is the one thing the planetology rounds get right and the reason the wizard works at all.
 
 *Files: `docs/ui/STARTUP.md`, `docs/generation/GENERATION_STRATEGY.md`*
+
+### NR-802 — A 4000-year pass 1 ending at 1200 CE contradicts prehistory_years = 400 and epoch_year = 0
+*question · raised 2026-09-08 · from Your description of round 4 against the live app: a time-lapse of the first 4000 years, ending at 1200 CE.*
+
+The code defaults are prehistory_years = 400 (hard_coded_world.hpp:73) and epoch_year = 0 CE, with era_band_for_epoch flipping to industrial at 1700. HISTORY.md carries the campaign epoch as 0 CE (your ruling, NR-177), and GENERATION_STRATEGY.md sets the pass 1 / pass 2 boundary at 400 years before the epoch. A 4000-year pass 1 ending at 1200 CE fits none of those three numbers.
+
+**Why it matters.** It is not a naming mismatch. It reads as a re-basing of the whole calendar: pass 1 becomes 2800 BCE to 1200 CE, pass 2 runs 1200 CE to an epoch that must now be well past 1700 - which puts the campaign in the industrial band rather than the ancient one, and that band choice reaches into eras, resources and the military roster. It also multiplies the most expensive pass in the project by ten, against your other requirement for this round, which is that it be rapid.
+
+- The epoch moves late (a modern arc) and 1200 CE is the pass 1 / pass 2 boundary year. Pass 1 is 4000 years, pass 2 is 1200 to the epoch.
+- The epoch stays at 0 CE and 1200 CE is wrong - the time-lapse ends at the epoch, whatever it is.
+- 4000 years is the SPAN and 1200 CE is illustrative; the real numbers fall out of the cost measurement.
+
+> **Recommendation:** Option 1, because it is what you actually described and the arc you named - through to a stable dark age - is a medieval end point, not a classical one. But it moves the campaign into the industrial era band, so it is not a small consequence and I am not taking it on your behalf.
+
+*Files: `src/world/hard_coded_world.hpp`, `src/world/era_band.hpp`, `docs/lore/HISTORY.md`, `docs/generation/GENERATION_STRATEGY.md`*
 
 ---
 

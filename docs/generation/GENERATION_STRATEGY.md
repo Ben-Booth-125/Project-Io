@@ -285,7 +285,7 @@ They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds 4 and 5):
 
 | Round | Phase | The moving object |
 |---|---|---|
-| **4** | **4 — The History** | **Polity colour per region on the globe**, advanced across the span. Empires form, spread, stall and collapse in view. Pass 1 and pass 2 share the round; the boundary year is a mark on the timeline, not a screen break. |
+| **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of the first 4000 years to 1200 CE**. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
 | **5** | **6 — The economic substrate** | Four, in order: **metros growing** from the population centres, **colonial reach across water**, **firm markers and their charters**, and the **market carve with its price field**. |
 
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
@@ -302,6 +302,41 @@ and 5 run the real pass *inside the round*, drawing as they compute. Ben, 2026-0
 wait needs no budget.* The obligation that replaces the budget is sharper, not looser — a watched
 wait must be **worth watching**, and a round that shows a still globe for ninety seconds is worse
 than the bar it replaced.
+
+### Round 4's arc, and the levers that keep it multipolar (Ben, 2026-09-08)
+
+**The shape the time-lapse must produce**, and it is an acceptance criterion rather than a
+description: *origin → communication → conquest or diplomatic union → a stable dark age.* Reaching
+1200 CE with plausible numbers and none of that shape is a failure of the pass, not of the surface
+drawing it. **Asymmetry is completely fine and expected.**
+
+**And it must be RAPID.** That pulls directly against a 4000-year span — `prehistory_years`
+defaults to 400 today — so the span is a cost question answered by measurement before it is a
+design question. If 4000 years cannot be had at watchable speed, the honest answers are a coarser
+step or a cheaper step, never a shorter history quietly relabelled.
+
+**The levers against a total hegemon.** BL-224's non-hegemony invariant is what these serve, and
+each is a **force with a visible cause on the map** — never a term inside an actor, and never a
+penalty that scales with a polity's rank (`../../.claude/rules/io-standing-rules.md`; Ben's
+standing preference for systemic forces over agent handicaps):
+
+| Lever | The force | State today |
+|---|---|---|
+| **Cultures in a region** | Ground of a foreign culture costs cohesion to hold and assimilates slowly, so conquest buys unrest rather than strength. | Partly built — `w_cult` and a per-region culture index exist in `history_sim.hpp`. |
+| **Simple logistics** | Reach falls with distance from the seat along real terrain, so a campaign past reach cannot be sustained. This is what makes a strait or a mountain stall a frontier without special-casing either. | Owed. |
+| **Communication** | Before a communication rung is reached, a polity cannot act on ground it cannot hear from — which bounds early growth by geography rather than by a cap. | Owed; it is also the second rung of Ben's own arc. |
+| **Succession** | A large polity fractures on a leadership transition, weighted by cohesion. This is the dark-age rung, and `../lore/COLLAPSE.md` already owns culmination. | Partly owned by COLLAPSE.md. |
+| **Strain** | Growth raises strain and strain caps growth; the accumulators already cross the pass 1 → pass 2 handoff. | Built. |
+| **Balancing coalitions** | Neighbours' stance moves against the largest polity. | Owed, and the most dangerous of the six — it is one step from an agent handicap. It is admissible only as a **stance the player can read on the map** (`../politics/RELATIONS.md`), never as a hidden coefficient on the leader. |
+
+**Research is PARKED, and the placeholder is stated rather than designed (Ben, 2026-09-08).**
+Research points accumulate in proportion to a culture's population. Nothing else: no tree, no
+rates, no unlocks in this pass.
+
+That has one consequence the leaderboard must not hide. Under the placeholder, *research speed* and
+*population* are the same number in two columns, so the board shows a correlation it did not
+measure. Either the column is **labelled as population-derived** while the placeholder stands, or
+it is not shown until research is real. An unlabelled duplicate column is a chart that lies.
 
 **Three of the four owed items above are paid by this.** The region surface is round 4's globe;
 the market-carving explanation is round 5's carve; background firms are round 5's markers, which

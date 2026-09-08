@@ -112,11 +112,25 @@ History)** and **phase 6 (The economic substrate)** —
 into the same idiom the planetology rounds established: a globe that is the primary
 view, charts as the extras on top, and **preferences, not parameters**.
 
-**Round 4 — The History.** The globe is the homeworld's real tile raster, tinted by
-**which polity holds each region**, advanced across the prehistory span. The player
-watches empires form, spread, stall at a strait and collapse. Pass 1 (ancient) and
-pass 2 (industrial) are one engine and one round's playback, with the boundary year
-marked on the timeline rather than splitting the screen.
+**Round 4 — The History.** The globe is **replaced by a 2D map** in the same pane, and
+the map runs a **time-lapse of the first 4000 years, ending at 1200 CE** (Ben,
+2026-09-08). A globe shows a world; a map shows a *frontier*, and the frontier is the
+whole subject of this round. Polity colour spreads across it, stalls, fractures and
+spreads again.
+
+On the left, where the planetology rounds stack their charts, round 4 keeps a
+**leaderboard** — how cultures grew and fell, on four metrics: **military might**,
+**research speed**, **population**, and **share of the world owned**. It is the round's
+chart surface, and it moves with the map.
+
+**The arc the time-lapse must show** is Ben's, and it is the acceptance criterion for
+the whole round: *origin → communication → conquest or diplomatic union → a stable dark
+age.* A run that reaches 1200 CE without that shape has failed even if every number is
+plausible. **Asymmetry is completely fine and expected** — it is the deliverable, not a
+defect (GENERATION_STRATEGY.md § Asymmetry is the deliverable).
+
+**Begin becomes Next.** The wizard's commit press moves to the last round; rounds 3 and
+4 advance rather than commit.
 
 **Round 5 — The Substrate.** The same globe, at the epoch, gaining four things in
 order: **metros growing** out of the population centres the history sacked and grew,
