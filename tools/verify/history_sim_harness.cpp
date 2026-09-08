@@ -632,6 +632,12 @@ int main()
         history_sim_params p3 = params; // The real epoch — winter is a real axis in it.
         p3.winter_score_premium_q = 0;  // Make winter freely competitive.
         const history_sim_state a = run_history_sim(s, nullptr, no_terrain, kgw, kgh, p3, 4242u);
+        // Print the counts BOTH checks read. R5b is trivially true when both are
+        // zero, so a bare R5 failure cannot distinguish "winter is never chosen"
+        // (a real regression in the scoring axis) from "this seed fought no war
+        // at all" (a fragile single-seed fixture). One line makes it diagnosable.
+        std::printf("      R5 fixture: %d battles / %d winter campaigns (seed 4242, premium 0)\n",
+                    a.battles, a.winter_campaigns);
         check(a.winter_campaigns > 0,
               "R5   winter campaigns are chosen as candidates, not scheduled by a clock");
         check(a.battles >= a.winter_campaigns,
