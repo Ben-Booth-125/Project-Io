@@ -1,5 +1,14 @@
 # Project Io — Eras
 
+> **Settles:** what an Era is and what separates one rung of the ladder from the next · what
+> moves an Era, and what merely gates access within one · which catastrophe a rung is played to
+> avoid and how nearness to it is read · what territory, resources and buildings a rung opens.
+> **Not here:** what those resources are or how they are made (RESOURCES, PRODUCTION) · the
+> strain and hazard model a later rung's catastrophe rests on (../CLIMATE.md) · what technology
+> unlocks and what pays for it (RESEARCH) · the pre-campaign history
+> (../generation/GENERATION_STRATEGY.md).
+> **Confused with:** ../CLIMATE.md, RESEARCH.md, RESOURCES.md.
+
 An **Era** is a named phase in the game's industrial arc, defined by the accessible territory, available buildings, and the dominant strategic challenge. Eras are a formal game system: each has a defined entry, a distinct resource profile, and a characteristic question for the player to answer. An Era changes as a **gear shift that changes what the game is about**, each Era necessitating the one before — and each poses **one catastrophe the player is playing to avoid**.
 
 Only Era 1 is designed in any depth; Era 2 has its territory and its catastrophe named and little
@@ -30,13 +39,14 @@ that say "era" in code, which already establishes those as separate axes. Nothin
 
 **The working start is the 1960s** (Ben, 2026-08-31). `world_params::epoch_year = 1960` selects it
 and the branch is live: `era_band_for_epoch` puts the recipe registry on the industrial band, and the
-Era −1 antiquity prehistory is skipped (`era_minus_one.cpp` runs only below 1700). The 0 CE ancient
+prehistory sim runs to it in two spans, ancient then industrial (`docs/lore/HISTORY.md` § The
+epoch and the run). The 0 CE ancient
 start (Ben, 2026-08-12; NR-177 — the mercenary company, the antiquity prehistory) remains a supported
 configuration on the same ladder; `docs/development/ROADMAP.md` § The two arcs owns which is the
 commercial product, and this document owns only the Era structure, which is the same on both.
 
 **The prehistory is a generator, not a play layer.** Generation runs a pre-epoch history sim that
-produces the 0 CE world the campaign opens on: **400 years in one band, at 4 years a tick — 100
+produces the world the campaign opens on, at either epoch. On the ancient arc it is one span: **400 years in one band, at 4 years a tick — 100
 decision rounds** (`world_params::prehistory_years = 400`, `src/world/hard_coded_world.hpp`; the
 single band is `hp.tick_bands[0] = {epoch_year, 4}` in `hard_coded_world.cpp`). A six-band ladder
 (100 → 50 → 20 → 10 → 5 → 1 years) is authored as the `history_sim_params` struct default
@@ -44,11 +54,23 @@ single band is `hp.tick_bands[0] = {epoch_year, 4}` in `hard_coded_world.cpp`). 
 overrides it on every world. A settle-dominated run is the intended shape, not a defect (NR-205,
 ruled 2026-08-12). Authority for the prehistory run is `docs/lore/HISTORY.md`.
 
-**The warm start has no calendar meaning** (BL-369, warm start). `app::start_new_game` runs
-`pre_game_ticks` (80, ~20 years) before play begins, then rebases the clock — so play always opens
-at the epoch regardless of how many warm-start ticks ran. It is a settling pass that produces a
-plausible opening position: the world is generated *at* the epoch and ticked forward to reach a
-steady economy, not generated at an earlier date and advanced.
+**The opening position has no calendar meaning** (BL-369, warm start; BL-772, retire warm start).
+The world is generated *at* the epoch and handed to play **already settled** — not generated at an
+earlier date and advanced to it. Whatever the pass that settles it spends in simulated quarters,
+the clock is **rebased at the handoff**, so play always opens at `epoch_year`. That rebase is the
+load-bearing half of this paragraph and it does not depend on which pass does the settling: the
+opening position owes the calendar nothing.
+
+**What settles it is a search, not a settle.** The third pass of simulated history is phase 6 — a
+**directed static search** over candidate corporate landscapes (rosters, placements, road tiers),
+scored on chain completeness, the supply-to-demand ratio and the *spread* of both, with one short
+validation run on the winner. It is not an undirected pre-game tick loop run long enough for the
+dust to settle: a settle asks *what survives whatever generation happened to place*, a search asks
+*which placement is worth handing over*, and paying for both would pay twice for the weaker answer.
+The property that must hold either way is the one the player meets — they enter a field that has
+**already been decided** rather than one about to be. The design is
+`docs/generation/GENERATION_STRATEGY.md` § The eight phases and § Three passes of simulated
+history; the search itself is BL-770 (Era 0 candidate search).
 
 ## Three things that say "era" in code, and which one this is
 

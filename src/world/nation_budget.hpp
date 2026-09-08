@@ -126,7 +126,8 @@ inline constexpr std::size_t priority_count = 10;
 /// Whether a line's claims name a SUBJECT — the one thing the credit is
 /// earmarked to pay for (rule 3a). `public_exploration`'s subject is the BODY
 /// to survey (NR-568); `contracted_force`'s is the PROVINCE a mercenary_offer
-/// targets (BL-572, CONTRACTS.md § Where offers come from) — an offer's
+/// targets (BL-572; the contract form carries no sell side to buy through —
+/// CONTRACTS.md § Explicitly out of scope) — an offer's
 /// escrow is a request that one named province's work be paid for, not a
 /// fungible credit, exactly the earmark shape rule 3a already generalises.
 /// `space_programme`'s is the BODY the purchased goods stand on (BL-644):

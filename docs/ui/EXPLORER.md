@@ -1,5 +1,12 @@
 # Project Io — Explorer
 
+> **Settles:** whether an Explorer surface exists, and what became of the shell
+> band it once reserved · whether pinning is a player affordance · what a fresh
+> pinning or quick-navigation surface would have to do rather than reviving this one.
+> **Not here:** the surface that answers coordination instead (CHAT) · the shell's
+> region map (LAYOUT) · the rail's slots (MENU).
+> **Confused with:** CHAT.md, LAYOUT.md, MENU.md.
+
 There is **no Explorer surface** in Io. The Explorer was a specified placeholder — a pinning /
 quick-navigation panel reserving the right middle shell band — and its band is not reserved:
 the right middle of the shell is canvas. The diplomacy-as-communication surface that once took

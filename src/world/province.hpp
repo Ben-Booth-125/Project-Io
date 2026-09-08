@@ -38,10 +38,15 @@
 // are exclusive by construction — a tile's substrate names exactly one — so the
 // claim is structural rather than checked.
 //
-// NOTHING CAN BE IN A SEA PROVINCE YET, and that is expected: units are
-// land-bound (march_unit refuses a water destination outright), buildings refuse
-// water, and a sea province sustains zero of them. They are addressable empty
-// space, built without inventing the naval model that will eventually fill them.
+// WHAT MAY BE IN A SEA PROVINCE IS A DOMAIN QUESTION (BL-778). This read
+// "nothing can be in a sea province yet... units are land-bound (march_unit
+// refuses a water destination outright)". march_unit now asks the unit TYPE
+// which domains it may cross (docs/military/MILITARY.md § Domains and
+// traversal): a land row may enter coastal water its own polity owns, a naval
+// row may hold water outright, and open ocean is closed to everything else.
+// Buildings still refuse water — the port is the named exception and is not
+// built yet — so a sea province remains largely empty in the campaign, because
+// the campaign raises no naval rows, not because water is a wall.
 //
 // The province is deliberately NOT the region: no name, no owner, no culture,
 // no economy. It exists because BL-467 (battle state) needs an engagement
@@ -74,7 +79,7 @@
 //
 // THE PARTITION IS PART OF WORLD GENERATION AND VERSIONS WITH IT. It is never
 // patched in place: a change to the algorithm re-rolls every battle in every
-// world. Authority: docs/generation/TILE_GENERATION.md § Province partition,
+// world. Authority: docs/generation/PROVINCES.md § The partition,
 // docs/GLOSSARY.md (the spatial vocabulary) and BL-515.
 // ---------------------------------------------------------------------------
 
@@ -185,7 +190,7 @@ inline constexpr std::size_t k_sea_province_max_tiles = 80;
 /// running into the ceiling instead of meeting its neighbours, the measured mean
 /// falls away from that prediction and provinces pile up on the cap exactly.
 /// The sweep (6 seeds, `province_partition_harness` section W) is in
-/// docs/generation/TILE_GENERATION.md § Provinces over water; at d = 8 one
+/// docs/generation/PROVINCES.md § Three domains, never mixed; at d = 8 one
 /// province in nine sits exactly on 80 and the mean has already broken from its
 /// prediction, while at d = 7 the measured mean still MATCHES the lattice —
 /// which is the evidence that terrain and spacing set the size, not the cap.

@@ -300,13 +300,13 @@
    "kind": "sub-element",
    "parent": "UI-013",
    "source": [
-    "docs/ui/CANVASES.md § Terrain channels",
+    "docs/ui/PLANETARY.md § Terrain channels — composition and landform",
     "docs/ui/PLANETARY.md § Terrain types",
     "src/ui/hex_render.hpp"
    ],
    "summary": "Two always-on chrome channels: composition owns hue, landform owns a subtle relief tint plus stroke-only glyphs for the four dramatic landforms (mountain/canyon/crater/rift), spanning contiguous runs as one marker.",
    "interesting_question": "Why split landform into a near-invisible relief tint for 95% of tiles versus a loud glyph for under 1.5% of tiles, rather than one uniform treatment?",
-   "resolution": "Measured, not guessed: CANVASES.md cites world_audit § S3 — plains+valley are ~95% of land tiles while dramatic landforms are ≤1.5% each but carry ×1.3+ movement cost, so the design deliberately reserves glyph density for the rare, expensive-to-miss cases.",
+   "resolution": "Measured, not guessed: PLANETARY.md cites world_audit § S3 — plains+valley are ~95% of land tiles while dramatic landforms are ≤1.5% each but carry ×1.3+ movement cost, so the design deliberately reserves glyph density for the rare, expensive-to-miss cases.",
    "checks": [
     "landform_relief",
     "tile_texture",
@@ -787,6 +787,22 @@
     "selection_tile_layout",
     "selection_accordion",
     "ui_shell_fixture"
+   ]
+  },
+  {
+   "id": "UI-117",
+   "name": "Water tile selection",
+   "kind": "sub-element",
+   "parent": "UI-043",
+   "source": [
+    "docs/ui/SELECTION.md § A water tile is selectable, and its selection answers ownership",
+    "docs/generation/PROVINCES.md § Who owns water"
+   ],
+   "summary": "The water variant of the tile element: the same header, hex ring and action grid, with a centre column that answers OWNER and DOMAIN first, then province and habitability, in place of the five ground sections. Unowned is stated in words, never left blank.",
+   "interesting_question": "The band answers 'who holds THIS tile', one tile at a time. Does answering ownership one hex at a time create pressure for a territory lens the design deliberately leaves unbuilt?",
+   "resolution": "Open by design: SELECTION.md names the lens as the thing this is NOT ('the lens stays unbuilt and unpromised'), so the pressure is acknowledged rather than resolved.",
+   "checks": [
+    "water_tile_selection"
    ]
   },
   {

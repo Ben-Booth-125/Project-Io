@@ -1,5 +1,12 @@
 # Project Io — Climate
 
+> **Settles:** what climate state a body carries and what moves it during play · what pressure the
+> commons puts on the people and firms under it · which era owns the catastrophe · how the change
+> is made legible · what causes the Era boundary.
+> **Not here:** how a body's scalars were generated in the first place (generation/PLANETOLOGY) ·
+> the era ladder itself (economy/ERAS).
+> **Confused with:** generation/PLANETOLOGY.md, economy/ERAS.md, EVENTS.md.
+
 Authority doc for **climate**: the state of a body's habitability as it changes during play, what
 changes it, and what that does to the people and corporations living under it.
 

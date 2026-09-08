@@ -1,48 +1,90 @@
-# Next session — sprint 33, the growth half
+# Next session — sprint 32c
 
-Sprint 31 closed 2026-09-02 a success on solvency: on the standard industrial lapse the field ends
-thirty years with a majority of corps operating-positive (46 of 61, 31 of 55) where it began with
-four and none, debtors a tenth of the field, median balances climbing. Sprint 33 owns what is left:
-**valued production still falls across the run** (×0.2 on seed 0, ×0.6 on seed 1, from a level ten
-to twenty times the old baseline). `docs/development/SPRINTS.md` § Sprint 33 is the plan; this note
-is the handoff.
+Sprint 32b closed 2026-09-06 with **eleven items delivered**. 32c carries the remaining **28**.
+`docs/development/SPRINTS.md` § Sprint 32c is the plan; this note is the handoff.
 
-## Order of work
+## Start here — two independent chains
 
-1. **BL-746 stage 2 (the generation bootstrap, NR-782 (c) held).** The field's mean supply factor
-   sits at ~0.57 — most buildings run at the new floor because power does not arrive (generation
-   18 → 3 units against a demand of 64; a generator short of power throttles itself; only
-   network-reached tiles can receive it). Design it so a fix that only silences the draw reads as
-   one: measure the supply-factor trend AND the power price together.
-2. **BL-745 (processor input bid cap).** 42 of 57 remaining debt entries are processors producing
-   less than they buy — construction materials at 8–10× base through the boom, and inputs above the
-   recipe's output value. The anchor's M1 identity carried to the live tick.
-3. BL-738 re-measure, then BL-726 (seed 1's interest is still 70% of net loss), then BL-725.
+**1. The water model reaches its judgement point.** BL-776 and BL-777 landed: coastal water and
+lakes are owned, open ocean is not, and no region anchors on open ocean. Remaining:
 
-## The instrument
+- **BL-778** (unit traversal domains) — a roster row declares which domains it crosses; land units
+  may cross **owned** coastal water, the deliberate middle case. **Gate on `region::domain`, never
+  on `port_q`** — that is a decayed wetness fraction that counts lakes and is inherited at 0.7×
+  without re-surveying. `HISTORY.md` now says so explicitly.
+- **BL-779** (naval rows become real) — `unit_class::naval` returns base power 0 and `sum_stack`
+  skips the class, so three authored port-gated rows are worth nothing.
+- **BL-780** (the ONE re-bless) — read the warning below before touching it.
 
-```
-cmd //c tools\verify\build_lua_harness.bat campaign_lapse
-./build_gen/verify/campaign_lapse.exe --epoch 1960 --seed 0 --warm 0 --ticks 60 --tag <tag>   # where debt begins
-./build_gen/verify/campaign_lapse.exe --epoch 1960 --seed 0 --tag <tag>                        # the done-when form
-```
+**2. Phase 6 gets its search.** The objective can finally see a roster (BL-770 slices 1–2). What is
+missing is candidate generation, parallel evaluation and a deterministic argmax —
+`landscape_score.cpp` still has **no caller outside its own harness**. Building it unblocks BL-772
+(retire the warm start) and BL-773 (the 3–6 minute budget).
 
-`corps.csv` carries every corp's balance delta attributed by tick phase (residual asserted zero),
-produced value, building state counts, labour and supply factor; `debt.csv` one row per debt entry
-with the dominant drain. The 2026-09-02 traces to compare against: `final-ind-s0/s1` (standard
-form, the sprint-33 baseline), `fix-ind-s0/s1` (unwarmed), `exp-noupkeep` (the zero-draw control),
-`debt-ind-s0/s1` (the cliff, before the fix). The aggregator pattern is in the devlog entry
-"every balance tracked".
+## BL-780 carries two problems it did not create
 
-## Traps (still true)
+**FOUR CAUSES, NOT ONE.** BL-780 was designed as the single point where the *water model* moves the
+world once and a human asks whether the new world is better. Wave 1 ran three reorder items
+alongside it, so the movement is now the water carve **plus** the population map **plus** the empire
+forces **plus** the paleo deposits. Every item measured its own before/after in isolation, so the
+causes stay attributable — but the question is no longer simple, and the description Ben authorises
+against must name all four.
 
-- Lua-linked harnesses build via `cmd //c tools\verify\build_lua_harness.bat <name>`; run as
-  `./build_gen/verify/<name>.exe` from the repo root. `nmake all` stops at
-  `battle_engagement_harness` (BL-731's sibling rot) and everything after reads as ctest "Not
-  Run"; build the target you need. `ctest -j6` is unusable — Debug world-building harnesses hit
-  the 60 s timeout under contention.
-- A function called from `io_world_obj` must not live in a Lua-linked TU (world_gen_config.cpp,
-  recipe_registry.cpp, tech_tree.cpp), or every Lua-free harness fails to link.
-- chain_depth's one red row is the DELIBERATE named-list guard. Do not quiet it.
-- Every remembered seed-0 number from before 2026-09-02 is stale twice over (the anchor, then the
-  floor). Re-baseline from `final-ind-s*`.
+**AND THE CENTRAL CLAIM CANNOT BE SEEN — NR-791.** The hover card over water reports terrain and
+habitability and says nothing about an owner; clicking water does not update the Selection panel; no
+lens colours territory by owner. BL-780 asks for a judgement *by looking* at a change that is
+currently invisible on every surface the game has. **Close that before the re-bless, not after** —
+the recommendation on the entry is to put ownership on the water hover card, since the card already
+reads the tile.
+
+## What Ben spotted that no harness could — BL-784
+
+**One nation comes out with a complete road lattice** while its neighbours carry the sparse trunk
+shape BL-768 intended. The aggregate was right (+320 roaded tiles era-ON) and the *per-nation
+distribution* was wrong — and nothing reports per-nation road density.
+
+Likely mechanism, to confirm rather than assume: BL-768 records a corridor at the **settle** path
+too, `(parent, daughter)` for every founding, and the run is settle-dominated by design (833
+foundings against 270 battles). A polity that expanded by settling has a corridor from every parent
+to every daughter, which over a contiguous holding **is** a spanning lattice. The corridor histogram
+agrees: 3,119 of 3,185 walked exactly once — a founding tree, not a trade network.
+
+The design question underneath is not a tuning one: **is a founding line a trade corridor at all?**
+A parent settling a daughter walked that ground once; a supply line walked forty times is a road.
+Weight or exclude the settle corridors rather than raising the threshold — but that is a call.
+
+## Open calls waiting on Ben
+
+| | |
+|---|---|
+| **NR-791** | Coastal ownership is invisible — blocks BL-780's own done-when |
+| **NR-785** | Three surviving sea-leg calls; hold BL-749 and through it BL-752 |
+| **NR-783** | Span boundary: authored at epoch − 400, or derived from the first furnace |
+| **NR-784** | Cap the ancient arc at medieval? BL-760's counters can now answer it — nothing above medieval is ever fielded |
+| **NR-787** | Stagnant lid immobile in the paleo frame — a modelling call that turned a red row green |
+| **NR-790** | The fossil epoch derivation — authored, and every later paleo consumer copies its shape |
+| **NR-788** | **Six** harnesses now ad hoc, awaiting skill names: `continent_drift`, `sim_water_census`, the saturation measure, `deposit_origin`, `landscape_score_harness`, `centre_region_bind` |
+| **BL-758** | Era-seeded demography at 1960; `era_world_harness` R2 is deliberately **red** |
+
+Two more from 32b, both about the furnace: is **1–4 crossers of 12** the intended outcome (BL-748's
+own done-when asked for a *wide* distribution), and is **within-world tariff flatness** enough to
+open BL-488's verb form?
+
+## Standing hazards, learned the hard way this sprint
+
+- **Exactly one item per wave may bump `save_game_version`.** Two agents bumped 4→5 independently
+  and produced two layouts under one version number. It is at **8**.
+- **A worktree agent cannot build `save_envelope_roundtrip`** (imgui). Every save-format change this
+  sprint arrived unasserted and the integrating session had to write the check. Budget for it.
+- **Any tooling fix for worktree agents must be tested FROM a worktree.** Three builder fixes landed
+  and the first two verifications were run in the main checkout, where the bug could not appear.
+- **`build/` is Debug.** Its generation and warm-start timings are not comparable to BL-761's
+  Release figures. The Debug warm start is ~11 minutes, which makes the Debug play loop barely
+  usable — a sharper argument for BL-772 than the Release number.
+- **Agents' worktree bases are stale by default.** Every one this session was; all had to merge main
+  before starting.
+
+## Sprint 33 is untouched and still open
+
+Its six: BL-746 → BL-745 → BL-782, plus BL-738, BL-725, and BL-726 — **whose premise 32b voided**
+(seed-1 interest is 7%, not 70%, so the sprint's interest done-when is already met).

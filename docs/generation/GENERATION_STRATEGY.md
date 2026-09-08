@@ -1,5 +1,14 @@
 # Project Io — Generation Strategy
 
+> **Settles:** which generation doc owns which question, and in what order the passes
+> compose · what each pass hands the next · what economic premise the campaign start is
+> derived from · what a world descriptor carries · which passes the player may watch ·
+> where real history may be borrowed from, and where a name may not.
+> **Not here:** what any single pass computes — each subject doc settles its own ·
+> what the world does once generation ends.
+> **Confused with:** TILE_GENERATION.md, PLANETOLOGY.md, ../lore/HISTORY.md.
+> *Start here when the question spans more than one generation doc.*
+
 This document is the **map of the generation layer** — the strategy that ties the
 per-subject generation docs together — and the home of the **economic premise** the whole
 campaign setup derives from. Each subject below has its own authoritative doc; this one
@@ -28,15 +37,25 @@ The subject docs:
 Generation runs, in `make_hard_coded_world`:
 
 ```
-planetology → continents → tiles                       (per body)
-  → population centres → history ladder → nations
-  → institutional history → provinces → roads → corporations → markets → laws   (homeworld only)
+planetology → continents → tiles → rivers              (per body)
+  → history ladder → creeds → settlement                 (homeworld only, from here)
+  → history sim, pass 1 (ancient) → history sim, pass 2 (industrial)
+  → population centres → nations → national character
+  → ruptures → institutional history → provinces → roads → corporations → markets
+  → other bodies' tiles → laws
   → provinces                                            (every other body, last)
+  → background firms → the economic settle (pass 3)      (after the worker, before play)
 ```
 
+The three simulated passes — two polity spans and one economic settle — are § Three passes of
+simulated history; `../lore/HISTORY.md` owns the polity spans.
+
 A body's atmosphere/history precedes its plates; plates precede its terrain; deposits exist
-before territory is drawn over them. On the homeworld, population centres are placed **before**
-nations (so the substrate-density pass can read them), the history ladder runs **before**
+before territory is drawn over them. On the homeworld, population centres are placed **after the
+Era −1 sim and before nations** — after, because the sim has grown, warred and plagued the
+regions' populations, so the centre count and scale distribution are the history's *consequence*
+rather than a land-area divisor and an authored draw (BL-610, centres from demography); before,
+so the substrate-density pass can read them. The history ladder runs **before**
 `generate_nations` because it *drives* the seed budget, and Stages 1–2 of the institutional
 history are recorded **after** — they name and count nations that did not exist a moment
 earlier. On the homeworld the **province partition runs before roads** (Ben, 2026-08-25;
@@ -324,6 +343,255 @@ BL-210's to close. **Full architecture, rationale, and the per-doc open question
 BL-210** (`backlog.json`).
 
 ---
+
+## The eight phases (Ben, 2026-09-03)
+
+The pass map above is the *call order*. This section is the **phase structure** it serves — the
+reorder Ben set out on 2026-09-03, with the five open calls taken on an elicitation form the same
+day. Where a phase's aim and its current implementation disagree, the phase wins and the gap is
+work.
+
+| # | Phase | Its aim | Owns |
+|---|---|---|---|
+| 1 | **The Body** | The world as geology: atmosphere, chemistry, plates, terrain — and **geological deposits**, metals among them. | BL-762 (resource origin split) |
+| 2 | **Life** | The biosphere's residue as resources — coal where the ancient swamps were, oil where the ancient seas were, timber where the forest still stands. | BL-763 (continent time axis), BL-764 (Lagrangian tiles), BL-765 (paleo deposits) |
+| 3 | **The People** | Where people are, weighted toward ground that farms easily — drawn **before** history and evolved by it. | BL-766 (population map early) |
+| 4 | **The History** | Empires that form, grow and collapse; the roads that supplied them; the markets that emerged from their trade. | BL-767 (empires reliably form), BL-768 (roads and markets from history) |
+| 5 | **The map of consequence** | **Finalise** what the history produced, rather than invent it: the anchors of one polity fold into one nation, city states survive the size floor, and the tariff posture is enacted. City states and pseudo-national borders belong to phase 4. | BL-769 (consequence folds into history), BL-750 (tariff posture) |
+| 6 | **The economic substrate** | Search for a corporate landscape that is **viable but uneven**. A **static** search with no clock and therefore no span — see § Phase 6 is a STATIC SEARCH below. | BL-770 (Era 0 candidate search) |
+| 7 | **The rest** | The other bodies, the laws, the partitions. Expands as core systems land. | — |
+| 8 | ~~Warm start~~ | **Retired.** Its burden moves to phase 6. | BL-772 (retire warm start) |
+
+**Five calls, taken on the form rather than assumed** (the NR-517 precedent — read a silence as a
+decision and you set the quiet precedent this project files items to avoid):
+
+1. **Empires are tuned for, never clamped.** "Force outcomes where empires form" means *tune the
+   forces until empires are a common outcome across the seed spread*, not guarantee one per world
+   and not impose one post-hoc. A world with no empire stays a legitimate outcome, which is what
+   keeps § Asymmetry is the deliverable, the 2026-07-30 emergent-nation-count ruling and BL-224's
+   non-hegemony invariant all intact.
+2. **The population map is drawn early and evolved.** This overturns BL-610's ordering while
+   keeping its goal: centres are still history's consequence, but now because history *grew and
+   sacked them* rather than because they were placed afterwards. It also stops the sim running
+   over a world with no cities in it.
+3. **The candidate search varies rosters, placements and road tiers — not worlds.** So generation
+   runs once and only the economic sim repeats, which is the whole reason the budget closes.
+4. **The search optimises for viable-but-uneven, not maximum profit.** Maximising profit would
+   flatten exactly the spread this document asks generation to produce.
+5. **Life samples the real drift history**, rather than proxying ancient climate from the present
+   landform. That is the expensive answer and it was taken deliberately; BL-764 is the largest item
+   in the reorder because of it.
+
+**Phase 6 is a STATIC SEARCH, not a simulation (Ben, 2026-09-03).** He put the goal narrowly:
+*"we are not looking for a 100% accurate series of trades… and neither what makes the most profit
+per tile. We want to find, given a planet with markets and national borders — how can we saturate
+all the resources in said market, so that each part makes some profit?"*
+
+**That is not a simulation question.** A tick answers *who traded what, at which price, this
+quarter*. Saturation — every resource has a supplier and a buyer, every chain reaches a terminal
+sink, every participant clears its costs — is a **static property of a candidate roster against a
+fixed world**. Roads, borders, markets, deposits and population are all settled by the end of
+phase 4, and none of them moves during phase 6, so there is nothing to step.
+
+**Both measures already exist**, which is the part worth knowing before anyone writes a simulator:
+`measure_completeness` returns terminals-closed over terminals-total per market from a static world
+and a recipe registry, and the recipe-margin computation returns revenue minus marginal cost
+(inputs at base plus the wage per batch) from the registry alone. Between them they answer both
+halves of that sentence. They sit inside harness anonymous namespaces today, so generation cannot
+link them — BL-775's to fix, and worth fixing regardless, because two callers sharing one
+implementation is the discipline that stops a check measuring something different from the code.
+
+So the method is **evaluate statically, validate dynamically, once**: score every candidate as a
+coverage-and-margin problem in milliseconds, pick the winner by a deterministic argmax over a total
+order with an explicit tie-break, then run **one** short tick simulation on the winner alone to
+confirm it holds up live. That dissolves the span question — there is no span, because there is no
+clock — and it turns the candidate count from a budget question into a design one.
+
+**The one thing a static check cannot see is price feedback**, and it is the failure that actually
+killed the industrial field: processors buying inputs at the ceiling and being idled as
+loss-making. The cheap proxy is a per-resource supply-to-demand **ratio** per market — the ratio is
+static, and it is what drives a price to the ceiling in the first place. The validation run is what
+confirms the proxy was good enough.
+
+**What the objective is made of (Ben, 2026-09-06).** **Four terms.** The third is what makes it an
+*asymmetry* objective rather than a coverage one, and the fourth is the only one that can see a
+candidate at all:
+
+1. **Chain completeness** — terminals closed over terminals total, per market. Does a chain reach a
+   sink here at all.
+2. **The supply-to-demand ratio**, per resource per market — the static price-feedback proxy above.
+   A market whose ratio pins a good at the band edge is not saturated, it is broken, and only this
+   term can tell the difference.
+3. **The spread of the first two across markets, explicitly rewarded for unevenness.** Not tolerated
+   as a side effect — *scored for*. A candidate landscape in which every market is equally complete
+   scores worse than one with rich and poor markets at the same mean, because an even map is the
+   outcome § Asymmetry is the deliverable exists to prevent, and a search that is merely neutral
+   about evenness will drift toward it.
+4. **Realisation — actual closure over potential closure.** Of the terminals a market *could*
+   close, how many are closed by a building that actually exists in its catchment. A landscape
+   with rich ground and no firms scores near 0; one whose firms close every chain the ground
+   allows scores 1.
+
+**Why the fourth term is not optional, and why the first three could not do its job.** Terms 1–3
+are computed from tiles, markets and population — none of which a candidate changes. Phase 6
+chooses among **rosters**, so an objective made only of those three is blind to the choice it is
+being asked to make; scored over candidates that differ by corporation count and placement seed,
+every term comes back identical to the last digit. Realisation is what turns a measure of the
+*world's* saturation potential into a measure of **this roster's** use of it.
+
+Term 1 is kept rather than replaced, because it is the denominator: realisation without potential
+alongside it cannot distinguish a roster that closed everything available on poor ground from one
+that closed half of what rich ground offered. The pair is the reading; either alone is not.
+
+**Recipe margin is deliberately NOT a term.** It exists (the registry computes revenue minus inputs
+at base plus the wage per batch) and it stays the *authoring* check that every recipe can pay — but
+it is a property of the roster, not of the landscape, and it is near-identical across candidates
+that differ only in placement and road tier. Scoring it would add a constant to every candidate and
+pull the objective back toward "most profitable", which is the reading point 4 above rejects.
+
+**The first slice is the scorer, and its job is to fail informatively.** Before any search is built,
+score a handful of hand-made candidate rosters and ask whether these terms **discriminate between
+them at all**. If completeness is flat across every candidate, the search has nothing to search on
+and everything downstream of it is wasted — that is a result worth having in an afternoon rather
+than after the parallel harness is written.
+
+**How a candidate is PRODUCED — greedy refinement (Ben, 2026-09-06).** The objective says how to
+rank a landscape; this says where landscapes come from, and it was the half nothing owned.
+
+The search **starts from one seed candidate, scores it, perturbs the winner along one axis,
+re-scores, and keeps the better** — for a **fixed number of rounds**, never until convergence. The
+three axes are the ones point 3 above names and no others: corporation **rosters**, starting
+**placements**, and **road/infrastructure tiers**. A round proposes a perturbation on each axis,
+scores the proposals, and the argmax over {incumbent, proposals} becomes the next incumbent.
+
+**Fixed rounds, not convergence, and that is a determinism requirement rather than a budget one.**
+A convergence test makes the amount of work depend on the landscape, so two worlds do the same
+search for different lengths and a threshold becomes a hidden tuning knob. A fixed round count
+makes the search a pure function of (world, seed, round count) with a cost known before it starts.
+
+**What keeps it deterministic**, and every clause is load-bearing: perturbations are drawn from a
+seeded stream in a fixed axis order; a round's proposals are scored independently and never in
+completion order; the argmax runs over a **total** order with an explicit tie-break, so an exact
+tie resolves the same way on every machine and at every thread count; and the incumbent is
+replaced only on a **strict** improvement, so a tie leaves the incumbent standing rather than
+churning between equals.
+
+**Greedy is chosen knowing what it costs.** It will find a local optimum and not the global one —
+which is acceptable here in a way it would not be elsewhere, because the objective is
+*viable-but-uneven* rather than maximal. A landscape that is good enough and unevenly good is the
+deliverable; a search that ground toward the single best landscape would be re-introducing exactly
+the "most profitable" reading that point 4 rejects. The greedy walk also gives the search
+something the alternatives do not: a **path**, so what a round changed and what it bought is
+inspectable rather than being one draw among hundreds.
+
+**Determinism is the binding constraint, and it survived the collapse of the budget argument.**
+The parallelism was once load-bearing — six candidates at 53–71 s each is 5–7 minutes serially,
+about one candidate's wall clock in parallel. The static ruling above deleted that arithmetic
+along with the clock, so parallelism is now an optimisation and nothing rests on it. What does
+**not** change is the constraint it imposed: each candidate must be a pure function of (shared
+world, candidate seed, candidate parameters), and the winner chosen by a deterministic argmax
+with an explicit tie-break — **never by which thread finished first**, and
+never varying with thread count. BL-773 owns the budget as a whole.
+
+**Two of the eight points needed new machinery rather than a reorder**, and are filed at that size
+rather than as tweaks. Sampling real drift history has no time axis to sample (nothing integrates
+plate motion), no frame in which ground moves (tiles do not ride plates — a tile's latitude *is*
+its grid row, fixed for all time), and no per-tile past climate. And roads cannot be laid *inside*
+the history sim, which is deliberately world-free and whose pathfinder returns a cost between
+regions rather than a list of tiles — so they are **stamped from** the history's record instead.
+
+---
+
+## Three passes of simulated history (Ben, 2026-09-03)
+
+> *"We have one pass to determine ancient borders and cultural doctrines, and then a second pass
+> to determine the extent of colonisation by major powers, and market conditions upon game
+> start."*
+
+The continuous history above is produced by **three passes on two engines**, and the abstraction
+problem the design has to solve is the **handoff** between them, not either engine. Generation is
+being tuned to reach a described output — a functioning global trade network at the epoch — and
+the rule for reaching it is unchanged from § Asymmetry is the deliverable: **tune the forces,
+never the outcome**. Each pass has a scoreboard read over a seed sweep; no world is steered to a
+target.
+
+| Pass | Engine | Span | Produces |
+|---|---|---|---|
+| **1 — Ancient** | The polity sim (`history_sim`), Classical and Medieval bands | The prehistory span to the **boundary year** | Ancient borders, cultural doctrines, the lacunae — who walked where |
+| **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | The boundary year to the epoch | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture |
+| **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which firms exist, what each market can close, the price field |
+
+**Pass 1 and pass 2 are one engine, not two.** The works roster is cumulative across its four
+bands and the unit roster is era-keyed, so the second span is the first span continued with more
+rows offered, not a second mechanism. What pass 2 adds is **reach across water** — a campaign or
+settle target across a sea leg, staged from harbour works — because colonisation by a major is
+the Metropole strategy played overseas, and it culminates as every major does (`../lore/COLLAPSE.md`).
+The epoch still arrives multipolar; the non-hegemony invariant is not relaxed for the sea.
+
+**The boundary year is a parameter with a default, not a fact.** The default is 400 years before
+the epoch, so that on a 1960 arc pass 2 is 1560 → 1960 and pass 1 is whatever
+`prehistory_years` leaves before it. A derived boundary — the year the first polity lights a
+furnace — is the better-founded alternative and is open; both are consequences of upstream
+scalars, and neither is a roll. On an ancient epoch there is no pass 2: the boundary falls past
+the epoch and the sim stops where it stops today.
+
+**Pass 3 SELECTS a landscape; it does not settle one.** The earlier design made pass 3 the warm
+start promoted — the same undirected pre-game ticks, run longer, with firm spawn added and firm
+exit as the cull. That is superseded: § The eight phases retires the warm start outright and
+replaces it with phase 6's **directed static search**, and the two are not variations of one
+another. A settle asks *what survives whatever generation happened to place*; a search asks *which
+placement is worth handing over*. Keeping both would pay twice for the weaker answer.
+
+So the acts of pass 3 are the scorer's: score every candidate landscape statically on the three
+terms in § The eight phases, pick the winner by a deterministic argmax with an explicit tie-break,
+and run **one** short validation tick-simulation on that winner alone to confirm the static proxy
+held. The player still enters a field that has already been selected rather than one about to be —
+which is the property the warm start was there for, and the one thing that must not be lost.
+
+Two constraints bound it, and both survive the change of mechanism. **Stable is not saturated**:
+the objective is viable-but-uneven, never every chain closed, and the chain-completeness *spread*
+is scored rather than merely tolerated. And **a search can only select over a roster that can
+pay**: on a roster that loses at base price, every candidate loses and the argmax ranks degrees of
+failure. The recipe-margin anchor (`../economy/PRODUCTION.md`) is therefore a **precondition** of
+pass 3 — which is precisely why margin is not one of the scoring terms. It is the gate the roster
+passes before the search runs, not an axis the search trades against.
+
+**What crosses each handoff, and nothing else.**
+
+- Pass 1 → pass 2: the region table, cultures, works, the strain accumulators. Nothing is reset.
+- Pass 2 → the political map: the same outputs `generate_nations` reads today, plus the
+  **polity map itself** — which polity held each region at the epoch, so a realm arrives as one
+  nation rather than as a Voronoi cell per region — plus a nation's **tariff posture**, enacted
+  as an ordinary `import_tariff` law at world setup where pass 2's polity ended up protective,
+  and its **colonial ties**, which seed the order book's preferred-seller relationships so a
+  colony's chains close through its metropole before they close anywhere else.
+
+  **The fold is what makes phase 5 a finalisation.** Before it, the political map was re-derived
+  from the region anchors as though the history had not just drawn one, and every empire the sim
+  built was dissolved back into its provinces at the handoff. The carve is unchanged and stays
+  unchanged: it answers where the line between two of a realm's own regions falls, which is a
+  geometric question the history never asked. What crosses is whose flag flies over both.
+
+  **A city state crosses as itself.** A polity that reached the epoch holding one region with a
+  city on it is exempt from the size floor that would otherwise absorb it — "it is fine to
+  consider city states as population centres" (Ben, point 5) — and never absorbs anybody, since a
+  city state that annexed its neighbours would stop being one. A world with no city state is a
+  legitimate outcome; the exemption is a permission, never a quota.
+- Pass 3 → play: the world state, as the warm start hands it over today. Pass 3 seeds no
+  behaviour (§ Generation seeds no behaviour in `CORPORATION_GENERATION.md` still holds).
+
+**Separate market conditions are produced by in-world forces with visible causes** — never by a
+term inside an agent. Tariffs, because a nation that industrialised late relative to its
+neighbours protects what it has; distance, because the landed price of a far competitor's good
+is high on the real road and sea network; ties, because history routed a colony's trade through
+its metropole. A local firm's early sales are sheltered by the same three, and a player can read
+why on the map.
+
+**The cost question is open and is measured first.** Pass 1 is already the most expensive pass;
+pass 2 doubles it and pass 3 lengthens the warm start. The budget is the generating screen's wait,
+and the affordability rungs in `../lore/COLLAPSE.md` § The 4000-year problem become load-bearing
+in the order that document gives. Whether the shape can be had cheaply is the sprint's question,
+not this document's.
 
 ## Open cross-doc items
 

@@ -97,6 +97,7 @@
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
 #include "world/placement_rules.hpp"
+#include "world/market_saturation.hpp" // BL-775: the promoted margin computation
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
 #include "world/world_gen_config.hpp"
@@ -140,41 +141,9 @@ struct anchor_params
 /// One evaluated row — a recipe in a band, or an extraction target in a band.
 /// Everything the two halves need, kept as plain numbers so the red-proof (R6)
 /// can drive the evaluator with values the tables do not contain.
-struct row_eval
-{
-    double revenue   = 0.0; ///< per batch / per unit, at base
-    double inputs    = 0.0; ///< per batch, at base
-    double wage_pb   = 0.0; ///< wage per batch / per unit
-    double mc        = 0.0; ///< marginal cost = inputs + wage_pb
-    double margin    = 0.0; ///< revenue - mc
-    double ratio     = 0.0; ///< margin / mc (revenue/mc - 1); +inf when mc == 0
-    bool   m1        = false;
-    double fixed     = 0.0; ///< maintenance + goods upkeep at base, per tick
-    double wages_pt  = 0.0; ///< wages per tick at W
-    double base_net  = 0.0; ///< per tick at base (information)
-    double floor_net = 0.0; ///< per tick at the floor (M2's quantity)
-    bool   m2        = false;
-};
-
-row_eval evaluate(double revenue, double inputs, double wage_pb,
-                  double units_per_tick, double wages_pt, double fixed,
-                  double floor_mult, double k)
-{
-    row_eval e;
-    e.revenue  = revenue;
-    e.inputs   = inputs;
-    e.wage_pb  = wage_pb;
-    e.mc       = inputs + wage_pb;
-    e.margin   = revenue - e.mc;
-    e.ratio    = (e.mc > 0.0) ? e.margin / e.mc : (revenue > 0.0 ? INFINITY : 0.0);
-    e.m1       = (e.mc > 0.0) ? (e.margin >= k * e.mc) : (revenue > 0.0);
-    e.fixed    = fixed;
-    e.wages_pt = wages_pt;
-    e.base_net  = (revenue - inputs) * units_per_tick - wages_pt - fixed;
-    e.floor_net = (revenue - inputs) * floor_mult * units_per_tick - wages_pt - fixed;
-    e.m2        = e.floor_net >= 0.0;
-    return e;
-}
+// struct margin_eval and evaluate_margin() — PROMOTED to world/market_saturation.hpp
+// (BL-775) as margin_eval / evaluate_margin, so generation can price a
+// candidate firm without this harness. Bodies unchanged; only the names moved.
 
 double basket_value(const std::array<float, resource_count>& basket,
                     const std::array<float, resource_count>& price)
@@ -192,7 +161,7 @@ void print_header()
                 "fixed/t", "base/t", "floor/t", "M2");
 }
 
-void print_row(const std::string& name, const std::string& group, const row_eval& e)
+void print_row(const std::string& name, const std::string& group, const margin_eval& e)
 {
     char ratio[16];
     if (std::isinf(e.ratio))
@@ -387,7 +356,7 @@ int main()
 
             const double batches = static_cast<double>(pe.base_rate) * W;
             const double wages   = W * static_cast<double>(pe.base_wage);
-            const row_eval e = evaluate(rev, inp, p_wage_pb, batches, wages, p_fixed,
+            const margin_eval e = evaluate_margin(rev, inp, p_wage_pb, batches, wages, p_fixed,
                                         floor_mult, kk);
             print_row((is_anchor ? "*" : " ") + rc.name, rc.group, e);
             if (!e.m1) { ++t.m1_fail; t.m1_red.push_back(rc.name); }
@@ -420,7 +389,7 @@ int main()
                 ++t.ext;
                 const double units = static_cast<double>(xe.base_rate) * W;
                 const double wages = W * static_cast<double>(xe.base_wage);
-                const row_eval e = evaluate(price[ri], 0.0, x_wage_pu, units, wages, x_fixed,
+                const margin_eval e = evaluate_margin(price[ri], 0.0, x_wage_pu, units, wages, x_fixed,
                                             floor_mult, k);
                 const std::string name = resource_names::name_of(r);
                 print_row(name, "extraction", e);
@@ -495,16 +464,16 @@ int main()
 
     // --- R6: the evaluator is not a constant ----------------------------------
     {
-        const row_eval dead = evaluate(0.0, 5.0, 1.5, 4.0, 6.0, 10.0, floor_mult, k);
-        const row_eval rich = evaluate(1000.0, 5.0, 1.5, 4.0, 6.0, 10.0, floor_mult, k);
-        const row_eval lights_off = evaluate(1000.0, 5.0, 1.5, 4.0, 6.0, 1.0e9, floor_mult, k);
+        const margin_eval dead = evaluate_margin(0.0, 5.0, 1.5, 4.0, 6.0, 10.0, floor_mult, k);
+        const margin_eval rich = evaluate_margin(1000.0, 5.0, 1.5, 4.0, 6.0, 10.0, floor_mult, k);
+        const margin_eval lights_off = evaluate_margin(1000.0, 5.0, 1.5, 4.0, 6.0, 1.0e9, floor_mult, k);
         check(!dead.m1 && !dead.m2, "R6: a zero-revenue row fails BOTH halves");
         check(rich.m1 && rich.m2, "R6: a plainly profitable row passes BOTH halves");
         check(lights_off.m1 && !lights_off.m2,
               "R6: a fixed cost no floor can cover fails M2 alone (M1 is per-batch)");
         // The two halves disagree on the right thing: M2 gets STRICTER as the
         // floor drops, M1 does not move with it.
-        const row_eval lower_floor = evaluate(rich.revenue, rich.inputs, rich.wage_pb, 4.0, 6.0,
+        const margin_eval lower_floor = evaluate_margin(rich.revenue, rich.inputs, rich.wage_pb, 4.0, 6.0,
                                               10.0, floor_mult * 0.5, k);
         check(lower_floor.floor_net < rich.floor_net && lower_floor.m1 == rich.m1,
               "R6: halving floor_mult lowers floor_net and leaves M1 untouched");

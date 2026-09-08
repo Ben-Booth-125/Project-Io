@@ -1,5 +1,14 @@
 # Project Io — Production
 
+> **Settles:** what a building is and what a recipe consumes and yields · how extraction and
+> processing throughput are shaped · how much labour a building demands and what a shortfall
+> does to its output · how construction and power are paid for · what a fresh corporation can
+> build on day one.
+> **Not here:** what a good is and what it is worth (RESOURCES) · where the labour comes from
+> and how it is contended for (POPULATION) · what a building costs the balance each tick
+> (FINANCE) · where the output goes to be sold (MARKETS).
+> **Confused with:** RESOURCES.md, POPULATION.md, FINANCE.md.
+
 Production converts tile resource deposits into tradeable goods through two stages: **extraction**, which harvests raw materials from tiles, and **processing**, which refines or manufactures higher-tier goods from those inputs. Workforce shapes throughput at both stages.
 
 See **`docs/economy/RESOURCES.md`** for the full resource list, tier definitions, and prototype subset. The market model production sells into — clearing, price resolution, the order book — is **`docs/economy/MARKETS.md`**. The network goods move over — reach, roads, travel time, throughput — is **`docs/economy/LOGISTICS.md`**.
@@ -471,43 +480,17 @@ version bump and no per-array edit (BL-107, save-format header).
 
 ---
 
-## Workforce model
+## Labour demand and the shortfall
 
-The per-`(corp, body)` pool model, as `run_economy_step` in `src/world/economy_system.cpp` and
-`compute_building_opex` in `src/world/budget_system.cpp` implement it; the design rationale is
-POPULATION.md § Workforce model.
-
-**Supply** derives from the body's population centres (BL-042, workforce supply derivation):
-each centre contributes labour by scale — `labour_by_scale` = 1 / 3 / 10 / 30 / 100 units for
-scale 1–5. A corp's share of that body supply is its share of the building count there; a body
-with no centres falls back to the authored `world::workforce_supply` figure (default 3.0).
+The pool this demand draws on — how much labour a body's centres yield, who wins it when it is
+scarce, and what it is paid — is [`POPULATION.md`](POPULATION.md) § Workforce model.
 
 **Demand** is the sum of `workforce_assigned` over the corp's producing buildings on the body
 (extraction and processing only; ports and hubs demand no labour), capped by the body's
 habitability cap `min(1, mean_hab / 0.6)` (BL-041, habitability gates workforce).
 
-**Contention** clears by **wage competition** (BL-614, wage competition; the ruling and its
-rationale are POPULATION.md § Contention). Uncontended (`demand ≤ supply`), every building is
-staffed at request. Contended, scarce labour allocates **per building** — offered wage
-descending, building id ascending on a tie, each building granted up to its demand until the
-pool is spent — so the marginal building runs partial and those below it idle, superseding the
-old uniform proportional scalar. The offered wage is `base_wage × (1 + wage_bid)`
-(`building_component.wage_bid`, a per-building premium fraction — the first-cut dial, data-only,
-no UI yet; NR-629 flags the shape for overturn). The pool aggregate `min(1, supply/demand)`
-survives in `economy_report.workforce_contention` as the report figure; the per-building grant
-is `economy_report.building_labour`. A recipe's **qualified** requirement (§ POPULATION.md
-§ Qualification, BL-613) clears against its national pool by the same rule, before the ordinary
-pool; a building's factor is the product of the two grants. Every grant is then multiplied by
-`workforce_efficiency(hab)` (`src/world/workforce.hpp`, BL-069 workforce efficiency): full
-labour at habitability ≥ 0.6, ramping linearly to 0.5× at 0. Effective workforce =
-`workforce_assigned × grant`.
-
-**Cost** follows the wage/maintenance split (`compute_building_opex`, BL-049): maintenance
-carries a fixed **30 % material floor** charged even when decommissioned, plus a labour
-remainder scaled by the workforce target (zero when decommissioned); wages are
-`workforce_assigned × grant × base_wage × (1 + wage_bid) × wt_scalar × hab` — paid **at the
-offered rate** on the labour actually allocated, not the request (BL-614): a building that
-outbid its siblings pays the premium it offered. `docs/economy/FINANCE.md` owns the money side.
+What a building's labour and maintenance cost the balance each tick is
+[`FINANCE.md`](FINANCE.md) § Building operating cost.
 
 `workforce_assigned` itself is an authored constant set at placement (0.5 for producing types,
 0 for passive infrastructure) and is never player-edited. The **player lever is
@@ -560,6 +543,27 @@ together, which is the cliff this rule exists to prevent. **And no wire, no draw
 (`LOGISTICS.md` § 3a) is drawn only where the road network reaches the building's tile. Where it
 does not, the good cannot arrive, so the building neither draws it nor weakens for want of it; the
 ordinary goods in its basket still draw and still bind. Owner: BL-746 (upkeep starvation cliff).
+
+**And no price, no draw (Ben, 2026-09-06).** A building draws a grid good only once its **catchment
+market has priced it** — that is, only once the market this building clears against has ever
+resolved a real price for that good, rather than carrying the untouched authored default. Before
+that moment the good has no supplier the building could have bought from, so a draw against it is
+not scarcity being expressed, it is a bill for a market that does not exist yet.
+
+This is the third rung of the same rule, and it exists for the same reason as the other two: it is
+what lets a supply industry **come into being at all**. A universal draw switched on at tick 0
+prices out the generation buildings that would have met it — a generator short of power throttles
+itself — so the draw suppresses its own supply and the shortfall is structural rather than
+transient. Gating on the priced market makes the draw arrive *behind* the industry instead of ahead
+of it.
+
+**The failure mode is that this silences the scarcity rather than resolving it**, and it is not
+distinguishable from success by the supply factor alone. A grid good that is never priced anywhere
+is never drawn anywhere, and the field then reads healthy for the reason a field with no economy
+reads healthy. So the pair is read together: the **supply factor** and the **price of the grid
+good**. A supply factor climbing while the good stays unpriced is the fix hiding the problem; a
+supply factor climbing while the good carries a real, moving price is the industry having been
+allowed to form.
 
 **The corollary for authoring:** a channel's rates may ship at zero while its shape ships complete.
 A draw for a good the world does not yet make is not a channel that needs tuning down — it is a

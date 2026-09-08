@@ -71,6 +71,12 @@ struct world_params
     /// Determinism is untouched — the value is part of the params, so the same
     /// params still give the same world.
     int             prehistory_years = 400;
+
+    /// Years of INDUSTRIAL span the sim plays after the boundary year, on an
+    /// epoch that has one. `prehistory_years` is the ANCIENT span before it,
+    /// so a 1960 arc at the defaults runs 1160 -> 1560 -> 1960. Zero means no
+    /// industrial span and the run is single-span, as an ancient epoch is.
+    int             industrial_years = 400;
     int             body_count = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a
     // *consequence* of its habitable land area and the minimum-viable-territory floor
@@ -110,6 +116,34 @@ struct generation_progress
     /// writes, renderer reads, relaxed atomics, no mutex.
     std::atomic<int> sub_progress{0};
     std::atomic<int> sub_total{0};
+
+    // --- The generation budget, published to the loading screen (BL-754) ----
+    //
+    // WHY HERE AND NOWHERE ELSE. The same numbers already reach a harness on
+    // `era_minus_one_fixture` (see that type for why they may not live on
+    // `generation_report` — the report is serialised, and a wall clock is the
+    // worst possible thing to put through a save). But the fixture is a heavy
+    // capture the app never asks for, and BL-754's remaining half is the APP
+    // printing its own budget on its own generating screen. This sink is
+    // already the app-to-generation seam, already atomic, already a pure tap
+    // with no save presence — so it is the one place the measurement can sit
+    // without becoming world state or costing a capture.
+    //
+    // NOTHING BELOW MAY EVER ENTER A DIGEST, A HASH, OR A BRANCH. These are
+    // milliseconds of wall clock: reading one back into generation would make
+    // the world non-deterministic by construction. They are WRITE-ONLY from
+    // the worker and READ-ONLY from the renderer, exactly like every other
+    // field in this struct, and they are reported to a human, never asserted.
+    //
+    // `budget_ready` is release-stored AFTER the five values, so an
+    // acquire-load of it is the renderer's guarantee that all five are filled.
+    // Zero until generation finishes; zero for any pass that did not run.
+    std::atomic<int64_t> ms_world_total{0};
+    std::atomic<int64_t> ms_before_settlement{0};
+    std::atomic<int64_t> ms_settlement{0};
+    std::atomic<int64_t> ms_era{0};
+    std::atomic<int64_t> ms_after_era{0};
+    std::atomic<bool>    budget_ready{false};
 
     // --- The territory carve, live (BL-305) ---------------------------------
     //
@@ -320,9 +354,15 @@ struct generation_report
         /// `history` is empty here — those lines were moved into `state.history`
         /// at generation, where the biography reads them; what is kept is the
         /// plate set and the per-tile `plate_id`, which nothing else records.
-        /// The Continent lens is the consumer. Presentation data, like the rest
-        /// of this struct: it never enters `world`, so it stays off the
-        /// serialisation seam.
+        /// The Continent lens is the consumer.
+        ///
+        /// IT IS NOT OFF THE SERIALISATION SEAM (corrected 2026-09-03, BL-763).
+        /// This comment used to say "it never enters `world`, so it stays off
+        /// the serialisation seam". The first clause is true and the second does
+        /// not follow: `continent_state` is written and read by
+        /// `src/core/save_game.cpp` as part of the SAVE ENVELOPE, so a field
+        /// added here is a `save_game_version` bump exactly like a field on
+        /// `world_params`. Two seams, and this struct is on the second one.
         continent_state continents;
 
         /// What the settlement/industrialisation pass computed for this body
@@ -411,6 +451,25 @@ struct generation_report
     int64_t prehistory_battles   = 0; ///< Battles fought in that span.
     int64_t prehistory_conquests = 0; ///< Regions that changed hands.
     int64_t prehistory_foundings = 0; ///< Regions founded by the sim.
+
+    // --- The ancient road record and what it carved (BL-768) ----------------
+    //
+    // Reported for the reason the four counters above are: the acceptance test
+    // is behavioural — roads whose shape follows the history's trunk routes, and
+    // markets where trade concentrated — and a pass that recorded nothing looks
+    // exactly like one that was never wired. These three make the difference
+    // countable rather than eyeballed.
+    //
+    // Zero when the era did not run, which is every `no_prehistory()` harness.
+    int64_t prehistory_corridors = 0; ///< Distinct region-to-region corridors recorded.
+    int64_t prehistory_junctions = 0; ///< Regions where three or more of them met.
+    /// Markets that qualified ONLY because their centre stands at a trade
+    /// junction — the ones that would not exist on the nation gate alone. THE
+    /// EXACT COUNT, taken at the carve by evaluating both gates, rather than a
+    /// difference between two worlds: an era-ON and an era-OFF world do not
+    /// share a settlement pattern, so subtracting their market counts would
+    /// measure the whole era rather than this term.
+    int64_t markets_from_trade   = 0;
 
 };
 

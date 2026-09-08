@@ -1,10 +1,19 @@
 # Project Io — Provinces
 
+> **Settles:** what a province is, and what it deliberately is not · how the partition is
+> grown, and what stops it · what size band it targets and why that takes three numbers ·
+> how the three domains stay unmixed, and who owns water · what contracts downstream code
+> may depend on · what reads a province, and at what grain.
+> **Not here:** how a tile got its terrain or its deposit (TILE_GENERATION) · what a plate
+> did (CONTINENTS) · who owns the territory a province falls inside (NATION_GENERATION) ·
+> what a battle in one costs (../military/MILITARY).
+> **Confused with:** TILE_GENERATION.md, CONTINENTS.md, NATION_GENERATION.md.
+
 **The province is the game's spatial unit of consequence.** A tile is where a building stands; a
 province is where a battle happens, where a unit *is*, what the map is coloured by, and what a
 building ceiling counts against.
 
-Its design is spread across four documents and one source file (`src/world/province.{hpp,cpp}`).
+Its design is spread across several documents and one source file (`src/world/province.{hpp,cpp}`).
 This document is its home. It is written against the source: where a file, function or constant
 is named, that name is the one in the code.
 
@@ -67,7 +76,14 @@ independent of how the shapes are drawn.
 **The five rulings the algorithm implements:**
 
 1. **Provinces grow from population centres**, and seed strength scales with the centre's scale
-   (1–5): *a metropolis draws a larger province than a village does.*
+   (1–5): *a metropolis draws a larger province than a village does* — a growth budget of 7
+   tiles at scale 1 up to 12 at scale 5, with every centre growing simultaneously as one
+   multi-source fill. **The budget is what scales; the finished size need not.** Because the fill
+   is simultaneous, and a large centre stands in a denser neighbourhood than a village does,
+   competition can take back what the budget granted. The harness measures the mean province size
+   by seed scale and **asserts the ordering** (`P9c`, over the seed set only — an anchor founding
+   under ruling 3 is not a seed), so any divergence between the ruling's wording and what the fill
+   produces is loud rather than reported away.
 2. **Boundaries are rivers and elevation difference.** *Superseded half (Ben, 2026-08-25;
    BL-623, provinces before roads): roads were a binding input — tiles a road links tended to
    share a province, never divide one. Overturned with the ordering: the partition now runs
@@ -88,12 +104,16 @@ independent of how the shapes are drawn.
    reaches one (Ben, 2026-08-22; BL-563, province respects nation). Regions grown to fit the border
    need no cutting, so there is no scatter of one- and two-tile offcuts and no merge pass.
 
-The cost model that makes an edge a border lives in `province.hpp`: a base edge cost
-(`k_province_edge_base_cost`), a river crossing cost (`k_province_river_edge_cost`), a height
-difference cost (`k_province_height_cost`, pinned so a p90 height step costs the same as a river)
-and a small seeded jitter (`k_province_edge_jitter`). The road-binding divisor retired with
-ruling 2's supersession (BL-623) — roads are laid after the partition and are not an input. Hinterland seeds are spaced `k_province_seed_spacing` apart, measured
-geodesically over land — and it is the spacing, not the budget, that sets hinterland size.
+The cost model that makes an edge a border lives in `province.hpp`, and it is integer arithmetic
+throughout: base 10 (`k_province_edge_base_cost`) + river 40 (`k_province_river_edge_cost`) +
+round(|Δheight| × 683) (`k_province_height_cost`, pinned so a p90 height step costs the same as a
+river) + a seeded jitter of 0–4 (`k_province_edge_jitter`). The road-binding divisor retired with
+ruling 2's supersession (BL-623) — roads are laid after the partition and are not an input. The
+height term reads `tile_component::height` — Pass 1's normalised heightmap, retained for this
+consumer (BL-517, retained height) — and never the seven landform classes, whose numeric order
+means nothing (`TILE_GENERATION.md` § Pass 1 — Heightmap, `GENERATION_LEDGER.md` § Data lifetime).
+Hinterland seeds are spaced `k_province_seed_spacing` = 3 apart, measured geodesically over
+land — and it is the spacing, not the budget, that sets hinterland size.
 
 **How rulings 3 and 5 are one mechanism** (BL-611, province centre anchor). The LAND fill is
 **nation-locked**: a region — centre-seeded or leftover — claims only tiles of its seed's
@@ -128,13 +148,51 @@ needs no threshold constant of its own, which is why the rule reads as terrain r
 
 **The hard cap is asserted, not imposed, and deliberately so.** Singleton absorption picks a
 tile's *cheapest* neighbour; choosing a costlier one to respect a size bound would contradict the
-cheapest-edge rule the whole growth model is expressed in. So the cap is **a claim about what the
-cost model produces, which breaks loudly if that stops being true.**
+cheapest-edge rule the whole growth model is expressed in. Ben chose the bound (2026-08-21,
+NR-438) — *"we prefer up to 12 tiles, but up to 20 is permitted in rare cases"* — so the
+cheapest-edge rule survives intact, which is what the ruling protects. The cap is therefore **a
+claim about what the cost model produces, which breaks loudly if that stops being true.** (The
+prefer-room variant was measured at 241 provinces over the preference, max 14, and rejected; the
+breach was its only justification.)
 
-Measured headroom: the partition tops out at **16 tiles** across the six-seed sweep, four short of
-the cap. The over-12 share (4.9% at the ruling) is **reported by the harness, never asserted** —
-*"rare" is Ben's judgement to make against a number*, and no threshold for it has been chosen. The
-preferred ceiling is therefore advisory in a way the hard cap is not.
+Measured headroom: the partition tops out at **18 tiles** across the six-seed sweep, two short of
+the cap. The over-12 share is **reported by the harness, never asserted** — *"rare" is Ben's
+judgement to make against a number*, and no threshold for it has been chosen (it stood at 4.9%
+when the ceiling was ruled). The preferred ceiling is therefore advisory in a way the hard cap is
+not.
+
+**The measured distribution, 6 seeds** (`tools/verify/province_partition_harness.cpp`,
+sections C and D — which is also the re-pinning instrument for the two
+measurement-pinned coefficients). The land domain only; water has its own table
+below. Re-read it off the instrument whenever generation moves — these are
+measurements, not targets, and nothing may be tuned to chase them:
+
+| Partition | provinces | min | max | mean | < 7 | < 3 | > 12 | % in 7–12 |
+|---|---|---|---|---|---|---|---|---|
+| Organic, **with absorption** | 22,153 | 1 | **18** | 8.70 | 4,630 | 1,621 | 1,690 | 71.47% |
+| Frozen BL-515 pre-absorption baseline | 24,498 | 1 | 12 | 7.87 | 6,195 | 3,008 | 0 | 74.71% |
+
+The second row is a **frozen comparison the harness carries as a literal**, not a
+re-measurement: it says what the growth passes produced before absorption existed,
+so the pass can be read as a delta. Only the first row moves when generation does.
+
+The spread is wide **on purpose** and is reported rather than tuned: organic
+borders are irregular, and the sub-floor tail is the pockets a ceiling leaves
+behind — kept by ruling, not repaired.
+
+Read the absorption row against the hard cap, not against 12. **Max 18 against a cap
+of 20**, so the bound holds with two tiles of headroom, and **7.63% sit above the
+preferred 12**. Absorption is what moves every one of those numbers: across the sweep
+the growth passes leave **3,625** one-tile provinces and the pass takes **3,463** of
+them into the cheapest neighbour each has, which is why the count falls, the mean
+rises, and the sub-floor tail thins. **A one-tile province has three fates, not two** —
+absorbed; kept as one of the **107** true islands, with no same-domain, same-nation
+neighbour to join; or **grown**, because another singleton chose it as ITS cheapest
+neighbour, which is where the remaining 55 went. (Those figures span all three
+domains, where the size columns above are land's.) The harness asserts the cap and the
+accounting identity (every tile above 12 arrived by absorption, so growth's own clamp
+is still proven separately) and **reports** the 7.63% — whether that counts as "rare"
+is Ben's judgement against a number, and no threshold for it has been chosen.
 
 ### Three domains, never mixed
 
@@ -155,27 +213,102 @@ at which the cap is still a guard rather than a clamp. **There is deliberately n
 cap** — inventing one would be a threshold nobody chose. The harness asserts the exact identity
 instead: every tile above 80 arrived by singleton absorption, never by growth.
 
+**The sea spacing is measurement-pinned, and the pin rule is "the cap must stay a
+guard, not a clamp."** Seeds at separation *d* tile a plane in cells of area
+(√3/2)·*d*², so the lattice predicts a mean size; where growth is running into the
+ceiling instead of meeting its neighbours, the measured mean falls away from that
+prediction and provinces pile up on the clamp exactly:
+
+| d | ideal cell | measured mean | max | exactly on the 80 | provinces |
+|---|---|---|---|---|---|
+| 6 | 31.2 | 32.17 | 75 | 0 (0.0%) | 2,901 |
+| **7** | **42.4** | **41.07** | **82** | **26 (1.1%)** | **2,272** |
+| 8 | 55.4 | 49.29 | 83 | 207 (10.9%) | 1,893 |
+| 9 | 70.1 | 55.25 | 83 | 507 (30.0%) | 1,689 |
+
+At *d* = 8 one province in nine sits exactly on 80 — the clamp is drawing the size
+rather than guarding it. At *d* = 7 the measured mean still matches its lattice
+prediction, which is the evidence that terrain and spacing set the size. 41 tiles
+against land's 8.6 is also "much larger" by nearly five times.
+
 `province_kind` is **derived from the substrate of any member tile**, never stored, so it cannot
 desynchronise from the tiles it describes.
 
-**A province never spans two domains.** Every land province is hex-connected land, and no province
-mixes land with water or a lake with the sea (the land-only invariant narrowed rather than deleted,
-NR-428). The domains are **exclusive by construction** — a tile's substrate names exactly one — so
-the claim is structural rather than checked.
+**A province never spans two domains.** The land-only invariant is narrowed, not deleted (NR-428):
+land provinces are hex-connected land that never spans water; the general claim — **asserted by the
+harness as P2b** — is that **a province holds exactly one domain**, which is strictly stronger,
+since it also forbids a lake joining the sea. The domains are **exclusive by construction** — a
+tile's substrate names exactly one — so construction is *why* the claim holds, and
+`province_partition_harness` P2b is what breaks loudly if it stops holding. Structural and checked,
+not one instead of the other.
 
-> **Nothing can be in a sea province, and that is expected.** Units are land-bound (`march_unit`
-> refuses a water destination outright), buildings refuse water, and a sea province sustains zero
-> of them. Sea provinces are **addressable empty space, built without inventing the naval model
-> that will eventually fill them** — ships, blockade and coastal trade are settled as eventual and
-> deferred (Ben, 2026-08-22: *"we can defer this for now"*). BL-188 (coastal ports) is the first
-> thing that would occupy one.
+### Who owns water (Ben, 2026-09-06)
+
+**Coastal water belongs to whoever owns the shore. Open ocean belongs to nobody.** That is the
+whole ownership rule, and it replaces the deferral this section used to carry.
+
+| Domain | Owned? | Who can be there |
+|---|---|---|
+| **`land`** | Yes, as always | Land units; buildings |
+| **`coastal_water`** | **Yes** — derived from the shore that claims it | Coastal units, and land units crossing **owned** coastal water |
+| **`open_ocean`** | **No, structurally** | Coastal/naval units only; never a territory |
+
+**The ownership half is DERIVED, and derived is not the same as claimed.** A province's owner comes
+from its tiles (§ above — `world::tile_to_nation`, no field of its own). The nation carve **never
+grows across water at all**; water ownership is worked out afterwards, from the shore:
+
+| Domain | How it gets an owner |
+|---|---|
+| **Coastal water** | The **shoreline ring**: a tile touching owned land takes that land's owner. Two nations on one strait → the lower owner index, a total and stable tie-break. It spreads no further. |
+| **Lake** | Filled **whole** by the shore enclosing it — a lake is bounded by its own coast, so ownership crossing it means something. |
+| **Open ocean** | Never. Structurally unowned, and it never conducts ownership between two coasts a deep sea separates. |
+
+**Water that touches no owned shore stays unowned**, which is the point: with most land unowned,
+much open coastline is unowned too, and *"you may walk your own shore, not someone else's"* meets
+shore belonging to nobody.
+
+> **This paragraph described the wrong mechanism until 2026-09-07 (NR-792).** It said the carve
+> narrowed its ocean mask to `is_open_ocean` and thereby "claims the shoreline ring". That is what
+> the code did, and it is not the same rule: letting the flood claim water made ownership a question
+> of which seed's growth arrived first, not of who owns the adjacent land. Measured, it gave **100%
+> of coastal water owned against 39% of land** — an apron derived from a shore that is itself mostly
+> unowned, which cannot be right.
+>
+> Worth recording that the first fix did not work either, and only measurement caught it: excluding
+> water from growth and then spreading ownership through **all** non-ocean water returned figures
+> **byte-identical** to the flood. The coastal band is globally connected, so one owned shore tile
+> conducts ownership around every landmass it touches. The sea is a ring because it is enclosed by
+> nothing; a lake fills because it is enclosed by its own shore.
+
+Nothing about the partition changes: the three domains still never mix, and growth still never
+leaves its domain.
+
+**Why unowned open ocean is the right asymmetry.** A territory is something a polity can hold, and
+holding requires standing somewhere. Coastal water is the shore's apron — reachable, contestable,
+and naturally the shore-owner's. The deep sea is not held; it is *crossed*, and control of it is a
+matter of who is sailing, not who owns the square. So open ocean stays addressable empty space,
+and the thing that makes it matter is traffic rather than title.
+
+**What this un-defers.** This section previously read: *"Sea provinces are addressable empty space,
+built without inventing the naval model that will eventually fill them — ships, blockade and
+coastal trade are settled as eventual and deferred (Ben, 2026-08-22)."* That deferral is lifted for
+the coastal half. The naval model that fills these provinces is `docs/military/MILITARY.md`
+§ Domains and traversal, and the ancient sim's use of it is
+[`MILITARY_HISTORY.md`](MILITARY_HISTORY.md) § Naval.
+
+**Two consequences worth stating before anyone builds them.** `march_unit` refuses a water
+destination outright, so it becomes a domain question rather than a flat refusal. And nation
+territory grows by the whole shoreline ring, which moves every carve — see BL-776 (coastal
+territory) for what that costs.
 
 ### Two contracts downstream code depends on
 
 **1. The id order is the contract.** Downstream code walks provinces in ascending `province::id` and
 gets an order that does not depend on container internals, tile-map iteration order, or the order
-bodies were created in. **Province id 0 is a real province**, so any seam needing a sentinel must
-not use zero (NR-412).
+bodies were created in. The id is the province's **lowest-id member tile** — derived, never
+allocated, so ascending id order is ascending lowest-member-tile order and an id cannot be
+handed out in the wrong order. **Province id 0 is a real province**, so any seam needing a
+sentinel must not use zero (NR-412).
 
 **2. The partition is part of world generation and versions with it.** It is **never patched in
 place**: a change to the algorithm re-rolls every battle in every world, so partition fixtures do
@@ -183,8 +316,14 @@ not survive a repartition, and that is correct rather than a defect (NR-422).
 
 ### Storage and determinism
 
-The partition is built once at the end of `make_hard_coded_world` from the world seed and the
-finished tile map, and held in `world::provinces`. It is **derived but stored**, because a battle
+The partition is built inside `make_hard_coded_world` from the world seed and the finished tile
+map, and held in `world::provinces`. Where in the pass order it runs is
+[`GENERATION_STRATEGY.md`](GENERATION_STRATEGY.md)'s to state, and it is not a single call: the
+homeworld is partitioned before its roads, and the canonical whole-world partition is rebuilt once
+every body's tiles exist. The rebuild reproduces the first call byte-identically for the bodies
+that call covered — the fill reads no road data, none of its other inputs moves between the two,
+and the anchor centres founded in between are skipped as seeds — so *one partition* is a claim
+about the result, not about the number of calls. It is **derived but stored**, because a battle
 must not be re-identified by a lazy rebuild. It joins the flat-binary serialisation seam as the
 trailing section of the history-log stream, so an earlier stream is still a valid prefix.
 
@@ -229,6 +368,33 @@ codebase already defines, leaving **one free scalar**, `k_province_buildings_per
 capacity the pooled per-tile cap already grants. The ceiling is **computed on demand, never
 cached**, so it moves as roads are built — the one placement bound not fixed at generation.
 
+### Richness is absorbed here, never clamped at generation (Ben, 2026-09-06)
+
+**When a deposit field comes out "too rich", the correction belongs in this score and not in the
+generator.** Ben, ruling on a paleo-deposit measurement that moved the world's petroleum by +68%:
+*"our per-province infrastructure scores will account for anything which seems 'too rich'."*
+
+The reasoning is the one this project applies everywhere else. Ground is a **fact about the
+world** — geology and biosphere history put oil where the ancient seas were, and how much is
+there is not a dial. What a corporation can *do* with it is bounded by something else entirely:
+how many buildings the province sustains, which is area × habitability × **roads** × population.
+So an extravagantly rich province is not an error to be tuned away at the point of placement; it
+is a province whose wealth is **gated behind infrastructure it has to build**, and that is a
+force with a visible cause a player can read on the map.
+
+Clamping the deposit instead would break two standing rules at once. It would make the generator
+produce an outcome rather than a consequence (§ Asymmetry is the deliverable — the spread is the
+point), and it would hide the richness from the player rather than making it *expensive to
+reach*. A seam of oil under an unroaded province should read as an opportunity nobody has paid
+for yet.
+
+**The practical consequence for anyone measuring a generation change:** a magnitude moving is not
+by itself a defect, and the question to ask is never "is this number too big" but "does the
+province score already bound what can be taken from it". If the answer is no, the fix is in the
+score's terms — the road multiplier's domain, the habitability weight, the free scalar — and not
+in the placement rule. `k_province_buildings_per_sustain_unit` is pinned by measurement precisely
+so that this stays checkable rather than a matter of taste.
+
 **Ben's ruling on what the ceiling is for (2026-08-22): drop it to where it bites**, and *"use
 technology for deeper mines and denser facilities which use more of the cap."* The ceiling is a
 real constraint and **technology is the thing that relieves it** — the first consumer of a
@@ -263,6 +429,11 @@ one visual language across the whole map.
 2. **What conquest moves.** With the province the unit of conquest (BL-567), BL-518 (war redraws
    borders) moves whole provinces between nations rather than tiles — how a border redraw
    interacts with ruling 5's per-nation seeding after generation is that item's to settle.
+3. **Which province a lake belongs to.** A lake is partitioned on the coastal band as its own
+   province — chosen because it invents no new size rule and keeps the one-domain invariant,
+   and consistent with § Who owns water filling a lake whole from its enclosing shore. Ben
+   named lakes as a tile kind but has not ruled between its own province, the surrounding
+   land province, and a coastal one.
 
 ---
 
@@ -277,9 +448,9 @@ one visual language across the whole map.
 | Building ceiling enforcement | `src/world/construction.cpp` |
 | The check | `tools/verify/province_partition_harness.cpp` § P5a, `province_capacity_probe` |
 
-**Related authorities.** [`TILE_GENERATION.md`](TILE_GENERATION.md) § Province partition (the
-generation-pass view), [`../ui/PLANETARY.md`](../ui/PLANETARY.md) § Province grain (the rendered
-view), [`../ui/SELECTION.md`](../ui/SELECTION.md) § The province element (the selected view),
+**Related authorities.** [`GENERATION_STRATEGY.md`](GENERATION_STRATEGY.md) (the pass order —
+where the partition runs), [`../ui/PLANETARY.md`](../ui/PLANETARY.md) § Province grain (the
+rendered view), [`../ui/SELECTION.md`](../ui/SELECTION.md) § The province element (the selected view),
 [`../military/MILITARY.md`](../military/MILITARY.md) (what a battle does inside one),
 [`../GLOSSARY.md`](../GLOSSARY.md) (the spatial vocabulary).
 

@@ -1,5 +1,14 @@
 # Collapse — polity strategies and culminating events for Era −1
 
+> **Settles:** what strain a major polity accumulates, and where that accumulator lives ·
+> which strategies a polity may play against it · which culminating events resolve the doom,
+> and how strategy and culmination pair · how the ideological axis narrates an outcome · how
+> the sim reads that story back · what makes a run this long affordable.
+> **Not here:** the institutional ladder the strategies play out inside (HISTORY) · how a
+> battle is settled (../generation/MILITARY_HISTORY) · how an event reaches the player
+> (../EVENTS) · the sibling roster at corp grain (../ai/STRATEGIES).
+> **Confused with:** HISTORY.md, ../EVENTS.md, ../ai/STRATEGIES.md.
+
 This document is the authority for the Era −1 collapse metagame: the strain a major polity
 accumulates, the strategies a polity plays against it, and the culminating events that resolve
 it. It sits on `docs/lore/HISTORY.md` (the institutional ladder this plays out inside) and

@@ -1,5 +1,17 @@
 # Project Io — Map Lenses
 
+> **Settles:** which lenses exist and how many may be active at once · which rung
+> each applies to — the whole Lens × rung table, for every rung at once — and how
+> the strip changes with the rung · which key a lens draws and whether it collapses
+> · what each lens overlays and at what grain it selects · how opening a ledger
+> arms a lens.
+> **Not here:** where the lens bar and the lens chrome region sit (MINIMAP) · glyph
+> shapes (ICONS) and identity colours (`presentation.hpp`) · what a press under a
+> lens resolves to (SELECTION) · what a rung draws that no lens gates, and what
+> each rung defers (SOLAR, CIRCUMPLANETARY, PLANETARY) · what the unlensed ground
+> looks like (PLANETARY, RENDERING).
+> **Confused with:** MINIMAP.md, SELECTION.md, ICONS.md.
+
 The **lens system** is the set of data overlays the player toggles over the
 canvases from the lens mode bar on the **minimap**
 ([`overlay.cpp`](../../src/ui/overlay.cpp), `draw_overlay_controls`; see
@@ -16,25 +28,27 @@ Glyph shapes live in [ICONS.md](ICONS.md); identity colours live in
 
 ## Roster
 
-The whole `overlay_mode` family at a glance. Bar slots 1–6 are the minimap strip
-order; "off the bar" lenses are reached by the keyboard lens-cycle (`L` /
-`Shift+L`, `0` clears). `canvas_command.cpp` derives `overlay_mode_count` from the
-enum's own `count` sentinel, so a lens added at the end of the family is reachable
+The whole `overlay_mode` family at a glance. Which of them the minimap strip carries
+is read in § The strip rotates with the rung; every lens is also reachable by the
+keyboard lens-cycle (`L` / `Shift+L`, `0` clears). `canvas_command.cpp` derives
+`overlay_mode_count` from the enum's own `count` sentinel, so a lens added at the
+end of the family is reachable
 by the cycle without a literal being kept in step by hand.
 
-| `overlay_mode` | Bar | Surface (one line) |
-|---|---|---|
-| `corporation` | 1 | Planetary tile tint per owning corp, player/rival HQ markers |
-| `resource` | 3 | Planetary contiguous-deposit flat fill; good selector in the legend |
-| `market` | 4 | Planetary **catchment tint** — one colour per market + city-name key; Circumplanetary price strip |
-| `population` | 5 | Per-tile red→green **value mark** (workforce efficiency) + gradient key |
-| `continent` | 6 | Planetary plate tint + boundary lift + plate-count key |
-| `scarcity` | off the bar | Per-market shortfall blocks + key |
-| `industry` | off the bar | Background-firm plant amber tint + key |
-| `supply` | off the bar | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
-| `reach` | off the bar | Planetary key listing the active body's trade-route endpoints by recency |
-| `supply_routes` | off the bar | Planetary key of aggregated lanes, log-scaled thickness |
-| `throughput` | 6 | Planetary reach-cost field (far → at an anchor) + an active-LP ring on every supply anchor + gradient key |
+| `overlay_mode` | Surface (one line) |
+|---|---|
+| `corporation` | Planetary tile tint per owning corp, player/rival HQ markers |
+| `company` | Planetary tile tint per owning background firm + its HQ marker — the Corporation lens's mirror |
+| `resource` | Planetary contiguous-deposit flat fill; good selector in the legend |
+| `market` | Planetary **catchment tint** — one colour per market + city-name key; Circumplanetary price strip |
+| `population` | Per-tile red→green **value mark** (workforce efficiency) + gradient key |
+| `continent` | Planetary plate tint + boundary lift + plate-count key |
+| `scarcity` | Per-market shortfall blocks + key |
+| `industry` | Background-firm plant amber tint + key |
+| `supply` | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
+| `reach` | Planetary key listing the active body's trade-route endpoints by recency |
+| `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
+| `throughput` | Planetary reach-cost field (far → at an anchor) + an active-LP ring on every supply anchor + gradient key |
 
 Identity colours live in `presentation.hpp`; the corporation-identity helper is
 `palette::corp_colour`.
@@ -43,20 +57,18 @@ Identity colours live in `presentation.hpp`; the corporation-identity helper is
 
 ## Rung applicability
 
-The lens bar — on the **minimap** (see [MINIMAP.md](MINIMAP.md)) — presents a
-**curated subset** in this order: **Corporation → Resource → Market →
-Population → Continent → Throughput**. **Scarcity** and **Industry** are off the
-bar, reached by **keyboard lens-cycle only** — joining **Supply**, **Reach** and
-**Supply-routes**, which do not fit the strip. The Continent
-lens earns its bar
-slot over the keyboard-only shelf because it answers a question the player asks at
-*first sight* of a body — "why is the land shaped like that?" — which is exactly
-the moment they are looking at the strip.
+The lens bar — on the **minimap** (see [MINIMAP.md](MINIMAP.md)) — is **derived per
+rung**: it carries the lenses that draw something at the canvas rung in play, and
+nothing else (§ The strip rotates with the rung). What follows is why a given lens
+earns a strip glyph at all, which is a separate question from which rung shows it.
 
-**Throughput earns the sixth slot** (Ben, 2026-08-25: *"the only thing now is to add
-the glyph for our throughput lens"*). It sat on the keyboard-only shelf because the
-eight-lens strip had no room; the three retirements above freed three slots, so the
-reason expired before the lens did. Logistics is one of the two things the whole
+The **Continent** lens earns a place on the strip over the keyboard-only shelf
+because it answers a question the player asks at *first sight* of a body — "why is
+the land shaped like that?" — which is exactly the moment they are looking at the
+strip.
+
+**Throughput carries its own glyph** (Ben, 2026-08-25: *"the only thing now is to add
+the glyph for our throughput lens"*). Logistics is one of the two things the whole
 design is rate-limited by, which is a poor thing to leave undiscoverable. It carries
 its **own** glyph rather than the borrowed convoy chevron — a strip lens gets a
 distinct mark (BL-605). The glyph is a **truck** (Ben: *"just use a truck as the
@@ -71,7 +83,11 @@ with a null state (re-selecting the active lens clears to plain terrain,
 `toggle_overlay`).
 
 The per-rung representation of every lens, on-bar or keyboard-only. "—" = no
-representation intended.
+representation intended. **This table is the only place a lens's rungs are
+stated.** The rung docs ([SOLAR.md](SOLAR.md), [CIRCUMPLANETARY.md](CIRCUMPLANETARY.md),
+[PLANETARY.md](PLANETARY.md)) point here rather than carrying a column of it: a
+column read off one rung at a time cannot show that Market and Supply span the
+ladder while the rest do not, and a copy drifts from the original silently.
 
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
@@ -126,19 +142,8 @@ quadrant) moved legends off the canvas into the right chrome column; BL-566
 (legend inside minimap) revised that to put them inside the minimap box. The
 current placement is the minimap **header**.
 
-**The rect.** Same x and width as the minimap (`ui::minimap_rect`), so the two read
-as one stack of chrome flush to the right screen edge; **bottom edge on the
-minimap's top edge**, growing **upward** into the column's otherwise-unused space
-and ceilinged one margin below the time panel's foot. `ui::lens_chrome_rect`
-(`shell_metrics.hpp`) owns that algebra and every legend asks it — no key takes a
-position argument, so there is no second derivation to drift.
-
-**Bottom-anchored, and that is load-bearing.** A box that grows upward from a
-fixed top takes its own header, and therefore its toggle, with it: opening the
-list moved the control a third of the screen and the second press landed on the
-canvas instead of closing it, so the toggle worked exactly once. Anchoring the
-**bottom** keeps the header on the minimap's edge open or shut, and the list reads
-as a drawer sliding up out of the minimap.
+The region's rect, its bottom anchor and the input blocker over it are
+[MINIMAP.md](MINIMAP.md) § Lens chrome.
 
 Every legend is keyed off the active `overlay_mode` and drawn in
 `body_surface_canvas.cpp`, before the input early-out so it shows in headless
@@ -159,24 +164,6 @@ captures too. Two shapes share the one region:
   belongs only to the lists, because a list that grows with the world is the only
   thing it was ever for; a key with nothing to overflow gains nothing from a press
   that hides it.
-
-**Z-order is a placement consequence, not a patch.** The gradient keys used to
-anchor flush-**left** of the minimap, vertically centred — inside the rect the
-always-open Selection band occupies — so they drew as ghosts through the band at
-roughly a tenth of their contrast, and only the Continent key escaped by taking
-ImGui's foreground draw list with an opaque fill (BL-376, continent key z-order).
-One of seven was fixed and the collision was never generalised. In the region the
-keys no longer overlap any window, so every key draws on the shared background
-list and the foreground special case is gone. An **input blocker** over the whole
-region is what remains necessary: a draw list paints pixels and registers no
-window, so without it a press on the legend would also select the tile underneath.
-
-> **SETTLED 2026-08-25 — the header region stands.** Ben ruled that day that a legend
-> "takes the minimap space", then saw the region above in the merged build and preferred
-> it: *"Looks fantastic, probably better than my direct instruction to fill minimap
-> space."* The ruling is superseded by its own author; the minimap keeps its rect and the
-> legend keeps the header. BL-609 is cancelled, and the z-order workaround it would have
-> removed was already dropped at the Sprint 17b merge.
 
 The resource/good selector shared by the Resource, Market and Scarcity lenses is
 one combo bound to `ui_state.lens_resource` (`draw_lens_resource_combo`), sitting
@@ -303,8 +290,11 @@ lens."*
 
 **The lens dissolved rather than being deleted: its content became chrome.** A
 nation's identity colour sits at its frontier and falls off inwards over three
-tiles, drawn always — under every lens and on the plain canvas — exactly as
-roads are. The full render spec, the falloff table, and the
+tiles, drawn **on the plain canvas and suppressed while any lens is up** (Ben,
+2026-08-28, reaffirmed 2026-09-07). Roads are *not* the precedent here, and the
+difference is the point: a road is terrain a lens reads over, while a national
+wash is a second political answer competing with the one the lens was opened to
+ask. The full render spec, the falloff table, and the
 never-average-two-nations constraint that decides both halves of the pass are in
 [PLANETARY.md](PLANETARY.md) § The national border band.
 
@@ -325,93 +315,6 @@ no pixel can belong to a colour that is neither neighbour's.
 **Its per-nation key retired with it.** A scroll-list of every nation on the body
 was the legend for a wash that no longer exists; the band answers the same question
 at the thing itself, by hovering the border.
-
-## Structure-grain selection & routing
-
-**The lens defines what the pointer resolves to — at the grain the lens DRAWS.** That principle
-is not new; the routing table below has carried it since 2026-06-15. What BL-603 adds is that the
-rule now works on whole **structures**, and says so *before* the click. Ben, 2026-08-24: *"When a
-lens reveals any large structure, the selection should pivot to the entire structure, and no longer
-provinces. So for the market lens, the entire market gets highlighted on mouse over, and clicking
-opens up our market ledger for that market."*
-
-### Two resolvers, and which wins
-
-| Resolver | Answers | Used by |
-|---|---|---|
-| **Boundary** (`resolve_structure_hit`) | "am I on this structure's edge?" | The national border band — always-on chrome, not a lens |
-| **Area** (`lens_structure_of_tile`) | "which structure is this ground part of?" | The active lens |
-
-**A marker outranks both, and a boundary outranks an area.** The order is not arbitrary: a marker
-and a border are things the player *aimed at*, while a catchment is ground they happen to be over.
-That ordering is also what keeps a border clickable while a lens is active.
-
-### Which lenses carry a structure
-
-| Lens | Structure | Resolves at | Opens |
-|---|---|---|---|
-| **Market**, **Scarcity** | The market's whole **catchment** | Area — any ground inside it | Market Ledger, aimed at that market |
-| **Corporation** | The corp's **holdings** on this body | The **marker** — see below | Budget ledger |
-| Population, Industry, Resource, Continent | *(none — tile grain)* | — | Tile Ledger |
-
-**Why Corporation resolves at the marker and not the ground.** Its structure is exactly the set of
-tiles carrying that corp's buildings — so every tile in it *also* carries a marker, and a marker
-outranks a structure. An area pivot there could never fire. It resolves *through* the building
-instead, which is what this document has described since 2026-06-15 and what nothing implemented
-until BL-603.
-
-**Why Resource and Continent carry none.** Their regions — a contiguous deposit, a tectonic plate —
-have no **entity id**, and a selection is an entity. Lighting a region the player then cannot select
-would promise a pivot that never arrives, so they keep tile grain rather than being half-supported.
-
-### The hover half
-
-The structure lights **whole** on hover, as a wash rather than an outline: outlining a catchment
-means walking its boundary every frame to find the outward-facing edges, while a wash costs one test
-per drawn tile — and it is the truer read, because the claim is *"all of this is one thing"*, which
-is an area statement rather than an edge one. It lands one frame behind the pointer, exactly as the
-hovered-province outline already does and for the same reason: the tile loop must know the answer
-before it has drawn the tile that produces it.
-
-**Check:** `scripts/verify/lens_structure_pivot.lua`.
-
-
-**A structure is selected by its boundary, not by anything under a single tile.**
-This is a selection grain of its own, sitting between the per-lens routing table
-below (which resolves what a *tile* means under the active lens) and the markers.
-It is **lens-agnostic**: a structure boundary is chrome, so it resolves the same
-way whatever lens is active, and it is not a row in the per-lens table.
-
-| Structure | Target on canvas | Routes selection to |
-|---|---|---|
-| **Nation** | the **national border band** (§ above) | the nation — the Nation ledger |
-
-Ben's ruling of 2026-08-24, on where the nation ledger is reached now that the
-lens that owned the route has gone: **"click the border itself."** The border is
-what carries a nation on screen, so the border is what opens it — a rail slot
-would have put a nation behind a menu while its territory sat under the pointer,
-and routing through the province card would have made it reachable only via a
-grain the player may not care about.
-
-Two things the pattern requires, neither optional:
-
-- **A real hit width.** The drawn stroke is a line, and a line is not clickable at
-  play zoom. Each drawn boundary segment registers a hit **corridor** whose width is
-  independent of the stroke's thickness (`structure_hit_zone`, `ui_state.hpp`).
-- **A hover read that names the structure before the click commits.** An immediate
-  label at the cursor — not the glance-then-stick hover card
-  ([TOOLTIP.md](TOOLTIP.md)), which waits out an appear delay by design.
-
-**Priority:** markers (building > market centre > unit) outrank a structure
-boundary, and a boundary outranks the tile/province under it. A marker is a
-specific thing the player aimed at; inside the corridor, the boundary *is* what the
-pointer is on.
-
-**This is the general case on purpose.** A `structure_hit_zone` carries its own
-kind and its own corridor width, and the resolver is a nearest-segment walk that
-knows nothing about nations. A plate rim, a market-catchment edge or a corp
-territory boundary joins the table by producing zones; the resolver and the click
-path do not change.
 
 ## Supply lens
 
@@ -481,50 +384,22 @@ surface share the resolved `market_component.price`. Verified by
 prices from base before capture (and `verify.show_panel("economy", false)` to
 clear the panel `econ_step` opens).
 
-## Per-lens selection validity & routing (settled 2026-06-15, [F4]; recut 2026-08-28)
-
-Owned by BL-372 (lens-keyed selection) and BL-664 (one tier under a lens). The active lens does not
-only re-skin the canvas: it **defines what the pointer resolves to**, each lens answering "what is
-the meaningful target under this pointer?" in its own terms. SELECTION.md § A lens collapses
-selection to ONE TIER owns the rule; this is the per-lens table it reads.
-
-**Under a lens there is exactly one tier**, and a marker does not outrank it (Ben, 2026-08-28). A
-lens with no answer for this ground is **inert**: no hover card, and a click that clears the
-Selection band to resting rather than falling through to a tile or a building.
-
-| Lens | Structure under the pointer | Routes selection to |
-|---|---|---|
-| **none** | the lowest drawn entity (marker, else tile), then the four-rung cycle | Tile Ledger |
-| **Corporation** | the corporation's **tile group** on this body | that corporation's ledger |
-| **Company** | the background firm's **tile group** | that company's ledger |
-| **Resource** | the **deposit** — every tile carrying the selected resource | Market Ledger, at that resource |
-| **Market** | the **market catchment** | Market Ledger |
-| **Scarcity** | the **market catchment** (the catchment under the pointer) | Market Ledger |
-| **Continent** | the **plate** | History ledger, at its tectonic record |
-| **Population** | — inert | — |
-| **Industry** | — inert | — |
-| **Throughput** | — inert | — |
-| **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
-
-**Country has no row because it is not a lens.** A nation is reached by its border
-band under *every* lens — see § Structure-grain selection & routing above.
-
-**A tile group lights whole on hover.** Hovering one tile of a corporation's holdings highlights
-all of them (Ben, 2026-08-28: "hovering one tile displays an outline around all company buildings
-for that corporation/company"), the same claim the market catchment's highlight makes. Ground held
-by nobody is inert.
+What a press under a lens resolves to, and which ledger it drives, is
+[SELECTION.md](SELECTION.md) § The lens names the ledger the selection drives.
 
 ## The other direction — a ledger opens, its lens arms
 
-The table above sends a **click on a lens** to a ledger. The reverse also holds for
-some slots: **opening the ledger arms the lens**, so the list and the map answer the
-same question in two registers rather than the player having to arm it themselves.
+That routing table — [SELECTION.md](SELECTION.md) § The lens names the
+ledger the selection drives — sends a **click on a lens** to a ledger. The
+reverse also holds for some slots: **opening the ledger arms the lens**, so the
+list and the map answer the same question in two registers rather than the player
+having to arm it themselves.
 Ben's preference is the general form — *"opening a menu usually should arm a lens"* —
 and 2026-08-30 settled the Market half of it by name: *"when we open the market
 ledger, we should also activate the market lens."*
 
 **A pair exists only where both directions name each other.** That is what keeps this
-from becoming a lens on every slot: the routing table above is the test, and most rail
+from becoming a lens on every slot: that routing table is the test, and most rail
 slots are not in it.
 
 | Rail slot | Ledger | Arms | The shared question |
@@ -568,7 +443,7 @@ inferred from the code, which is what NR-722 exists to prevent.
 **Three lenses have no ledger to pair with, and that is not an omission.**
 `Corporation` and `Company` route to *that corporation's* / *that company's* ledger —
 per-entity surfaces reached through Selection, not rail slots, so there is no slot to
-arm from. `Throughput` is **inert** in the routing table and has no ledger at all: it is
+arm from. `Throughput` is **inert** in that routing table and has no ledger at all: it is
 the surface half of `LOGISTICS.md` § Logistic Points, and no ledger surfaces LP.
 Logistics is the road and Supply is the traffic; the Convoys ledger is the traffic's, so
 throughput's twin would be a **Logistics ledger that does not exist**.

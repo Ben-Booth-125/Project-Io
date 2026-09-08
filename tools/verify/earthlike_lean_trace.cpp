@@ -167,7 +167,7 @@ sample run_one(const world_preferences& pref, uint32_t campaign_seed)
     const entity_id fb = w.create_entity();
     generation_record rec;
     const std::vector<entity_id> ids = generate_body_tiles(w, fb, gw, gh, st.profile,
-        chosen_seed, 1.0f, &st, &rec, &cs.height_bias, &cs.convergent);
+        chosen_seed, 1.0f, &st, &rec, &cs.height_bias, &cs.convergent, &cs);
     generate_rivers(w, ids, gw, gh, rec.height, campaign_seed ^ 0x52490001u);
 
     std::vector<char> land(static_cast<std::size_t>(k_cells), 0);

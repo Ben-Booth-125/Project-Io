@@ -115,7 +115,12 @@ const generation_record* record_for(const generation_report::body_entry& e)
     generate_body_tiles(scratch, probe, e.tiles.gw, e.tiles.gh, e.state.profile,
                         e.tiles.seed, e.tiles.deposit_scalar, &e.state, &rec,
                         &e.continents.height_bias,
-                        e.tiles.used_convergent ? &e.continents.convergent : nullptr);
+                        e.tiles.used_convergent ? &e.continents.convergent : nullptr,
+                        // BL-765: the Life phase reads the plate set, so the
+                        // replay has to be handed the same continents result the
+                        // real generation was, or its coal and petroleum would
+                        // land somewhere the finished world's do not.
+                        &e.continents);
 
     cache.rec  = std::move(rec);
     cache.body = e.id;

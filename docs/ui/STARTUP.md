@@ -1,5 +1,13 @@
 # Project Io — Startup (Entry Screens)
 
+> **Settles:** which screens sit between launch and the first frame of play, and in
+> what order · what the main menu offers · what the player chooses in the world
+> wizard and what its globe is for · what happens during the carve and the warm
+> start · how the player comes to be seated on a corporation.
+> **Not here:** the in-game shell (LAYOUT) · the view play opens on (CANVASES,
+> PLANETARY) · what the generator produces (generation/*).
+> **Confused with:** MENU.md, LAYOUT.md.
+
 The app's entry flow — everything between launch and the first frame of play.
 Written against `src/core/app.{hpp,cpp}` and `src/ui/startup_screens.cpp`. See
 [LAYOUT.md](LAYOUT.md) for the in-game shell and [CANVASES.md](CANVASES.md) for

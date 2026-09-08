@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>       // BL-754: the generation budget, MEASURED not asserted
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -187,7 +188,7 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
                                                      params.seed, deposit_scalar);
     return generate_body_tiles(w, body, home_grid_width, home_grid_height,
                                st.profile, tile_seed, deposit_scalar, &st,
-                               nullptr, &cs.height_bias, &cs.convergent);
+                               nullptr, &cs.height_bias, &cs.convergent, &cs);
 }
 
 world make_hard_coded_world(world_params params, generation_report* report,
@@ -197,6 +198,30 @@ world make_hard_coded_world(world_params params, generation_report* report,
                             era_minus_one_fixture* fixture)
 {
     world w;
+
+    // --- The generation budget (BL-754) -------------------------------------
+    //
+    // Per-pass wall clock, REPORTED and never asserted. Ben's question for the
+    // sprint is what the two-span era costs against the single-span one, and
+    // that is not a number any check can own: it varies with the machine, the
+    // build type and what else is running. So it is measured, handed to the
+    // fixture (which has no save-seam presence — see era_minus_one.hpp) and
+    // printed once; nothing reads it back.
+    //
+    // THESE CLOCKS TOUCH NO CONTROL FLOW AND NO DIGEST. A `steady_clock` read
+    // inside `world/*` is only safe while it is write-only with respect to the
+    // world, and every use below is: the values land in the fixture and in one
+    // fprintf, and never in a branch, a seed, a hash or a stored field. The
+    // standing determinism rule forbids timing that can VARY OUTPUT, not
+    // measuring how long the output took.
+    using gen_clock = std::chrono::steady_clock;
+    const auto ms_between = [](gen_clock::time_point a, gen_clock::time_point b) {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(b - a).count();
+    };
+    const gen_clock::time_point t_world_begin = gen_clock::now();
+    gen_clock::time_point t_settlement_begin = t_world_begin;
+    gen_clock::time_point t_settlement_end   = t_world_begin;
+    gen_clock::time_point t_era_end          = t_world_begin;
 
     // Coarse progress for a caller drawing a loading screen on another thread.
     // `bump` is the only writer and it only ever moves forward, so a reader
@@ -260,7 +285,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // match a report entry to a world body by its display name.
     auto plan = [&](int proto_index, entity_id body_id, int gw, int gh,
                     std::vector<float>& bias_out,
-                    std::vector<uint8_t>* convergent_out = nullptr) {
+                    std::vector<uint8_t>* convergent_out = nullptr,
+                    continent_state* cs_out = nullptr) {
         body_inputs in = prototype_body(proto_index);
         // The generated name, not the prototype's placeholder literal — the
         // chain's biography lines quote it (BL-257). `naming` outlives `in`.
@@ -287,6 +313,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
             { return a.years_before_epoch > b.years_before_epoch; });
         bias_out = cs.height_bias;
         if (convergent_out) *convergent_out = cs.convergent;
+        // BL-765: Pass 6's Life phase asks the PLATE SET where a tile sat when
+        // its fossils formed, so the whole continents result has to reach
+        // generate_body_tiles, not just the two per-tile masks derived from it.
+        // Copied rather than referenced because `cs` is moved into the report
+        // below when one is being written.
+        if (cs_out) *cs_out = cs;
 
         if (report)
         {
@@ -370,11 +402,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // Mercury-analogue physical facts; everything else is derived by the chain.
     std::vector<float> cinder_bias;
+    continent_state cinder_cs;
     bump(1);
-    const planetology_state cinder_pl = plan(0, cinder, 180, 84, cinder_bias);
+    const planetology_state cinder_pl = plan(0, cinder, 180, 84, cinder_bias, nullptr, &cinder_cs);
     const uint32_t cinder_tile_seed = params.seed ^ 0xC1D0001u;
     generate_body_tiles(w, cinder, 180, 84, cinder_pl.profile,
-        cinder_tile_seed, deposit_scalar, &cinder_pl, nullptr, &cinder_bias);
+        cinder_tile_seed, deposit_scalar, &cinder_pl, nullptr, &cinder_bias, nullptr, &cinder_cs);
     record_tile_inputs(cinder, cinder_tile_seed, 180, 84, /*used_convergent=*/false);
 
     // -----------------------------------------------------------------------
@@ -418,7 +451,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
     std::vector<float> kepler_bias;
     std::vector<uint8_t> kepler_convergent; // Pass 5 seeds mountain ranges along these
     bump(2);
-    const planetology_state kepler_pl = plan(1, kepler, home_grid_width, home_grid_height, kepler_bias, &kepler_convergent);
+    continent_state kepler_cs;
+    const planetology_state kepler_pl = plan(1, kepler, home_grid_width, home_grid_height,
+                                             kepler_bias, &kepler_convergent, &kepler_cs);
     // A non-null generation_record is requested here so the river pass below can read the
     // Pass-1 heightmap it captures; this is a pure capture (TILE_GENERATION.md § Generation
     // history hook) and does not perturb the deterministic tile surface itself.
@@ -441,7 +476,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
     bump(4);
     auto kepler_tiles = generate_body_tiles(w, kepler, home_grid_width, home_grid_height,
         kepler_pl.profile,
-        kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent);
+        kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent,
+        &kepler_cs);
     record_tile_inputs(kepler, kepler_tile_seed, 180, 84, /*used_convergent=*/true);
 
     // Rivers (BL-170) — sibling pass (BL-051 convention) over the same heightmap Pass 2
@@ -496,6 +532,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // inherits its nearest cradle's culture, so the pantheons the creeds pass
     // raised are now mapped onto specific ground and specific ancient deposits.
     settlement_state kepler_settlement;
+
+    // BL-768 — THE ANCIENT ROAD RECORD, hoisted to this scope because the two
+    // passes that consume it (the road stamp, and the market carve's trade-
+    // concentration term) both run long after the block below has closed. The
+    // sim's own `history_sim_state` stays local to that block: what crosses out
+    // of it is the record, not the run.
+    std::vector<history_corridor> kepler_corridors;
+
     nation_params kepler_np =
         nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 });
     {
@@ -511,10 +555,27 @@ world make_hard_coded_world(world_params params, generation_report* report,
         const int budget = std::max(1, kepler_land / std::max(1, kepler_np.land_tiles_per_seed));
 
         bump(7);
+        t_settlement_begin = gen_clock::now(); // BL-754
         kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
                                            kepler_tiles, home_grid_width, home_grid_height, budget,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
                                            /*stop_year=*/params.epoch_year);
+        t_settlement_end = gen_clock::now(); // BL-754
+
+        // THE POPULATION MAP, DRAWN EARLY (BL-766). Before the Era -1 sim, not
+        // after it: every region whose ground farms easily is given an opening
+        // urban headcount and the centres those heads stand up, so the sim runs
+        // over a world that has cities in it and can grow, sack and raze them.
+        //
+        // This deliberately overturns BL-610's ORDERING while keeping its goal.
+        // Centre count and scale are still the history's consequence — they are
+        // carved from `region::centres` / `region::urban_population`, which only
+        // this sim moves — but now because history grew and sacked the cities
+        // rather than because they were placed after it had finished.
+        //
+        // Pure and seedless: a deterministic consequence of `farm_q`, which is
+        // the shape the generation layer asks new stages to take.
+        draw_urban_map(kepler_settlement);
         // ------------------------------------------------------------------
         // The year-tick sim, wired into generation (Ben, 2026-08-12).
         //
@@ -596,6 +657,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
             if (progress != nullptr)
                 progress->sub_total.store(0, std::memory_order_relaxed);
 
+            // BL-768: the corridors the history walked, carried out of this
+            // block. Copied rather than moved — `hs` is const, and the record is
+            // small (one row per distinct region pair) against the settlement it
+            // travels beside.
+            kepler_corridors = hs.supply_corridors;
+
             // The sim narrates through the same history_event shape the other
             // generation passes use, so its wars join the world log without a
             // new case anywhere.
@@ -637,6 +704,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 fixture->years     = hs.years;
             }
         }
+        // OUTSIDE the gate, deliberately: a skipped era must read as zero
+        // elapsed rather than folding the whole remainder of generation into
+        // the era's bucket (BL-754).
+        t_era_end = gen_clock::now();
 
         // Population centres (BL-610, centres from demography): placed HERE,
         // after the Era -1 sim has grown, warred and plagued the regions'
@@ -649,6 +720,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                     &kepler_settlement);
 
         kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
+
+        // BL-769 — THE HISTORY'S POLITICAL MAP CROSSES THE HANDOFF. Read here,
+        // BEFORE `derive_national_character` overwrites `region::nation` with
+        // the nation index: until that call the field holds the POLITY id the
+        // sim wrote as it ran. Phase 5 folds a polity's regions into one nation
+        // instead of growing an independent realm out of each anchor.
+        kepler_np.seed_polities = settlement_seed_polities(kepler_settlement);
 
         // Each anchor carries its region's tongue across into Pass 5, so a
         // nation is named in the speech of the people who settled its core
@@ -682,6 +760,18 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Pass 4 draw, which stays as the fallback for bodies with no settlement.
     derive_national_character(kepler_settlement, kepler_creeds, w,
                               kepler_nations, kepler_tiles, home_grid_width, home_grid_height);
+
+    // BL-750 — THE TARIFF POSTURE, ENACTED. `derive_national_character` has just
+    // put the nation index in `region::nation`, so this is the first moment a
+    // nation's inherited protection can be read; the law it bands to is an
+    // ordinary `import_tariff` authored by that nation, which is what finally
+    // gives NATIONS.md's "vocabulary ahead of its consumer" its instance.
+    //
+    // A world whose polities never industrialised enacts NOTHING here, and that
+    // is a legitimate outcome rather than a gap — see `polity::protection_q`.
+    seed_national_tariffs(w, kepler_nations,
+                          derive_national_protection(
+                              kepler_settlement, static_cast<int>(kepler_nations.size())));
 
     // Coverage (BL-463): the population pass above ran before there were borders,
     // so it could only derive its target from LAND AREA. The NATION term lands
@@ -806,6 +896,29 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // a pure function of the generated tiles/nations/centres.
     bump(10);
     generate_roads(w, kepler);
+
+    // ANCIENT ROADS, STAMPED FROM THE HISTORY (BL-768; Ben, the eight-phase
+    // reorder point 4 — "we should also be laying simple roads to supply
+    // provinces"). The Era -1 sim recorded every corridor it moved an army or a
+    // founding party along; this stamps those lines onto the tile field at their
+    // own ancient tier — traffic, and the works the corridor's two ends raised,
+    // never the 1960 qualification percentile the national lattice reads.
+    //
+    // AFTER generate_roads, and the ordering is argued in road_generation.hpp:
+    // stamping takes the max per tile, so this is purely additive and no
+    // national road is downgraded, whereas stamping first would re-route the
+    // whole national MST off the ancient corridors' cheapened ground.
+    //
+    // No-op when the era did not run — `kepler_corridors` is empty, and every
+    // harness declaring `no_prehistory()` takes exactly that path.
+    if (!kepler_corridors.empty())
+    {
+        std::vector<history_road_node> road_nodes;
+        road_nodes.reserve(kepler_settlement.regions.size());
+        for (const region& p : kepler_settlement.regions)
+            road_nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
+        stamp_history_roads(w, kepler, road_nodes, kepler_corridors);
+    }
 
     // Attach installations to the first two land tiles found in raster order.
     // This lookup used to publish its first tile as `kepler_home_tile` for the
@@ -942,6 +1055,73 @@ world make_hard_coded_world(world_params params, generation_report* report,
             return 3;
         };
 
+        // ------------------------------------------------------------------
+        // BL-768 — MARKETS EMERGE WHERE TRADE CONCENTRATED, not from population
+        // alone. Ben, the eight-phase reorder point 4: "markets should begin to
+        // emerge towards the end of this phase."
+        //
+        // The gate above is a nation-grain judgement — this nation's geology and
+        // its competing corporations — and it says nothing about WHERE inside
+        // that territory exchange actually happened. The history now does: every
+        // corridor in `kepler_corridors` is a line the era supplied an army or a
+        // founding party along, so a region several of them MEET at is a
+        // junction, and a junction is where goods change hands.
+        //
+        // A JUNCTION IS A GRAPH PROPERTY, NOT A TUNED PERCENTILE. Degree — the
+        // number of distinct corridors incident on a region — is a plain integer
+        // count over a sorted record, so it cannot drift with a container's
+        // layout and it needs no threshold argued from a distribution. It is
+        // still MEASURED: over `history_sweep 8 --epoch 1960` (2026-09-06) the
+        // 4,657 regions of eight worlds grade 1,297 at degree 0, 3,236 at 1-2,
+        // and only 124 at 3 or more — the busiest at 66. So three keeps the
+        // junction set at 2.7% of regions, which is the difference between a
+        // line and a crossing rather than a nudge to the whole map.
+        //
+        // IT ONLY EVER LOWERS THE GATE, so this term ADDS markets and removes
+        // none. Raising it at a quiet region would delete a market the economy
+        // is already built on, and "markets emerge" is an emergence rather than
+        // a cull. The floor is the existing FRACTURE gate (2), never below it,
+        // so a village still never carries a market however many roads meet on
+        // it — the ladder's own bottom rung is not moved.
+        //
+        // AND IT DROPS TO THAT FLOOR OUTRIGHT, rather than by one rung. One rung
+        // was the first cut and it is the weaker claim: it only ever helps a
+        // centre sitting exactly one scale under its nation's gate, so on the
+        // shipping seed it opened no market at all. Dropping to the fracture gate
+        // says the stronger and more historical thing — a crossroads fractures
+        // into markets as finely as a rich nation's territory does, BECAUSE
+        // trade concentrated there. That is an entrepôt on poor ground, which is
+        // the shape a barren nation folded into its neighbour could not
+        // otherwise produce.
+        constexpr int kMarketJunctionDegree = 3;
+        std::vector<int> region_corridor_degree(kepler_settlement.regions.size(), 0);
+        for (const history_corridor& c : kepler_corridors)
+        {
+            if (c.a < region_corridor_degree.size()) ++region_corridor_degree[c.a];
+            if (c.b < region_corridor_degree.size()) ++region_corridor_degree[c.b];
+        }
+        if (report != nullptr)
+        {
+            report->prehistory_corridors = static_cast<int64_t>(kepler_corridors.size());
+            for (const int d : region_corridor_degree)
+                if (d >= kMarketJunctionDegree) ++report->prehistory_junctions;
+        }
+        // `nearest_region` is the canonical read of a region's extent — the same
+        // Voronoi over anchors that binds a centre to the region that grew it
+        // (BL-783) and names it in that region's tongue. Reusing it is what makes
+        // "this centre's region" one answer rather than two.
+        auto centre_is_trade_junction = [&](entity_id pop_tile) -> bool {
+            if (kepler_corridors.empty()) return false;
+            const auto pit = w.tiles.find(pop_tile);
+            if (pit == w.tiles.end()) return false;
+            const int ri = nearest_region(kepler_settlement, pit->second.grid_x,
+                                          pit->second.grid_y, home_grid_width);
+            if (ri < 0 || ri >= static_cast<int>(region_corridor_degree.size()))
+                return false;
+            return region_corridor_degree[static_cast<std::size_t>(ri)]
+                   >= kMarketJunctionDegree;
+        };
+
         // Seed markets in ascending centre-id order for deterministic market ids.
         std::vector<entity_id> centre_ids;
         centre_ids.reserve(w.population_centres.size());
@@ -1030,6 +1210,19 @@ world make_hard_coded_world(world_params params, generation_report* report,
             const auto nit = w.tile_to_nation.find(tile_it->second);
             if (nit != w.tile_to_nation.end())
                 gate = gate_for_nation(nit->second);
+            // BL-768: a centre standing where the history's corridors met is
+            // gated as a rich nation's centres are. The GATE moves, not the
+            // scale — a trade junction lets a smaller centre carry a market, it
+            // does not make the centre big.
+            const int nation_gate = gate;
+            if (centre_is_trade_junction(tile_it->second))
+                gate = std::min(gate, 2);
+            // Counted HERE, where both gates are in hand, so the report carries
+            // the exact number of markets the history's trade opened rather than
+            // a difference between two worlds that do not share a settlement.
+            if (report != nullptr && gate < nation_gate && pcc.scale >= gate
+                && pcc.scale < nation_gate)
+                ++report->markets_from_trade;
             if (pcc.scale < gate)
                 continue; // folds into a neighbouring market (routed by market_for_tile)
 
@@ -1153,10 +1346,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // instellation); parent_orbit_au is its distance from Kepler, which is what
     // drives the tidal term.
     std::vector<float> selene_bias;
-    const planetology_state selene_pl = plan(2, selene, 90, 42, selene_bias);
+    continent_state selene_cs;
+    const planetology_state selene_pl = plan(2, selene, 90, 42, selene_bias, nullptr, &selene_cs);
     const uint32_t selene_tile_seed = params.seed ^ 0x5E1E001u;
     generate_body_tiles(w, selene, 90, 42, selene_pl.profile,
-        selene_tile_seed, deposit_scalar, &selene_pl, nullptr, &selene_bias);
+        selene_tile_seed, deposit_scalar, &selene_pl, nullptr, &selene_bias, nullptr, &selene_cs);
     record_tile_inputs(selene, selene_tile_seed, 90, 42, /*used_convergent=*/false);
 
     // -----------------------------------------------------------------------
@@ -1196,10 +1390,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // Differentiated on 26-Al heat, then stripped: the core_fragment branch
         // exits the chain at accretion and the whole object becomes the deposit.
         std::vector<float> ast_bias;
-        const planetology_state ast_pl = plan(a.proto_index, id, 30, 14, ast_bias);
+        continent_state ast_cs;
+        const planetology_state ast_pl = plan(a.proto_index, id, 30, 14, ast_bias, nullptr, &ast_cs);
         const uint32_t ast_tile_seed = params.seed ^ a.seed;
         generate_body_tiles(w, id, 30, 14, ast_pl.profile,
-            ast_tile_seed, deposit_scalar, &ast_pl, nullptr, &ast_bias);
+            ast_tile_seed, deposit_scalar, &ast_pl, nullptr, &ast_bias, nullptr, &ast_cs);
         record_tile_inputs(id, ast_tile_seed, 30, 14, /*used_convergent=*/false);
     }
 
@@ -1318,5 +1513,57 @@ world make_hard_coded_world(world_params params, generation_report* report,
     seed_nation_garrisons(w);
 
     bump(12);
+
+    // --- The generation budget, reported (BL-754) ---------------------------
+    //
+    // Three destinations, and they are deliberately different. (1) The
+    // progress sink, ALWAYS — that is what lets the app print its own budget
+    // on its own generating screen, which is the half of BL-754 that was
+    // still owed. (2) The fixture, when a caller asked for one. (3) One line
+    // to stderr, gated on the fixture: stderr rather than stdout so a harness
+    // parsing its own stdout is unaffected, and gated so the harness tier's
+    // output stays exactly as it was when the app started publishing too.
+    {
+        const gen_clock::time_point t_world_end = gen_clock::now();
+        const int64_t ms_total      = ms_between(t_world_begin, t_world_end);
+        const int64_t ms_before     = ms_between(t_world_begin, t_settlement_begin);
+        const int64_t ms_settlement = ms_between(t_settlement_begin, t_settlement_end);
+        const int64_t ms_era        = ms_between(t_settlement_end, t_era_end);
+        const int64_t ms_after      = ms_between(t_era_end, t_world_end);
+
+        // Write-only tap. `budget_ready` is released last, so a renderer that
+        // acquire-loads it sees all five values or none of them.
+        if (progress != nullptr)
+        {
+            progress->ms_world_total.store(ms_total, std::memory_order_relaxed);
+            progress->ms_before_settlement.store(ms_before, std::memory_order_relaxed);
+            progress->ms_settlement.store(ms_settlement, std::memory_order_relaxed);
+            progress->ms_era.store(ms_era, std::memory_order_relaxed);
+            progress->ms_after_era.store(ms_after, std::memory_order_relaxed);
+            progress->budget_ready.store(true, std::memory_order_release);
+        }
+
+        if (fixture != nullptr)
+        {
+            fixture->ms_world_total       = ms_total;
+            fixture->ms_before_settlement = ms_before;
+            fixture->ms_settlement        = ms_settlement;
+            fixture->ms_era               = ms_era;
+            fixture->ms_after_era         = ms_after;
+
+            std::fprintf(stderr,
+                         "[gen budget] total %lld ms  (pre-settlement %lld, settlement %lld, "
+                         "era-1 %lld, post-era %lld)  epoch=%lld ancient=%d industrial=%d\n",
+                         static_cast<long long>(ms_total),
+                         static_cast<long long>(ms_before),
+                         static_cast<long long>(ms_settlement),
+                         static_cast<long long>(ms_era),
+                         static_cast<long long>(ms_after),
+                         static_cast<long long>(params.epoch_year),
+                         params.prehistory_years,
+                         era_minus_one_has_industrial_span(params) ? params.industrial_years : 0);
+        }
+    }
+
     return w;
 }

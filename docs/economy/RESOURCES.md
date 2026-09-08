@@ -1,5 +1,13 @@
 # Project Io — Resources
 
+> **Settles:** what a good is, and which production tier and value track it sits in · what
+> put a deposit in the ground and how rare it is · which goods trade at all and what their
+> base price is derived from · which roster an era band exposes · what admits a value to
+> the roster in the first place.
+> **Not here:** the recipe that consumes a good (PRODUCTION) · what a listed good actually
+> fetches (MARKETS) · which ground carries which deposit (TILES).
+> **Confused with:** PRODUCTION.md, MARKETS.md, TILES.md.
+
 Resources are the goods that flow through the economy: extracted from tiles, refined by processing buildings, assembled into products, and bought and sold through markets. A tradeable resource has a base price derived from rarity; local supply and demand shift the market price each Tick (the clearing model is `docs/economy/MARKETS.md`; which resources carry a base price is § What trades below).
 
 The roster is **38** values of `resource_type` (`src/world/components.hpp`), and every one of them is held to the **admission rule** (`docs/economy/PRODUCTION.md`): a value earns its place by being consumed by an authored recipe or contracted for by a named actor, and nothing else gets in. A base price is not a behaviour — a good that is priced but produced by nothing and consumed by nothing is an orphan, and `tools/verify/chain_depth.cpp`'s R1 row (no orphan resources) and R1b row (producer and consumer reachable in the *same* era band) hold the line.
@@ -31,6 +39,41 @@ Price volatility and trade margins increase with tier. Raw materials are abundan
 
 Ambient and habitability resources exist at the edges of the market. They are worth producing and trading, but rarely the primary profit driver. Their value is to ensure every tile is economically meaningful in some way and that population welfare has a supply chain behind it.
 
+### Origin — what put it in the ground
+
+The tiers and tracks above both group resources by **what they are for**. Neither answers the
+question generation actually has to ask, which is **where a resource came from**: metals are the
+lithosphere's and belong with the body, while coal, petroleum, peat, timber, crops, fibre and
+hides are the biosphere's residue and belong with life. Every resource therefore carries an
+**origin**, and it is one of exactly three:
+
+| Origin | What it is | Examples |
+|---|---|---|
+| **Geological** | The lithosphere's. Seeded with the body itself, in the Body phase. | Iron ore, copper ore, silica, stone, sand, clay, water ice, regolith |
+| **Biological** | The biosphere's residue — **fossil and living alike**. Placed by the Life phase. | Coal, petroleum, peat; timber, agricultural produce, fibre, tobacco, spices, coffee, furs, hides |
+| **Manufactured** | Made by a recipe, never deposited. It has no origin in the ground at all, and asking for one is a category error rather than a missing entry. | Steel, refined fuel, machinery, electronics, ordnance |
+
+**Fossil and living are ONE origin, deliberately.** Coal and timber differ in *when* their life
+existed, not in whether it did, and planetology already encodes that difference in which scalar
+it gates on — a fossil resource keys off the biosphere's **peak**, a living one off its **current
+stage**, which is exactly why a dead world keeps its coal and loses its forests. Splitting the
+origin three ways would put that same distinction in a second place, and a second copy of a
+distinction is a copy that drifts.
+
+**The classification is total and enforced at compile time.** Every resource in the roster carries
+an origin or the build fails, naming the resource — a runtime check would let an unclassified
+resource ship and be discovered by its absence from the map. This is the single source of the
+split: nothing re-derives it from an inline gate.
+
+**What origin buys the generator.** The two phases are separate *destinations*, decided by the
+table rather than by which line of the deposit pass happens to write them, so the Body phase's
+output is free of biological deposits by construction rather than by inspection. The Life phase
+writes through that seam: it derives the biosphere's residue from a body's own past
+(`docs/generation/CONTINENTS.md` § The Lagrangian frame is what makes that past askable), placing
+coal where the ancient swamps were and oil where the ancient seas were, while the living
+resources stay where the forest stands now (`docs/generation/TILE_GENERATION.md` § The Life
+phase).
+
 ### Deposit rarity & scarcity
 
 Deposit authoring covers the full raw-material set, driven by a **per-resource rarity scalar** — a
@@ -42,6 +85,10 @@ design is BL-040 (full-set deposit authoring). Rules:
 - The scalar **modulates deposit frequency and magnitude** on top of the terrain affinity: a low
   scalar (e.g. platinum-group metals ≈ rare) keeps deposits sparse and small even on affine
   terrain; a high scalar (ambient stone/sand) approaches the every-tile ambient floor.
+- **The FOSSIL resources take the magnitude half only.** Coal and petroleum are placed by the
+  Life phase from the palaeo record, and their presence is a consequence of a body's own history
+  rather than a draw — so the scalar scales what a bearing tile carries and does not decide
+  whether the tile bears at all. Ordering is preserved; frequency is a fact about the world.
 - The scalar is **seeded**, so a campaign's exact distribution varies but the rarity *ordering*
   (rare goods rare, ambient goods abundant) is stable, matching each resource's base-price
   rarity in the Tier 1 tables.

@@ -26,6 +26,7 @@ constexpr auto max_chain_stage = chain_stage::count;
 constexpr auto max_life_stage  = life_stage::civilised;
 constexpr auto max_rung        = ladder_rung::borders;
 constexpr auto max_region_cls  = region_class::port;
+constexpr auto max_region_dom  = region_domain::open_ocean;
 constexpr auto max_temp        = temperature_class::frozen;
 constexpr auto max_atmos       = atmosphere_class::thick;
 constexpr auto max_hydro       = hydrological_state::liquid;
@@ -86,6 +87,7 @@ void w_world_params(std::ostream& o, const world_params& p)
     w_enum(o, p.abundance);
     w_i64(o, p.epoch_year);
     w_int(o, p.prehistory_years);
+    w_int(o, p.industrial_years); // save_game_version 4 (BL-747) -- keep r_world_params in step.
     w_int(o, p.body_count);
     w_prefs(o, p.preferences);
 }
@@ -93,7 +95,8 @@ void w_world_params(std::ostream& o, const world_params& p)
 bool r_world_params(std::istream& i, world_params& p)
 {
     return r_u32(i, p.seed) && r_enum(i, p.abundance, max_abundance) && r_i64(i, p.epoch_year)
-        && r_int(i, p.prehistory_years) && r_int(i, p.body_count) && r_prefs(i, p.preferences);
+        && r_int(i, p.prehistory_years) && r_int(i, p.industrial_years) // save_game_version 4
+        && r_int(i, p.body_count) && r_prefs(i, p.preferences);
 }
 
 void w_planetology_params(std::ostream& o, const planetology_params& p)
@@ -291,6 +294,7 @@ void w_region(std::ostream& o, const region& r)
     w_i64(o, r.founded_year);
     w_i64(o, r.industrial_year);
     w_bool(o, r.industrialised);
+    w_int(o, r.industrial_lag_years); // save_game_version 6 (BL-748) -- keep r_region in step.
     w_int(o, r.nation);
     w_int(o, r.contest_q);
     w_i64(o, r.population);
@@ -302,6 +306,15 @@ void w_region(std::ostream& o, const region& r)
     w_int(o, r.work_reach_mod);
     w_int(o, r.work_defence_mod);
     w_int(o, r.work_industrial_mod);
+    // save_game_version 5 (BL-766, the urban record) -- keep r_region in step.
+    w_int(o, r.centres);
+    w_int(o, r.centres_razed);
+    w_i64(o, r.urban_population);
+    // save_game_version 7 (BL-777, the region domain) -- keep r_region in step.
+    // ONE BYTE, APPENDED. See save_game.hpp's layout-7 note: nothing before it
+    // moved, and the strict-equality version check is still what refuses a v6
+    // stream rather than any attempt to read one.
+    w_enum(o, r.domain);
 }
 
 bool r_region(std::istream& i, region& r)
@@ -311,11 +324,17 @@ bool r_region(std::istream& i, region& r)
         && r_int(i, r.settle_score_q) && r_int(i, r.farm_q) && r_int(i, r.ore_q)
         && r_int(i, r.energy_q) && r_int(i, r.port_q) && r_enum(i, r.dominant, max_region_cls)
         && r_i64(i, r.founded_year) && r_i64(i, r.industrial_year) && r_bool(i, r.industrialised)
+        && r_int(i, r.industrial_lag_years) // save_game_version 6
         && r_int(i, r.nation) && r_int(i, r.contest_q) && r_i64(i, r.population)
         && r_i64(i, r.last_demography_year) && r_i64(i, r.manpower_stock)
         && r_u32(i, r.works_built) && r_int(i, r.work_capacity_mod)
         && r_int(i, r.work_manpower_mod) && r_int(i, r.work_reach_mod)
-        && r_int(i, r.work_defence_mod) && r_int(i, r.work_industrial_mod);
+        && r_int(i, r.work_defence_mod) && r_int(i, r.work_industrial_mod)
+        // save_game_version 5 (BL-766) -- keep w_region in step.
+        && r_int(i, r.centres) && r_int(i, r.centres_razed)
+        && r_i64(i, r.urban_population)
+        // save_game_version 7 (BL-777) -- keep w_region in step.
+        && r_enum(i, r.domain, max_region_dom);
 }
 
 void w_settlement(std::ostream& o, const settlement_state& s)
@@ -325,13 +344,15 @@ void w_settlement(std::ostream& o, const settlement_state& s)
     w_vec(o, s.checkpoints, w_checkpoint);
     w_int(o, s.lacunae);
     w_i64(o, s.median_industrial_year);
+    w_bool(o, s.urban_map_drawn); // save_game_version 5 (BL-766)
 }
 
 bool r_settlement(std::istream& i, settlement_state& s)
 {
     return r_vec(i, s.regions, r_region) && r_vec(i, s.history, r_history_event)
         && r_vec(i, s.checkpoints, r_checkpoint) && r_int(i, s.lacunae)
-        && r_i64(i, s.median_industrial_year);
+        && r_i64(i, s.median_industrial_year)
+        && r_bool(i, s.urban_map_drawn); // save_game_version 5 (BL-766)
 }
 
 // ---------------------------------------------------------------------------
@@ -418,6 +439,10 @@ void w_report(std::ostream& o, const generation_report& g)
     w_i64(o, g.prehistory_battles);
     w_i64(o, g.prehistory_conquests);
     w_i64(o, g.prehistory_foundings);
+    // save_game_version 8 (BL-768, the ancient road record) -- keep r_report in step.
+    w_i64(o, g.prehistory_corridors);
+    w_i64(o, g.prehistory_junctions);
+    w_i64(o, g.markets_from_trade);
 }
 
 bool r_report(std::istream& i, generation_report& g)
@@ -427,7 +452,10 @@ bool r_report(std::istream& i, generation_report& g)
         && r_vec(i, g.bodies, r_body_entry)
         && r_vec(i, g.stage_lines, [](std::istream& s, std::string& v) { return r_str(s, v); })
         && r_i64(i, g.prehistory_years) && r_i64(i, g.prehistory_battles)
-        && r_i64(i, g.prehistory_conquests) && r_i64(i, g.prehistory_foundings);
+        && r_i64(i, g.prehistory_conquests) && r_i64(i, g.prehistory_foundings)
+        // save_game_version 8 (BL-768) -- keep w_report in step.
+        && r_i64(i, g.prehistory_corridors) && r_i64(i, g.prehistory_junctions)
+        && r_i64(i, g.markets_from_trade);
 }
 
 // ---------------------------------------------------------------------------

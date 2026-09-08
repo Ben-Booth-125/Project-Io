@@ -1,5 +1,14 @@
 # Strategies — the meta, authored ahead of the game
 
+> **Proposes:** what a strategy is if it is data rather than weights · what a card must carry
+> to be playable · which hypotheses are worth seeding a deck with · how a rival would be read ·
+> how a deck would be invented rather than authored · what compresses tightly enough to run
+> locally.
+> **Not here:** what a rival actually is and may do (AI_OPPONENT, the authority) · the control
+> dictionary (ACTIONS) · whether the language route is tractable at all
+> (LANGUAGE_POLICY_FEASIBILITY, also research).
+> **Confused with:** ai/AI_OPPONENT.md, ai/LANGUAGE_POLICY_FEASIBILITY.md, ai/ACTIONS.md.
+
 > **Status: research scaffolding — the design conversation's home, not authority.** From Ben's
 > ask (2026-08-06): *develop strategies and meta ahead of the game, to make it easier for AI to
 > play properly — we will have to compress strategy to a local machine.* Sits on

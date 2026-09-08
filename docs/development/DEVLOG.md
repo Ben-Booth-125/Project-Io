@@ -10,6 +10,578 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-07 (sprint 33 opens) — The corpus stops charging every session, and two tools are found lying
+
+**Mode:** Design (one question, two calls) → Corpus/Batch delivery in one wave → close.
+**Runtime:** one session; 7 sub-agents in worktrees, no compile — not one line of `src/` changed.
+
+### What started it
+
+Ben asked whether the query tools reading *both* the hot backlog and its archive defeats the
+archive's purpose, and whether reading the relevant docs was creating context creep.
+
+Half of that answer was easy and stayed easy. The archive exists to keep `backlog.json` meaning
+exactly one thing — open work — so the hot file never needs disambiguating. The union exists
+because `--touches` has to see closed items or it cannot answer "is this built?". Those two do not
+fight: the archive keeps the *file's meaning* clean, the union keeps the *question* answerable.
+
+The other half was the real cost, and it was somewhere else entirely: ~650K tokens of authority
+docs with no summary layer, so a nearly-right traversal opens a 40K doc to discover it wanted the
+sibling; `--full` prose resolving out of 1.9MB of archived designs; and `CLAUDE.md` plus the
+standing rules loading whole for a one-line doc tweak. Five items, filed as **sprint 33**; the
+market-viability sprint that held that number moved to **34** unchanged.
+
+### What was built
+
+**BL-787 (doc summary headers)** — every authority doc named in `CLAUDE.md` § 3 now opens with a
+header block. Ben chose the **index of questions** form over a précis and over questions-plus-stance:
+it lists the questions a doc settles and never the answers, so it survives a design change that
+alters one. 71 docs, five parallel slices. `ACTIONS.md` is regenerated whole, so its header lives in
+`render_actions.js`'s preamble instead.
+
+**BL-789 (standing rules split)** — `io-standing-rules.md` went **230 lines to 133**. The
+AI-behaviour grant register — BL-079 through the rival-network grant, 110 lines of dated precedent —
+moved verbatim into `AI_OPPONENT.md` § 11, diffed line-for-line with all 20 ids accounted for. The
+*gate* stayed, and was sharpened rather than summarised: a new widening is raised, never assumed.
+That was the item's whole risk — moving the history must not make the next widening cheaper to take.
+
+**BL-788** gave `--grep`/`--touches` a one-line-per-item default (33,072 bytes → 2,294 on one sweep,
+`--full` byte-identical). **BL-790** added `doc_owner.js`, which answers "which doc owns this file"
+from what work actually cited. **BL-791** put the fan-out-as-compression paragraph in `DELIVERY.md`.
+
+### What it found — the part worth keeping
+
+**The union does not union.** `archive_store.js` globs `backlog-design-*.json` only. It sees **138
+items; the archive directory holds 762.** The 624 it misses — 420 of them `complete`, 590 carrying
+the `files[]` array `--touches` reads — sit in `backlog-complete-*`, `backlog-cancelled-*` and
+`backlog-purged-*`, which predate `archive_landed.js` and use an `items` array instead of a `records`
+object. On `MARKETS.md` alone, 35 invisible items. **BL-792**, priority A.
+
+**And `--grep` throws away what it does find.** It matches across the union, then drops terminal
+items in the default view: `--grep market` prints "nothing matched" while `--grep market --all`
+returns 11 landed items. `DELIVERY.md` makes `--grep` the first step before authoring an item
+precisely to catch duplicate work, and it is blind to exactly that case. **BL-793**, priority A.
+
+Both fail the same way — a confident, silent NO — and both were surfaced by delivering something
+else. The session's opening answer needed its correction: the split is sound, the union is the right
+design, and the union as implemented has been answering wrong.
+
+**Six doc-truth defects, from writing one-line boundaries.** `PRODUCTION` and `POPULATION` each name
+the *other* as the workforce authority and both restate the derivation. `MARKETS` holds 70 lines of
+procurement; `CONTRACTS`, the doc named for it, is 113 lines total. `TILE_GENERATION` holds province
+rules the new headers now point away from — orphaned authority, which is worse than duplicated.
+`HISTORY` holds an ancient-naval rule `MILITARY_HISTORY` owns. Four UI subjects have no single owner,
+including `LAYOUT`'s 170-line drill-through system. **BL-794, BL-795, BL-796.** Fixed in place:
+`NATION_GENERATION` § Pass 7 carried "(RULED, not yet built)" in a heading — a state claim in an
+authority doc, forbidden outright.
+
+None of these are visible while each doc is read alone. Stating a boundary in one line is what
+exposes that it was never stated.
+
+### Method note
+
+BL-791 demonstrated by the sprint that filed it: five slices read the entire ~650K corpus and the
+main session paid for none of it. Every report came back as boundaries and findings, not excerpts.
+
+### Verification
+
+No compile — no `src/` change in the sprint. `backlog_lint`: **0 fails** throughout (warnings
+pre-existing). `next_id.js`: BL-797. All five agent branches merged in the main session, one conflict
+in `DELIVERY.md` resolved by keeping both bullets. `render_sprints`, `render_actions` and
+`devlog_index` re-run. `archive_landed` evicted the five closed items plus four already-terminal rows
+that had been sitting in the hot file, all verified to rebuild byte-exact; the hot file holds 31 open
+items.
+
+### Block 2 — the batch, and what four failed reviews bought
+
+**Mode:** two Workflow runs — 20 agents, then 10. No compile: the only `src/` edits in the whole
+batch are comment pointers repointed at moved sections.
+
+Five lanes, each built from a settled instruction. **Four failed cold review**, and none of the four
+on style:
+
+- **tools** traded the false negative for a false positive. Widening the union admitted 204 cold
+  rows whose `status` field *lies* — the 2026-08 sweeps froze each row at its pre-purge status, so a
+  culled item still reads `designed`. `--grep market --open` returned 18 rows with **zero** on the
+  hot worklist. It also shipped a DELIVERY.md bullet and a `--help` line promising a behaviour its
+  own code did not have. The rule that fixed it: **a cold row's state comes from the file it is
+  archived in**, normalised once at the union so no caller can be fooled.
+- **generation** deleted the *accurate* half of a doubled claim. PROVINCES was left asserting the
+  one-domain invariant is "structural rather than checked" while
+  `province_partition_harness.cpp:203` checks it as P2b. One false statement where there had been
+  two, one of them true — the specific failure mode of consolidating a boundary.
+- **ui** claimed to have grepped for dangling citations and had not (TOOLTIP still cited a moved
+  CANVASES section), and asserted an answer in SELECTION.md on a question the same agent had told
+  the judge was Ben's.
+- **proposes** switched PEOPLE.md and EVENTS.md to `Proposes:` on a half-read sentence. Both carry
+  `## Settled — Ben's rulings, 2026-08-22`, and the disclaimer they were switched on is qualified:
+  *"except where § Settled records one."* **That half-read was mine** — it is the premise I gave Ben
+  when I asked the question. The variant itself stands, on nine genuine research and exploration
+  docs.
+
+The **second** review earned its keep too: it caught a fabricated `(Ben, 2026-09-07)` attribution on
+the cold-row rule. That rule was mine, off the review's own measurement. In this repo a dated Ben tag
+is load-bearing provenance, and it would have hardened an agent's design call into a settled human
+ruling.
+
+**The design panel changed an answer.** Two independent proposals per boundary — one arguing from
+CLAUDE.md's router, one licensed to say the router is wrong — split workforce differently from the
+way the backlog item suggested. A builder reading the item alone would have built the wrong split
+confidently.
+
+### What the completeness critic proved about scope
+
+The three boundary lanes were scoped off defects a header sweep *happened* to notice. The critic
+built the `Confused with:` graph properly — **72 docs, 59 mutual pairs, 89 one-way edges** — and
+found three overlaps no lane would have reached: LOGISTICS and SUPPLY both holding the travel-time
+model under the same ruling date (**BL-797**); the navigation model and per-rung lens table each
+asserted **three** times (**BL-798**); and CREEDS/NATION_GENERATION, which survived every sweep
+because it is a *one-way* edge (**BL-799**).
+
+BL-798 is the lesson worth keeping. BL-796 deleted copy two of the lens table on entirely correct
+grounds and left copies three and four, which were outside its write set. **A correct rule applied
+to a partial scope leaves the corpus more inconsistent than it found it.** That is what **BL-801**
+(the header graph checker) exists to prevent, and it is why the tool comes before the next boundary
+sweep rather than after it.
+
+### Verification, block 2
+
+Union **138 → 757** items. `--grep market` **0 → 101** matches; `--touches MARKETS.md` **1 → 29**.
+Non-terminal over the union is 36, and that set *is* the hot set. `next_id` BL-806, never lower.
+`backlog_lint` 0 fails throughout. `doc_owner`, `backlog_view` and `status.ps1` all unchanged or
+better. 72 docs carry a header; `docs/ui/DRILL_THROUGH.md` exists with its CLAUDE.md § 3 row. All
+five fix branches merged with no conflicts.
+
+### Block 3 — the checker, and the sweep it scoped
+
+**Mode:** three Workflow runs — 3 agents, then 3, then 15. Still no application compile: the only
+`src/` edits are comment pointers and one harness correction.
+
+**BL-801 (header graph checker) came first, deliberately.** Three boundary lanes in block 2 had been
+scoped off defects a header sweep *happened* to notice, and sweeping again by hand would repeat that.
+`tools/session/header_graph.js` now checks four things: dangling citations (fails the run), the
+header graph (prints), router coverage both directions, and state-independence (fails).
+
+**It failed both its cold reviews on the first cut, and the graph half was badly wrong.**
+`demarkup()` stripped underscores along with markdown emphasis, so `NATION_GENERATION.md` resolved
+to nothing and **no doc with an underscore in its filename could ever be an edge target** — about a
+third of the corpus. The consequence is the one that matters: **the defect it was built to catch
+(BL-799, a one-way edge) was absent from its output entirely.** It measured 195 edges against a true
+264. The resolver half carried a *false pass* — a one-token anchor certifying a citation to a
+heading that does not exist — plus two citation shapes it never swept at all.
+
+After repair, an independent parser agrees **edge for edge**: 264 edges, 83 mutual pairs, 98 one-way,
+72 headers, set difference zero both ways. The dangling class went 2.7% false-positive → **0%**,
+audited at 80 of 80 rows. It ships with 27 self-test assertions, each pinned by a mutation test.
+
+First measurement of the corpus: **1119 citations — 729 OK, 310 prefix, 83 dangling.** The dangling
+cluster by *rename*, not by file, and one cluster was ours: five references named
+`io-standing-rules § the player-corp exception`, which BL-789 had moved that morning without
+sweeping. Filed as **BL-807**.
+
+### The sweep — and the item that repeated itself
+
+Five lanes; three passed, two failed.
+
+**BL-798 failed in exactly the way it was filed to fix.** It consolidated copies two and three of
+the pan/zoom claim and left a verbatim **fourth** at `MINIMAP.md:301`, outside its write set — and
+its completeness evidence was *false* when the reviewer re-ran it. Widening the write set and
+requiring the search be pasted in full, empty results included, is what fixed it. `"primary slot"`
+now appears once in the corpus.
+
+**BL-799 failed twice, identically**, and was finished in the main session by reading the code site
+by site. Both agents wrote the tidy universal rule; the truth has an exception the corpus had
+already recorded elsewhere — `make_corp_name` pairs a tongue-inheriting identifier with one of
+twelve **English structural type words**. When two independent attempts fail the same way, the
+brief is wrong, not the agent.
+
+**BL-804 corrected the harness’s MEASUREMENT, and left it red.** P9c asks about seed strength, and
+`build_province_partition` skips `province_anchor` centres when gathering seeds — those are founded
+*after* the partition ships, so their size owes nothing to their scale, and the row was pooling 1,011
+of them. On the corrected measurement **P9c still fails** (s1: 458 @ 7.51 · s4: 1 @ 3.00), and so does
+A1. Rebuilt and rerun in the main session to confirm: **42 PASS, 2 FAIL, exit 1.** Neither was
+weakened to pass, and the surviving question is sharper than the one BL-804 answered — a monotone
+claim over four buckets decided by a single scale-4 sample may not be answerable as written. **BL-809**.
+
+### The defect the docs were hiding
+
+**BL-808**, priority A. `history_sim.cpp:1564` names a sim-founded region `src.name + " Reach"` — an
+English literal in a name that ships, against the standing rule that every generated name is
+sci-fi/fantasy.
+
+**The project fixed this exact defect once already.** `settlement.cpp:272` carries the post-mortem in
+its own words — *"'MelethWorirUlael Reach' put two naming systems side by side in one string, which
+reads as a bug rather than a style"* — and BL-348 coined the quarter word from the tongue. The second
+pass was never swept. It surfaced because a doc claim was too broad: **the tidy rule was wrong
+because the code was wrong.**
+
+### The pre-push audit, and what it caught
+
+Three cold auditors over the finished state — corpus coherence, doc-versus-code truth, and whether
+the RECORD is honest — then an adjudicator that verified each blocker itself before accepting it.
+Two blockers were raised; one survived.
+
+**NR-794 was minted twice, and the second mint was mine.** A prior session used it for a
+naval-composition ruling and cited it at three source sites (`unit_roster.hpp:283`,
+`unit_roster.cpp:211`, `history_sim.cpp:201`) — and **never filed it**. So nothing in the review
+store could see the id was taken. This session minted NR-794 for the border-band question, and for
+a few hours three code comments resolved to a ruling about lens chrome: a visible gap converted
+into a confident wrong answer, which is the exact failure class these 61 commits spent the day
+removing. Renumbered to **NR-797**, with the collision recorded on that entry. **BL-811** widens
+`next_id.js`, which guards BL ids and nothing else — and the guard must scan the *tree*, not the
+store, because this id was cited in code and never filed.
+
+**The second blocker did not survive, and the adjudication is worth keeping.** Six docs derive
+km-per-tile from a 312-column grid the code retired at BL-424 (`home_grid_width = 261`), so the
+constant is ~20% wrong. Real — but the session did not cause it: BL-797 deleted the duplicate in
+SUPPLY, taking the corpus from seven false copies to six, and four of the five survivors were never
+touched. Filed as **BL-810**, with the aggravating detail that the re-authored line now cites
+`body_km_per_tile` beside the wrong number, so a false constant reads as code-verified.
+
+The auditors also confirmed the load-bearing claim by the right method: today's checker run against
+an extracted base tree, diffing the *misses by citing site* rather than by count. **4 added, 4
+removed — zero citations broken by this session**, and three of the four additions are BL-807's own
+prose quoting the broken forms it exists to fix.
+
+### Verification, block 3
+
+Dangling **83 → 81** across the whole sweep: five lanes moved prose between docs and created no net
+dangling citation. `header_graph --self-test` 27/27. `backlog_lint` 0 fails throughout. `next_id`
+monotonic. Nine items closed and evicted, all verified to rebuild byte-exact; the hot file holds 28.
+`docs/development/design/` deleted after three independent checks, `--doc GLOBAL_STYLE_SHEET` now
+resolving where two files had shared the basename.
+
+### Open for Ben
+
+- **BL-792 and BL-793 landed in block 2**, so a bare `--touches` or `--grep` negative is evidence
+  again. It was not, for the whole life of this session before that point — worth knowing when
+  reading anything filed earlier today.
+- `--sprint` does not exist as a flag; unknown flags are ignored silently and the tool returns
+  everything. Minor next to the two above, and not chased.
+- `PEOPLE.md` and `EVENTS.md` are proposal-stage but their headers say **Settles:** like every other
+  doc. A `Proposes:` variant would be more honest; I did not invent one without your say.
+- `research/ERA1_TECH_LANDSCAPE.md` and `TECH_EFFECTS.md` route readers to `economy/RESEARCH.md`,
+  which is a stub. Correct routing, empty destination.
+
+---
+
+## 2026-09-06 (sprint 32b closes) — The world changes, and the instruments learn to see it
+
+**Mode:** Design (one elicitation form, eight calls) → Full batch delivery in three waves → two cold
+reviews → live check → close.
+**Runtime:** one long session; ~40 harness builds, three play builds, 10 sub-agents in worktrees,
+two cold adversarial reviews.
+
+Sprint 32b closed with **eleven items delivered** across three waves; **32c opened** for the
+remaining 28. The distinction from 32a is the whole point: 32a delivered instruments and moved no
+world on purpose; 32b moved every world four separate times and kept the causes attributable.
+
+### The design pass that set the scope
+
+Ben answered a market-work elicitation form settling **eight open calls**. Five became authority-doc
+text rather than commit messages: *no price, no draw* in PRODUCTION.md; phase 6's three-term
+objective in GENERATION_STRATEGY.md; pass 3 rewritten to SELECT a landscape rather than settle one;
+protection DERIVED at handoff in NATIONS.md; `trade_goods_misc` joining the endemic basket with its
+asymmetry cost stated in MARKETS.md. BL-751 was cancelled superseded with its parts named on BL-770
+and BL-772, so nothing went with it.
+
+Later, ruling on a paleo measurement, Ben added the steer that outlives the item: **richness is
+absorbed by the per-province infrastructure score, never clamped at generation** (PROVINCES.md
+§ Richness is absorbed here). Ground is a fact about the world; what a corporation can *do* with it
+is gated behind roads it has to build.
+
+### The result that decides the most
+
+**BL-770 slice 1 returned a negative result, and it was the right question to ask.** Five candidates
+whose fixtures differed by 20 corporations and 41 buildings scored *identically to the last digit* —
+every term read tiles, markets and population, and `market_saturation.cpp` contains neither
+"corporation" nor "building". Slice 2 added the roster-aware term (actual against potential
+completeness) and the same five candidates now spread **3.2e-01**. The search itself is still
+unbuilt, which is why BL-772 stayed blocked rather than shipping an unsettled opening position.
+
+### Four things that went wrong, kept because they will recur
+
+1. **Two agents bumped `save_game_version` 4 → 5 independently**, each correct alone. Merged, the
+   stream carried both and was neither one's v5 — two layouts under one version number, each
+   readable only by the build that wrote it. Resolved to 6; the wave ended at 8. Thereafter: exactly
+   one item per wave may bump it.
+2. **Three save-format changes landed unasserted**, because no worktree agent can build
+   `save_envelope_roundtrip` (it links imgui). Each time the integrating session wrote the assertion
+   and ran the differential. That is the builder gap's standing cost, now recorded in the harness.
+3. **The cold review caught a regression shipped as an improvement.** BL-767's Invest ground-pull
+   made industrialisation *worse* — 8/16 against 14/16 at the value that measures best — and the
+   item's own diagnosis ("the ceiling is in the selection rule, not the price") was falsified by
+   measurement. Underneath it was a real bug: a capped domain kept its pull, but the investment it
+   won did nothing.
+4. **Three builder fixes, and my first two verifications were run where the bug could not appear.**
+   Deps-cache resolution, `JSON.stringify` quoting, MSYS export ordering — each "fixed" and each
+   still broken for worktree agents until tested *from* a worktree.
+
+### Measurement over argument
+
+The pattern that worked, repeatedly. BL-783 tested its causal claim as a controlled **experiment** —
+sack 59 regions in a copy and re-materialise: sacked lose 73.3% of their cities, controls 2.4% —
+rather than resting on the one razed region the seed happened to produce. BL-765 asserted "the
+fossils read the past" by generating the same body twice with the drift record withheld. BL-768
+measured both its constants off a bimodal distribution instead of choosing round numbers. BL-750
+traced its flat tariff table to an upstream furnace count rather than tuning the banding.
+
+And the peat re-examination **overturned** a change: RESOURCES.md authors peat as a pair on scrub,
+BL-765 had narrowed it to marsh on a reading of prose, and 58% of the world's peat went with it.
+Restored, and measured back to 7930 against a 7792 baseline.
+
+### The live check, run at the close rather than owed forward
+
+BL-754's budget line **verified on screen**. BL-768's roads render, but an ancient road is
+indistinguishable by eye from a national one, so the headless differential is the stronger evidence.
+**Coastal ownership could not be checked at all** (NR-791): the hover card reports terrain, clicking
+water selects nothing, no lens colours by owner. That is a hole in BL-780's own done-when.
+
+Two measurements fell out of it: `build/` is Debug, so its 84.75 s generation must not be quoted
+against BL-761's Release figure; and the Debug warm start is **667,428 ms**, of which
+`run_economy_step` is 534,719 — BL-761's finding quantified, naming the same culprits.
+
+### And a bug the harnesses could not see
+
+Ben, looking at the live world: **one nation carries a complete road lattice** while its neighbours
+are sparse. The aggregate (+320 roaded tiles) was right and the per-nation distribution was wrong,
+and nothing reports per-nation road density. I had seen the same density, doubted it, checked a
+different region and moved on — an aggregate cannot see a distribution. **BL-784.**
+
+---
+
+## 2026-09-06 (sprint 32a closes) — The arc runs, and four instruments could not see
+
+**Mode:** Design → Full (batch, then hand-built slices) → three design rulings → close.
+**Runtime:** one long session across several days; ~25 harness builds, one play build, 12 sub-agent
+launches of which **zero** succeeded.
+
+### What closed, and why here
+
+Sprint 32 opened with 8 items on "three passes of simulated history". Ben's eight-phase reorder
+added 12, the water-domain ruling added 5, and findings added the rest — **34 items, 5 delivered**.
+Closed as **32a** at a natural boundary rather than pushed on: everything delivered is one coherent
+thing (*the arc runs, and the instruments that measure it are honest*), and everything remaining
+moves the generated world, which wants its own before/after. 32b carries the other 29.
+
+### Delivered
+
+**BL-747 (two-span prehistory).** The Era −1 sim now runs at any epoch — the gate had refused
+anything above 1700, so the arc we build the product on had ancient borders and no simulated history
+behind them. Two spans on **one** invocation, because `era_minus_one.hpp` exists precisely to stop
+that call drifting across callers. `boundary_year` (INT64_MIN) and `span1_band_ceiling`
+(`industrial`) are inert at their defaults, which is what makes the 0 CE world byte-identical rather
+than hoped-identical. A 1960 world runs 1160 → 1560 → 1960.
+
+**BL-757 (the sweep measures generation's own era).** `history_sweep` printed "−4000 → 0" because it
+built default params; generation runs −400 → 0. So the harness that `HISTORY.md` and `COLLAPSE.md`
+both name as the place every Era −1 magnitude is argued was describing a run no world is built from.
+It now runs from `era_minus_one_fixture`, closing all six divergence axes, asserted per seed by a
+**self-checking** row: the report already carries generation's own counts, so a pinned 270/207/833
+would have rotted the first time the world legitimately changed.
+
+**BL-763 (continent time axis).** `drift_col`/`drift_row` were documented "per-epoch" with no epoch
+defined anywhere — the vector existed and nothing integrated it. Now 5 My over 20 epochs, with any
+past configuration derived rather than stored (`continent_state` is on the save envelope seam;
+twenty rasters per body would be ~2.5 MB for data that is a pure function of five floats per plate).
+
+**BL-771 (tick length).** Closed on its **audit**, not its code. The audit found the tick length was
+the wrong dial, Ben ruled the quarterly tick, and the parameter became unnecessary — so R1, R2 and
+R4 were **cancelled rather than deferred**, because a deferred row invites someone to build it later
+for a reason that has gone away.
+
+**BL-775 (saturation measure promoted).** Ben's phase 6 question turned out to be already answered
+by two computations the project verifies against daily — they were inside harness anonymous
+namespaces where `src/` could not link them. Now in `src/world/market_saturation.{hpp,cpp}`.
+
+### Three rulings, each of which changed the work rather than confirming it
+
+**The quarterly tick** (NR-786). It moved phase 6's *span*, not just BL-771: at 90-day ticks, 100
+ticks is 25 years rather than the 400 Ben's point 6 named.
+
+**The static saturation search.** Ben restated phase 6 narrowly — *"not a 100% accurate series of
+trades… nor what makes the most profit per tile"* — and that is not a simulation question at all.
+Saturation is a **static property** of a candidate roster against a fixed world. It dissolved the
+span question entirely: there is no span, because there is no clock.
+
+**The water domains.** Ben: *"Give coastal to owners, and sea provinces are unowned."* Better than
+what was filed, and the codebase was most of the way there — `province_kind` already partitions the
+three domains exclusively, ownership already derives from tiles, and the naval class already exists
+as three authored rows worth zero. It halved BL-756's destructiveness and dissolved BL-749.
+
+### The finding that matters most: four instruments that could not see their subject
+
+1. **`history_sweep` swept the struct default** rather than generation's run (BL-757).
+2. **`era_world_harness` was never run** while `world_determinism` was green — so a real regression
+   shipped inside a wave I had called verified. Found by the cold review, confirmed by hand: 12 pass,
+   1 fail, and only the 1960 clause moved (BL-758, left **red** for Ben).
+3. **The app never prints the generation budget** the item added — the line is inside an
+   `if (fixture)` branch and the app passes none, so every figure quoted is a harness figure.
+4. **`history_sweep.json` diffs on a wall-clock field**, so genuine drift hides in timing churn —
+   and the "it is stale" claim I had repeated turned out to be wrong on inspection.
+
+This is the BL-714 pattern recurring, and it recurs because **a green check is not evidence that it
+looked**.
+
+### Measure-first paid for itself twice, and both times the number inverted the item
+
+`sim_water_census`, three seeds of generation's own era:
+
+- **1105 of 3819 regions sit on water** — 29% — with 613 on open ocean. BL-756 had assumed the count
+  might be zero and its guard free; it would have deleted a third of every world.
+- **43% of adjacency edges cross sea.** BL-755 had assumed sea reach was absent. It is unpriced, not
+  absent, and every tuning constant in `history_sim_params` was fitted with it happening.
+
+Both items would have been built wrong from their own filed premise. Ben's water ruling then made
+the ~492 coastal regions *legitimate* and left only the 613 on open ocean to fix.
+
+### Two process lessons
+
+**A requirement written after the code describes the code, not the intent.** BL-775 said "promote
+both"; one half was promoted, the group was written describing that half, and lint, requirements and
+harnesses all went green on a half-delivered item. Caught only by re-reading the item.
+
+**Sub-agent capacity was unavailable for the entire session** — 12 launches, every one a 529 with
+zero tool calls. Every slice was hand-built, and the batch's **cross-slice review barrier never
+ran**. Recorded as a debt, not dropped. BL-774 compounds it: worktree agents cannot build the
+harness class that checks the byte-identity invariant.
+
+### Owed
+
+The review barrier; `continent_drift`, `sim_water_census` and the promoted measure are **ad hoc**
+until Ben names them in the verifier skill; BL-762's deposit split stays blocked on BL-765 because
+removing biological deposits before the Life phase exists would delete `agricultural_produce` and
+take the food chain with it.
+
+
+---
+
+## 2026-09-03 (sprint 32 opens, wave 1) — The second span is free, and four instruments were pointing the wrong way
+
+**Mode:** Design → Full (merge repair, then one delivery wave). **Runtime:** one session; one
+7-agent subsystem map, one implementer in a worktree, one cold review; ~6 harness builds.
+
+### The design
+
+Ben's brief: gamify generation — duplicate the 400-year timelapse so a second pass produces
+post-Enlightenment industry, colonisation by major powers, and market conditions at game start.
+Settled as **three passes on two engines** and written into `GENERATION_STRATEGY.md` § Three
+passes of simulated history, `HISTORY.md` § The epoch and the run, `ERAS.md`, and
+`CORPORATION_GENERATION.md` § Pass 6. Two polity spans on the existing sim, then the warm start
+promoted to an economic settle. Market differentiation comes from three in-world forces with
+visible causes — tariffs from industrialisation timing, distance on the real network, colonial
+ties as preferred sellers — and a seed-sweep scoreboard reads the SPREAD, never a per-world value.
+
+### The merge, which needed three repairs
+
+The branch was cut before 2026-09-02 and collided on all three shared numbering spaces. Main had
+minted **BL-746** (upkeep starvation cliff) while this branch filed BL-746 (two-span prehistory);
+**sprint 31 closed** mid-session and sprint 33 opened; and the sprint number itself moved twice —
+renumbered to 34 by reading `next_up`, then corrected back to **32** by Ben, who reads 32 as a gap
+to fill rather than a number to skip. `next_up` is corrected so the next session does not re-derive
+34. Resolution took main's stores whole and re-applied this branch's additions on top, so nothing
+of the other session's was displaced. Memory `io-backlog-id-collision-on-stale-branch` records the
+tell: `next_id.js` reported its own scan INCOMPLETE and was believed anyway.
+
+### Built — BL-747 (two-span prehistory) and BL-754 (generation budget)
+
+**One invocation, not two.** `era_minus_one.hpp` exists because this exact call has drifted across
+callers on six axes with a seventh going uncounted, so a second `run_history_sim` call was ruled
+out at design time. The spans live inside the single existing call: `history_sim_params` gains
+`boundary_year` (default `INT64_MIN`) and `span1_band_ceiling` (default `industrial`), and
+`sim_band_ceiling(params, y)` is one derivation read at BOTH roster sites — the works table off
+materials capacity, the unit table through a new `build_stack` ceiling argument. The gate drops its
+epoch clause and asks `prehistory_years > 0` alone; the epoch now decides only whether there is a
+second span.
+
+**Both new fields are inert at their defaults**, which is what makes the ancient arc byte-identical
+rather than hoped-identical: no year is before `INT64_MIN`, and a clamp to `industrial` is the
+identity. Adding a candidate to the scorer would have moved the argmax even where it never won; an
+inert clamp cannot.
+
+**Save format:** `world_params` is serialised, so `industrial_years` is a mid-record insertion and
+`save_game_version` goes 3 → 4. **Existing `.iosave` files are rejected** — that file has no
+upgrade path by design, refusal being its whole compatibility story.
+
+### Verified — in the main session, not on the agent's report
+
+`world_determinism` ALL PASS. The three 0 CE digests are unmoved — `039EE9880739CDF6`,
+`B0EBBA249B3DDABB`, `DE55600457797638` — with the era report still years=400 battles=270
+conquests=207 foundings=833 on seed A. The 1960 arc runs **1160 → 1560 → 1960**, two tick bands,
+span-1 ceiling medieval, years=800 battles=1323 conquests=1128 foundings=506, digest
+`DB86651B9A596F7B` identical across two builds. Three new reported rows (R4.1–R4.3) assert only
+that both spans ran, that the pass did something, and that it is deterministic — no magnitude pinned.
+
+**A defect found while reviewing the merge, fixed in the main session:**
+`era_minus_one_has_industrial_span` tested only the epoch, so `industrial_years = 0` on a 1960 arc
+would have put the boundary AT the epoch and capped the whole run at medieval — the exact opposite
+of what that field's own doc-comment promises. It now tests `industrial_years > 0` too.
+
+### The answer to Ben's question, which was the point of the wave
+
+*"I am interested to see if this can be done cheaply."* **Yes, and the second span is free.**
+
+| run | total | pre-settle | settlement | era-1 | post-era |
+|---|---|---|---|---|---|
+| 0 CE, 400 y | 8200 ms | 443 | 4 | **323** | 7428 |
+| 0 CE, no era | 6661 ms | 455 | 3 | 0 | 6202 |
+| 1960, two-span 800 y | 7996 ms | 465 | 2 | **197** | 7331 |
+
+800 simulated years at 1960 cost **less** than 400 at 0 CE, and the whole 1960 world builds faster
+than the ancient one. Cost tracks the region table the sim grows, not the years it walks — at 1960
+the settlement pass has already founded most regions, so the sim founds 506 where the ancient arc
+founds 833. `COLLAPSE.md` § The 4000-year problem already said cost tracks the province table; this
+is that sentence measured.
+
+**And the era pass costs four times its own wall clock.** Era on versus off at 0 CE is a ~1.5 s
+difference of which only 323 ms is the sim; the rest is every pass after it working over the 833
+regions the era founded. A budget taken off the era's own timer is wrong by 4×, and the
+affordability rungs in `COLLAPSE.md` are aimed at the 323 ms rather than the 1.2 s. **No rung is
+re-filed**, per BL-754's own rule: re-file the one a measurement points at, when it does.
+
+### Four instruments that were pointing the wrong way
+
+The wave's most valuable output was not the feature. Scoping the sea-leg item against the code
+inverted its premise, and measuring the baseline caught two more:
+
+- **BL-755** — region adjacency is Chebyshev radius 9 and **water-blind**, so short overseas
+  campaigns are already legal and FREE, and every tuning constant in `history_sim_params` was
+  measured with that happening. Sea reach is unpriced, not absent.
+- **BL-756** — the Settle verb applies **no terrain test**, so a region can be founded on ocean,
+  where `terrain_combat` returns 0 defence. Silently undefendable, and nothing reports it. Also:
+  `region::port_q` counts lakes and is inherited-and-decayed rather than re-surveyed, so it is
+  wetness, not sea access — any harbour gate keyed on it gates on the wrong thing.
+- **BL-757** — `history_sweep` prints "16 seeds, -4000 -> 0" because it constructs bare default
+  params instead of deriving through `era_minus_one_sim_params`. Generation runs -400 -> 0 on one
+  band. So the harness both `HISTORY.md` and `COLLAPSE.md` name as the place every Era -1 magnitude
+  is argued describes a run no world is built from — BL-462's defect, unclosed, in the one harness
+  whose whole subject is the era. Its banner now says which params it runs, and `--epoch` derives
+  through the real helper.
+- **Zero works raised across all 16 seeds**, reproduced in all three modes. The cause is the
+  **argmax, not the gates**: gates are met comfortably, but `work_score_q` lands in the low tens
+  while `build_work` is scored LAST against a `best_score` already set by campaign and settle. So
+  the roster is not inert, but **BL-748's band unlock has nothing to unlock** until `build_work` can
+  win a round. Read from code, not yet measured.
+- A fifth, same class: every harness calls generation with `works = nullptr` while the app passes
+  the real registry, so **the shipped game scores five verbs and every harness scores four**.
+
+`history_conquest_gap` R3 fails on all 8 seeds and **was already failing** — confirmed by building
+the harness from unmodified base sources in a scratch tree, which emits the identical table. The pin
+is stale, not broken by this change; `history_sweep.json` is stale the same way. Neither was
+re-blessed, because re-blessing inside this commit would bury the signal.
+
+### Left open, deliberately
+
+BL-749 (sea legs) is held out of wave 1: its premise is inverted by BL-755/BL-756 and five design
+calls on it are open (NR-785). BL-751 (economic settle) is gated on sprint 33's growth half — sprint
+31 made the field solvent, but valued production still falls, and a settle over a shrinking field
+culls toward a smaller economy rather than a steady one. **NR-783** asks whether the span boundary
+should be derived from the first furnace rather than authored at epoch − 400; **NR-784** records the
+call taken to keep the ancient arc's band ladder uncapped, and asks whether it should be capped at
+all — a 400 BCE polity can currently reach the gunpowder band and nobody has measured whether it does.
+
+---
+
 ## 2026-09-02 (sprint 31 closes, sprint 33 opens) — A field that can pay, and the one that must grow
 
 **Mode:** the whole arc in one session — Design → Full → measure → rule → fix → measure — closed on

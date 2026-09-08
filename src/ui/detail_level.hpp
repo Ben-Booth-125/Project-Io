@@ -59,7 +59,7 @@ struct ui_state;
 //   SUBJECT what am I looking at                 -> ui_state::card_stack (BL-196)
 //   HOST    where does this properly live        -> ui::focus_on_entity, the [>] button
 //
-// Authority: docs/ui/LAYOUT.md § Drill-through.
+// Authority: docs/ui/DRILL_THROUGH.md.
 // ---------------------------------------------------------------------------
 
 /// Every site that owns a disclosure control. `key` disambiguates instances within

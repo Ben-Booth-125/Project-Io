@@ -12,9 +12,13 @@ int clamp_permille(int v) { return std::clamp(v, 0, 1000); }
 /// Baseline power per unit of a class before any per-type, doctrine or
 /// terrain modifier is applied. Illustrative first-cut values, not gospel —
 /// the roster table (BL-274) is where real era tuning happens; this is just
-/// enough spread to make the class matrix legible. `naval` is 0: naval is
-/// strategic-only in this cut (file header), so it never contributes tactical
-/// power regardless of what the matrix below says about it.
+/// enough spread to make the class matrix legible.
+///
+/// BL-779: `naval` was 0 here — the class was excluded from the tactical
+/// calculation outright. It is now authored like the other four, at 140: a
+/// ship is few, costly and heavy per unit, so it sits between cavalry's 130
+/// and siege's 150. Domain, not arithmetic, is what keeps fleets off land
+/// (file header).
 int class_base_power(unit_class c)
 {
     switch (c)
@@ -23,7 +27,7 @@ int class_base_power(unit_class c)
         case unit_class::cavalry:  return 130;
         case unit_class::ranged:   return  90;
         case unit_class::siege:    return 150;
-        case unit_class::naval:    return   0;
+        case unit_class::naval:    return 140;
     }
     return 0;
 }
@@ -49,7 +53,14 @@ int matchup_mult(unit_class attacker, unit_class defender)
         /* cavalry  */ { 1300,    1000,    700,  1300,  1000 },
         /* ranged   */ {  700,    1300,   1000,  1100,  1000 },
         /* siege    */ {  600,     600,    700,  1000,  1000 },
-        /* naval    */ { 1000,    1000,   1000,  1000,  1000 }, // unused: naval never enters tactical power
+        // NAVAL IS NEUTRAL ON PURPOSE, and the row is live (BL-779). The
+        // authority is explicit that a naval entry contributes "power and
+        // weight to the matchup average exactly as a land class does", and
+        // that what separates it "is not its arithmetic but its domain". A
+        // rock-paper-scissors edge for or against ships would be a tuning
+        // constant nobody has asked for, doing the job the domain gate
+        // already does; neutral is the reading of the doc, not a placeholder.
+        /* naval    */ { 1000,    1000,   1000,  1000,  1000 },
     };
     return table[static_cast<int>(attacker)][static_cast<int>(defender)];
 }
@@ -62,10 +73,11 @@ int season_attrition_multiplier(season s)
     return s == season::winter ? 1500 : 1000;
 }
 
-/// Sum of (count * per-unit power) across a stack, and the total non-naval
-/// unit count, in one pass. Naval entries are skipped entirely — see file
-/// header § naval — so they add neither power nor weight to the matchup
-/// average computed from `total_count`.
+/// Sum of (count * per-unit power) across a stack, and the total committed
+/// unit count, in one pass. EVERY class counts, naval included (BL-779) — the
+/// class-blind loop here is the arithmetic half of "naval scores like any
+/// other class", and an all-naval stack now sums to real power rather than to
+/// zero.
 struct stack_totals
 {
     std::int64_t power = 0;
@@ -77,7 +89,7 @@ stack_totals sum_stack(const std::vector<army_stack_entry>& stack)
     stack_totals t;
     for (const army_stack_entry& e : stack)
     {
-        if (e.cls == unit_class::naval || e.count <= 0)
+        if (e.count <= 0)
             continue;
         const int per_unit = std::max(1, class_base_power(e.cls) + e.type_power_mod);
         t.power += static_cast<std::int64_t>(e.count) * per_unit;
@@ -89,16 +101,18 @@ stack_totals sum_stack(const std::vector<army_stack_entry>& stack)
 /// Weighted average matchup multiplier of `attacker` against the composition
 /// of `defender`, per-mille. Weighted by unit COUNT on both sides (a class
 /// that makes up half of a huge defending army matters more than one making
-/// up half of a token garrison). Returns 1000 (neutral) if either side has no
-/// non-naval units, so an empty/all-naval stack never divides by zero.
+/// up half of a token garrison). Returns 1000 (neutral) if either side commits
+/// no units at all, so an EMPTY stack never divides by zero. An all-naval
+/// stack is no longer one of those cases (BL-779): it counts, so it resolves
+/// as an ordinary fight — the rare one the water model exists to express.
 int weighted_matchup(const std::vector<army_stack_entry>& attacker,
                       const std::vector<army_stack_entry>& defender)
 {
     std::int64_t attacker_count = 0, defender_count = 0;
     for (const army_stack_entry& e : attacker)
-        if (e.cls != unit_class::naval && e.count > 0) attacker_count += e.count;
+        if (e.count > 0) attacker_count += e.count;
     for (const army_stack_entry& e : defender)
-        if (e.cls != unit_class::naval && e.count > 0) defender_count += e.count;
+        if (e.count > 0) defender_count += e.count;
 
     if (attacker_count == 0 || defender_count == 0)
         return 1000;
@@ -106,10 +120,10 @@ int weighted_matchup(const std::vector<army_stack_entry>& attacker,
     std::int64_t weighted_sum = 0; // sum of count_a * count_d * matchup_mult, before the final division
     for (const army_stack_entry& a : attacker)
     {
-        if (a.cls == unit_class::naval || a.count <= 0) continue;
+        if (a.count <= 0) continue;
         for (const army_stack_entry& d : defender)
         {
-            if (d.cls == unit_class::naval || d.count <= 0) continue;
+            if (d.count <= 0) continue;
             weighted_sum += static_cast<std::int64_t>(a.count) * d.count * matchup_mult(a.cls, d.cls);
         }
     }

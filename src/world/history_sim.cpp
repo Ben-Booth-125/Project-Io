@@ -147,6 +147,38 @@ doctrine_row doctrine_for(const polity& p)
     return d;
 }
 
+/// Which span a year falls in (BL-760 (1)): 0 = the ancient span, 1 = industrial.
+///
+/// A SINGLE-SPAN RUN REPORTS EVERYTHING AS SPAN 0, which is the reading that
+/// matches the design rather than the sentinel. `boundary_year` defaults to
+/// INT64_MIN so that "no year is before it" leaves a one-span arc inert — but
+/// read naively that puts an ancient arc's whole history in span 1, i.e. in the
+/// industrial span it does not have. The explicit sentinel test is what keeps
+/// the ancient-arc rows readable.
+int span_index(const history_sim_params& params, int64_t y)
+{
+    if (params.boundary_year == INT64_MIN)
+        return 0;
+    return y >= params.boundary_year ? 1 : 0;
+}
+
+/// Count a fielded stack into the per-band and per-span rows.
+void note_units_fielded(history_sim_state&        out,
+                        const history_sim_params& params,
+                        int64_t                   y,
+                        roster_band               band,
+                        const std::vector<army_stack_entry>& stack)
+{
+    int64_t n = 0;
+    for (const army_stack_entry& e : stack)
+        n += e.count;
+    const int b = static_cast<int>(band);
+    if (b < 0 || b >= roster_band_count)
+        return;
+    out.units_by_span_band[static_cast<std::size_t>(span_index(params, y))]
+                          [static_cast<std::size_t>(b)] += n;
+}
+
 /// Turn raised manpower into a typed stack via the era-keyed roster (BL-274),
 /// then scale the whole stack by the owner's COHESION (BL-308).
 ///
@@ -157,20 +189,91 @@ doctrine_row doctrine_for(const polity& p)
 ///
 /// `readiness_q` is the caller-side lever the winter-campaign candidate uses
 /// against a defender (history_sim.hpp § season).
+///
+/// `ceiling` is the two-span band cap (BL-747). It carried a
+/// `= roster_band::industrial` default — no restriction — which BOTH call sites
+/// already override with `sim_band_ceiling(params, y)`. The default was therefore
+/// dead, and dead in the dangerous direction: a new in-TU caller that omitted the
+/// argument would silently un-apply the span cap, with no diagnostic and no
+/// harness able to see it (BL-760 (3)). Required rather than defaulted, so
+/// forgetting it is a compile error.
+///
+/// @p allow_naval carries NR-794 (Ben, 2026-09-07): ships are composed only into
+/// a stack whose campaign actually crosses water. Required for the same reason
+/// @p ceiling is — an omitted argument would silently re-admit fleets to land
+/// battles, and nothing downstream could tell.
 std::vector<army_stack_entry> build_stack(int64_t manpower,
                                           const region& home,
                                           const polity&   owner,
-                                          int             readiness_q)
+                                          int             readiness_q,
+                                          roster_band     ceiling,
+                                          bool            allow_naval,
+                                          roster_band*    band_out)
 {
     const int band_index = clampi(owner.capacity[static_cast<int>(sim_domain::military)], 1, 6);
-    const roster_band band = roster_band_for_capacity(band_index);
+    const roster_band band = min_band(roster_band_for_capacity(band_index), ceiling);
+    // BL-760 (1): the band is computed HERE and nowhere else, so the counter
+    // reads the value the stack was actually built from. Re-deriving it at the
+    // call site would be a second copy of the min_band rule, free to drift from
+    // this one — the divergence class this file's own header warns about.
+    if (band_out != nullptr)
+        *band_out = band;
 
     // Cohesion folds into readiness rather than into the counts: a shaken
     // polity fields the same men fighting worse, not fewer men fighting well.
     const int cohesion = clampi(owner.cohesion_q, 0, 1000);
     const int effective_readiness = (readiness_q * cohesion) / 1000;
 
-    return roster_stack(manpower, home, band, effective_readiness);
+    return roster_stack(manpower, home, band, effective_readiness, allow_naval);
+}
+
+/// True iff the straight line between two regions crosses SEA (open ocean or
+/// coastal sea; lakes are not sea). BL-778's traversal legality is asked of an
+/// EDGE, and this is the predicate that answers it.
+///
+/// DELIBERATELY THE SAME SAMPLER `tools/verify/sim_water_census.cpp` USES, step
+/// for step, so the "43% of adjacency edges cross sea" figure the item is
+/// scoped against and the legality the sim now enforces are the same
+/// measurement. Sampled along the line rather than pathfound, because the sim
+/// has no path either — its adjacency is a water-blind Chebyshev radius, which
+/// is exactly the free reach this prices.
+///
+/// Integer-only, no wrap (the census does not wrap either), and a function of
+/// the terrain raster alone: two runs at one seed ask it the same questions in
+/// the same order and get the same answers.
+bool line_crosses_sea(const region& a, const region& b,
+                      const sim_terrain_view& terrain, int gw, int gh, int radius)
+{
+    const int steps = radius * 2;
+    for (int t = 1; t < steps; ++t)
+    {
+        const int c = a.col + (b.col - a.col) * t / steps;
+        const int r = a.row + (b.row - a.row) * t / steps;
+        if (c < 0 || r < 0 || c >= gw || r >= gh) continue;
+        if (is_sea(sub_at(terrain, c + r * gw))) return true;
+    }
+    return false;
+}
+
+/// Does @p home's ground let this polity field anything that may hold open
+/// ocean? Asked of the ROW's traversal mask (BL-778), never of `unit_class`,
+/// so an amphibious row added to the table later answers this without touching
+/// the sim. `port_q` is what gates the three naval rows, so this is "does the
+/// staging holding have a harbour good enough to carry an army".
+bool can_field_naval(const region& home, roster_band band)
+{
+    for (const roster_row* r : available_rows(home, band))
+        if (row_can_traverse(*r, traversal_domain::open_ocean, false))
+            return true;
+    return false;
+}
+
+/// Did either stack commit a naval entry? The BL-779 calibration reading.
+bool stack_has_naval(const std::vector<army_stack_entry>& s)
+{
+    for (const army_stack_entry& e : s)
+        if (e.cls == unit_class::naval && e.count > 0) return true;
+    return false;
 }
 
 /// Total committed headcount in a stack — the denominator losses apply to.
@@ -326,13 +429,35 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // Seed a headcount so demography has something to grow from — the
         // graduation path settlement.hpp's demography note leaves to this item.
         if (p.population <= 0)
-            p.population = clampi64(region_carrying_capacity(p.farm_q) / 8, 1, 1 << 30);
+            p.population = region_seed_population(p.farm_q); // BL-766: ONE derivation,
+                                                             // shared with `draw_urban_map`.
         p.last_demography_year = params.start_year;
         replenish_manpower(p);
     }
 
     // --- Per-year war pressure, reset each tick ---------------------------
     std::vector<int> war_pressure(ss.regions.size(), 0);
+
+    // --- THE ANCIENT ROAD RECORD (BL-768) ---------------------------------
+    //
+    // Appended raw as events happen, then sorted and run-length-encoded into
+    // `out.supply_corridors` at the end of the run. A raw list plus one sort is
+    // deliberately preferred to a keyed map: the sort key is a pair of plain
+    // integers, so the result cannot depend on a container's layout, and the
+    // hot loop pays a push_back rather than a tree lookup.
+    //
+    // PURE OBSERVATION. Nothing below reads this back, so it cannot move a
+    // decision — the same contract `battle_trace` holds, and the reason both
+    // can be recorded unconditionally without a determinism argument.
+    std::vector<std::pair<uint16_t, uint16_t>> corridor_uses;
+    const auto note_corridor = [&](int a, int b) {
+        if (a < 0 || b < 0 || a == b) return;
+        if (a >= static_cast<int>(owner_index_limit)
+         || b >= static_cast<int>(owner_index_limit)) return;
+        const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
+        const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
+        corridor_uses.push_back({lo, hi});
+    };
 
     // --- Neighbour index --------------------------------------------------
     //
@@ -451,6 +576,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {
             advance_region_demography(ss.regions[i], 1, war_pressure[i]);
+            // BL-766: the cities drawn before this loop started live through it
+            // — they grow with the region and thin when it thins.
+            advance_region_urban(ss.regions[i]);
             war_pressure[i] = 0;
             total_pop += ss.regions[i].population;
         }
@@ -524,6 +652,34 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const int mean_reach_q       = static_cast<int>(works_reach_sum / n_held);
             const int mean_industrial_q  = static_cast<int>(works_ind_sum / n_held);
 
+            // ---- THE MATERIALS BAND, DERIVED ONCE (BL-748) ----------------
+            //
+            // Keyed off MATERIALS, not military. The unit roster reads the
+            // military column because that is the column whose rows turn over
+            // at a roster boundary; a Blast Works turns over with metallurgy
+            // instead. Same band enum, different column — which is the point of
+            // the two tables sharing `roster_band` rather than one deriving
+            // from the other.
+            //
+            // ONE derivation, TWO readers: the `build_work` candidate below,
+            // and the furnace at the end of this round. They must agree, or a
+            // polity would light furnaces at a band it could not build at —
+            // and re-deriving it at each site is exactly the drift this file's
+            // header warns about (see `build_stack`'s `band_out`).
+            // The MILITARY band, derived exactly as `build_stack` derives it,
+            // and read by the BL-778 legality gate to ask whether this polity
+            // can field anything that may hold open ocean. Same one-derivation
+            // discipline as `mat_band` immediately below.
+            const roster_band mil_band = min_band(
+                roster_band_for_capacity(
+                    clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6)),
+                sim_band_ceiling(params, y));
+
+            const roster_band mat_band = min_band(
+                roster_band_for_capacity(
+                    clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6)),
+                sim_band_ceiling(params, y));
+
             // THE BURDEN OF BREADTH (BL-314 S3). Every region held past
             // `free_holdings` costs supply on every campaign this polity runs.
             const int over = static_cast<int>(held.size()) - params.free_holdings;
@@ -584,6 +740,51 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             0, 1000);
             };
 
+            // ---- BL-778 / BL-779: the water gate on a campaign edge -------
+            //
+            // TWO QUESTIONS, ASKED OF ONE EDGE, and they are deliberately
+            // different questions with different answers.
+            //
+            // LEGALITY (BL-778, general — docs/military/MILITARY.md § Domains
+            // and traversal): a land force may not cross sea it does not own.
+            // The sim's adjacency is a water-blind Chebyshev radius, so until
+            // now a polity campaigned across up to nine tiles of open water for
+            // free, on 43% of its edges (BL-755's census). Priced as a LEGALITY
+            // TEST rather than a supply penalty, because a legality test cannot
+            // be tuned into meaninglessness.
+            //
+            // FORAGE (ancient-sim SIMPLIFICATION — docs/generation/
+            // MILITARY_HISTORY.md § Forage): a force feeds where it is adjacent
+            // to land or water its own polity owns, and starves where it is
+            // not. It lives HERE, in the sim's caller, and NOT in
+            // `terrain_combat`'s table: both resolvers read that table, and the
+            // general claim is the opposite one — overseas supply works. It is
+            // a stand-in for a logistics model this sim cannot afford, not a
+            // statement about how supply works in Io.
+            //
+            // The bridging case is the polity's OWN SHORE. A q-owned coastal
+            // region touching the target is the shallow, causewayed water a
+            // land force may wade, so it makes the crossing both legal and
+            // fed — which is what makes littoral empires cohere and stops
+            // nothing but the free ocean hop.
+            const auto owns_shore_at = [&](std::size_t ti) {
+                for (int n : neighbours[ti])
+                {
+                    const std::size_t ni = static_cast<std::size_t>(n);
+                    if (owner[ni] == q.id
+                     && ss.regions[ni].domain == region_domain::coastal_water)
+                        return true;
+                }
+                return false;
+            };
+            // The staging holding reaches the target overland (or over its own
+            // lakes) — no sea in the line at all.
+            const auto dry_contact = [&](int hub, std::size_t ti) {
+                return !line_crosses_sea(ss.regions[static_cast<std::size_t>(hub)],
+                                         ss.regions[ti], terrain, gw, gh,
+                                         params.neighbour_radius);
+            };
+
             // ---- Build the bounded candidate set -------------------------
             //
             // Four verbs. The set is bounded by construction: neighbours only,
@@ -627,6 +828,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int to = owner[ti];
                     if (to == q.id || to < 0) continue;
                     if (params.trace_battles) ++out.campaign_contacts;
+
+                    // THE WATER GATE, applied before anything is scored — an
+                    // illegal campaign is not a bad candidate, it is not a
+                    // candidate. See the two lambdas above for the rule.
+                    const bool dry   = dry_contact(hi, ti);
+                    const bool shore = dry ? true : owns_shore_at(ti);
+                    if (!dry && !shore
+                     && !can_field_naval(ss.regions[static_cast<std::size_t>(hi)], mil_band))
+                    {
+                        ++out.illegal_campaigns;
+                        continue;
+                    }
+                    // Forage is the SAME reading: fed on one's own ground or
+                    // one's own shore, starving on a sea leg carried by ships.
+                    // Ships get the force there; they do not feed it.
+                    const bool forages = dry || shore;
 
                     const region& tgt = ss.regions[ti];
                     const int cap_dist = region_distance(cap, tgt, gw);
@@ -690,7 +907,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     // Odds from the power ratio the sim can actually estimate:
                     // levy x supply x cohesion against the defender's levy.
-                    const int supply_here = campaign_supply(hub_dist, ti, hi);
+                    // A force that cannot forage arrives at NOTHING. The
+                    // starvation is expressed through the supply channel the
+                    // resolver already reads rather than through a term of its
+                    // own — zero supply takes the full attrition hit, which is
+                    // the pressure the rule is for (MILITARY_HISTORY.md
+                    // § Forage). No new constant: it is the same 0..1000.
+                    const int supply_here =
+                        forages ? campaign_supply(hub_dist, ti, hi) : 0;
 
                     int64_t atk_men = 0;
                     for (int hi2 : held)
@@ -836,10 +1060,77 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
             // -- Invest ----------------------------------------------------
             {
-                // One domain: the lowest band, ties to the lower enum value.
+                // ONE DOMAIN, CHOSEN BY ARREARS AND BY GROUND (BL-767).
+                //
+                // The old rule was "whichever domain sits at the lowest band",
+                // which levels all seven in lockstep and makes `capacity[]` a
+                // flat line rather than the profile the ladder asks for. Two
+                // weighted pulls now decide it: how far a domain is behind, and
+                // what the polity's ground argues for. See
+                // `invest_ground_pull_q` for the measurement that motivated it.
+                //
+                // Integer throughout, and the tie-break is the lower enum
+                // value — the same rule the old argmin used, so a world with no
+                // ground signal at all decides exactly as it did.
                 int dom = 0;
-                for (int d = 1; d < sim_domain_count; ++d)
-                    if (q.capacity[d] < q.capacity[dom]) dom = d;
+                {
+                    // The polity's ground, as the mean of what it holds. Means,
+                    // not totals, for the reason the works aggregates above
+                    // give: a total makes conquest alone look like endowment.
+                    int64_t farm_sum = 0, ore_sum = 0, energy_sum = 0, port_sum = 0;
+                    for (int hi : held)
+                    {
+                        const region& hp = ss.regions[static_cast<std::size_t>(hi)];
+                        farm_sum   += hp.farm_q;
+                        ore_sum    += hp.ore_q;
+                        energy_sum += hp.energy_q;
+                        port_sum   += hp.port_q;
+                    }
+                    // Four windows, seven domains. Institutions, military and
+                    // medicine have no ground behind them and take 0 — they
+                    // advance on arrears alone, which is the honest reading of
+                    // "no endowment window measures this".
+                    int ground_q[sim_domain_count] = {0, 0, 0, 0, 0, 0, 0};
+                    ground_q[static_cast<int>(sim_domain::agriculture)] =
+                        static_cast<int>(farm_sum / n_held);
+                    ground_q[static_cast<int>(sim_domain::materials)] =
+                        static_cast<int>(ore_sum / n_held);
+                    ground_q[static_cast<int>(sim_domain::energy)] =
+                        static_cast<int>(energy_sum / n_held);
+                    ground_q[static_cast<int>(sim_domain::transport)] =
+                        static_cast<int>(port_sum / n_held);
+
+                    // A CAPPED DOMAIN IS NOT A CANDIDATE, and leaving it as one
+                    // was a real defect rather than a tuning choice. A domain at
+                    // the top band has `arrears == 0` but KEEPS its ground pull,
+                    // so on good ground it outbids every under-levelled domain
+                    // forever — and the investment it wins does nothing, because
+                    // the rung below is gated on `capacity[d] < 6` while
+                    // `progress_q[d]` goes on accumulating. The polity spends
+                    // every remaining round buying a level it already has.
+                    //
+                    // Measured: a polity with mean farm_q ~900 caps agriculture,
+                    // and materials then stalls one band under the Industrial
+                    // rung with every later Invest round producing literally
+                    // nothing. The old argmin could not do this — it could only
+                    // select a capped domain when all seven were capped.
+                    int best_pull = INT32_MIN;
+                    bool any_open = false;
+                    for (int d = 0; d < sim_domain_count; ++d)
+                    {
+                        if (q.capacity[d] >= 6)
+                            continue;               // nothing to buy here
+                        any_open = true;
+                        const int arrears = 6 - clampi(q.capacity[d], 1, 6);
+                        const int pull = arrears * params.invest_level_pull_q
+                                       + (ground_q[d] * params.invest_ground_pull_q) / 1000;
+                        if (pull > best_pull) { best_pull = pull; dom = d; }
+                    }
+                    // Every domain capped: the verb has nothing to do. `dom`
+                    // stays 0 and the rung gate below makes the round inert,
+                    // which is the same outcome the old rule reached.
+                    (void)any_open;
+                }
 
                 int64_t pop = 0;
                 for (int hi : held) pop += ss.regions[static_cast<std::size_t>(hi)].population;
@@ -900,14 +1191,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // large against any one polity's holdings.
             if (works != nullptr && works->size() > 0)
             {
-                // Keyed off MATERIALS, not military. The unit roster reads the
-                // military column because that is the column whose rows turn
-                // over at a roster boundary; a Blast Works turns over with
-                // metallurgy instead. Same band enum, different column — which
-                // is the point of the two tables sharing `roster_band` rather
-                // than one deriving from the other.
-                const roster_band band =
-                    roster_band_for_capacity(clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6));
+                // The materials band, derived ONCE above this round's verbs
+                // (BL-748) so the works table and the furnace read the same
+                // value. It used to be re-derived here.
+                const roster_band band = mat_band;
 
                 for (int slot = 0; slot < clampi(params.work_candidate_regions, 0, 8); ++slot)
                 {
@@ -988,13 +1275,24 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const std::size_t ti = static_cast<std::size_t>(best_target);
                 region& tgt = ss.regions[ti];
 
-                // Nearest holding is the staging region.
-                int src = held.front(), src_d = 1 << 30;
+                // Nearest LEGAL holding is the staging region (BL-778). The
+                // scorer refused this target unless some hub could reach it,
+                // and execute picks its own hub — so it filters by the same
+                // rule, or it could stage a campaign the scorer would never
+                // have offered. `tgt_shore` and `tgt_naval` are hoisted because
+                // neither depends on which hub is chosen.
+                const bool tgt_shore = owns_shore_at(ti);
+                int src = -1, src_d = 1 << 30;
                 for (int hi : held)
                 {
-                    const int d = region_distance(ss.regions[static_cast<std::size_t>(hi)], tgt, gw);
+                    const std::size_t hs = static_cast<std::size_t>(hi);
+                    if (!dry_contact(hi, ti) && !tgt_shore
+                     && !can_field_naval(ss.regions[hs], mil_band))
+                        continue;
+                    const int d = region_distance(ss.regions[hs], tgt, gw);
                     if (d < src_d) { src_d = d; src = hi; }
                 }
+                if (src < 0) break; // no legal staging holding — nothing marches
                 region& home = ss.regions[static_cast<std::size_t>(src)];
 
                 const int64_t want   = (home.manpower_stock * params.levy_fraction_q) / 1000;
@@ -1012,8 +1310,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // the scored estimate. Optimistic by a bounded amount, and in
                 // the right direction: the sim does not launch campaigns it then
                 // silently under-supplies.
-                const int atk_supply = campaign_supply(src_d, ti, src);
+                //
+                // FORAGE, priced by the same rule the scorer used (§ Forage).
+                // The file's own thesis applies: a cost authored on one scale
+                // and spent on another is the bug, so the estimate and the
+                // outcome ask the identical question.
+                const bool exec_dry     = dry_contact(src, ti);
+                const bool exec_forages = exec_dry || tgt_shore;
+                const int atk_supply = exec_forages ? campaign_supply(src_d, ti, src) : 0;
                 const int def_supply = 1000;
+                if (!exec_forages) ++out.starved_campaigns;
+
+                // BL-768 — THE SUPPLY CORRIDOR, recorded where it is priced.
+                // `src` is the staging holding the army victualled from and
+                // `ti` the objective it marched on, so this pair is literally
+                // the line supply moved along, taken from the two indices
+                // `campaign_supply` was just handed rather than reconstructed.
+                // Recorded on LAUNCH, not on victory: the road was walked
+                // whether or not the battle was won, and a network that only
+                // remembered the winners would be a map of conquests rather
+                // than a map of routes.
+                note_corridor(src, static_cast<int>(ti));
 
                 // The stall, counted where it actually happens (BL-312). The
                 // first cut incremented this AFTER resolve_battle and only at
@@ -1038,11 +1355,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 for (const polity& o : out.polities)
                     if (o.id == owner[ti]) { dq = &o; break; }
 
-                std::vector<army_stack_entry> atk = build_stack(raised, home, q, 1000);
+                roster_band atk_band = roster_band::classical;
+                std::vector<army_stack_entry> atk =
+                    build_stack(raised, home, q, 1000, sim_band_ceiling(params, y),
+                                !exec_dry, &atk_band);
+                note_units_fielded(out, params, y, atk_band, atk);
                 const int64_t def_want = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
                 const int64_t def_men  = raise_manpower(tgt, def_want);
+                roster_band def_band = roster_band::classical;
                 std::vector<army_stack_entry> def =
-                    build_stack(def_men, tgt, dq ? *dq : q, def_ready);
+                    build_stack(def_men, tgt, dq ? *dq : q, def_ready, sim_band_ceiling(params, y),
+                                !exec_dry, &def_band);
+                note_units_fielded(out, params, y, def_band, def);
 
                 const battle_outcome bo = resolve_battle(
                     atk, doctrine_for(q),
@@ -1053,6 +1377,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     atk_supply, def_supply);
 
                 ++out.battles;
+                // BL-779's calibration reading: how often naval combat actually
+                // occurs. Counted, never asserted upward — rare is the design
+                // (MILITARY_HISTORY.md § Naval).
+                if (stack_has_naval(atk) || stack_has_naval(def)) ++out.naval_battles;
+                if (!exec_dry) ++out.sea_leg_battles;
                 if (century < out.battles_per_century.size())
                     ++out.battles_per_century[century];
                 if (best_winter) ++out.winter_campaigns;
@@ -1131,6 +1460,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     tgt.population = clampi64(
                         tgt.population - (tgt.population * params.sack_population_loss_q) / 1000,
                         0, 1LL << 40);
+                    // BL-766: and it falls hardest on the walls. This is the
+                    // one place history DESTROYS a centre rather than thinning
+                    // it, so a sacked city reads as a smaller or absent centre
+                    // on the epoch map.
+                    sack_region_urban(tgt, params.sack_population_loss_q);
 
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
@@ -1173,6 +1507,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (gw > 0) cc = ((cc % gw) + gw) % gw;
                         const int rr = clampi(src.row + dr, 0, gh > 0 ? gh - 1 : 0);
 
+                        // BL-777 — NOBODY FOUNDS ON OPEN OCEAN.
+                        //
+                        // This probe applied no terrain test at all, so 447 of
+                        // 1754 regions across three seeds were anchored on
+                        // water and 183 of those on open ocean (measured by
+                        // sim_water_census, 2026-09-06). `terrain_combat`
+                        // returns 0 defence and 0 forage for every water kind,
+                        // so those regions were silently undefendable.
+                        //
+                        // IT IS NOT A "NO WATER" TEST, and the distinction is
+                        // the design. Under the ownership ruling (BL-776,
+                        // PROVINCES.md § Who owns water) coastal water belongs
+                        // to whoever owns the shore, so founding on the
+                        // shoreline ring or a lake is LEGITIMATE — there is an
+                        // owner to found under. Open ocean has no owner at all,
+                        // structurally, so it is the only domain refused. That
+                        // is ~183 sites rather than the ~447 a blanket ban
+                        // would have deleted.
+                        //
+                        // A caller with no terrain is unaffected: `sub_at`
+                        // hands out the neutral dry default, so every synthetic
+                        // harness case probes exactly the cells it always did.
+                        const int cand = (gw > 0) ? rr * gw + cc : -1;
+                        if (region_domain_of(sub_at(terrain, cand)) == region_domain::open_ocean)
+                            continue;
+
                         bool taken = false;
                         for (const region& e : ss.regions)
                             if (e.col == cc && e.row == rr) { taken = true; break; }
@@ -1185,6 +1545,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.col = nc;
                 np.row = nr;
                 np.anchor = (gw > 0) ? np.row * gw + np.col : -1;
+                // BL-777: the domain of the ground actually chosen. The probe
+                // above has already refused open ocean, so this records `land`
+                // or `coastal_water` — but it is DERIVED rather than assumed,
+                // so the field stays a fact about the tile and the census can
+                // check the two against each other.
+                np.domain = region_domain_of(sub_at(terrain, np.anchor));
 
                 // Daughter ground is a decayed inheritance of the parent's —
                 // good land begets good land, but never better than its parent.
@@ -1201,6 +1567,55 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.nation = q.id;
                 np.population = clampi64(region_carrying_capacity(np.farm_q) / 16, 1, 1 << 30);
                 replenish_manpower(np);
+                // BL-766: a region founded HERE gets its settlement on the same
+                // terms as one drawn before the sim ran — one rule, not two.
+                draw_region_urban(np);
+
+                // THE DAUGHTER'S OWN GROUND DECIDES ITS FURNACE (BL-748).
+                //
+                // Without this every region the run founds would carry the
+                // struct default of -1 — "this ground never could" — and on a
+                // 1960 arc that is two regions in three, so Stage 4 could only
+                // ever reach the settlement pass's original ground. That is
+                // not a bounded simplification, it is the endowment gate
+                // silently answering "no" for a majority of the map.
+                //
+                // The gate is recomputed from the daughter's OWN fuel, on the
+                // same expression settlement.cpp § Stage 4 uses — inheriting
+                // the flag would let poor ground industrialise because its
+                // parent could, which is the opposite of endowment-not-virtue.
+                // The date's ground terms are recomputed the same way.
+                //
+                // THE FOUNDING TERM IS CHARGED, NOT INHERITED, and getting that
+                // wrong was a real defect. Stage 4's formula carries
+                // `founded_year / 8`, and the first cut folded it into the
+                // parent's residual on the grounds that "the rest of that
+                // formula is not reachable inside this loop". `founded_year` IS
+                // reachable — `np.founded_year = y` is set a few lines above.
+                // So a daughter settled in 1900 by a parent founded in year 0
+                // was charged 0 extra years where the endowment rule charges
+                // ~237, and the late frontier lit its furnaces centuries early.
+                // That term exists precisely to punish a late frontier, so it is
+                // taken off the parent's residual and recomputed from the
+                // daughter's own founding year. Everything genuinely out of
+                // reach — the world's arable share, the creed bonuses, the
+                // parent's own draw — stays inherited.
+                {
+                    const auto ground_lag = [](const region& r) {
+                        return 90 - r.energy_q / 12 - r.ore_q / 22;
+                    };
+                    const auto founding_lag = [](const region& r) {
+                        return static_cast<int>(r.founded_year / 8);
+                    };
+                    const int daughter_fuel = np.energy_q + np.ore_q / 2;
+                    if (daughter_fuel >= 900 && src.industrial_lag_years >= 0)
+                    {
+                        const int residual = src.industrial_lag_years
+                                           - ground_lag(src) - founding_lag(src);
+                        np.industrial_lag_years =
+                            clampi(ground_lag(np) + founding_lag(np) + residual, 0, 235);
+                    }
+                }
 
                 // The change list indexes regions as uint16_t, so refuse to
                 // create one the time-lapse could not address (BL-312). Past
@@ -1214,6 +1629,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 war_pressure.push_back(0);
                 neighbours.emplace_back();
                 link_region(ss.regions.size() - 1); // Keep the index complete.
+
+                // BL-768 — the road a founding party walked. The daughter is
+                // reached FROM its parent and supplied from there until it can
+                // feed itself, so (parent, daughter) is the second and by far
+                // the commoner of the two corridor sources: a polity settles far
+                // more often than it campaigns, which is what gives a peaceful
+                // history a road network at all.
+                note_corridor(best_target, static_cast<int>(ss.regions.size()) - 1);
                 out.owner_changes.push_back(owner_change{
                     static_cast<int32_t>(y),
                     static_cast<uint16_t>(ss.regions.size() - 1),
@@ -1232,24 +1655,40 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // advance tech exactly as far as a 1-year one and the ladder
                 // would never leave band 1 (history_sim.hpp § stepped clock).
                 //
-                // THE INDUSTRIAL WORKS LAND HERE (BL-321), and this is a
-                // deliberate divergence from the item's own words, recorded
-                // rather than hidden. The design says `industrial_mod` is a
-                // "pull-forward on the Stage 4 furnace date" — but Stage 4 runs
-                // inside `run_settlement`, which has already finished before
-                // this loop starts, so there is no furnace date left to pull.
-                // What the sim actually has as its industrial clock is the
-                // capacity ladder, and a Blast Works accelerating a polity's
-                // progress up that ladder is the same claim expressed against
-                // the mechanism that exists. Wiring it to Stage 4 instead would
-                // mean either running settlement twice or leaving the field
-                // inert; this reads as the honest third option.
-                const int ind_boost = clampi(mean_industrial_q, 0, 1000);
-                const int progress  = clampi(best_score, 0, 1000) * step_years;
+                // THE INDUSTRIAL WORKS LAND HERE (BL-321), AND THE DIVERGENCE
+                // THAT USED TO BE RECORDED HERE IS CLOSED (BL-748).
+                //
+                // The old note said: the design calls `industrial_mod` a
+                // "pull-forward on the Stage 4 furnace date", but Stage 4 ran
+                // inside `run_settlement` and had already finished before this
+                // loop started, so there was no furnace date left to pull — and
+                // the boost was applied to whatever domain Invest happened to
+                // pick, which is the tech ladder generally rather than the
+                // industrial clock specifically.
+                //
+                // The furnace date now lives INSIDE the run: a polity lights
+                // when its MATERIALS capacity crosses the Industrial rung (see
+                // the furnace block at the end of this round). So the
+                // pull-forward is expressed against that crossing, which means
+                // it applies to the materials ladder and to nothing else. A
+                // Blast Works shortens the road to a furnace; it does not make
+                // a polity better at medicine.
+                //
+                // INERT TODAY, and honestly so: `mean_industrial_q` is the mean
+                // of `region::work_industrial_mod` over the polity's holdings,
+                // and BL-757 measured ZERO works raised across sixteen seeds
+                // because `build_work` never wins the scored contest. The
+                // mechanism is wired and the boost is zero until that is fixed
+                // — which is a finding about BL-757, not a reason to route this
+                // through a domain it does not belong to.
+                const bool  ind_domain = (d == static_cast<int>(sim_domain::materials));
+                const int   ind_boost  = ind_domain ? clampi(mean_industrial_q, 0, 1000) : 0;
+                const int   progress   = clampi(best_score, 0, 1000) * step_years;
                 q.progress_q[d] += progress + (progress * ind_boost) / 1000;
                 // A band costs more the higher it sits — capacity follows the
                 // map, and it never runs away (ANCIENT_TECH_LADDER § diffusion).
-                const int cost = 4000 * q.capacity[d];
+                // The rate is a parameter since BL-767; the value is unchanged.
+                const int cost = params.capacity_band_cost * q.capacity[d];
                 if (q.progress_q[d] >= cost && q.capacity[d] < 6)
                 {
                     q.progress_q[d] -= cost;
@@ -1275,6 +1714,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 replenish_manpower(bp);
 
                 ++out.works_raised;
+                {
+                    const int b = static_cast<int>(r->band);
+                    if (b >= 0 && b < roster_band_count)
+                        ++out.works_by_span_band[static_cast<std::size_t>(span_index(params, y))]
+                                                [static_cast<std::size_t>(b)];
+                }
                 out.history.push_back(history_event{
                     years_from_calendar_year(y), chain_stage::legacy,
                     bp.name + " raises a " + r->name, std::string{}});
@@ -1300,6 +1745,57 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                       params.cohesion_floor_q, 1000);
                 break;
             }
+
+            // ---- THE FURNACE (BL-748) ------------------------------------
+            //
+            // Stage 4's date used to be `run_settlement`'s, fixed before this
+            // loop started. Under an industrial epoch that is backwards — the
+            // SECOND SPAN is where industrialisation happens — so the date is
+            // now the year a polity's materials capacity crosses the Industrial
+            // rung INSIDE the run, plus the lag its ground imposes.
+            //
+            // TWO HALVES, EACH OWNED WHERE IT BELONGS. The endowment gate and
+            // the per-region lag are `run_settlement`'s (settlement.cpp § Stage
+            // 4) — that arithmetic is unchanged, coefficient for coefficient,
+            // only re-anchored. WHEN is this loop's, and it is reached by
+            // playing: a polity that spends its rounds fighting never climbs
+            // the ladder and never lights, which is a legitimate outcome and
+            // not a gap for anything downstream to fill in.
+            //
+            // Read through `mat_band`, so the rung is the same derivation the
+            // works table uses and a polity cannot light a furnace at a band it
+            // could not build at. On a two-span run that means no furnace
+            // before the boundary year, because `sim_band_ceiling` caps span 0
+            // at medieval. On a single-span ancient arc the ceiling is inert —
+            // and no region there carries a lag at all (Stage 4 does not run
+            // below 1700), so the 0 CE world lights nothing, exactly as before.
+            //
+            // Placed AFTER the verb executes so a crossing bought by this
+            // round's Invest is visible this round rather than next.
+            {
+                if (q.industrial_year == k_never_industrialised
+                    && mat_band == roster_band::industrial)
+                {
+                    q.industrial_year = y;
+                    ++out.polities_industrialised;
+                }
+
+                if (q.industrial_year != k_never_industrialised)
+                {
+                    for (int hi : held)
+                    {
+                        region& p = ss.regions[static_cast<std::size_t>(hi)];
+                        // A negative lag is the gate saying "this ground never
+                        // could" — below-average fuel, or an arc whose Stage 4
+                        // never ran at all.
+                        if (p.industrialised || p.industrial_lag_years < 0) continue;
+                        if (y < q.industrial_year + p.industrial_lag_years) continue;
+                        p.industrialised  = true;
+                        p.industrial_year = y;
+                        ++out.regions_industrialised;
+                    }
+                }
+            }
         }
 
         // Ownership changes are appended where they happen (conquest, founding),
@@ -1310,11 +1806,129 @@ history_sim_state run_history_sim(settlement_state&         ss,
     out.years           = years;
     out.start_year      = params.start_year;
 
+    // --- The ancient road record, folded (BL-768) -------------------------
+    //
+    // Sort by (a, b) — a total order over two plain integers — then run-length
+    // encode. The corridor a region walked forty times and the one it walked
+    // once are the same edge with different traffic, and traffic is what the
+    // ancient tier rule reads, so the count has to survive the fold.
+    {
+        std::sort(corridor_uses.begin(), corridor_uses.end());
+        out.supply_corridors.reserve(corridor_uses.size());
+        for (const auto& e : corridor_uses)
+        {
+            if (!out.supply_corridors.empty()
+                && out.supply_corridors.back().a == e.first
+                && out.supply_corridors.back().b == e.second)
+            {
+                ++out.supply_corridors.back().uses;
+                continue;
+            }
+            out.supply_corridors.push_back(history_corridor{e.first, e.second, 1});
+        }
+    }
+
+    // --- The world median furnace year (BL-748) ---------------------------
+    //
+    // `run_settlement` used to own this, and could not any more: nothing has
+    // industrialised while that pass is running. THIS is the first moment the
+    // answer exists, so the sim writes it back into the same field on the same
+    // state it was handed — one owner, one field, no second derivation for
+    // BL-219's early/late corporate pivot to disagree with.
+    //
+    // Left at whatever it already held when nobody industrialised, which for
+    // every path in the project is 0 — nobody — and 0 is what the
+    // never-industrialised rung in corporation_generation.cpp reads.
+    {
+        std::vector<int64_t> years_lit;
+        for (const region& p : ss.regions)
+            if (p.industrialised) years_lit.push_back(p.industrial_year);
+        if (!years_lit.empty())
+        {
+            std::sort(years_lit.begin(), years_lit.end());
+            ss.median_industrial_year = years_lit[years_lit.size() / 2];
+        }
+    }
+
     for (polity& q : out.polities)
     {
         bool any = false;
         for (int o : owner) if (o == q.id) { any = true; break; }
         q.alive = any;
+    }
+
+    // --- THE TARIFF POSTURE (BL-750) --------------------------------------
+    //
+    // A DERIVED OUTPUT READ AT HANDOFF, NEVER A SCORED VERB (Ben, 2026-09-06;
+    // NATIONS.md sec 4 Tariffs). Nothing in the decision loop above reads
+    // `protection_q`, and nothing here can move the run: this block executes
+    // once, after the last round, and writes a field no verb, no score and no
+    // RNG draw ever touches. A run with this block deleted would take every
+    // decision it takes with it.
+    //
+    // The formula and the reason for its shape are on `polity::protection_q`.
+    // Integer throughout, walked in polity-id order over a vector, so it is
+    // byte-identical from a seed like everything else in this file.
+    {
+        std::vector<int> alive_ids;
+        for (const polity& q : out.polities)
+            if (q.alive) alive_ids.push_back(q.id);
+
+        // The world's FIRST furnace, among the polities that survived to be
+        // handed over. A polity that lit and was then eliminated is not part of
+        // the field the campaign inherits.
+        int64_t lead = k_never_industrialised;
+        for (int qi : alive_ids)
+        {
+            const int64_t yr = out.polities[static_cast<std::size_t>(qi)].industrial_year;
+            if (yr == k_never_industrialised) continue;
+            if (lead == k_never_industrialised || yr < lead) lead = yr;
+        }
+
+        if (lead != k_never_industrialised && alive_ids.size() > 1)
+        {
+            const int64_t span = std::max<int64_t>(1, params.stop_year - lead);
+            for (int qi : alive_ids)
+            {
+                polity& q = out.polities[static_cast<std::size_t>(qi)];
+
+                // Strictly before: a tie is not "ahead", so two polities that
+                // lit the same year neither protect against each other.
+                int ahead = 0;
+                for (int pi : alive_ids)
+                {
+                    if (pi == qi) continue;
+                    const int64_t py = out.polities[static_cast<std::size_t>(pi)].industrial_year;
+                    if (py == k_never_industrialised) continue;
+                    if (q.industrial_year == k_never_industrialised
+                        || py < q.industrial_year)
+                        ++ahead;
+                }
+                const int share_ahead_q =
+                    (ahead * 1000) / (static_cast<int>(alive_ids.size()) - 1);
+
+                // A polity that never lit is behind by the WHOLE remaining
+                // span, which is the continuous reading of the sentinel rather
+                // than a second branch downstream.
+                const int64_t my_year = q.industrial_year == k_never_industrialised
+                                      ? params.stop_year : q.industrial_year;
+                const int lag_q = clampi(
+                    static_cast<int>(((my_year - lead) * 1000) / span), 0, 1000);
+
+                q.protection_q = clampi((share_ahead_q * lag_q) / 1000, 0, 1000);
+            }
+        }
+
+        // Broadcast onto the ground, the way `contest_q` is broadcast in
+        // `derive_national_character`: the settlement state is the handoff
+        // object, and the political pass reads regions, not polities.
+        for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
+        {
+            const int o = owner[i];
+            ss.regions[i].protection_q =
+                (o >= 0 && o < static_cast<int>(out.polities.size()))
+                    ? out.polities[static_cast<std::size_t>(o)].protection_q : 0;
+        }
     }
 
     return out;

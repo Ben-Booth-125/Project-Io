@@ -1,5 +1,13 @@
 # Project Io — Header
 
+> **Settles:** which question the top strip answers without opening anything ·
+> which money and material figures it carries and how a trend is shown · which
+> survival signals share that row and when each is worth showing · what the strip
+> gives up first as width runs out.
+> **Not here:** the detail behind any figure (ledgers/*) · the identity tile
+> (PROFILE) · the clock (TIME_CONTROLS) · placement (LAYOUT).
+> **Confused with:** PROFILE.md, TIME_CONTROLS.md, LAYOUT.md.
+
 The **header** is a full-width strip across the top of the canvas area, sitting between the profile (top-left) and the time column (top-right). It top-aligns at `y=0` and stands at the profile card's full height (`profile_panel_height`), so it reads level with the identity tile as a single top band; its content row is vertically centred within that band. It is the player's persistent financial and material dashboard — always visible, glanceable, never opened or closed. See `LAYOUT.md` for where it sits in the shell.
 
 It reads the live economy (`src/ui/header_panel.{hpp,cpp}`) and is a **summary surface**: three money figures plus a trend line, with all detail left to the ledgers, and two survival signals — runway and the debt flag — on the same row.

@@ -607,6 +607,47 @@ target_link_libraries(spawn_solvency PRIVATE io_world_obj lua54)
 target_compile_features(spawn_solvency PRIVATE cxx_std_20)
 target_compile_options(spawn_solvency PRIVATE ${IO_WARNING_FLAGS})
 
+# landscape_score_harness (BL-770 slice 1) is the same shape as spawn_solvency
+# above and is hand-declared for the same reason: it constructs a lua_state,
+# calls recipe_registry::load_from_lua, and PARSES scripts/world_gen.lua into a
+# world_gen_config through harness_params.hpp's parsed_gen_config. All three of
+# those TUs are excluded from io_world_obj, so the generic foreach below would
+# emit a target that does not link - which under `nmake all` stops every target
+# after it and reads as a suite of "Not Run" (the BL-744 failure, and the one
+# that made main unbuildable for weeks before that).
+add_executable(landscape_score_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/landscape_score_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(landscape_score_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(landscape_score_harness PRIVATE io_world_obj lua54)
+target_compile_features(landscape_score_harness PRIVATE cxx_std_20)
+target_compile_options(landscape_score_harness PRIVATE ${IO_WARNING_FLAGS})
+
+# landscape_search_harness (BL-770 slice 3) — same shape and same reason as
+# landscape_score_harness directly above: a live lua_state, load_from_lua, and
+# parsed_gen_config, all three of whose TUs are excluded from io_world_obj.
+# Hand-declared so the generic foreach below does not emit a target that fails
+# to link and stops every target after it under `nmake all`.
+add_executable(landscape_search_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/landscape_search_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(landscape_search_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(landscape_search_harness PRIVATE io_world_obj lua54)
+target_compile_features(landscape_search_harness PRIVATE cxx_std_20)
+target_compile_options(landscape_search_harness PRIVATE ${IO_WARNING_FLAGS})
+
 # persona_counsel_harness (BL-207) needs a live sol2/Lua state too — it loads
 # the real scripts/personas/*.lua packs through src/scripting/persona_pack.cpp.
 # Same shape as pregame_balance_harness above: add back the sol2/Lua TU +
@@ -1134,6 +1175,14 @@ set(IO_TEST_LONG_HARNESSES
     # is a Timeout, which reads as infrastructure noise rather than as a harness
     # that has never verified anything.
     sea_leg_census
+    # water_ownership_census added 2026-09-06 (sprint 32c lane D). Builds four
+    # prehistory-off worlds and walks every tile of each, to assert the BL-776/
+    # BL-777 claim that coastal water and lakes are territory and the open ocean
+    # is not. ~40 s at /O2 over four worlds; tiered LONG rather than measured in
+    # Debug, on the NR-259 lesson the sea_leg_census entry above records -- the
+    # cost of guessing the tier wrong is a Timeout, which reads as noise rather
+    # than as a check that has never verified anything.
+    water_ownership_census
 )
 
 # EXCLUDED FROM THE ROUTINE GATE - labelled `sweep`. TWO REASONS live here, and

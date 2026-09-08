@@ -1,5 +1,15 @@
 # Project Io — Canvas Ground Rendering
 
+> **Settles:** by what mechanism the Planetary ground is drawn and when that work
+> is done · which art direction the ground is held to, and how the grade relates to
+> the terrain under it · whether a hex grid is ever on screen and what the grid
+> serves instead · how an installation appears if not as a glyph · what moves, what
+> changes with zoom, and how the result is checked.
+> **Not here:** what the canvas communicates above the ground (PLANETARY) · the
+> ladder and the shared state (CANVASES) · the unsettled style exploration
+> (design/GLOBAL_STYLE_SHEET).
+> **Confused with:** PLANETARY.md, design/GLOBAL_STYLE_SHEET.md, ICONS.md.
+
 This document owns **how the Planetary canvas renders its ground**: the baked-chunk
 mechanism, the settled art direction, the grid rule, installations-as-geometry,
 animation, level-of-detail and the verification story. [PLANETARY.md](PLANETARY.md)

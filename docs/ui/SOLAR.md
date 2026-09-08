@@ -1,9 +1,20 @@
 # Project Io — Solar Screen
 
+> **Settles:** what the system-wide rung shows and how a body's orbit maps to a
+> screen position · what the star is as an entity, how it is drawn, and why it is
+> the one body a press cannot descend into · how the asteroid belt reads against
+> the bodies within it · which reference a distance on this rung is measured from ·
+> what this rung's default framing is.
+> **Not here:** the ladder, the click model, the descend and ascend rules, the
+> shared view controls and the shared state (CANVASES) · which lenses draw at which
+> rung (LENSES) · the rung below (CIRCUMPLANETARY) · what the inset frames
+> (MINIMAP).
+> **Confused with:** CANVASES.md, CIRCUMPLANETARY.md, MINIMAP.md, LENSES.md.
+
 The Solar screen is the top-down 2D view of the solar system — the **top rung**
 of the canvas ladder. See [CANVASES.md](CANVASES.md) for layout rules shared
-across the three canvases (the zoom ladder, context minimap, region sizing,
-shared selection state, implementation approach).
+across the three canvases (the zoom ladder, context minimap, region sizing, the
+shared view controls, shared selection state, implementation approach).
 
 ---
 
@@ -18,7 +29,8 @@ The **star is a body entity** (`body_type::star`) at the system centre
 carries a `name`, which the canvas labels and which the minimap shows as its
 title when the Solar screen is the minimap (see `MINIMAP.md`). The star is drawn
 through the same body-draw pass as every other body, with a star style (large,
-yellow). It has no Circumplanetary view, so double-clicking it does nothing.
+yellow). It has no Circumplanetary view — the one body on this rung a press
+cannot descend into (§ Interaction).
 
 This canvas communicates:
 
@@ -49,8 +61,8 @@ Economic and military data (supply routes, faction presence, convoy paths) are o
 | Activity badge | Per-body commercial-activity glyph at the body's **lower-left** — the **activity** fog (the commercial sphere, BL-089), deliberately offset from the survey badge so the two fogs read apart. A concentric pulse (`icons::activity`) coloured by tier: `known` (`palette::activity_known`), `known_stale` (greyed), `visible` (`palette::activity_visible`). **Unknown** bodies and the **home body** (which carries its own presence halo) show no badge. Derived from `body_activity_visibility` (routes + live convoys + ownership + tick). See [`DISCOVERY.md`](DISCOVERY.md). |
 | Home halo | An always-on player-identity ring around `home_body` (player presence, BL-085), drawn behind the body — a soft player-blue glow + ring, distinct from the survey/activity badges and the selection highlight. |
 | Trade corridors | The player's persistent trade routes (BL-088, persistent trade routes) drawn as lit lanes between endpoint bodies (primary view only): fresh routes glow (`palette::activity_corridor`), stale routes fade to grey. Commercial reach made visible; see [`DISCOVERY.md`](DISCOVERY.md). |
-| Convoys | The Supply lens draws a line per live convoy (`w.convoys`, `supply_system.cpp`), with the convoy vision beams of the activity fog. |
-| Scale bar + zoom slider | Bottom-centre overlay (primary view only): a fixed-width scale bar reporting the AU it spans at the current zoom, and a logarithmic zoom slider where **right = zoomed in, left = zoomed out**. Factored into the shared `ui::draw_scale_zoom_overlay` (`src/ui/canvas_scale.hpp`), used by the Circumplanetary canvas too. |
+| Convoys | The Supply lens draws a line per live convoy between its endpoint bodies (`w.convoys`, `supply_system.cpp`), primary view only. Inter-body traffic is all this rung carries — the radius-2 convoy **vision beam** is an intra-body layer and belongs to the surface ([`DISCOVERY.md`](DISCOVERY.md)). |
+| Scale bar + zoom slider | The shared bottom-centre overlay (primary view only; CANVASES.md § Shared view controls). Its scale bar reports the **AU** it spans at the current zoom — this rung's unit. |
 
 ---
 
@@ -94,14 +106,21 @@ ring: **separate bodies drawn over the band**, not markers embedded in it.
 
 ## Interaction
 
-- **Hover** a body circle: show tooltip.
-- **Single-click a body — select.** Sets `selected_entity` and fills the Selection band. The view rung does not change (`solar_system_canvas.cpp`).
-- **Double-click a body — descend (zoom in).** Sets `active_body` and drills the primary down one rung to that body's **Circumplanetary** view. A **planet** opens its own view; a **moon** opens its **parent planet's** view with the moon selected. The **star** does not descend — it has no Circumplanetary view — but it does select, the star being a selectable entity.
+The click model, the descend and ascend rules, the shared view controls and input
+precedence are settled once for the whole ladder in [CANVASES.md](CANVASES.md)
+§ Navigation — the zoom ladder; `solar_system_canvas.cpp` is this rung's half of
+them. What is particular to this rung:
 
-  *(Single-click-selects / double-click-navigates is the shared model across all three canvases; `docs/ui/SELECTION.md` owns it.)*
-- **Click the Solar minimap — ascend.** When the Solar screen is the minimap (i.e. the Circumplanetary screen is primary), any click promotes the Solar screen back to primary.
-- Input is only processed for the canvas the mouse is over; an ImGui panel under the cursor takes precedence over the canvases.
-- **Pan and zoom (primary view only).** Scroll wheel zooms, anchored at the cursor so the point under the mouse stays fixed; the middle mouse button pans. A bottom-centre **zoom slider** sets the same factor — dragging **right zooms in**, left zooms out — sharing its bounds with the wheel. Positions and orbital rings scale with zoom, but element sizes (body/star radii, labels, selection outlines) stay the same pixel size. The default framing (zoom 1, no pan) is the auto-fit that shows all bodies. The **minimap always renders the default framing** — pan/zoom apply only when the canvas holds the primary slot. View state (`solar_zoom`, `solar_pan_x/y`) lives in `ui_state`.
+- **Hover** a body circle: tooltip with the body's name, type, and orbital radius
+  in AU from the star (§ Visual elements).
+- **The star is the one body a press cannot descend into.** It has no
+  Circumplanetary view, so a double-click on it changes nothing. It still
+  *selects* — the star is a selectable entity like any other body here.
+- **Default framing** is the auto-fit that shows every body at zoom 1 with no pan,
+  scaled off `max_radius_au` (§ Coordinate mapping), which takes the belt's outer
+  radius into account so the whole band fits. Positions and orbital rings scale
+  with zoom. This rung's pan/zoom lives in `solar_zoom` and `solar_pan_x/y`
+  (`ui_state`).
 
 ---
 
@@ -117,11 +136,13 @@ Bodies orbit continuously. Each `body_component` carries an `orbital_angular_vel
 
 ---
 
-## Lens surfaces on this rung
+## What is deferred on this rung
 
-| Lens | Solar surface |
-|---|---|
-| Market | None — prices are per-body-market with no Solar surface (LENSES.md § rung table). |
-| Supply | A line per live convoy, plus the convoy vision beams (above). |
-| Reach / Supply-routes | Planetary keys only; a connected-body glow and an aggregated lane graph are the designed Solar surfaces (BL-011, reach lens; BL-014, supply-routes lens). |
-| Faction colour coding on bodies | Post-prototype (diplomacy). |
+**Lenses are not a Solar question.** [LENSES.md](LENSES.md) § Rung applicability
+holds the whole Lens × rung table, this rung's column included, and it is not
+restated here — a column copied into a rung doc drifts from the table it was
+copied out of.
+
+**Faction colour coding on bodies** is post-prototype: it waits on diplomacy, and
+until nations declare toward one another there is nothing for a body's colour to
+report.

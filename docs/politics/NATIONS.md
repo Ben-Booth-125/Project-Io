@@ -1,5 +1,15 @@
 # Project Io — Nations
 
+> **Settles:** what a nation is once generation has finished making it · what it holds — territory,
+> treasury, budget weights, law · how a law reaches the market · what an import tariff does and
+> which direction it points · what a nation may do, what it does each tick, and in what order it
+> spends · what a nation wants.
+> **Not here:** how a nation comes to exist — territory placement, resource profile, character,
+> naming (NATION_GENERATION) · which quantity says how a nation reads a corporation (RELATIONS) ·
+> the predicate/effect substrate a law is composed from (META_LAYER) · a corporation's own money loop
+> (FINANCE).
+> **Confused with:** generation/NATION_GENERATION.md, politics/RELATIONS.md, META_LAYER.md.
+
 **The nation as an actor** — what a nation *is* once generation has finished making it, what it
 holds, what it may do, and what it does each tick. This document is the authority for that
 question, and it is the one `docs/generation/NATION_GENERATION.md` explicitly declines:
@@ -113,7 +123,7 @@ indexed by them):
 | `military_research` | force-side research, and a nation's own garrison upkeep (MILITARY.md § Nation garrisons) |
 | `academic_research` | the civil tech ladder — `science` is reached, not spent, and this is the debit BL-478 (ancient research spend) is shaped around |
 | `public_exploration` | state-funded survey — DISCOVERY.md's geographic fog |
-| `contracted_force` | buying force the nation does not raise — CONTRACTS.md § Where offers come from (BL-572) derives an offer from this line's spendable share |
+| `contracted_force` | buying force the nation does not raise — BL-572 (contract offers) derives an offer from this line's spendable share; the contract form itself carries no sell side to buy through (CONTRACTS.md § Explicitly out of scope) |
 | `strategic_reserve` | buying goods to **hold** — through BL-350's procurement seam from a named supplier, never on the market. Distinct from `reserve_fraction`, which withholds credits; this line spends them |
 | `public_works` | works a corporation builds and the nation pays for |
 | `charters` | paying a corporation to exist somewhere it otherwise would not |
@@ -231,18 +241,23 @@ mechanism.
 `all_nations` sentinel for the blanket form. The intended authoring path is a derivation at campaign
 setup from the Era −1 sim's pair outcomes.
 
-**The tariff has no author** (Ben, 2026-08-23, ruling on NR-400). This is a deliberate ordering, and
-it is stated here so the section above is not read as describing a live duty. `import_tariff` is a
-member of the law-effect vocabulary and of the save format, and `market_clearing` carries the whole
-duty pass — but **nothing enacts one**. No corp verb, no control, and no generation path authors a
-tariff law; the generator seeds the extraction levy alone. So `any_import_tariff_enacted` is false
-for the whole of a played campaign, and the duty pass is unreached.
+**Its author is the history that produced it.** `seed_national_tariffs` enacts one blanket tariff
+per nation whose inherited protection clears the floor, authored by that nation — so the duty falls
+in the author's own market and credits the author's own treasury, through the single
+`enacting_nation` field the levy already uses. No second author, no branch in `market_clearing`, no
+corp verb and no control: the *only* path that writes a tariff is the handoff out of pre-history
+(§ 4 Tariffs).
 
-That makes the tariff **vocabulary ahead of its consumer** — the same shape META_LAYER.md's unwired
-modifier subjects have, and subject to the same discipline: a shape is proven by an instance, and
-an instance is owed. What it is *not* is an inert mechanic the reader should design against as
-though it were charging anyone. The nation grant (§ The 2026-08-18 grant) is what a rate-setting
-author would be built on: setting a tariff rate is named there as a nation power.
+That is what closes the ordering this section used to record. `import_tariff` was **vocabulary ahead
+of its consumer** — a member of the law-effect enum and of the save format, with the whole duty pass
+built and nothing enacting one — the same shape META_LAYER.md's unwired modifier subjects have, and
+subject to the same discipline: *a shape is proven by an instance, and an instance is owed*. The
+instance is the generated posture, and it arrives from history rather than from a dial, which is the
+only form of it § 4 Tariffs would accept.
+
+**`any_import_tariff_enacted` therefore answers a real question now**, and the answer varies by
+world: a world whose pre-history produced no protective polity enacts nothing and pays nothing for
+the mechanism, exactly as before. No tariff is a legitimate world, not a gap.
 
 ---
 
@@ -452,6 +467,49 @@ scorer's grudge term (§ 5).
 
 *Owned by BL-541 (directional tariffs).*
 
+**A polity's protection is a DERIVED output, not a scored verb (Ben, 2026-09-06).** The pre-history
+polity does not spend a round choosing protectionism. It carries a protection scalar moved
+deterministically by facts it already accumulates — when it industrialised relative to its
+neighbours (the axis `derive_national_character` already reads for ideology), and whether it holds
+colonies, since a metropole protects its ties. At handoff a polity above the threshold enacts an
+ordinary `import_tariff` law on its campaign nation, the rate banded off the scalar.
+
+**The timing term is a PRODUCT of two readings, and neither alone would do.** How much of the field
+is ahead — the share of surviving polities that lit a furnace strictly before this one — multiplied
+by how far behind it is, its own lag from the world's first furnace as a share of the span from that
+furnace to the epoch. Rank alone is uniform by construction: the last polity in a twelve-way field
+always scores top whether it lit two years late or never. Lag alone makes every non-industrialiser
+saturate, so a world where one polity of twelve industrialises would tariff eleven nations
+identically. The product says *behind, and far behind*.
+
+**A world where nobody lit a furnace scores zero for everyone**, and it falls out rather than being
+special-cased: with no furnace nobody is strictly ahead of anybody and the share term collapses.
+That is the honest reading — protection is a response to an industrial competitor, and a world
+without one has nothing to protect against.
+
+**The colony term is owed, not forgotten.** It has no input while a polity cannot take ground across
+water; BL-749 (sea-leg campaign) is what gives it one, and it lands as an addend on the same scalar.
+A far-flung holding is a large empire, not an overseas one, so no proxy stands in for it meanwhile.
+
+**Rates are banded, blanket, and first-cut.** Three ad-valorem bands above a floor, so the report can
+show *how hard* a history protects and not merely *whether* — a single threshold yields one number
+per world and cannot show whether the scalar carries variation, which is the measurement the
+paragraph below turns on. The directional form — `(author, target, resource) → rate` — stays
+BL-541's; scoping the first instance to one resource would be building half of that item here.
+
+The alternative — protection as a **verb** the polity spends a round on, which would make it a real
+strategy weighting alongside the others — is held as the **fallback, conditioned on a
+measurement**: if the derived form produces a *flat* distribution, where every world tariffs the
+same nations to the same degree or none at all, then the scalar is not carrying real variation and
+the verb is what would give it some. Flatness is the trigger and it is the only one; the verb costs
+a candidate per round and is not bought for elegance.
+
+This keeps the tariff inside the 2026-08-18 nation grant unchanged either way — setting a rate is
+named there as a nation power, and a derived posture is pure, seeded and replayable by
+construction. And it keeps the player-facing half honest: a home market sheltered because *its
+nation's history sheltered it* is a force with a visible cause, which is the standing requirement
+that market conditions never come from a term inside an agent.
+
 ### 5. What a nation wants — **a positional objective, not an accumulative one**
 
 Ben: *"Nation objectives should be terrestrial diplomacy. Figuring out which economic niche can be
@@ -561,8 +619,8 @@ harness must say so where a reader would otherwise assume the channel's rule.
 **Related authorities.** `docs/generation/NATION_GENERATION.md` (how a nation is made),
 `docs/economy/FINANCE.md` (the money loop the levy is accounted in), `docs/economy/MARKETS.md`
 (§ Tariffs, the clearing-tick half), `docs/politics/RELATIONS.md` (sentiment, the substrate
-nation→corp stance reads), `docs/economy/CONTRACTS.md` (§ Where offers come from, the
-`contracted_force` line's consumer), `docs/military/MILITARY.md` (§ Nation garrisons, the
+nation→corp stance reads), `docs/economy/CONTRACTS.md` (§ Explicitly out of scope, the sell side
+the `contracted_force` line would buy through), `docs/military/MILITARY.md` (§ Nation garrisons, the
 `military_research` line's other consumer), `docs/SYSTEMS.md` (§ Policy, § Conditions),
 `.claude/rules/io-standing-rules.md` (the grant's exact terms).
 

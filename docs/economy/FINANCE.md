@@ -1,5 +1,12 @@
 # Corporate Finance
 
+> **Settles:** what moves a corporation's balance each tick, and in which order · which costs
+> recur, in credits and in goods · what a quarterly return reports and who may read it · what
+> becomes of a firm that is bought, dissolved, or cannot pay.
+> **Not here:** what a good sells for and how that clears (MARKETS) · what a building yields for
+> its cost (PRODUCTION) · what a nation does with the money it levies (../politics/NATIONS.md).
+> **Confused with:** MARKETS.md, PRODUCTION.md, ../politics/NATIONS.md.
+
 The money loop: how a corporation's balance moves each economy tick, where the costs come
 from, and which surfaces read it. The authority for the *market* half of the cash flows is
 `docs/economy/MARKETS.md`; the authority for the law object behind the levy is
@@ -131,13 +138,21 @@ per-building profitability estimate (`building_profit.hpp`, BL-074 building
 profitability) both call it, so they cannot drift. The wage/maintenance split is
 BL-049 (wage/maintenance split).
 
-- **Material maintenance** — a fixed 30 % floor of the building's maintenance constant,
-  charged even when decommissioned.
+- **Material maintenance** — the **idle floor**, `economy.thresholds.idle_maintenance_floor`
+  (`scripts/economy.lua`, reached in code as `recipe_registry::idle_maintenance_floor`): the
+  fraction of the building's maintenance constant charged even at workforce 0 or decommissioned.
+  It is an **authored parameter, not a constant** — BL-739 (idle floor to data) owns the move out
+  of code, and the loader rejects a value outside [0, 1] rather than clamping it. Every call site
+  passes the registry's value into `compute_building_opex`, which takes it undefaulted so a new
+  one cannot fall back to a stale copy. Non-zero deliberately: holding land is never free.
 - **Labour maintenance** — the remainder, scaled by `workforce_target` (0–200 %,
-  `wt_scalar` clamped [0, 2]); zero when decommissioned.
-- **Wages** — `workforce_assigned × contention_scalar × base_wage × wt_scalar × hab`.
-  `contention_scalar` is the (corp, body) labour throttle from the economy step — a
-  building pays for the labour it actually used, not its target. `hab` is the body's
+  `wt_scalar` clamped [0, 2]); zero when decommissioned, and floored at zero rather than going
+  negative where `wt_scalar` falls below the idle floor — there the floor already covers more
+  than the scaled total, and maintenance is the floor alone.
+- **Wages** — `workforce_assigned × contention_scalar × base_wage × (1 + wage_bid) × wt_scalar
+  × hab`. `contention_scalar` is the building's own grant from the wage-competition allocation
+  (BL-614, wage competition), not a uniform pool throttle — a building pays for the labour it
+  actually won, not the labour it requested, and at the rate it offered. `hab` is the body's
   mean population-centre habitability, clamped [0.1, 2.0] (`body_mean_habitability`).
 
 Maintenance and wage constants per building type load from the recipe registry

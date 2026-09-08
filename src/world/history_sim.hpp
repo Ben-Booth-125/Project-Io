@@ -55,6 +55,7 @@
 #include "settlement.hpp"
 #include "works_roster.hpp"
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <string>
@@ -145,6 +146,27 @@ struct history_sim_params
     };
     int tick_band_count = 6; ///< Live entries in `tick_bands`.
 
+    // --- The two spans (BL-747) -------------------------------------------
+    //
+    // ONE engine, TWO spans: an ancient span to a boundary year, then an
+    // industrial span from the boundary to the epoch with the higher roster
+    // bands unlocked. Expressed as params on the SINGLE existing invocation
+    // rather than as a second call to `run_history_sim` — see
+    // era_minus_one.hpp for the six axes a second caller drifts on.
+
+    /// The year the INDUSTRIAL span begins. Before it a polity may not reach
+    /// past `span1_band_ceiling`; at or after it the ladder is unrestricted.
+    /// The default is INT64_MIN — no year is before it, so the whole run is
+    /// one unrestricted span and the struct default is exactly today's
+    /// behaviour. A caller that sets neither field cannot change a world.
+    int64_t boundary_year = INT64_MIN;
+
+    /// The highest roster band reachable before `boundary_year`. `industrial`
+    /// (the default) is no restriction at all, so the ceiling is inert twice
+    /// over on a single-span run: no year is before the boundary, AND the
+    /// clamp is the identity.
+    roster_band span1_band_ceiling = roster_band::industrial;
+
     // --- Objective selection (BL-277 Q1) ----------------------------------
     int w_farm = 300; ///< Weight on a target region's farm endowment.
     int w_ore  = 250; ///< Weight on its ore endowment.
@@ -218,8 +240,87 @@ struct history_sim_params
     /// Cost charged per per-mille of missing supply, in the shared currency.
     int campaign_supply_cost_q = 260;
     /// Capacity yield as a fraction of holdings value, and its payback years.
-    int invest_yield_q        = 90;
-    int invest_amortise_years = 12;
+    ///
+    /// RE-PRICED BY MEASUREMENT (BL-767, history_sweep 8 seeds at --epoch 1960,
+    /// 2026-09-06). At 90 over 12 years a capacity band was worth ~75 a year to
+    /// a polity holding forty regions, against Settle at ~190 and Campaign at
+    /// ~140 in the same currency — so Invest lost every round it was offered
+    /// past band 2, and every world in the spread topped out at materials band
+    /// 2 against an Industrial rung of 5. The pair says a permanent capacity
+    /// band pays back over FIVE years rather than twelve, which is the honest
+    /// reading of a benefit that never expires; measured, it puts three worlds
+    /// in eight over the rung with the first furnace spread from 1560 to 1804.
+    int invest_yield_q        = 260;
+    int invest_amortise_years = 5;
+
+    /// Accumulated progress one rung of the capacity ladder costs, MULTIPLIED
+    /// by the band already held — so band 4 costs four times what band 1 did
+    /// and capacity never runs away (ANCIENT_TECH_LADDER § diffusion).
+    ///
+    /// PROMOTED FROM A LITERAL (BL-767). It was `4000 * q.capacity[d]` inline
+    /// in the Invest execution, which made the single most load-bearing
+    /// quantity in the tech ladder the one thing in this file that could not be
+    /// tuned as data. The value is unchanged; only its address is.
+    int capacity_band_cost = 4000;
+
+    /// WHERE A POLITY'S INVESTMENT GOES (BL-767). The Invest verb raises ONE
+    /// domain a round, and these two weights decide which.
+    ///
+    /// THE DEFECT THEY EXIST TO CLOSE. The choice used to be "whichever domain
+    /// sits at the lowest band", full stop — which levels all seven domains in
+    /// LOCKSTEP and makes `capacity[]` a flat line rather than the PROFILE the
+    /// ladder's own § Shape asks for. It also puts the Industrial rung out of
+    /// arithmetic reach: crossing it in materials means dragging all seven
+    /// domains to band 5, roughly seven times the investment of the one rung
+    /// that matters, and measured (history_sweep, 4 seeds at --epoch 1960,
+    /// 2026-09-06) every world in the spread topped out at materials band 2.
+    /// No weight anywhere else could move that, because the ceiling was in the
+    /// selection rule rather than in the price.
+    ///
+    /// `invest_level_pull_q` is the old rule as a force: how strongly a domain
+    /// being BEHIND pulls investment toward it, per band of arrears.
+    /// `invest_ground_pull_q` is the new one: how strongly the polity's own
+    /// GROUND pulls, scored off the mean endowment of what it holds — farm to
+    /// agriculture, ore to materials, energy to energy, port to transport, and
+    /// nothing to institutions, military or medicine, which no window measures.
+    ///
+    /// The claim is HISTORY.md's Stage 4 hook read one stage earlier:
+    /// endowment, not virtue. A people sitting on ore climbs the materials
+    /// ladder because of the ore, and the furnace that eventually lights over
+    /// it is the same fact read twice.
+    ///
+    /// AT `invest_ground_pull_q = 0` THE OLD RULE IS EXACTLY RECOVERED, which
+    /// is what makes this a dial rather than a rewrite.
+    ///
+    /// THE DEFAULTS ARE MEASURED, NOT GUESSED. At `level_pull` 1000 a single
+    /// band of arrears outweighs any ground signal (endowment windows top out
+    /// at 1000, so the ground term cannot reach 1000 x 900/1000), and the run
+    /// levels in lockstep exactly as it did — which is what the first trial
+    /// measured. At 200/1000 the ground can outweigh roughly two bands of
+    /// arrears at a mean endowment of 400, so a polity specialises where its
+    /// ground argues and still catches a domain up once it falls far enough
+    /// behind. Military, which no window measures, therefore advances on
+    /// arrears alone and still reaches the medieval roster.
+    int invest_level_pull_q  = 200;
+    /// DEFAULT 0, AND THAT IS A MEASUREMENT OVERTURNING THE ITEM'S OWN
+    /// DIAGNOSIS (cold review, 2026-09-06). BL-767 shipped this at 1000 on the
+    /// reading that "the ceiling was in the selection rule rather than in the
+    /// price". Swept over 16 seeds at epoch 1960, the opposite is true:
+    ///
+    ///     ground_pull     0    100   200   400   700  1000  3000  10000
+    ///     worlds ind.   14/16   -     -     -     -   8/16    -     1/16
+    ///
+    /// monotone in the WRONG direction, with the shipped value among the worst.
+    /// The PRICE change alone (invest_yield_q 260, invest_amortise_years 5) is
+    /// what achieves R1 — 14 of 16 worlds industrialise with the selection rule
+    /// left exactly as it was. The ground pull then re-breaks it.
+    ///
+    /// The dial is KEPT rather than deleted, because it is a real force and it
+    /// may earn its keep once a capped domain stops being a sink (fixed
+    /// separately) and once BL-757's zero-works finding moves. But it ships
+    /// INERT, at the value that measures best, and the claim that 0 recovers the
+    /// old argmin exactly was verified from the code rather than assumed.
+    int invest_ground_pull_q = 0;
     /// Divisor turning holdings-value-at-risk into a comparable annual figure.
     int consolidate_divisor = 24;
 
@@ -349,7 +450,42 @@ struct history_sim_params
 
     /// Payback horizon turning a work's permanent benefit into the annual
     /// figure the shared currency is denominated in.
-    int work_amortise_years = 4;
+    ///
+    /// 4 -> 2 (BL-767), and it is a CONSEQUENCE rather than a finding of its
+    /// own. Re-pricing Invest to make the capacity ladder climbable made it
+    /// ~7x stronger in the shared currency, and this file's own § Magnitudes
+    /// note says the works weights exist to put the verb "in the same band as
+    /// the other verbs" — so leaving this at 4 dropped `build_work` out of the
+    /// contest entirely, taking three green harness checks (history_sweep W5 /
+    /// W5c / W5d) red with it. Halving the horizon puts it back in band.
+    ///
+    /// DELIBERATELY PARTIAL: a 2x correction against a 7x move. It restores
+    /// the checks and does NOT pretend to fix BL-757, whose zero-works finding
+    /// is a SCALE MISMATCH rather than a weight — Invest's score is
+    /// proportional to the whole empire's holdings while a work's local term is
+    /// proportional to ONE region, so the gap widens with every region a polity
+    /// takes. Measured under this change: real worlds still raise ZERO works
+    /// (history_sweep, 8 seeds at --epoch 1960, 2026-09-06), and no value of
+    /// this dial changes that.
+    /// 4 -> 2 -> 1, and every step was a CONSEQUENCE of re-pricing Invest
+    /// rather than a finding about works. BL-767 dropped it to 2 as a 2x
+    /// correction against a ~7x Invest re-pricing; excluding capped domains from
+    /// Invest selection (a correctness fix, not a tuning one) made Invest
+    /// productive in rounds where it previously bought nothing, which squeezed
+    /// build_work out of the contest again - 18 works raised fell to 6, and the
+    /// capacity effect on population vanished entirely. 1 restores it (30 works,
+    /// population 2660758 against 2297778 without) with industrialisation
+    /// unchanged at 14/16.
+    ///
+    /// THIS IS THE FLOOR, AND THAT IS THE POINT WORTH CARRYING FORWARD. A work
+    /// cannot amortise over less than one year, so if Invest becomes any more
+    /// productive there is no headroom left in this dial and build_work leaves
+    /// the contest for good. That is BL-757's structural finding arriving at its
+    /// limit: Invest's score scales with the WHOLE EMPIRE while a work's local
+    /// term scales with ONE REGION, so the gap widens with every conquest and no
+    /// dial closes it. It still does not fix BL-757 - real generated worlds
+    /// raise ZERO works at 16 seeds even here.
+    int work_amortise_years = 1;
 
     /// Minimum in the shared currency, like the four thresholds above.
     /// Deliberately LOW: a Way Station on poor ground is a marginal choice and
@@ -407,6 +543,11 @@ enum class sim_domain : uint8_t
 };
 
 inline constexpr int sim_domain_count = 7;
+/// "This polity never crossed the Industrial rung." A sentinel outside every
+/// arc this sim runs, because 0 is a legitimate crossing year on the ancient
+/// arc (4000 BCE -> 0 CE).
+inline constexpr int64_t k_never_industrialised = INT64_MIN;
+
 
 /// One governing entity. At the antiquity start these are CULTURES, not
 /// nations — `run_settlement` leaves `region::nation` at -1 until the
@@ -453,6 +594,70 @@ struct polity
     /// raw-score comparison Consolidate was never chosen after ~year 176 and
     /// this escape did not exist.
     int cohesion_q = 1000;
+
+    /// BL-748 — THE YEAR THIS POLITY CROSSED THE INDUSTRIAL RUNG, or 0 for
+    /// never. The sim's industrial clock is the capacity ladder, and the rung
+    /// is `roster_band_for_capacity(capacity[materials]) == industrial` under
+    /// the span ceiling in force — the SAME derivation the works table reads,
+    /// so a polity cannot light a furnace at a band it could not build at.
+    ///
+    /// Materials, not military, for the reason HISTORY.md § The works roster
+    /// gives: a Blast Works turns over with metallurgy, not with the column
+    /// whose rows turn over at a roster boundary.
+    ///
+    /// This is the polity half of Stage 4. The REGION half is
+    /// `region::industrial_lag_years` — how long that particular ground takes
+    /// once its owner can pay for a furnace at all — and a region lights at
+    /// `industrial_year + lag`, if that year falls before the epoch.
+    /// `k_never_industrialised`, NOT 0, and the distinction is not pedantry:
+    /// 0 CE is a real calendar year on every arc this sim runs, and the ancient
+    /// arc runs 4000 BCE -> 0 CE. Sentinel-as-zero meant three things at once.
+    /// A polity that crossed the rung in year 0 wrote the sentinel, so it was
+    /// re-detected on every later round and `polities_industrialised`
+    /// double-counted it. And on the default single-span arc `sim_band_ceiling`
+    /// is inert, so a median of four polities per world "crossed" between 2000
+    /// and 3100 BCE - garbage that no consumer could tell from a real date, two
+    /// lines beneath a summary correctly printing "no polity reached the rung".
+    int64_t industrial_year = k_never_industrialised;
+
+    /// BL-750 — TARIFF POSTURE, AS A DERIVED SCALAR, 0-1000.
+    ///
+    /// How hard this polity protects what it has. Ben ruled the DERIVED form on
+    /// 2026-09-06 (NATIONS.md sec 4 Tariffs): a polity does not spend a round
+    /// choosing protectionism, so this is not a scored verb and nothing in the
+    /// decision loop reads it. It is computed ONCE, after the run, from facts
+    /// the run already accumulated, and read at the handoff by
+    /// `derive_national_protection` -> `seed_national_tariffs`.
+    ///
+    /// TWO TERMS, MULTIPLIED, and the product is the point:
+    ///   - HOW MUCH OF THE FIELD IS AHEAD of it (the share of surviving
+    ///     polities that lit a furnace strictly before it did), and
+    ///   - HOW FAR BEHIND it is (its own lag from the world's first furnace,
+    ///     as a share of the span from that furnace to the epoch).
+    /// Either alone reads flat. Rank alone is uniform by construction — the
+    /// last polity in a twelve-way field always scores 1000 whether it lit two
+    /// years late or never. Lag alone makes every non-industrialiser max out,
+    /// so a world where one polity of twelve industrialises tariffs eleven
+    /// nations identically. The product says "behind, AND far behind".
+    ///
+    /// A WORLD WHERE NOBODY LIT SCORES ZERO FOR EVERYONE, and it falls out
+    /// rather than being special-cased: with no furnace, nobody is strictly
+    /// ahead of anybody, the share term is zero for every polity, and the
+    /// product collapses. That is the honest reading — protection is a response
+    /// to an industrial competitor, and a world without one has nothing to
+    /// protect against. A world with no tariff is a legitimate outcome
+    /// (GENERATION_STRATEGY.md sec Asymmetry is the deliverable) and this is
+    /// where it comes from.
+    ///
+    /// THE COLONY TERM IS OWED, NOT FORGOTTEN. Ben's ruling names two movers:
+    /// industrialisation timing and whether the polity holds colonies, "since a
+    /// metropole protects its ties". The second has NO INPUT in this codebase —
+    /// BL-749 (sea-leg campaign) is what gives a polity ground across water,
+    /// and it has not landed. Rather than invent a proxy for a colony (a
+    /// far-flung holding is a large empire, not an overseas one), the term is
+    /// left out and recorded as owed. It is an addend on this scalar when
+    /// BL-749 lands, not a restructure.
+    int protection_q = 0;
 
     /// True for a seeded great power (BL-299). Majors start with more ground
     /// and an opposed strategic creed; the periphery stays alive as actors.
@@ -641,6 +846,24 @@ struct history_sim_state
     /// each change, and you have the map at any year. `owner_slice_at` does
     /// exactly that for a caller that wants one year materialised.
     std::vector<owner_change> owner_changes;
+
+    /// THE ANCIENT ROAD RECORD (BL-768) — every region-to-region corridor the
+    /// history actually moved along, deduplicated and counted.
+    ///
+    /// Two sources, and each is an event the sim already resolves rather than a
+    /// new concept: a CAMPAIGN records (staging holding -> objective), the line
+    /// an army was actually victualled along and the exact pair `campaign_supply`
+    /// prices; a SETTLE records (parent -> daughter), the line a founding party
+    /// walked. Consolidate and Invest have no spatial pair and contribute none.
+    ///
+    /// Sorted ascending by (a, b) with `uses` accumulated, so the stamping pass
+    /// is order-independent by construction. Region indices are stable for the
+    /// life of a run — Settle only ever appends — so an index recorded in year
+    /// -3900 still names the same region at the epoch.
+    ///
+    /// NOT gated on `trace_battles`: generation is its consumer, not a harness.
+    std::vector<history_corridor> supply_corridors;
+
     int      region_stride = 0; ///< Final region count (slice width for replay).
     int64_t  years           = 0; ///< Years simulated.
     int64_t  start_year      = 0; ///< First simulated year, for replay bounds.
@@ -659,10 +882,71 @@ struct history_sim_state
     /// — launched, but arriving too thin for the distance. The supply-decay
     /// stall, counted where it happens rather than after the battle resolved.
     int64_t stalled_campaigns = 0;
+
+    // --- BL-778 / BL-779: what the water model actually produced -----------
+    //
+    // Three readings, and all three are CALIBRATION, never coverage targets to
+    // raise (docs/generation/MILITARY_HISTORY.md § Naval — "rare is the design,
+    // not a shortfall"). A sim in which sea battles were routine would be
+    // generating a different history.
+
+    /// Campaign candidates REFUSED on traversal legality (BL-778): the line
+    /// from the staging holding to the target crosses sea, the polity owns no
+    /// shore bridging it, and it can field no naval row to carry the force.
+    /// This is the free overseas conquest BL-755 measured, now priced.
+    int64_t illegal_campaigns = 0;
+
+    /// Campaigns fought at ZERO supply because the force could not forage
+    /// (MILITARY_HISTORY.md § Forage) — it reached ground adjacent to neither
+    /// land nor water its own polity holds. A subset of `stalled_campaigns`.
+    int64_t starved_campaigns = 0;
+
+    /// Battles in which EITHER stack committed a naval entry (BL-779).
+    ///
+    /// READ THIS WITH `sea_leg_battles`, NOT ALONE, and the reason is the
+    /// composition model. `roster_stack` composes a stack from EVERY available
+    /// row by weight (MILITARY_HISTORY.md § Naval — ships "are rows in the same
+    /// roster... composed into the same stack"), so a polity whose ground clears
+    /// `port_q` carries a galley contingent into every fight it has, inland ones
+    /// included. A high figure here therefore measures HOW COASTAL THE POWERS
+    /// ARE, not how often anyone fought at sea.
+    int64_t naval_battles = 0;
+
+    /// Battles reached over a SEA LEG — the line from the staging holding to the
+    /// objective crossed sea. This is the one that answers "how often does naval
+    /// combat actually occur", because it is the only figure that requires water
+    /// to have been crossed rather than merely bordered.
+    int64_t sea_leg_battles = 0;
+
     /// Works raised over the run (BL-321). Counted because "did the roster fire
     /// at all" and "did it fire so much nothing else happened" are the two ways
     /// this item fails, and neither is visible in the battle/founding counts.
     int64_t works_raised = 0;
+
+    /// BL-760 (1): works raised and units fielded, SPLIT BY ROSTER BAND and by
+    /// which span they happened in (index 0 = the ancient span, 1 = industrial).
+    ///
+    /// WITHOUT THIS THE TWO-SPAN BAND CEILING HAS NO OBSERVABLE. `works_raised`
+    /// is one scalar with no band split, so nothing in the project could tell
+    /// `span1_band_ceiling = medieval` from `= industrial`: if no polity reaches
+    /// materials capacity 4 before the boundary the clamp never binds, and every
+    /// check stays green whether or not the ceiling works at all. A requirement
+    /// was marked complete on substituted evidence because of it.
+    ///
+    /// READ THEM WITH BL-757 IN HAND. That item measured ZERO works raised
+    /// across sixteen seeds, because `build_work` never wins the scored contest
+    /// — so a band row of zeros here has two possible causes and the counter
+    /// alone cannot separate them. The units rows are the ones carrying signal
+    /// until that is fixed.
+    /// CROSS-TABULATED, not two marginals. [span][band], span 0 = ancient.
+    /// Two separate 1-D arrays cannot answer this question and the first cut of
+    /// this counter got that wrong: with a medieval span-1 ceiling, span 1
+    /// legitimately fields gunpowder, so units_by_band[gunpowder] > 0 and
+    /// units_by_span[0] > 0 - and an UNRESTRICTED run where span 0 fields
+    /// gunpowder produces the IDENTICAL pair of marginals. The counter built to
+    /// see the ceiling was blind to exactly the case it existed for.
+    std::array<std::array<int64_t, roster_band_count>, 2> works_by_span_band{};
+    std::array<std::array<int64_t, roster_band_count>, 2> units_by_span_band{};
 
     /// Battles in each century of the run, index 0 = the first hundred years.
     /// The sweep reports war frequency PER CENTURY rather than as a total,
@@ -670,6 +954,14 @@ struct history_sim_state
     /// fought steadily for two millennia have the same total and nothing else
     /// in common — the total alone cannot tell them apart.
     std::vector<int32_t> battles_per_century;
+
+    /// BL-748 — how many polities crossed the Industrial rung inside the run,
+    /// and how many regions actually lit a furnace before the epoch. The two
+    /// differ and the gap is the point: a polity can cross with two years left
+    /// and industrialise nothing, and a counter that reported only the second
+    /// could not tell that world from one where the rung was never reached.
+    int64_t polities_industrialised = 0;
+    int64_t regions_industrialised  = 0;
 
     /// Highest total population the body ever carried, and the year it peaked.
     /// Peak has to be tracked as the run goes: the epoch figure alone cannot
@@ -747,6 +1039,12 @@ int region_distance(const region& a, const region& b, int gw);
 /// that recomputed the ladder its own way would be testing its own arithmetic,
 /// the same reason `region_distance` is public.
 int step_for_year(const history_sim_params& p, int64_t y);
+
+/// The roster band ceiling in force at year @p y. ONE derivation, read by
+/// BOTH roster sites — the works table off materials capacity and the unit
+/// table off military — so the two tables cannot drift apart on the span.
+inline roster_band sim_band_ceiling(const history_sim_params& p, int64_t y)
+{ return y < p.boundary_year ? p.span1_band_ceiling : roster_band::industrial; }
 
 /// Bytes the time-lapse substrate occupies — the quantity the requirement
 /// bounds, and the reason the encoding is a change list rather than a grid.

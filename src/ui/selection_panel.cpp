@@ -28,6 +28,7 @@
 #include "world/logistics.hpp"       // invalidate_logistics_caches (idle/resume flips the anchor set)
 #include "world/placement_rules.hpp" // buildable-type validity + stack capacity
 #include "world/province.hpp"        // BL-534: province membership + BL-513 building ceiling
+#include "world/settlement.hpp"      // BL-785: region_domain_of - the three-domain word for a water tile
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
 #include "world/tech_gate.hpp"       // BL-593: recipe_unlocked — the door filters what the gate would refuse
@@ -2670,6 +2671,95 @@ void draw_tile_chart_section(ui_state& ui, entity_id sel, const tile_metric& mp,
     draw_tile_metric_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh}, mp);
 }
 
+// ── The WATER variant of the centre column (BL-785) ──────────────────────
+//
+// A water tile selects exactly as a land tile does, and its centre column
+// answers a different question because the ground answers a different one.
+// SELECTION.md § A water tile is selectable: owner and domain are the headline
+// pair, then the province, then habitability. There is no accordion here —
+// Buildings, Deposits, Resources and Population all read the ground, and on
+// water there is none.
+//
+// UNOWNED IS THE ASSERTION, NOT THE ABSENCE OF ONE. Open ocean is unowned
+// STRUCTURALLY (PROVINCES.md § Who owns water), so the row says so in words. An
+// empty owner row and an owner row reading "Unowned" cost the same pixels and
+// mean opposite things: the first looks like the panel failed, the second is
+// the model's central claim — which is the whole reason this surface exists.
+void draw_water_facts_column(const world& w, entity_id sel, const tile_component& tile,
+                             float center_w, float total_h)
+{
+    const ImGuiStyle& style = ImGui::GetStyle();
+    ImGui::BeginChild("##water_facts", {center_w, total_h}, true,
+                      ImGuiWindowFlags_NoSavedSettings);
+
+    const region_domain dom = region_domain_of(tile.substrate);
+    const bool open_ocean   = (dom == region_domain::open_ocean);
+
+    entity_id owner = null_entity;
+    if (const auto nit = w.tile_to_nation.find(sel); nit != w.tile_to_nation.end())
+        owner = nit->second;
+
+    // ── Owner — the headline, and the reason the surface exists ──
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Owner");
+    ImGui::SameLine();
+    if (owner != null_entity)
+    {
+        if (const auto nat = w.nations.find(owner); nat != w.nations.end())
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::nation_colour(owner)),
+                               "%s", nat->second.name.c_str());
+        else
+            ImGui::Text("Claimed");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Coastal water belongs to whoever owns the shore.\n"
+                              "Title is derived from the shore that claims it,\n"
+                              "never from anything built on the water.");
+    }
+    else
+    {
+        // Stated, never blank. The two branches are deliberately the same shape,
+        // so "Unowned" reads as a VALUE in the row rather than as a gap in it.
+        ImGui::TextDisabled("Unowned");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(open_ocean
+                                  ? "Open ocean is unowned STRUCTURALLY - it is not a\n"
+                                    "territory anyone can hold. It is crossed, not held."
+                                  : "This water is claimed by no nation: no shore beside\n"
+                                    "it is held either.");
+    }
+
+    // ── Domain — what KIND of water, which is what decides ownership ──
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Domain");
+    ImGui::SameLine();
+    ImGui::Text("%s", open_ocean ? "Open ocean"
+                    : (tile.substrate == terrain_substrate::lake) ? "Lake (coastal water)"
+                                                                  : "Coastal water");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Land, coastal water and open ocean are the three domains.\n"
+                          "Coastal water and lakes can be owned; open ocean cannot.");
+
+    ImGui::Separator();
+
+    // ── Province ──
+    const uint32_t prov = w.provinces.province_of(sel);
+    ImGui::TextDisabled("Province");
+    ImGui::SameLine();
+    if (prov != 0u) ImGui::Text("#%u", prov);
+    else            ImGui::TextDisabled("none");
+
+    // ── Habitability — the one terrain scalar water still answers ──
+    ImGui::TextDisabled("Habitability");
+    ImGui::SameLine();
+    ImGui::Text("%.2f", static_cast<double>(tile.habitability));
+
+    ImGui::Dummy({1.0f, style.ItemSpacing.y});
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("No deposits, workforce or buildings are read here: those "
+                        "questions are about ground, and there is none.");
+    ImGui::PopTextWrapPos();
+
+    ImGui::EndChild();
+}
+
 void draw_tile_selection(world& w, ui_state& ui)
 {
     const entity_id sel = ui.selected_entity;
@@ -2680,6 +2770,11 @@ void draw_tile_selection(world& w, ui_state& ui)
         return;
     }
     const tile_component& tile   = tit->second;
+    // BL-785: water selects through this same element, and the centre column
+    // forks on it. Not a second card — the header, the hex ring and the action
+    // grid are the same ones, which is what "selects exactly as a land tile
+    // does" means (SELECTION.md).
+    const bool            water  = is_water(tile.substrate);
     const ImGuiStyle&     style  = ImGui::GetStyle();
     ImDrawList*           dl     = ImGui::GetWindowDrawList();
     const float           avail  = ImGui::GetContentRegionAvail().x;
@@ -2760,6 +2855,17 @@ void draw_tile_selection(world& w, ui_state& ui)
     // resolved from the selected tile rather than from a province selection —
     // that is what "bundled into" means, and it is why there is no longer a
     // gesture that selects a province without also selecting a tile.
+    //
+    // ...AND NOT ON WATER (BL-785). Four of the five sections read the ground,
+    // and water has none, so the water tile takes the owner/domain column above
+    // instead. The left and right columns are shared unchanged: the hex ring
+    // reads a shoreline usefully, and the action grid's refusals are the same
+    // refusals.
+    if (water)
+    {
+        draw_water_facts_column(w, sel, tile, center_w, total_h);
+    }
+    else
     {
         const std::vector<tile_metric> pages = tile_metrics(w, sel);
 
@@ -3141,13 +3247,33 @@ void draw_tile_selection(world& w, ui_state& ui)
         //    capital and nothing on the way". True at launch, extinguishes
         //    itself the moment a build starts, returns when it becomes true
         //    again. No timer, no flag, no dismissal to persist.
+        // ON WATER THE LIST IS ONE TYPE LONG (BL-785). A coastal province holds a
+        // PORT and nothing else (MILITARY.md § Domains and traversal), and only on
+        // water this nation owns — every other type wants ground, workers and a
+        // deposit, and none of the three is on the water. So the probe below is
+        // not run at all here: sweeping every extractable and every structure over
+        // open sea can only produce the same refusal thirty times.
+        //
+        // The OWNERSHIP half is checked here rather than left to the seam, because
+        // it is a fact about title and the placement seam is about terrain. It is
+        // the same predicate the centre column just stated in words, so the button
+        // and the owner row cannot come to disagree.
         bool any_placeable = false;
+        if (water)
+        {
+            const bool owned = w.tile_to_nation.count(sel) != 0;
+            any_placeable = owned
+                            && placement_rules::can_place_in_world(
+                                   w, sel, building_type::port, resource_type::iron_ore,
+                                   ui.max_logistics_reach).ok();
+        }
+        else
         for (const resource_type er : placement_rules::k_extractable)
             if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f &&
                 placement_rules::can_place_in_world(w, sel, building_type::extraction_site, er,
                                                    ui.max_logistics_reach).ok())
             { any_placeable = true; break; }
-        if (!any_placeable)
+        if (!any_placeable && !water)
         {
             for (const building_type bt : {building_type::processing_facility,
                                            building_type::port,
@@ -3182,8 +3308,14 @@ void draw_tile_selection(world& w, ui_state& ui)
         }
         if (tile_icon_button("##act_construct", bsz, any_placeable,
                              any_placeable
-                                 ? (primed ? "Construct buildings - nothing under way"
-                                           : "Construct buildings")
+                                 ? (water
+                                        ? "Construct a port - the one thing that stands on water"
+                                        : (primed ? "Construct buildings - nothing under way"
+                                                  : "Construct buildings"))
+                             : water
+                                 ? (w.tile_to_nation.count(sel) != 0
+                                        ? "Only a port stands on water, and not on this water"
+                                        : "Unowned water: a port needs a shore its owner holds")
                                  : "Nothing can be built on this tile",
                              glyph_hammer))
         {

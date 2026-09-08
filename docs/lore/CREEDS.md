@@ -1,5 +1,19 @@
 # Kepler — Creeds
 
+> **Settles:** how a cradle culture rolls its own phonology and coins its lexicon · why one
+> pantheon per culture · what a creed's drives do at the tribal-conflict stage · where a
+> pantheon sits on the ground · how globalisation renders the record into a common tongue.
+> **Not here:** which names each generation pass draws from a tongue, and on what terms
+> (../generation/NATION_GENERATION § Pass 5 — Naming, the register of naming sites) · the
+> stage ladder this pass interleaves with (HISTORY) · how a polity narrates its doom
+> (COLLAPSE).
+> **Confused with:** HISTORY.md, COLLAPSE.md, ../generation/NATION_GENERATION.md.
+
+> **The tongue is coined here and CONSUMED elsewhere.** This doc owns the phonology and the
+> lexicon; it does not own the naming sites. Which passes draw on a tongue — and the one
+> sanctioned place an English structural word survives — is registered in
+> [NATION_GENERATION.md](../generation/NATION_GENERATION.md) § Pass 5 — Naming.
+
 One pantheon per cradle-culture, each in its own generated tongue, and the
 globalisation that renders the record in the player's language. The pass is
 `src/world/creeds.{hpp,cpp}` (BL-235, creeds), verified by

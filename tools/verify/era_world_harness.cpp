@@ -60,7 +60,11 @@ bool regions_identical(const std::vector<region>& a, const std::vector<region>& 
             || x.founded_year != y.founded_year || x.industrial_year != y.industrial_year
             || x.population != y.population || x.manpower_stock != y.manpower_stock
             || x.farm_q != y.farm_q || x.ore_q != y.ore_q || x.energy_q != y.energy_q
-            || x.port_q != y.port_q || x.nation != y.nation)
+            || x.port_q != y.port_q || x.nation != y.nation
+            // BL-766: the urban record is sim output too, so R4's determinism
+            // claim has to cover it or a non-deterministic city map passes.
+            || x.centres != y.centres || x.centres_razed != y.centres_razed
+            || x.urban_population != y.urban_population)
             return false;
     }
     return true;
@@ -154,6 +158,75 @@ int main()
     if (k_settled != nullptr)
         check(ps60.size() >= k_settled->settlement.regions.size(),
               "R5 the 1960 world holds at least as many regions as the 0 CE settlement pass");
+
+    // --- R6: roads and markets FROM the history (BL-768) --------------------
+    //
+    // THE ONLY PLACE THIS CAN BE ASSERTED. Every road and market census in the
+    // project declares `no_prehistory()` — correct for their own subjects, and
+    // structurally blind to this one: with no era there are no corridors, so the
+    // ancient stamp is a no-op and the market carve's trade term never fires.
+    // This harness generates the era-ON world by construction, so the check
+    // belongs here rather than beside the passes it measures.
+    //
+    // Four claims, in the order the phase produces them:
+    //   R6a  the history RECORDED where it walked;
+    //   R6b  those lines MET somewhere — a network with no junction is a set of
+    //        unconnected spokes, and the market term would have nothing to read;
+    //   R6c  the ancient roads are ON THE GROUND, not merely recorded;
+    //   R6d  a market actually emerges from trade — over a SEED SWEEP, not at one
+    //        seed.
+    //
+    // R6d IS A REACHABILITY CLAIM, and deliberately so: whether a junction
+    // happens to hold a centre its nation's own gate would have refused is
+    // spatial luck at any one world, exactly as road_generation_harness argues
+    // for the Highway tier. A world where trade opened no market is a legitimate
+    // outcome (§ Asymmetry is the deliverable, and the five calls' "tune the
+    // forces, never the outcome"); a SWEEP where it never happens would mean the
+    // term is dead, which is the thing worth failing on.
+    {
+        std::printf("\n--- R6  roads and markets from the history (BL-768) ---\n");
+        std::printf("  seed 0: corridors %" PRId64 "  junctions (degree >= 3) %" PRId64
+                    "  markets opened by trade %" PRId64 "\n",
+                    rep_a.prehistory_corridors, rep_a.prehistory_junctions,
+                    rep_a.markets_from_trade);
+        check(rep_a.prehistory_corridors > 0,
+              "R6a the era recorded the corridors it supplied and settled along");
+        check(rep_a.prehistory_junctions > 0,
+              "R6b those corridors MEET somewhere — there are trade junctions to carve on");
+        check(rep_a.prehistory_corridors == rep_b.prehistory_corridors
+              && rep_a.prehistory_junctions == rep_b.prehistory_junctions
+              && rep_a.markets_from_trade == rep_b.markets_from_trade,
+              "R6 the record is deterministic across two generations");
+
+        int roaded = 0;
+        for (const auto& [tid, tc] : wa.tiles)
+            if (tc.body == wa.home_body && tc.road_level > 0 && !is_water(tc.substrate))
+                ++roaded;
+        std::printf("  roaded land tiles on the 0 CE world: %d\n", roaded);
+        check(roaded > 0, "R6c the ancient world opens with roads on the ground");
+
+        int seeds_with_trade_market = 0, trade_markets = 0;
+        std::int64_t seed0_trade = rep_a.markets_from_trade;
+        for (std::uint32_t s = 1; s < 4; ++s)
+        {
+            world_params sp{};
+            sp.epoch_year = 0;
+            sp.seed = s * 0x9E3779B1u;
+            generation_report rs{};
+            make_hard_coded_world(sp, &rs);
+            std::printf("  seed %u: corridors %" PRId64 "  junctions %" PRId64
+                        "  markets opened by trade %" PRId64 "\n",
+                        s, rs.prehistory_corridors, rs.prehistory_junctions,
+                        rs.markets_from_trade);
+            if (rs.markets_from_trade > 0) ++seeds_with_trade_market;
+            trade_markets += static_cast<int>(rs.markets_from_trade);
+        }
+        if (seed0_trade > 0) { ++seeds_with_trade_market; trade_markets += static_cast<int>(seed0_trade); }
+        std::printf("  markets opened by trade: %d across %d of 4 worlds\n",
+                    trade_markets, seeds_with_trade_market);
+        check(seeds_with_trade_market > 0,
+              "R6d a market emerges where trade concentrated (reachable across the seed sweep)");
+    }
 
     // --- The dossier ---------------------------------------------------------
     std::printf("\n=== KEPLER AT 0 CE ===\n");

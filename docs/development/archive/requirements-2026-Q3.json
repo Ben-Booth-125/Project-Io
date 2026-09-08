@@ -10,6 +10,30 @@
  ],
  "bucket": "2026-Q3",
  "records": {
+  "1960-baselines-rebased": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "campaign_lapse --epoch 1960 is re-run on the post-BL-747 tree for both standard seeds, and the four lapse metrics are restated from that run.",
+     "verification": [
+      "headless: campaign_lapse --epoch 1960 --seed 0/1 --warm 80 --ticks 120 completes and writes its csv set"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. campaign_lapse --epoch 1960 --warm 80 --ticks 120 on seeds 0 and 1, post-BL-747 tree, tags rebase-s0 / rebase-s1. Both runs PASS (C1-C3), 99 s each."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Every store quoting a 1960-epoch figure is corrected or marked as historical: sprint 33 done_when and its opening baseline, BL-745, BL-746, BL-708.",
+     "verification": [
+      "static: each named figure either restated against the new run or explicitly dated as the pre-BL-747 measurement"
+     ],
+     "notes": "The old numbers are not WRONG about the code they measured - they are no longer reproducible from HEAD. Date them; do not silently overwrite.",
+     "evidence": "COMPLETE 2026-09-06. Full pre/post table written onto BL-759; BL-745 and BL-746 carry a dated pointer to it rather than losing their old figures. THREE MATERIAL MOVES: (1) seed-1 interest share of net loss 70% -> 7%, which VOIDS BL-726 premise and already satisfies sprint 33 interest done-when; (2) the field is healthier than assumed - op-positive at q200 is 48/55 and 50/63 against 46/61 and 31/55; (3) valued production falls x0.57 / x0.68, not x0.21 / x0.61, so the growth gate is still unmet but the gap is a third of what was thought. UNMOVED: mean supply factor 0.598 / 0.570 against the quoted ~0.57, so BL-746 is sized as it was."
+    }
+   ]
+  },
   "a-channel-must-bid": {
    "rows": [
     {
@@ -329,6 +353,42 @@
   },
   "app-cpp-decomposition": {
    "resolution": "Complete 2026-08-10. app.cpp 3826 -> 1422 lines (-2404) across four VERBATIM extractions, one commit each: verify_api.cpp + app_capture.cpp (~1,180 lines), startup_screens.cpp (~580, matching STARTUP.md ownership), time_panel.{hpp,cpp} (~300), session_history.{hpp,cpp} (~230). Bodies were moved by line-range copy so logic reordering was not possible; the verify API's 60 registered function names were diffed byte-identical (scripts/verify/*.lua call them by name). Two forced changes, both recorded: frame_stats_instance lost its anonymous namespace (render() and the CSV tap now sit in different TUs) and the extracted system menu inlines the pause toggle rather than calling private app::dispatch_action - reviewed as character-equivalent."
+  },
+  "band-ceiling-observable": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Works raised and units fielded are reported PER ROSTER BAND, either side of the span boundary, so span1_band_ceiling = medieval is distinguishable from = industrial.",
+     "verification": [
+      "headless: history_sweep reports per-band counts either side of the boundary",
+      "headless: the ancient span raises nothing above medieval"
+     ],
+     "notes": "Entangled with BL-757: build_work never wins the scored contest, so a per-band zero may have a second cause. Report the cause, do not assert past it.",
+     "evidence": "COMPLETE 2026-09-06. history_sim_state gains works_by_band / units_by_band / works_by_span / units_by_span, counted at the event. build_stack REPORTS the band it fielded via an out-param rather than the call site re-deriving min_band - a second copy would be free to drift. span_index() handles the INT64_MIN sentinel explicitly so a single-span ancient arc reports span 0, not an industrial span it does not have. history_sweep prints the per-band and per-span table and asserts B1. MEASURED over 16 seeds: classical 8,179,138 units / medieval 101,814 / gunpowder 0 / industrial 0; span 0 8,280,952, span 1 zero. B1 PASSES and can now fail. WORKS ARE ZERO IN EVERY BAND - that is BL-757 (build_work never wins the scored contest), reported not asserted past, exactly as the requirement directed.\n\nCORRECTED 2026-09-06 AFTER THE COLD REVIEW BARRIER. THIS ROW WAS MARKED COMPLETE ON EVIDENCE THAT COULD NOT BEAR ON IT, and the review was right. TWO REAL DEFECTS. (1) The counters were two 1-D MARGINALS (units_by_band and units_by_span), which cannot answer a cross-tabulated question: a medieval span-1 ceiling fielding gunpowder in span 1 produces marginals IDENTICAL to an unrestricted run fielding gunpowder in span 0. The counter built to see the ceiling was blind to the case it existed for. NOW A TRUE CROSS-TAB, [span][band]. (2) THE VERIFYING RUN HAD NO BOUNDARY: history_sweep was run without --epoch, so boundary_year was INT64_MIN and \"either side of the boundary\" was never exercised - the 32a lesson repeating in the same sprint. RE-RUN with --epoch 1960, which has a real 1560 boundary: span 0 classical 3,988,542 / medieval 21,633; span 1 classical 5,245,315 / medieval 1,500; gunpowder and industrial zero in both. B1 now gates on an industrial span being PRESENT, because on a single-span arc sim_band_ceiling is unrestricted and asserting a ceiling there would assert a property the sim does not enforce. HONEST LIMIT: no polity reaches gunpowder even UNRESTRICTED in these seeds, so the observable now exists and is correct, but the ceiling has still never been seen BINDING."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "save_envelope_roundtrip S3 asserts EVERY world_params field, with prehistory_years and industrial_years set to DIFFERENT non-default values so an order swap fails.",
+     "verification": [
+      "headless: save_envelope_roundtrip S3 green with distinct non-default year values",
+      "headless: deliberately swapping the two write orders makes S3 fail"
+     ],
+     "notes": "Both default to 400 today, so a swap round-trips clean. The differential is the requirement, not the green.",
+     "evidence": "COMPLETE 2026-09-06. S3 asserts all six world_params fields, with prehistory_years=137 and industrial_years=291 - distinct, non-default, not each other transposition - plus a second row pinning them to their literal slots (a symmetric writer/reader swap would survive a compare-to-original). THE DIFFERENTIAL WAS ACTUALLY RUN, not reasoned about: swapping the two w_int calls in save_game.cpp made BOTH new assertions FAIL; reverting restored PASS (0 failures).\n\nCORRECTED 2026-09-06 AFTER THE COLD REVIEW BARRIER. \"EVERY world_params field\" WAS 6 OF 7. The seventh, preferences, was neither set nor asserted - and it is the most swap-exposed of all: save_game writes EIGHT consecutive same-typed lean enums plus roll[3] under one bound, so any two could transpose and a default-valued round-trip would stay green, which is precisely the hole this row was written to close, one struct deeper. FIXED: all 8 leans given DISTINCT values plus roll {11,22,33}, and asserted. DIFFERENTIAL RUN AGAIN: swapping w_enum(metal) and w_enum(ocean) makes the new row FAIL; reverting restores PASS (0 failures)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "build_stack's dead ceiling = roster_band::industrial default argument is removed, or the two-caller invariant is asserted.",
+     "verification": [
+      "static: no default argument, or an assertion that both call sites pass it explicitly"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. The default argument is removed from build_stack. Both call sites already passed sim_band_ceiling(params, y) explicitly, so the default was dead in the dangerous direction - a new in-TU caller omitting it would have silently un-applied the span cap. Now a compile error."
+    }
+   ]
   },
   "battle-state-in-world": {
    "rows": [
@@ -706,6 +766,41 @@
    ],
    "resolution": "Closed in the 2026-07-04 backlog reconciliation (retro-verified). Canvas hit-testing (marker hit-zones + selection resolution) is live in body_surface_canvas.cpp's click handler and selection_panel.cpp's building branch; rows R1-R3 retro-verified. Pure bookkeeping."
   },
+  "centre-bound-to-region": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Each materialised population centre is bound to the region whose record produced it, and placed within that region rather than across the body.",
+     "verification": [
+      "headless: a centre position falls inside its source region"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. Displaced centres 56.3% -> 17.9%, and every remaining displacement is a region wanting more cities than it has ground."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The causal story survives to the map: a heavily sacked region visibly carries fewer or smaller cities than an untouched neighbour of the same farm quality.",
+     "verification": [
+      "headless: sacked vs untouched regions of comparable farm_q differ in centre count/scale"
+     ],
+     "notes": "This is the point of the item. BL-766 made history grow and raze specific places; a body-wide scatter loses that at the last step.",
+     "evidence": "COMPLETE, AND TESTED AS AN EXPERIMENT rather than an anecdote: razing is as rare as designed, so the harness sacks 59 city-bearing regions in a COPY and re-materialises - sacked lose 73.3% of their cities, untouched controls 2.4%, and the 2.4% is explained (borrowed spill returning) rather than tolerated."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Deterministic and seedless, like the draw it materialises.",
+     "verification": [
+      "headless: repeat generation is identical",
+      "static: no unsorted container walk feeding a position"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE. No RNG on the campaign placement path at all; the rank-size share-out is byte-for-byte unchanged."
+    }
+   ]
+  },
   "centre-promotion-decline": {
    "rows": [
     {
@@ -944,6 +1039,42 @@
    ],
    "resolution": "All 6 rows met. planetology_harness 121/121 pass (19 new R13); planetology_sweep unchanged; full CTest 37/37."
   },
+  "coastal-territory": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "nation_generation builds its unclaimable mask from is_open_ocean, not is_water, so coastal and lake tiles are claimable.",
+     "verification": [
+      "static: the predicate at nation_generation.cpp:689 is narrowed",
+      "headless: coastal and lake tiles carry a nation; open ocean tiles carry none"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. Measured after merge: coast 2177 owned, lake 1312 owned, open ocean 0 owned against 15336 unowned. Full record on the backlog item."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Coastal provinces become owned as a consequence of tile ownership, with no separate province rule.",
+     "verification": [
+      "headless: province ownership derives from tiles, unchanged in mechanism"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE. province.cpp needed NOTHING - R2 holds by derivation, as PROVINCES.md predicts."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "THE WORLD MOVES AND IT IS REPORTED, NEVER RE-BLESSED HERE. Report every golden/digest that shifts; BL-780 owns the single re-bless at the end of the wave.",
+     "verification": [
+      "headless: world_determinism run and its digest movement REPORTED",
+      "static: no golden re-blessed in this item"
+     ],
+     "notes": "The whole point of BL-780 is that the water model moves worlds ONCE. An item that re-blesses on its own destroys that.",
+     "evidence": "COMPLETE. All four digests reported and LEFT RED. The agent reproduced the four OLD values on a stashed baseline first, so the movement is attributable to this item alone."
+    }
+   ]
+  },
   "composite-standing-index": {
    "rows": [
     {
@@ -1052,6 +1183,61 @@
     }
    ],
    "resolution": "Closed in the 2026-07-04 backlog reconciliation (retro-verified). Construction pricing (per-building resource+budget cost, pool deduction guard) is live in recipe_registry.{hpp,cpp}, scripts/economy.lua, construction.cpp, construction_panel.cpp; rows R1-R4 retro-verified. Follow-up noted: no harness covers the insufficient-materials path."
+  },
+  "continent-time-axis": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "`run_continents` returns an ordered sequence of plate snapshots with a DEFINED epoch length. `drift_col`/`drift_row` are integrated by an explicit loop rather than documented as \"per-epoch\" with no epoch defined anywhere.",
+     "verification": [
+      "headless: a harness asserts the sequence is ordered, non-empty, and its epoch length is a stated parameter"
+     ],
+     "notes": "The row asked for a returned sequence. A derived one is strictly better here because of the save seam, and the reasoning is in the header comment beside the constants so the next reader does not re-litigate it.",
+     "evidence": "COMPLETE 2026-09-03, with a deliberate deviation stated rather than smuggled. The epoch length and depth are now STATED constants - continent_epoch_years = 5,000,000 (one grid column is ~153 km and Earth-like plate motion covers that in 3-6 My, so the clamped 0.15-1.2 columns per epoch sits at a plausible rate) and continent_drift_epochs = 20, which is 100 My. continent_snapshot_at(cs, e, gw, gh) reconstructs any epoch. THE DEVIATION: run_continents does NOT return a stored sequence. continent_state is on the save ENVELOPE seam, and 20 plate_id rasters at 31,581 tiles each is ~2.5 MB of save per body for data that is a pure function of five floats per plate. The sequence is therefore DERIVABLE - snapshot_at over [0, depth] - and costs nothing until asked for. continent_drift C2b asserts the age arithmetic."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "THE ENDPOINT IS UNCHANGED. The final snapshot is identical to today's `continent_state` output, so nothing downstream of continents moves and the 0 CE digests hold.",
+     "verification": [
+      "headless: world_determinism - the three 2026-09-03 digests unchanged"
+     ],
+     "notes": "The sequence is additive; the present-day answer must be bit-identical or the item has changed the world rather than described its past.",
+     "evidence": "COMPLETE 2026-09-03. world_determinism digests unmoved: 039EE9880739CDF6 / B0EBBA249B3DDABB / DE55600457797638, era report years=400 battles=270 conquests=207 foundings=833. And the sharper check is in the new harness rather than in the world: continent_drift C1 asserts that epoch 0 reproduces continent_state::plate_id BIT-IDENTICALLY, using the same comparison and the same strict-< tie-break as run_continents own Voronoi. That identity is what makes every deeper epoch a reconstruction instead of a fiction - if zero offset disagreed with the present, nothing built on this would mean anything."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The shared plate RNG stream is not disturbed. `run_continents` draws every plate's position, direction and oceanic flag from one stream in a fixed order; any new draw inserted into that loop shifts every subsequent plate.",
+     "verification": [
+      "headless: world_determinism",
+      "static: review confirms no draw was inserted before an existing one"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-03, and asserted rather than reasoned. The snapshot consumes NO randomness - it winds existing seeds back along drift vectors and re-runs the Voronoi - so no draw was inserted into the shared plate stream, which draws position, direction and oceanic flag for every plate in one fixed order. continent_drift C4 proves the stream is where it was: a second run_continents at the same seed produces identical plates AND identical plate_id."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "The expensive neighbour is NOT re-run per epoch. The rift-basin search (corridor_of, O(total) per candidate pair with a 25-sample inlandness probe per corridor tile) runs once, not once per snapshot.",
+     "verification": [
+      "headless: the harness reports per-epoch wall clock, and total cost stays within single-digit ms per snapshot"
+     ],
+     "notes": "Feasibility measured the Voronoi snapshot as cheap (~316k distance evals) and named the basin search as the real cost.",
+     "evidence": "COMPLETE 2026-09-03, reported not asserted. Measured by continent_drift C6: 21 snapshots in 5.1 ms, 0.24 ms each, against 2.8 ms for one full run_continents - so a snapshot is ~12x cheaper than the pass, which is the observable form of 'the rift-basin search is not re-run'. snapshot_at deliberately does neither the boundary classification nor the basin search: the basin search describes the PRESENT surface, so re-running it per epoch would cost more and mean less. CAVEAT ON THE COMPARISON: the harness builds its planetology_state by hand, so its run_continents baseline may not exercise every gate the real pass does - the ratio is indicative, not a budget."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The stale comment at hard_coded_world.hpp is corrected: it claims `continent_state` \"never enters world, so it stays off the serialisation seam\", and it IS serialised on the envelope seam (save_game.cpp).",
+     "verification": [
+      "static: review confirms the comment matches the code"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-03. The comment at hard_coded_world.hpp said continent_state 'never enters world, so it stays off the serialisation seam'. The first clause is true and the second does not follow: save_game.cpp writes and reads it as part of the save ENVELOPE, so a field here is a save_game_version bump exactly like a field on world_params. Corrected in place, naming both seams so the mistake is not available to make again."
+    }
+   ]
   },
   "contract-harness": {
    "rows": [
@@ -2395,6 +2581,21 @@
    ],
    "resolution": "Complete. Reports last/avg/max/1% low against ROADMAP targets with a worst-frame breakdown; off by default; honest about the sub-measure it cannot take."
   },
+  "generation-budget": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Generation reports its wall clock per pass, so the cost of each of the three simulated passes is a number rather than an impression. The measurement is reported, never asserted against a threshold.",
+     "verification": [
+      "headless: world_determinism prints per-pass timings",
+      "headless: history_sweep reports the sim's own span cost"
+     ],
+     "notes": "BASELINE CORRECTED 2026-09-03. The note first read \"world build 11.2 s with prehistory on vs 4.79 s off, so the 400-year era pass is 6.4 s\". That was a MISREADING of the pre-change harness output: 6.45 s was the whole world build with prehistory on, not the era pass, and 11.2 s was never a figure the harness printed. The instrumentation this row added is what settles it.",
+     "evidence": "COMPLETE 2026-09-03. Generation now reports per-pass wall clock and the span structure; world_determinism prints both. Measured on the merged tree, RELEASE harness path (build_lua_harness.bat -> build_gen/verify/), which memory io-headless-build-invocation names as the evidence path:\n\n  0 CE, 400 y      total 8200 ms = pre-settlement 443 + settlement 4 + ERA-1 323 + post-era 7428\n  0 CE, no era     total 6661 ms = pre-settlement 455 + settlement 3 + ERA-1   0 + post-era 6202\n  1960, two-span   total 7996 ms = pre-settlement 465 + settlement 2 + ERA-1 197 + post-era 7331\n\nTWO FINDINGS. (1) THE SECOND SPAN IS FREE, and in fact cheaper: 800 years at epoch 1960 costs 197 ms against 323 ms for 400 years at 0 CE. Cost tracks the region table the sim grows, not the years it walks, and at 1960 the settlement pass has already founded most regions - 506 sim foundings against 833. (2) THE ERA PASS COSTS 4x ITS OWN WALL CLOCK. Era on vs off at 0 CE is a ~1.5 s difference of which only 323 ms is the sim; the rest is the post-era passes working over the 833 regions it founded. Anyone budgeting the era off its own timer is wrong by four. Reported, never asserted.\n\nBUILD TYPE IS PART OF THE MEASUREMENT (cold review, 2026-09-03). The same passes in a Debug build/ tree price at 0 CE total 73130 ms with era-1 26189 ms, and 1960 two-span total 57792 ms with era-1 13838 ms. The era pass is 3.9% of a Release build and 36% of a Debug one - a ~9x difference in SHARE - so the derived ratio \"the era costs 4x its own wall clock\" is a Release fact and reads 1.45x in Debug. What reproduces across BOTH build types, and is the finding that matters, is the DIRECTION: the two-span 1960 world builds FASTER than the single-span 0 CE one (57.8 s vs 73.1 s in Debug, 8.0 s vs 8.2 s in Release). Quote no ratio from this row without its build type."
+    }
+   ]
+  },
   "goldens-platform-dependent": {
    "rows": [
     {
@@ -2763,6 +2964,41 @@
    ],
    "resolution": "Complete. Fourth History tab; the sim runs lazily over a COPY of the body's settlement state when the view opens, so world generation is untouched. scripts/verify/history_ages.lua captures three years. Captures inspected; NOT blessed as goldens — the software renderer fails on this machine, so any golden blessed here would be GPU-specific and would widen the Windows-vs-Linux golden drift the first Linux CTest baseline (43/49, 2026-08-04) recorded. (The review notes for both — pre-rebase ids NR-064/NR-065 — did not survive the 2026-08-07 rebase; those ids now name unrelated 2026-08-06 entries.)"
   },
+  "history-sim-ladder-and-empires": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "BL-748: the furnace date is the year a polity crosses the Industrial rung of the capacity ladder INSIDE the run, not run_settlement's pre-resolved date. Gunpowder/Industrial works and era-keyed unit rows become reachable only in pass 2.",
+     "verification": [
+      "headless: history_sweep reports the furnace-year DISTRIBUTION and the count industrialised by the epoch",
+      "headless: the distribution is WIDE - some worlds late, some never - not clustered at the boundary"
+     ],
+     "notes": "Fresh authoring: the industrial-ladder prose was purged 2026-08-23. Do NOT restore it; it is reference only (the NR-517 precedent).",
+     "evidence": "COMPLETE 2026-09-06. 13/16 worlds industrialise (was 0/8), polities crossing median 2, first furnace median 1812 range 1560..1936 - spread across the second span, not clustered at the boundary."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "BL-767: tune the FORCES until the rise-peak-fall shape is common across the seed spread. Report the distribution.",
+     "verification": [
+      "headless: history_sweep over the standard spread reports the shape distribution"
+     ],
+     "notes": "NEVER CLAMP A WORLD. A world with no empire stays a legitimate outcome - that is the 2026-08-31 asymmetry ruling and BL-224's non-hegemony invariant. Tune forces, report spread.",
+     "evidence": "COMPLETE AS A REPORT, which is what the row asked for. The distribution IS reported: rose-and-fell is 0 in every world. That is a FINDING, not a failure to deliver - it is not reachable by tuning, confirmed by the implementer and independently by a cold review running five further levers. Conquest is symmetric churn; rise comes only from monotone Settle."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Determinism holds and any digest movement is REPORTED, not re-blessed.",
+     "verification": [
+      "headless: world_determinism run; movement reported with its cause"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE. Digests reported, never re-blessed. prehistory OFF unchanged is the control."
+    }
+   ]
+  },
   "history-sweep": {
    "rows": [
     {
@@ -2993,6 +3229,53 @@
     }
    ]
   },
+  "landscape-scorer-discriminates": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "A landscape scorer lives in src/world and computes the three ruled terms from a static world: chain completeness per market, the per-resource supply-to-demand ratio per market, and the SPREAD of both across markets with unevenness rewarded.",
+     "verification": [
+      "static: src/world/landscape_score.{hpp,cpp} exists and compiles into the world TU set",
+      "headless: the scorer returns all three terms on a generated world"
+     ],
+     "notes": "Recipe margin is deliberately NOT a term (GENERATION_STRATEGY.md § The eight phases) - it is the precondition gate, not an axis.",
+     "evidence": "COMPLETE 2026-09-06. src/world/landscape_score.{hpp,cpp}. Term 1 delegates to BL-775 promoted measure_market_completeness (two callers, one implementation). Term 2 is the per-market per-resource supply:demand ratio with a pin band. Term 3 is the coefficient of variation over markets - CV rather than variance deliberately, because it is scale-free, so a landscape uniformly twice as good scores as MORE VIABLE and no more UNEVEN. Unevenness is a MULTIPLIER on viability, never an addend: a landscape where nothing works is not rescued by being unevenly broken. Recipe margin correctly excluded."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "THE SLICE'S ACTUAL QUESTION: scoring several hand-made candidate landscapes on one generated world produces MATERIALLY DIFFERENT scores. If the terms do not discriminate, that is the reported result and the search is not built.",
+     "verification": [
+      "headless: K candidates scored on one world, per-term range and spread reported per candidate",
+      "headless: the report states plainly whether each term discriminates"
+     ],
+     "notes": "The slice is built to be able to FAIL. A flat completeness across every candidate means the search has nothing to search on, and that answer is the deliverable.",
+     "evidence": "COMPLETE 2026-09-06 - AND THE ANSWER IS NO. Five candidates on one fixed world (corporation_count 4/8/16, two placement seeds at 8 - exactly Ben point-3 axes) score IDENTICALLY to the last digit: every term relative range 0.000e+00. The POSITIVE CONTROL, built in so that \"flat\" could be told from \"constant\", moves 1.000e+00 over three different worlds. CAUSE IS STRUCTURAL: every term reads tiles, markets and population, and market_saturation.cpp contains neither \"corporation\" nor \"building\" - so the objective measures the WORLD saturation potential, not a roster realisation of it. Phase 6 cannot search on it as ruled. A roster-aware term (actual vs potential completeness) is owed; recorded on BL-770, deliberately not built in this slice.\n\nCORRECTED 2026-09-06 AFTER THE COLD REVIEW BARRIER. THE CONCLUSION SURVIVED, AND IS NOW PROPERLY CONTROLLED. The review found the negative result had no FIXTURE control: \"flat across candidates\" was indistinguishable from \"the candidates never differed\". Added R2.0, which asserts the fixtures move before any conclusion is drawn. MEASURED: corps 149..169 and buildings 415..456 across the five candidates - they differ materially - and every score term is still bit-identical at 0.000e+00. The finding is stronger than when first reported. ONE CLAIM WITHDRAWN: section B's three 1.000e+00 readings are largely an ARTEFACT. relative_range is (hi-lo)/hi and seed ABCDEF01 generates a ONE-MARKET world, whose spread is definitionally 0 and whose composite is therefore 0 - so those terms read 1.000 by dividing against a zero floor. Only chain completeness (3.432e-01) is real control signal. That is enough to carry the conclusion, but the control is weaker than first stated."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The scorer is PURE and deterministic: same world and same candidate produce the same score, and the score does not depend on container traversal order.",
+     "verification": [
+      "headless: repeat scoring is bit-identical",
+      "headless: the market walk uses sorted_market_ids, not world::markets order"
+     ],
+     "notes": "Determinism is the binding constraint on the eventual parallel search - it is asserted from the first slice, not retrofitted.",
+     "evidence": "COMPLETE 2026-09-06. R3.1 asserts three scorings of one world are bit-identical on every term - PASS. The market walk uses sorted_market_ids. NOTED IN THE SOURCE rather than hidden: the tile accumulation is float += over the unordered w.tiles map, which is sound for RANKING candidates within one process (every candidate sees the identical traversal) and would need a sorted walk before any cross-process comparison. Submitted to the cold review barrier specifically to be attacked on this point.\n\nCORRECTED 2026-09-06 AFTER THE COLD REVIEW BARRIER. R3 WAS MARKED COMPLETE ON EVIDENCE THAT DID NOT BEAR ON THE CLAIM, and this was the review's most serious finding. The scorer summed DOUBLES over w.tiles, an unordered_map - making the result depend on hash bucket layout, which varies by standard library. src/world/CLAUDE.md forbids exactly this with no \"same process\" carve-out, and market_saturation.cpp - the sibling this file delegates term 1 to - REFUSES the same thing in a comment at its own tile walk. The first cut wrote a rationalisation instead of following the local invariant. And R3.1 could never have caught it: it scores the SAME world object three times, so it shares one bucket layout by construction. FIXED: the tile walk is now sorted by entity_id before accumulation. The amplification made it worse than theoretical - the entire term-2 signal on the default world is ONE resource in ONE of three markets, so a single ULP flip would have taken composite from 0.0099 to 0."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "The report states that scores taken in this state are ORDINAL AND PROVISIONAL, because the sprint 33 growth gate is unmet (valued production falls x0.2 / x0.6 across the standard lapse).",
+     "verification": [
+      "static: the harness prints the caveat with the measured figures behind it"
+     ],
+     "notes": "Ben accepted the gate unmet on 2026-09-06. The discipline that buys back is that the report cannot be read as evidence of viability.",
+     "evidence": "COMPLETE 2026-09-06. The harness prints the caveat with the BL-759 RE-BASED figures behind it (11738 -> 6693 and 5845 -> 3971), not the stale x0.2/x0.6 pair, and states that scores order candidates and do not evidence viability.\n\nCORRECTED 2026-09-06 AFTER THE COLD REVIEW BARRIER. Also corrected: the header claimed score_landscape is PURE and \"writes nothing\". It is not - measure_market_completeness calls body_reach_field, which MEMOISES the reach field into the world, which is why the signature takes world&. The score is order-independent but the call mutates shared state, so phase 6 candidates must not share one world across threads. Documented rather than left to be found by a data race."
+    }
+   ]
+  },
   "lens-driven-selection": {
    "rows": [
     {
@@ -3046,6 +3329,42 @@
      ],
      "requirement": "Live: start the app in spectate, watch at least one economy tick resolve, and confirm rival corps act while no seat is held.",
      "notes": "Interactive surface - a capture is not sufficient (DELIVERY.md step 4). DONE: ProjectIo --spectate --autostart-windowed runs wizard -> generation -> seating -> 80-tick warm start -> 120 rendered frames, exit 0."
+    }
+   ]
+  },
+  "lua-harness-builder-bash": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "A bash sibling builds any Lua-linked harness with one documented command, from the repo root, with no cmd and no MSVC archaeology.",
+     "verification": [
+      "headless: bash tools/verify/build_lua_harness.sh world_determinism produces build_gen/verify/world_determinism.exe",
+      "headless: the produced exe runs and reports its assertions"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. tools/verify/build_lua_harness.sh builds the MSVC environment by hand from the PINNED BuildTools toolchain (14.44.35207 + SDK 10.0.26100.0) - bash cannot call vcvars, which is the whole reason the .bat was unreachable. Verified building four harnesses: world_determinism, campaign_lapse, history_sweep, landscape_score_harness. world_determinism then RAN to ALL PASS, so the produced exe is good, not merely linked.\n\nCORRECTED 2026-09-06 AFTER THE COLD REVIEW BARRIER. THE FIRST PASS DID NOT MEET THIS ROW. The .sh compiled only src/scripting/lua_state.cpp, so persona_counsel_harness - the very harness the new routing REFERS here, and the reason persona_pack is in the predicate - failed with five LNK2019s on persona::pack. A builder that refuses a harness by name and then cannot build it reproduces the exact failure BL-774 exists to kill. FIXED: the whole src/scripting/*.cpp bridge is globbed, not just lua_state.cpp. Re-verified: persona_counsel_harness now COMPILE_OK. The .bat has the same hole and is left as-is (bash is the agent path); worth a follow-up."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The builder choice is DERIVED, not listed: build_harness.js computes whether a harness needs the Lua builder from its translation-unit closure, and refuses with that reason rather than from a hand-written NEEDS_LUA map.",
+     "verification": [
+      "headless: build_harness.js correctly routes every harness in tools/verify, including ones absent from the old hand list",
+      "static: the four-entry NEEDS_LUA map is gone or reduced to an override with a stated reason"
+     ],
+     "notes": "Closes NR-767. The old hand list named 4-6 while the real set is 16+, and a wrong-builder failure reads exactly like broken code.",
+     "evidence": "COMPLETE 2026-09-06. The hand list is deleted. Derived set is 21 of 138 against a hand list of FOUR. THE FIRST PREDICATE WAS WRONG AND WAS CAUGHT BY MEASUREMENT: include-closure-reaches-lua_state.hpp flags 54 of 138, because sol2/Lua headers are on the include path for every world-superset harness - world_determinism reaches that header and links clean. The failure is a LINK failure, so the test is a live-code reference to load_from_lua / lua_state / persona_pack in the harness own TU. Comments and string literals excluded (works_roster_harness names load_from_lua in a comment and links fine). Validated against 16 real link probes: zero false positives, zero false negatives.\n\nCORRECTED 2026-09-06 AFTER THE COLD REVIEW BARRIER. TWO LATENT MISROUTES FOUND AND FIXED. (a) stripComments treated a C++ DIGIT SEPARATOR as a character-literal opener, so `1'000'000` or `0b0000'0001` blanked the rest of its line - a FALSE NEGATIVE, the dangerous direction, and that pattern is live in river_generation_harness and demography_harness. An apostrophe between two identifier characters is now a separator. (b) A THIRD misroute class the predicate never covered is now refused explicitly: a harness including core/save_game.hpp links imgui and builds with NEITHER headless builder. Derived set is 22 of 139, still zero false positives and zero false negatives over the probe set. STILL LATENT AND UNFIXED: raw string literals R\"(...)\" are unhandled by the scanner; no harness uses one today."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The bash path is named in the generation-dev and economy-dev agent definitions, so a spawn does not need to be told.",
+     "verification": [
+      "static: .claude/agents/generation-dev.md and economy-dev.md name the script"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. Both .claude/agents/generation-dev.md and economy-dev.md carry the two bash commands and the wrong-builder symptom (\"failing on sol/sol.hpp or LNK2019 is the WRONG BUILDER, not broken code\"), each keeping its own preamble."
     }
    ]
   },
@@ -3747,6 +4066,41 @@
    ],
    "resolution": "Complete 2026-08-26. ownership_class harness ALL PASS (0 failures) at the integrated tree, R5 at world_save_version 17. R2 is measured and REPORTED, and what it reported is NR-659: at the default 0 CE epoch every corporation classes closed. The requirement is met - the derivation is correct - and the finding is about the SIGNAL it was pointed at, which BL-638 re-points. R3's background half is vacuous headless (no Lua registry, 0 firms) and the harness says so rather than passing silently. Integrating build BUILD_OK."
   },
+  "paleo-deposits": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Biological deposits are placed from the tile's PAST climate, sampled through BL-764's paleo query, rather than from its present cover.",
+     "verification": [
+      "headless: a coal seam lands on ground that was swamp at the relevant age, not on ground that is barren today",
+      "headless: deposit_origin stays green"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. Asserted DIRECTLY by new row D6: the same body generated twice, once with the drift record withheld, must place fossils differently - coal differs on 284 tiles, petroleum on 491."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "This closes BL-762's remaining half: agricultural_produce and the other biological resources can now leave the Body phase, because the Life phase has somewhere to place them FROM.",
+     "verification": [
+      "headless: the Body phase places no biological deposit and the world still has food"
+     ],
+     "notes": "BL-762 could not do this alone - deleting it from the Body phase generated a world with no food. That is why this item is its unblocker.",
+     "evidence": "COMPLETE. D7/D8: the Body phase places no biological deposit AND the world still feeds itself and has energy. This is what closed BL-762 remaining half."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Digest movement is REPORTED with its cause, never re-blessed.",
+     "verification": [
+      "headless: world_determinism run, movement reported"
+     ],
+     "notes": "tile_rng is shared between the deposit draw, the endemic draw and hazard/habitability jitter. Reordering a draw moves the other two.",
+     "evidence": "COMPLETE. Three causes separated - placement, RNG shift, and nothing - with copper (drawn first) byte-identical across the sweep proving the boundary. Petroleum +68% accepted by Ben; peat restored to the RESOURCES.md rule after re-examination."
+    }
+   ]
+  },
   "pass6-density-retune": {
    "rows": [
     {
@@ -3991,6 +4345,52 @@
     }
    ],
    "resolution": "Complete. The population agricultural_produce demand stub, previously written by run_economy_step and erased by clear_markets' per-tick demand reset the same tick (never priced), now lives in inject_population_demand (market_clearing.cpp), called from clear_markets after the reset alongside the BL-078 substrate injection. Routing upgraded from first-market-on-body to market_for_tile catchment (BL-096 multi-market bodies). population_demand_harness: 4/4 PASS; population_mvp (R4 + growth updated to call clear_markets): 11/11 PASS."
+  },
+  "population-map-early": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Population centres are drawn EARLY, weighted toward ground that farms easily, and then grown and destroyed by the history sim rather than placed after it.",
+     "verification": [
+      "headless: centres exist before the sim runs",
+      "headless: the sim grows and razes them"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. Centres drawn before the sim, grown and sacked by it. A measurement forced the key fix: the first cut drew only at generation, so 207 conquests razed ZERO centres; the draw is now one rule at every founding and razing is 8 of 207."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The save format carries it, with both write and read paths in the same change and a round-trip assertion.",
+     "verification": [
+      "headless: save_envelope_roundtrip green on the new version",
+      "static: save_game_version bumped, both paths present"
+     ],
+     "notes": "The serialisation seam travels with the change - src/world/CLAUDE.md, absolute.",
+     "evidence": "COMPLETE. save_game_version bumped with both paths, verified in the MAIN tree after merge at 0 failures, using the distinct-literal precedent."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "IT PROBABLY DISSOLVES BL-758. If centres exist before the sim, the sim's seed-any-empty-region rule has nothing to fire on. Report whether BL-758 still has a subject.",
+     "verification": [
+      "static: a stated finding on whether BL-758 survives"
+     ],
+     "notes": "era_world_harness R2 is deliberately RED for BL-758 and must NOT be weakened to pass.",
+     "evidence": "COMPLETE. BL-758 is NOT dissolved - era_world_harness R2 stays red for exactly the reason it was, not weakened, and R4 was strengthened. The item now argues for reading (a); still Ben call."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "Determinism holds; digest movement REPORTED, never re-blessed.",
+     "verification": [
+      "headless: world_determinism run; movement reported with cause"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE. Digests reported with cause, never re-blessed."
+    }
+   ]
   },
   "population-migration": {
    "rows": [
@@ -4479,6 +4879,88 @@
     }
    ]
   },
+  "region-domain": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "region carries the same three-way domain the province layer uses (land / coastal_water / open_ocean), derived from the substrate the sim already sees.",
+     "verification": [
+      "headless: regions expose their domain",
+      "headless: sim_water_census reports it"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. Regions carry land / coastal_water / open_ocean, derived from the substrate the sim already sees."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The Settle verb stops founding on OPEN OCEAN - and only open ocean. Coastal founding stays legitimate, because the shore has an owner under BL-776.",
+     "verification": [
+      "headless: no region anchors on open ocean",
+      "headless: coastal regions still exist and are owned"
+     ],
+     "notes": "~613 regions, not the ~1105 a blanket water ban would have deleted. That distinction IS the design.",
+     "evidence": "COMPLETE. Open ocean regions 183 -> 0, and 0 on EVERY seed in the merged tree. Coastal water RISES 264 -> 318 - the fix working, not leaking, since sites that would have anchored on ocean now land on shore."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The save format carries the new field, both paths in the same change, with a round-trip assertion at a DISTINCT non-default value.",
+     "verification": [
+      "headless: save_envelope_roundtrip green on the new version"
+     ],
+     "notes": "save_game_version is at 6 and this item takes it to 7. IT IS THE ONLY ITEM IN THIS WAVE PERMITTED TO BUMP IT.",
+     "evidence": "COMPLETE. save_game_version 6 -> 7, one enum byte at the region tail, range-checked. The agent built and RAN the round-trip from its own worktree; green in the merged tree alongside BL-783 urban record."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "Digest movement REPORTED, never re-blessed - BL-780 still owns the water model's single re-bless.",
+     "verification": [
+      "headless: world_determinism run, movement reported with cause"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE. Digests reported; seedA/off UNCHANGED is the control - prehistory-off runs no sim, so the only mover is the Settle verb."
+    }
+   ]
+  },
+  "resource-origin-and-lagrangian": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "BL-762: resources declare their ORIGIN (geological vs biological), and the Body phase places only geological deposits; biological ones defer to the Life phase.",
+     "verification": [
+      "headless: a resource origin classification exists and is enforced",
+      "headless: the Body phase places no biological deposit"
+     ],
+     "notes": "Part 1 (resources declare their origin, compile-time enforced) LANDED 2026-09-05 as commit a95af886. Read that first; this is the remaining half.",
+     "evidence": "COMPLETE 2026-09-06. The structural half landed here; the remaining half was NOT deliverable without BL-765 (deleting biological rows from the Body phase generated a world with no food) and BL-765 closed it. D1/D2/D7/D8 assert both directions."
+    },
+    {
+     "id": "R2",
+     "status": "partial",
+     "requirement": "BL-764: a tile can be asked where it was, and what its climate was, at age T - tiles ride plates rather than having latitude fixed to their grid row.",
+     "verification": [
+      "headless: a tile reports a past position and past climate for a given age",
+      "headless: continent_drift still green"
+     ],
+     "notes": null,
+     "evidence": "PARTIAL, DELIBERATELY. Slice 1 is the paleo QUERY and it is consumed by BL-765. The FRAME is not built - the generator still bands by present row and must. Four boundaries stated in CONTINENTS.md § The boundary of the frame; BL-764 stays open carrying them."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "HAZARD, and it is the reason this pair is one agent: tile_rng is SHARED between the deposit draw, the endemic draw and hazard/habitability jitter. Removing or reordering a draw MOVES the other two.",
+     "verification": [
+      "headless: world_determinism run and every digest movement REPORTED with its cause"
+     ],
+     "notes": "Do not re-bless. Report what moved and why. BL-780 owns the wave re-bless.",
+     "evidence": "COMPLETE. No digest moved at all - the traversal was kept draw-for-draw, so the shared tile_rng hazard was avoided rather than absorbed."
+    }
+   ]
+  },
   "retire-standing-bands": {
    "rows": [
     {
@@ -4729,6 +5211,52 @@
     }
    ]
   },
+  "saturation-measure-promoted": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "The saturation measure and its dependencies live in src/world and are callable from generation: measure_market_completeness, classify_resources, terminal_resources, tile_in_reach, sorted_market_ids, and the two structs.",
+     "verification": [
+      "static: src/world/market_saturation.{hpp,cpp} exists and compiles into the world TU set"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-03. src/world/market_saturation.{hpp,cpp}, 127 and 360 lines. Compiles and links into the harness world TU set. One real dependency surfaced during the move: the measure calls market_for_tile, so it was already reaching into the market layer while sitting in a harness - now an explicit include rather than an accident of where the code sat. Two names were changed because they ALREADY collide inside src/world: classification -> resource_classification and classify -> classify_resources; generic names are tolerable in a harness anonymous namespace and not in a shared header. measure_completeness -> measure_market_completeness to match its struct."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "BEHAVIOUR IS UNCHANGED. The promoted bodies are the originals, and the census reports what it reported before.",
+     "verification": [
+      "static: every promoted body diffed against the original extracted from git",
+      "headless: demand_census green"
+     ],
+     "notes": "Proven textually rather than by a before/after run, deliberately - see the evidence.",
+     "evidence": "COMPLETE 2026-09-03, and proven BY CONSTRUCTION rather than by comparison. A before/after byte comparison would have cost two ~10-minute census runs, and the baseline run had already exceeded its timeout before the code changed - so instead the original bodies were extracted from git, the same four renames applied, and diffed against the promoted file: ALL SEVEN blocks IDENTICAL (sorted_market_ids, classify_resources, terminal_resources, tile_in_reach, measure_market_completeness, and both structs). That is stronger than two runs agreeing, which only speaks to the inputs actually run. Confirmed live: demand_census --fast --band ancient reports PASS - 0 failure(s), both R5 rows green, completeness spread over 3 markets min 0.6818 median 0.8636 max 0.8636."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The world is unchanged: adding a translation unit to src/world moves no generated world.",
+     "verification": [
+      "headless: world_determinism, the three 0 CE digests"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-03. Nothing in generation calls the promoted code yet - it is compiled and unreferenced - so the world cannot move, and world_determinism confirms it rather than assuming it."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "The MARGIN computation is promoted too. \"Each part makes some profit\" is the other half of the phase 6 question, and generation could not ask it either.",
+     "verification": [
+      "static: evaluate_margin and margin_eval live in src/world/market_saturation",
+      "headless: recipe_margin green after the move"
+     ],
+     "notes": "ADDED 2026-09-03 AS A CORRECTION. The item said \"promote both\"; the first pass delivered only the saturation half and the group was closed complete on it. Caught on the next read of the item, not by a check - worth noting, because nothing in the process would have caught it.",
+     "evidence": "COMPLETE 2026-09-03. row_eval -> margin_eval and evaluate() -> evaluate_margin() now live in src/world/market_saturation.{hpp,cpp}; recipe_margin.cpp includes the header and its own copies are gone. evaluate_margin takes plain doubles - no world, no registry, no tick - which is what lets a candidate firm be priced statically. Move proven textual by the same git-extract-and-diff method as the saturation half: struct and function both IDENTICAL modulo the rename. recipe_margin runs ALL PASS (0 failures) afterwards, including R6 as its differential red-proof."
+    }
+   ]
+  },
   "save-version-reservation": {
    "rows": [
     {
@@ -4760,6 +5288,43 @@
     }
    ],
    "resolution": "Complete 2026-08-26. Verified in the main session rather than self-reported, because the agent's worktree was stale and could not read its own rows. Used for real at this wave's integration."
+  },
+  "scorer-sees-a-roster": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "The scorer gains an ACTUAL-against-POTENTIAL completeness term: of the terminals a market COULD close, how many are closed by a building that actually exists in its catchment.",
+     "verification": [
+      "static: the term is computed in src/world/landscape_score.cpp",
+      "headless: it reads buildings, which no existing term does"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-06. actual-against-potential completeness in src/world/landscape_score.cpp, using the SAME closure as measure_market_completeness so the two are comparable."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "THE SLICE 1 RESULT INVERTS. Candidate rosters that differ now score DIFFERENTLY, measured on the same harness that proved they did not.",
+     "verification": [
+      "headless: landscape_score_harness reports the roster terms DISCRIMINATE",
+      "headless: R2.0 still proves the fixtures differ"
+     ],
+     "notes": "Slice 1 measured 0.000e+00 across five candidates whose fixtures differ by 20 corps and 41 buildings. That is the before-figure.",
+     "evidence": "COMPLETE, AND THE SLICE 1 RESULT INVERTED: composite relative range 0.000e+00 -> 3.214e-01 over the same five candidates, whose fixtures R2.0 proves differ. A defect found on the way: every non-processing building counted as an extractor, so a port seeded the closure with iron ore; realisation fell 0.27-0.39 to 0.15-0.20 once fixed."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Determinism and purity hold: sorted walks, no hash-order dependence, bit-identical repeat scoring.",
+     "verification": [
+      "headless: R3.1 still green",
+      "static: any new map walk is sorted"
+     ],
+     "notes": "The cold review caught an unsorted double accumulation here once already.",
+     "evidence": "COMPLETE. R3.1 bit-identical; the tile walk sorted after a cold review caught an unsorted double accumulation."
+    }
+   ]
   },
   "seam-actor-authority": {
    "rows": [
@@ -5300,6 +5865,51 @@
    ],
    "resolution": "Complete. rank_extraction_sites() (src/world/corp_ai.cpp) hoists the O(tiles) survey/richness/affinity scan out of the per-corp loop in run_corp_strategic_step, computed once per tick and read by every due corp; only the per-corp can_place_in_world filter (tech gate, logistics reach) and scoring still run per corp, over the already-truncated top-M list. Verified behaviour-preserving by stash-and-diff against unmodified main: ai_skill_harness's 5-seed/300-tick benchmark produces numerically identical net_worth curves and action-verb counts on both sides, including its pre-existing golden-band failures (seeds 1-4 'net-worth final' fail identically on both sides - tracked by NR-140, not caused or worsened by this item; not re-blessed here since it is out of this item's scope). econ_stability's BL-250 scaling sweep is the direct measurement: exponent 1.28 -> 1.18, worst 2x-size-step growth 3.17x -> 3.01x, all six harnesses/build targets green. BL-365 (background industry, ~80 corps) is now unblocked."
   },
+  "tariff-posture-and-consequence": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "BL-750: a polity carries a protection scalar moved DETERMINISTICALLY by its industrialisation timing against its neighbours and by whether it holds colonies. Read at handoff; enacted as an ordinary import_tariff law on the campaign nation, rate banded off the scalar.",
+     "verification": [
+      "headless: a 1960 world opens with SOME nations tariffed and most not",
+      "headless: the law panel shows each one"
+     ],
+     "notes": "DERIVED, not a scored verb - Ben ruled this 2026-09-06. A polity does not spend a round choosing protectionism.",
+     "evidence": "COMPLETE 2026-09-06. DERIVED form per Ben ruling: protection_q computed at the END of run_history_sim, read by no verb and no score. The colony term is NOT built and no proxy was invented - BL-749 has not landed."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "BL-750 owes a DISTRIBUTION, not just a working tariff: tariffed-nation counts and rate bands across the seed spread.",
+     "verification": [
+      "headless: history_sweep reports the distribution"
+     ],
+     "notes": "THE DISTRIBUTION IS THE DELIVERABLE, because flatness is the ONLY trigger for reopening the scored-verb form. If every world tariffs the same nations to the same degree, the scalar carries no real variation and BL-488 opens. Report it either way.",
+     "evidence": "COMPLETE, AND THE DISTRIBUTION IS THE FINDING: 1/8 worlds tariffed, peak protection median 181 range 90..500. Not flat between worlds but flat WITHIN one, and the cause was TRACED - only 1-4 polities of 9-12 cross the rung, so every non-crosser has identical facts. An upstream furnace-count finding, not a banding one, and NOT on its own the BL-488 trigger as stated."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "BL-769: city states and pseudo-national borders become part of the History phase, so the history keeps its detail rather than having consequence invented after it.",
+     "verification": [
+      "headless: the consequence layer reads the history record rather than re-deriving from the finished map"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE. Pass 2d polity fold; the carve itself untouched. The city-state path is built but DID NOT FIRE in 8 seeds and was not widened to make it - half the item is unexercised by the sweep and that is recorded, not read as coverage."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "Determinism holds and every digest movement is REPORTED, never re-blessed.",
+     "verification": [
+      "headless: world_determinism run, movement reported with cause"
+     ],
+     "notes": "BL-780 owns the water model single re-bless; nothing else re-blesses anything.",
+     "evidence": "COMPLETE. seedA/off unmoved; era counters byte-identical, so the sim itself did not move - only what generation makes of it."
+    }
+   ]
+  },
   "tech-tree-era-tabs": {
    "rows": [
     {
@@ -5574,6 +6184,51 @@
     }
    ],
    "resolution": "Landed with BL-215; verified by scripts/verify/text_overflow_floor.lua (0 overflow records at the 1280x720 floor)."
+  },
+  "tick-length-parameter": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "cancelled",
+     "requirement": "Tick length is a PARAMETER, not a static constexpr. `econ_tick_days` becomes configurable and the default reproduces today's 90-day quarter exactly.",
+     "verification": [
+      "headless: econ_harness and upkeep_harness green at the default",
+      "headless: world_determinism unchanged"
+     ],
+     "notes": "If Ben chooses the quarterly-tick alternative, this row is CANCELLED rather than deferred - there is no reason to make the tick length variable if nothing varies it.",
+     "evidence": "CANCELLED 2026-09-03 by Ben's ruling on NR-786: the tick stays quarterly, so nothing varies it and a parameter for it is not work. Cancelled rather than deferred, deliberately - a deferred row invites someone to build it later for a reason that no longer exists."
+    },
+    {
+     "id": "R2",
+     "status": "cancelled",
+     "requirement": "Every rate constant declares its PERIOD (per-tick, per-quarter, per-year) and is derived from the tick-length parameter rather than assumed quarterly. The authored tables say which they are.",
+     "verification": [
+      "headless: a harness enumerates the rate set and asserts each carries a declared period"
+     ],
+     "notes": null,
+     "evidence": "CANCELLED 2026-09-03 by Ben's ruling on NR-786: the tick stays quarterly, so nothing varies it and a parameter for it is not work. Cancelled rather than deferred, deliberately - a deferred row invites someone to build it later for a reason that no longer exists."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The constants that do NOT scale linearly are identified and handled explicitly rather than multiplied: interest compounding, build durations counted in ticks, and every decay/recovery step. A list of them is recorded on the item.",
+     "verification": [
+      "headless: a differential harness runs the same simulated span at two tick lengths and reports the divergence per flow"
+     ],
+     "notes": "A 4-year tick is a 16x rescale. Anything that compounds or counts ticks changes MEANING, not magnitude, and multiplying it is the defect this row exists to catch.",
+     "evidence": "COMPLETE 2026-09-03, and it is the row that answers the item. The audit is on BL-771 in full. TWO CLASSES. Class 1, rates that COMPOUND, where 16x is not 16 applications: k_debt_interest_per_quarter (16 x 0.015 = 0.240 against a compounded 0.269, so a 4-year tick under-charges debt ~11% AND hands a debtor 16 years to escape a hole quarterly interest would have closed), plus the two sentiment decays. Class 2, and this is the one that settles it - ~15 quantities COUNTED in ticks, which change MEANING not magnitude: travel_ticks = 1 becomes a 4-YEAR convoy leg, build_duration_ticks becomes decades, base_lead_ticks = 2 becomes an 8-year procurement lead, deposit_taper_ticks = 8 becomes a 32-year taper, the survey phases become decades, and corp_ai's planning horizon silently stretches 16x. Full list with file:line on the item."
+    },
+    {
+     "id": "R4",
+     "status": "cancelled",
+     "requirement": "REPORTED, NOT ASSERTED: the same simulated span at two different tick lengths reaches comparable state, and the harness prints the per-flow divergence so the trade is visible. No magnitude is pinned.",
+     "verification": [
+      "headless: the differential harness prints the table"
+     ],
+     "notes": "The legitimate alternative - run phase 6 at the ordinary quarterly tick and simulate fewer years - is Ben's to choose, and this row's numbers are what he chooses from.",
+     "evidence": "CANCELLED 2026-09-03 by Ben's ruling on NR-786: the tick stays quarterly, so nothing varies it and a parameter for it is not work. Cancelled rather than deferred, deliberately - a deferred row invites someone to build it later for a reason that no longer exists."
+    }
+   ]
   },
   "tile-construction-profit-chart": {
    "rows": [

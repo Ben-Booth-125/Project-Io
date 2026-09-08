@@ -1,5 +1,12 @@
 # Project Io — Development Practices
 
+> **Settles:** how a check is written and run without a unit-test framework · what naming, style
+> and comments should look like · what a doc must carry · how the save format is versioned · how
+> a release is cut.
+> **Not here:** how work is scoped, sequenced and committed (DELIVERY) · which theme comes next
+> (ROADMAP) · who reviews a change and how (REVIEW_AUTOMATION).
+> **Confused with:** DELIVERY.md, REVIEW_AUTOMATION.md, ROADMAP.md.
+
 This document defines the coding standards, documentation conventions, and testing approach for Project Io. Apply these consistently across all code written or reviewed. Where code deviates from these standards, note it and suggest a correction — but do not refuse to proceed or treat it as a blocker. The note rides along with the work.
 
 ---
@@ -410,6 +417,87 @@ All public interfaces are documented with **Doxygen-style comments**. This appli
 /// @return           Resolved price for this tick.
 float resolve_price(float supply, float demand, float base_price);
 ```
+
+### The doc header — an index of questions (Ben, 2026-09-07)
+
+Every authority doc named in `CLAUDE.md` § 3 opens with a header block, immediately under the
+H1, before any prose. It exists so a traversal can pick the owning doc **from headers alone**,
+instead of opening a 40K doc to discover it wanted the sibling.
+
+```markdown
+# Markets
+
+> **Settles:** where a market centre is and what it covers · how an order book
+> clears · how a price resolves and what bounds it · who may place an order and on
+> what terms · what a market does when it cannot clear.
+> **Not here:** the money loop (FINANCE) · what moves the goods (SUPPLY) · what the
+> road costs (LOGISTICS).
+> **Confused with:** FINANCE.md, SUPPLY.md, PRODUCTION.md.
+```
+
+Three rules make it hold:
+
+- **It lists questions, never answers.** "How a price resolves and what bounds it" — not what
+  the bound is. A doc gains or loses a *question* far more rarely than it changes an *answer*,
+  so a header written this way survives the design changes that would make a précis stale.
+- **It never restates a rule, and it is never a summary.** If a line could be quoted as
+  authority, it is the wrong line. The header routes; the doc settles.
+- **State-independence applies unchanged.** A header never says landed, built, pending, or
+  shipped, and never carries a `BL-` id (see `.claude/rules/io-standing-rules.md` § Terms &
+  docs).
+
+Ten lines is the ceiling. `Not here` names the questions readers most often arrive with and
+should be sent elsewhere for; `Confused with` names the two or three sibling docs that near-miss
+against this one. Both are part of the routing job, not decoration.
+
+**A doc that has not settled its questions opens with `Proposes:` instead** (Ben, 2026-09-07).
+Same block, same rules, one word changed — the reader learns in that word that nothing below is
+authority. It is the right opening for a proposal-stage doc whose own prose awaits a ruling, and
+for a research note, which settles nothing by construction. `Settles:` is a claim; a doc must not
+make it on questions it is still asking.
+
+#### The check — `node tools/session/header_graph.js`
+
+The headers and the citations that cross them are checked by one tool, in four parts. Two are
+objective and **fail** (exit 1); two are judgement and only **print**.
+
+- **Dangling citations** — every `DOC.md § Heading` reference in `docs/`, `src/`, `scripts/`,
+  `tools/` and `.claude/` resolved against the target's real headings. A citation in a header
+  comment, a Lua script, a harness README or a skill file rots exactly like one in prose, which
+  is why the sweep is not doc-only. A heading here means a `#` line, a bold lead-in opening a
+  line or a sentence, or a table row's first cell — the corpus names sections all three ways.
+  **PREFIX hits are reported separately**: a citation naming only the opening of a longer
+  heading resolves for a human and is invisible to an exact-match check, so it is counted and
+  grouped rather than either passed or failed. Hand-grepping for these is what fails.
+- **The header graph** — mutual pairs and one-way edges built from the `Confused with` and
+  `Not here` lines. A boundary sweep scoped off mutual pairs alone is blind to the one-way half,
+  which is where a sprawl hides, so the one-way edges are ranked first, by how many docs point at
+  a target whose own header points back at none. The tool never guesses that two docs assert the
+  same *subject* — it hands over the candidate set and a human reads it.
+- **Coverage** — every doc in `CLAUDE.md` § 3 carries a header, and every doc carrying a header
+  is in § 3. Orphans both ways, no allow-list: the orphan list is the router's staleness
+  detector, and an entry suppressed is the detector switched off for that doc.
+- **State-independence** — a header saying landed, shipped, pending or not yet, or carrying a
+  `BL-` id at all.
+
+A **weak anchor** — a table cell or a bold lead-in, as against a `#` heading — of a single common
+word does not certify a citation. A citation of a *Sprint 16* section must not pass on the table
+cell "Sprint", and one naming a *rung table* must not pass on the cell "Rung"; both are reported
+as prefix hits, where a human sees the heading they actually name. A false PASS is the worst
+outcome available to a checker, because it prints nowhere.
+
+`--dangling`, `--graph`, `--coverage` and `--state` run one part, and the exit code answers only
+the part that ran; `--doc <NAME>` gives one doc's header, its edges, the broken citations into it
+and the ones it makes; `--json` dumps everything; `--strict` makes the prefix hits fail too.
+
+`--self-test` runs the parser against a fixture of a dozen headings, with no corpus and no
+filesystem, pinning every citation and header shape the corpus is known to contain: an underscored
+filename, a Not-here parenthetical naming four owners, a relative-path owner, a doc name followed
+by prose, a one-token section id, a line-wrapped citation, a citation whose section marker sits
+inside its own parenthesis, one whose heading is in double quotes, and the weak-anchor rule. Each
+shape is there because a parser once dropped it silently, and a
+sweep scoped off a graph that silently drops a third of its edges is how a correct rule gets
+applied to a partial write set. **Run it after touching the tool.**
 
 ### Design-direction Q&A (Batch Delivery)
 
