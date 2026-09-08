@@ -97,14 +97,14 @@ settlement_state two_polity_world(int separation)
 
     region a;
     a.col = 0; a.row = 0; a.anchor = 0;
-    a.culture = 0; a.founding_culture = 0;
+    a.culture = culture_shares::pure(0); a.founding_culture = 0;
     a.farm_q = 900; a.ore_q = 500; a.port_q = 100;
     a.settle_score_q = 900; a.name = "Home";
     ss.regions.push_back(a);
 
     region b;
     b.col = separation; b.row = 0; b.anchor = separation;
-    b.culture = 1; b.founding_culture = 1;
+    b.culture = culture_shares::pure(1); b.founding_culture = 1;
     b.farm_q = 950; b.ore_q = 900; b.port_q = 100;
     b.settle_score_q = 880; b.name = "Prize";
     ss.regions.push_back(b);

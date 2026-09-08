@@ -70,7 +70,10 @@ void name_population_centres(world& w, entity_id body_id, int gw,
         // cradle — so a city, its region and its gods share one tongue.
         const int pi = nearest_region(ss, tit->second.grid_x, tit->second.grid_y, gw);
         if (pi < 0) continue;
-        const int ci = ss.regions[static_cast<std::size_t>(pi)].culture;
+        // BL-826 — PLURALITY. A town is named in the tongue of the largest
+        // people on the ground under it; a name has no fractional form, so the
+        // distribution has to collapse to one answer and the largest is it.
+        const int ci = ss.regions[static_cast<std::size_t>(pi)].culture.plurality();
         if (ci < 0 || ci >= static_cast<int>(cs.cultures.size())) continue;
 
         const tongue& t = cs.cultures[static_cast<std::size_t>(ci)].speech;
