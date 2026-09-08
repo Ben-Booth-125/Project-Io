@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*6 entries — 5 open, 1 resolved.*
+*7 entries — 6 open, 1 resolved.*
 
 ---
 
@@ -100,6 +100,21 @@ BL-825 added history_sim_profile / history_sim_last_profile() - a report-only wa
 > **Recommendation:** Write it down. The constraints are already clear from the two instances, and a stated rule is cheaper than a third argument.
 
 *Files: `src/world/history_sim.hpp`, `src/world/era_minus_one.hpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-806 — Most of the war in the history sim is two neighbours ping-ponging one dead region
+*question · raised 2026-09-08 · from Chasing an R5 failure after the culture-shares merge. The check was right; my hypothesis about its cause was wrong, and so was the first diagnosis.*
+
+On the seed-0 fixture all 258 battles of a 4000-year run are the same region, ti=348, with zero population and therefore zero defenders, taken and retaken by two neighbours. battles == conquests == 258 exactly - the shipped harness prints that 1:1 ratio without any instrumentation.
+
+**Why it matters.** The battle count is how anyone judges whether the history sim produced a believable world, and here it is almost entirely one dead tile. This sprint is about SHOWING that history to the player: a border flickering 258 times over one region would be the single most visible thing on the time-lapse map, and it is an artefact. It also means the 1 -> 258 battle jump was never a richer history, so nothing should be tuned against it.
+
+- A region with no population is not a battle target - walking in is an occupation, not a war.
+- Depopulated ground is released rather than held, so there is nobody to take it from.
+- A floor on what makes ground worth campaigning for at all.
+
+> **Recommendation:** The first. It says the clearest thing about what the sim thinks war is - a fight needs someone to fight - and it is the smallest change. But it is a statement about your model of war rather than a bug fix, which is why it is here rather than simply built. BL-835 and BL-836 carry the work either way.
+
+*Files: `src/world/history_sim.cpp`, `src/world/settlement.cpp`, `docs/generation/MILITARY_HISTORY.md`*
 
 ---
 

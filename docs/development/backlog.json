@@ -312,7 +312,8 @@
     "src/world/history_sim.cpp",
     "src/world/settlement.cpp"
    ],
-   "design": "BEN, 2026-09-08, on what pass 1 must hand back: grudges, CULTURAL MIXES, and specific provinces owned.\n\nTODAY region::culture IS A SINGLE INT - one index into creed_state::cultures. A region is wholly one people or wholly another, and conquest flips it or does not. That cannot express a mix, and a mix is the thing being asked for.\n\nTHE CHANGE: a region carries SHARES over a small number of cultures - a fixed-width vector of per-mille weights, k small, sorted, with a tail bucket. Fixed width matters: it keeps the region POD-ish, keeps the record in BL-817 bounded, and keeps the serialisation seam simple.\n\nTHIS IS TWO THINGS FOR ONE PRICE, which is why it is worth the disruption. It is the take-back Ben named. And it is BL-823's first lever made real: holding foreign ground shifts shares SLOWLY toward the holder, so a conquest is culturally digested over centuries rather than at the moment the border moves - which is precisely what makes a fast conqueror fragile rather than compounding. w_cult (=150, a penalty for taking ground of a foreign culture) already exists and becomes a function of the shares rather than of an equality test.\n\nTHE BLAST RADIUS IS THE RISK. region::culture is read across settlement, nations, creeds and the political handoff; every equality test against it (p.culture == q.culture appears in the polity loop) becomes a question about a distribution and each one needs a deliberate answer - plurality, majority, or share-weighted. Do not let the compiler pick by silently reading element 0.\n\nDONE WHEN: regions carry shares, conquest shifts them over time rather than instantly, every former equality test has a stated replacement, and a harness shows a long-held conquest assimilating while a recent one has not."
+   "design": "BEN, 2026-09-08, on what pass 1 must hand back: grudges, CULTURAL MIXES, and specific provinces owned.\n\nTODAY region::culture IS A SINGLE INT - one index into creed_state::cultures. A region is wholly one people or wholly another, and conquest flips it or does not. That cannot express a mix, and a mix is the thing being asked for.\n\nTHE CHANGE: a region carries SHARES over a small number of cultures - a fixed-width vector of per-mille weights, k small, sorted, with a tail bucket. Fixed width matters: it keeps the region POD-ish, keeps the record in BL-817 bounded, and keeps the serialisation seam simple.\n\nTHIS IS TWO THINGS FOR ONE PRICE, which is why it is worth the disruption. It is the take-back Ben named. And it is BL-823's first lever made real: holding foreign ground shifts shares SLOWLY toward the holder, so a conquest is culturally digested over centuries rather than at the moment the border moves - which is precisely what makes a fast conqueror fragile rather than compounding. w_cult (=150, a penalty for taking ground of a foreign culture) already exists and becomes a function of the shares rather than of an equality test.\n\nTHE BLAST RADIUS IS THE RISK. region::culture is read across settlement, nations, creeds and the political handoff; every equality test against it (p.culture == q.culture appears in the polity loop) becomes a question about a distribution and each one needs a deliberate answer - plurality, majority, or share-weighted. Do not let the compiler pick by silently reading element 0.\n\nDONE WHEN: regions carry shares, conquest shifts them over time rather than instantly, every former equality test has a stated replacement, and a harness shows a long-held conquest assimilating while a recent one has not.",
+   "notes": "CLEARED of the R5 regression by direct experiment (2026-09-08): toggling w_cult back to the pre-BL-826 equality test in place leaves the counts IDENTICAL (258 battles / 0 winter, both semantics). The share term reports foreign_q == 1000 on every candidate, so it is a uniform 0.85 multiplier - a monotone transform that cannot reorder an argmax. The real causes are BL-835 and BL-836."
   },
   {
    "status": "designed",
@@ -515,6 +516,53 @@
     "src/world/history_sim.cpp"
    ],
    "design": "MEASURED, NOT SUSPECTED (BL-825). reach/Dijkstra is 66-86% of a 4000-year run and is the entire reason the span is superlinear.\n\nTHE DEFECT IS A CACHE THRASH, and the code says so if you read it beside its own comment. history_sim.cpp:531-534 declares ONE reach vector and ONE reach_capital int. The comment above them says the reach is \"cached until the capital moves, so the per-year cost stays a lookup\". That is true for one polity. There are twelve. At :668 each polity in the round finds reach_capital holding the PREVIOUS polity capital and rebuilds - so the cache never survives a single iteration and the run pays a full O(N^2) Dijkstra per polity per round. 12,000 rebuilds over 1,000 rounds, which is exactly 12 per round: the polity count.\n\nTHE FIX IS THE OBVIOUS ONE: cache PER POLITY, not one shared slot. Twelve vectors of N ints is small. A rebuild then happens when that polity capital actually moves or the region count grows - which is what the comment always claimed.\n\nAND THE SECOND, COMPOUNDING FACT is not fixed by that and must not be forgotten: N GROWS INSIDE THE RUN. Regions go from ~150 at the start to ~1,190 by 4000 years as polities found new ground, so every later rebuild is dearer than the last, quadratically. Per-polity caching cuts the NUMBER of rebuilds; a heap (this Dijkstra is heapless) cuts the cost of each. Do the caching first and re-measure before deciding whether the heap is also needed - the first fix may make the second unnecessary, and an unneeded rewrite of a deterministic sim path is a bad trade.\n\nDETERMINISM IS THE BINDING CONSTRAINT. This is world/* and the sim is seeded and replayable. A caching change must be OUTPUT-IDENTICAL: same seed, same digests, same battles/conquests/foundings. tools/verify/world_determinism is the instrument and it was already used this way in BL-825 - run it before and after and require identical digests. A faster sim that produces a different world has not been optimised, it has been broken.\n\nDONE WHEN: rebuild count falls by an order of magnitude, the 4000-year span is re-measured on history_span_cost, and world_determinism digests are bit-identical to the pre-change run."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Found by the BL-826 regression hunt (2026-09-08); Claude",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-835",
+   "short_name": "DEAD_REGION_PINGPONG",
+   "priority": "A",
+   "difficulty": 3,
+   "category": "Generation",
+   "title": "A zero-population region is a perpetual battle target, and it is most of the war in the sim",
+   "authority_doc": "docs/generation/MILITARY_HISTORY.md",
+   "requires": [],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/settlement.cpp"
+   ],
+   "design": "FOUND WHILE CLEARING BL-826, AND IT IS NOT BL-826's DOING. The seed-0 fixture reports 258 battles over 4000 years. All 258 are THE SAME REGION - ti=348 - taken and retaken by its neighbours, with manpower_stock == 0 on every flip. battles == conquests == 258, exactly 1:1, which the shipped harness prints without any probe: every battle is a conquest because no target ever defends.\n\nmanpower_stock is capped by manpower_ceiling(population, ...) (settlement.cpp:1580), so a permanent zero means POPULATION ZERO. A depopulated but OWNED region can never resist, so it tops the candidate score forever: zero defence both zeroes the defence cost term AND drives p_win_q to ~1000, so it dominates every defended candidate on two axes at once. Two neighbours then ping-pong it for four thousand years.\n\nWHY THIS MATTERS FAR BEYOND ONE CHECK. The battle count is the headline statistic for whether the history sim produces a believable world, and on this fixture it is almost entirely noise from one dead tile. Sprint 35 plans to SHOW this history to the player as a time-lapse with a scoreboard - a border flickering 258 times on one region would be the most visible thing on the map, and it is an artefact. It also means the recent 1 -> 258 battle jump was never a richer history, so nothing should be tuned against it.\n\nTHE CALL IS BEN'S, and it is a design question rather than a bug fix. Candidates: a region with no population is not a battle target at all (there is nobody there to fight - walking in is an occupation, not a war); or depopulated ground is released rather than held; or a floor on what makes ground worth campaigning for. Each says something different about what the sim thinks war is.\n\nDONE WHEN: no fixture spends its whole span fighting over one region, and the battle count reflects contested ground rather than a dead tile."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Found by the BL-826 regression hunt (2026-09-08); Claude",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-836",
+   "short_name": "WINTER_LOSES_EVERY_TIE",
+   "priority": "B",
+   "difficulty": 2,
+   "category": "Generation",
+   "title": "Winter can never win a tie in the season argmax, and integer truncation makes ties common",
+   "authority_doc": "docs/generation/MILITARY_HISTORY.md",
+   "requires": [
+    "BL-835"
+   ],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "design": "THE SEASON AXIS IS DECIDED BY A STRICT COMPARISON. Summer is evaluated first (w = 0) and winter guards on s > best_score - strictly greater - so an EXACT TIE always keeps summer.\n\nWINTER'S ONLY BENEFIT IN THE SCORE is that def_ready drops 1000 -> 750, shrinking the defence term (params.w_def * def_eff) / 2000. That is integer division, so on a weak defender the winter advantage TRUNCATES TO ZERO and the two seasons tie exactly - at which point the strict comparison silently discards winter. Measured: def_scaled must reach about 4 before the winter delta survives the divide at all.\n\nAgainst a zero-defence target both terms are 0, so winter is unreachable BY CONSTRUCTION, not by a hair. That is why R5 reports 0 winter campaigns out of 258 with the winter premium set to 0 to make winter freely competitive. The scoring itself is healthy where a defender exists - probed candidates show winter strictly ahead (s=70 vs 67, s=83 vs 81) - the argmax simply never reaches them while a dead region outranks everything.\n\nSO THIS IS THE SECOND-ORDER HALF AND IT IS SEQUENCED DELIBERATELY. Fixing BL-835 may make R5 pass on its own by removing the dominating candidate. Fix BL-835 first, RE-MEASURE, and only then decide whether the tie-break also wants changing - a tie-break altered while a bigger distortion is still in play is a change nobody can evaluate.\n\nAND THE TIE-BREAK IS A DESIGN CALL, not a defect to silently flip. Preferring summer on a tie may be exactly right. What is wrong is that it is UNSTATED and that truncation manufactures the ties.\n\nDONE WHEN: BL-835 is fixed and R5 re-measured; the tie-break is then either stated as deliberate in MILITARY_HISTORY.md or changed on Ben's ruling."
   }
  ]
 }

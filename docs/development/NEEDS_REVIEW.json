@@ -175,6 +175,28 @@
         "docs/development/DEVELOPMENT_PRACTICES.md"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-806",
+      "title": "Most of the war in the history sim is two neighbours ping-ponging one dead region",
+      "raised": "2026-09-08",
+      "kind": "question",
+      "status": "open",
+      "source": "Chasing an R5 failure after the culture-shares merge. The check was right; my hypothesis about its cause was wrong, and so was the first diagnosis.",
+      "what": "On the seed-0 fixture all 258 battles of a 4000-year run are the same region, ti=348, with zero population and therefore zero defenders, taken and retaken by two neighbours. battles == conquests == 258 exactly - the shipped harness prints that 1:1 ratio without any instrumentation.",
+      "why_it_matters": "The battle count is how anyone judges whether the history sim produced a believable world, and here it is almost entirely one dead tile. This sprint is about SHOWING that history to the player: a border flickering 258 times over one region would be the single most visible thing on the time-lapse map, and it is an artefact. It also means the 1 -> 258 battle jump was never a richer history, so nothing should be tuned against it.",
+      "options": [
+        "A region with no population is not a battle target - walking in is an occupation, not a war.",
+        "Depopulated ground is released rather than held, so there is nobody to take it from.",
+        "A floor on what makes ground worth campaigning for at all."
+      ],
+      "recommendation": "The first. It says the clearest thing about what the sim thinks war is - a fight needs someone to fight - and it is the smallest change. But it is a statement about your model of war rather than a bug fix, which is why it is here rather than simply built. BL-835 and BL-836 carry the work either way.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/settlement.cpp",
+        "docs/generation/MILITARY_HISTORY.md"
+      ],
+      "resolution": null
     }
   ]
 }
