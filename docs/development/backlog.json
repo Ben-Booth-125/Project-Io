@@ -1,111 +1,165 @@
 {
-  "_schema": "backlog/io-v2",
-  "_note": [
-    "FOURTH ARCHIVE PASS, 2026-09-01 (Ben: \"drop them\"): landed items no longer live here AT ALL. The third pass left their metadata behind; this file is now the LIVE WORKLIST and nothing else.",
-    "A landed item's whole row is in archive/backlog-design-<quarter>.json. Readers reach it through archive_store.landedItems()/landedIds() - backlog_query.js unions it for --all, --touches, --grep, an explicit id, or --status complete; next_id.js scans it for the max id; backlog_lint.js resolves requires-targets against it; status.ps1 renders \"DONE lately\" from it.",
-    "Reversible: node tools/session/archive_landed.js --restore. Row content comes back exactly; array order normalises to numeric id.",
-    "Canonical backlog for Project Io - the authoritative METADATA index of every open item.",
-    "One item = one object in `items`.",
-    "STATUS (authoritative; JSON wins over any prose/glyph disagreement):",
-    "  designed    (glyph ✓) - design settled, promote-ready.",
-    "  design-owed (glyph ~) - design still owed; must be settled before promotion.",
-    "PRIORITY (ascending): F C B A S SSS."
-  ],
-  "items": [
-    {
-      "id": "BL-812",
-      "short_name": "PHASE6_SEES_ROADS",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 3,
-      "glyph": "✓",
-      "sprint": "35",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08, on the cleared board); Claude (itemisation)",
-      "requires": [],
-      "parked": false,
-      "category": "Generation",
-      "title": "The phase 6 objective gains a reach-quality term, so a road tier is something it can see",
-      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "files": [
-        "src/world/landscape_score.cpp",
-        "src/world/landscape_score.hpp",
-        "src/world/landscape_search.cpp",
-        "tools/verify/landscape_score_harness.cpp"
-      ],
-      "design": "BEN, 2026-09-08: \"Roads should be visible in phase 6 too.\" The ruling is written into GENERATION_STRATEGY.md as the objective's FIFTH TERM; this item is the work.\n\nTHE MEASUREMENT THAT FORCED IT (archived NR-793, confirmed on a live ten-market world, seed ABCDEF01, every term alive):\n  tier=1  IN_REACH=25658  raws=122  composite=0.010256174\n  tier=3  IN_REACH=26024  raws=122  composite=0.010256174\nThe reach frontier moves by 366 tiles. Every scored term is bit-identical.\n\nTHE CAUSE IS ONE NUMBER, and it is raws_in_reach: 122 either side. A road tier scales traversal COST, continuously. Terms 1 and 4 read reach through a PER-RESOURCE COVERAGE BOOLEAN - is there any reachable deposit of resource R in this catchment - and that boolean is SATURATED. With 122 resource-market pairs already covered across 25,658 tiles, 366 more tiles introduce no pair that was not already covered. So the axis moves a continuous quantity the objective only reads through a threshold, and the search spends a third of every round proposing a change it cannot score.\n\nTHE CONSTRAINT, and it is the whole difficulty. Cheaper traversal everywhere is trivially better, so a reach-quality term entered as a FLAT VIABILITY BONUS would reward a uniformly well-connected map - precisely the evenness term 3 and GENERATION_STRATEGY.md § Asymmetry is the deliverable exist to prevent. The term must be a PER-MARKET reading whose SPREAD is scored, exactly like terms 1 and 2, never a single global number added to the composite.\n\nSLICE 1 IS A MEASUREMENT, NOT A FEATURE, and it decides what the term reads. Two candidates: the mean traversal cost from a market to the tiles in its catchment, and the in-reach tile COUNT rather than the coverage boolean. Both are continuous and both move when a tier does. Score candidates that differ ONLY in road tier and ask whether the chosen reading DISCRIMINATES between them at all. A reading that does not is not worth keeping, and that is an afternoon's answer rather than a wasted build. This is § The first slice is the scorer applied to the new term.\n\nTWO THINGS TO CARRY, both from the archived phase 6 work. (1) The default-seed phase 6 fixture is a TWO-MARKET world on which balance and composite evaluate to zero for every candidate - it is not a sound basis for any phase 6 measurement, and NR-793's first reading was taken on it before being re-run on a live world. Use a 10-15 market world. (2) Adding a term changes every ranking and therefore the selected landscape, so this is a world-moving change and owes the digest discipline in DELIVERY.md § The digest re-bless is one act per WAVE.\n\nDONE WHEN: road tier 1, 2 and 3 produce DIFFERENT composites on a 10-15 market world; the difference is reported per market rather than as one global number; an even-reach landscape does not beat an uneven one at the same mean; and the determinism of the argmax is unchanged across thread counts."
-    },
-    {
-      "id": "BL-813",
-      "short_name": "WARM_START_REMEASURED",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 3,
-      "glyph": "✓",
-      "sprint": "35",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08, on the cleared board); Claude (itemisation)",
-      "requires": [],
-      "parked": false,
-      "category": "Economy",
-      "title": "Re-measure the startup wait on the current base, and profile where the warm start actually goes",
-      "authority_doc": "docs/economy/ERAS.md",
-      "files": [
-        "src/core/app.cpp",
-        "src/world/economy_system.cpp",
-        "src/world/supply_system.cpp",
-        "tools/verify/campaign_lapse.cpp"
-      ],
-      "design": "FIRST, BECAUSE EVERY LATER DECISION IN THIS SPRINT IS TAKEN ON THIS NUMBER, and the number on record was measured on a line of history this base does not share.\n\nWHAT WAS LAST RECORDED (archived BL-761, measured 2026-09-03 in the RELEASE play build, build_rel, with --autostart):\n  epoch 1960 (two-span)  warm_start_80_ticks  73167 ms | convoys 14763.9 | run_economy_step 57023.9\n  epoch 0    (ancient)   warm_start_80_ticks  72088 ms | convoys 28321.1 | run_economy_step 42361.6\nAgainst app.cpp's own comment, which budgets \"~25-38 s generation plus ~6 s warm start\". That is 12x the budget, and it dwarfs generation's ~8 s.\n\nTREAT THOSE AS A PRIOR, NOT AS FACT. They predate the current base by a substantial body of work. The first act of this item is to reproduce them here, in build_rel and NOT in build/ (Debug is a different world - the Debug warm start was recorded at ~11 minutes). If they no longer hold, that is the finding and the rest of the sprint is re-argued on the new figures rather than on these.\n\nTHEN PROFILE, because the split is the useful part and it differs by arc. run_economy_step dominates both but MORE on the industrial band; convoys are the reverse, with the ancient arc spending nearly twice as long moving goods. Everything else was noise (clear_markets ~0.11 s, apply_budget ~0.77 s, history_recorders ~0.39 s). Find what is O(n^2) or rebuilding per tick.\n\nWHY IT IS NOT ONLY A LOADING-SCREEN PROBLEM: 42-57 s over 80 ticks is 530-710 ms PER TICK, which is also what the player pays per tick at speed once playing. This is a play-speed problem wearing a loading-screen costume, and that is the stronger reason to fix it.\n\nDONE WHEN: the startup wait is measured on this base in the release build on both arcs, the per-pass split is recorded, and the dominant cost inside run_economy_step is named rather than guessed at."
-    },
-    {
-      "id": "BL-814",
-      "short_name": "RETIRE_WARM_START",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 3,
-      "glyph": "✓",
-      "sprint": "35",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08, on the cleared board); Claude (itemisation)",
-      "requires": [
-        "BL-813"
-      ],
-      "parked": false,
-      "category": "Economy",
-      "title": "Retire the warm start and hand its burden to phase 6 - the position play opens on is SELECTED, not settled",
-      "authority_doc": "docs/economy/ERAS.md",
-      "files": [
-        "src/core/app.cpp",
-        "src/world/corporation_generation.cpp",
-        "docs/economy/ERAS.md",
-        "docs/economy/MARKETS.md"
-      ],
-      "design": "THE AIM, and GENERATION_STRATEGY.md § The eight phases already carries it as design: phase 8 is retired and its burden moves to phase 6. The warm start is 80 undirected ticks that settle whatever generation happened to place; phase 6 is a directed search that CHOOSES the corporate landscape. Keeping both pays twice for the weaker answer.\n\nWHAT GOES: app::start_new_game's pre_game_ticks loop and its sliced-progress UI, and Pass 6 background-firm generation as a separate one-shot - the firms phase 6 selects ARE the background economy.\n\nTHE KNOWN BLOCKER, written down rather than guessed at. generate_corporations APPENDS and runs BEFORE the registry loads, so phase 6 cannot vary the specialist roster at the live seam. That ordering restructure is the actual work of this item; the search itself already exists and app.cpp already calls it.\n\nWHAT MUST NOT BE LOST. The warm start exists so play opens on a SETTLED position rather than a cold one, and the clock is rebased so play always begins at the epoch. ERAS.md carries the calendar rebase as the load-bearing, pass-independent half - play opens at epoch_year and the opening position owes the calendar nothing - and it survives whatever replaces the warm start. That paragraph is REWRITTEN, never deleted.\n\nAND THE TRADE THIS ITEM MUST NOT MAKE. Retiring the warm start before phase 6 can genuinely hand over a settled world opens play on an UNSETTLED position, which is worse than the seconds it saves. This was refused once before on exactly that reasoning and the refusal was correct. Taking the block again is a legitimate outcome; trading correctness for a wall clock is not.\n\nBL-812 BEARS ON THIS DIRECTLY. This item promotes phase 6 to being the only judge of the opening position, so a blind axis in its objective matters more here than it did when phase 6 merely selected alongside a warm start.\n\nDONE WHEN: no pre_game_ticks loop remains; a world handed to play is settled by phase 6; the startup drop is measured against BL-813's figure in the release build; and ERAS.md and MARKETS.md § Background corporations describe the new source of the background economy."
-    },
-    {
-      "id": "BL-815",
-      "short_name": "GENERATION_BUDGET_ON_SCREEN",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 2,
-      "glyph": "✓",
-      "sprint": "35",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08, on the cleared board); Claude (itemisation)",
-      "requires": [
-        "BL-814"
-      ],
-      "parked": false,
-      "category": "Generation",
-      "title": "The game states its own generation budget on the generating screen, and the total sits in 3-6 minutes",
-      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "files": [
-        "src/core/app.cpp",
-        "tools/verify/history_sweep.cpp",
-        "docs/generation/GENERATION_STRATEGY.md"
-      ],
-      "design": "BEN'S TARGET, 2026-09-03: \"I'm aiming to have generation take anywhere from 3-6 minutes.\" This item keeps that arithmetic true as the sprint moves, and makes it visible in the game rather than only in a harness.\n\nTHE VISIBLE HALF IS THE PART STILL OWED. generation_progress carries atomic budget fields and the harness tier prints a [gen budget] line, but the GENERATING SCREEN says nothing about where its wait goes. A budget nobody can see in the game is not a budget. This half was previously called delivered on a clean compile and was NOT verified by a live look - the standing rule is that a UI requirement needs a live click, so this one closes by opening the built app and looking at it.\n\nTHE ARITHMETIC TO KEEP HONEST: retiring the warm start returns most of the current wait, and the phase 6 search costs roughly +20 s of startup on its own - a regression until BL-814 removes the larger number beside it. Six candidates evaluated serially would break the budget outright; the budget closes only because they run in parallel, which makes DETERMINISM UNDER THREADING the binding constraint. A winner chosen by completion order rather than by a deterministic argmax is a non-deterministic world, and that is the one invariant this project does not bend.\n\nTHE RISK WORTH STATING: the era pass costs about FOUR TIMES its own wall clock, because everything downstream works over the regions it founded. So the cheap-looking additions are the ones to measure, not the expensive-looking ones - a budget taken off a pass's own timer is wrong by 4x.\n\nDONE WHEN: a full generation is timed per phase in the release play build, the total sits inside 3-6 minutes, and the app itself reports the split on its generating screen - confirmed by opening the game and looking, not by a clean compile."
-    }
-  ]
+ "_schema": "backlog/io-v2",
+ "_note": [
+  "FOURTH ARCHIVE PASS, 2026-09-01 (Ben: \"drop them\"): landed items no longer live here AT ALL. The third pass left their metadata behind; this file is now the LIVE WORKLIST and nothing else.",
+  "A landed item's whole row is in archive/backlog-design-<quarter>.json. Readers reach it through archive_store.landedItems()/landedIds() - backlog_query.js unions it for --all, --touches, --grep, an explicit id, or --status complete; next_id.js scans it for the max id; backlog_lint.js resolves requires-targets against it; status.ps1 renders \"DONE lately\" from it.",
+  "Reversible: node tools/session/archive_landed.js --restore. Row content comes back exactly; array order normalises to numeric id.",
+  "Canonical backlog for Project Io - the authoritative METADATA index of every open item.",
+  "One item = one object in `items`.",
+  "STATUS (authoritative; JSON wins over any prose/glyph disagreement):",
+  "  designed    (glyph ✓) - design settled, promote-ready.",
+  "  design-owed (glyph ~) - design still owed; must be settled before promotion.",
+  "PRIORITY (ascending): F C B A S SSS."
+ ],
+ "items": [
+  {
+   "id": "BL-812",
+   "short_name": "PHASE6_SEES_ROADS",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": 3,
+   "glyph": "✓",
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, on the cleared board); Claude (itemisation)",
+   "requires": [],
+   "parked": false,
+   "category": "Generation",
+   "title": "The phase 6 objective gains a reach-quality term, so a road tier is something it can see",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/world/landscape_score.cpp",
+    "src/world/landscape_score.hpp",
+    "src/world/landscape_search.cpp",
+    "tools/verify/landscape_score_harness.cpp"
+   ],
+   "design": "BEN, 2026-09-08: \"Roads should be visible in phase 6 too.\" The ruling is written into GENERATION_STRATEGY.md as the objective's FIFTH TERM; this item is the work.\n\nTHE MEASUREMENT THAT FORCED IT (archived NR-793, confirmed on a live ten-market world, seed ABCDEF01, every term alive):\n  tier=1  IN_REACH=25658  raws=122  composite=0.010256174\n  tier=3  IN_REACH=26024  raws=122  composite=0.010256174\nThe reach frontier moves by 366 tiles. Every scored term is bit-identical.\n\nTHE CAUSE IS ONE NUMBER, and it is raws_in_reach: 122 either side. A road tier scales traversal COST, continuously. Terms 1 and 4 read reach through a PER-RESOURCE COVERAGE BOOLEAN - is there any reachable deposit of resource R in this catchment - and that boolean is SATURATED. With 122 resource-market pairs already covered across 25,658 tiles, 366 more tiles introduce no pair that was not already covered. So the axis moves a continuous quantity the objective only reads through a threshold, and the search spends a third of every round proposing a change it cannot score.\n\nTHE CONSTRAINT, and it is the whole difficulty. Cheaper traversal everywhere is trivially better, so a reach-quality term entered as a FLAT VIABILITY BONUS would reward a uniformly well-connected map - precisely the evenness term 3 and GENERATION_STRATEGY.md § Asymmetry is the deliverable exist to prevent. The term must be a PER-MARKET reading whose SPREAD is scored, exactly like terms 1 and 2, never a single global number added to the composite.\n\nSLICE 1 IS A MEASUREMENT, NOT A FEATURE, and it decides what the term reads. Two candidates: the mean traversal cost from a market to the tiles in its catchment, and the in-reach tile COUNT rather than the coverage boolean. Both are continuous and both move when a tier does. Score candidates that differ ONLY in road tier and ask whether the chosen reading DISCRIMINATES between them at all. A reading that does not is not worth keeping, and that is an afternoon's answer rather than a wasted build. This is § The first slice is the scorer applied to the new term.\n\nTWO THINGS TO CARRY, both from the archived phase 6 work. (1) The default-seed phase 6 fixture is a TWO-MARKET world on which balance and composite evaluate to zero for every candidate - it is not a sound basis for any phase 6 measurement, and NR-793's first reading was taken on it before being re-run on a live world. Use a 10-15 market world. (2) Adding a term changes every ranking and therefore the selected landscape, so this is a world-moving change and owes the digest discipline in DELIVERY.md § The digest re-bless is one act per WAVE.\n\nDONE WHEN: road tier 1, 2 and 3 produce DIFFERENT composites on a 10-15 market world; the difference is reported per market rather than as one global number; an even-reach landscape does not beat an uneven one at the same mean; and the determinism of the argmax is unchanged across thread counts."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, on the visibility form: extra wizard rounds, leans per pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-816",
+   "short_name": "WIZARD_ROUNDS_FOUR_AND_FIVE",
+   "priority": "A",
+   "difficulty": 3,
+   "category": "UI",
+   "title": "Extend the world wizard from three rounds to five - the shell rounds 4 and 5 live in",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [],
+   "files": [
+    "src/core/app.hpp",
+    "src/ui/startup_screens.cpp"
+   ],
+   "design": "THE SCAFFOLD ITEM, and it is deliberately first: every other item in this sprint needs somewhere to draw.\n\nwizard_round_count goes 3 -> 5 (src/core/app.hpp:384). The static_assert against ui::chain_round_count is the tell that the pip strip, the Back/Next chrome and the chart chain are all keyed to one constant - so the count is not a one-line change and the assert must be RE-EXPRESSED rather than deleted. The chain rounds stay THREE; the wizard rounds become FIVE, and the two constants stop being the same number.\n\nWHAT ROUNDS 4 AND 5 SHOW IN THIS ITEM: a PLACEHOLDER each, honestly labelled. The globe already draws the real tile raster and keeps doing so; the round frame, the pip strip, Back/Next and the causal-reroll rule (rerolling 4 invalidates 5) all work end to end before any history is played back over them.\n\nDONE WHEN: five rounds navigate live in the built app, Back from 5 lands on 4, and a capture exists for each new round."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, on the visibility form: extra wizard rounds, leans per pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-817",
+   "short_name": "POLITY_PLAYBACK_GLOBE",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Generation",
+   "title": "Round 4 - polity colour per region on the wizard globe, advanced across the history span",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-816"
+   ],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/ui/startup_screens.cpp"
+   ],
+   "design": "WHAT BEN CHOSE TO WATCH (2026-09-08, visibility form): polity colours on the globe. Empires form, spread, stall at a strait and collapse in view.\n\nTHE THING THAT DOES NOT EXIST YET is the record it draws from. The sim carries the region table forward and hands the political map across at the epoch; it does not emit WHO HELD WHAT AT EACH STEP. That per-step ownership record is the actual work here, and it is a generation-layer change, not a UI one. Keep it small: a region-count-sized array of polity ids per recorded step, at a step granularity coarse enough that the record does not rival the world in size.\n\nPASS 1 AND PASS 2 SHARE THE ROUND. They are one engine (GENERATION_STRATEGY.md, Three passes of simulated history); the boundary year is a MARK ON THE TIMELINE, never a screen break.\n\nDETERMINISM: the record is an output of a deterministic sim and must not perturb it. Recording must not consume from the sim's stream.\n\nDONE WHEN: a full span plays back on the globe in the built app, watched live, with the boundary year marked; and the same seed produces a bit-identical record twice."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, on the visibility form: extra wizard rounds, leans per pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-818",
+   "short_name": "HISTORY_LEANS",
+   "priority": "B",
+   "difficulty": 4,
+   "category": "Generation",
+   "title": "Leans per pass - named forces over the ancient and industrial spans, resolved against the seed",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-817"
+   ],
+   "files": [
+    "src/world/planetology.hpp",
+    "src/world/history_sim.cpp",
+    "src/ui/startup_screens.cpp"
+   ],
+   "design": "BEN'S CALL (2026-09-08): yes, leans per pass - the wizard's preferences model extended past planetology.\n\nTHE MODEL IS UNCHANGED AND MUST STAY UNCHANGED: a lean is a NAMED LEAN on an axis, resolved against the seed by a resolve_* function, and no raw generated value is editable. It names a FORCE, never an outcome - the tune-the-forces-never-the-outcome rule is not relaxed for being player-facing, and 'guarantee me an empire' is exactly the reading it forbids.\n\nWHAT THE AXES ARE IS THE DESIGN WORK OF THIS ITEM, and it is NOT settled. Each candidate axis must map onto a scalar the sim ALREADY reads, or it is a new mechanism wearing a lean's clothes. The obvious candidates to test: consolidation pressure (fractious vs consolidating) and sea legs (insular vs seafaring) for pass 1; industrialisation timing (late vs early) and tariff posture (open vs protective) for pass 2. A lean whose effect is not visible on the round's own globe is not worth offering.\n\nDONE WHEN: each shipped axis moves a measurable outcome across a SEED SWEEP - not one seed - and none of them clamps."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, on the visibility form: extra wizard rounds, leans per pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-819",
+   "short_name": "SUBSTRATE_ROUND",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "UI",
+   "title": "Round 5 - metros, reach across water, firm markers and charters, and the market carve",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [
+    "BL-816"
+   ],
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/market.cpp"
+   ],
+   "design": "FOUR OBJECTS, ALL FOUR CHOSEN BY BEN (2026-09-08), drawn in order on the epoch globe: metros growing out of the population centres the history grew and sacked; colonial reach across water; firm markers with their charters; the market carve and its price field.\n\nTHIS ROUND SHOWS THE SELECTED LANDSCAPE, NOT THE SEARCH. Phase 6 scores candidates statically in milliseconds; a ranking is not a spectacle. The player watches the winner being drawn.\n\nPLACEHOLDERS ARE EXPECTED AND ARE THE POINT. Phase 6's search is not built (BL-770 was cancelled with the board clear) and colonial ties do not cross the handoff yet. Each of the four draws from whatever is real today - centres, corporations and markets all are; reach across water is the one with nothing behind it - and is LABELLED as a placeholder where it is one. An unlabelled placeholder is a lie the next session will believe.\n\nTHIS PAYS THREE OF THE FOUR OWED VISIBILITY ITEMS: the region surface, the market-carving explanation, and background firms - the last of which stops being blocked by the worker-thread objection, because a wizard round is not the worker's loading screen.\n\nDONE WHEN: all four draw in the built app on a LIVE click-through, each placeholder is visibly marked as one, and the Visibility table's verdicts are updated to match what actually renders."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08, on the visibility form: extra wizard rounds, leans per pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-820",
+   "short_name": "PASS_RUNS_IN_THE_ROUND",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "UI",
+   "title": "The wait becomes the round - run the real pass inside rounds 4 and 5, drawing as it computes",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [
+    "BL-817"
+   ],
+   "files": [
+    "src/core/app.cpp",
+    "src/ui/startup_screens.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "design": "THE STRUCTURAL PROBLEM THIS ITEM EXISTS FOR. The planetology rounds re-run their chain as a pure throwaway preview on EVERY control move. The history sim is the most expensive pass in the project and cannot be previewed that way at any budget - so rounds 4 and 5 invert the wizard's own mechanism, and that inversion needs stating rather than discovering.\n\nTHE SHAPE: the player sets the leans, presses Run, and the pass runs INSIDE the round with its output drawn as it computes. Accept moves on; reroll runs it again. The generation_progress sink already exists for the loading screen and is the natural feed; what changes is that generation stops being one call behind a bar and becomes calls the player initiates.\n\nBEN'S RULING THAT LICENSES IT (2026-09-08): 'a watched wait needs no budget' - which is why the whole startup-budget chain was dropped rather than deferred.\n\nAND THE OBLIGATION THAT REPLACES THE BUDGET IS SHARPER, NOT LOOSER. A watched wait must be WORTH WATCHING. A round that shows a still globe for ninety seconds is worse than the bar it replaced, because the bar at least admitted it was a wait. If the playback has dead stretches, the answer is to make them move - never to hide them behind a caption.\n\nSTART_NEW_GAME IS THE SEAM THAT MOVES. The one-and-only generation call splits, and the clock rebase at handoff must still hold: wall time spent watching must not land as elapsed in-game days.\n\nDONE WHEN: a live click-through from the menu to play, timed, with no stretch longer than a few seconds in which nothing on the globe changes."
+  }
+ ]
 }

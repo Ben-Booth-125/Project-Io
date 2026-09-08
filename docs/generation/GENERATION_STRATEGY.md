@@ -274,6 +274,40 @@ Four owed items, none of them blocking: the tile-derivation ledger (designed in
 which the worker split puts out of the loading screen's reach. Recorded here rather than filed as
 items so the map stays in one place; promote from this table when one is picked up.
 
+### The two watched passes (Ben, 2026-09-08)
+
+The table above is honest about a structural gap: **everything after planetology is a bar.** The
+wizard is the one generation surface that works — the player sets a lean, watches a globe resolve,
+and understands what they chose — and it stops at phase 1. Phases 4 and 6 produce the two things a
+player would most want to have watched, and neither has a surface.
+
+They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds 4 and 5):
+
+| Round | Phase | The moving object |
+|---|---|---|
+| **4** | **4 — The History** | **Polity colour per region on the globe**, advanced across the span. Empires form, spread, stall and collapse in view. Pass 1 and pass 2 share the round; the boundary year is a mark on the timeline, not a screen break. |
+| **5** | **6 — The economic substrate** | Four, in order: **metros growing** from the population centres, **colonial reach across water**, **firm markers and their charters**, and the **market carve with its price field**. |
+
+**Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
+any `world_preference`, and targets no outcome — the tune-the-forces-never-the-outcome rule of
+§ Asymmetry is the deliverable is not relaxed for being player-facing. The wizard's standing
+premise carries over unchanged: **you set conditions, you do not steer.**
+
+**Round 5 shows the selected landscape, not the search.** Phase 6 scores candidates statically in
+milliseconds and the ranking is not a spectacle; what the player watches is the winner being drawn.
+
+**And the wait becomes the round.** The planetology rounds preview by re-running a cheap pure
+chain per control move; the history sim cannot be previewed that way at any budget. So rounds 4
+and 5 run the real pass *inside the round*, drawing as they compute. Ben, 2026-09-08: *a watched
+wait needs no budget.* The obligation that replaces the budget is sharper, not looser — a watched
+wait must be **worth watching**, and a round that shows a still globe for ninety seconds is worse
+than the bar it replaced.
+
+**Three of the four owed items above are paid by this.** The region surface is round 4's globe;
+the market-carving explanation is round 5's carve; background firms are round 5's markers, which
+also settles the "runs after the worker" objection — a wizard round is not the worker's loading
+screen and does not inherit its threading constraint.
+
 ---
 
 ## Real history in, invented names out (Ben, 2026-08-03)

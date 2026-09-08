@@ -59,10 +59,10 @@ slider you cannot judge.
 
 ## New World wizard — `draw_generation_screen`
 
-The wizard is BL-167 (planetology pass). **Three rounds** (`wizard_round_count`),
+The wizard is BL-167 (planetology pass). Its first **three rounds** (`wizard_round_count`),
 batched thematically from the ten-stage Planetology chain (Ben, 2026-07-22: fewer
 rounds, too slow otherwise). Each round stacks its stages' charts and
-explanations, then takes that round's preferences.
+explanations, then takes that round's preferences. Two further rounds carry the history and the economic substrate — § Rounds 4 and 5 below.
 
 - **Preferences, not parameters** (`world_preferences`,
   `src/world/planetology.hpp`): a named lean per axis ("Dimmer", "Metal-rich"),
@@ -103,6 +103,52 @@ not something you are operating.
 subdivided in latitude, every cell a quad — not a per-pixel inverse projection
 into a texture. Both avoid projecting ~7,500 hexes as polygons against ImGui's
 16-bit draw indices; the slice path gets there with less machinery.
+
+## Rounds 4 and 5 — the history, and the substrate (Ben, 2026-09-08)
+
+The wizard does not stop at planetology. Two further rounds carry **phase 4 (The
+History)** and **phase 6 (The economic substrate)** —
+[`GENERATION_STRATEGY.md`](../generation/GENERATION_STRATEGY.md) § The eight phases —
+into the same idiom the planetology rounds established: a globe that is the primary
+view, charts as the extras on top, and **preferences, not parameters**.
+
+**Round 4 — The History.** The globe is the homeworld's real tile raster, tinted by
+**which polity holds each region**, advanced across the prehistory span. The player
+watches empires form, spread, stall at a strait and collapse. Pass 1 (ancient) and
+pass 2 (industrial) are one engine and one round's playback, with the boundary year
+marked on the timeline rather than splitting the screen.
+
+**Round 5 — The Substrate.** The same globe, at the epoch, gaining four things in
+order: **metros growing** out of the population centres the history sacked and grew,
+**colonial reach across water**, **firm markers with their charters**, and the
+**market carve with its price field**. This is phase 6's search made watchable — the
+player sees the landscape that was selected, not every candidate that was scored.
+
+### Leans per pass
+
+Each round takes a lean per axis, resolved against the seed exactly as
+`world_preferences` are (PLANETOLOGY.md § Preferences, not parameters). No raw
+generated value is editable and no outcome is targeted; the axes name a *force*, and
+§ Asymmetry is the deliverable still forbids steering to a result. The globe's
+no-input rule holds for the same reason it always did: **you set conditions here, you
+do not steer.**
+
+### The wait is the round, not a loading bar
+
+The planetology rounds re-run their chain as a pure throwaway preview on every control
+move. **Rounds 4 and 5 cannot**: the history sim is the most expensive pass in the
+project, and a live preview per keystroke is not affordable at any budget.
+
+So these rounds invert it. The player sets the leans, presses **Run**, and the pass
+runs *inside the round* with its output drawn as it computes. The wait is not hidden
+behind a bar — it **is** the content. Accepting moves to the next round; rerolling
+runs it again. Ben, 2026-09-08: *a watched wait needs no budget* — which is why the
+generation-budget chain was dropped rather than deferred. What is still owed is that a
+watched wait must be **worth watching**; a round that shows a frozen globe for ninety
+seconds is worse than a bar, not better.
+
+**Rounds stay causal.** Rerolling round 4 invalidates round 5, as rerolling a
+planetology round already re-draws the ones below it.
 
 ## Handoff — `start_new_game`
 
