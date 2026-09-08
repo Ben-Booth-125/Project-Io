@@ -329,6 +329,28 @@ standing preference for systemic forces over agent handicaps):
 | **Strain** | Growth raises strain and strain caps growth; the accumulators already cross the pass 1 → pass 2 handoff. | Built. |
 | **Balancing coalitions** | Neighbours' stance moves against the largest polity. | Owed, and the most dangerous of the six — it is one step from an agent handicap. It is admissible only as a **stance the player can read on the map** (`../politics/RELATIONS.md`), never as a hidden coefficient on the leader. |
 
+**What pass 1 hands back (Ben, 2026-09-08).** *"The important part is that we take back
+something useful."* Three things, and they are the reason the pass is worth 4000 years at all:
+
+- **Grudges** — a directed, decaying ledger of who did what to whom, raised by named events with a
+  place and a date. Directed because resentment is not symmetric; decaying because a 4000-year run
+  would otherwise reach the epoch with every pair maximally aggrieved, which carries no information.
+  It is an **input to sentiment** at world setup, not a fifth quantity beside the four
+  `../politics/RELATIONS.md` already distinguishes.
+- **Cultural mixes** — a region holds *shares* of several cultures, not one index. This is both the
+  take-back and § Round 4's lever 1 made real: holding foreign ground shifts the shares slowly, so a
+  conquest is digested over centuries and a fast conqueror is fragile rather than compounding.
+- **The provinces each polity holds** — already the loop's output; the sim writes region ownership as
+  it goes. What was missing was the *intermediate* states, which is what a time-lapse is.
+
+**4000 years is probably already affordable, and nobody has run it.** The sim works on the region
+graph rather than on tiles; the O(N²) neighbour build sits outside the year loop; and the **stepped
+decision clock** (Ben, 2026-08-12) already amortises decisions while letting demography advance
+yearly. The ancient arc in the sim's own comments is 4000 BCE → 0 CE. `prehistory_years = 400` is a
+default, not a ceiling. So the first move is a **measurement**, not an optimisation — and if
+something in the loop is superlinear, the measurement names it and *that* is what gets fixed, never
+the span.
+
 **Research is PARKED, and the placeholder is stated rather than designed (Ben, 2026-09-08).**
 Research points accumulate in proportion to a culture's population. Nothing else: no tree, no
 rates, no unlocks in this pass.

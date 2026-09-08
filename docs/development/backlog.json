@@ -68,20 +68,20 @@
    "blocked_on": null,
    "version_goal": null,
    "id": "BL-817",
-   "short_name": "HISTORY_TIMELAPSE_MAP",
+   "short_name": "HISTORY_PLAYBACK_RECORD",
    "priority": "A",
-   "difficulty": 4,
+   "difficulty": 3,
    "category": "Generation",
-   "title": "Round 4 - a 2D map running a time-lapse of the first 4000 years to 1200 CE",
+   "title": "The playback record - what pass 1 emits per step so 4000 years can be watched and handed on",
    "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
    "requires": [
     "BL-816"
    ],
    "files": [
     "src/world/history_sim.cpp",
-    "src/ui/startup_screens.cpp"
+    "src/world/history_sim.hpp"
    ],
-   "design": "WHAT BEN CHOSE (2026-09-08, describing the round against the live app): the globe is REPLACED by a 2D MAP in the same pane, and the map runs a TIME-LAPSE of the first 4000 years, ENDING AT 1200 CE. A globe shows a world; a map shows a frontier, and the frontier is the whole subject of the round.\n\nTWO COLLISIONS WITH THE CODE, both real and both named before anyone starts. prehistory_years defaults to 400, not 4000 (src/world/hard_coded_world.hpp:73). epoch_year defaults to 0 CE and era_band_for_epoch flips to industrial at 1700. A 4000-year pass 1 ending at 1200 CE is a TENFOLD span increase on the most expensive pass in the project, and Ben's other requirement for this round is that it be RAPID. Those two pull against each other and the resolution is a MEASUREMENT, not a preference. If 4000 years cannot be had at watchable speed, the honest answers are a coarser step or a cheaper step - never a shorter history quietly relabelled.\n\nTHE ARC IS THE ACCEPTANCE CRITERION, not a description: origin -> communication -> conquest or diplomatic union -> a stable dark age. A run that reaches 1200 CE with plausible numbers and none of that shape has FAILED, and it fails as a sim result rather than as a rendering bug. Asymmetry is completely fine and expected.\n\nTHE RECORD IT DRAWS FROM DOES NOT EXIST YET. The sim carries the region table forward and hands the political map across at the end; it does not emit WHO HELD WHAT AT EACH STEP. That per-step ownership record is the actual work here and it is a generation-layer change, not a UI one. Keep it small - a region-count-sized array of polity ids per recorded step, at a step granularity coarse enough that the record does not rival the world in size - and it must not perturb the sim it records or consume from its stream.\n\nDONE WHEN: the full span plays back as a 2D map in the built app, watched live end to end; the arc above is legible in the playback without being narrated; and the same seed produces a bit-identical record twice."
+   "design": "THE SIM ALREADY WRITES OWNERSHIP AS IT GOES. history_sim.hpp says it plainly: run_settlement leaves region::nation at -1 and the sim writes it during the loop, so by the stop year the political map IS the loop's output. What does not exist is a record of the INTERMEDIATE states - and a time-lapse is exactly a sequence of intermediate states.\n\nWHAT THIS ITEM EMITS, one entry per RECORDED step (which is coarser than a decision step, and much coarser than a year): the owner of every region, each region's culture shares (BL-826), and the population and land share per polity for the scoreboard (BL-830). Sized so the record does not rival the world - a few hundred regions by a few hundred recorded steps is small; a per-year record over 4000 years is not, and that is the trap.\n\nIT MUST NOT PERTURB THE SIM IT RECORDS. The precedent is right there in the same header: trace_battles is off by default, no decision reads a trace field, no trace field feeds a draw, and a HARNESS ASSERTS that a traced run and an untraced run agree in every other output rather than a comment claiming it. Do the same here - it is the cheapest way to keep a watchable sim and a deterministic one from becoming two different sims.\n\nDONE WHEN: a full run emits a record whose size is bounded and stated; a recorded run and an unrecorded run agree bit-for-bit on every other output, asserted by a harness; and the same seed records identically twice."
   },
   {
    "status": "designed",
@@ -162,8 +162,8 @@
    "design": "THE STRUCTURAL PROBLEM THIS ITEM EXISTS FOR. The planetology rounds re-run their chain as a pure throwaway preview on EVERY control move. The history sim is the most expensive pass in the project and cannot be previewed that way at any budget - so rounds 4 and 5 invert the wizard's own mechanism, and that inversion needs stating rather than discovering.\n\nTHE SHAPE: the player sets the leans, presses Run, and the pass runs INSIDE the round with its output drawn as it computes. Accept moves on; reroll runs it again. The generation_progress sink already exists for the loading screen and is the natural feed; what changes is that generation stops being one call behind a bar and becomes calls the player initiates.\n\nBEN'S RULING THAT LICENSES IT (2026-09-08): 'a watched wait needs no budget' - which is why the whole startup-budget chain was dropped rather than deferred.\n\nAND THE OBLIGATION THAT REPLACES THE BUDGET IS SHARPER, NOT LOOSER. A watched wait must be WORTH WATCHING. A round that shows a still globe for ninety seconds is worse than the bar it replaced, because the bar at least admitted it was a wait. If the playback has dead stretches, the answer is to make them move - never to hide them behind a caption.\n\nSTART_NEW_GAME IS THE SEAM THAT MOVES. The one-and-only generation call splits, and the clock rebase at handoff must still hold: wall time spent watching must not land as elapsed in-game days.\n\nDONE WHEN: a live click-through from the menu to play, timed, with no stretch longer than a few seconds in which nothing on the globe changes."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "cancelled",
+   "glyph": "x",
    "parked": false,
    "sprint": "35",
    "written": "2026-09-08",
@@ -183,7 +183,9 @@
    "files": [
     "src/ui/startup_screens.cpp"
    ],
-   "design": "BEN'S FOUR METRICS (2026-09-08): military might, research speed, population, and share of the world owned. It sits on the LEFT, where the planetology rounds stack their charts, and it moves with the map - it is the round's chart surface, not a side panel.\n\nTHE ONE TRAP, and it is a chart-honesty problem rather than a layout one. Research is PARKED and its placeholder accrues points in proportion to population (BL-822). So under the placeholder, RESEARCH SPEED AND POPULATION ARE THE SAME NUMBER IN TWO COLUMNS, and the board would show a perfect correlation it never measured. Either the column is LABELLED as population-derived while the placeholder stands, or it is not shown until research is real. An unlabelled duplicate column is a chart that lies, and it would lie to Ben while he is using this very board to judge whether the levers work.\n\nSHARE OF THE WORLD OWNED is share of the homeworld's LAND, not its surface - an ocean nobody can hold would otherwise cap every culture at a fraction and compress the whole axis.\n\nDONE WHEN: the board moves in step with the time-lapse on a live watch, cultures enter and leave it as they rise and fall, and the research column is either honestly labelled or absent."
+   "design": "BEN'S FOUR METRICS (2026-09-08): military might, research speed, population, and share of the world owned. It sits on the LEFT, where the planetology rounds stack their charts, and it moves with the map - it is the round's chart surface, not a side panel.\n\nTHE ONE TRAP, and it is a chart-honesty problem rather than a layout one. Research is PARKED and its placeholder accrues points in proportion to population (BL-822). So under the placeholder, RESEARCH SPEED AND POPULATION ARE THE SAME NUMBER IN TWO COLUMNS, and the board would show a perfect correlation it never measured. Either the column is LABELLED as population-derived while the placeholder stands, or it is not shown until research is real. An unlabelled duplicate column is a chart that lies, and it would lie to Ben while he is using this very board to judge whether the levers work.\n\nSHARE OF THE WORLD OWNED is share of the homeworld's LAND, not its surface - an ocean nobody can hold would otherwise cap every culture at a fraction and compress the whole axis.\n\nDONE WHEN: the board moves in step with the time-lapse on a live watch, cultures enter and leave it as they rise and fall, and the research column is either honestly labelled or absent.",
+   "resolved": "2026-09-08",
+   "resolution": "CANCELLED into BL-830 (top sixteen scoreboard) the same day, after Ben sharpened the ask: an ORDERED scoreboard of the TOP 16, not an unordered leaderboard. The cap and the ordering are the design rather than a display choice - sixteen rows re-ranking is what shows rise and fall - so the item was re-authored rather than amended. The research-column trap it identified is carried into BL-830 verbatim; it was the only thing here worth keeping."
   },
   {
    "status": "designed",
@@ -255,6 +257,157 @@
     "src/ui/startup_screens.cpp"
    ],
    "design": "SMALL, AND BEN NAMED IT FIRST when he looked at the live app: \"In place of begin we should see next.\"\n\nThe wizard's commit press belongs on the LAST round. Round 3 currently reads Reroll / Back / Begin because it is last today; once rounds 4 and 5 exist it advances like any other round, and only round 5 commits.\n\nDONE WHEN: rounds 3 and 4 read Next, round 5 reads Begin, and Begin is the only press in the wizard that generates anything."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08: get the sim right first - grudges, cultural mixes, provinces owned); Claude (itemisation, against the sim as it stands)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-825",
+   "short_name": "FOUR_THOUSAND_YEARS_MEASURED",
+   "priority": "A",
+   "difficulty": 2,
+   "category": "Generation",
+   "title": "Run pass 1 at 4000 years and measure it - the span may already be affordable",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [],
+   "files": [
+    "tools/verify/",
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.hpp"
+   ],
+   "design": "THIS ITEM IS FIRST AND IT IS CHEAP, because reading the sim suggests the expensive answer may not be needed.\n\nWHAT THE CODE ALREADY DOES, and it is not what a 400-year default implies. (1) The sim runs on the REGION graph, not on tiles - a few hundred regions, not 31,581 hexes. (2) The O(N^2) neighbour build is OUTSIDE the year loop; it is paid once. (3) THE STEPPED DECISION CLOCK ALREADY EXISTS (Ben, 2026-08-12): the year counter advances one year at a time so demography never skips, but polities only ACT when the year reaches next_decision, walked forward by step_for_year - which varies the step by BAND. (4) The header's own comments describe the ancient arc as 4000 BCE -> 0 CE, so a 4000-year span is the arc the sim was written for. prehistory_years = 400 is a DEFAULT, not a ceiling.\n\nSO THE PER-YEAR COST IS DEMOGRAPHY OVER N REGIONS - linear, small - and the decision cost is already amortised by a clock built for exactly this. The plausible conclusion is that 4000 years costs single-digit seconds and NOBODY HAS EVER RUN IT.\n\nMEASURE, DO NOT ASSUME. Release build, named in the figure. Run 400, 1000, 2000 and 4000 years and report wall time and the split - demography, decisions, battles, the reach recompute. If it is linear in years, the span question is closed and BL-823's levers are the only real work. If something in the loop is superlinear, this measurement names it, and THAT is the thing to fix - not the span.\n\nAND MEASURE step_years WHILE THERE: it is the one knob that trades fidelity for speed directly, and its cost curve is worth knowing before anyone argues about the span.\n\nDONE WHEN: a wall-time figure per span, against a named release build, with the split; and a stated verdict on whether 4000 years is watchable as-is."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08: get the sim right first - grudges, cultural mixes, provinces owned); Claude (itemisation, against the sim as it stands)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-826",
+   "short_name": "CULTURAL_MIXES",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Generation",
+   "title": "A region holds a mix of cultures, not one - the take-back Ben named, and the assimilation lever in the same structure",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-825"
+   ],
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/settlement.cpp"
+   ],
+   "design": "BEN, 2026-09-08, on what pass 1 must hand back: grudges, CULTURAL MIXES, and specific provinces owned.\n\nTODAY region::culture IS A SINGLE INT - one index into creed_state::cultures. A region is wholly one people or wholly another, and conquest flips it or does not. That cannot express a mix, and a mix is the thing being asked for.\n\nTHE CHANGE: a region carries SHARES over a small number of cultures - a fixed-width vector of per-mille weights, k small, sorted, with a tail bucket. Fixed width matters: it keeps the region POD-ish, keeps the record in BL-817 bounded, and keeps the serialisation seam simple.\n\nTHIS IS TWO THINGS FOR ONE PRICE, which is why it is worth the disruption. It is the take-back Ben named. And it is BL-823's first lever made real: holding foreign ground shifts shares SLOWLY toward the holder, so a conquest is culturally digested over centuries rather than at the moment the border moves - which is precisely what makes a fast conqueror fragile rather than compounding. w_cult (=150, a penalty for taking ground of a foreign culture) already exists and becomes a function of the shares rather than of an equality test.\n\nTHE BLAST RADIUS IS THE RISK. region::culture is read across settlement, nations, creeds and the political handoff; every equality test against it (p.culture == q.culture appears in the polity loop) becomes a question about a distribution and each one needs a deliberate answer - plurality, majority, or share-weighted. Do not let the compiler pick by silently reading element 0.\n\nDONE WHEN: regions carry shares, conquest shifts them over time rather than instantly, every former equality test has a stated replacement, and a harness shows a long-held conquest assimilating while a recent one has not."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08: get the sim right first - grudges, cultural mixes, provinces owned); Claude (itemisation, against the sim as it stands)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-827",
+   "short_name": "GRUDGES",
+   "priority": "A",
+   "difficulty": 3,
+   "category": "Generation",
+   "title": "Grudges - a decaying directed ledger of who did what to whom, carried out of pass 1",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "requires": [
+    "BL-825"
+   ],
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "BEN, 2026-09-08: the important part is that we take back something useful - GRUDGES, cultural mixes, and specific provinces owned.\n\nWHAT A GRUDGE IS HERE: a DIRECTED, SPARSE, DECAYING integer from one polity to another, raised by NAMED EVENTS with a place and a date - ground taken, a seat sacked, a union refused, an ally abandoned. Directed because resentment is not symmetric and that asymmetry is the whole flavour. Decaying because a 4000-year run would otherwise arrive at the epoch with every pair maximally aggrieved, which carries no information at all. Sparse because most pairs never meet.\n\nIT MUST CARRY ITS CAUSE, not just its magnitude. A number a player cannot ask about is a number they cannot use; keep the top few contributing events per pair - what, where, when - and drop the rest into the scalar. That is what makes a grudge a story rather than a modifier, and it is what a later Relations surface reads.\n\nWHERE IT LANDS: RELATIONS.md owns sentiment, stance and reputation, and this is an INPUT to sentiment at world setup - not a fifth quantity beside them. Read that doc's distinction before adding a field; the question it settles is which quantity answers which question, and a grudge answers 'why do these two dislike each other', not 'what have they declared'.\n\nA POLITY THAT DIES STILL LEAVES A GRUDGE. Its successors inherit it, or it is lost - and that is a call worth making deliberately rather than by whichever way the ids happen to fall.\n\nDONE WHEN: grudges accumulate from named events across a full run, decay, survive the handoff into sentiment, and a harness can print the top pairs on a world with the events behind each."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08: get the sim right first - grudges, cultural mixes, provinces owned); Claude (itemisation, against the sim as it stands)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-828",
+   "short_name": "PASS_ONE_HANDOFF",
+   "priority": "A",
+   "difficulty": 2,
+   "category": "Generation",
+   "title": "State what pass 1 hands on, as one structure, and assert nothing else crosses",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-826",
+    "BL-827"
+   ],
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "design": "\"THE IMPORTANT PART IS THAT WE TAKE BACK SOMETHING USEFUL\" (Ben, 2026-09-08). This item is that sentence made checkable.\n\nGENERATION_STRATEGY.md already names what crosses each handoff and adds 'and nothing else'. That clause is currently a promise in prose with nothing enforcing it. Pass 1 now produces three more things - grudges, cultural mixes, and the provinces each polity holds - and a fourth pass will want a fifth thing unless the boundary is written down as a TYPE.\n\nTHE WORK: one struct that is the whole of what pass 1 hands forward, with every consumer taking it rather than reaching into the sim state. Then the doc's list and the struct's fields are the same list, and a change to either shows up as a change to the other.\n\nWHY IT IS WORTH A SEPARATE ITEM rather than a tidy-up inside BL-826: a handoff that is a struct is the difference between 'the history informed the world' and 'the history IS the world's cause'. It is also what makes pass 1 re-runnable in a wizard round without dragging the entire sim state into the UI layer.\n\nDONE WHEN: one type carries the handoff, no consumer reaches past it, and the doc's list matches its fields."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08: get the sim right first - grudges, cultural mixes, provinces owned); Claude (itemisation, against the sim as it stands)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-829",
+   "short_name": "TIMELAPSE_VIEW",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "UI",
+   "title": "The time-lapse view - a 2D map in the globe pane, playing the record back",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [
+    "BL-816",
+    "BL-817"
+   ],
+   "files": [
+    "src/ui/startup_screens.cpp"
+   ],
+   "design": "SPLIT OUT OF BL-817 so the record and the view can be built and judged separately - the record is generation-layer work and the view is UI work, and bundling them would have put one agent across both layers.\n\nWHAT BEN ASKED FOR (2026-09-08, at the live app): the globe is REPLACED by a 2D MAP occupying the same pane on the right, playing back the first 4000 years. A globe shows a world; a map shows a FRONTIER, and the frontier is this round's whole subject - a border that stalls at a strait reads as a stall on a map and as foreshortening on a sphere.\n\nWHAT IT DRAWS: polity colour per region from the BL-817 record, advanced through recorded steps. Culture mixes are available (BL-826) and are NOT drawn by default - two overlapping colour meanings on one map is how a legible surface becomes a plaid.\n\nTRANSPORT CONTROLS ARE THE OPEN QUESTION and should be decided by watching, not in advance: whether the player can pause, scrub or replay, or whether it simply runs. The wizard's standing premise - you set conditions, you do not steer - argues for the plainer answer, and the globe's own no-input ruling is the precedent.\n\nDONE WHEN: a full span plays back in the built app on a live watch; the arc in GENERATION_STRATEGY.md § Round 4's arc is legible from the map alone without narration; and a capture exists at three points across the span."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08: get the sim right first - grudges, cultural mixes, provinces owned); Claude (itemisation, against the sim as it stands)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-830",
+   "short_name": "TOP_SIXTEEN_SCOREBOARD",
+   "priority": "A",
+   "difficulty": 3,
+   "category": "UI",
+   "title": "An ordered scoreboard of the top 16, moving with the time-lapse",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [
+    "BL-817",
+    "BL-829"
+   ],
+   "files": [
+    "src/ui/startup_screens.cpp"
+   ],
+   "design": "BEN, 2026-09-08: an ORDERED scoreboard for the TOP 16 countries/settlements. It supersedes the unordered leaderboard sketch in BL-821, which is cancelled into this item.\n\nORDERED AND CAPPED IS THE DESIGN, not a display convenience. Sixteen rows re-ranking as the centuries pass is the surface that shows RISE AND FALL - a polity climbing into the board and dropping out of it is the whole story of the round, and an uncapped list of everything would show none of it.\n\nTHE METRICS ARE BEN'S FOUR: military might, research speed, population, share of the world owned. Share is of the homeworld's LAND, not its surface - an ocean nobody can hold would otherwise compress every culture into the bottom of the axis.\n\nWHICH COLUMN ORDERS THE BOARD is unsettled and matters more than it looks, because it decides which story the round tells. Share of land is the honest default for a round about borders.\n\nCOUNTRIES OR SETTLEMENTS - Ben said both, and they are different rows. A polity is the actor; a settlement is a place. Recommend POLITIES, since the round is about who holds what and a settlement cannot rise and fall against a rival. Raise it rather than assume it if the distinction turns out to matter to him.\n\nTHE RESEARCH COLUMN LIES WHILE RESEARCH IS PARKED. Under BL-822 the placeholder accrues points from population, so research speed and population are the same number in two columns and the board shows a correlation it never measured - while Ben is using this very board to judge whether BL-823's levers work. Either label the column population-derived, or do not show it yet.\n\nDONE WHEN: sixteen rows re-rank live across the span on a watched run, entries and exits are visible, and the research column is either honestly labelled or absent."
   }
  ]
 }
