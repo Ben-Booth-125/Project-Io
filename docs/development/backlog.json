@@ -408,6 +408,83 @@
     "src/ui/startup_screens.cpp"
    ],
    "design": "BEN, 2026-09-08: an ORDERED scoreboard for the TOP 16 countries/settlements. It supersedes the unordered leaderboard sketch in BL-821, which is cancelled into this item.\n\nORDERED AND CAPPED IS THE DESIGN, not a display convenience. Sixteen rows re-ranking as the centuries pass is the surface that shows RISE AND FALL - a polity climbing into the board and dropping out of it is the whole story of the round, and an uncapped list of everything would show none of it.\n\nTHE METRICS ARE BEN'S FOUR: military might, research speed, population, share of the world owned. Share is of the homeworld's LAND, not its surface - an ocean nobody can hold would otherwise compress every culture into the bottom of the axis.\n\nWHICH COLUMN ORDERS THE BOARD is unsettled and matters more than it looks, because it decides which story the round tells. Share of land is the honest default for a round about borders.\n\nCOUNTRIES OR SETTLEMENTS - Ben said both, and they are different rows. A polity is the actor; a settlement is a place. Recommend POLITIES, since the round is about who holds what and a settlement cannot rise and fall against a rival. Raise it rather than assume it if the distinction turns out to matter to him.\n\nTHE RESEARCH COLUMN LIES WHILE RESEARCH IS PARKED. Under BL-822 the placeholder accrues points from population, so research speed and population are the same number in two columns and the board shows a correlation it never measured - while Ben is using this very board to judge whether BL-823's levers work. Either label the column population-derived, or do not show it yet.\n\nDONE WHEN: sixteen rows re-rank live across the span on a watched run, entries and exits are visible, and the research column is either honestly labelled or absent."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08: another focused pass on economy from 1560 to 1960); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-831",
+   "short_name": "PASS_TWO_ECONOMY_SPAN",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Generation",
+   "title": "Pass 2 as the economy pass - 1560 to 1960, on the calendar Ben stated",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-825",
+    "BL-828"
+   ],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.hpp",
+    "src/world/era_band.hpp"
+   ],
+   "design": "BEN, 2026-09-08: \"another focused pass on economy from 1560 to 1960\". With pass 1 ending at 1200 CE that fixes the whole calendar - and the calendar is now STATED rather than derived from a boundary-year default.\n\nTHE CONSEQUENCE THAT IS NOT A DETAIL: epoch_year = 1960 puts the campaign in the INDUSTRIAL era band. era_band_for_epoch flips at 1700, so every consumer keyed on the band - eras, the resource split, the unit roster - takes the industrial branch rather than the ancient one that epoch_year = 0 produced. That is a world-moving change and it owes the digest discipline in DELIVERY.md: one deliberate re-bless against a stated description of what changed.\n\nTHE 1200 -> 1560 GAP IS A COAST, NOT A HOLE. Pass 1's arc ends in a stable dark age, and a span defined by little changing is the one span not worth simulating. The world arrives at 1560 holding what 1200 left it. What this item must check is whether anything ACCUMULATING is silently lost across it - assimilation shares (BL-826) and grudge decay (BL-827) are the two that move on their own - and advance those cheaply across the gap rather than stepping it.\n\nSAME ENGINE, DIFFERENT QUESTION. Pass 1 asks who holds what ground. Pass 2 asks what that ground produces and trades. The works roster is cumulative and the unit roster is era-keyed, so this is the first span continued with more rows offered - not a second mechanism (§ Three passes of simulated history).\n\nDONE WHEN: a full run does 4000 years to 1200, coasts to 1560, runs 1560-1960, and arrives at an industrial-band epoch; the accumulators crossing the gap are named and handled; and the era-band flip is deliberately re-blessed rather than absorbed."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08: another focused pass on economy from 1560 to 1960); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-832",
+   "short_name": "COLONIAL_TIES",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Generation",
+   "title": "Colonial ties - reach across water in pass 2, and the trade relationships it leaves behind",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-831"
+   ],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/market.cpp"
+   ],
+   "design": "WHAT PASS 2 ADDS OVER PASS 1 is reach across water - a campaign or settle target across a sea leg, staged from harbour works, because colonisation by a major is the Metropole strategy played overseas. It culminates as every major does (../lore/COLLAPSE.md), and the epoch still arrives multipolar: the non-hegemony invariant is NOT relaxed for the sea.\n\nWHAT IT LEAVES BEHIND is the part that matters to the campaign, and it is already named in GENERATION_STRATEGY.md as crossing the handoff: COLONIAL TIES seed the order book's preferred-seller relationships, so a colony's chains close through its metropole before they close anywhere else.\n\nTHAT IS ONE OF THE THREE IN-WORLD FORCES the design relies on to make market conditions uneven WITHOUT a term inside an agent - tariffs, distance, and ties. A player can read why on the map, which is the whole test.\n\nAND IT IS ALSO ROUND 5'S SECOND OBJECT: reach across water is the one of BL-819's four with nothing behind it today. This item is what turns that placeholder into a real drawing.\n\nDONE WHEN: colonisation happens across water on a seeded sweep without producing a hegemon; ties survive the handoff into the order book; and round 5 draws real reach rather than a labelled stub."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "35",
+   "written": "2026-09-08",
+   "author": "Ben (2026-09-08: another focused pass on economy from 1560 to 1960); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-833",
+   "short_name": "TARIFF_POSTURE_FROM_HISTORY",
+   "priority": "B",
+   "difficulty": 3,
+   "category": "Generation",
+   "title": "Tariff posture out of pass 2, enacted as an ordinary import_tariff law",
+   "authority_doc": "docs/politics/NATIONS.md",
+   "requires": [
+    "BL-831"
+   ],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/law.cpp"
+   ],
+   "design": "A NATION THAT INDUSTRIALISED LATE RELATIVE TO ITS NEIGHBOURS PROTECTS WHAT IT HAS. That is the cause; the posture is its consequence, and pass 2 already computes the input - polity::industrial_year, the year a polity crossed the rung, is in history_sim.hpp today.\n\nWHAT MATTERS IS HOW IT IS ENACTED: as an ORDINARY import_tariff law at world setup, not as a special generation-only field. The design says so explicitly, and the reason is the one that keeps the whole economy legible - a player can open the law panel and read the tariff, repeal it, and watch prices move. A hidden generation modifier would be invisible and unrepealable, which is the shape the standing rule against invisible forces exists to prevent.\n\nRELATIVE, NOT ABSOLUTE. 'Late' means late against its neighbours, so a world where everyone industrialised late produces no protectionists - which is correct, and is why the term must not be a threshold on the raw year.\n\nDONE WHEN: postures derive from relative industrialisation dates, land as real import_tariff laws visible in the law panel, and a world with uniform timing produces no tariffs."
   }
  ]
 }

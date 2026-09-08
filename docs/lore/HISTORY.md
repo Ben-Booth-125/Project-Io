@@ -32,8 +32,13 @@ epoch lies past that boundary, an **industrial pass** from the boundary to the e
 Gunpowder and Industrial bands unlocked and sea legs open to Campaign and Settle. The first pass
 determines ancient borders and cultural doctrines; the second determines the extent of
 colonisation by the majors, who industrialised and when, and each polity's tariff posture. The
-boundary defaults to 400 years before the epoch; a boundary derived from the first furnace is the
-open alternative. Nothing resets between the spans — the region table, works and strain carry
+**The industrial arc's calendar is stated, not derived (Ben, 2026-09-08).** The ancient pass runs
+**4000 years and ends at 1200 CE**; the industrial pass runs **1560 → 1960**. The 1200 → 1560 gap is
+a deliberate **coast** — the ancient pass ends in a stable dark age, and a span defined by little
+changing is the one span not worth stepping — so the world arrives at 1560 holding what 1200 left
+it, with only its self-moving accumulators (assimilation, grudge decay) advanced across. That
+supersedes the 400-year default for this arc: the boundary defaults to 400 years before the epoch
+elsewhere, and a boundary derived from the first furnace is the open alternative. Nothing resets between the spans — the region table, works and strain carry
 across — and on an ancient epoch the boundary falls past the stop year, so there is one span, as
 today. A third, economic pass follows the political map and is not this document's: it is the
 settle in `../generation/GENERATION_STRATEGY.md` § Three passes of simulated history, and it is

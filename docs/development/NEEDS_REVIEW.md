@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*3 entries — 3 open, 0 resolved.*
+*4 entries — 3 open, 1 resolved.*
 
 ---
 
@@ -58,6 +58,28 @@ STARTUP.md has said since BL-167 that NOTHING is generated in the wizard - every
 
 *Files: `docs/ui/STARTUP.md`, `docs/generation/GENERATION_STRATEGY.md`*
 
+### NR-803 — The 1200 - 1560 gap is unsimulated, and I have written it up as a deliberate coast
+*decision taken on your behalf · raised 2026-09-08 · from Your two spans: pass 1 ends at 1200 CE, pass 2 runs 1560 to 1960.*
+
+That leaves 360 years nothing steps. I have written it into GENERATION_STRATEGY.md and HISTORY.md as a deliberate COAST rather than a gap: pass 1 ends in a stable dark age, a span defined by little changing is not worth simulating, and the world arrives at 1560 holding what 1200 left it.
+
+**Why it matters.** It reads as intentional and it fits the arc you named - a stable dark age is precisely a span where skipping loses little. But you did not say it, I inferred it, and the alternative reading is that pass 1 should run to 1560 and 1200 was approximate. The two differ by 360 years of assimilation and grudge decay, which are the accumulators that move on their own even when borders do not.
+
+- A deliberate coast, with self-moving accumulators advanced cheaply across it (what I wrote).
+- Pass 1 runs to 1560 and the two spans meet.
+- 1200 was approximate; the boundary is wherever the measurement says it can afford to be.
+
+> **Recommendation:** Keep the coast. It is the cheapest span in the whole calendar and the one where the least is lost - but BL-831 has to name which accumulators cross it, because silently dropping 360 years of assimilation would undo the lever that makes conquest fragile.
+
+*Files: `docs/generation/GENERATION_STRATEGY.md`, `docs/lore/HISTORY.md`*
+
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-802 — A 4000-year pass 1 ending at 1200 CE contradicts prehistory_years = 400 and epoch_year = 0
 *question · raised 2026-09-08 · from Your description of round 4 against the live app: a time-lapse of the first 4000 years, ending at 1200 CE.*
 
@@ -71,12 +93,7 @@ The code defaults are prehistory_years = 400 (hard_coded_world.hpp:73) and epoch
 
 > **Recommendation:** Option 1, because it is what you actually described and the arc you named - through to a stable dark age - is a medieval end point, not a classical one. But it moves the campaign into the industrial era band, so it is not a small consequence and I am not taking it on your behalf.
 
+> **RESOLVED.** RESOLVED 2026-09-08 by Ben the same day: "another focused pass on economy from 1560 to 1960". That is option 1 - the epoch moves late. The calendar is now stated rather than derived: 4000 years to 1200 CE, a coast to 1560, then 1560-1960, epoch 1960. Written into GENERATION_STRATEGY.md § Pass 2 is the economy pass and lore/HISTORY.md § The epoch and the run. The consequence I flagged holds and is now carried by BL-831: an epoch of 1960 puts the campaign in the INDUSTRIAL era band, not the ancient one, and that owes a deliberate digest re-bless.
+
 *Files: `src/world/hard_coded_world.hpp`, `src/world/era_band.hpp`, `docs/lore/HISTORY.md`, `docs/generation/GENERATION_STRATEGY.md`*
-
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
 

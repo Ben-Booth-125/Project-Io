@@ -644,7 +644,7 @@ target.
 | Pass | Engine | Span | Produces |
 |---|---|---|---|
 | **1 — Ancient** | The polity sim (`history_sim`), Classical and Medieval bands | The prehistory span to the **boundary year** | Ancient borders, cultural doctrines, the lacunae — who walked where |
-| **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | The boundary year to the epoch | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture |
+| **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | **1560 → 1960** (Ben, 2026-09-08) | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
 | **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which firms exist, what each market can close, the price field |
 
 **Pass 1 and pass 2 are one engine, not two.** The works roster is cumulative across its four
@@ -660,6 +660,27 @@ the epoch, so that on a 1960 arc pass 2 is 1560 → 1960 and pass 1 is whatever
 furnace — is the better-founded alternative and is open; both are consequences of upstream
 scalars, and neither is a roll. On an ancient epoch there is no pass 2: the boundary falls past
 the epoch and the sim stops where it stops today.
+
+### Pass 2 is the economy pass, 1560 → 1960 (Ben, 2026-09-08)
+
+**The calendar is now stated rather than derived.** Pass 1 runs 4000 years and ends at **1200 CE**;
+pass 2 runs **1560 → 1960**; the epoch is **1960**. That makes the campaign an **industrial-band**
+world (`era_band_for_epoch` flips at 1700), not the ancient one the 0 CE default produced.
+
+**The 1200 → 1560 gap is deliberate and is the dark age.** Pass 1's arc ends in *a stable dark age*
+(§ Round 4's arc), and a span whose defining property is that little changes is the one span not
+worth simulating. It is a **coast**, not an omission: the world arrives at 1560 holding what 1200
+left it. If that turns out to lose something — a slow assimilation, a decaying grudge — the honest
+fix is to advance those accumulators across the gap cheaply, never to simulate it.
+
+**Where pass 1 is a polity pass, pass 2 is an ECONOMY pass.** Same engine, different question. Pass
+1 asks who holds what ground; pass 2 asks what that ground *produces and trades* — which polities
+industrialised and when, what colonisation carried where, and what each nation's tariff posture is
+by 1960. This is what makes pass 2 the bridge to phase 6: the substrate search selects a corporate
+landscape over a world whose trade relationships already have a cause.
+
+**Its output is round 5's**, exactly as pass 1's is round 4's: metros grown from the centres pass 1
+sacked, reach across water, firms and their charters, the market carve and its price field.
 
 **Pass 3 SELECTS a landscape; it does not settle one.** The earlier design made pass 3 the warm
 start promoted — the same undirected pre-game ticks, run longer, with firm spawn added and firm
