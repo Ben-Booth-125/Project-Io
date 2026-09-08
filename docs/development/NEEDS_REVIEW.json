@@ -134,6 +134,26 @@
         "docs/lore/HISTORY.md"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-804",
+      "title": "The wizard has no entries in the action dictionary, and the five rounds did not add any",
+      "raised": "2026-09-08",
+      "kind": "question",
+      "status": "open",
+      "source": "Merging the wizard shell (BL-816, BL-824) and verifying it live.",
+      "what": "CLAUDE.md says any control change updates its ACTIONS.json entry. The wizard gained two rounds, a per-round Reroll, and a Begin that moved. None of it was recorded, because ACTIONS.json has no startup family at all - its dictionary is gameplay.* and canvas.* only.",
+      "why_it_matters": "Either the pre-game wizard is deliberately outside the action dictionary - defensible, since the dictionary exists for an agent playing the game and nobody plays the wizard - or it is a gap that has been quietly widening since the wizard was built. The rule as written does not distinguish, so every session touching startup will face this again and answer it differently.",
+      "options": [
+        "The wizard is out of scope for ACTIONS.json; say so in the doc so it stops being a question.",
+        "Add a startup.* family and backfill the wizard."
+      ],
+      "recommendation": "Out of scope, stated explicitly. The dictionary is the AI seam and no agent presses Begin; a startup family would be inventory nobody reads. But it needs writing down, because silence is what made this a question.",
+      "files": [
+        "docs/ai/ACTIONS.json",
+        "CLAUDE.md"
+      ],
+      "resolution": null
     }
   ]
 }

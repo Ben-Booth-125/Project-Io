@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*4 entries — 3 open, 1 resolved.*
+*5 entries — 4 open, 1 resolved.*
 
 ---
 
@@ -72,6 +72,20 @@ That leaves 360 years nothing steps. I have written it into GENERATION_STRATEGY.
 > **Recommendation:** Keep the coast. It is the cheapest span in the whole calendar and the one where the least is lost - but BL-831 has to name which accumulators cross it, because silently dropping 360 years of assimilation would undo the lever that makes conquest fragile.
 
 *Files: `docs/generation/GENERATION_STRATEGY.md`, `docs/lore/HISTORY.md`*
+
+### NR-804 — The wizard has no entries in the action dictionary, and the five rounds did not add any
+*question · raised 2026-09-08 · from Merging the wizard shell (BL-816, BL-824) and verifying it live.*
+
+CLAUDE.md says any control change updates its ACTIONS.json entry. The wizard gained two rounds, a per-round Reroll, and a Begin that moved. None of it was recorded, because ACTIONS.json has no startup family at all - its dictionary is gameplay.* and canvas.* only.
+
+**Why it matters.** Either the pre-game wizard is deliberately outside the action dictionary - defensible, since the dictionary exists for an agent playing the game and nobody plays the wizard - or it is a gap that has been quietly widening since the wizard was built. The rule as written does not distinguish, so every session touching startup will face this again and answer it differently.
+
+- The wizard is out of scope for ACTIONS.json; say so in the doc so it stops being a question.
+- Add a startup.* family and backfill the wizard.
+
+> **Recommendation:** Out of scope, stated explicitly. The dictionary is the AI seam and no agent presses Begin; a startup family would be inventory nobody reads. But it needs writing down, because silence is what made this a question.
+
+*Files: `docs/ai/ACTIONS.json`, `CLAUDE.md`*
 
 ---
 
