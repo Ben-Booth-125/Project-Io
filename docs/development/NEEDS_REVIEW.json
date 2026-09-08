@@ -154,6 +154,27 @@
         "CLAUDE.md"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-805",
+      "title": "Profiling counters now live inside world/, and no doc owns that",
+      "raised": "2026-09-08",
+      "kind": "novel-work",
+      "status": "open",
+      "source": "Raised by the BL-825 agent about its own task; filed by the main session.",
+      "what": "BL-825 added history_sim_profile / history_sim_last_profile() - a report-only wall clock and rebuild counters living next to sim state in src/world/history_sim.hpp.",
+      "why_it_matters": "world/* is the deterministic core, and a wall clock is the least deterministic thing there is. The precedent it followed is real and close - era_minus_one.hpp already argues exactly this case for ms_era, kept off the save seam and out of every digest - and the instrumentation was proven output-neutral empirically rather than by assertion. But no doc owns the general question, so the next session adding a counter has the same argument again from scratch.",
+      "options": [
+        "Write the rule into DEVELOPMENT_PRACTICES.md: profiling state in world/* is permitted if it is off the save seam, out of every digest, and proven output-neutral by world_determinism.",
+        "Keep it case-by-case."
+      ],
+      "recommendation": "Write it down. The constraints are already clear from the two instances, and a stated rule is cheaper than a third argument.",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/era_minus_one.hpp",
+        "docs/development/DEVELOPMENT_PRACTICES.md"
+      ],
+      "resolution": null
     }
   ]
 }

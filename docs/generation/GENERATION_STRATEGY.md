@@ -343,13 +343,21 @@ something useful."* Three things, and they are the reason the pass is worth 4000
 - **The provinces each polity holds** — already the loop's output; the sim writes region ownership as
   it goes. What was missing was the *intermediate* states, which is what a time-lapse is.
 
-**4000 years is probably already affordable, and nobody has run it.** The sim works on the region
-graph rather than on tiles; the O(N²) neighbour build sits outside the year loop; and the **stepped
-decision clock** (Ben, 2026-08-12) already amortises decisions while letting demography advance
-yearly. The ancient arc in the sim's own comments is 4000 BCE → 0 CE. `prehistory_years = 400` is a
-default, not a ceiling. So the first move is a **measurement**, not an optimisation — and if
-something in the loop is superlinear, the measurement names it and *that* is what gets fixed, never
-the span.
+**4000 years is NOT free, and the cost is one call site (measured 2026-09-08).** The span was
+expected to be near-linear — the sim works on the region graph, the O(N²) neighbour build sits
+outside the year loop, and the stepped decision clock already amortises decisions. It is not.
+Per-year cost at 4000 years is **6–9× its cost at 400**, so ten times the years costs seventy to
+eighty times the time.
+
+**Reach is the whole of it**, at 66–86% of the run. `rebuild_reach` is a heapless O(N²) Dijkstra
+from a polity's capital, cached — and the cache is a *single* shared slot. Every polity in a round
+evicts the previous one's, so a cache written to survive until a capital moves does not survive one
+iteration, and the run pays a full Dijkstra per polity per round. The region count then grows
+*inside* the run as polities found new ground, so each later rebuild is more expensive than the
+last. Both facts compound; neither is the span's fault.
+
+`step_years` is the clean lever, at a true 1/step: it halves the cost and it also halves the
+battles, so it trades fidelity, not waste. It is the fallback, not the fix.
 
 **Research is PARKED, and the placeholder is stated rather than designed (Ben, 2026-09-08).**
 Research points accumulate in proportion to a culture's population. Nothing else: no tree, no

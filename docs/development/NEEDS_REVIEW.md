@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*5 entries — 4 open, 1 resolved.*
+*6 entries — 5 open, 1 resolved.*
 
 ---
 
@@ -86,6 +86,20 @@ CLAUDE.md says any control change updates its ACTIONS.json entry. The wizard gai
 > **Recommendation:** Out of scope, stated explicitly. The dictionary is the AI seam and no agent presses Begin; a startup family would be inventory nobody reads. But it needs writing down, because silence is what made this a question.
 
 *Files: `docs/ai/ACTIONS.json`, `CLAUDE.md`*
+
+### NR-805 — Profiling counters now live inside world/, and no doc owns that
+*novel-work · raised 2026-09-08 · from Raised by the BL-825 agent about its own task; filed by the main session.*
+
+BL-825 added history_sim_profile / history_sim_last_profile() - a report-only wall clock and rebuild counters living next to sim state in src/world/history_sim.hpp.
+
+**Why it matters.** world/* is the deterministic core, and a wall clock is the least deterministic thing there is. The precedent it followed is real and close - era_minus_one.hpp already argues exactly this case for ms_era, kept off the save seam and out of every digest - and the instrumentation was proven output-neutral empirically rather than by assertion. But no doc owns the general question, so the next session adding a counter has the same argument again from scratch.
+
+- Write the rule into DEVELOPMENT_PRACTICES.md: profiling state in world/* is permitted if it is off the save seam, out of every digest, and proven output-neutral by world_determinism.
+- Keep it case-by-case.
+
+> **Recommendation:** Write it down. The constraints are already clear from the two instances, and a stated rule is cheaper than a third argument.
+
+*Files: `src/world/history_sim.hpp`, `src/world/era_minus_one.hpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 
 ---
 
