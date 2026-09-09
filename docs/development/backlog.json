@@ -347,30 +347,6 @@
    "parked": false,
    "sprint": "36",
    "written": "2026-09-08",
-   "author": "BL-825 measurement (2026-09-08); Claude",
-   "blocked_on": null,
-   "version_goal": null,
-   "id": "BL-834",
-   "short_name": "REACH_CACHE_PER_POLITY",
-   "priority": "A",
-   "difficulty": 3,
-   "category": "Generation",
-   "title": "The reach cache is one shared slot that twelve polities evict every round",
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-   "requires": [
-    "BL-825"
-   ],
-   "files": [
-    "src/world/history_sim.cpp"
-   ],
-   "design": "MEASURED, NOT SUSPECTED (BL-825). reach/Dijkstra is 66-86% of a 4000-year run and is the entire reason the span is superlinear.\n\nTHE DEFECT IS A CACHE THRASH, and the code says so if you read it beside its own comment. history_sim.cpp:531-534 declares ONE reach vector and ONE reach_capital int. The comment above them says the reach is \"cached until the capital moves, so the per-year cost stays a lookup\". That is true for one polity. There are twelve. At :668 each polity in the round finds reach_capital holding the PREVIOUS polity capital and rebuilds - so the cache never survives a single iteration and the run pays a full O(N^2) Dijkstra per polity per round. 12,000 rebuilds over 1,000 rounds, which is exactly 12 per round: the polity count.\n\nTHE FIX IS THE OBVIOUS ONE: cache PER POLITY, not one shared slot. Twelve vectors of N ints is small. A rebuild then happens when that polity capital actually moves or the region count grows - which is what the comment always claimed.\n\nAND THE SECOND, COMPOUNDING FACT is not fixed by that and must not be forgotten: N GROWS INSIDE THE RUN. Regions go from ~150 at the start to ~1,190 by 4000 years as polities found new ground, so every later rebuild is dearer than the last, quadratically. Per-polity caching cuts the NUMBER of rebuilds; a heap (this Dijkstra is heapless) cuts the cost of each. Do the caching first and re-measure before deciding whether the heap is also needed - the first fix may make the second unnecessary, and an unneeded rewrite of a deterministic sim path is a bad trade.\n\nDETERMINISM IS THE BINDING CONSTRAINT. This is world/* and the sim is seeded and replayable. A caching change must be OUTPUT-IDENTICAL: same seed, same digests, same battles/conquests/foundings. tools/verify/world_determinism is the instrument and it was already used this way in BL-825 - run it before and after and require identical digests. A faster sim that produces a different world has not been optimised, it has been broken.\n\nDONE WHEN: rebuild count falls by an order of magnitude, the 4000-year span is re-measured on history_span_cost, and world_determinism digests are bit-identical to the pre-change run."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "parked": false,
-   "sprint": "36",
-   "written": "2026-09-08",
    "author": "Found by the BL-826 regression hunt (2026-09-08); Claude",
    "blocked_on": null,
    "version_goal": null,
@@ -577,6 +553,30 @@
     "src/world/history_sim.cpp"
    ],
    "design": "FOUND BY THE STEP 4a REVIEW BARRIER. r_region (save_game.cpp:351) enforces total_q() == 1000 and per-field ranges, but NOT the structural invariants every culture_shares accessor depends on: weight 0 exactly where id is -1, descending sort, no duplicate ids, ids in range.\n\nTHE FAILURE. A truncated or bit-flipped save carrying id = {-1, 5, -1}, weight_q = {1000, 0, 0}, other_q = 0 passes every current check and loads clean. The region then reports empty() == true and plurality() == -1 while carrying 1000 per-mille on an unnamed slot, and share_of(5) == 0 although slot 1 names culture 5. Every downstream reader - city_names.cpp:76, hard_coded_world.cpp:742, the polity seed at history_sim.cpp:399 - silently treats the region as uncultured.\n\nTHE PART THAT MAKES THIS CHEAP AND SLIGHTLY EMBARRASSING: pass_one_output_valid() ALREADY CHECKS ALL FOUR (history_sim.cpp:2337-2379). The stricter checker exists and the load path does not call it. Two callers sharing one implementation is the discipline that stops a check measuring something different from the code - the same argument BL-775 was filed on.\n\nNOTE THE SEVERITY HONESTLY: this is a corrupt-input hardening issue on a local single-player save, not a live exploit, and the save seam is not the untrusted wire boundary the standing rules govern. It is filed because the fix is small and the checker is already written.\n\nDONE WHEN: the load path enforces the same four structural invariants as pass_one_output_valid, through one shared implementation rather than a second copy."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": true,
+   "sprint": "36",
+   "written": "2026-09-09",
+   "author": "BL-834 re-measurement (2026-09-09); Claude",
+   "blocked_on": "Ben - is the second half of the reach cost worth paying for now, or does BL-837 tell us first?",
+   "version_goal": null,
+   "id": "BL-844",
+   "short_name": "REACH_DIJKSTRA_HEAP",
+   "priority": "B",
+   "difficulty": 3,
+   "category": "Generation",
+   "title": "The reach Dijkstra is heapless, and each rebuild is quadratic in a region count that quadruples",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-834"
+   ],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "design": "RAISED BY BL-834 HAVING BEEN MEASURED, and deliberately parked rather than done in the same breath - BL-834 itself said to re-measure before deciding, because an unneeded rewrite of a deterministic sim path is a bad trade.\n\nWHAT THE RE-MEASUREMENT SAID. Per-polity caching cut rebuilds 12,000 -> 5,256 (seed 0) / 5,597 (seed 1) and roughly halved the 4000-year span. It did NOT reach the order of magnitude BL-834 asked for, and the reason is structural rather than fixable by more caching: a founding ANYWHERE grows the region count, which correctly invalidates every polity cache, and the sim founds constantly (149 regions -> 1,188 over the span). Reach is STILL 71% (seed 0) and 42% (seed 1) of a long run.\n\nSO THE REMAINING COST IS PER-REBUILD, NOT PER-COUNT. The Dijkstra at history_sim.cpp is heapless by deliberate choice - its comment says region counts are hundreds and a linear scan keeps the order deterministic without depending on a priority queue tie-break. The first half of that is now false: the count reaches ~1,190, and the scan makes each rebuild O(N^2) against a graph whose edges are O(N). ms/rebuild rises 0.058 -> 0.163 (seed 0) and 0.159 -> 0.321 (seed 1) across the span, which is the quadratic showing.\n\nTHE SECOND HALF OF THAT COMMENT REMAINS TRUE AND IS THE WHOLE DIFFICULTY. A heap introduces a tie-break, and a tie-break inside a priority queue is exactly the kind of container-order dependency world/* forbids. Any heap here must order on (cost, region index) so that equal costs resolve on a stable integer and never on insertion order or heap layout. That is cheap to write and easy to get subtly wrong, which is why this is its own item rather than a line inside another one.\n\nDONE WHEN: ms/rebuild stops rising with region count, the 4000-year span is re-measured on history_span_cost, and world_determinism digests are bit-identical to the pre-change run - the same gate BL-834 passed."
   }
  ]
 }

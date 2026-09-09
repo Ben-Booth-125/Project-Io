@@ -640,8 +640,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // plains does, using the landform ratios logistics.cpp already defines for
     // the 1960 era. Computed by Dijkstra from the capital and cached until the
     // capital moves, so the per-year cost stays a lookup.
-    std::vector<int> reach;            // Per-region cost from the current capital.
-    int reach_capital = -2;            // Which capital `reach` was built for.
+    //
+    // ONE SLOT PER POLITY, NOT ONE SHARED SLOT (BL-834). The paragraph above is
+    // true of a single polity and false of twelve. A shared slot holds the
+    // PREVIOUS polity's capital when the next one asks for reach, so the cache
+    // never survived one iteration of the round and every polity paid a full
+    // Dijkstra every round: 12,000 rebuilds over a 1,000-round run, and 66-86%
+    // of the whole span. That is measured rather than suspected (BL-825).
+    //
+    // The key is `polity::id`, which is that polity's index in `out.polities`
+    // and is assigned once at seeding, so the container is a plain vector and
+    // there is no iteration order for a result to depend on.
+    //
+    // WHY THIS IS OUTPUT-IDENTICAL, which is the only property that matters in
+    // `world/*`: the cost vector is a function of the capital, the neighbour
+    // graph and the terrain under each region's anchor. Terrain is fixed for the
+    // run and an anchor is written once, at founding. The graph is mutated in
+    // exactly one place — `link_region`, called only when a region is founded —
+    // and that founding also grows `ss.regions`. So the region-count check below
+    // catches every graph mutation, and the capital check catches the only two
+    // places a capital is assigned. There is no third input to go stale.
+    struct reach_cache
+    {
+        std::vector<int> cost;    ///< Per-region cost from `capital`.
+        int              capital = -2; ///< Which capital `cost` was built for.
+    };
+    std::vector<reach_cache> reach_by_polity;
 
     const auto tile_cost = [&](const region& p) {
         // Landform ratios, x100: plains 100, highland 125, mountain 200, ...
@@ -657,9 +681,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
         }
     };
 
-    const auto rebuild_reach = [&](int capital) {
+    const auto rebuild_reach = [&](reach_cache& rc, int capital) {
         const scoped_ns prof_reach(prof.ns_reach); // BL-825, report-only
         ++prof.reach_rebuilds;
+        std::vector<int>& reach = rc.cost;
         reach.assign(ss.regions.size(), 1 << 28);
         if (capital < 0 || capital >= static_cast<int>(ss.regions.size())) return;
         reach[static_cast<std::size_t>(capital)] = 0;
@@ -687,7 +712,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     reach[static_cast<std::size_t>(nb)] = cand;
             }
         }
-        reach_capital = capital;
+        rc.capital = capital;
     };
 
     // --- Time-lapse change list -------------------------------------------
@@ -821,8 +846,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const region& cap = ss.regions[static_cast<std::size_t>(q.capital)];
             const uint32_t  qs  = salt(seed, static_cast<uint32_t>(q.id));
 
-            if (reach_capital != q.capital || reach.size() != ss.regions.size())
-                rebuild_reach(q.capital);
+            // This polity's own slot, grown on demand: `id` is an index into
+            // `out.polities`, and nothing appends a polity mid-run, but sizing
+            // here rather than up front keeps the two facts independent.
+            if (reach_by_polity.size() <= static_cast<std::size_t>(q.id))
+                reach_by_polity.resize(static_cast<std::size_t>(q.id) + 1);
+            reach_cache& rc = reach_by_polity[static_cast<std::size_t>(q.id)];
+
+            if (rc.capital != q.capital || rc.cost.size() != ss.regions.size())
+                rebuild_reach(rc, q.capital);
+            const std::vector<int>& reach = rc.cost;
 
             // ---- What this polity's WORKS are worth it (BL-321) -----------
             //

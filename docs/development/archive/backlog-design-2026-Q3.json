@@ -9457,6 +9457,52 @@
         "design",
         "resolved"
       ]
+    },
+    "BL-834": {
+      "status": "complete",
+      "glyph": "✓",
+      "parked": false,
+      "sprint": "36",
+      "written": "2026-09-08",
+      "author": "BL-825 measurement (2026-09-08); Claude",
+      "blocked_on": null,
+      "version_goal": null,
+      "id": "BL-834",
+      "short_name": "REACH_CACHE_PER_POLITY",
+      "priority": "A",
+      "difficulty": 3,
+      "category": "Generation",
+      "title": "The reach cache is one shared slot that twelve polities evict every round",
+      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+      "requires": [
+        "BL-825"
+      ],
+      "files": [
+        "src/world/history_sim.cpp"
+      ],
+      "design": "MEASURED, NOT SUSPECTED (BL-825). reach/Dijkstra is 66-86% of a 4000-year run and is the entire reason the span is superlinear.\n\nTHE DEFECT IS A CACHE THRASH, and the code says so if you read it beside its own comment. history_sim.cpp:531-534 declares ONE reach vector and ONE reach_capital int. The comment above them says the reach is \"cached until the capital moves, so the per-year cost stays a lookup\". That is true for one polity. There are twelve. At :668 each polity in the round finds reach_capital holding the PREVIOUS polity capital and rebuilds - so the cache never survives a single iteration and the run pays a full O(N^2) Dijkstra per polity per round. 12,000 rebuilds over 1,000 rounds, which is exactly 12 per round: the polity count.\n\nTHE FIX IS THE OBVIOUS ONE: cache PER POLITY, not one shared slot. Twelve vectors of N ints is small. A rebuild then happens when that polity capital actually moves or the region count grows - which is what the comment always claimed.\n\nAND THE SECOND, COMPOUNDING FACT is not fixed by that and must not be forgotten: N GROWS INSIDE THE RUN. Regions go from ~150 at the start to ~1,190 by 4000 years as polities found new ground, so every later rebuild is dearer than the last, quadratically. Per-polity caching cuts the NUMBER of rebuilds; a heap (this Dijkstra is heapless) cuts the cost of each. Do the caching first and re-measure before deciding whether the heap is also needed - the first fix may make the second unnecessary, and an unneeded rewrite of a deterministic sim path is a bad trade.\n\nDETERMINISM IS THE BINDING CONSTRAINT. This is world/* and the sim is seeded and replayable. A caching change must be OUTPUT-IDENTICAL: same seed, same digests, same battles/conquests/foundings. tools/verify/world_determinism is the instrument and it was already used this way in BL-825 - run it before and after and require identical digests. A faster sim that produces a different world has not been optimised, it has been broken.\n\nDONE WHEN: rebuild count falls by an order of magnitude, the 4000-year span is re-measured on history_span_cost, and world_determinism digests are bit-identical to the pre-change run.\n\nDELIVERED 2026-09-09. The cache is now one slot per polity keyed on polity::id (a plain vector, no map, no iteration order to depend on). WHY IT IS OUTPUT-IDENTICAL, verified rather than argued: the cost vector's only inputs are the capital, the neighbour graph and the terrain under each region's anchor. Terrain is fixed for the run; an anchor is written once at founding; and the graph is mutated in exactly ONE place - link_region, called only when a region is founded, which also grows ss.regions. So the pre-existing region-count check catches every graph mutation and the capital check catches both places a capital is assigned. There is no third input to go stale.\n\nMEASURED, Debug build_gen harness tree, seeds 0 and 1: reach rebuilds 12,000 -> 5,256 (seed 0) and 5,597 (seed 1). The 4000-year span 6,923 -> 2,742 ms (seed 0, 2.5x) and 15,667 -> 9,106 ms (seed 1, 1.7x). Per-year cost ratio 4000yr/400yr 6.67x -> 3.22x and 6.90x -> 3.81x. world_determinism: all four digests bit-identical (365A1005DECDDA8A, 5E77B09A8579289C, B43D91116F1830F9, 02E29C777AB47DAA), every battles/conquests/foundings counter unchanged, 0 failures. history_sim_harness unchanged at 258 battles / 258 conquests with its five known failures intact.\n\nTHE DONE-WHEN WAS NOT FULLY MET AND THAT IS RECORDED RATHER THAN ROUNDED UP. It asked for an order-of-magnitude fall in rebuilds; the fall is 2.3x. The cause is the second fact this item already named: a founding ANYWHERE grows the region count, which correctly invalidates every polity's cache, and foundings are frequent (149 regions -> 1,188 over the span). Reach is still 71% (seed 0) and 42% (seed 1) of a long run. Per-polity caching cut the NUMBER of rebuilds; cutting the COST of each is the heapless Dijkstra question this item deferred to exactly this re-measurement. See BL-844.",
+      "delivered": "2026-09-09",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "parked",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "version_goal",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "category",
+        "title",
+        "authority_doc",
+        "requires",
+        "files",
+        "design",
+        "delivered"
+      ]
     }
   }
 }
