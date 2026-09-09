@@ -304,6 +304,29 @@ struct history_sim_params
     /// 500 is the half-measure and it is also the honest model: the near
     /// hinterland reaches the muster field within a campaign season and the far
     /// hinterland does not.
+    ///
+    /// AND IT SITS IN A BASIN, NOT ON A POINT — swept 2026-09-09 because Ben
+    /// asked whether the value was calibrated or merely fitted, which is the
+    /// right question to ask of any number derived from a fixture. Running
+    /// `history_sim_harness` across the range, the criterion that moves is
+    /// `S1a` ("terrain CHANGES the history — the terrain view is no longer
+    /// inert"), and it is a good criterion: at either extreme terrain stops
+    /// mattering to how the history comes out.
+    ///
+    ///     0    S1a FAILS      (defence never rebuilds; the frontier is a walkover)
+    ///     250  passes, 4 fail (the four known failures, unchanged)
+    ///     375  passes, 4 fail
+    ///     500  passes, 4 fail (this value)
+    ///     625  passes, 4 fail
+    ///     750  S1a FAILS      (defence outruns any concentration an attacker can bring)
+    ///     1000 S1a FAILS
+    ///
+    /// So anything from 250 to 625 behaves identically on every assertion in
+    /// the harness and only the ends break. 500 is near the centre of that
+    /// basin, which is what makes it a calibration rather than a fit — and it
+    /// is also why re-deriving it is not worth anyone's time unless the basin
+    /// itself moves. If a change makes this dial suddenly sharp, that is the
+    /// signal something else has gone wrong.
     int defence_levy_q = 500;
 
     // --- Season as an action axis -----------------------------------------

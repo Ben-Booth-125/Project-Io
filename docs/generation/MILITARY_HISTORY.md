@@ -208,6 +208,15 @@ on the walls: `sack_region_urban` razes centres and records every one it took, s
 reads as smaller or absent on the epoch map and still says it was sacked if it regrows. What is
 gone is war as a demographic event.
 
+**And that is the settled position, not an implementation consequence (Ben, 2026-09-09).** The
+question was put explicitly, because removing the countryside sack and the ambient war-pressure
+drawdown leaves **plague as the only force that lowers a civilian count** — which is a larger claim
+than the ruling above literally made. The answer is that war stays non-demographic and only the
+sacking of walls touches people at all. Armies die; farmers do not. If a war should ever shrink a
+population, it does so through a **famine or displacement mechanism of its own**, authored as such
+and visible as such — never as a coefficient hidden inside a battle. A battle that quietly killed
+farmers is exactly the accounting this section replaced.
+
 ---
 
 ## The band ladder — how a polity's roster advances

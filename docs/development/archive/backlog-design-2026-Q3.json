@@ -9549,6 +9549,52 @@
         "design",
         "delivered"
       ]
+    },
+    "BL-835": {
+      "status": "complete",
+      "glyph": "✓",
+      "parked": false,
+      "sprint": "36",
+      "written": "2026-09-08",
+      "author": "Found by the BL-826 regression hunt (2026-09-08); Claude",
+      "blocked_on": null,
+      "version_goal": null,
+      "id": "BL-835",
+      "short_name": "CIVILIAN_POPULATION_ARMIES_APART",
+      "priority": "A",
+      "difficulty": 5,
+      "category": "Generation",
+      "title": "Population is civilian and armies are distinct - the root fix for the dead-region ping-pong",
+      "authority_doc": "docs/generation/MILITARY_HISTORY.md",
+      "requires": [],
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/history_sim.hpp",
+        "src/world/settlement.cpp"
+      ],
+      "design": "BEN'S RULING, 2026-09-08: \"population as a civilian thing - where armies are distinct from population, and we don't simulate total warfare in stage 4\".\n\nTHIS IS A ROOT FIX, NOT THE PATCH THE ITEM WAS FILED AS. The measured pathology was an OWNED REGION WITH ZERO POPULATION: manpower_stock is capped by manpower_ceiling(population, ...) (settlement.cpp:1580), so no population meant no manpower, no manpower meant no defence, and a permanently undefendable region outscored every real objective forever. All 258 battles of the seed-0 fixture were that one region, battles == conquests == 258 exactly.\n\nUNDER A CIVILIAN POPULATION THAT WAR DOES NOT CONSUME, THE EMPTY REGION STOPS BEING PRODUCED. That is why this supersedes the three options originally offered (no-battle-target / release / value floor): each of those blocked the symptom, and this removes the cause.\n\nTHE MODEL. Population is civilian - it moves on demography, habitability, famine and plague. An ARMY is a separate pool, raised from population at a cost and tracked apart. Battles destroy armies, not the people living on the ground. A region's defence reads THE ARMY STANDING ON IT, so an undefended region is a normal and TEMPORARY state (an army marched away, a levy not raised) rather than a permanent property of dead ground. Walking in is cheap exactly once, and the ground is worth holding because the people are still there.\n\nAND IT GIVES CULTURE SHARES THEIR SUBJECT BACK. Conquest transfers PEOPLE, and the people transferred are what BL-826 then digests. An emptied region had nobody to assimilate, which is exactly why conquest had become free of the cohesion cost the lever depends on.\n\nWHAT IT ASKS OF THE SCORER: question A sharpens from 'can I take this' to 'can I keep an army there'. That is what makes BL-837 (logistics and roads) load-bearing rather than decorative.\n\nBLAST RADIUS IS REAL AND MUST BE PLANNED, NOT DISCOVERED. manpower_stock, manpower_ceiling, replenish_manpower, the defence term, the campaign candidate score and the battle resolution all currently read population as if it were the army. Each needs a deliberate answer. The save seam moves again (it went 8 -> 9 for culture shares).\n\nDONE WHEN: no fixture spends its span fighting one region; battles no longer equal conquests 1:1; a conquered region keeps its people and its shares are digested afterwards; and armies can be raised, paid for and destroyed without the civilian count moving.\n\nDELIVERED 2026-09-09. Built by a generation-dev agent in a worktree; MERGED, REBUILT AND\nRE-VERIFIED BY THE MAIN SESSION, and the numbers below are the main session's own, not the\nagent's. That distinction earned itself: the agent's reported figures did not reproduce (it\ngave the seed-0 fixture as 258/258/641 -> 7/7/780 where the same tree measures 258/258/659 ->\n9/8/839, and it described levy extremes of 2 and 534 battles that no run here reproduces).\nIts CONCLUSIONS all held on re-measurement; its FIGURES did not. Treat an agent's numbers as\nleads to re-run.\n\nTHE MODEL. region::army_stock is the army standing on a region, distinct from population\n(civilians) and manpower_stock (the recruitable pool). garrison_target, muster_garrison and\nspend_army drive it and none of them reads or writes population. The defence term reads the\narmy on the ground plus the province's emergency levy. The candidate score reads the army at\nthe hub it would actually march from - it used to read the realm's LARGEST manpower pool, in a\nregion the campaign would never stage from. Battle losses spend armies; survivors garrison the\nregion if it is taken and march home if it is not. The war_pressure vector is gone.\n\nMEASURED ON THE MERGED TREE. The seed-0 fixture: 258 battles / 258 conquests on ONE region ->\n9 battles / 8 conquests across a world growing 533 -> 1,372 regions, 839 foundings. Harness\nfailures 5 -> 4: R3a2, R3a3, B384a and B384c remain; R5 NOW PASSES and was never touched,\nwhich is what distinguishes a root fix from a patch. world_determinism ALL PASS, 0 failures,\ndigests moved as intended - and seedA/off, the prehistory-OFF world that never runs the era\npass, kept its digest B43D91116F1830F9 exactly, which is the check that the change is confined\nto where it belongs. demography_harness 30 passed / 0 failed, including ten new R9 assertions;\nR9f is the one that matters - armies raise, pay and die with the civilian count never moving.\n\nTHE SAVE SEAM, 9 -> 10, WAS THE GAP AND IT IS CLOSED. The agent could not build\nsave_envelope_roundtrip from a worktree (it includes core/save_game.hpp, which links imgui, so\nneither headless builder compiles it) and flagged the field as unverified. The main session\nbuilt it through CMake under the pinned VS2022 vcvars and added the missing assertion. The\nhazard was never a DROPPED field - that desynchronises the stream and breaks every later check\n- but a TRANSPOSED one: army_stock is written directly beside manpower_stock and two adjacent\ni64s that both default to zero swap cleanly. The new check sets four distinct values across\ntwo regions, and it was MUTATION-TESTED: with the read order deliberately swapped it is the\nONLY one of the file's 26 checks that fails.\n\nDONE-WHEN, HONESTLY. Met: no fixture spends its span fighting one region; a conquered region\nkeeps its people; armies raise, pay and die without moving population. Partly met: 'battles no\nlonger equal conquests 1:1' holds in the worlds that fight at volume and does not in the quiet\nones (seed 0 at 9/8, seed A at 4/4). The 258-on-one-province signature is gone, which is what\nthe item was written against; the residue is a different and smaller question and Ben's call\nwas to CLOSE THIS AND FILE THAT SEPARATELY - see BL-845.\n\nTWO CALLS TAKEN ON BEN'S BEHALF, BOTH SINCE RULED ON. (1) War is now entirely non-demographic,\nleaving plague as the only force that lowers a civilian count. Ben confirmed 2026-09-09: war\nstays non-demographic, only the sacking of walls touches people, and a war that shrinks a\npopulation must do so through an authored famine or displacement mechanism, never a\ncoefficient inside a battle. Recorded in MILITARY_HISTORY.md. (2) Two combat dials calibrated\nagainst the fixtures - a 2x army concentration cap in gather_army (a hub commits its whole\ngarrison, neighbours spare at most half each until the support equals the hub) and\ndefence_levy_q = 500. Ben asked to see the numbers, so the dial was swept: S1a fails at 0, 750 and 1000 and passes at 250, 375, 500 and 625 with the four known failures unchanged throughout. 500 sits near the centre of a basin rather than on a point, which makes it a calibration rather than a fit. Recorded where it belongs - in the parameter's own comment in history_sim.hpp - rather than as a backlog item, since it is a fact and not work.",
+      "delivered": "2026-09-09",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "parked",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "version_goal",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "category",
+        "title",
+        "authority_doc",
+        "requires",
+        "files",
+        "design",
+        "delivered"
+      ]
     }
   }
 }
