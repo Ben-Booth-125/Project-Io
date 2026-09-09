@@ -489,10 +489,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                                              // shared with `draw_urban_map`.
         p.last_demography_year = params.start_year;
         replenish_manpower(p);
+        // BL-835 — THE WORLD OPENS WITH ARMIES ALREADY STANDING. Seeded at the
+        // target rather than at zero: a run that began with every region bare
+        // would spend its first century as a free-for-all of undefended ground,
+        // which is an artefact of the start and not a fact about the world.
+        p.army_stock = garrison_target(p, params.garrison_fraction_q);
+        p.manpower_stock = clampi64(p.manpower_stock - p.army_stock, 0, p.manpower_stock);
     }
-
-    // --- Per-year war pressure, reset each tick ---------------------------
-    std::vector<int> war_pressure(ss.regions.size(), 0);
 
     // --- THE ANCIENT ROAD RECORD (BL-768) ---------------------------------
     //
@@ -750,11 +753,30 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const scoped_ns prof_demo(prof.ns_demography); // BL-825, report-only
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {
-            advance_region_demography(ss.regions[i], 1, war_pressure[i]);
+            // BL-835 — WAR PRESSURE IS NO LONGER A DEMOGRAPHIC INPUT, and the
+            // literal 0 is the change rather than an omission.
+            //
+            // `advance_region_demography`'s third argument is a battle-intensity
+            // drawdown: up to ~4% of a region's people a year, killed by the
+            // fighting standing on them. That is total warfare, and Ben's ruling
+            // is that stage 4 does not simulate it. Population moves on
+            // demography, habitability, famine and plague; the war is fought by
+            // `army_stock`, one field over, and it is spent there.
+            //
+            // The settlement-level API keeps the parameter — it is a correct
+            // model of something, `demography_harness` asserts it, and the
+            // campaign era may yet want it. This sim just stops feeding it.
+            advance_region_demography(ss.regions[i], 1, /*war_pressure_q=*/0);
             // BL-766: the cities drawn before this loop started live through it
             // — they grow with the region and thin when it thins.
             advance_region_urban(ss.regions[i]);
-            war_pressure[i] = 0;
+            // BL-835 — ONE YEAR OF THE MUSTER, for every region whether or not
+            // anyone is fighting over it. This is what makes an undefended
+            // region a TEMPORARY state: a region stripped by a march away, or
+            // by a garrison broken in battle, is rebuilding from the year after
+            // it happened, at the pace its own people can pay for.
+            muster_garrison(ss.regions[i], params.garrison_fraction_q,
+                            params.garrison_muster_q, params.garrison_disband_q);
             total_pop += ss.regions[i].population;
         }
         } // BL-825 demography timer
@@ -1009,6 +1031,59 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
                 return false;
             };
+            // BL-835 — THE FIELD ARMY A CAMPAIGN CAN CONCENTRATE AT ONE HUB.
+            //
+            // The hub's own garrison, plus what the polity's holdings ADJACENT
+            // to the hub can spare, and no more than double the hub's own.
+            //
+            // WHY THE POOL CANNOT BE ONE REGION'S GARRISON ALONE. Measured:
+            // with the attacker fielding a single region's army against a
+            // single region's army, the defender's terrain multiplier and works
+            // made every campaign a losing proposition, `p_win_q` collapsed to
+            // roughly a fifth of what it had been, and the seed-0 fixture went
+            // from 258 battles to 0. A model in which no polity can ever
+            // profitably attack is not a better model than one in which the
+            // same region is taken 258 times; it is the same failure mirrored.
+            //
+            // WHY IT IS CAPPED AT 2x THE HUB'S OWN. `neighbours` is a radius,
+            // not a border, so an uncapped sum would let a large realm mass
+            // twenty garrisons on one frontier and roll the map. The cap says
+            // a march can roughly double itself from what it picks up on the
+            // way and no more, which keeps the contest inside the range the
+            // resolver was calibrated on.
+            //
+            // THE SUPPORTING HOLDINGS SPARE HALF, because they are still
+            // covering their own ground — and what they spare is genuinely
+            // GONE from them while the campaign runs, which is what makes a
+            // wide offensive an uncovered frontier rather than a free action.
+            //
+            // `commit` is the only difference between the estimate and the
+            // execution: the scorer asks the question, the campaign takes the
+            // men. One rule, read twice, so a polity cannot be offered a force
+            // it then fails to raise (this file's standing thesis — a cost
+            // authored on one scale and spent on another is the bug).
+            const auto gather_army = [&](int hub, bool commit) -> int64_t {
+                const std::size_t hs = static_cast<std::size_t>(hub);
+                int64_t total = ss.regions[hs].army_stock;
+                if (total <= 0) return 0;
+                if (commit) ss.regions[hs].army_stock = 0;
+
+                int64_t budget = total; // The cap: support may match the hub, not exceed it.
+                for (int n : neighbours[hs])
+                {
+                    if (budget <= 0) break;
+                    const std::size_t ni = static_cast<std::size_t>(n);
+                    if (owner[ni] != q.id) continue;
+                    const int64_t spare = ss.regions[ni].army_stock / 2;
+                    if (spare <= 0) continue;
+                    const int64_t take = std::min(spare, budget);
+                    total  += take;
+                    budget -= take;
+                    if (commit) ss.regions[ni].army_stock -= take;
+                }
+                return total;
+            };
+
             // The staging holding reaches the target overland (or over its own
             // lakes) — no sea in the line at all.
             const auto dry_contact = [&](int hub, std::size_t ti) {
@@ -1054,6 +1129,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // -- Campaign --------------------------------------------------
             for (int hi : held)
             {
+                // BL-835 — A HUB WITH NO ARMY STAGES NOTHING. Hoisted above the
+                // target loop rather than repeated inside it: whether this
+                // holding has a force to march is a property of the holding,
+                // and the execute path filters staging holdings by the same
+                // test, so the scorer cannot offer a campaign execute would
+                // then refuse to launch.
+                const int64_t hub_army = gather_army(hi, /*commit=*/false);
+                if (hub_army <= 0) continue;
+
                 for (int tn : neighbours[static_cast<std::size_t>(hi)])
                 {
                     const std::size_t ti = static_cast<std::size_t>(tn);
@@ -1106,7 +1190,29 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // could not see would be making the decision on stale
                     // information every time, and the work would read as bad
                     // luck rather than as the defender's choice it is.
-                    const int64_t def_men = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
+                    //
+                    // BL-835 — IT READS THE ARMY STANDING ON THE REGION. This
+                    // was `tgt.manpower_stock * levy_fraction_q`, i.e. a share
+                    // of the target's recruitable CIVILIANS, which is how a
+                    // region emptied of people became permanently undefendable.
+                    // The question the scorer asks is now "what is standing
+                    // there", and its answer changes from year to year.
+                    // ...AND IT INCLUDES THE LEVY THE TARGET WILL CALL UP. The
+                    // execute path musters the defender to its garrison target
+                    // out of its manpower pool before the fight, so a scorer
+                    // reading the bare `army_stock` would be pricing a province
+                    // it can never actually meet — this file's standing thesis
+                    // again, a cost authored on one scale and paid on another.
+                    // The two lines below are `muster_garrison`'s arithmetic
+                    // asked as a question instead of applied as a mutation.
+                    const int64_t def_target = garrison_target(tgt, params.garrison_fraction_q);
+                    int64_t def_men = tgt.army_stock;
+                    if (def_men < def_target)
+                    {
+                        const int64_t gap  = def_target - def_men;
+                        const int64_t want = (gap * clampi(params.defence_levy_q, 0, 1000)) / 1000;
+                        def_men += std::min(want, tgt.manpower_stock);
+                    }
                     const int def_works   = clampi(tgt.work_defence_mod, 0, 1000);
                     const int def_scaled  = static_cast<int>(clampi64(
                         (def_men / 64) * (1000 + def_works) / 1000, 0, 1000));
@@ -1148,13 +1254,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int supply_here =
                         forages ? campaign_supply(hub_dist, ti, hi) : 0;
 
-                    int64_t atk_men = 0;
-                    for (int hi2 : held)
-                        if (ss.regions[static_cast<std::size_t>(hi2)].manpower_stock > atk_men)
-                            atk_men = ss.regions[static_cast<std::size_t>(hi2)].manpower_stock;
+                    // BL-835 — THE ARMY AT THE HUB IT WOULD ACTUALLY MARCH FROM.
+                    //
+                    // This was the LARGEST manpower stock anywhere in the realm,
+                    // which was wrong twice over and is now wrong zero times.
+                    // It read a civilian pool rather than an army, and it read
+                    // it in a region the campaign would never stage from — the
+                    // execute path marches from the nearest legal holding, and
+                    // `hi` IS that holding for this candidate. A polity now
+                    // scores the force it can actually put on the objective,
+                    // which is the sharpened question the item asks for: not
+                    // "can I take this" but "can I get an army there".
+                    const int64_t atk_men = hub_army;
                     const int64_t atk_est = (atk_men * supply_here / 1000)
                                           * clampi(q.cohesion_q, 1, 1000) / 1000;
-                    const int64_t def_est = tgt.manpower_stock > 0 ? tgt.manpower_stock : 1;
+                    const int64_t def_est = def_men > 0 ? def_men : 1;
                     const int p_win_q = static_cast<int>(
                         clampi64((atk_est * 1000) / (atk_est + def_est), 0, 1000));
 
@@ -1540,6 +1654,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 for (int hi : held)
                 {
                     const std::size_t hs = static_cast<std::size_t>(hi);
+                    // BL-835 — and it must have an ARMY, by the same test the
+                    // scorer used. Nearest-with-a-force, not merely nearest:
+                    // without this, execute could stage from a bare region the
+                    // scorer had already skipped and the round would fall
+                    // through having chosen a verb it could not perform.
+                    if (ss.regions[hs].army_stock <= 0) continue;
                     if (!dry_contact(hi, ti) && !tgt_shore
                      && !can_field_naval(ss.regions[hs], mil_band))
                         continue;
@@ -1549,8 +1669,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (src < 0) break; // no legal staging holding — nothing marches
                 region& home = ss.regions[static_cast<std::size_t>(src)];
 
-                const int64_t want   = (home.manpower_stock * params.levy_fraction_q) / 1000;
-                const int64_t raised = raise_manpower(home, want);
+                // BL-835 — THE FIELD ARMY MARCHES, AND IT LEAVES. The staging
+                // holding's whole garrison goes; `home.army_stock` is zero
+                // until the survivors come back, which is a real and visible
+                // cost rather than a bookkeeping one — a polity that campaigns
+                // out of a frontier march has just uncovered that march, and
+                // its neighbours' scorers can see it.
+                //
+                // This is the line that used to read
+                // `raise_manpower(home, manpower_stock * levy_fraction_q)`:
+                // an army conjured out of civilians at the moment of battle
+                // and never seen again, which is precisely the accounting that
+                // let war eat the population.
+                const int64_t raised = gather_army(src, /*commit=*/true);
                 if (raised <= 0) break;
 
                 // FORCE COMMITMENT (BL-277 Q2), priced by the SAME lambda the
@@ -1614,8 +1745,38 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     build_stack(raised, home, q, 1000, sim_band_ceiling(params, y),
                                 !exec_dry, &atk_band);
                 note_units_fielded(out, params, y, atk_band, atk);
-                const int64_t def_want = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
-                const int64_t def_men  = raise_manpower(tgt, def_want);
+                // BL-835 — THE EMERGENCY LEVY. A province being invaded calls
+                // up its own people, now, rather than at the 25%-a-year pace of
+                // the peacetime muster: `muster_rate_q` of 1000 fills the
+                // garrison to its target in one act, BOUNDED BY THE REGION'S
+                // OWN MANPOWER POOL, which is what a levy actually is.
+                //
+                // IT IS THE MECHANISM THAT MAKES GROUND EXPENSIVE TO TAKE
+                // TWICE, and it was measured into existence. Without it the
+                // attacker's survivors marched home intact while the defender
+                // rebuilt at a quarter of a quarter, so the second battle on any
+                // frontier was a walkover: the synthetic fixture fell in two
+                // battles where it used to grind for sixty-six, and four of
+                // eight real seeds showed every single battle ending in a
+                // conquest.
+                //
+                // AND THE POOL IS FINITE, which is the other half. A frontier
+                // attacked year after year empties its manpower and then really
+                // is defenceless — honestly, temporarily, and with a cause you
+                // can point at. That is BL-308's "a ground-down frontier
+                // eventually gives", arriving through exhaustion rather than
+                // through the transfer bar alone.
+                muster_garrison(tgt, params.garrison_fraction_q,
+                                params.defence_levy_q, params.garrison_disband_q);
+
+                // THE DEFENDER FIELDS WHAT IS STANDING THERE, all of
+                // it. There is no sense in a garrison holding half itself back
+                // from the fight on the ground it is garrisoning, and reading
+                // the whole pool keeps the two sides symmetric: attacker and
+                // defender each commit one region's field army, which is the
+                // same 1:1 shape the old `levy_fraction_q` of `manpower_stock`
+                // gave both of them.
+                const int64_t def_men = tgt.army_stock;
                 roster_band def_band = roster_band::classical;
                 std::vector<army_stack_entry> def =
                     build_stack(def_men, tgt, dq ? *dq : q, def_ready, sim_band_ceiling(params, y),
@@ -1648,11 +1809,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // is this caller's job (combat.hpp § battle_outcome).
                 const int64_t atk_lost = (stack_size(atk) * bo.attacker_losses_permille) / 1000;
                 const int64_t def_lost = (stack_size(def) * bo.defender_losses_permille) / 1000;
-                home.population = clampi64(home.population - atk_lost / 4, 0, 1LL << 40);
-                tgt.population  = clampi64(tgt.population  - def_lost / 4, 0, 1LL << 40);
 
-                war_pressure[static_cast<std::size_t>(src)] = clampi(bo.decisiveness / 2, 0, 1000);
-                war_pressure[ti] = clampi(bo.decisiveness, 0, 1000);
+                // BL-835 — THE BATTLE IS SPENT ON THE ARMIES, AND ONLY ON THEM.
+                //
+                // These two lines were `home.population -= atk_lost / 4` and
+                // `tgt.population -= def_lost / 4`: a battle killed civilians in
+                // both regions, on both sides, whoever won, and the arbitrary
+                // /4 is the tell that nobody could say what the quantity meant.
+                // The soldiers now come out of the pool the soldiers are in.
+                //
+                // `atk_survivors` is carried rather than spent here because
+                // where it ends up depends on the outcome — see the conquest
+                // block below. The defender's remnant is settled immediately:
+                // it is standing where it fought.
+                const int64_t atk_survivors = clampi64(raised - atk_lost, 0, raised);
+                tgt.army_stock = clampi64(def_men - def_lost, 0, def_men);
+
                 tgt.contest_q = clampi(tgt.contest_q + bo.decisiveness / 4, 0, 1000);
 
                 // TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE.
@@ -1713,15 +1885,38 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                                   params.cohesion_floor_q, 1000);
                     }
 
-                    // The sack — the collapse path the first sweep had none of.
-                    tgt.population = clampi64(
-                        tgt.population - (tgt.population * params.sack_population_loss_q) / 1000,
-                        0, 1LL << 40);
-                    // BL-766: and it falls hardest on the walls. This is the
+                    // BL-835 — THE COUNTRYSIDE KEEPS ITS PEOPLE. The line that
+                    // stood here took `sack_population_loss_q` (22%) off
+                    // `tgt.population` on every conquest, and 258 conquests of
+                    // one region is how a province ends a 4000-year run with
+                    // nobody living on it. Ben's ruling is that population is
+                    // civilian and war does not consume it; a conquest is now a
+                    // change of flag over the same people, which is also what
+                    // gives BL-826's culture shares a subject to assimilate.
+                    //
+                    // BL-766: and the sack still falls on the walls. This is the
                     // one place history DESTROYS a centre rather than thinning
                     // it, so a sacked city reads as a smaller or absent centre
                     // on the epoch map.
                     sack_region_urban(tgt, params.sack_population_loss_q);
+
+                    // BL-835 — THE ARMY THAT TOOK IT IS THE ARMY THAT HOLDS IT,
+                    // and this is the line that breaks the ping-pong.
+                    //
+                    // The defeated garrison is dispersed with the province it
+                    // was defending, and the victors garrison the ground they
+                    // just walked onto. So a region that has just changed hands
+                    // is the BEST-defended region on that frontier, not the
+                    // worst — where before it was left bare, and therefore the
+                    // top-scoring objective for the polity that had just lost
+                    // it, on the very next round, for the rest of the run.
+                    //
+                    // The cost is paid at the other end: `home` is now empty
+                    // and re-mustering from its own people, so a conqueror is
+                    // holding a forward province with an uncovered rear. That
+                    // is question A in the shape the item asks for — not "can I
+                    // take this" but "can I keep an army there".
+                    tgt.army_stock = atk_survivors;
 
                     const int loser_id = dq ? dq->id : -1;
                     const bool was_seat =
@@ -1795,6 +1990,28 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     raise_grudge(dq->id, q.id, grudge_kind::border_raided,
                                  static_cast<int>(ti), y, params.grudge_border_raided);
                 }
+
+                // BL-835 — AND IF IT DID NOT TAKE THE GROUND, THE ARMY MARCHES
+                // HOME. Placed after the whole if/else rather than inside the
+                // `else if (dq)` arm, because a repulsed army comes back
+                // whether or not the defender had a polity to be resented by.
+                //
+                // THIS IS WHY AN ARMY IS A POOL AND NOT AN EXPENDITURE. Under
+                // the old accounting every campaign consumed its levy outright,
+                // so a polity's capacity to fight was set entirely by how fast
+                // civilians regrew — war was a demographic process wearing a
+                // military costume. Survivors returning make a standing army a
+                // thing a polity HAS, which can be worn down over a campaign
+                // season and rebuilt over a generation, and which can be
+                // somewhere other than where it is needed.
+                // The whole column comes back to the STAGING hub rather than
+                // dispersing to the holdings it was drawn from. Deliberate: an
+                // army that fought together is standing together, and the next
+                // round's `gather_army` will redistribute it through the same
+                // half-share rule if it marches again.
+                if (!takes_it)
+                    home.army_stock = clampi64(home.army_stock + atk_survivors,
+                                               0, 1LL << 40);
                 break;
             }
             case sim_verb::settle:
@@ -1887,6 +2104,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.nation = q.id;
                 np.population = clampi64(region_carrying_capacity(np.farm_q) / 16, 1, 1 << 30);
                 replenish_manpower(np);
+                // BL-835 — A NEW REGION HAS NO ARMY YET, and that is the
+                // correct opening state rather than an oversight: a frontier
+                // settlement musters its garrison over its first decades like
+                // every other region, out of the people who walked there. The
+                // world-opening seed above is the exception, and it is one
+                // because a run cannot begin mid-muster.
+                np.army_stock = 0;
                 // BL-766: a region founded HERE gets its settlement on the same
                 // terms as one drawn before the sim ran — one rule, not two.
                 draw_region_urban(np);
@@ -1946,7 +2170,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 ss.regions.push_back(np);
                 owner.push_back(q.id);
-                war_pressure.push_back(0);
                 neighbours.emplace_back();
                 link_region(ss.regions.size() - 1); // Keep the index complete.
 

@@ -1596,6 +1596,60 @@ int64_t raise_manpower(region& p, int64_t want)
 }
 
 // ---------------------------------------------------------------------------
+// The army pool (BL-835) — armies are distinct from population
+// ---------------------------------------------------------------------------
+
+int64_t garrison_target(const region& p, int garrison_fraction_q)
+{
+    const int64_t ceiling = manpower_ceiling(p.population, p.work_manpower_mod);
+    if (ceiling <= 0) return 0;
+    // Clamped at 1000: a garrison larger than the recruitable ceiling would be
+    // an army with no pool to have come out of, and the muster below would
+    // then chase a target it can never reach for the rest of the run.
+    const int q = clampi(garrison_fraction_q, 0, 1000);
+    return (ceiling * q) / 1000;
+}
+
+void muster_garrison(region& p, int garrison_fraction_q,
+                     int muster_rate_q, int disband_rate_q)
+{
+    const int64_t target = garrison_target(p, garrison_fraction_q);
+
+    if (p.army_stock < target)
+    {
+        const int64_t gap  = target - p.army_stock;
+        const int64_t want = (gap * clampi(muster_rate_q, 0, 1000)) / 1000;
+        // THE COST, and the only place it is charged: bodies come out of the
+        // recruitable pool. `raise_manpower` is self-limiting, so a region
+        // whose people are already under arms simply musters nothing this year
+        // rather than conjuring soldiers off a population it cannot spare.
+        p.army_stock += raise_manpower(p, want);
+        return;
+    }
+
+    if (p.army_stock > target)
+    {
+        const int64_t excess = p.army_stock - target;
+        const int64_t home   = (excess * clampi(disband_rate_q, 0, 1000)) / 1000;
+        p.army_stock -= home;
+        // Discharged, back to the pool they were raised from — NOT to
+        // `population`, which never lost them. Capped at the ceiling by the
+        // same rule `replenish_manpower` uses, so a demobilisation cannot bank
+        // more manpower than the living population could ever field.
+        const int64_t ceiling = manpower_ceiling(p.population, p.work_manpower_mod);
+        p.manpower_stock = clampi64(p.manpower_stock + home, 0, ceiling);
+    }
+}
+
+int64_t spend_army(region& p, int64_t lost)
+{
+    if (lost <= 0 || p.army_stock <= 0) return 0;
+    const int64_t spent = std::min(lost, p.army_stock);
+    p.army_stock -= spent;
+    return spent;
+}
+
+// ---------------------------------------------------------------------------
 // The urban record (BL-766) — the population map, drawn early and then lived in
 // ---------------------------------------------------------------------------
 
