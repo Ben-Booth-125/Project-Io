@@ -875,6 +875,61 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const std::size_t century =
             static_cast<std::size_t>((y - params.start_year) / 100);
 
+        // ---- The founding schedule (BL-846) ------------------------------
+        //
+        // COLONISATION HAPPENS HERE, INSIDE THE SPAN, and that is the whole
+        // point of the block. `run_settlement` used to hand this loop a
+        // finished map — every region it would ever have, placed before the
+        // first tick — so the only thing the sim could show was borders moving
+        // and a time-lapse of it opened on a world already full. Now a region
+        // whose stream arrives during the span waits in `pending_foundings`
+        // and is founded when its year comes round.
+        //
+        // NO ACTOR, exactly as COLONISATION.md requires: nothing scores this,
+        // nothing chooses it, and no polity decides. The year arrived, so the
+        // people arrived. It is the diffusion's schedule being played back, not
+        // a sixth verb.
+        //
+        // The list is sorted ascending by (year, anchor), so this drains a
+        // prefix and the walk order is a total order on stable values.
+        while (!ss.pending_foundings.empty()
+               && ss.pending_foundings.front().founded_year <= y)
+        {
+            // The change list indexes regions as uint16_t, so refuse to create
+            // one the time-lapse could not address — the same guard the Settle
+            // verb carries, and for the same reason (BL-312): past 65,535 the
+            // cast wrapped silently to a small in-range index and replay drew a
+            // plausible but WRONG map.
+            if (ss.regions.size() >= owner_index_limit) break;
+
+            region np = std::move(ss.pending_foundings.front());
+            ss.pending_foundings.erase(ss.pending_foundings.begin());
+
+            // WHOSE IT IS: the polity of the people whose stream arrived. The
+            // same plurality rule the world-opening seed uses, so a region
+            // founded in year -3000 is owned on identical terms to one that was
+            // there at tick zero.
+            int np_owner = -1;
+            for (const polity& q : out.polities)
+                if (q.culture == np.culture.plurality()) { np_owner = q.id; break; }
+            np.nation = np_owner;
+
+            ss.regions.push_back(std::move(np));
+            owner.push_back(np_owner);
+            neighbours.emplace_back();
+            link_region(ss.regions.size() - 1); // Keep the index complete.
+
+            if (np_owner >= 0)
+                out.owner_changes.push_back(owner_change{
+                    static_cast<int32_t>(y),
+                    static_cast<uint16_t>(ss.regions.size() - 1),
+                    static_cast<uint16_t>(np_owner)});
+            ++out.foundings;
+            out.history.push_back(history_event{
+                years_from_calendar_year(y), chain_stage::legacy,
+                ss.regions.back().name + " is settled", std::string{}});
+        }
+
         // ---- Demography -------------------------------------------------
         int64_t total_pop = 0;
         {

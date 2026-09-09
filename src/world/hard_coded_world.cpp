@@ -556,10 +556,25 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
         bump(7);
         t_settlement_begin = gen_clock::now(); // BL-754
+        // THE SIM'S OWN START YEAR, so settlement knows which foundings to hand
+        // forward rather than place (BL-846). Derived from the same helper the
+        // era invocation uses a hundred lines below — there is no second
+        // construction here, only an earlier read of the same one.
+        //
+        // INT64_MAX WHERE THE ERA WILL NOT RUN, and that guard is load-bearing:
+        // a schedule with no sim to play it is a set of regions that never get
+        // founded at all. `prehistory_years == 0` is exactly how the harnesses
+        // that do not test the era avoid paying for it, so this path is taken
+        // often and must leave the map complete.
+        const int64_t sim_start = era_minus_one_enabled(params)
+                                      ? era_minus_one_sim_params(params).start_year
+                                      : INT64_MAX;
+
         kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
                                            kepler_tiles, home_grid_width, home_grid_height, budget,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
-                                           /*stop_year=*/params.epoch_year);
+                                           /*stop_year=*/params.epoch_year,
+                                           /*sim_start_year=*/sim_start);
         t_settlement_end = gen_clock::now(); // BL-754
 
         // THE POPULATION MAP, DRAWN EARLY (BL-766). Before the Era -1 sim, not

@@ -556,7 +556,8 @@ settlement_state run_settlement(const planetology_state& pl,
                                 int gw, int gh,
                                 int target_regions,
                                 uint32_t seed,
-                                int64_t stop_year)
+                                int64_t stop_year,
+                                int64_t sim_start_year)
 {
     settlement_state out;
     if (gw <= 0 || gh <= 0 || target_regions <= 0 || hl.cradles.empty())
@@ -808,6 +809,60 @@ settlement_state run_settlement(const planetology_state& pl,
             p.last_demography_year = p.founded_year;
             advance_region_demography(
                 p, static_cast<int>(stop_year - p.founded_year), /*war_pressure_q=*/0);
+        }
+
+        // --- THE FOUNDING SCHEDULE (BL-846) -------------------------------
+        //
+        // Regions the colonisation walk dated AFTER the sim starts are not
+        // placed on the map here. They are handed to the sim, which founds each
+        // one as its year comes round — so the world FILLING is inside the
+        // recorded span instead of finished before it opens.
+        //
+        // WHY THIS IS THE WHOLE FIX for "phase 4 reads as combined colonisation
+        // and conquest" (Ben, 2026-09-09). Every region existed at tick zero, so
+        // the only thing a time-lapse could ever show was borders moving. The
+        // spreading had already happened, off-screen, in a pass with no clock.
+        //
+        // The partition is STABLE — a region either sits before the sim's start
+        // or after it, and nothing here re-scores or re-orders. `regions` keeps
+        // its placement order (best ground first), which the nation seeds read.
+        if (sim_start_year != INT64_MAX)
+        {
+            std::vector<region> present;
+            present.reserve(out.regions.size());
+            for (region& p : out.regions)
+            {
+                if (p.founded_year > sim_start_year)
+                    out.pending_foundings.push_back(std::move(p));
+                else
+                    present.push_back(std::move(p));
+            }
+            out.regions = std::move(present);
+
+            // ASCENDING BY YEAR, ties on the anchor — a TOTAL order, so two
+            // regions dated to the same year are founded in an order that
+            // cannot depend on a sort's stability or on placement order having
+            // survived the partition.
+            std::sort(out.pending_foundings.begin(), out.pending_foundings.end(),
+                      [](const region& a, const region& b) {
+                          if (a.founded_year != b.founded_year)
+                              return a.founded_year < b.founded_year;
+                          return a.anchor < b.anchor;
+                      });
+
+            // A SCHEDULED REGION IS SEEDED AT ITS FOUNDING, NOT GROWN TO THE
+            // EPOCH. The loop above grew every region from its founding year to
+            // `stop_year`; for one that has not been founded yet that is
+            // centuries of growth before anybody lives there. Reset to the
+            // founding band and let the sim's own demography carry it forward
+            // from the year it actually arrives.
+            for (region& p : out.pending_foundings)
+            {
+                p.population           = 2000 + static_cast<int64_t>(p.farm_q) * 24;
+                p.last_demography_year = p.founded_year;
+                p.army_stock           = 0; // No garrison before there are people.
+                replenish_manpower(p);
+            }
         }
     }
 

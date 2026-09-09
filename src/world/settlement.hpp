@@ -508,6 +508,38 @@ struct settlement_state
     /// the corporation pass takes `const settlement_state*`, and the generation
     /// report copies this struct whole.
     charter_reach charter;
+
+    /// THE FOUNDING SCHEDULE — regions the colonisation walk dated INSIDE the
+    /// sim's own span, waiting for their year to come round (BL-846).
+    ///
+    /// WHY IT EXISTS. Settlement used to hand the sim a finished map: every
+    /// region it would ever have, placed and dated before the first tick. The
+    /// sim then only ever redrew BORDERS, so a time-lapse of it opened with
+    /// every continent already claimed and there was no origin to watch —
+    /// round 4 was showing the last tenth of the story it advertised
+    /// (Ben, 2026-09-09, at the live app: "I'm still seeing phase 4 as our
+    /// combined colonization and conquest parts").
+    ///
+    /// Now a region whose stream arrives after the sim starts waits HERE, and
+    /// `run_history_sim` founds it when its year arrives — emitting an
+    /// ownership change like any other founding, so the filling of the world is
+    /// something the record CONTAINS rather than something that happened before
+    /// it began. Colonisation and conquest become two visibly different halves
+    /// of one span.
+    ///
+    /// ASCENDING BY `founded_year`, then by placement order — a total order, so
+    /// two regions dated to the same year are founded in an order that cannot
+    /// depend on a sort's stability.
+    ///
+    /// EMPTY IS THE ORDINARY CASE for every caller that does not ask for a
+    /// schedule: `run_settlement`'s `sim_start_year` defaults to the stop year,
+    /// which puts every region in `regions` exactly as before.
+    ///
+    /// IT IS DRAINED BY THE SIM, not carried past it. After `run_history_sim`
+    /// this is empty and every region it held is in `regions` — which is what
+    /// keeps it off the save seam: `generation_report` copies the settlement
+    /// AFTER the sim, so there is no half-founded state to serialise.
+    std::vector<region> pending_foundings;
 };
 
 /// Settle the body: place regions, inherit each one's cradle culture, survey
@@ -533,6 +565,14 @@ struct settlement_state
 ///                  antiquity), and demography is seeded at founding then grown
 ///                  to `stop_year` (the graduation path the region struct
 ///                  names as BL-271's job).
+/// @param sim_start_year The year `run_history_sim` will begin at. Regions the
+///                  colonisation walk dates AFTER it are not placed in
+///                  `regions`; they go to `pending_foundings` for the sim to
+///                  found as their year arrives, so the world FILLING is inside
+///                  the recorded span rather than before it (BL-846).
+///                  Defaults to `INT64_MAX`, which schedules nothing and
+///                  reproduces the pre-BL-846 behaviour exactly — every caller
+///                  that does not ask for a schedule is unaffected.
 settlement_state run_settlement(const planetology_state& pl,
                                 const history_ladder_state& hl,
                                 const creed_state& cs,
@@ -541,7 +581,8 @@ settlement_state run_settlement(const planetology_state& pl,
                                 int gw, int gh,
                                 int target_regions,
                                 uint32_t seed,
-                                int64_t stop_year = 1960);
+                                int64_t stop_year = 1960,
+                                int64_t sim_start_year = INT64_MAX);
 
 /// The region anchors, as raster indices, in placement order — the seed list
 /// `nation_params::seed_tiles` takes. This is the whole of "seeding changes,
