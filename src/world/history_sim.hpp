@@ -254,8 +254,57 @@ struct history_sim_params
     /// place all three are priced.
     int supply_decay_per_tile_q = 28;
 
-    /// Fraction of a region's banked manpower a campaign may raise.
-    int levy_fraction_q = 400;
+    // --- The army pool (BL-835) -------------------------------------------
+    //
+    // ARMIES ARE DISTINCT FROM POPULATION (Ben, 2026-09-08). These three
+    // per-mille dials are the whole of what the sim says about how militarised
+    // an ancient polity is; the mechanics they drive are `muster_garrison` in
+    // settlement.cpp, which never touches a civilian headcount.
+
+    /// Per-mille of a region's recruitable manpower ceiling that stands as its
+    /// GARRISON — the army the ground keeps under arms, and the force both
+    /// sides field in a campaign over it.
+    ///
+    /// THE VALUE IS 400 BECAUSE THAT IS WHAT THE OLD MODEL COMMITTED. This
+    /// field was `levy_fraction_q`, "the fraction of a region's banked manpower
+    /// a campaign may raise", read straight out of `manpower_stock` at the
+    /// moment of battle by both attacker and defender. Keeping the number puts
+    /// the armies of the new model in the same headcount range as the armies
+    /// of the old one, so what moved in the measurements below is the MODEL and
+    /// not a silent recalibration riding along with it.
+    int garrison_fraction_q = 400;
+
+    /// Per-mille of the shortfall a region closes toward `garrison_fraction_q`
+    /// each year. Matched to `demog_manpower_recover_q` (250) deliberately: an
+    /// army destroyed is rebuilt at the same pace the pool behind it refills,
+    /// so the two stages compound into a recovery measured in decades rather
+    /// than in years. That is what makes losing an army expensive.
+    int garrison_muster_q = 250;
+
+    /// Per-mille of an OVER-strength garrison discharged per year — the case
+    /// where the ground can no longer feed the host standing on it, after a
+    /// plague or after a victorious army parks itself on a poor frontier.
+    int garrison_disband_q = 300;
+
+    /// THE EMERGENCY LEVY, per-mille: how much of its garrison shortfall a
+    /// province under attack calls up in the year of the attack, over and above
+    /// the peacetime muster. Read by BOTH the scorer's defence estimate and the
+    /// battle itself.
+    ///
+    /// THE VALUE IS MEASURED, AND BOTH EXTREMES WERE MEASURED FIRST, because
+    /// this dial turns out to decide whether the sim has wars at all. At 0 the
+    /// defender rebuilds at the peacetime quarter-a-year while the attacker's
+    /// survivors march home intact, so the second battle on any frontier is a
+    /// walkover: the two-polity fixture fell in 2 battles and four of eight real
+    /// seeds had every battle end in a conquest. At 1000 the province refills to
+    /// full strength before every engagement and NEVER exhausts — the pool it
+    /// draws from is larger than the garrison it fills — so the same fixture
+    /// ground out 534 battles and took nothing at all.
+    ///
+    /// 500 is the half-measure and it is also the honest model: the near
+    /// hinterland reaches the muster field within a campaign season and the far
+    /// hinterland does not.
+    int defence_levy_q = 500;
 
     // --- Season as an action axis -----------------------------------------
     /// Caller-side readiness penalty applied to a WINTER defender's power,
@@ -467,9 +516,20 @@ struct history_sim_params
     /// main reason losers regrew faster than they were conquered.
     int settle_cohesion_gate_q = 620;
 
-    /// Fraction of a conquered region's population lost in the taking.
-    /// The collapse path the first sweep had none of: population rose to
-    /// carrying capacity by ~1300 CE and never fell again in any world.
+    /// Severity of the sack a conquered region suffers, per-mille.
+    ///
+    /// BL-835 — THIS IS NOW AN URBAN QUANTITY ONLY. It used to be subtracted
+    /// from `region::population` as well, and that was the mechanism that
+    /// emptied the ground: 258 conquests of one region left it with no people,
+    /// therefore no manpower, therefore no defence, therefore the best target
+    /// on the map for the rest of the run. Under Ben's civilian-population
+    /// ruling the countryside headcount does not move for war at all, so the
+    /// sack now falls only where a sack falls — on the walls, through
+    /// `sack_region_urban`, which razes centres and records every one it took.
+    ///
+    /// The collapse path survives, in the shape that was always the legible
+    /// one: a razed city that regrows and still says it was razed. What is
+    /// gone is war as a demographic event.
     int sack_population_loss_q = 220;
 
     /// How much a region's accumulated `contest_q` lowers the decisiveness a

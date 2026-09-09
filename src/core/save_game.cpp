@@ -281,7 +281,7 @@ void w_region(std::ostream& o, const region& r)
     w_int(o, r.anchor);
     w_int(o, r.col);
     w_int(o, r.row);
-    // save_game_version 9 (BL-826, culture shares) -- keep r_region in step.
+    // save_game_version 10 (BL-835, the army pool) -- keep r_region in step.
     //
     // FIXED WIDTH IS WHAT KEEPS THIS SIMPLE. `region::culture` became a
     // distribution, and a length-prefixed list would have made the seam a
@@ -310,6 +310,14 @@ void w_region(std::ostream& o, const region& r)
     w_i64(o, r.population);
     w_i64(o, r.last_demography_year);
     w_i64(o, r.manpower_stock);
+    // save_game_version 10 (BL-835, the army pool) -- keep r_region in step.
+    // APPENDED IN PLACE, next to the pool it is raised from, because that is
+    // where a reader looking for "how many soldiers" will look. Nothing before
+    // it moved; the strict-equality version check is what refuses a v9 stream,
+    // and there is deliberately no v9 read path -- an army_stock defaulted to
+    // zero on load would be a world whose every region is undefended, which is
+    // the exact pathology this field exists to remove.
+    w_i64(o, r.army_stock);
     w_u32(o, r.works_built);
     w_int(o, r.work_capacity_mod);
     w_int(o, r.work_manpower_mod);
@@ -357,6 +365,7 @@ bool r_region(std::istream& i, region& r)
         && r_int(i, r.industrial_lag_years) // save_game_version 6
         && r_int(i, r.nation) && r_int(i, r.contest_q) && r_i64(i, r.population)
         && r_i64(i, r.last_demography_year) && r_i64(i, r.manpower_stock)
+        && r_i64(i, r.army_stock) // save_game_version 10 (BL-835)
         && r_u32(i, r.works_built) && r_int(i, r.work_capacity_mod)
         && r_int(i, r.work_manpower_mod) && r_int(i, r.work_reach_mod)
         && r_int(i, r.work_defence_mod) && r_int(i, r.work_industrial_mod)

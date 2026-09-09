@@ -319,7 +319,39 @@ struct region
     /// Recruitable manpower currently banked — the army budget BL-273 closes
     /// the loop with. A bounded fraction of `population` (`manpower_ceiling`),
     /// refilled gradually by `replenish_manpower`, spent by `raise_manpower`.
+    ///
+    /// BL-835 — THIS IS A POOL OF ELIGIBLE CIVILIANS, NOT AN ARMY. Drawing it
+    /// is what raising an army COSTS; the soldiers themselves stand in
+    /// `army_stock` below. Nothing in the sim fights out of this field.
     int64_t manpower_stock = 0;
+
+    /// BL-835 — THE ARMY STANDING ON THIS REGION, in heads. Separate from
+    /// `population` and from `manpower_stock`, and that separation is the
+    /// whole point of the field.
+    ///
+    /// BEN'S RULING, 2026-09-08: "population as a civilian thing — where
+    /// armies are distinct from population, and we don't simulate total
+    /// warfare in stage 4." Population moves on demography, habitability,
+    /// famine and plague. Battles destroy ARMIES; they do not thin the people
+    /// living on the ground.
+    ///
+    /// WHY IT HAD TO EXIST. Before it, a region's defence was read straight
+    /// off `manpower_stock`, which is capped by `manpower_ceiling(population)`
+    /// — so a region war had emptied of people had no manpower, therefore no
+    /// defence, FOREVER. It outscored every real objective on every round of
+    /// the rest of the run. In the seed-0 fixture all 258 battles were that
+    /// one region: `battles == conquests == 258`, exactly 1:1.
+    ///
+    /// Under an army pool an undefended region is a NORMAL and TEMPORARY
+    /// state — an army marched away, a levy not yet raised — rather than a
+    /// permanent property of dead ground. Walking in is cheap exactly once,
+    /// because the army that walked in is then standing there.
+    ///
+    /// RAISED by `muster_garrison` out of `manpower_stock` (the cost, in
+    /// bodies that leave the fields and come back only slowly), SPENT by
+    /// `spend_army` when a battle goes against it, and MOVED between regions
+    /// by the sim's campaign verb. `population` is untouched by all three.
+    int64_t army_stock = 0;
 
     // --- The urban record (BL-766, the population map is drawn early) ------
     // WHY IT LIVES HERE AND NOT AS ENTITIES. The Era -1 sim has no ECS access
@@ -737,6 +769,54 @@ void replenish_manpower(region& p);
 /// unbounded — the self-limiting close BL-273 asks for (ancient hegemonies
 /// stall on manpower exhaustion rather than being capped by fiat).
 int64_t raise_manpower(region& p, int64_t want);
+
+// ---------------------------------------------------------------------------
+// The army pool (BL-835) — armies are distinct from population
+//
+// Three calls, and between them they are the whole model: what size of army
+// this ground keeps under arms, one year of raising or disbanding toward it,
+// and spending the army when a battle goes against it. NONE of the three
+// reads or writes `population`. That is the invariant the item exists for and
+// `demography_harness` asserts it directly.
+//
+// The tuning lives in the CALLER (`history_sim_params`) rather than as
+// constants here, because the Era -1 sim is the only consumer with a view on
+// how militarised an ancient polity should be, and a second consumer would
+// want a different answer.
+// ---------------------------------------------------------------------------
+
+/// The standing army this region's people can keep under arms — a fraction of
+/// the recruitable manpower ceiling, NOT of the population directly. It is a
+/// second bound below `manpower_ceiling`, so a region always keeps a reserve
+/// of eligible civilians it has not called up.
+///
+/// @param p                    The region; reads `population` and `work_manpower_mod`.
+/// @param garrison_fraction_q  Per-mille of the manpower ceiling to hold under arms.
+int64_t garrison_target(const region& p, int garrison_fraction_q);
+
+/// ONE YEAR of the muster. Below target, close `muster_rate_q` per-mille of
+/// the shortfall by drawing from `manpower_stock` — which is what raising an
+/// army COSTS, and the reason recovery is slow: the pool itself only refills
+/// at `replenish_manpower`'s rate off a population that war never touched.
+/// Above target (the ground can no longer feed the host it is carrying, after
+/// a plague or a lost hinterland), `disband_rate_q` per-mille of the excess
+/// goes home — and it goes home to `manpower_stock`, not to `population`,
+/// because a discharged soldier was never subtracted from the civilian count
+/// in the first place.
+///
+/// Pure in `p` and its three arguments; no RNG. Deterministic and idempotent
+/// per call, so a caller replaying the same year sequence replays the same
+/// muster (`world_determinism`'s requirement, and the sim runs this over every
+/// region of every year).
+void muster_garrison(region& p, int garrison_fraction_q,
+                     int muster_rate_q, int disband_rate_q);
+
+/// Spend `lost` heads off `army_stock`, bounded at zero. Returns the number
+/// actually spent, which is less than `lost` when the army was already smaller
+/// than its casualties — the caller's loss figure is a per-mille of a
+/// COMMITTED stack and this pool is the region's whole army, so the two can
+/// disagree and the bound is the honest answer rather than a negative pool.
+int64_t spend_army(region& p, int64_t lost);
 
 /// Resolve one plague-event checkpoint over a body's settled regions,
 /// reusing `resolve_checkpoint`'s class-agnostic mechanism from
