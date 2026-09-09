@@ -73,10 +73,13 @@ is read off its culture's `aggression_q` — rather than fighting its wars.
 ## Where a pantheon sits on the ground
 
 The culture unit is the **cradle**; settlement refines it into **regions**
-(`src/world/settlement.cpp`) without replacing it. A region inherits its
-nearest cradle's culture, so a pantheon is mapped onto specific ground and
-specific ancient deposits, and the distribution of gods across the map is a
-record of who walked where.
+(`src/world/settlement.cpp`) without replacing it. A region inherits the
+culture of **the stream that reached it**, so a pantheon is mapped onto
+specific ground and specific ancient deposits, and the distribution of gods
+across the map is a record of who walked where.
+[`../generation/COLONISATION.md`](../generation/COLONISATION.md) § Culture
+arrives by route owns which stream that is — and supersedes the straight-line
+nearest-cradle assignment this section previously stated (Ben, 2026-09-09).
 
 Pantheons do three things: write history, drive fragmentation, and **bias
 industrialisation timing** — a forge culture's ore regions light up earlier,

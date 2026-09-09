@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*2 entries — 2 open, 0 resolved.*
+*3 entries — 3 open, 0 resolved.*
 
 ---
 
@@ -58,6 +58,21 @@ CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch
 > **Recommendation:** The second, provisionally - both arcs already exist in the code (era_band_for_epoch branches on the epoch, and HISTORY.md was already written arc-aware), so nothing forces a product choice yet. But it should be YOUR sentence, not mine, and it is the kind of thing that quietly becomes true by being left alone.
 
 *Files: `docs/CONCEPT.md`, `docs/generation/GENERATION_STRATEGY.md`, `src/world/era_band.hpp`*
+
+### NR-808 — The creeds' tribal marches are wars, sitting inside a span whose premise is that war is not yet the process
+*question · raised 2026-09-09 · from The colonisation design session, 2026-09-09. Recorded as an open question in COLONISATION.md and raised here because it is a call, not work.*
+
+CREEDS.md's tribal marches resolve single-round pairwise wars at cradle grain and WELD two cradles into one, lowering fragmentation_q before nation_params_from_ladder reads it. Under the new colonisation span (COLONISATION.md) they run inside a span whose stated premise is that spreading, not fighting, is the interesting process.
+
+**Why it matters.** They are the only wars in the peaceful span, so leaving them where they are makes the span's premise partly false on its own terms. But moving them is not free: welding drives fragmentation_q, fragmentation_q drives the SEED BUDGET, and the seed budget drives the nation count. Moving the marches past the boundary changes how many nations a world has. That is a measured change, not a design one, which is why nothing was moved by this session.
+
+- Leave them where they are - a peaceful span is a comparative claim, not an absolute one, and cradle-grain welding is coarse enough not to contradict it.
+- Move them to the boundary, so the colonisation span is warless by construction and the marches become the first act of the empire phase.
+- Fold them into the span as a NON-violent mechanism - two cradles that meet merge by contact rather than by conquest, keeping the fragmentation effect and dropping the war.
+
+> **Recommendation:** Do not decide it dry. Whoever builds BL-846 (colonisation span) should measure the nation-count distribution across a seed spread with the marches in each position, and bring you the three numbers. The third option is the most interesting design and the least measured.
+
+*Files: `docs/lore/CREEDS.md`, `docs/generation/COLONISATION.md`, `src/world/creeds.cpp`*
 
 ---
 

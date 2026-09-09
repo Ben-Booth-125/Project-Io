@@ -302,8 +302,10 @@ nation is a *territory*; neither can say "these particular fields, under these p
 sitting on this particular ore". The region can, which is why belief, endowment and industrial
 timing all hang off it and why corporate focus reads straight out of it without a new mechanism.
 
-**Pantheons are mapped, not re-rolled.** A region inherits its nearest cradle's culture, so the
-distribution of gods across the map is a record of who walked where. That mapping then feeds back
+**Pantheons are mapped, not re-rolled.** A region inherits the culture of the stream that
+reached it — [`../generation/COLONISATION.md`](../generation/COLONISATION.md) § Culture arrives
+by route owns the rule, superseding the nearest-cradle assignment stated here before 2026-09-09 —
+so the distribution of gods across the map is a record of who walked where. That mapping feeds back
 into the material history: a forge god only exists where the cradle window held ore, so "the
 forge god's country industrialises early" is not flavour laid over the data — it is the same fact
 read twice, one stage apart.

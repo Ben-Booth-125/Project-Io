@@ -554,6 +554,112 @@
     "tools/verify/history_sim_harness.cpp"
    ],
    "design": "FILED ON BEN'S CALL when BL-835 was closed (2026-09-09): the pathology BL-835 was written against is gone, and what is left is a smaller and different question that deserves its own item rather than holding that one open.\n\nWHAT WAS FIXED. BL-835 removed the cause of the dead-region ping-pong. The seed-0 fixture went from 258 battles on ONE zero-population region - battles == conquests == 258, exactly 1:1 - to 9 battles across a world that grows from 533 to 1,372 regions. The signature is gone.\n\nWHAT REMAINS. Several seeds still show battles == conquests exactly. Measured on the merged tree: seed 0 at 9 battles / 8 conquests, and the world_determinism fixtures at 4/4 (seed A) and 65/49 (seed B), 30/13 (the 1960 arc). The worlds that DO fight at volume have broken the 1:1 ratio; the quiet worlds have not. At 4 to 9 battles across four thousand years the ratio may be nothing but small numbers - nine coin flips landing the same way is not evidence of a weighted coin - or it may be that in a world with almost no armies, any attack that is worth launching at all is one that cannot be resisted.\n\nTHE ITEM IS TO FIND OUT WHICH, AND IT IS A MEASUREMENT BEFORE IT IS A FIX. Do not tune anything against the ratio until a seed sweep says whether it survives at volume. The instrument exists: history_sim_harness already prints battles and conquests unaided, and B384a ('every world sees at least one region change hands by war') and B384c currently FAIL because several seeds fight zero times - which is itself part of the same question.\n\nRELATED AND POSSIBLY THE REAL ANSWER: Ben's 2026-09-09 observation that the rules for initial colonisation and the peaceful spreading of societies are vastly different from those of war and empire, and that stage 4 may want to be two phases rather than one. A span that is overwhelmingly settlement - 839 foundings against 9 battles on seed 0 - being scored by empire-phase rules is a candidate explanation for every symptom in this item. See the sprint 37 goal.\n\nDONE WHEN: a seed sweep says whether battles == conquests survives at volume, and either a cause is named or the ratio is recorded as small-number noise and the item closed."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, colonisation design form); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [],
+   "id": "BL-846",
+   "short_name": "COLONISATION_SPAN",
+   "difficulty": 4,
+   "title": "The colonisation span - humanity spreads by diffusion before the polity loop starts",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/colonisation.cpp",
+    "src/world/colonisation.hpp",
+    "src/world/era_minus_one.cpp",
+    "src/world/history_sim.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "THE SPINE. COLONISATION.md is the authority; this item is the work.\n\nWHAT IT ADDS: an opening span of the ancient pass, start_year -> a STATED boundary year on history_sim_params, in which no polity verb runs and population spreads as a DIFFUSION - surplus over region_carrying_capacity(farm_q) flowing to the cheapest reachable ground its package can farm, cost denominated in YEARS over terrain alone.\n\nNO ACTOR. There is no verb, no score, no utility comparison. This is why the span needs NO AI-behaviour grant and must never be read as precedent for one; see COLONISATION.md's boxed note and .claude/rules/io-standing-rules.md.\n\nNO INFRASTRUCTURE (Ben, 2026-09-09): no roads, no works, no logistics, no supply. The only cost of colonisation is that people physically move.\n\nTHE WALK: river courses and coastal shelf cheap, open lowland ordinary, barrier terrain dear, open ocean impassable via region::domain (already exists, already the real water test - MILITARY_HISTORY.md).\n\nWHY IT PAYS TWICE: the ranges that stall a stream are the ranges that stall an army, read from one terrain table by two consumers. Stage 2's non-hegemony lore claim stops being an assertion and becomes a property of the map.\n\nTHE EVIDENCE IT IS A REAL SEAM (measured in sprint 36, not inherited): seed 0 over 4000 years is 533 regions -> 1372 with 839 foundings and 9 battles, and B384a fails because several seeds fight zero times. The ancient span is overwhelmingly a settlement process.\n\nDONE WHEN: the span runs, a harness asserts the STRUCTURE (no polity verb before the boundary, no diffusion after it), and world_determinism stays ALL PASS. The boundary year's VALUE is history_sweep's to argue, never a harness's."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, colonisation design form); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-846"
+   ],
+   "id": "BL-847",
+   "short_name": "DOMESTICATION_PACKAGE",
+   "difficulty": 3,
+   "title": "The domestication package - what a cradle can farm, and what that gates",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/colonisation.cpp",
+    "src/world/colonisation.hpp",
+    "src/world/history_ladder.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "THE MISSING MECHANISM, and the reason the span is worth building at all.\n\nNothing in the stack currently makes distance from a cradle cost anything: a region 40 tiles from the first granary is founded on the same terms as one beside it. So there is no frontier, nothing stalls, and a migration route carries nothing but headcount.\n\nONE PACKAGE PER CRADLE, coined exactly as one pantheon is (CREEDS.md), from the endemics the cradle window holds - already the input to agrarian_score. Package and pantheon are the same act read on two axes, which is WHY the map of gods and the map of farming end up being the same map.\n\nTWO FIELDS: AFFINITY (which terrain classes it farms, over TILES.md's two axes, derived from the cradle's own ground) and BREADTH (how many it tolerates, derived from how varied the cradle window was).\n\nBREADTH IS THE ASYMMETRY GENERATOR. A broad package colonises a continent; a narrow one fills its valley and stops. This is the instrument GENERATION_STRATEGY.md's Asymmetry-is-the-deliverable section asks for and currently does not have - nothing today measures or produces spread.\n\nGROUND NO PACKAGE SUITS IS NOT SETTLED. Emptiness is a real outcome, not a failure to fill.\n\nCROSSING is the sub-rule that could be cut, and the doc says so: a daughter founded on ground marginal for A beside a people carrying B takes the floored union of both affinities. It is the only way a stalled frontier ever moves again.\n\nDONE WHEN: packages are coined deterministically per cradle, the founding gate reads affinity, and a harness shows breadth spread across a seed set is WIDE rather than clustered."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, colonisation design form); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-846"
+   ],
+   "id": "BL-848",
+   "short_name": "CULTURE_BY_ROUTE",
+   "difficulty": 2,
+   "title": "A region inherits the culture of the stream that reached it, not its nearest cradle",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/settlement.hpp",
+    "src/world/hard_coded_world.cpp",
+    "tools/verify/creeds_harness.cpp"
+   ],
+   "design": "THE PHILOSOPHY DELIVERABLE, and it needs no new axis (Ben, 2026-09-09: 'just the existing pantheon, mapped by route').\n\nTODAY a region inherits its NEAREST cradle's culture - a straight-line geometric assignment standing in for a history nothing was simulating. CREEDS.md already claims the god map is 'a record of who walked where' and cannot deliver it, because nobody walked.\n\nAFTER: the culture of the stream that ARRIVED. A path fact, not a distance fact. A cradle stops owning the ground on the far side of its own mountains; the culture that came the long way round by the coast owns it.\n\nNO NEW TYPE NEEDED: region::culture is already a culture_shares distribution, so ground reached from two directions inside the span carries both, and the assimilation machinery that resolves it already exists.\n\nNO NEW AXIS: the pantheon IS the philosophy; aggression_q off the war god remains exactly the doctrine input the sim reads. What changes is that the distribution is EARNED rather than assigned - the same data, arrived at causally. This is what makes doctrine downstream of settlement rather than an axis beside it.\n\nDOCS ALREADY UPDATED 2026-09-09: HISTORY.md, CREEDS.md and NATION_GENERATION.md were pointed at COLONISATION.md and no longer assert the nearest-cradle rule. The CODE comments (settlement.hpp:18, hard_coded_world.cpp:532) still describe the proximity rule and are correct until this item lands - fix them WITH the change, not before.\n\nDONE WHEN: culture is assigned by arrival, and a harness shows the god map is not reproducible by a Voronoi of cradles."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, colonisation design form); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-846"
+   ],
+   "id": "BL-849",
+   "short_name": "COLONISATION_SEEDS_PARTITION",
+   "difficulty": 2,
+   "title": "The settled cells become a binding input to the province partition",
+   "authority_doc": "docs/generation/PROVINCES.md",
+   "files": [
+    "src/world/province.cpp",
+    "src/world/province.hpp",
+    "tools/verify/province_harness.cpp"
+   ],
+   "design": "BEN, 2026-09-09, ruling on the direct question: colonisation SEEDS the partition; the late pass still DRAWS it.\n\nPROVINCES.md keeps its ordering (after the sim, before roads) and keeps its nation lock. What it gains is the colonisation span's settled cells and their anchors as a HARD INPUT, the way it already takes the national assignment.\n\nTHE ROAD NOT TAKEN, recorded so it is not rediscovered: colonisation drawing the REAL partition, with the nation carve then assigning whole provinces rather than tiles. That would make ruling 5's single-nation guarantee true BY CONSTRUCTION rather than by a check, and it answers Ben's own 2026-08-21 objection that packed provinces are 'scarcely how borders were defined in history'. It reorders the generation chain, which is why it was not taken now.\n\nDONE WHEN: the partition reads the settled cells, P9c and the nation-lock scan still pass, and province shapes visibly follow settlement history rather than centre geometry alone."
   }
  ]
 }

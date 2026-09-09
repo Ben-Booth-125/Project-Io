@@ -22,6 +22,9 @@ The subject docs:
 - **`CONTINENTS.md`** — the plate-drift pass: plates derived from Planetology's Engine output,
   feeding a height bias into the tile pipeline's Pass 1.
 - **`TILE_GENERATION.md`** — the procedural tile pipeline (terrain, ocean, deposits) per body.
+- **`COLONISATION.md`** — the opening span of the ancient pass: how people spread out of the
+  cradles into empty ground, what gates them, and which culture arrives where. A diffusion with
+  no actor and no infrastructure; `MILITARY_HISTORY.md` is its violent sibling.
 - **`PROVINCES.md`** — the partition of every body's tiles into small spatial cells, the grain a
   battle, a unit position and a building ceiling are measured in.
 - **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map,

@@ -92,6 +92,28 @@
     "src/world/era_band.hpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-808",
+   "title": "The creeds' tribal marches are wars, sitting inside a span whose premise is that war is not yet the process",
+   "raised": "2026-09-09",
+   "kind": "question",
+   "status": "open",
+   "source": "The colonisation design session, 2026-09-09. Recorded as an open question in COLONISATION.md and raised here because it is a call, not work.",
+   "what": "CREEDS.md's tribal marches resolve single-round pairwise wars at cradle grain and WELD two cradles into one, lowering fragmentation_q before nation_params_from_ladder reads it. Under the new colonisation span (COLONISATION.md) they run inside a span whose stated premise is that spreading, not fighting, is the interesting process.",
+   "why_it_matters": "They are the only wars in the peaceful span, so leaving them where they are makes the span's premise partly false on its own terms. But moving them is not free: welding drives fragmentation_q, fragmentation_q drives the SEED BUDGET, and the seed budget drives the nation count. Moving the marches past the boundary changes how many nations a world has. That is a measured change, not a design one, which is why nothing was moved by this session.",
+   "options": [
+    "Leave them where they are - a peaceful span is a comparative claim, not an absolute one, and cradle-grain welding is coarse enough not to contradict it.",
+    "Move them to the boundary, so the colonisation span is warless by construction and the marches become the first act of the empire phase.",
+    "Fold them into the span as a NON-violent mechanism - two cradles that meet merge by contact rather than by conquest, keeping the fragmentation effect and dropping the war."
+   ],
+   "recommendation": "Do not decide it dry. Whoever builds BL-846 (colonisation span) should measure the nation-count distribution across a seed spread with the marches in each position, and bring you the three numbers. The third option is the most interesting design and the least measured.",
+   "files": [
+    "docs/lore/CREEDS.md",
+    "docs/generation/COLONISATION.md",
+    "src/world/creeds.cpp"
+   ],
+   "resolution": null
   }
  ]
 }
