@@ -30,23 +30,39 @@ void app::open_new_world_wizard()
     m_wiz_dirty = true;
     m_screen    = app_screen::generating;
 
-    // THE FULL FOUR THOUSAND YEARS (BL-846; Ben, 2026-09-09). The struct default
-    // is 400, which is a SCOPE knob rather than a design one — it exists so a
-    // harness that does not test the era can skip paying for it. A player's
-    // world is not a harness, and round 4's whole subject is the span.
+    // THE EMPIRES ROUND STARTS AT 400 BCE (BL-871, revising BL-846's 4000;
+    // Ben, 2026-09-09). `era_minus_one_sim_params`'s single-span branch
+    // (`era_minus_one.cpp`) derives the sim's own start year as
+    // `epoch_year - prehistory_years`; at this wizard's epoch (0 CE — the
+    // "ancient refocus" default, NR-177) that means `prehistory_years` IS the
+    // number of years before 0 CE the sim starts at. 400 lands it at exactly
+    // 400 BCE, the year `CIVILISATION.md` § The span is 400 BCE to 1200 CE
+    // hands the Empires round.
     //
-    // WHY IT IS SET HERE AND NOT AS THE STRUCT DEFAULT. Every headless harness
-    // in the project builds worlds from `world_params{}`, and the era at 4000
-    // years costs ~6.5 s against ~60 ms at 400. Moving the default would put
-    // that on every check in the repo to serve one screen. So the wizard asks
-    // for the long span and everything else keeps the cheap one.
+    // NOT SIXTEEN HUNDRED YEARS, AND THAT IS A KNOWN GAP, NOT AN OVERSIGHT.
+    // The design's full arithmetic is 400 BCE -> 1200 CE, 1,600 years — but
+    // reaching 1200 CE needs an epoch past it, and this wizard's epoch is
+    // still 0 CE: round 5 (Industrialisation) and pass 2's 1560 -> 1960 span
+    // (`GENERATION_STRATEGY.md` § Pass 2 is the economy pass) are not built
+    // yet (`draw_pass_round_placeholder`), so nothing today can watch the sim
+    // run past 0 CE. CIVILISATION.md's own words: "sixteen hundred years is
+    // the constraint on the phase going forward, not something to solve in
+    // this item." What BL-871 owes is the SPLIT and the STARTING YEAR the
+    // Culture round hands off at; the full depth is follow-on work once the
+    // epoch moves.
     //
-    // IT REACHES "BEGIN" TOO, AND THAT IS DELIBERATE RATHER THAN INCIDENTAL:
-    // `begin_new_game` builds from these same params, so the campaign gets the
-    // history the player actually watched. A wizard that showed a 4000-year
-    // history and then dealt a 400-year world would be lying about the world it
-    // was selling.
-    m_pending_world_params.prehistory_years = 4000;
+    // THE MIGRATION IS NOT COUNTED HERE. It used to be: the OLD figure (4000)
+    // put the sim's own start at roughly 4000 BCE, so a single continuous run
+    // covered colonisation AND conquest and both wizard rounds replayed it.
+    // BL-871 splits them — the migration now runs to its own derived end year
+    // (`colonisation_start_year`, colonisation.hpp, -2400) and the world
+    // COASTS from there to 400 BCE holding what it left behind, so the sim
+    // itself only ever needs to start where the Empires round does.
+    //
+    // THIS IS ALSO WHAT "BEGIN" BUILDS (unchanged from before BL-846): the
+    // struct default already IS 400, so this line is written for clarity
+    // against the new arithmetic rather than for a numeric change.
+    m_pending_world_params.prehistory_years = 400;
 }
 
 void app::refresh_wizard_preview()
@@ -191,17 +207,21 @@ void app::launch_wizard_history_run(int lapse_index)
     cfg.load_from_lua(m_lua);
     ensure_works_loaded();
 
-    // STOP ONCE THE ERA HAS RUN. Everything this round draws comes out of the
-    // report by the end of stage 8; stages 9-12 (borders, roads, companies,
-    // finishing) were being computed and thrown away, which measured 10,805 ms
-    // of 11,316 — about 95% of the wait — and is why the round visibly hung on
-    // "Laying roads" (Ben, 2026-09-09).
+    // STOP WHERE THIS ROUND'S OWN SPAN ENDS, AND NO FURTHER (BL-871). The two
+    // rounds are no longer one fused pass replayed twice: round 3 (Culture,
+    // lapse_index 0) wants the migration's own record and must stop BEFORE
+    // the Empires round's history sim ever starts, while round 4 (Empires,
+    // lapse_index 1) wants that sim's record and stops once IT has run, before
+    // borders, roads and companies — stages 9-12 — are computed and thrown
+    // away (measured 10,805 ms of 11,316, about 95% of the wait, and why the
+    // round visibly hung on "Laying roads", Ben, 2026-09-09).
     //
     // Note this is set on the COPY the worker takes, never on the campaign's:
     // `begin_new_game` builds a whole world from its own config, and a world
-    // stopped at stage 8 has no nations, roads or corporations in it.
+    // stopped at either point has no nations, roads or corporations in it.
     world_gen_config hist_cfg = cfg;
-    hist_cfg.stop_after_ancient_era = true;
+    if (lapse_index == 0) hist_cfg.stop_after_migration   = true;
+    else                  hist_cfg.stop_after_ancient_era = true;
 
     auto run = [this, hist_cfg, lapse_index, params = m_pending_world_params]() {
         generation_report rep;
@@ -467,11 +487,15 @@ wizard_round_head wizard_round_head_at(int r)
         { "Culture",
           "Who reached this ground first, and by which routes?" },
         { "Empires",
-          // THE SPAN NAMED HERE IS THE SPAN THE RECORD ACTUALLY COVERS, and it
-          // is not yet the four thousand years the design asks for (NR-810).
-          // `run_settlement` places and dates every region BEFORE
-          // `run_history_sim` starts, so the record opens with the whole map
-          // already claimed and only the sim's own span is watchable.
+          // THIS ROUND'S OWN SPAN, SEPARATE FROM ROUND 3's (BL-871). Before the
+          // split both rounds replayed the same fused record — colonisation and
+          // conquest run together — so round 4 opened with the whole map
+          // already claimed and had nothing left to show but the tail of one
+          // pass. Now round 3 stops at the migration's own end and round 4
+          // starts the Empires sim at 400 BCE
+          // (`docs/generation/CIVILISATION.md` § The span is 400 BCE to
+          // 1200 CE), so this round watches conquest from a world that is
+          // freshly peopled rather than one already settled off-screen.
           //
           // Titled to what it plays rather than left aspirational, on the rule
           // that a surface must not assert something the code has not delivered.
@@ -879,8 +903,8 @@ void app::draw_generation_screen()
                       "the pass behind it is the most expensive in the project, and it "
                       "cannot be re-rolled on every keystroke the way the planetology "
                       "rounds are."
-                    : "Four thousand years of claim and counter-claim, run here rather "
-                      "than previewed: the history is the most expensive pass in the "
+                    : "Claim and counter-claim from 400 BCE, run here rather than "
+                      "previewed: the history is the most expensive pass in the "
                       "project, and it cannot be re-rolled on every keystroke the way "
                       "the planetology rounds are.");
             }
@@ -909,24 +933,22 @@ void app::draw_generation_screen()
                 ui::draw_lapse_scoreboard(rec, hist_slice, hist_lagged);
 
                 ImGui::Spacing();
-                // WHAT THIS ROUND IS AND IS NOT YET, said in as many words rather
-                // than left for a player to discover. The wizard walks the two
-                // rounds the design asks for, but GENERATION still emits ONE
-                // record: both rounds run the same pass and replay the same span,
-                // so round 5 is not yet a separate age with its own terminating
-                // condition. That split is BL-858/BL-861, on the generation side.
-                // Naming it here is the alternative to implying a separation the
-                // code has not made.
-                if (lapse_index == 0)
-                    dim_text("This is the same recorded age round 5 replays: generation "
-                             "still emits one span, so the migration does not yet stop "
-                             "where the history begins. Reroll plays the same ground "
-                             "through a different age.");
-                else
-                    dim_text("This replays the same recorded age as round 4, because "
-                             "generation still emits one span rather than a migration "
-                             "and a history. Reroll plays the same ground through a "
-                             "different age.");
+                // WHAT THIS ROUND IS AND IS NOT YET (BL-871), said in as many
+                // words rather than left for a player to discover. The two
+                // rounds now stop at different points — the migration at its
+                // own derived end year, the Empires sim at 400 BCE — so they no
+                // longer replay the same recorded age. What is still owed:
+                // the Empires round's own span is the epoch's last 400 years
+                // rather than the full 1,600 `CIVILISATION.md` § The span is
+                // 400 BCE to 1200 CE asks for, because reaching 1200 CE needs
+                // an epoch this wizard does not yet reach (round 5 /
+                // Industrialisation is still a placeholder). Naming it here is
+                // the alternative to implying a depth the code has not
+                // delivered.
+                if (lapse_index == 1)
+                    dim_text("This round's own span, separate from round 3's migration. "
+                             "Not yet the full 1,600 years the design asks for — "
+                             "see CIVILISATION.md.");
             }
         }
         else

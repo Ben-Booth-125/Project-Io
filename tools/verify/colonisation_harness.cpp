@@ -954,7 +954,7 @@ void case_spawned_cultures(int seed_count)
 // it is worth checking rather than trusting: if the allocation order ever
 // changed, this walk is where it would hang.
 
-void case_family_tree(int seed_count)
+void case_family_tree(int seed_count, int span_years)
 {
     std::printf("\n--- C14: does the family tree survive the migration? ----------\n");
 
@@ -964,7 +964,12 @@ void case_family_tree(int seed_count)
     {
         world_params wp;
         wp.seed = static_cast<uint32_t>(s);
-        wp.prehistory_years = 4000;
+        // BL-871: this was a hardcoded 4000, stale against the OLD undifferentiated
+        // span. colonisation_start_year is now -2400 (2,000-year migration), so a
+        // fixed 4000-year prehistory window no longer lines up with where the walk
+        // actually starts -- take it from the harness's own span argument instead,
+        // matching case_founding_schedule (C12) and case_spawned_cultures (C13).
+        wp.prehistory_years = span_years;
 
         generation_report     rep;
         era_minus_one_fixture fx;
@@ -975,10 +980,14 @@ void case_family_tree(int seed_count)
 
         const std::vector<culture>& cs = fx.creeds.cultures;
         int rooted = 0, deepest = 0, with_class = 0, monotonic = 1;
+        int with_year = 0, time_monotonic = 1, roots_at_span_start = 1;
+        int deepest_hops = -1;
+        int64_t deepest_years = 0;
 
         for (std::size_t i = 0; i < cs.size(); ++i)
         {
             if (cs[i].origin_farm_class >= 0) ++with_class;
+            if (cs[i].coined_year != INT64_MIN) ++with_year;
 
             // Walk to the root, bounded by the culture count so a broken tree
             // fails the assertion rather than hanging the harness.
@@ -989,28 +998,136 @@ void case_family_tree(int seed_count)
             {
                 const int up = cs[static_cast<std::size_t>(at)].parent;
                 if (up >= at) monotonic = 0;   // must strictly decrease
+                // TIME MOVES FORWARD DOWN THE TREE: a parent's coining year
+                // must be no later than its child's (NR-816 — kinship as years
+                // since the common ancestor is worthless if time can run backward).
+                if (cs[static_cast<std::size_t>(up)].coined_year
+                    > cs[static_cast<std::size_t>(at)].coined_year)
+                    time_monotonic = 0;
                 at = up;
                 ++depth;
             }
-            if (at >= 0 && cs[static_cast<std::size_t>(at)].parent < 0) ++rooted;
-            if (depth > deepest) deepest = depth;
+            const bool this_rooted = at >= 0 && cs[static_cast<std::size_t>(at)].parent < 0;
+            if (this_rooted)
+            {
+                ++rooted;
+                // THE CRADLE-YEAR CHECK (BL-873 DONE-WHEN): the root of every
+                // walk must carry the span's start, never a sentinel.
+                if (cs[static_cast<std::size_t>(at)].coined_year != colonisation_start_year)
+                    roots_at_span_start = 0;
+            }
+            if (depth > deepest && this_rooted)
+            {
+                deepest        = depth;
+                deepest_hops   = depth;
+                // YEARS SINCE THE COMMON ANCESTOR (NR-816) — the actual measure
+                // hop count was standing in for. Printed alongside the hop count
+                // so the two are visible side by side.
+                deepest_years  = cs[i].coined_year - cs[static_cast<std::size_t>(at)].coined_year;
+            }
         }
 
         std::printf("seed %u  cultures %d  reach a cradle %d  deepest descent %d  "
-                    "carry an origin class %d\n",
-                    wp.seed, static_cast<int>(cs.size()), rooted, deepest, with_class);
+                    "carry an origin class %d  carry a coined year %d  "
+                    "deepest hops %d  deepest years %lld\n",
+                    wp.seed, static_cast<int>(cs.size()), rooted, deepest, with_class,
+                    with_year, deepest_hops, static_cast<long long>(deepest_years));
 
-        if (rooted == static_cast<int>(cs.size()) && monotonic
-            && with_class == static_cast<int>(cs.size()))
+        if (rooted == static_cast<int>(cs.size()) && monotonic && time_monotonic
+            && roots_at_span_start
+            && with_class == static_cast<int>(cs.size())
+            && with_year == static_cast<int>(cs.size()))
             ++worlds_ok;
     }
 
     if (worlds == 0) { check(false, "C14 no world ran - the case is vacuous"); return; }
 
     check(worlds_ok == worlds,
-          "C14  THE FAMILY TREE SURVIVES: every culture walks back to a cradle, parents are "
-          "strictly lower-indexed so the walk cannot loop, and every people records the "
-          "country it was coined on");
+          "C14  THE FAMILY TREE SURVIVES: every culture walks back to a cradle at the span's "
+          "start, parents are strictly lower-indexed and no later in time than their children, "
+          "and every people records both the country and the year it was coined on");
+}
+
+// ---------------------------------------------------------------------------
+// D — SETTLEMENT SEATS ARE SPARSE, AND THE HINTERLAND IS A POINTER (BL-866)
+// ---------------------------------------------------------------------------
+//
+// CIVILISATION.md § The unit is the city state: "a settlement is a SEAT FLAG
+// on a region, and every region points at the seat it feeds", and "taking the
+// seat takes what points at it." This is the acceptance test for that shape,
+// against real generated worlds after the Era -1 sim has run wars over them.
+//
+// D1  every region resolves to a seat or to none — never a dangling pointer
+// D2  seats are a SPARSE minority of the settled map
+// D3  A TAKEN SEAT CARRIES ITS HINTERLAND — the load-bearing invariant: at
+//     any region whose `seat_region` points somewhere, that region's nation
+//     and its seat's nation agree. This holds from the opening map (every
+//     region seeded under its own polity's capital) and must still hold after
+//     however many centuries of conquest the sim ran, because every seat
+//     capture in `history_sim.cpp` carries its hinterland in the same event.
+// D4  the seat count is reported across a seed spread — not pinned (every
+//     magnitude in this layer is the sweep's to argue), but never zero on a
+//     world that settled at all.
+
+void case_settlement_seats(int seed_count)
+{
+    std::printf("\n--- D: are settlement seats sparse, and does a taken seat carry its "
+                "hinterland? (BL-866) ---\n");
+
+    int worlds = 0, worlds_consistent = 0, worlds_sparse = 0;
+
+    for (int s = 0; s < seed_count; ++s)
+    {
+        world_params wp;
+        wp.seed             = static_cast<uint32_t>(s);
+        wp.prehistory_years = 2000; // BL-871: the Empires span; long enough for real wars.
+
+        generation_report rep;
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{});
+        (void)w;
+        const generation_report::body_entry* k = kepler_of(rep);
+        // READ THE POST-SIM SETTLEMENT, NOT THE FIXTURE'S. `era_minus_one_fixture`
+        // (BL-462) deliberately captures the settlement BEFORE `run_history_sim`
+        // mutates it in place, for a harness that wants to re-run the sim itself
+        // — so seats and ownership are still the OPENING map there. The report's
+        // own body entry is assigned AFTER the sim (hard_coded_world.cpp), which
+        // is the settlement this case needs to see conquest carry a hinterland.
+        if (k == nullptr || k->settlement.regions.empty()) continue;
+        ++worlds;
+
+        const std::vector<region>& regions = k->settlement.regions;
+        const int n = static_cast<int>(regions.size());
+
+        int seats = 0, dangling = 0, mismatched = 0, no_seat = 0;
+        for (const region& r : regions)
+        {
+            if (r.is_seat) ++seats;
+
+            if (r.seat_region < 0) { ++no_seat; continue; }
+            if (r.seat_region >= n) { ++dangling; continue; }
+            const region& seat = regions[static_cast<std::size_t>(r.seat_region)];
+            if (!seat.is_seat) ++dangling; // Points somewhere that is not a seat at all.
+            else if (seat.nation != r.nation) ++mismatched;
+        }
+
+        const bool consistent = (dangling == 0 && mismatched == 0);
+        const bool sparse = seats > 0 && seats * 2 < n; // Under half, on any settled world.
+        if (consistent) ++worlds_consistent;
+        if (sparse) ++worlds_sparse;
+
+        std::printf("seed %u  regions %d  seats %d (%d%%)  no-seat %d  dangling %d  "
+                    "hinterland/seat nation mismatches %d\n",
+                    wp.seed, n, seats, n ? (seats * 100) / n : 0, no_seat, dangling, mismatched);
+    }
+
+    if (worlds == 0) { check(false, "D no world ran - the case is vacuous"); return; }
+
+    check(worlds_sparse == worlds,
+          "D2  SEATS ARE SPARSE on every world — fewer than half of settled regions are one");
+    check(worlds_consistent == worlds,
+          "D1/D3  EVERY REGION RESOLVES TO A SEAT OR TO NONE, and A TAKEN SEAT CARRIES ITS "
+          "HINTERLAND — every hinterland region shares its seat's nation, on the opening map "
+          "and after however many centuries of conquest the sim ran");
 }
 
 } // namespace
@@ -1018,7 +1135,12 @@ void case_family_tree(int seed_count)
 int main(int argc, char** argv)
 {
     const int seed_count = argc > 1 ? std::atoi(argv[1]) : 3;
-    const int span_years = argc > 2 ? std::atoi(argv[2]) : 4000;
+    // BL-871: was 4000, matching the OLD undifferentiated pass. The migration is
+    // now its own 2,000-year span (colonisation_start_year -2400 -> 400 BCE), and
+    // that is what this harness exercises -- a caller wanting the old figure must
+    // now say so explicitly, per the standing rule against silently absorbing a
+    // changed baseline.
+    const int span_years = argc > 2 ? std::atoi(argv[2]) : 2000;
 
     std::printf("\n=== colonisation_harness — BL-846/847/848/850 ===\n");
     std::printf("Asserts STRUCTURE only. Every magnitude in this layer is history_sweep's\n"
@@ -1034,7 +1156,8 @@ int main(int argc, char** argv)
     case_route_on_real_worlds(seed_count);
     case_founding_schedule(span_years);
     case_spawned_cultures(seed_count);
-    case_family_tree(seed_count);
+    case_family_tree(seed_count, span_years);
+    case_settlement_seats(seed_count);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;

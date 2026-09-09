@@ -3,7 +3,7 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 202 entries across 2 volume(s).
+One line per session, newest first — 203 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
@@ -197,6 +197,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-06-13 | [Layer 2: Primary canvases](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 1: ECS data model](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 0: Engine scaffolding](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
+| ? | [2026-09-10 (sprint 40 opens) — Three trees, one grammar](DEVLOG.md) | BL-881 BL-886 | DEVLOG.md |
 | ? | [2026-09-09 (sprint 37) — The world stops opening already full](DEVLOG.md) | BL-844 BL-855 BL-862 | DEVLOG.md |
 | ? | [2026-09-08/09 (sprint 35) — Generation gets two more rounds, and the measurements refute nearly everything](DEVLOG.md) | BL-816 BL-824 BL-825 BL-826 BL-827 BL-828 BL-834 BL-835 BL-840 | DEVLOG.md |
 | ? | [2026-09-07 (sprint 33 opens) — The corpus stops charging every session, and two tools are found lying](DEVLOG.md) | BL-079 BL-348 BL-424 BL-787 BL-788 BL-789 BL-790 BL-791 BL-792 BL-793 BL-794 BL-795 BL-796 BL-797 BL-798 BL-799 BL-801 BL-804 BL-806 BL-807 BL-808 BL-809 BL-810 BL-811 | DEVLOG.md |

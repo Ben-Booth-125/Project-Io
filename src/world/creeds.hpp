@@ -27,6 +27,7 @@
 #include "planetology.hpp"
 #include "tongue.hpp"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -92,6 +93,12 @@ struct culture
     /// disagreement rather than a stated one (BL-864 made a daughter a people OF
     /// the country it settled).
     int8_t origin_farm_class = -1;
+
+    /// The calendar year this culture was coined — a cradle culture at the span's
+    /// start (`colonisation_start_year`), a daughter at the year its stream
+    /// diverged. NR-816 makes kinship a YEARS-SINCE-COMMON-ANCESTOR measure, and
+    /// that measure is worthless without the years themselves (BL-873).
+    int64_t coined_year = INT64_MIN;
 };
 
 /// What the creeds pass computed for one body.

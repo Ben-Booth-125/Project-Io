@@ -112,9 +112,10 @@ The **seed** is an 8-digit hex value. You can roll it, type one in, or copy the 
 same seed and the same preferences always produce the same world; this is guaranteed, not
 incidental.
 
-Generation then runs **4000 years of history**, from 4000 BCE to the campaign epoch of **0 CE**,
-before handing you a world with settled peoples, borders drawn by centuries of war, and cities
-where the ground actually rewarded building one. The homeworld is a **312 × 145 hex grid — 45,240
+Generation then runs the world's history from **2400 BCE to the campaign epoch of 1960** — four
+thousand simulated years across two passes, with a deliberate gap at 1200–1560 that is coasted
+rather than stepped. It hands you a world with settled peoples, borders drawn by centuries of war,
+and cities where the ground actually rewarded building one. The homeworld is a **312 × 145 hex grid — 45,240
 tiles**, of which roughly 18,000 are land.
 
 ### 2.2 The screen
@@ -420,19 +421,34 @@ engine ships no HTTP client, no API key and no cloud dependency, and it never wi
 
 ### 4.14 The pre-history
 
-Before you arrive, the world runs — **4000 years of it, from 4000 BCE to the 0 CE campaign epoch.**
-Polities settle, campaign, invest and consolidate; cohesion falls when ground is lost, so defeat
-compounds; supply decays with distance and with the breadth of what you hold, so empires stall on
-arithmetic rather than on a designer's cap.
+Before you arrive, the world runs — **2400 BCE to the 1960 campaign epoch, four thousand of those
+years simulated.** It runs in two passes with a coast between them.
+
+**The migration, 2400 BCE → 400 BCE.** An empty world fills: where people started, the routes they
+took over land and along coasts, and the cultures those routes produced. It ends when every
+habitable landmass carries some culture, and the world then holds still until 400 BCE.
+
+**The empires, 400 BCE → 1200 CE.** What happens once the ground is taken and the question stops
+being who arrives. Polities settle, campaign, invest and consolidate; cohesion falls when ground is
+lost, so defeat compounds; supply decays with distance and with the breadth of what you hold, so
+empires stall on arithmetic rather than on a designer's cap.
+
+**1200 to 1560 is a coast.** A stable dark age is a span whose defining property is that little
+changes, and that is the one span not worth simulating. The world arrives at 1560 holding what 1200
+left it.
+
+**The economy, 1560 → 1960.** The same engine asking a different question: not who holds the
+ground, but what it produces and trades — who industrialised and when, what was carried where, and
+how protective each nation had become by the time you arrive.
 
 **The clock steps.** Decisions come every 100 years in deep prehistory, then 50, 20, 10, 5, and
 finally every year approaching the epoch — so the recent centuries that shaped your starting world
-are simulated in detail while the distant ones are painted in broad strokes. That is 136 decision
-rounds rather than 4000, which is both cheaper and finer where it matters. Population, meanwhile,
+are simulated in detail while the distant ones are painted in broad strokes. That is a few hundred
+decision rounds rather than four thousand, which is both cheaper and finer where it matters. Population, meanwhile,
 grows every real year regardless; only the *decisions* are stepped.
 
-A deep prehistory dominated by settling new ground rather than by war is the intended shape, not an
-accident.
+The migration pass being dominated by settling new ground rather than by war is the intended shape,
+not an accident — the fighting belongs to the empire pass that follows it.
 
 This is a generator, not a play layer. It produces the world you start in, and its architecture —
 not its constants — is what graduates into the campaign.

@@ -31,9 +31,16 @@ lives, never an independent axis bolted on beside it.
 
 Colonisation is **its own round of the generation wizard, and its own span** — the migration
 that fills an empty world. It runs from `start_year` until **every habitable landmass carries
-some culture**, and then it stops. What follows is a *separate* round with a separate span: the
-four thousand years to 1200 CE in which polities contest what migration left
-(`../ui/STARTUP.md` § Rounds 4 and 5).
+some culture**, and then it stops. What follows is a *separate* round with a separate span: **400 BCE to 1200 CE**, in which
+polities contest what migration left (`CIVILISATION.md` § The span is 400 BCE to 1200 CE).
+
+**THIS ROUND'S OWN SPAN IS 2400 BCE → 400 BCE, two thousand years**, inside a pass 1 that now
+covers three thousand six hundred (Ben, 2026-09-09).
+
+**A COAST JOINS THE TWO (Ben, 2026-09-09, confirming NR-818).** This round's end is derived and
+the next round's start is stated, so they are not the same year and are not meant to be. When the
+filling finishes, the world holds what migration left it until 400 BCE — the same device the
+design uses across 1200 → 1560. Nothing is simulated in between, and nothing is reset.
 
 **THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09).** This is the framing correction, and it is
 the load-bearing one: the migration round is not the opening slice of the ancient pass with the

@@ -500,6 +500,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
         p.manpower_stock = clampi64(p.manpower_stock - p.army_stock, 0, p.manpower_stock);
     }
 
+    // --- SETTLEMENT SEATS, SPARSE FROM THE OPENING MAP (BL-866) -----------
+    //
+    // CIVILISATION.md § The unit is the city state: "a settlement is a SEAT
+    // FLAG on a region, and every region points at the seat it feeds." Each
+    // polity's `capital` above is already derived as "the best-settled region
+    // of this culture" — exactly what a founding city state's seat is — so
+    // this reuses that choice rather than running a second placement pass.
+    // One seat per polity is the sparse first cut: with dozens to hundreds of
+    // regions per surviving culture, seats land at a small fraction of the
+    // map, and an empire's later seat count (several, once it has conquered
+    // other polities' capitals — see the conquest block below) is a
+    // consequence of war, not of this seeding.
+    //
+    // EVERY REGION RESOLVES TO A SEAT HERE: `owner[i]` was just derived from
+    // `out.polities`, and every polity's `capital` is a valid index (the loop
+    // above never leaves one at -1 when regions exist), so no region opens
+    // the run already outside anyone's reach.
+    for (const polity& q : out.polities)
+    {
+        if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= ss.regions.size())
+            continue;
+        region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
+        seat.is_seat     = true;
+        seat.seat_region = q.capital;
+    }
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
+    {
+        region& p = ss.regions[i];
+        if (p.is_seat) continue; // Already points at itself, above.
+        if (p.nation < 0 || p.nation >= static_cast<int>(out.polities.size())) continue;
+        p.seat_region = out.polities[static_cast<std::size_t>(p.nation)].capital;
+    }
+
     // --- THE ANCIENT ROAD RECORD (BL-768) ---------------------------------
     //
     // Appended raw as events happen, then sorted and run-length-encoded into
@@ -1154,11 +1187,28 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
             if (held.empty()) { q.alive = false; continue; }
             if (q.capital < 0 || owner[static_cast<std::size_t>(q.capital)] != q.id)
+            {
                 // Capital fell. The successor is the polity's lowest-indexed
                 // surviving region — placement order, which is best-ground
                 // first, so it is a reasonable seat without being "the largest
                 // holding" the first cut's comment claimed (BL-312).
+                const int old_capital = q.capital;
                 q.capital = held.front();
+
+                // BL-866 — THE SURVIVING HINTERLAND FOLLOWS ITS REALM'S NEW
+                // SEAT. The old capital is no longer this polity's seat (it
+                // now belongs to whoever just took it, and stays a seat in
+                // its own right there — see the conquest block), so the
+                // regions this polity still holds that pointed at it would
+                // otherwise be feeding ground they no longer own.
+                region& new_seat = ss.regions[static_cast<std::size_t>(q.capital)];
+                new_seat.is_seat     = true;
+                new_seat.seat_region = q.capital;
+                for (int h : held)
+                    if (h != q.capital
+                     && ss.regions[static_cast<std::size_t>(h)].seat_region == old_capital)
+                        ss.regions[static_cast<std::size_t>(h)].seat_region = q.capital;
+            }
 
             // ---- ASSIMILATION (BL-826) --------------------------------
             //
@@ -2309,6 +2359,36 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
+
+                    // BL-866 — GROUND IS NOT CONQUERED REGION BY REGION.
+                    // Taking a SEAT takes every region that points at it, in
+                    // this same event (CIVILISATION.md § The unit is the city
+                    // state). `seat_region` is left unchanged on every one of
+                    // them: `ti` is still a seat, only its flag moved, the
+                    // same way `founding_culture` survives a conquest below.
+                    //
+                    // A region taken on ITS OWN — decoupled from a seat it no
+                    // longer shares an owner with — re-points at the
+                    // conqueror's own seat, or falls outside anyone's reach
+                    // if the conqueror somehow holds none (never observed:
+                    // every living polity's `capital` is a valid seat by
+                    // construction, above and at the reassignment site).
+                    if (tgt.is_seat)
+                    {
+                        for (std::size_t hi = 0; hi < ss.regions.size(); ++hi)
+                        {
+                            if (hi == ti) continue;
+                            region& h = ss.regions[hi];
+                            if (h.seat_region != static_cast<int>(ti)) continue;
+                            owner[hi] = q.id;
+                            h.nation  = q.id;
+                        }
+                    }
+                    else
+                    {
+                        tgt.seat_region = (q.capital >= 0) ? q.capital : -1;
+                    }
+
                     // BL-826 — THE CONQUEROR'S GODS NO LONGER ARRIVE THE SAME
                     // AFTERNOON. This was `tgt.culture = q.culture`, an instant
                     // replacement, and it is the single line that made conquest

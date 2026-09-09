@@ -58,5 +58,8 @@ settled ahead of it.
   trades.
 - The tech graph: `scripts/tech_tree.lua` holds ~150 nodes of deliberately inert data with one
   resolving gate — whether that data becomes this system's graph or is replaced is undecided.
+- The pre-game layer is not this system: generation's three technology trees, and where research
+  comes from before there is a university, are `../generation/trees/TREES.md`. Where the campaign's
+  RP economy meets the capacity vector those trees hand over at 1960 is open here.
 - The relationship between corp research and nation research, and whether a nation's budget
   (`docs/politics/NATIONS.md`) can fund it.

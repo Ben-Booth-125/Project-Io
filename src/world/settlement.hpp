@@ -303,6 +303,36 @@ struct region
     /// path where no sim ran.
     int protection_q = 0;
 
+    // --- Settlement seats and hinterland (BL-866) --------------------------
+    // CIVILISATION.md § The unit is the city state, and settlements are
+    // sparse. SETTLED (Ben, 2026-09-09): "a settlement is a SEAT FLAG ON A
+    // REGION, and every region points at the seat it feeds." No new table,
+    // no new id space — a region already carries everything a seat needs to
+    // be worth taking (population, manpower_stock, army_stock, the four
+    // endowment windows, the urban record), so this is two fields, not a
+    // record.
+
+    /// TRUE FOR A SPARSE MINORITY OF REGIONS. A settlement worth taking: it
+    /// holds the stores (owed, § Materials are spent — BL-867) and is where
+    /// the muster forms. `history_sim.cpp` seeds one per polity, at its
+    /// `capital` — the polity's best-settled region — and never clears it:
+    /// a seat is a fact about the GROUND, so conquest changes who governs
+    /// from it, never whether it is one (mirrors `founding_culture`, which
+    /// conquest also never overwrites).
+    bool is_seat = false;
+
+    /// WHICH SEAT'S HINTERLAND THIS REGION IS PART OF — an index into the
+    /// same `settlement_state::regions` vector, itself when `is_seat` is
+    /// true, or -1 when no seat reaches it at all (a legitimate outcome,
+    /// CIVILISATION.md: "falls outside anyone's reach").
+    ///
+    /// THE POINTER IS WHAT MAKES GROUND CHANGE HANDS WITH ITS SEAT. Taking a
+    /// seat in `history_sim.cpp` carries every region pointing at it into the
+    /// same ownership change, in the same event — ground is not conquered
+    /// region by region. A region captured on its OWN, decoupled from its
+    /// seat, is re-pointed at its new owner's seat instead of left dangling.
+    int seat_region = -1;
+
     // --- Demography (BL-273) ----------------------------------------------
     // The region is the unit of population as well as of settlement — see
     // demography.md's section header below for the model. Left at zero here;

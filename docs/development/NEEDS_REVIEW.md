@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*9 entries — 7 open, 2 resolved.*
+*17 entries — 14 open, 3 resolved.*
 
 ---
 
@@ -47,7 +47,7 @@ BL-813, BL-814 and BL-815 were deleted outright under the 2026-08-24 unstarted-p
 ### NR-807 — CONCEPT.md still names the ancient arc as the live product, and the epoch moved to 1960
 *question · raised 2026-09-09 · from The doc-contradiction sweep at the close of sprint 35.*
 
-CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch is 0 CE, the player a mercenary company. Your 2026-09-08 calendar makes the epoch 1960, and era_band_for_epoch flips to industrial at 1700 - so generation now runs the INDUSTRIAL arc.
+CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch is 0 CE, the player a mercenary company. Your 2026-09-08 calendar makes the epoch 1960, and era_band_for_epoch flips to industrial at 1700 - so generation now runs the INDUSTRIAL arc. ALSO MANUAL.md (found 2026-09-09 during the Empires respan): lines 115 and 423 both say 'generation runs 4000 years of history, from 4000 BCE to the campaign epoch of 0 CE'. That is stale twice over -- the 2026-09-08 calendar moved the epoch to 1960, and the 2026-09-09 ruling made pass 1 3,600 years from 2400 BCE. It is the SAME call as CONCEPT.md's, so it is added here rather than opened as its own entry: whether the player-facing docs describe the ancient arc or the arc generation actually runs. CALENDAR HALF SETTLED (Ben, 2026-09-09): 'fix MANUAL.md to match the new calendar'. MANUAL.md sections 2.1 and 4.14 now state 2400 BCE -> 1960 with the two passes and the 1200-1560 coast. THE IDENTITY HALF IS STILL OPEN AND IS WHY THIS ENTRY STAYS SO: MANUAL.md line 35 still has the player arriving at the epoch as 'a company of armed professionals', and CONCEPT.md still names the ancient arc as the live product. A mercenary company arriving at an INDUSTRIAL 1960 epoch is the tension, and it is a product call rather than a date. The dates were fixed; the sentence about who the player is was deliberately left alone.
 
 **Why it matters.** I fixed the generation-side citation because the calendar is that doc subject. I did NOT touch this one, because it is not a date - it names WHO THE PLAYER IS and which product is live. Changing the live arc from ancient to industrial in the doc that owns player identity is a product call, not a reconciliation, and CONCEPT.md is the authority the rest of the corpus reads for it.
 
@@ -57,7 +57,7 @@ CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch
 
 > **Recommendation:** The second, provisionally - both arcs already exist in the code (era_band_for_epoch branches on the epoch, and HISTORY.md was already written arc-aware), so nothing forces a product choice yet. But it should be YOUR sentence, not mine, and it is the kind of thing that quietly becomes true by being left alone.
 
-*Files: `docs/CONCEPT.md`, `docs/generation/GENERATION_STRATEGY.md`, `src/world/era_band.hpp`*
+*Files: `docs/CONCEPT.md`, `docs/generation/GENERATION_STRATEGY.md`, `src/world/era_band.hpp`, `docs/MANUAL.md`*
 
 ### NR-809 — Region count still scales ~quadratically AFTER BL-844, so regions cannot become provinces one-for-one - and no optimisation is waiting to change that
 *decision · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. The region-count sensitivity measurement NEXT_SESSION.md asks for before any scale decision. Measured with history_span_cost, build_gen (/O2), seeds 0 and 1.*
@@ -133,6 +133,110 @@ The plain transport was built as briefed: Run, then it plays, then Restart. The 
 
 *Files: `src/ui/history_lapse.cpp`, `docs/ui/STARTUP.md`*
 
+### NR-815 — Culture opposition is SYMMETRIC, so relations are a matrix and not directed pairs
+*decision taken on your behalf · raised 2026-09-09 · from The Empires design pass; the elicitation form settled the two opposition AXES but not the shape of the relation.*
+
+Opposition between two cultures is symmetric: a triangular matrix over cultures rather than a directed table. The directed layer is left to `grudge`, which already records who wronged whom at a place and a date.
+
+**Why it matters.** It decides the data shape before anything reads it, and a directed table is hard to make symmetric later once consumers assume asymmetry. It also keeps two questions apart - `are we opposed` and `what did you do to me` - which would blur into one quantity if opposition were directed too.
+
+- Symmetric matrix, grudges stay directed (TAKEN)
+- Directed, mirroring the grudge table
+- Symmetric with a directed override
+
+> **Recommendation:** Symmetric. Ben's own phrasing is 'cultures have similarities, and sometimes directly opposing views' - a view held in opposition is held by both sides. Overturn this if a one-sided resentment should be expressible WITHOUT an event behind it; today every such case has a grudge.
+
+*Files: `docs/generation/CIVILISATION.md`*
+
+### NR-816 — Kinship is measured in YEARS since the common ancestor, not in tree hops
+*decision taken on your behalf · raised 2026-09-09 · from The Empires design pass; the form did not carry this call, and CIVILISATION.md left it open as 'does kinship decay'.*
+
+Similarity between two cultures is the time since their most recent common ancestor, not the number of hops between them in the descent tree. This needs one new retained field - the year a culture was coined - in the same shape BL-865 (culture descent retained) used for `parent`.
+
+**Why it matters.** It answers the open 'does kinship decay' call without introducing a decay constant, which is the kind of dial this layer keeps refusing. Hop count is also coarse and blind to timing: the tree runs 9-10 deep over 676 and 929 cultures, so two peoples four hops apart may have parted three thousand years ago or three hundred, and those are not the same relationship.
+
+- Years since the common ancestor (TAKEN)
+- Hop count alone
+- Hop count with an authored decay constant
+
+> **Recommendation:** Years. It costs one integer per culture that the migration already knows, and it makes the measure a fact about the world's history rather than a number assigned to it. The cost is that the coining year must be RETAINED - a third discarded migration fact, alongside parentage and origin farm class.
+
+*Files: `docs/generation/CIVILISATION.md`, `src/world/creeds.hpp`*
+
+### NR-817 — A civilisation cannot form across opposition above a bar, and inherits what is left as strain
+*decision taken on your behalf · raised 2026-09-09 · from The Empires design pass; CIVILISATION.md asked whether a civilisation resolves, inherits or fractures over opposed member cultures.*
+
+Two of the three candidates apply at different moments. FRACTURE is the formation rule - peoples too opposed do not produce a shared answer about how to live, so no civilisation is coined there. INHERIT is the consequence - one that does form over residual opposition carries it as internal strain. RESOLVE is rejected.
+
+**Why it matters.** Resolve would make a civilisation a peacemaker that flattens the world at exactly the scale the design wants asymmetry, which is a forced outcome. Inherit alone gives no reason for a civilisation NOT to form everywhere, so the map would carry one over every mixed region. The pair gives both a gate and a consequence.
+
+- Fracture as the gate, inherit as the consequence (TAKEN)
+- Inherit only
+- Resolve - belonging softens opposition
+
+> **Recommendation:** Keep the pair. The open half is WHERE THE BAR SITS, and that is a measurement rather than a judgement: set it from a sweep producing both alliance-shaped and enmity-shaped worlds, never from a number picked to make one seed look right.
+
+*Files: `docs/generation/CIVILISATION.md`*
+
+### NR-819 — Twelve farm classes, four Colonisation branches — which class teaches which ground, and is there a fifth branch?
+*question · raised 2026-09-10 · from Authoring COLONISATION_TREE.md: the brief assumed one branch per origin farm class and sized the tree for four; classify_farm_class in src/world/colonisation.cpp yields twelve (boreal, volcanic, floodplain, montane, coastal, woodland, arid, valley, highland, grassland, stone, steppe) and COLONISATION.md names none.*
+
+The tree folds them into four ground families — Wet Ground (floodplain, valley), High Ground (highland, montane, volcanic), Open Ground (grassland, steppe), The Shore (coastal) — and leaves woodland, boreal, arid and stone belonging to no branch. A people coined on unowned ground climbs the spire on contact alone. Related: the gate vocabulary has no highland atom, so High Ground's majors carry no gate.
+
+**Why it matters.** Which ground teaches what is the whole content of a carried tree; a class that teaches nothing makes its peoples uniformly poor, and a fifth branch re-shapes the tree (rule 4 breadth, milestone requires_any sets). Cheap now, expensive after BL-882.
+
+- A - fold the four unowned classes into the nearest family (woodland/boreal -> High Ground, arid/stone -> Open Ground) and add a table to the doc
+- B - a fifth branch, Forest, for woodland and boreal; arid and stone stay unowned as hostile country
+- C - unowned classes teach nothing by design: peoples from hostile ground are late by construction
+
+> **Recommendation:** A, with a highland gate atom raised as its own small item only if the sweep shows High Ground nodes held by peoples who never stood on high ground. B is the deeper option and costs ~7 nodes; the cap has room.
+
+*Files: `docs/generation/trees/COLONISATION_TREE.md`, `docs/generation/trees/colonisation_tree.json`, `src/world/colonisation.cpp`*
+
+### NR-820 — DECISION TAKEN: the grammar gained requires_fork and requires_any beside the AND requirement
+*decision taken on your behalf · raised 2026-09-10 · from Authoring the Empire and Colonisation trees against the agreed grammar. The Sworn Province wants the granary fork TAKEN either way (the ladder's house rule for a fork under a vertex); the Colonisation milestones cannot demand two named branches of a people coined on one ground.*
+
+TREES.md § Milestones now carries three forms: requires (all held), requires_fork (either side of a fork pair), requires_any (any count of a set). tree_lint enforces all three at the milestone's own ring and counts guaranteed breadth for rule 4 in the worst case.
+
+**Why it matters.** Rule 2 says meaning is AND. Two softer forms are a widening of the grammar you agreed, taken so the trees could be finished; they are recorded so they can be overturned rather than become precedent.
+
+- A - keep both (ADOPTED)
+- B - keep requires_fork only; the Colonisation milestones name the spire major and ONE branch major each, accepting that peoples off that ground climb late
+- C - keep neither; the Colonisation tree becomes a documented exception
+
+> **Recommendation:** A. Both are lintable and both are used by exactly the case that needed them.
+
+*Files: `docs/generation/trees/TREES.md`, `tools/session/tree_lint.js`, `docs/generation/trees/colonisation_tree.json`, `docs/generation/trees/empire_tree.json`*
+
+### NR-821 — DECISION TAKEN: the old ladder is kept as a calibration reference with a superseded banner, not deleted
+*decision taken on your behalf · raised 2026-09-10 · from Ben, 2026-09-10: "write the docs and JSON to replace what we had pre-existing." docs/research/ANCIENT_TECH_LADDER.md (52K) and ancient_tech_ladder.json are cited by ten docs, by history_sim.hpp's own comments, by ladder_lint.js, and transcribed into scripts/tech_tree.lua's Era -1 section.*
+
+The three trees under docs/generation/trees/ are now the authority for the pre-game layer; the research doc carries a banner saying so and stays as the Earth-calibration reference (§ What "not every nation is equal" means, § Acquisition model, the band tables). ladder_lint.js still runs; the tech_tree.lua transcription retires under BL-885.
+
+**Why it matters.** Deleting would break header_graph on ten docs and orphan the calibration facts the sweep is tuned against; keeping leaves a superseded 52K research doc in the corpus. Your call which cost to pay.
+
+- A - keep with banner (ADOPTED)
+- B - delete doc + JSON + ladder_lint.js and re-point the citations at TREES.md
+- C - move both under docs/research/archive/ and re-point
+
+> **Recommendation:** A until BL-885 lands, then C — the transcription is the last thing that reads the JSON.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`*
+
+### NR-822 — DECISION TAKEN: one milestone per ring, so the trees carry 3 / 4 / 4 milestones rather than the 2 / 3 / 4 first stated
+*decision taken on your behalf · raised 2026-09-10 · from The sizing table in the 2026-09-10 assessment said 2, 3 and 4 milestones; the spire rule (one major and one milestone per ring, chained) makes the count equal the ring count.*
+
+Colonisation 3 rings / 3 milestones, Empire 4 / 4, Industry 4 / 4. The ring-1 milestone requires two ring-1 branch majors, so a polity cannot leave ring 1 by the spire alone.
+
+**Why it matters.** A rule-driven count is checkable and the stated count was not; but it means one more gate per tree than you agreed to, which slows the climb by one milestone cost.
+
+- A - one per ring (ADOPTED)
+- B - no ring-1 milestone: the root opens ring 2 directly
+
+> **Recommendation:** A.
+
+*Files: `docs/generation/trees/TREES.md`, `tools/session/tree_lint.js`*
+
 ---
 
 ## Resolved
@@ -186,4 +290,21 @@ CALLS (1), (2) and (4) REMAIN OPEN and are sprint 38's, along with the build its
 WHAT LANDED IN SPRINT 37 INSTEAD is the substrate the whole question rests on: BL-865 retains the migration's family tree, and it turns out to have real depth -- deepest descent 9 and 10 on seeds 0 and 1, across 676 and 929 cultures, every one of which walks back to a cradle. Kinship distance therefore carries actual signal rather than being flat, which is what a similarity measure needs to be worth reading.
 
 *Files: `docs/generation/CIVILISATION.md`, `src/world/creeds.hpp`, `src/world/history_sim.cpp`*
+
+### NR-818 — Does the Culture round COAST to the boundary, or does its terminating condition become it?
+*question · raised 2026-09-09 · from Your elicitation answer on the span boundary: 'Run this from 0 CE to 1200 CE'. It names the Empires start and does not say what happens to the migration's own ending.*
+
+Two readings. (A) THE COAST, adopted: the Culture round still ends when every habitable landmass carries some culture - a derived year - and the world then holds what migration left it until 0 CE, simulating nothing in between. (B) THE CLAMP: the Culture round's terminating condition simply becomes 0 CE.
+
+**Why it matters.** COLONISATION.md settled the derived terminating condition on 2026-09-09, overturning a stated-year ruling made earlier the same day. Reading B would overturn it a second time within the day; reading A keeps both your rulings true at once. It also changes a written line in two authority docs, which is why it is raised rather than assumed.
+
+- A - coast to 0 CE, derived ending preserved (ADOPTED)
+- B - the migration's terminating condition becomes 0 CE
+- C - derived ending, and the Empires start floats with it
+
+> **Recommendation:** A, on the grounds that it is the only reading under which neither of your two rulings has to be discarded, and because the design already uses exactly this device across 1200 -> 1560. The consequence to accept is that a world filling early sits still for a while - which is what a dark age looks like, and it is cheap. Overturn to B if you want the migration span itself bounded.
+
+> **RESOLVED.** RESOLVED (Ben, 2026-09-09): reading A, the COAST, confirmed - and the boundary moved with it. The Culture round keeps its derived terminating condition, and the world holds what migration left it until the stated boundary, simulating nothing in between. THE BOUNDARY IS 400 BCE, NOT 0 CE, and pass 1 now covers 3,600 years rather than 4,000: Culture 2400 BCE -> 400 BCE (2,000 years), Empires 400 BCE -> 1200 CE (1,600 years). 1200 CE is unmoved, so the coast to 1560, pass 2 and the 1960 epoch are untouched. One claim written under the first cut is now FALSE and was removed: 0 CE was 'a year the engine already knows' because the sim's ancient arc ends there - 400 BCE is not, so the split is real work rather than free. Written into CIVILISATION.md sec The span is 400 BCE to 1200 CE, which owns the arithmetic; COLONISATION.md, STARTUP.md and GENERATION_STRATEGY.md take their figures from it. Carried by BL-871.
+
+*Files: `docs/generation/CIVILISATION.md`, `docs/generation/COLONISATION.md`, `docs/ui/STARTUP.md`*
 

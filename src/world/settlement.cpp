@@ -569,7 +569,7 @@ namespace
 /// EVERY NAME STAYS SCI-FI/FANTASY, out of the seeded phoneme tables — never an
 /// Earth proper noun (.claude/rules/io-standing-rules.md § Terms & docs).
 culture derive_daughter_culture(const culture& parent, int parent_id, int8_t origin_class,
-                                uint32_t seed, int spawn_index)
+                                uint32_t seed, int spawn_index, int64_t coined_year)
 {
     culture d = parent;                 // Pantheon, cradle and speech inherited whole.
     // DESCENT (BL-865). The tree the migration builds is retained rather than
@@ -577,6 +577,7 @@ culture derive_daughter_culture(const culture& parent, int parent_id, int8_t ori
     // two peoples are (CIVILISATION.md § Culture relations).
     d.parent            = parent_id;
     d.origin_farm_class = origin_class;
+    d.coined_year       = coined_year;
     rng r(seed, static_cast<uint32_t>(0xDA05u + spawn_index));
 
     // Drift the inventory: drop one onset, admit one from a fixed pool. Both
@@ -818,7 +819,8 @@ settlement_state run_settlement(const planetology_state& pl,
         if (par == nullptr) { out.spawned_cultures.push_back(culture{}); continue; }
         out.spawned_cultures.push_back(
             derive_daughter_culture(*par, pid, static_cast<int8_t>(sp.origin_class),
-                                    seed ^ 0xC0DAu, static_cast<int>(si)));
+                                    seed ^ 0xC0DAu, static_cast<int>(si),
+                                    sp.coined_year));
     }
 
     // --- Score every tile once, in raster order --------------------------------
@@ -1219,6 +1221,42 @@ void derive_national_character(settlement_state& ss,
         p.nation = (p.anchor >= 0 && p.anchor < total)
                  ? owner[static_cast<std::size_t>(p.anchor)] : -1;
 
+    // --- BL-866 — THE SEAT WINS ITS OWN HINTERLAND, EVEN HERE -----------------
+    //
+    // ROOT CAUSE of the small, persistent seat/hinterland nation mismatches
+    // `colonisation_harness`'s case_settlement_seats (D1/D3) measures after a
+    // full era -1 run: `generate_nations` grows the political map from tile
+    // ANCHORS via its own Voronoi/BFS over the grid, which knows nothing about
+    // `region::seat_region` — so a hinterland region's anchor tile can fall a
+    // hair on the far side of a border its own seat's anchor did not, even
+    // though `history_sim.cpp` kept the two in lockstep, region-index for
+    // region-index, for the whole 2000+ year run. The blanket per-anchor
+    // assignment above is exactly that geometric read, with no seat awareness
+    // at all — unlike `resolve_historical_ruptures::carry_seat_on_transfer`
+    // below, which already carries a seat's hinterland on every nation
+    // transfer IT makes. This is the one write in the pass 1 -> pass 2 handoff
+    // that had no equivalent.
+    //
+    // THE FIX: same rule, same grain (CIVILISATION.md § The unit is the city
+    // state — "taking a seat takes what points at it"). Every region whose
+    // `seat_region` names a seat inherits THAT SEAT's freshly-assigned nation,
+    // overriding whatever the tile-level growth gave it on its own. A no-op
+    // wherever the geometry already agreed (the overwhelming majority of
+    // regions), and the one place a hinterland's own anchor tile disagreed
+    // with its seat's.
+    for (std::size_t si = 0; si < ss.regions.size(); ++si)
+    {
+        const region& seat = ss.regions[si];
+        if (!seat.is_seat) continue;
+        const int seat_nation = seat.nation;
+        for (std::size_t hi = 0; hi < ss.regions.size(); ++hi)
+        {
+            if (hi == si) continue;
+            if (ss.regions[hi].seat_region == static_cast<int>(si))
+                ss.regions[hi].nation = seat_nation;
+        }
+    }
+
     // --- The border-contest integral -------------------------------------------
     // Two terms, because a frontier is two things: how much of your edge faces
     // somebody (the static share) and how much settled weight is pressed
@@ -1486,6 +1524,38 @@ void resolve_historical_ruptures(settlement_state& ss,
     const int nations = static_cast<int>(nation_ids.size());
     const int total = gw * gh;
 
+    // BL-866 — THE SEAT/HINTERLAND CARRY, at the NATION grain this pass works
+    // at. The same principle `history_sim.cpp`'s per-round conquest applies:
+    // taking a seat takes what points at it, in the same event. This pass
+    // moves whole REGIONS between nations (collapse, war) rather than
+    // fighting round by round, but the invariant is the same one
+    // (CIVILISATION.md § The unit is the city state) and it is what
+    // `colonisation_harness`'s D1/D3 case checks at the epoch.
+    const auto carry_seat_on_transfer = [&](int region_index, int new_nation) {
+        region& p = ss.regions[static_cast<std::size_t>(region_index)];
+        if (p.is_seat)
+        {
+            for (std::size_t hi = 0; hi < ss.regions.size(); ++hi)
+            {
+                if (static_cast<int>(hi) == region_index) continue;
+                region& h = ss.regions[hi];
+                if (h.seat_region != region_index) continue;
+                h.nation = new_nation;
+            }
+        }
+        else
+        {
+            // Decoupled from its old seat: re-point at the new nation's own
+            // seat (its lowest-indexed one), or fall outside anyone's reach
+            // if it holds none yet.
+            int seat = -1;
+            for (std::size_t i = 0; i < ss.regions.size(); ++i)
+                if (ss.regions[i].nation == new_nation && ss.regions[i].is_seat)
+                    { seat = static_cast<int>(i); break; }
+            p.seat_region = seat;
+        }
+    };
+
     // Shared-border counts, so "war" can pick a real neighbour rather than a
     // nation on the other side of the world.
     std::vector<std::vector<int>> shared(
@@ -1621,6 +1691,7 @@ void resolve_historical_ruptures(settlement_state& ss,
                                 transfer_tile(w, tid, nid, tnid);
                                 ++moved;
                             }
+                        carry_seat_on_transfer(pi, taker); // BL-866
                         p.nation = taker;
                         p.industrial_year = p.industrialised
                             ? std::min<int64_t>(1935, p.industrial_year + 40) : 0;
@@ -1705,8 +1776,9 @@ void resolve_historical_ruptures(settlement_state& ss,
                 for (const region& p : ss.regions)
                     if (p.nation == win_ni) { victor_culture = p.culture.plurality(); break; }
 
-                for (region& p : ss.regions)
+                for (std::size_t pi2 = 0; pi2 < ss.regions.size(); ++pi2)
                 {
+                    region& p = ss.regions[pi2];
                     if (p.nation != los_ni) continue;
                     if (p.anchor < 0) continue;
                     bool near_front = false;
@@ -1715,6 +1787,7 @@ void resolve_historical_ruptures(settlement_state& ss,
                          && grid_dist(p.col, p.row, q.col, q.row, gw) <= 10) { near_front = true; break; }
                     if (!near_front) continue;
 
+                    carry_seat_on_transfer(static_cast<int>(pi2), win_ni); // BL-866
                     p.nation = win_ni;
                     // BL-826 — TOTAL here, and deliberately so. This is the
                     // settlement pass's own prehistoric conflict, resolved
