@@ -5,7 +5,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <queue>
+#include <unordered_map>
 
 // ---------------------------------------------------------------------------
 // The Era -1 history sim (BL-277 + BL-271's first slice). See history_sim.hpp
@@ -506,10 +508,54 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // integers, so the result cannot depend on a container's layout, and the
     // hot loop pays a push_back rather than a tree lookup.
     //
-    // PURE OBSERVATION. Nothing below reads this back, so it cannot move a
-    // decision — the same contract `battle_trace` holds, and the reason both
-    // can be recorded unconditionally without a determinism argument.
+    // NO LONGER PURE OBSERVATION (BL-837). Until this item nothing below read
+    // this back — the record existed only for `road_generation.cpp` to stamp
+    // onto the FINISHED world's tile grid, one pass removed from the sim that
+    // produced it. `road_uses_live` is the same count, kept live, and
+    // `rebuild_reach` below reads it: a corridor this run has actually walked
+    // repeatedly is cheaper for the REST OF THIS RUN, which is what makes a
+    // road something a polity BUILDS rather than a label applied afterwards
+    // (CIVILISATION.md's outcome brief: "a sparse road network which connects
+    // city-states, forms empires"). `battle_trace` still holds the
+    // pure-observation contract; this record no longer does.
     std::vector<std::pair<uint16_t, uint16_t>> corridor_uses;
+
+    // Canonical (lo, hi) edge key -> live use count, read by `rebuild_reach`
+    // and gated by `road_tier1_uses`/`road_tier2_uses` below. A plain
+    // `unordered_map` is safe here (unlike the ownership/political state)
+    // because nothing iterates it — every read is a point lookup on a key
+    // computed from region indices, never a walk in map order.
+    std::unordered_map<uint64_t, int> road_uses_live;
+    // Bumped every time an edge's tier (0/1/2, from `road_tier_for_uses`)
+    // actually changes, so `reach_cache` can invalidate on "a road changed"
+    // without invalidating on every single use — most uses do not cross a
+    // tier boundary, and re-running a polity's Dijkstra on every one of them
+    // would revive the per-round-rebuild cost BL-834 just eliminated.
+    int roads_version = 0;
+
+    const auto edge_key = [](int a, int b) -> uint64_t {
+        const uint32_t lo = static_cast<uint32_t>(a < b ? a : b);
+        const uint32_t hi = static_cast<uint32_t>(a < b ? b : a);
+        return (static_cast<uint64_t>(lo) << 32) | static_cast<uint64_t>(hi);
+    };
+    const auto road_tier_for_uses = [&](int uses) {
+        if (uses >= params.road_tier2_uses) return 2;
+        if (uses >= params.road_tier1_uses) return 1;
+        return 0;
+    };
+    // Mirrors logistics.hpp's `road_traversal_multiplier` exactly (1 / (1 +
+    // 0.5 x tier): Track ~0.67, Road 0.50) — the SAME discount shape the
+    // campaign-era A* already applies for the same reason, restated here
+    // rather than called across the ECS boundary this file is deliberately
+    // free of (settlement.hpp: "no `world&`, no tile ids, no allocator").
+    const auto road_discount = [](int tier) {
+        return 1.0f / (1.0f + 0.5f * static_cast<float>(tier));
+    };
+    const auto road_tier_between = [&](int a, int b) {
+        const auto it = road_uses_live.find(edge_key(a, b));
+        return it != road_uses_live.end() ? road_tier_for_uses(it->second) : 0;
+    };
+
     const auto note_corridor = [&](int a, int b) {
         if (a < 0 || b < 0 || a == b) return;
         if (a >= static_cast<int>(owner_index_limit)
@@ -517,6 +563,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
         const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
         corridor_uses.push_back({lo, hi});
+
+        int& uses = road_uses_live[edge_key(a, b)];
+        const int before = road_tier_for_uses(uses);
+        ++uses;
+        const int after = road_tier_for_uses(uses);
+        if (after != before) ++roads_version;
     };
 
     // --- GRUDGES (BL-827) -------------------------------------------------
@@ -668,6 +720,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
     {
         std::vector<int> cost;    ///< Per-region cost from `capital`.
         int              capital = -2; ///< Which capital `cost` was built for.
+        /// BL-837: `roads_version` this cost vector was built against. A road
+        /// crossing a tier changes an edge weight without moving the capital
+        /// or growing the region count, so it is a THIRD invalidation input
+        /// alongside the two the header comment above names.
+        int              roads_version = -1;
     };
     std::vector<reach_cache> reach_by_polity;
 
@@ -734,9 +791,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
             for (int nb : neighbours[static_cast<std::size_t>(best)])
             {
                 const region& np2 = ss.regions[static_cast<std::size_t>(nb)];
-                const int step = region_distance(bp, np2, gw)
-                               * (tile_cost(bp) + tile_cost(np2)) / 200;
-                const int cand = best_c + (step > 0 ? step : 1);
+                const int raw_step = region_distance(bp, np2, gw)
+                                    * (tile_cost(bp) + tile_cost(np2)) / 200;
+                // BL-837 — THE ROAD DISCOUNT, applied to the SAME edge this
+                // history's own corridors have actually walked. A tier-2 edge
+                // costs half what an unroaded one does, mirroring
+                // logistics.cpp's `road_traversal_multiplier` exactly (see
+                // `road_discount` above). This is what makes "the only way to
+                // reach further is to BUILD further" literally true of the
+                // Dijkstra: the capital's effective reach grows along lines
+                // the polity has actually used, never along a straight-line
+                // radius.
+                const float discount = road_discount(road_tier_between(best, nb));
+                const int step = raw_step > 0
+                                ? std::max(1, static_cast<int>(raw_step * discount + 0.5f))
+                                : 1;
+                const int cand = best_c + step;
                 if (cand < reach[static_cast<std::size_t>(nb)])
                 {
                     reach[static_cast<std::size_t>(nb)] = cand;
@@ -744,7 +814,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
         }
-        rc.capital = capital;
+        rc.capital       = capital;
+        rc.roads_version = roads_version;
     };
 
     // --- Time-lapse change list -------------------------------------------
@@ -1122,7 +1193,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 reach_by_polity.resize(static_cast<std::size_t>(q.id) + 1);
             reach_cache& rc = reach_by_polity[static_cast<std::size_t>(q.id)];
 
-            if (rc.capital != q.capital || rc.cost.size() != ss.regions.size())
+            if (rc.capital != q.capital || rc.cost.size() != ss.regions.size()
+             || rc.roads_version != roads_version) // BL-837: a road crossed a tier
                 rebuild_reach(rc, q.capital);
             const std::vector<int>& reach = rc.cost;
 
@@ -1152,6 +1224,50 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const int mean_holding_value = static_cast<int>(holdings_value_sum / n_held);
             const int mean_reach_q       = static_cast<int>(works_reach_sum / n_held);
             const int mean_industrial_q  = static_cast<int>(works_ind_sum / n_held);
+
+            // ---- BL-837 — AN ARMY BEYOND SUSTAINABLE REACH CANNOT BE
+            // MAINTAINED. The campaign gate below stops a polity PROJECTING
+            // force past its roads; this is that rule's standing-army twin,
+            // and it is what makes holding distant ground cost something
+            // even when nobody ever contests it.
+            //
+            // Read the SAME terrain-and-road reach `campaign_supply` prices a
+            // campaign at (`reach[hi]`, already road-discounted by
+            // `rebuild_reach` above), but WITHOUT the staging-hub relief or
+            // the burden-of-breadth term: a garrison standing at home pays
+            // neither a march's cost nor the empire's own overextension
+            // penalty, only the ground's terrain price back to the capital.
+            // `sustainable_garrison_floor_q` is deliberately below the
+            // campaign floor for exactly that reason (see the field comment).
+            //
+            // A RATE x THE STEP, like every other per-year accumulator in
+            // this loop. `held` is already region-index order, so the walk
+            // order is a property of the map, not of anything transient.
+            if (params.unsustained_army_attrition_q > 0)
+            {
+                for (int hi : held)
+                {
+                    region& hp = ss.regions[static_cast<std::size_t>(hi)];
+                    if (hp.army_stock <= 0) continue;
+
+                    const std::size_t hidx = static_cast<std::size_t>(hi);
+                    const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
+                                          ? reach[hidx] : (1 << 27);
+                    const int hub_reach_q = clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
+                    const int terrain_cost = reach_here * params.terrain_reach_cost_q / 100;
+                    const int terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
+                    const int supply_at_q  = clampi(1000 - terrain_paid, 0, 1000);
+
+                    if (supply_at_q <= params.sustainable_garrison_floor_q)
+                    {
+                        ++out.unsustained_attrition_events;
+                        const int64_t lost = (hp.army_stock
+                                             * clampi(params.unsustained_army_attrition_q, 0, 1000)
+                                             * step_years) / 1000;
+                        hp.army_stock = std::max<int64_t>(0, hp.army_stock - lost);
+                    }
+                }
+            }
 
             // ---- THE MATERIALS BAND, DERIVED ONCE (BL-748) ----------------
             //
@@ -1500,6 +1616,28 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // § Forage). No new constant: it is the same 0..1000.
                     const int supply_here =
                         forages ? campaign_supply(hub_dist, ti, hi) : 0;
+
+                    // BL-837 — REACH GATES A CAMPAIGN; IT DOES NOT MERELY
+                    // PRICE IT (Ben, 2026-09-09 elicitation). Everything
+                    // above already prices distance and terrain into
+                    // `supply_here`; what was missing is that pricing alone
+                    // never actually STOPS a rich-enough polity, it only
+                    // discourages it. Applied only when the force forages at
+                    // all — a `!forages` crossing is the water/forage rule's
+                    // business (MILITARY_HISTORY.md § Forage) and stays
+                    // priced at zero rather than gated a second time by an
+                    // unrelated rule.
+                    //
+                    // NOT A CANDIDATE, exactly like the water-legality gate
+                    // above: `continue` before anything scores, counted
+                    // separately from `illegal_campaigns` so the two refusals
+                    // — no legal line at all, versus a legal line too far to
+                    // supply — stay distinguishable in the trace.
+                    if (forages && supply_here <= params.sustainable_campaign_floor_q)
+                    {
+                        ++out.reach_denied_campaigns;
+                        continue;
+                    }
 
                     // BL-835 — THE ARMY AT THE HUB IT WOULD ACTUALLY MARCH FROM.
                     //
