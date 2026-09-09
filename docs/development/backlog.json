@@ -660,6 +660,60 @@
     "tools/verify/province_harness.cpp"
    ],
    "design": "BEN, 2026-09-09, ruling on the direct question: colonisation SEEDS the partition; the late pass still DRAWS it.\n\nPROVINCES.md keeps its ordering (after the sim, before roads) and keeps its nation lock. What it gains is the colonisation span's settled cells and their anchors as a HARD INPUT, the way it already takes the national assignment.\n\nTHE ROAD NOT TAKEN, recorded so it is not rediscovered: colonisation drawing the REAL partition, with the nation carve then assigning whole provinces rather than tiles. That would make ruling 5's single-nation guarantee true BY CONSTRUCTION rather than by a check, and it answers Ben's own 2026-08-21 objection that packed provinces are 'scarcely how borders were defined in history'. It reorders the generation chain, which is why it was not taken now.\n\nDONE WHEN: the partition reads the settled cells, P9c and the nation-lock scan still pass, and province shapes visibly follow settlement history rather than centre geometry alone."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, colonisation design session); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-846"
+   ],
+   "id": "BL-850",
+   "short_name": "PREDATION_CAPS_PRESSURE",
+   "difficulty": 3,
+   "title": "Predation - wildlife danger caps a penned people, and prices wild ground twice",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/colonisation.cpp",
+    "src/world/colonisation.hpp",
+    "src/world/settlement.cpp",
+    "src/world/history_ladder.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "BEN, 2026-09-09, answering what a penned people does with surplus it cannot send anywhere: \"Death from natural causes can put a cap on said pressure. We won't model the whole tree of life, but we can make certain areas start with varying wildlife safety measures.\"\n\nA REGION-GRAIN SCALAR, derived not rolled, from two terms that already exist upstream: the BODY term from PLANETOLOGY.md's simulated biosphere (how far life got, how productive - a world that never reached land animals carries none), and the REGION term from terrain cover (dense forest and wetland dangerous, open lowland and cold country much less so).\n\nWHAT IT DOES: raises baseline mortality, holding sustainable population BELOW region_carrying_capacity(farm_q). That is the cap - surplus is consumed by death rather than accumulating into a pressure the model has nowhere to send. The brake is an in-world force with a visible cause, never a term inside an agent.\n\nIT PRICES THE SAME GROUND TWICE, which is why it earns its place: dense forest is dear for a stream to cross AND dangerous to live in once crossed, so forest colonisation stalls on both terms with no constant tuned to make it happen.\n\nSETTLEMENT CLEARS PREDATORS, so predation decays with density - a TRANSIENT frontier cost, not a permanent ceiling. The first settlers pay most; their grandchildren pay little. A permanent wall is the cheaper model and the worse one: it would make the long run static.\n\nIT IS NOT hazard, AND MUST NOT BE FOLDED INTO IT. tile_component::hazard_level is an EXTRACTION danger consumed by the economy's site draw, and Ben ruled against 'hazard' as a body-scale state on 2026-08-31 (its design job is off-world). Distinct quantity, distinct consumer; sharing the name would silently couple two unrelated models.\n\nAGRARIAN_SCORE READS IT. The predation floor is a SELECTION test, not a failure mode: lethal ground is never picked as a cradle. A cradle that forms and then fails spends a simulation discovering what a score could have said for free.\n\nDONE WHEN: predation is derived deterministically per region, mortality reads it, agrarian_score reads it at cradle selection, and a harness shows sustainable population sits below carrying capacity in wild country and converges to it as density rises. The DECAY RATE is history_sweep's to argue, never a harness's; whether it decays to zero is an open design call in COLONISATION.md."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, colonisation design session); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-846",
+    "BL-847"
+   ],
+   "id": "BL-851",
+   "short_name": "SWEEP_SEPARATES_CRADLE_OUTCOMES",
+   "difficulty": 2,
+   "title": "history_sweep reports why a cradle stopped, because four outcomes currently look identical",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "tools/verify/history_sweep.cpp",
+    "src/world/colonisation.hpp"
+   ],
+   "design": "THE INSTRUMENTATION THAT MAKES THE REST TUNABLE, and the finding that produced it: under the colonisation model a cradle almost never DIES, but four different outcomes all read as 'the cradle stopped' and the sweep cannot tell them apart.\n\n  STERILITY   - narrow affinity, no adjacent ground of a matching class. Sessile, not dead.\n  ENCIRCLEMENT- affinity fine, every exit barrier terrain the span never pays for. Sessile.\n  DILUTION    - a neighbour's stream reached the same ground, culture_shares split. Not death;\n                the gods survive as a minority share and the record stays intact.\n  PREDATION FLOOR - sustainable population below the density Stage 0 needs. The only real\n                death, and BL-850 makes it a selection test so it should never be reached.\n\nWHY IT MATTERS MORE THAN IT LOOKS: sessile-forever is a NORMAL and frequent outcome by design (the breadth term in BL-847 makes it so). So a sweep reading 'N cradles stopped' carries no information at all - it cannot separate the design working from a cradle that was never viable, and nobody can argue a single constant in COLONISATION.md against it.\n\nDONE WHEN: the sweep reports the four outcomes separately across a seed spread, and the reading distinguishes a cradle that filled its window from one that never had one."
   }
  ]
 }

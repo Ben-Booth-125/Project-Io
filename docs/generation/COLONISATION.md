@@ -2,9 +2,10 @@
 
 > **Settles:** what the colonisation span is and where it ends · what a domestication
 > package is, how it spreads, and what it gates · what makes people move and what that
-> movement costs · which culture a founded region inherits, and on what terms · what the
-> span hands the settlement, sim and province layers · why no actor and no infrastructure
-> appear anywhere in it.
+> movement costs · what caps the pressure on a people that cannot spread, and what a
+> cradle stopping actually means · which culture a founded region inherits, and on what
+> terms · what the span hands the settlement, sim and province layers · why no actor and
+> no infrastructure appear anywhere in it.
 > **Not here:** what a pantheon is or how a tongue is coined (../lore/CREEDS) · the stage
 > ladder this span sits inside (../lore/HISTORY) · how force resolves once polities contest
 > ground (MILITARY_HISTORY) · how the partition is drawn from what this span leaves
@@ -162,6 +163,64 @@ what a founding is.
 
 ---
 
+## Predation — what caps the pressure
+
+**Ben, 2026-09-09, answering what a penned people does with surplus it cannot send anywhere:**
+*"Death from natural causes can put a cap on said pressure. We won't model the whole tree of life,
+but we can make certain areas start with varying wildlife safety measures."*
+
+**A region carries a predation scalar, and it is a consequence rather than a roll.** Two terms,
+both read from passes that already run:
+
+- the **body** term, from `PLANETOLOGY.md`'s simulated biosphere — how far life got and how
+  productive it is. A world that never reached land animals carries none of this at all;
+- the **region** term, from terrain cover — dense forest and wetland are dangerous, open lowland
+  and cold country much less so.
+
+**What it does is raise baseline mortality**, holding sustainable population *below*
+`region_carrying_capacity(farm_q)`. That is the cap: a penned people's surplus is consumed by
+death rather than accumulating into a pressure the model has nowhere to send. The brake is an
+in-world force with a cause a player can point at, never a term inside anybody's head.
+
+**It prices the same ground twice, and that is why it earns its place.** Dense forest is dear for
+a stream to cross *and* dangerous to live in once crossed, so forest colonisation stalls on both
+terms at once — with no constant tuned to make it happen. Good farming ground in dangerous country
+becomes a real dilemma rather than a free pick.
+
+**Settlement clears predators, so predation decays with density.** The first settlers pay the most
+and their grandchildren pay little. Predation is therefore a **transient frontier cost**, not a
+permanent ceiling: ground that killed a cradle's founders can be taken by its descendants. A
+permanent wall would be the cheaper model and the worse one, because it would make the long run
+static in exactly the way § Packages broaden by crossing exists to avoid.
+
+**It is not `hazard`, and must not be folded into it.** `tile_component::hazard_level` is an
+*extraction* danger consumed by the economy's site draw, and Ben ruled against `hazard` as a
+body-scale state on 2026-08-31 — its design job is off-world. Predation is a distinct quantity
+with a distinct consumer, and sharing the name would silently couple two unrelated models.
+
+### What a cradle stopping actually means
+
+Four outcomes look identical from outside — *the cradle stopped* — and only one is death. They are
+listed because a sweep that cannot separate them cannot argue a single constant in this document.
+
+| Outcome | What happened | Is it death |
+|---|---|---|
+| **Sterility** | Narrow affinity, no adjacent ground of a matching class | No — sessile. People persist, gods never leave home |
+| **Encirclement** | Affinity is fine; every exit is barrier terrain whose year-cost the span never pays | No — sessile, and distinguishable from sterility only by *why* the stream stopped |
+| **Dilution** | A neighbour's stream reached the same ground and `culture_shares` split | No — the gods survive as a minority share, record intact |
+| **The predation floor** | Sustainable population sits below the density Stage 0 needs for surplus | Yes, and it should never be reached |
+
+**The predation floor is a selection test, not a failure mode.** `agrarian_score` reads predation,
+so lethal ground is never chosen as a cradle in the first place. A cradle that forms and then fails
+is the worse design of the two: it spends a simulation discovering what a score could have said for
+free.
+
+**Sessile is a normal outcome and not a defect.** A cradle that fills its valley and stops for four
+thousand years is a legitimate history, and § The domestication package's breadth term makes it a
+frequent one by design.
+
+---
+
 ## Culture arrives by route
 
 **A region inherits the culture of the stream that reached it.**
@@ -224,6 +283,10 @@ than left to be rediscovered.
   after the boundary; they are not moved here, because moving them changes `fragmentation_q` and
   therefore the seed budget — a measured change rather than a design one.
 - **Whether package crossing survives** — see the note under § Packages broaden by crossing.
+- **How fast predation decays with density, and how far.** § Predation makes it a transient
+  frontier cost; the rate is a magnitude, so it is `history_sweep`'s to argue. Whether it decays
+  to *zero* is the design half of the same question, and that one is a call: a floor that never
+  reaches zero keeps a permanent tax on wild country, which may or may not be wanted.
 - **What a package costs to represent.** Affinity over the two-axis terrain is a small fixed-width
   field per cradle, but the founding-time affinity test runs inside the walk, and the walk is the
   span's whole cost. Whether it is a table lookup or something cheaper is an implementation
