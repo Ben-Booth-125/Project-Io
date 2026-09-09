@@ -35,6 +35,7 @@
 #include "ui/presentation.hpp"
 #include "ui/selection.hpp"
 #include "ui/text_fit.hpp"
+#include "world/era_timelapse.hpp" // BL-829: round 4's replay, for the history_* readouts
 #include "ui/view_nav.hpp"
 #include "world/construction.hpp"
 #include "world/corporation_generation.hpp"
@@ -1042,6 +1043,58 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_screen    = app_screen::generating;
         m_wiz_round = round;
         m_wiz_dirty = true;
+    });
+
+    // Round 4's Run press (BL-829), from the same call site the button uses.
+    // Under --verify the run is SYNCHRONOUS — it adopts the record the harness's
+    // own world already carries, or resolves a deferred run in place — so the
+    // call returns with the record in hand and a capture can never race it.
+    v.set_function("history_run", [this]() {
+        m_screen    = app_screen::generating;
+        m_wiz_round = wizard_planetology_round_count;
+        // ORDER MATTERS. The preview is refreshed FIRST because the map's land
+        // mask is the wizard's own packed surface, and because the wizard's draw
+        // re-runs the chain whenever the preview is empty — which invalidates
+        // every pass round below it, and would drop the record this call just
+        // took. Refreshing here leaves nothing for the draw to redo.
+        refresh_wizard_preview();
+        m_wiz_dirty = false;
+        launch_wizard_history_run();
+    });
+
+    // Park round 4's playback at a calendar year, so a check can capture three
+    // points across one span. Playback does not advance under --verify (all
+    // animation is frozen there), so this is the ONLY thing that moves it; the
+    // wizard clamps the year to the record's own span.
+    v.set_function("history_year", [this](int year) {
+        m_wiz_history_year    = year;
+        m_wiz_history_playing = false;
+    });
+
+    // How many polities hold ground on round 4 right now, and 0 when no record
+    // has been taken. It is what lets an ACCEPTANCE script assert that a CLICK on
+    // Run actually landed — without a readout the only provable thing is that a
+    // Lua binding works, which is not the question BL-829's live half asks.
+    // Ownership-only, and per-year: it says nothing a slice of the record does
+    // not already say on screen.
+    v.set_function("history_powers", [this]() -> int {
+        if (m_wiz_history.empty()) return 0;
+        const std::vector<uint16_t> slice =
+            owner_slice_at(m_wiz_history.lapse, m_wiz_history_year);
+        std::vector<uint16_t> seen;
+        for (uint16_t o : slice)
+            if (o != owner_none
+                && std::find(seen.begin(), seen.end(), o) == seen.end())
+                seen.push_back(o);
+        return static_cast<int>(seen.size());
+    });
+
+    // The record's own span, so a script walks the years the run actually
+    // produced rather than the years a doc says it should have.
+    v.set_function("history_span", [this]() {
+        return std::make_tuple(m_wiz_history.lapse.start_year,
+                               m_wiz_history.lapse.start_year
+                                   + m_wiz_history.lapse.years);
     });
 
     v.set_function("show_panel", [this](const std::string& name, bool open) {

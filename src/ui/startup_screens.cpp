@@ -11,6 +11,8 @@
 #include "ui/detail_level.hpp"
 #include "ui/generation_charts.hpp"
 #include "ui/generation_preview.hpp"
+#include "ui/history_lapse.hpp"      // BL-829/BL-830: round 4's map and its board
+#include "world/era_timelapse.hpp"   // owner_slice_at — the whole replay substrate
 
 #include <algorithm>
 #include <chrono>
@@ -85,6 +87,134 @@ void app::launch_wizard_surface_build()
                                            scratch.tiles.at(tiles[i]).cover);
             return comp;
         });
+}
+
+namespace {
+
+/// Lift the recorded era out of a finished generation report.
+///
+/// EVERYTHING THE ROUND DRAWS COMES FROM HERE, and it is all a reading: the
+/// change list, the settled regions' positions and names, and generation's own
+/// three era counters. Nothing is re-simulated and nothing is re-derived — see
+/// `app::launch_wizard_history_run` for why that matters more than it looks.
+ui::history_lapse lapse_from_report(const generation_report& rep)
+{
+    ui::history_lapse h;
+
+    // The homeworld by its authored flag, not by name or position: names are
+    // generated and display-only (BL-257), and the body list can be reordered.
+    const generation_report::body_entry* home = nullptr;
+    for (const generation_report::body_entry& b : rep.bodies)
+        if (b.is_homeworld) { home = &b; break; }
+    if (home == nullptr) return h;
+
+    h.lapse  = home->prehistory_timelapse;
+    h.grid_w = home_grid_width;
+    h.grid_h = home_grid_height;
+
+    h.region_col.reserve(home->settlement.regions.size());
+    h.region_row.reserve(home->settlement.regions.size());
+    h.region_name.reserve(home->settlement.regions.size());
+    for (const region& r : home->settlement.regions)
+    {
+        h.region_col.push_back(r.col);
+        h.region_row.push_back(r.row);
+        h.region_name.push_back(r.name);
+    }
+
+    h.battles   = rep.prehistory_battles;
+    h.conquests = rep.prehistory_conquests;
+    h.foundings = rep.prehistory_foundings;
+    return h;
+}
+
+} // namespace
+
+void app::launch_wizard_history_run()
+{
+    if (m_wiz_history_future.valid()) return; // already running; Run is disabled meanwhile
+
+    m_wiz_history = ui::history_lapse{};
+    m_wiz_history_playing = false;
+    m_wiz_history_carry   = 0.0f;
+
+    // The wait's own content. Cleared FIRST so no frame can read the previous
+    // run's pass split as this one's — the same ordering begin_new_game keeps.
+    m_wiz_history_progress.stage.store(0, std::memory_order_relaxed);
+    m_wiz_history_progress.label.store(0, std::memory_order_relaxed);
+    m_wiz_history_progress.stage_count.store(generation_stage_label_count,
+                                             std::memory_order_relaxed);
+    m_wiz_history_progress.sub_progress.store(0, std::memory_order_relaxed);
+    m_wiz_history_progress.sub_total.store(0, std::memory_order_relaxed);
+
+    // UNDER --verify, ADOPT THE WORLD THE HARNESS ALREADY BUILT. run_verify opens
+    // in_game on a generated world, so `m_generation_report` already holds this
+    // very record — running the pass a second time would cost a Debug harness
+    // minutes to reproduce a record it is already holding, and would produce the
+    // same one. Nothing is faked: it is generation's report either way.
+    if (!m_golden_dir.empty())
+    {
+        ui::history_lapse adopted = lapse_from_report(m_generation_report);
+        if (!adopted.empty())
+        {
+            m_wiz_history      = std::move(adopted);
+            m_wiz_history_year = m_wiz_history.lapse.start_year;
+            return;
+        }
+    }
+
+    // Lua and the works table are read on THIS thread before the worker starts:
+    // sol2 is not thread-safe, and `m_works` is generation's input (BL-321).
+    m_lua.load("scripts/world_gen.lua");
+    world_gen_config cfg{};
+    cfg.load_from_lua(m_lua);
+    ensure_works_loaded();
+
+    auto run = [this, cfg, params = m_pending_world_params]() {
+        generation_report rep;
+        // The world itself is DISCARDED. What the round wants is the era it
+        // recorded, and holding the world would only invite a second, divergent
+        // copy of the campaign's own.
+        (void)make_hard_coded_world(params, &rep, cfg, &m_wiz_history_progress, &m_works);
+        return lapse_from_report(rep);
+    };
+
+    if (!m_golden_dir.empty())
+        m_wiz_history_future = std::async(std::launch::deferred, run);
+    else
+        m_wiz_history_future = std::async(std::launch::async, run);
+
+    // A deferred future never becomes ready on its own, so a capture path
+    // resolves it here and now rather than spinning forever in poll.
+    if (!m_golden_dir.empty())
+        poll_wizard_history();
+}
+
+void app::poll_wizard_history()
+{
+    if (!m_wiz_history_future.valid())
+        return;
+    if (m_golden_dir.empty()
+        && m_wiz_history_future.wait_for(std::chrono::seconds(0))
+               != std::future_status::ready)
+        return;
+    ui::history_lapse landed = m_wiz_history_future.get();
+    if (m_wiz_history_stale)
+    {
+        // The ground moved while this ran: it is a true history of a world the
+        // player has already rerolled away from. Dropped rather than drawn.
+        m_wiz_history_stale   = false;
+        m_wiz_history         = ui::history_lapse{};
+        m_wiz_history_playing = false;
+        return;
+    }
+    m_wiz_history      = std::move(landed);
+    m_wiz_history_year = m_wiz_history.lapse.start_year;
+    // It plays the moment it lands: the run was the wait, and the playback is
+    // what the player pressed Run for. Frozen under --verify, where the year is
+    // set by the script instead (verify.history_year).
+    m_wiz_history_playing = m_golden_dir.empty();
+    m_wiz_history_carry   = 0.0f;
 }
 
 void app::poll_wizard_surface()
@@ -402,6 +532,10 @@ void app::draw_generation_screen()
     // Adopt a finished real-surface build (and chain a relaunch if the params
     // moved mid-build). Cheap zero-wait probe; runs every wizard frame.
     poll_wizard_surface();
+    // The same probe for round 4's history run (BL-829). Also every frame, and
+    // also cheap: the wizard must keep repainting while the pass works, because
+    // on this round the wait IS the content.
+    poll_wizard_history();
 
     // What this GUARDED, before the wizard grew past the chain (BL-816): that every
     // wizard round the code hands to ui::chain_round_at has a chart-round entry
@@ -424,6 +558,59 @@ void app::draw_generation_screen()
     // per keystroke; the pass rounds cannot (STARTUP.md § The wait is the round).
     const bool planetology_round = (m_wiz_round < wizard_planetology_round_count);
     const int  pass_index        = m_wiz_round - wizard_planetology_round_count;
+
+    // ── Round 4's playback, advanced once per frame and read TWICE — the board on
+    //    the left and the map on the right must show the same instant, so the
+    //    slice is materialised here rather than in each of them. ──
+    const bool history_round = (m_wiz_round == wizard_planetology_round_count);
+    std::vector<uint16_t> hist_slice, hist_lagged;
+    if (history_round && !m_wiz_history.empty())
+    {
+        // The land mask comes from the wizard's OWN packed surface — the same
+        // raster the globe samples and the same one "Begin" builds — so the
+        // coastline a frontier stalls at is the coastline the campaign has. It is
+        // a no-op until that async build lands; the round simply retries.
+        ui::finish_history_lapse(m_wiz_history,
+                                 m_wiz_surface.empty() ? nullptr : m_wiz_surface.data(),
+                                 m_wiz_surface.size());
+
+        const int first = m_wiz_history.lapse.start_year;
+        const int last  = first + m_wiz_history.lapse.years;
+
+        // FROZEN UNDER --verify, for the reason the globe's rotation is: a capture
+        // must never race an animation. The year is then whatever the script set.
+        if (m_wiz_history_playing && m_golden_dir.empty())
+        {
+            // The rate follows the SPAN rather than being a constant, the same
+            // derivation the History ledger's Ages view makes: the recorded era is
+            // 400 years today and the round is written against 4000, and a fixed
+            // years-per-second would empty the transport in a blink on one of them.
+            const float span = static_cast<float>(last - first);
+            constexpr float run_secs = 30.0f;
+            const float rate = span > 0.0f ? span / run_secs : 1.0f;
+            m_wiz_history_carry += ImGui::GetIO().DeltaTime * rate;
+            const int whole = static_cast<int>(m_wiz_history_carry);
+            if (whole > 0)
+            {
+                m_wiz_history_carry -= static_cast<float>(whole);
+                m_wiz_history_year  += whole;
+            }
+            if (m_wiz_history_year >= last)
+            {
+                m_wiz_history_year    = last;
+                m_wiz_history_playing = false;
+            }
+        }
+        if (m_wiz_history_year < first) m_wiz_history_year = first;
+        if (m_wiz_history_year > last)  m_wiz_history_year = last;
+
+        hist_slice = owner_slice_at(m_wiz_history.lapse, m_wiz_history_year);
+        // The lagged board, for the entry/exit marks. A twelfth of the span back:
+        // far enough that a rank move means something, near enough that the marks
+        // are not permanently lit.
+        const int lag = std::max(1, (last - first) / 12);
+        hist_lagged = owner_slice_at(m_wiz_history.lapse, m_wiz_history_year - lag);
+    }
 
     const wizard_round_head wr       = wizard_round_head_at(m_wiz_round);
     const int               n_bodies = std::min(static_cast<int>(m_wiz_preview.size()),
@@ -560,11 +747,98 @@ void app::draw_generation_screen()
                 ui::draw_stage_fold(chart_src, static_cast<chain_stage>(s), m_ui,
                                     detail_surface::generation_stage);
         }
+        else if (history_round)
+        {
+            // ── Round 4: Run, the wait, then the board (BL-829 / BL-830) ──
+            //
+            // THE TRANSPORT IS DELIBERATELY PLAIN. The wizard's standing premise —
+            // *you set conditions here, you do not steer* — and the globe's own
+            // no-input ruling both argue for the plainer answer, and BL-829 files
+            // scrub/pause as a question to be settled by WATCHING rather than in
+            // advance. So: it runs, and it can be run again from the start. No
+            // pause and no scrub until Ben has watched one.
+            if (m_wiz_history_future.valid())
+            {
+                // The wait, with its own content. A frozen pane for ninety seconds
+                // is worse than a bar, not better (STARTUP.md § The wait is the
+                // round) — so the pass says which link it is on, and the era
+                // reports its own year counter while it runs.
+                ImGui::BeginDisabled();
+                ImGui::Button("Running the history...",
+                              {ImGui::GetContentRegionAvail().x, 30.0f});
+                ImGui::EndDisabled();
+                ImGui::Spacing();
+
+                int li = m_wiz_history_progress.label.load(std::memory_order_relaxed);
+                if (li < 0 || li >= generation_stage_label_count) li = 0;
+                dim_text(generation_stage_labels[li]);
+
+                const int sub_total = m_wiz_history_progress.sub_total.load(
+                    std::memory_order_relaxed);
+                if (sub_total > 0)
+                {
+                    const int sub_done = m_wiz_history_progress.sub_progress.load(
+                        std::memory_order_relaxed);
+                    ImGui::ProgressBar(
+                        std::clamp(static_cast<float>(sub_done)
+                                       / static_cast<float>(sub_total), 0.0f, 1.0f),
+                        {ImGui::GetContentRegionAvail().x, 10.0f}, "");
+                    std::snprintf(buf, sizeof buf, "year %d of %d", sub_done, sub_total);
+                    dim_text(buf);
+                }
+            }
+            else if (m_wiz_history.empty())
+            {
+                if (ImGui::Button("Run##wizhistrun",
+                                  {ImGui::GetContentRegionAvail().x, 30.0f}))
+                    launch_wizard_history_run();
+                ImGui::Spacing();
+                dim_text("Four thousand years of claim and counter-claim, run here rather "
+                         "than previewed: the history is the most expensive pass in the "
+                         "project, and it cannot be re-rolled on every keystroke the way "
+                         "the planetology rounds are. Press Run and watch it.");
+            }
+            else
+            {
+                // Restart is the whole transport. It is not a toggle — it has no
+                // active state to undo; it re-parks the playhead and plays.
+                if (ImGui::Button("Restart##wizhistrestart",
+                                  {ImGui::GetContentRegionAvail().x, 30.0f}))
+                {
+                    m_wiz_history_year    = m_wiz_history.lapse.start_year;
+                    m_wiz_history_carry   = 0.0f;
+                    m_wiz_history_playing = m_golden_dir.empty();
+                }
+                ImGui::Spacing();
+
+                std::snprintf(buf, sizeof buf, "%s  -  %lld battles, %lld conquests, "
+                                               "%lld foundings in the full run",
+                              ui::lapse_year_label(m_wiz_history_year).c_str(),
+                              static_cast<long long>(m_wiz_history.battles),
+                              static_cast<long long>(m_wiz_history.conquests),
+                              static_cast<long long>(m_wiz_history.foundings));
+                dim_text(buf);
+                ImGui::Separator();
+
+                ui::draw_lapse_scoreboard(m_wiz_history, hist_slice, hist_lagged);
+
+                ImGui::Spacing();
+                // THE ONE THING THIS ROUND CANNOT DO YET, said in as many words
+                // rather than left for a player to discover. `world_params` carries
+                // no per-pass era seed, so re-running the history off the same
+                // planetology reproduces it exactly; folding the round's reroll into
+                // `params.seed` would re-draw the planetology rounds above it, which
+                // rounds-are-causal forbids in that direction.
+                dim_text("Reroll re-runs the pass. Until the era carries a seed of its "
+                         "own, a re-run on the same world reproduces this same history "
+                         "- reroll a planetology round to change the ground first.");
+            }
+        }
         else
         {
-            // The pass rounds' real chart surfaces — round 4's culture leaderboard,
-            // round 5's substrate readout — arrive with their passes. Until then the
-            // round says so in as many words rather than showing an empty column.
+            // Round 5's real chart surface — the substrate readout — arrives with its
+            // pass. Until then the round says so in as many words rather than showing
+            // an empty column.
             draw_pass_round_placeholder(pass_index);
         }
 
@@ -652,6 +926,16 @@ void app::draw_generation_screen()
                 ++m_wiz_pass_roll[pass_index];
                 m_wiz_pass_current[pass_index] = false; // re-run, not yet accepted
                 invalidate_wizard_rounds_below(m_wiz_round);
+                // Round 4 rerolls by RE-RUNNING the pass, not by re-drawing a
+                // cached one (STARTUP.md § The 4000 years can be rerolled) — which
+                // is the whole reason the wait had to be worth watching rather than
+                // merely tolerable. See the caption on the round for the one thing
+                // this cannot yet vary.
+                if (history_round && !m_wiz_history_future.valid())
+                {
+                    m_wiz_history = ui::history_lapse{};
+                    launch_wizard_history_run();
+                }
             }
         }
 
@@ -686,6 +970,29 @@ void app::draw_generation_screen()
         ImGui::SameLine();
         ImGui::BeginChild("##wiz_preview", {0.0f, 0.0f}, false,
                           ImGuiWindowFlags_NoBackground);
+        if (history_round)
+        {
+            // ── Round 4 replaces the globe with a 2D MAP (Ben, 2026-09-08, at the
+            //    live app). A globe shows a world; a map shows a FRONTIER, and the
+            //    frontier is this round's whole subject — a border that stalls at a
+            //    strait reads as a stall on a map and as foreshortening on a sphere.
+            //    It inherits the globe's no-input rule: nothing here is a widget. ──
+            if (m_wiz_history.empty())
+            {
+                ImGui::Dummy({0.0f, ImGui::GetContentRegionAvail().y * 0.45f});
+                ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+                ImGui::TextWrapped(
+                    m_wiz_history_future.valid()
+                        ? "  The history is running. The map fills in when it lands."
+                        : "  No history yet. Press Run.");
+                ImGui::PopStyleColor();
+            }
+            else
+            {
+                ui::draw_lapse_map(m_wiz_history, hist_slice, m_wiz_history_year);
+            }
+        }
+        else
         {
             std::vector<ui::preview_body> pv;
             pv.reserve(static_cast<std::size_t>(n_bodies));

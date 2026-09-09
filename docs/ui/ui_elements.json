@@ -1863,6 +1863,38 @@
     "nav_rail_fit",
     "shell_pass"
    ]
+  },
+  {
+   "id": "UI-118",
+   "name": "Wizard round 4 time-lapse map",
+   "kind": "sub-element",
+   "parent": "UI-092",
+   "source": [
+    "docs/ui/STARTUP.md § Rounds 4 and 5"
+   ],
+   "summary": "A 2D political map in place of the globe, replaying the recorded Era -1 ownership history (era_timelapse / owner_slice_at) at tile resolution with every land tile assigned to its nearest region; run-merged per row so a 261x121 raster stays inside ImGui 16-bit draw indices. Takes no mouse input, inheriting the globe rule; playback frozen under --verify.",
+   "interesting_question": "The record starts at 400 BCE with every polity already founded, because the settlement pass places regions BEFORE the era sim - so the arc STARTUP.md asks for (origin -> communication -> conquest -> dark age) has no visible origin phase on the map. Is the round showing the last 400 years of a 4000-year story?",
+   "resolution": "Open. The map draws what the record holds and the record covers only the sim span; the founding diffusion belongs to the settlement pass and COLONISATION.md, which emit no ownership changes.",
+   "checks": [
+    "history_lapse",
+    "history_lapse_press"
+   ]
+  },
+  {
+   "id": "UI-119",
+   "name": "Wizard round 4 top-sixteen board",
+   "kind": "sub-element",
+   "parent": "UI-092",
+   "source": [
+    "docs/ui/STARTUP.md § Rounds 4 and 5"
+   ],
+   "summary": "An ordered, capped board of the sixteen polities holding the most land at the played year, re-ranking as the time-lapse advances. Share of LAND (region areas from the same nearest-region assignment the map draws), rows named by the seat each polity first held, rank delta and entry marks measured against a slice a twelfth of the span earlier. Population and military columns are owed on BL-817; a research column is refused, not deferred.",
+   "interesting_question": "Generation produces about twelve polities on the cradle, so a board of sixteen never fills and no polity is ever pushed OUT of it - which BL-830 names as the whole story of the round.",
+   "resolution": "Open, and it is a sim fact rather than a board fact: the cap is right and the population of polities is below it. Entries and exits become visible only when the era ends with more than sixteen powers.",
+   "checks": [
+    "history_lapse",
+    "history_lapse_press"
+   ]
   }
  ]
 }

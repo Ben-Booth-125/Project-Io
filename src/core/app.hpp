@@ -16,6 +16,7 @@
 #include "world/world.hpp"
 
 #include "ui/canvas_command.hpp"
+#include "ui/history_lapse.hpp"    // BL-829: the wizard round 4 time-lapse record
 #include "scripting/persona_pack.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/plot_history.hpp"
@@ -276,6 +277,20 @@ private:
         for (int i = 0; i < wizard_pass_round_count; ++i)
             if (wizard_planetology_round_count + i > round)
                 m_wiz_pass_current[i] = false;
+
+        // Round 4's RECORD goes with it (BL-829). A history is a history OF a
+        // world, so a planetology move makes the one on screen a plausible
+        // account of ground that no longer exists — which is exactly the silent
+        // failure this function was wired ahead of the passes to prevent. A run
+        // already in flight cannot be recalled, so it is marked instead and
+        // discarded when it lands; the player presses Run again, because starting
+        // the project's most expensive pass unbidden is not a repair.
+        if (round < wizard_planetology_round_count)
+        {
+            if (m_wiz_history_future.valid()) m_wiz_history_stale = true;
+            else                              m_wiz_history = ui::history_lapse{};
+            m_wiz_history_playing = false;
+        }
     }
 
     /// Draw the New World wizard (BL-167) — the surface between "New Game" and the
@@ -521,6 +536,39 @@ private:
     bool m_wiz_surface_stale = false;         ///< Params moved while a build was in flight.
     void launch_wizard_surface_build();       ///< Start the worker for the CURRENT pending params.
     void poll_wizard_surface();               ///< Per-frame: adopt a finished build, relaunch if stale.
+
+    // --- Round 4: the history time-lapse (BL-829 / BL-830) ------------------
+    //
+    // THIS ROUND INVERTS THE WIZARD'S MODEL and STARTUP.md § The wait is the
+    // round says why: rounds 0-2 re-run a cheap chain preview on every control
+    // move, and the history sim cannot be previewed per keystroke at any budget.
+    // So the player presses RUN, the pass runs inside the round, and the wait IS
+    // the content (Ben, 2026-09-08: *a watched wait needs no budget*).
+    //
+    // WHAT THE WORKER ACTUALLY RUNS is `make_hard_coded_world` — generation's own
+    // single invocation — and it throws the world away, keeping only the recorded
+    // era. That is the same argument `generate_home_surface_preview` is built on:
+    // the ground the history runs on must be the ground "Begin" hands over. A
+    // partial re-derivation of settlement-plus-era up here would be a SECOND
+    // construction of the Era -1 invocation, which is precisely the drift
+    // `world/era_minus_one.hpp` exists to stop (BL-462, and NR-733 for the last
+    // caller that did it). No caller is added: the record is read off the report
+    // the run already fills.
+    ui::history_lapse                 m_wiz_history;        ///< Round 4's record; empty until Run finishes.
+    std::future<ui::history_lapse>    m_wiz_history_future; ///< The run in flight, if any.
+    generation_progress               m_wiz_history_progress; ///< The wait's own content: which pass, which year.
+    int   m_wiz_history_year    = 0;     ///< Where playback stands, in calendar years.
+    bool  m_wiz_history_playing = false; ///< Advancing on wall time.
+    /// The planetology moved while a run was in flight, so what it returns is a
+    /// history of a world that is gone. Discarded on arrival rather than shown.
+    bool  m_wiz_history_stale   = false;
+    float m_wiz_history_carry   = 0.0f;  ///< Sub-year accumulator for the advance.
+    /// Start the history pass for the CURRENT pending params. Synchronous under
+    /// `--verify` (a capture must never race a worker), exactly as the wizard's
+    /// surface build already is.
+    void launch_wizard_history_run();
+    /// Per-frame: adopt a finished run and park playback at its first year.
+    void poll_wizard_history();
 
     // --- The seat (BL-630, 2026-08-26) --------------------------------------
     //
