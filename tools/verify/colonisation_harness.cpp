@@ -975,10 +975,14 @@ void case_family_tree(int seed_count)
 
         const std::vector<culture>& cs = fx.creeds.cultures;
         int rooted = 0, deepest = 0, with_class = 0, monotonic = 1;
+        int with_year = 0, time_monotonic = 1, roots_at_span_start = 1;
+        int deepest_hops = -1;
+        int64_t deepest_years = 0;
 
         for (std::size_t i = 0; i < cs.size(); ++i)
         {
             if (cs[i].origin_farm_class >= 0) ++with_class;
+            if (cs[i].coined_year != INT64_MIN) ++with_year;
 
             // Walk to the root, bounded by the culture count so a broken tree
             // fails the assertion rather than hanging the harness.
@@ -989,28 +993,54 @@ void case_family_tree(int seed_count)
             {
                 const int up = cs[static_cast<std::size_t>(at)].parent;
                 if (up >= at) monotonic = 0;   // must strictly decrease
+                // TIME MOVES FORWARD DOWN THE TREE: a parent's coining year
+                // must be no later than its child's (NR-816 — kinship as years
+                // since the common ancestor is worthless if time can run backward).
+                if (cs[static_cast<std::size_t>(up)].coined_year
+                    > cs[static_cast<std::size_t>(at)].coined_year)
+                    time_monotonic = 0;
                 at = up;
                 ++depth;
             }
-            if (at >= 0 && cs[static_cast<std::size_t>(at)].parent < 0) ++rooted;
-            if (depth > deepest) deepest = depth;
+            const bool this_rooted = at >= 0 && cs[static_cast<std::size_t>(at)].parent < 0;
+            if (this_rooted)
+            {
+                ++rooted;
+                // THE CRADLE-YEAR CHECK (BL-873 DONE-WHEN): the root of every
+                // walk must carry the span's start, never a sentinel.
+                if (cs[static_cast<std::size_t>(at)].coined_year != colonisation_start_year)
+                    roots_at_span_start = 0;
+            }
+            if (depth > deepest && this_rooted)
+            {
+                deepest        = depth;
+                deepest_hops   = depth;
+                // YEARS SINCE THE COMMON ANCESTOR (NR-816) — the actual measure
+                // hop count was standing in for. Printed alongside the hop count
+                // so the two are visible side by side.
+                deepest_years  = cs[i].coined_year - cs[static_cast<std::size_t>(at)].coined_year;
+            }
         }
 
         std::printf("seed %u  cultures %d  reach a cradle %d  deepest descent %d  "
-                    "carry an origin class %d\n",
-                    wp.seed, static_cast<int>(cs.size()), rooted, deepest, with_class);
+                    "carry an origin class %d  carry a coined year %d  "
+                    "deepest hops %d  deepest years %lld\n",
+                    wp.seed, static_cast<int>(cs.size()), rooted, deepest, with_class,
+                    with_year, deepest_hops, static_cast<long long>(deepest_years));
 
-        if (rooted == static_cast<int>(cs.size()) && monotonic
-            && with_class == static_cast<int>(cs.size()))
+        if (rooted == static_cast<int>(cs.size()) && monotonic && time_monotonic
+            && roots_at_span_start
+            && with_class == static_cast<int>(cs.size())
+            && with_year == static_cast<int>(cs.size()))
             ++worlds_ok;
     }
 
     if (worlds == 0) { check(false, "C14 no world ran - the case is vacuous"); return; }
 
     check(worlds_ok == worlds,
-          "C14  THE FAMILY TREE SURVIVES: every culture walks back to a cradle, parents are "
-          "strictly lower-indexed so the walk cannot loop, and every people records the "
-          "country it was coined on");
+          "C14  THE FAMILY TREE SURVIVES: every culture walks back to a cradle at the span's "
+          "start, parents are strictly lower-indexed and no later in time than their children, "
+          "and every people records both the country and the year it was coined on");
 }
 
 } // namespace
