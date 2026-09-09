@@ -47,6 +47,7 @@
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -739,11 +740,95 @@ void case_route_on_real_worlds(int seed_count)
           "earned by arrival, not assigned by distance (BL-848's acceptance test)");
 }
 
+
+// ---------------------------------------------------------------------------
+// C12 — THE FOUNDING SCHEDULE FILLS THE SPAN (BL-846)
+// ---------------------------------------------------------------------------
+//
+// The acceptance test for "phase 4 should not read as combined colonisation and
+// conquest" (Ben, 2026-09-09). Everything else in this file tests the walk; this
+// tests whether the walk's schedule actually reaches the RECORD, which is the
+// only thing a player ever sees.
+//
+// WHAT IT ASKS. Build a world at a span long enough to contain the diffusion,
+// then read the recorded ownership changes and ask WHEN they happened. If every
+// change is dated to the run's first year, the map was full at tick zero and the
+// time-lapse has no origin -- which is precisely the defect this item exists to
+// close. What we want is a substantial share of foundings landing INSIDE the
+// span, spread across it.
+//
+// IT REPORTS THE SHAPE RATHER THAN ASSERTING A MAGNITUDE. How many foundings
+// fall in which century is history_sweep's to argue; what a harness may assert
+// is that the span is not degenerate -- that the record contains a filling
+// phase at all.
+
+void case_founding_schedule(int span_years)
+{
+    std::printf("\n--- C12: does the record contain the world filling? -----------\n");
+
+    world_params wp;
+    wp.seed             = 0;
+    wp.prehistory_years = span_years;
+
+    generation_report rep;
+    const world w = make_hard_coded_world(wp, &rep, world_gen_config{}, nullptr, nullptr,
+                                          nullptr);
+    (void)w;
+
+    const generation_report::body_entry* k = kepler_of(rep);
+    if (k == nullptr) { check(false, "C12 no homeworld -- the case is vacuous"); return; }
+
+    const era_timelapse& t = k->prehistory_timelapse;
+    if (t.empty()) { check(false, "C12 the era recorded nothing"); return; }
+
+    const int64_t first = t.start_year;
+    const int64_t last  = t.start_year + t.years;
+
+    // How many ownership changes are dated to the very first year -- the world
+    // as it stood before the sim began -- against those that happened during it.
+    int at_open = 0, during = 0;
+    for (const owner_change& c : t.changes)
+        if (c.year <= first) ++at_open; else ++during;
+
+    // And the spread: how many DISTINCT years carry a change. A record whose
+    // changes all land in one or two years is a jump cut, not a time-lapse.
+    std::vector<int32_t> years;
+    for (const owner_change& c : t.changes)
+        if (c.year > first) years.push_back(c.year);
+    std::sort(years.begin(), years.end());
+    years.erase(std::unique(years.begin(), years.end()), years.end());
+
+    std::printf("span %lld yr (%lld -> %lld)  changes %d  at the open %d  during %d "
+                "(%d%%)  across %d distinct years\n",
+                static_cast<long long>(span_years),
+                static_cast<long long>(first), static_cast<long long>(last),
+                static_cast<int>(t.changes.size()), at_open, during,
+                t.changes.empty() ? 0
+                                  : static_cast<int>((during * 100) / t.changes.size()),
+                static_cast<int>(years.size()));
+    std::printf("      regions at the epoch %d   foundings reported %lld\n",
+                static_cast<int>(k->settlement.regions.size()),
+                static_cast<long long>(rep.prehistory_foundings));
+
+    check(during > 0,
+          "C12  THE RECORD CONTAINS THE WORLD FILLING -- ownership changes happen "
+          "DURING the span, not only at its opening frame");
+    check(static_cast<int>(years.size()) >= 10,
+          "C12b and they are spread across the span rather than bunched into a jump cut");
+
+    // THE SETTLEMENT IS COMPLETE BY THE EPOCH. The schedule is drained by the
+    // sim, never carried past it -- which is what keeps it off the save seam.
+    check(k->settlement.pending_foundings.empty(),
+          "C12c the founding schedule is fully drained by the epoch (nothing is left "
+          "un-founded, so no half-built settlement reaches the report)");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
 {
     const int seed_count = argc > 1 ? std::atoi(argv[1]) : 3;
+    const int span_years = argc > 2 ? std::atoi(argv[2]) : 4000;
 
     std::printf("\n=== colonisation_harness — BL-846/847/848/850 ===\n");
     std::printf("Asserts STRUCTURE only. Every magnitude in this layer is history_sweep's\n"
@@ -757,6 +842,7 @@ int main(int argc, char** argv)
     case_cradle_outcomes();
     case_real_worlds(seed_count);
     case_route_on_real_worlds(seed_count);
+    case_founding_schedule(span_years);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;

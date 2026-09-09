@@ -29,6 +29,24 @@ void app::open_new_world_wizard()
     m_wiz_round = 0;
     m_wiz_dirty = true;
     m_screen    = app_screen::generating;
+
+    // THE FULL FOUR THOUSAND YEARS (BL-846; Ben, 2026-09-09). The struct default
+    // is 400, which is a SCOPE knob rather than a design one — it exists so a
+    // harness that does not test the era can skip paying for it. A player's
+    // world is not a harness, and round 4's whole subject is the span.
+    //
+    // WHY IT IS SET HERE AND NOT AS THE STRUCT DEFAULT. Every headless harness
+    // in the project builds worlds from `world_params{}`, and the era at 4000
+    // years costs ~6.5 s against ~60 ms at 400. Moving the default would put
+    // that on every check in the repo to serve one screen. So the wizard asks
+    // for the long span and everything else keeps the cheap one.
+    //
+    // IT REACHES "BEGIN" TOO, AND THAT IS DELIBERATE RATHER THAN INCIDENTAL:
+    // `begin_new_game` builds from these same params, so the campaign gets the
+    // history the player actually watched. A wizard that showed a 4000-year
+    // history and then dealt a 400-year world would be lying about the world it
+    // was selling.
+    m_pending_world_params.prehistory_years = 4000;
 }
 
 void app::refresh_wizard_preview()
