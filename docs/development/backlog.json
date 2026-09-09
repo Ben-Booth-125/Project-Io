@@ -821,6 +821,159 @@
     "tools/verify/history_span_cost.cpp"
    ],
    "design": "WHAT BL-844 LEFT STANDING, and it said so itself. BL-844 replaced the heapless reach scan with a heap and removed the O(N^2) per rebuild; its closing note records that ms/rebuild still rises with region count (0.017 at 529 regions -> 0.079 at 1,160 on seed 0) because the neighbour graph DENSIFIES as regions fill in, so edges are not O(N) in this world and O(E log V) still grows - and declines to pursue it further on the grounds that reach is no longer what a long run is made of.\n\nRE-MEASURED INDEPENDENTLY THIS SESSION and the figures reproduce exactly: seed 0 gives 0.017 / 0.045 / 0.079 ms per rebuild at 533 / 833 / 1,174 regions; seed 1 gives 0.035 / 0.114 / 0.218 at 563 / 931 / 1,260. Fitted exponent 1.95-2.27 across both seeds. Reach is 24-37% of a 4,000-year run (history_span_cost, build_gen /O2).\n\nWHY IT MATTERS NOW, WHEN IT DID NOT BEFORE. Ben's sprint-37 brief asks to transform regions into provinces and not to aim for a small set - which spans a factor of SIXTEEN (1,372 regions against 22,153 land provinces). At an exponent of ~2 that is ~256x the reach term: seed 1's 6,541 ms run would spend roughly 400 SECONDS in reach alone. The region count is therefore capped by the ADJACENCY MODEL rather than by the pathfinder, and no further heap work reaches it.\n\nTHE SHAPE OF A FIX, none of it settled: region adjacency is Chebyshev at neighbour_radius 9 and water-blind, so a region gains neighbours as the map fills whether or not anything can move between them. Capping degree, or making adjacency a nearest-k rather than a radius, would make edges O(N) again. Both change what the sim considers a neighbour, which moves battles and campaigns - so this is a determinism-digest change and NOT a refactor.\n\nNR-809 IS THE DECISION THIS ITEM HANGS OFF. If Ben caps the region count for this sprint (the recommendation), this stays filed and unbuilt. It is what a sixteen-fold count would need.\n\nDONE WHEN: mean neighbour degree stops rising with region count, history_span_cost shows ms/rebuild flat across the span table, and world_determinism's digests are re-blessed deliberately rather than accidentally."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, watching round 4 at the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [],
+   "id": "BL-856",
+   "short_name": "MIGRATION_SPAWNS_CULTURES",
+   "difficulty": 3,
+   "title": "A stream that walks far enough from its origin founds a new people",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/colonisation.cpp",
+    "src/world/colonisation.hpp",
+    "src/world/creeds.cpp",
+    "src/world/settlement.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "BEN, 2026-09-09, ON WATCHING THE ROUND: this should be a timelapse of initial migration patterns, and SPAWN NEW CULTURES.\n\nTHE DEFECT, MEASURED. The first build carries exactly one culture per cradle for the life of the run, so a stream that crosses a continent arrives as the same people who set out. On seed 0 that produced FIVE surviving cultures across a whole homeworld -- and since the run also has zero conquests (BL-861), those five are not survivors of a contest, they are simply all there ever were. A map of five peoples is a map of where agriculture started, not a map of a migration.\n\nAFTER: a stream that has travelled far enough from its origin founds a NEW culture derived from its parent -- inheriting the pantheon's shape and the tongue's phonology and diverging from them, exactly as CREEDS.md already coins a tongue from a parent. The parent's package travels with it, subject to the crossing rule.\n\nNO ACTOR. The split is a consequence of the walk -- distance and time are what make a people diverge -- never a decision. This must not become a verb.\n\nWHAT 'FAR ENOUGH' IS -- years walked, distance, or both -- is history_sweep's like every other magnitude in this layer. What is settled is the shape.\n\nDONE WHEN: a homeworld ends with dozens of related cultures grouped by the routes their ancestors took, a harness shows daughter cultures are derived from their parent rather than rolled fresh, and every generated name still comes from the seeded banks."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, watching round 4 at the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-853"
+   ],
+   "id": "BL-857",
+   "short_name": "COASTAL_AND_OVERSEAS_ROUTES",
+   "difficulty": 3,
+   "title": "The coast is the road, and a crude overseas hop peoples the awkward corners",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/colonisation.cpp",
+    "src/world/colonisation.hpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "BEN, 2026-09-09: not enough emphasis on crude coastal and overseas migration routes.\n\nTWO THINGS ARE MISSING AND BOTH ARE WHAT ACTUALLY MOVED PEOPLE.\n\n(1) THE COAST IS NOT MERELY CHEAP, IT IS THE ROAD. The walk currently discounts shoreline to 55% of base, which makes a coastal route preferable and not decisive. Early migration follows shorelines because the shore FEEDS you while you walk it, so the discount should be strong enough that a coastal route beats an inland one over any comparable distance -- and the map's first cultures should string out along the coasts and only later push inland. An inland-first map is the tell that the walk is mispriced.\n\n(2) CRUDE OVERSEAS HOPS EXIST. Open ocean is impassable to a walk and was never impassable to people: a short crossing to a visible island or across a strait is how the awkward corners of a world get peopled. What is wanted is the CRUDE version -- a bounded hop across a small number of water tiles, costing years like everything else here.\n\nEMPHATICALLY NOT THE STAGED HARBOUR-WORKS MODEL of MILITARY_HISTORY.md's sea legs, which belongs to a later era with institutions in it. No naval capability, no works, no staging hub. This span has no infrastructure in it at all and must not grow any.\n\nBL-853 (the sim view carries no rivers) is the third leg of the same complaint: COLONISATION.md names river courses as the cheapest ground of all and the walk cannot price them.\n\nDONE WHEN: the first cultures on a generated world string along the shorelines, an island or far peninsula that no land route reaches is peopled by a hop, and a harness asserts the hop is BOUNDED -- a stream cannot cross an ocean."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, watching round 4 at the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [],
+   "id": "BL-858",
+   "short_name": "MIGRATION_ENDS_WHEN_LAND_IS_FULL",
+   "difficulty": 3,
+   "title": "The migration round ends when all land has some culture, not on a calendar year",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/colonisation.cpp",
+    "src/world/settlement.cpp",
+    "src/world/history_sim.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "BEN, 2026-09-09: the terminating condition for this round is simply that all land has some culture.\n\nTHIS OVERTURNS THE STATED-BOUNDARY RULING OF EARLIER THE SAME DAY, and COLONISATION.md records the overturn rather than quietly dropping it. The original ruling chose a STATED year on the arc calendar's precedent and explicitly recorded the derived alternative as considered and not taken -- the objection being that a derived boundary makes the span a function of tuning constants elsewhere.\n\nWHAT OVERRULED IT IS A MEASUREMENT. On seed 0 a stated 4000-year span left the last ~1,300 years completely static: standings at 1312 BCE (123/97/115/119/81 regions) were IDENTICAL at 31 BCE and 0 CE. A third of the round showed nothing. A migration round that stops on a calendar year stops mid-migration on some worlds and long after the filling finished on others.\n\nTHE ACCEPTED CONSEQUENCE: the round's LENGTH now varies per world. That is correct for a process whose whole subject is how long the filling took.\n\nTHE SAFETY STOP IS THE REAL WORK AND IS NOT SETTLED. Ground no package can farm never gets a culture by construction, so a naive 'until all land has a culture' never terminates. What counts as 'all land' -- every habitable tile, every landmass above a size, or a share above a threshold -- is an open question in the doc and must be answered before this is built.\n\nDONE WHEN: the round terminates on the condition rather than a year, a harness asserts it TERMINATES on every seed in a spread (including a world with unfarmable ground in it), and no run is left with a visibly static tail."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, watching round 4 at the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [],
+   "id": "BL-859",
+   "short_name": "MOST_LAND_HABITABLE",
+   "difficulty": 3,
+   "title": "Most of the land ends habitable and peopled, and emptiness stops being the default",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/colonisation.cpp",
+    "src/world/colonisation.hpp",
+    "tools/verify/history_sweep.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "BEN, 2026-09-09: we aim for most of the land to be habitable, and include human populations.\n\nMEASURED: the first build leaves roughly HALF the homeworld permanently grey, and it is visible on screen as unclaimed ground that never fills. The harness reads 51-61% of land farmable across three seeds, and one seed (2) reached only 34% farmable with 62% of land reached at all.\n\nEMPTINESS STAYS A REAL OUTCOME AND STOPS BEING THE DEFAULT ONE. COLONISATION.md's 'ground no package suits is not settled' is unchanged as a RULE. What changes is the calibration target it is measured against: a finished migration round should leave the map substantially peopled, with unsettled ground the exception marking genuinely hostile country.\n\nTHE FIX IS IN THE PACKAGE, NEVER IN A FLOOR THAT FILLS THE MAP REGARDLESS. The levers are what a package can farm (the affinity floor, currently 120 per-mille) and how it broadens -- both magnitudes, so this is history_sweep's to argue. A clamp that settles ground no package can farm would delete the frontier mechanism BL-847 exists to create, which is the failure mode this item must not produce.\n\nDONE WHEN: history_sweep reports the habitable/peopled share across a seed spread, most land is peopled on most seeds, and the frontier still stalls somewhere on every world."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, watching round 4 at the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "UI",
+   "requires": [
+    "BL-858"
+   ],
+   "id": "BL-860",
+   "short_name": "HISTORY_BECOMES_ITS_OWN_ROUND",
+   "difficulty": 4,
+   "title": "The 4000 years to 1200 CE become their own wizard round, after migration",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/ui/history_lapse.cpp",
+    "src/core/app.hpp"
+   ],
+   "design": "BEN, 2026-09-09: we will insert a phase after this one -- this is the phase which runs 4000 years ending at 1200 CE. Our rounds are NOT CONTINUOUS.\n\nWHAT THIS REFRAMES. Round 4 was specified as one round covering both the peopling of the world and the empires that followed. Building it showed why that is the wrong cut twice over: first it drew conquest with the migration already finished off-screen, and then -- once the migration was moved inside it -- it drew migration with NO CONQUEST AT ALL and a static final third. The two processes have different subjects, different rules and different terminating conditions.\n\nAFTER: round 4 is THE MIGRATION (ends when all land has a culture, BL-858); round 5 is THE HISTORY (the 4000-year span to 1200 CE, polities contesting what migration left); round 6 is the substrate. The wizard walks SIX rounds.\n\nTHE ARC SPLITS WITH THEM. Origin belongs to round 4. Round 5's acceptance criterion is the rest: communication -> conquest or diplomatic union -> a stable dark age.\n\nNOTHING RESETS BETWEEN THEM -- the region table, culture shares and demography carry across as they do at the ancient/industrial seam. What changes is which rules run.\n\nWATCH THE STATIC ASSERTS: wizard_round_count and its chain mirrors are bound by two static_asserts in startup_screens.cpp, and the pass-round counters are sized per pass round.\n\nDONE WHEN: six pips navigate, Back from 6 lands on 5, each pass round runs its own pass on arrival, and a live click confirms it -- not a capture."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, watching round 4 at the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-860"
+   ],
+   "id": "BL-861",
+   "short_name": "NO_CONQUEST_IN_THE_SPAN",
+   "difficulty": 4,
+   "title": "The 4000-year run fights zero battles, so the arc has no conquest in it",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "design": "FOUND BY DRIVING THE BUILT APP, 2026-09-09, and not by any harness.\n\nTHE READING: '0 battles, 0 conquests, 611 foundings in the full run' across four thousand years on seed 0, with five powers holding ground and none ever taking any from another. Ben's arc -- origin, communication, conquest or diplomatic union, a stable dark age -- has only its first act.\n\nTHE LIKELY CAUSE, and it needs confirming rather than assuming. Culture-by-route (BL-848) gives each stream a CONTIGUOUS block, so a region's neighbours are overwhelmingly kin; the objective scorer's w_cult discount for foreign ground therefore never fires. Large unclaimed buffers (BL-859) compound it by leaving polities without shared frontiers at all.\n\nTHE EVIDENCE IS AMBIGUOUS AND MUST NOT BE ARGUED FROM ONE ARC. At the 4000-year span battles fell 567 -> 70 after culture-by-route; on the 1960 two-span arc they ROSE 30 -> 141. Both are real measurements of different arcs. A tidy story about kinship suppressing war fits the first and not the second, so the cause is to be MEASURED across history_sweep before anything is changed.\n\nTHIS IS THE COUNTERWEIGHT TO BL-854. That item argues B384a (every world sees a region change hands by war) should be retired because a warless settlement span is correct behaviour. This item is the reason that argument cannot be taken on faith: a span with NO war in it at all is not a peaceful settlement process, it is a missing mechanism. Settle the two together.\n\nDONE WHEN: the cause is measured rather than reasoned, and the history round (BL-860) produces conquest without the migration round being made violent."
   }
  ]
 }

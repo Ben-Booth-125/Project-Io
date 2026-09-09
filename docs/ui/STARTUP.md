@@ -104,50 +104,64 @@ subdivided in latitude, every cell a quad — not a per-pixel inverse projection
 into a texture. Both avoid projecting ~7,500 hexes as polygons against ImGui's
 16-bit draw indices; the slice path gets there with less machinery.
 
-## Rounds 4 and 5 — the history, and the substrate (Ben, 2026-09-08)
+## Rounds 4, 5 and 6 — migration, history, substrate (Ben, 2026-09-08; reframed 2026-09-09)
 
-The wizard does not stop at planetology. Two further rounds carry **phase 4 (The
-History)** and **phase 6 (The economic substrate)** —
-[`GENERATION_STRATEGY.md`](../generation/GENERATION_STRATEGY.md) § The eight phases —
-into the same idiom the planetology rounds established: a globe that is the primary
-view, charts as the extras on top, and **preferences, not parameters**.
+The wizard does not stop at planetology. Three further rounds carry the generation
+phases — [`GENERATION_STRATEGY.md`](../generation/GENERATION_STRATEGY.md) § The eight
+phases — into the same idiom the planetology rounds established: a primary view filling
+the pane, charts as the extras on top, and **preferences, not parameters**.
 
-**Round 4 — The History.** The globe is **replaced by a 2D map** in the same pane, and
-the map runs a **time-lapse of the first 4000 years, ending at 1200 CE** (Ben,
-2026-09-08). A globe shows a world; a map shows a *frontier*, and the frontier is the
-whole subject of this round. Polity colour spreads across it, stalls, fractures and
-spreads again.
+**THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09), and this reframes what was one round
+into two.** Round 4 was originally specified as "a time-lapse of the first 4000 years,
+ending at 1200 CE" — one round covering both the peopling of the world and the empires
+that followed. Watching it built showed why that is the wrong cut: the two processes have
+different subjects, different rules and different terminating conditions, and fusing them
+produced a round that showed conquest with the migration already finished off-screen, and
+then — once the migration was moved inside it — a round with **no conquest at all** and a
+static final third. They are separate rounds now, each with its own span.
 
-On the left, where the planetology rounds stack their charts, round 4 keeps a
+**Round 4 — The Migration.** A 2D map replacing the globe, playing the peopling of an
+empty world: where people started, the routes they took, and the cultures those routes
+produced. Its authority is [`COLONISATION.md`](../generation/COLONISATION.md).
+
+- **It ends when all land has some culture** — a derived terminating condition, not a
+  calendar year, so the round is exactly as long as the filling took on this world.
+- **Coastal and overseas routes are the emphasis.** The first cultures should string out
+  along shorelines and hop crude, short water crossings, because that is how people
+  actually moved; an inland-first map is the tell that the walk is mispriced.
+- **Migration spawns cultures.** A stream that travels far enough from its origin founds
+  a new people derived from its parent, so the round's output is dozens of related
+  cultures grouped by route — not the handful its cradles started with.
+- **Most of the land ends habitable and peopled.** Unsettled ground is the exception
+  marking hostile country, never the background state of half a continent.
+
+**Round 5 — The History.** The 4000-year span **ending at 1200 CE**, which is what the
+original round 4 named and what this round now owns alone: polities contesting the world
+migration left them. Origin is round 4's; this round is *communication → conquest or
+diplomatic union → a stable dark age*, and that arc is its acceptance criterion. A run
+reaching 1200 CE without that shape has failed even if every number is plausible.
+**Asymmetry is completely fine and expected** — it is the deliverable, not a defect.
+
+On the left, where the planetology rounds stack their charts, round 5 keeps a
 **leaderboard** — how cultures grew and fell, on four metrics: **military might**,
 **research speed**, **population**, and **share of the world owned**. It is the round's
 chart surface, and it moves with the map.
 
-**The arc the time-lapse must show** is Ben's, and it is the acceptance criterion for
-the whole round: *origin → communication → conquest or diplomatic union → a stable dark
-age.* A run that reaches 1200 CE without that shape has failed even if every number is
-plausible. **Asymmetry is completely fine and expected** — it is the deliverable, not a
-defect (GENERATION_STRATEGY.md § Asymmetry is the deliverable).
-
-**The 4000 years can be rerolled** (Ben, 2026-09-08). Round 4 keeps the wizard's
-`Reroll`, and rerolling re-runs the pass rather than re-drawing a cached one — which is
-the whole reason § The wait is the round has to be affordable rather than merely
-tolerable. A history you cannot reject is a history you were assigned.
-
-**And the focused 400 years is its own page** (Ben, 2026-09-08). Pass 2 — the
-**1560 → 1960 economy pass** — is round 5, a page in its own right with its own run and
-its own reroll, not a coda to round 4. Round 4 settles who holds what ground; round 5
-settles what that ground produces and trades. Phase 6's substrate selection folds in at
-the final `Begin`, after round 5 is accepted.
-
-**Begin becomes Next.** The wizard's commit press moves to the last round; rounds 3 and
-4 advance rather than commit.
-
-**Round 5 — The Substrate.** The same globe, at the epoch, gaining four things in
+**Round 6 — The Substrate.** The same globe, at the epoch, gaining four things in
 order: **metros growing** out of the population centres the history sacked and grew,
 **colonial reach across water**, **firm markers with their charters**, and the
 **market carve with its price field**. This is phase 6's search made watchable — the
 player sees the landscape that was selected, not every candidate that was scored.
+
+**Each pass round is rerollable, and rerolling re-runs the pass** rather than re-drawing
+a cached one (Ben, 2026-09-08) — which is the whole reason § The wait is the round has to
+be affordable rather than merely tolerable. A history you cannot reject is a history you
+were assigned. Each carries its own reroll; the era carries a seed of its own
+(`world_params::era_seed`) so a reroll varies the history without re-drawing the
+planetology rounds above it.
+
+**Begin becomes Next.** The wizard's commit press moves to the last round; every round
+before it advances rather than commits.
 
 ### Leans per pass
 
@@ -164,16 +178,20 @@ The planetology rounds re-run their chain as a pure throwaway preview on every c
 move. **Rounds 4 and 5 cannot**: the history sim is the most expensive pass in the
 project, and a live preview per keystroke is not affordable at any budget.
 
-So these rounds invert it. The player sets the leans, presses **Run**, and the pass
-runs *inside the round* with its output drawn as it computes. The wait is not hidden
-behind a bar — it **is** the content. Accepting moves to the next round; rerolling
-runs it again. Ben, 2026-09-08: *a watched wait needs no budget* — which is why the
+So these rounds invert it. The player sets the leans, and the pass runs *inside the
+round* with its output drawn as it computes. The wait is not hidden behind a bar — it
+**is** the content. Accepting moves to the next round; rerolling runs it again.
+
+**There is no Run button (Ben, 2026-09-09).** Arriving on the round IS the instruction
+to run it, so the press that moves onto a pass round starts its pass — it is already
+under way while the round's first frame draws. A button here asked a question with one
+answer. Ben, 2026-09-08: *a watched wait needs no budget* — which is why the
 generation-budget chain was dropped rather than deferred. What is still owed is that a
 watched wait must be **worth watching**; a round that shows a frozen globe for ninety
 seconds is worse than a bar, not better.
 
-**Rounds stay causal.** Rerolling round 4 invalidates round 5, as rerolling a
-planetology round already re-draws the ones below it.
+**Rounds stay causal.** Rerolling a pass round invalidates the rounds below it, as
+rerolling a planetology round already re-draws the ones below it.
 
 ## Handoff — `start_new_game`
 

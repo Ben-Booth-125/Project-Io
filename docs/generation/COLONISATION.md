@@ -29,26 +29,105 @@ lives, never an independent axis bolted on beside it.
 
 ## The span, and where it ends
 
-Colonisation is the **opening span of the ancient pass**, running from `start_year` to a
-**stated boundary year** in `history_sim_params`. Before the boundary the world is filling;
-after it the world is full enough that the interesting events are contests, and the polity loop
-with its five scored verbs is the right model.
+Colonisation is **its own round of the generation wizard, and its own span** — the migration
+that fills an empty world. It runs from `start_year` until **every habitable landmass carries
+some culture**, and then it stops. What follows is a *separate* round with a separate span: the
+four thousand years to 1200 CE in which polities contest what migration left
+(`../ui/STARTUP.md` § Rounds 4 and 5).
 
-**The boundary is stated, not derived (Ben, 2026-09-09).** It follows the precedent the arc
-calendar already set in `../lore/HISTORY.md` § The epoch and the run, where the ancient pass ends
-at 1200 CE and the 1200 → 1560 coast is a stated span rather than a computed one. A derived
-boundary — a settled-density threshold, or first sustained contact between peoples — was the
-alternative and was not taken: both make the boundary a function of tuning constants elsewhere,
-so a change to carrying capacity would silently move the shape of every generated history.
+**THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09).** This is the framing correction, and it is
+the load-bearing one: the migration round is not the opening slice of the ancient pass with the
+polity loop bolted onto its end. It is a distinct process, with a distinct question — *how did
+people come to be everywhere* — and it finishes when that question is answered. The history round
+then starts from the world it left.
 
-**A stated boundary is a scope decision, and the value is the sweep's to argue.** Like every
-other magnitude in this layer it is calibrated in `history_sweep` and never in a harness
-(`../lore/HISTORY.md` § Settlement — *calibration is the sweep's, not the harness's*). What a
-harness may assert is the **structure**: that no polity verb runs before the boundary, and no
-diffusion runs after it.
+**THE TERMINATING CONDITION IS DERIVED, AND THIS OVERTURNS THE RULING OF EARLIER THE SAME DAY
+(Ben, 2026-09-09).** This document previously settled the boundary as a **stated year**, on the
+precedent of the arc calendar, and explicitly recorded the derived alternative as *considered and
+not taken* — the objection being that a derived boundary makes the span a function of tuning
+constants elsewhere. That objection is overruled by what the round is *for*. A migration round
+that stops on a calendar year stops mid-migration on some worlds and long after the map filled on
+others; on seed 0 the last **1,300 years of a 4,000-year span were measurably static**, which is a
+third of the round showing nothing. The condition is now simply: **all land has some culture.**
 
-**Nothing resets at the boundary.** The region table, the culture shares and the demography carry
-across exactly as they do at the ancient/industrial seam. What changes is which rules are running.
+The consequence the old ruling warned about is real and is accepted: the round's *length* now
+varies per world. That is correct for a process whose whole subject is how long the filling took.
+
+**Nothing resets between the rounds.** The region table, the culture shares and the demography
+carry across exactly as they do at the ancient/industrial seam. What changes is which rules run.
+
+---
+
+## Most of the land is habitable, and it carries people
+
+**Ben, 2026-09-09, on watching the round: the aim is for MOST of the land to be habitable and to
+hold human population.** The first build left roughly half the homeworld permanently grey — ground
+no cradle package could farm, which the model reads as a legitimate outcome and a player reads as
+a broken map.
+
+**Emptiness stays a real outcome; it stops being the DEFAULT one.** § The domestication package's
+"ground no package suits is not settled" is unchanged as a rule. What changes is the calibration
+target it is measured against: a finished migration round should leave the map substantially
+peopled, with unsettled ground the exception that marks genuinely hostile country — not the
+background condition of half a continent.
+
+This is the acceptance criterion the sweep argues the package's affinity floor and breadth
+against, and it is a **measurement**, not a constant to be clamped: if most land is not habitable,
+the fix is in what a package can farm and how it broadens, never a floor that fills the map
+regardless.
+
+---
+
+## Migration spawns cultures
+
+**A culture is not only something a cradle coins; it is something a migration PRODUCES (Ben,
+2026-09-09).**
+
+The first build carried exactly one culture per cradle, for the life of the run — so a stream that
+crossed a continent arrived as the same people who set out, and a world with five viable cradles
+had five cultures at the epoch however far anybody walked. That is the wrong shape for a round
+whose subject is migration: distance and time are precisely what make a people diverge.
+
+**A stream that has travelled far enough from its origin founds a NEW culture** rather than
+extending its parent. What "far enough" is — in years walked, in distance, or in some combination
+— is the sweep's to argue like every other magnitude here. What is settled is the shape:
+
+- the daughter culture is **derived from its parent**, not rolled fresh — it inherits the
+  pantheon's shape and the tongue's phonology, and diverges from them, exactly as
+  `../lore/CREEDS.md` already coins a tongue from a parent;
+- the parent's package travels with it, subject to § Packages broaden by crossing;
+- the split is a **consequence of the walk**, never a decision — no actor, in the sense this
+  document's own § No actor, and no infrastructure means it.
+
+**This is what makes the round's output worth looking at.** Twelve cradles producing five surviving
+peoples is a map of where agriculture started. Twelve cradles producing dozens of related peoples,
+grouped by the routes their ancestors took, is a map of a *migration* — and it is the input the
+history round needs if its contests are to be between neighbours who are recognisably kin or
+recognisably not.
+
+---
+
+## Coastal and overseas routes are the ones that need emphasis
+
+**Ben, 2026-09-09: there is not enough emphasis on crude coastal and overseas migration routes.**
+
+The walk prices the shoreline as cheap and open ocean as impassable, and that is currently the whole
+of the model's relationship with water. Two things are missing, and both are what actually moved
+people:
+
+- **The coast is not merely cheap, it is the ROAD.** Early migration follows shorelines because
+  the shore feeds you while you walk it. The shoreline discount should be strong enough that a
+  coastal route beats an inland one over any comparable distance, so the map's first cultures string
+  out along the coasts and only later push inland.
+- **Crude overseas hops exist.** Open ocean is impassable to a walk and was never impassable to
+  people: a short crossing to a visible island or across a strait is exactly how the awkward
+  corners of a world get peopled. What is wanted is the **crude** version — a bounded hop across a
+  small number of water tiles, not seafaring, not a naval capability, and emphatically not the
+  staged harbour-works model of `MILITARY_HISTORY.md` § Sea legs, which belongs to a later era with
+  institutions in it. A hop costs years like everything else here.
+
+Both are the same claim the span already makes about mountains, applied to water: **the routes
+people actually followed should be the cheap ones**, and the map should show it.
 
 ---
 
@@ -308,7 +387,7 @@ both, and the assimilation machinery that resolves it already exists.
 | Consumer | What it receives | What changes for it |
 |---|---|---|
 | `run_settlement` | The founding set, with culture, package and `founded_year` | Founding *rules* unchanged; the set is earned rather than scattered |
-| `run_history_sim` | A populated, culturally uneven map at the boundary year | Starts from a world with a settlement history instead of an even fill |
+| The **history round** (`run_history_sim`) | A filled, culturally uneven map — every habitable landmass carrying some culture | Starts from a world with a migration behind it rather than an even fill. A SEPARATE round with its own span (`../ui/STARTUP.md`), not a continuation of this one |
 | The province partition | **The settled cells and their anchors, as a hard input** | A new binding input; ordering and nation lock unchanged |
 | `../economy/POPULATION.md` | Regions whose `centres` record begins at a founding the span dates | Nothing — the urban record already works this way |
 
@@ -325,8 +404,19 @@ than left to be rediscovered.
 
 ## Open questions
 
-- **The boundary year's value.** Stated by design, unargued as yet; `history_sweep` is where it is
-  settled, against the shape of the histories it produces.
+- **What "all land has some culture" means exactly.** The terminating condition is settled in
+  shape (§ The span, and where it ends) and not in detail: whether it means every habitable tile,
+  every landmass above some size, or a share of habitable land above a threshold — and what the
+  round does about ground no package can farm, which by construction never gets a culture and so
+  could hold the condition open forever. A safety stop is needed and its form is not settled.
+- **How far is far enough to spawn a culture.** § Migration spawns cultures settles that distance
+  divides a people and leaves the magnitude — years walked, distance, or both — to `history_sweep`.
+- **How strong the coastal discount and how long an overseas hop.** § Coastal and overseas routes
+  settles that both exist and that the crossing is CRUDE. The numbers are the sweep's, and the
+  acceptance test is whether the first cultures string along the coasts.
+- **What share of land counts as "most".** § Most of the land is habitable states the target and
+  deliberately does not put a number on it; the sweep argues it against the package's affinity
+  floor and breadth, never against a floor that fills the map regardless.
 - **The non-hegemony floor on contact-derived fragmentation.** § Fragmentation comes from contact
   retires a welding rule that carried an explicit half-fragmentation floor for BL-224's sake. The
   replacement needs its own bound, and what that bound is has not been derived.

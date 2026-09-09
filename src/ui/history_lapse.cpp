@@ -139,22 +139,38 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
 
     if (!h.derived())
     {
-        dl->AddRectFilled(origin, {origin.x + avail.x, origin.y + avail.y}, col_void);
+        // Nothing painted before the record lands — the shell's own background
+        // is the right empty state, and flooding the pane with `col_void` was
+        // the same black frame the drawn map has now dropped.
         ImGui::Dummy(avail);
         return;
     }
 
     const int gw = h.grid_w, gh = h.grid_h;
 
-    // Fit the raster into the pane, letterboxed, aspect preserved: a political
-    // map stretched to a pane is a map of a different world's shape.
+    // Fit the raster into the pane, aspect preserved: a political map stretched
+    // to a pane is a map of a different world's shape.
     const float scale = std::min(avail.x / static_cast<float>(gw),
                                  avail.y / static_cast<float>(gh));
     const float mw = scale * static_cast<float>(gw);
     const float mh = scale * static_cast<float>(gh);
-    const ImVec2 tl{origin.x + (avail.x - mw) * 0.5f, origin.y + (avail.y - mh) * 0.5f};
 
-    dl->AddRectFilled(origin, {origin.x + avail.x, origin.y + avail.y}, col_void);
+    // NO LETTERBOX (Ben, 2026-09-09: "so that our timelapse doesn't contain
+    // black bars"). The pane used to be flooded with `col_void` and the map laid
+    // on top of it, so a 261x121 raster in a much taller pane wore a black band
+    // above and below — a frame around the subject that said nothing. Only the
+    // map's own rect is painted now, and the shell's background carries the
+    // rest, so the map reads as a map rather than as a picture of one.
+    //
+    // NUDGED RIGHT (Ben, same): centred in the pane it sat visually left of the
+    // space it was given, because the round's left column ends well before the
+    // pane begins. The offset is authored rather than derived — it is a framing
+    // judgement about this screen, and deriving it from some other quantity
+    // would only disguise that.
+    constexpr float map_nudge_x = 120.0f;
+    const ImVec2 tl{origin.x + (avail.x - mw) * 0.5f + map_nudge_x,
+                    origin.y + (avail.y - mh) * 0.5f};
+
     dl->AddRectFilled(tl, {tl.x + mw, tl.y + mh}, col_sea);
 
     // One colour per tile, then RUN-MERGED along the row. A political map is long

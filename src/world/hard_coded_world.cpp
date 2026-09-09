@@ -768,13 +768,32 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                 /*seed=*/params.seed ^ 0xC17910E6u);
     }
 
-    // THE ANCIENT ERA HAS RUN AND THE REPORT IS COMPLETE. A caller that only
-    // wanted the history — the wizard's history round — stops here rather than
-    // paying for borders, roads and companies it will discard (about 95% of the
-    // wall clock; see world_gen_config::stop_after_ancient_era). The world left
-    // behind is deliberately half-built and must not be played.
+    // THE ANCIENT ERA HAS RUN. A caller that only wanted the history — the
+    // wizard's history round — stops here rather than paying for borders, roads
+    // and companies it will discard (about 95% of the wall clock; see
+    // world_gen_config::stop_after_ancient_era). The world left behind is
+    // deliberately half-built and must not be played.
+    //
+    // THE REPORT IS FINISHED FIRST, AND THAT ORDERING IS THE WHOLE OF THIS
+    // BLOCK. The first cut returned immediately and shipped a report carrying
+    // the era's TIME-LAPSE but not its SETTLEMENT — `be.settlement` is assigned
+    // a hundred lines below, past the return — so the wizard's round got an
+    // ownership record with no region coordinates to draw it against and
+    // rendered an empty map for four thousand years while its own header
+    // reported 611 foundings.
+    //
+    // It survived the scripted check because that check cannot see this path:
+    // under `--verify` the round ADOPTS the harness's own fully-built world
+    // rather than running a stopped one, so five green assertions said nothing
+    // about the branch. Caught by driving the built app, which is what the
+    // live-click rule is for.
     if (gen_cfg.stop_after_ancient_era)
+    {
+        if (report)
+            for (generation_report::body_entry& be : report->bodies)
+                if (be.id == kepler) { be.settlement = kepler_settlement; break; }
         return w;
+    }
 
     bump(9);
     const std::vector<entity_id> kepler_nations =
