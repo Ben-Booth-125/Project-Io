@@ -101,6 +101,15 @@ const wantsLanded = showAll || ids.size > 0 || !!touches || !!grep
     || (statuses || []).some((s) => A.CLOSED.has(s));
 const pool = wantsLanded ? A.allItems(backlog, A.ROOT) : backlog.items;
 
+// EVERY path an item names, because --touches is asked of docs as often as of code.
+// `files` is the code an item edits; `touches` is the wider set some items carry; and
+// `authority_doc` is the DOC that owns the design — the field CLAUDE.md's "is this
+// built?" actually turns on. Reading `files` alone answered "nothing matched" for
+// every doc path, because no item puts a docs/ path there (defect found 2026-09-09).
+// All three are INDEX fields (archive_store.js INDEX_KEEP), so a cold row carries them
+// through the union unresolved and this predicate reads landed work as well as open.
+const pathsOf = (it) => [].concat(it.files || [], it.touches || [], it.authority_doc || []);
+
 let hits = pool.filter((it) => {
     if (ids.size) return ids.has(it.id);
     const terminal = A.CLOSED.has(it.status);
@@ -110,7 +119,7 @@ let hits = pool.filter((it) => {
     if (priorities && !priorities.includes(it.priority)) return false;
     if (categories && !categories.includes(it.category)) return false;
     if (version && it.version_goal !== version) return false;
-    if (touches && !(it.files || []).some((f) => f.includes(touches))) return false;
+    if (touches && !pathsOf(it).some((f) => f.includes(touches))) return false;
     if (grep) {
         const needle = grep.toLowerCase();
         // A landed item's summary is cold (archival pass 2026-08-23); pull it back for the match.
