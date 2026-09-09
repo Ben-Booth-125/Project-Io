@@ -58,6 +58,10 @@ namespace
 
 int g_failures = 0;
 
+/// The outcome mix across every swept world — BL-851's reading, summed so the
+/// spread is visible even where one seed happens to be uniform.
+int g_outcome_total[5] = {0, 0, 0, 0, 0};
+
 void check(bool ok, const char* label)
 {
     std::printf("%s  %s\n", ok ? "PASS" : "FAIL", label);
@@ -356,6 +360,100 @@ void case_predation()
 }
 
 // ---------------------------------------------------------------------------
+// C10 — the four cradle outcomes are SEPARATED (BL-851)
+// ---------------------------------------------------------------------------
+//
+// Sessile-forever is a NORMAL and frequent outcome by design, so "N cradles
+// stopped" carries no information at all: it cannot separate the design working
+// from a cradle that was never viable. Each case below builds the ONE map that
+// produces its outcome and nothing else, because that is the only way to show
+// the four are actually distinguished rather than merely enumerated.
+
+void case_cradle_outcomes()
+{
+    // --- STERILITY: the stream walks a long way and can farm none of it ----
+    {
+        test_map m(40, 20);
+        for (std::size_t i = 0; i < m.cover.size(); ++i)
+            m.cover[i] = terrain_cover::forest;      // Woodland everywhere...
+        m.cover[m.at(20, 10)] = terrain_cover::grass; // ...except the anchor.
+
+        domestication_package grass_only;
+        grass_only.affinity[static_cast<std::size_t>(farm_class::grassland)] = 900;
+        grass_only.breadth = 1;
+
+        std::vector<colonisation_source> src{
+            colonisation_source{static_cast<int32_t>(m.at(20, 10)), 0, 0, -4000, grass_only}};
+        const colonisation_field f = run_colonisation(m.input(4000), src);
+        const auto o = classify_cradle_outcomes(f, src, {});
+        check(o[0] == cradle_outcome::sterility,
+              "C10a STERILITY — the stream crossed real ground and could farm none of it");
+    }
+
+    // --- ENCIRCLEMENT: affinity is fine, but there is no way out -----------
+    {
+        test_map m(40, 20);
+        // Ring the anchor in ocean: every exit is impassable, so the stream
+        // never moves at all. Affinity is untouched — it farms everything.
+        //
+        // ONE TILE, NOT A 2x2 BLOCK, and that mattered: a two-by-two island
+        // gives the source farmable ground BEYOND its own anchor, so it read as
+        // SPREAD and the case tested nothing. An encircled cradle is one that
+        // holds its anchor and nothing else.
+        for (int row = 0; row < 20; ++row)
+            for (int col = 0; col < 40; ++col)
+                if (!(col == 20 && row == 10))
+                    m.substrate[m.at(col, row)] = terrain_substrate::ocean;
+
+        std::vector<colonisation_source> src{
+            colonisation_source{static_cast<int32_t>(m.at(20, 10)), 0, 0, -4000, omnivorous()}};
+        const colonisation_field f = run_colonisation(m.input(4000), src);
+        const auto o = classify_cradle_outcomes(f, src, {});
+        check(o[0] == cradle_outcome::encirclement,
+              "C10b ENCIRCLEMENT — affinity is fine and the stream never left its anchor");
+    }
+
+    // --- DILUTION: a rival got to the ground this package could have used --
+    {
+        test_map m(40, 20);
+        // Two sources side by side on identical open ground. The second starts
+        // 2,000 years earlier, so it takes almost everything; the first is left
+        // holding its anchor beside ground it could plainly have farmed.
+        std::vector<colonisation_source> src{
+            colonisation_source{static_cast<int32_t>(m.at(20, 10)), 0, 0,  -1000, omnivorous()},
+            colonisation_source{static_cast<int32_t>(m.at(22, 10)), 1, 1,  -4000, omnivorous()}};
+        const colonisation_field f = run_colonisation(m.input(4000), src);
+        const auto o = classify_cradle_outcomes(f, src, {});
+        check(o[0] == cradle_outcome::dilution,
+              "C10c DILUTION — a rival's stream took ground this package could have farmed");
+        check(o[1] == cradle_outcome::spread,
+              "C10d and the rival that took it reads as SPREAD, not as anything else");
+    }
+
+    // --- THE PREDATION FLOOR: the only one that is death -------------------
+    {
+        test_map m(40, 20);
+        std::vector<colonisation_source> src{
+            colonisation_source{static_cast<int32_t>(m.at(20, 10)), 0, 0, -4000, omnivorous()}};
+        const colonisation_field f = run_colonisation(m.input(4000), src);
+
+        // Sustainable population below the density Stage 0 needs for surplus.
+        std::vector<cradle_vitals> vitals{cradle_vitals{800, 2000}};
+        const auto o = classify_cradle_outcomes(f, src, vitals);
+        check(o[0] == cradle_outcome::predation_floor,
+              "C10e THE PREDATION FLOOR outranks every other reading — a cradle that is both "
+              "penned and dying is reported as dying");
+
+        // And it is NOT reported when the caller supplied no population facts:
+        // silence is the honest answer, not a zero that would read as 'nobody died'.
+        const auto o2 = classify_cradle_outcomes(f, src, {});
+        check(o2[0] != cradle_outcome::predation_floor,
+              "C10f with no vitals supplied the floor is never reported (silence, not a "
+              "silent zero)");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // C5 / C9 — against real generated worlds
 // ---------------------------------------------------------------------------
 
@@ -450,6 +548,43 @@ void case_real_worlds(int seed_count)
                     reached, land ? (reached * 100) / land : 0,
                     farmable, land ? (farmable * 100) / land : 0,
                     static_cast<long long>(bytes / 1024));
+
+        // BL-851's DELIVERABLE, and the reason it is printed rather than
+        // asserted: the outcome MIX is what history_sweep argues the boundary
+        // year and the predation coefficient against, and a harness that pinned
+        // it would be asserting a magnitude this layer puts in the sweep's
+        // hands. What IS asserted below is that the four are separated at all.
+        std::vector<cradle_vitals> vitals;
+        vitals.reserve(fx.settlement.regions.size());
+        for (const region& r : fx.settlement.regions)
+        {
+            const int pred = predation_base_q(
+                1000,
+                (static_cast<std::size_t>(r.row * fx.gw + r.col) < cov.size())
+                    ? cov[static_cast<std::size_t>(r.row * fx.gw + r.col)] : terrain_cover::none,
+                (static_cast<std::size_t>(r.row * fx.gw + r.col) < lf.size())
+                    ? lf[static_cast<std::size_t>(r.row * fx.gw + r.col)] : terrain_landform::plains);
+            const int64_t cap = region_carrying_capacity(r.farm_q);
+            const int64_t sustainable =
+                (cap * predation_capacity_mult_q(
+                           predation_now_q(pred, r.population,
+                                           predation_per_doubling_default_q))) / 1000;
+            // Stage 0's density requirement, as the founding band: a people
+            // that cannot hold what it was founded with raises no surplus.
+            vitals.push_back(cradle_vitals{sustainable, 2000});
+        }
+
+        const std::vector<cradle_outcome> oc =
+            classify_cradle_outcomes(f, src, vitals);
+        int tally[5] = {0, 0, 0, 0, 0};
+        for (cradle_outcome o : oc) ++tally[static_cast<int>(o)];
+        std::printf("        outcomes: spread %d  sterility %d  encirclement %d  "
+                    "dilution %d  PREDATION FLOOR %d\n",
+                    tally[0], tally[1], tally[2], tally[3], tally[4]);
+        if (tally[4] > 0)
+            std::printf("        NOTE: a cradle on the predation floor is a finding about "
+                        "CRADLE SELECTION (agrarian_score reads predation), not about the span.\n");
+        for (int k = 0; k < 5; ++k) g_outcome_total[k] += tally[k];
     }
 
     if (worlds == 0)
@@ -457,6 +592,31 @@ void case_real_worlds(int seed_count)
         check(false, "C5  no world ran — the real-world cases are vacuous");
         return;
     }
+
+    // BL-851's DONE-WHEN: the four outcomes are reported SEPARATELY, and the
+    // reading distinguishes a cradle that filled its window from one that never
+    // had one. Asserted as "more than one outcome occurs across the sweep" —
+    // a classifier that answered `spread` for everything would report the same
+    // no-information the item was written about.
+    int kinds = 0;
+    for (int k = 0; k < 5; ++k) if (g_outcome_total[k] > 0) ++kinds;
+    std::printf("      outcome mix across the sweep: spread %d, sterility %d, "
+                "encirclement %d, dilution %d, predation floor %d (%d distinct)\n",
+                g_outcome_total[0], g_outcome_total[1], g_outcome_total[2],
+                g_outcome_total[3], g_outcome_total[4], kinds);
+    std::printf(
+                "      READ THAT MIX WITH ITS SCALE IN MIND. Every SETTLED REGION is a source\n"
+                "      here (149-195 of them), not the handful of CRADLES the span will actually\n"
+                "      start from, so dilution dominates by construction: with two hundred\n"
+                "      streams on one map almost every one meets a rival before it meets a wall.\n"
+                "      Sterility reading ZERO is a consequence of the same thing - a region-grain\n"
+                "      package is coined on the ground it already sits on, so it can always farm\n"
+                "      home. The MIX is history_sweep's to argue once the span runs from cradles;\n"
+                "      what this case establishes is that the four are SEPARABLE at all.\n");
+
+    check(kinds >= 2,
+          "C10 THE FOUR OUTCOMES ARE SEPARATED on real worlds — the sweep can tell a cradle "
+          "that filled its window from one that never had one");
 
     check(wide_enough * 2 >= worlds,
           "C5  BREADTH SPREADS RATHER THAN CLUSTERING — most worlds show a range of at "
@@ -489,6 +649,7 @@ int main(int argc, char** argv)
     case_emptiness_is_an_outcome();
     case_crossing_is_floored();
     case_predation();
+    case_cradle_outcomes();
     case_real_worlds(seed_count);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);

@@ -499,6 +499,187 @@ colonisation_field run_colonisation(const colonisation_input& in,
     return f;
 }
 
+// ---------------------------------------------------------------------------
+// Why a cradle stopped (BL-851)
+// ---------------------------------------------------------------------------
+
+const char* cradle_outcome_name(cradle_outcome o)
+{
+    switch (o)
+    {
+        case cradle_outcome::spread:          return "spread";
+        case cradle_outcome::sterility:       return "sterility";
+        case cradle_outcome::encirclement:    return "encirclement";
+        case cradle_outcome::dilution:        return "dilution";
+        case cradle_outcome::predation_floor: return "predation floor";
+    }
+    return "?";
+}
+
+std::vector<cradle_outcome> classify_cradle_outcomes(
+    const colonisation_field&               f,
+    const std::vector<colonisation_source>& sources,
+    const std::vector<cradle_vitals>&       vitals)
+{
+    std::vector<cradle_outcome> out(sources.size(), cradle_outcome::spread);
+    if (f.empty()) return out;
+
+    const int gw = f.gw, gh = f.gh;
+
+    // --- Per-source tallies, in ONE raster pass ---------------------------
+    //
+    // One pass rather than one per source: the map is walked once and every
+    // source's counters are updated from the tile it claimed. That keeps this a
+    // read over the field rather than a second search, which is the whole
+    // reason the field exists.
+    std::vector<int64_t> claimed(sources.size(), 0);
+    std::vector<int64_t> farmable_held(sources.size(), 0);
+
+    // REGION INDEX -> SOURCE INDEX, built once.
+    //
+    // `source_region` carries the CALLER'S region index, not our source index,
+    // so the two must be matched rather than assumed equal — a caller may pass
+    // a subset of its regions as sources. The obvious way to match them is a
+    // scan over `sources` per tile, and that is O(tiles x sources): 1.8M
+    // comparisons at today's 150 regions, and 30M at the 2,500 the region-count
+    // question (NR-809) is about. A classifier that scales worse than the walk
+    // it classifies would be an odd thing to ship in the same commit as a
+    // measurement saying so.
+    //
+    // A DENSE VECTOR RATHER THAN A MAP, because region indices are small,
+    // contiguous and already bounded by `owner_index_limit` — and because an
+    // unordered container keyed here would be one more place for a walk order
+    // to depend on a hash.
+    int32_t max_region = -1;
+    for (const colonisation_source& s : sources)
+        if (s.region > max_region) max_region = s.region;
+    std::vector<int32_t> source_of(static_cast<std::size_t>(max_region + 1), -1);
+    for (std::size_t s = 0; s < sources.size(); ++s)
+        if (sources[s].region >= 0)
+        {
+            // FIRST WINS, so a duplicated region index is resolved by source
+            // order rather than by whichever happened to be written last.
+            int32_t& slot = source_of[static_cast<std::size_t>(sources[s].region)];
+            if (slot < 0) slot = static_cast<int32_t>(s);
+        }
+
+    const auto source_index = [&](int32_t region) -> int32_t {
+        if (region < 0 || region > max_region) return -1;
+        return source_of[static_cast<std::size_t>(region)];
+    };
+
+    for (std::size_t i = 0; i < f.source_region.size(); ++i)
+    {
+        const int32_t s = source_index(f.source_region[i]);
+        if (s < 0) continue;
+        ++claimed[static_cast<std::size_t>(s)];
+        if (f.farmable[i]) ++farmable_held[static_cast<std::size_t>(s)];
+    }
+
+    // --- WHY did each stopped source stop? Read its own frontier. ----------
+    //
+    // THE TEST THAT SEPARATES DILUTION FROM ENCIRCLEMENT, and getting it wrong
+    // is what the first cut did. That version asked only "did this source get
+    // much ground", and reported everything that did not as ENCIRCLEMENT. On
+    // real worlds that read 317 encircled against 186 spread and ZERO sterile,
+    // which is not a measurement of anything: with 149 sources flooding one map
+    // simultaneously, most of them are simply born into ground their neighbours
+    // already hold. Being outnumbered is not being penned, and a sweep told
+    // otherwise would tune the barrier costs to fix a crowding effect.
+    //
+    // So the question is asked of the FRONTIER instead. Walk the tiles adjacent
+    // to what a source holds but not held by it, and count two kinds:
+    //   WALL  — water, or ground no stream ever reached. Terrain stopped it.
+    //   RIVAL — ground another stream got to first. Somebody else stopped it.
+    // Whichever is larger is why it stopped. That is a claim about cause rather
+    // than about size, which is the whole of what BL-851 asked for.
+    //
+    // Testing the whole map instead of the frontier would report every cradle
+    // in the world as diluted, since somewhere on a continent there is always
+    // suitable ground in somebody else's hands.
+    std::vector<int64_t> wall_edge(sources.size(), 0);
+    std::vector<int64_t> rival_edge(sources.size(), 0);
+    for (std::size_t i = 0; i < f.source_region.size(); ++i)
+    {
+        const int32_t sr = f.source_region[i];
+        const int32_t si = source_index(sr);
+        if (si < 0) continue;
+        const std::size_t s = static_cast<std::size_t>(si);
+
+        const int col = static_cast<int>(i) % gw;
+        const int row = static_cast<int>(i) / gw;
+        for (int side = 0; side < 6; ++side)
+        {
+            const auto nb = hex_neighbors::neighbour(col, row, side);
+            if (nb.gy < 0 || nb.gy >= gh) { ++wall_edge[s]; continue; }
+            int nx = nb.gx % gw;
+            if (nx < 0) nx += gw;
+            const std::size_t ni = static_cast<std::size_t>(nb.gy) * static_cast<std::size_t>(gw)
+                                 + static_cast<std::size_t>(nx);
+            if (ni >= f.source_region.size()) continue;
+
+            const int32_t nsr = f.source_region[ni];
+            if (nsr == sr) continue;               // Its own ground; not a frontier at all.
+            if (nsr < 0) { ++wall_edge[s]; continue; } // Water, or ground nobody reached.
+            ++rival_edge[s];                       // Somebody else got there first.
+        }
+    }
+
+    // --- Classify, most-fatal first ----------------------------------------
+    //
+    // A cradle that is BOTH penned and dying is reported as dying: the reading
+    // that matters is the one that ends the people, and the sweep should never
+    // have to guess which of two labels it was given.
+    for (std::size_t s = 0; s < sources.size(); ++s)
+    {
+        const bool has_vitals = s < vitals.size();
+        if (has_vitals && vitals[s].surplus_threshold > 0
+            && vitals[s].sustainable < vitals[s].surplus_threshold)
+        {
+            out[s] = cradle_outcome::predation_floor;
+            continue;
+        }
+
+        // It holds farmable ground beyond its own anchor tile. The anchor is
+        // subtracted so a cradle sitting alone on one farmable tile is not
+        // counted as having spread onto it.
+        if (farmable_held[s] > 1) { out[s] = cradle_outcome::spread; continue; }
+
+        // PRE-EMPTED OUTRIGHT is the purest dilution there is, and it does not
+        // reach the `outbid` test — that test walks the tiles a source HOLDS,
+        // and this source holds none. A rival's stream reached its anchor
+        // before it was ready to send, so it never claimed even the ground it
+        // was standing on.
+        //
+        // Without this clause it read as ENCIRCLEMENT, because "claimed almost
+        // nothing" is also what a penned cradle looks like. The two are
+        // opposite findings — one says the ground was taken, the other says
+        // there was nowhere to go — and a sweep that confused them would be
+        // exactly the no-information reading BL-851 exists to remove.
+        if (claimed[s] == 0) { out[s] = cradle_outcome::dilution; continue; }
+
+        // A RIVAL-DOMINATED FRONTIER IS DILUTION. Most of what this stream
+        // could have walked into is already somebody else's.
+        if (rival_edge[s] > wall_edge[s]) { out[s] = cradle_outcome::dilution; continue; }
+
+        // ENCIRCLEMENT AGAINST STERILITY, and this is the only place the two
+        // are separated. Both stopped against terrain rather than against a
+        // rival; the difference is whether the stream MOVED. A stream that
+        // crossed real ground and found nothing it could farm is STERILE —
+        // narrow affinity, no matching class anywhere it reached. A stream that
+        // barely left its anchor never got the chance to find out: every exit
+        // was barrier terrain whose year-cost the span did not pay.
+        //
+        // The threshold is deliberately small and deliberately stated. Six is
+        // one hex ring: a stream that claimed no more than its own immediate
+        // neighbourhood did not walk.
+        out[s] = claimed[s] > 6 ? cradle_outcome::sterility
+                                : cradle_outcome::encirclement;
+    }
+
+    return out;
+}
+
 int64_t colonisation_field_bytes(const colonisation_field& f)
 {
     const int64_t n = static_cast<int64_t>(f.arrival_year.size());
