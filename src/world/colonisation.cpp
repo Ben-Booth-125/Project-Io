@@ -311,10 +311,22 @@ int32_t tile_year_cost(terrain_substrate s, terrain_cover c, terrain_landform lf
 
     int32_t cost = colonisation_base_centiyears;
 
-    // THE CHEAP ROUTES — the ones people actually followed. A river course
-    // first where the caller can see one, the shoreline otherwise.
-    if (river)          cost = (cost * 35) / 100;
-    else if (shoreline) cost = (cost * 55) / 100;
+    // THE CHEAP ROUTES — the ones people actually followed, and the discount is
+    // deliberately STEEP (BL-857; Ben, 2026-09-09).
+    //
+    // THE COAST IS NOT MERELY CHEAP, IT IS THE ROAD. At the first cut's 55% a
+    // coastal route was preferable and not decisive, so streams pushed inland
+    // about as readily as along the shore and the map's first cultures did not
+    // string out the way real ones did. Early migration follows shorelines
+    // because the shore FEEDS you while you walk it, so the discount has to be
+    // strong enough that a coastal route beats an inland one over any
+    // comparable distance. An inland-first map is the tell that this is
+    // mispriced.
+    //
+    // A river course is cheaper still: it is a shoreline that also points
+    // somewhere.
+    if (river)          cost = (cost * 22) / 100;
+    else if (shoreline) cost = (cost * 30) / 100;
 
     // Barrier terrain is DEAR, and this is where three centuries of mountain
     // come from. Multiplicative on the base so a forested mountain is worse
@@ -366,6 +378,13 @@ struct front_entry
     int64_t arrival_cy = 0;  ///< Centi-years since the run's zero point.
     int32_t tile       = 0;
     int32_t source     = -1; ///< Index into the caller's `sources`.
+    /// The culture this stream is CARRYING — the source's, or a daughter it
+    /// coined on the way (BL-856). Inherited from the tile it expanded from,
+    /// which is what makes divergence follow the route rather than the source.
+    int32_t culture    = -1;
+    /// Centi-years since this stream last diverged. Crossing
+    /// `colonisation_split_centiyears` coins a daughter and resets it.
+    int64_t since_split_cy = 0;
 };
 
 /// Greater-than, because std::priority_queue is a MAX heap and we want the
@@ -400,6 +419,8 @@ colonisation_field run_colonisation(const colonisation_input& in,
     f.culture.assign(n, -1);
     f.ground.assign(n, farm_class::steppe);
     f.farmable.assign(n, 0u);
+    f.last_arrival_year = in.boundary_year; // Overwritten by the first landing.
+    bool any_arrival = false;
 
     const auto cover_at = [&](std::size_t i) {
         return (in.cover && i < in.cover->size()) ? (*in.cover)[i] : terrain_cover::none;
@@ -440,10 +461,46 @@ colonisation_field run_colonisation(const colonisation_input& in,
         if (s.tile < 0 || static_cast<std::size_t>(s.tile) >= n) continue;
         if (is_water(sub[static_cast<std::size_t>(s.tile)])) continue;
         front.push(front_entry{static_cast<int64_t>(s.ready_year) * 100,
-                               s.tile, static_cast<int32_t>(si)});
+                               s.tile, static_cast<int32_t>(si), s.culture, 0});
     }
 
     const int64_t boundary_cy = static_cast<int64_t>(in.boundary_year) * 100;
+
+    // THE DAUGHTER-CULTURE ALLOCATOR (BL-856). Ids run upward from one past the
+    // last cradle culture, handed out in ARRIVAL order because the heap pops in
+    // arrival order — so the numbering is a record of when each people came to
+    // be, and is identical on every machine. A negative `first_spawn_culture`
+    // disables spawning entirely, which is what the synthetic route cases want.
+    int32_t next_culture = in.first_spawn_culture;
+
+    // A PEOPLE DIVERGES OCCASIONALLY, NOT ONCE PER TILE — the grain fix.
+    //
+    // The first cut split whenever ANY advancing tile had been walking longer
+    // than the threshold. Every tile on a frontier carries its own clock, so a
+    // broad lobe crossed the threshold across its whole width at once and coined
+    // a separate culture on each tile: 1,739 / 2,474 / 1,231 "peoples" per world
+    // against 13-17 that actually held ground. The mechanism was right and the
+    // GRAIN was wrong — it was measuring tiles, not streams.
+    //
+    // So a lineage may only diverge once per `colonisation_split_centiyears`.
+    // The whole lobe that crosses together produces ONE daughter, which is what
+    // a people splitting actually looks like, and the count becomes a function
+    // of the span rather than of the map's width.
+    //
+    // Keyed by PARENT culture and compared against arrival year, both of which
+    // are stable integers, so this adds no order dependence: two tiles crossing
+    // in the same year still resolve on the heap's (year, tile, source) order.
+    std::vector<int64_t> last_split_cy;
+    const auto may_split = [&](int32_t parent, int64_t at) {
+        if (parent < 0) return false;
+        const std::size_t k = static_cast<std::size_t>(parent);
+        if (k >= last_split_cy.size()) last_split_cy.resize(k + 1, INT64_MIN);
+        if (last_split_cy[k] != INT64_MIN
+            && at - last_split_cy[k] < colonisation_split_centiyears)
+            return false;
+        last_split_cy[k] = at;
+        return true;
+    };
 
     // --- Walk ---------------------------------------------------------------
     while (!front.empty())
@@ -465,8 +522,14 @@ colonisation_field run_colonisation(const colonisation_input& in,
         const colonisation_source& src = sources[static_cast<std::size_t>(e.source)];
 
         f.arrival_year[i]  = e.arrival_cy / 100;
+        // THE MIGRATION'S END (BL-858). Pops come out in ascending arrival
+        // order, so the last tile claimed carries the year the last stream
+        // landed -- the moment nothing more is going to happen.
+        if (!any_arrival) { f.last_arrival_year = f.arrival_year[i]; any_arrival = true; }
+        else if (f.arrival_year[i] > f.last_arrival_year)
+            f.last_arrival_year = f.arrival_year[i];
         f.source_region[i] = src.region;
-        f.culture[i]       = src.culture;
+        f.culture[i]       = e.culture; // The stream's, which may be a daughter.
         // GROUND NO PACKAGE SUITS IS NOT SETTLED. The stream still CROSSES it —
         // a people walks over a mountain it cannot farm — so the tile is
         // claimed and passed through, but it is not a founding candidate.
@@ -492,7 +555,109 @@ colonisation_field run_colonisation(const colonisation_input& in,
 
             const int64_t at = e.arrival_cy + step;
             if (at > boundary_cy) continue; // Cannot land in time; do not queue it.
-            front.push(front_entry{at, static_cast<int32_t>(ni), e.source});
+
+            // MIGRATION SPAWNS CULTURES (BL-856). A stream carries its people
+            // until it has been walking long enough that the ones who arrive
+            // are no longer the ones who set out; then it coins a daughter and
+            // the clock restarts. No actor: distance and time do this, not a
+            // decision, and the split is a consequence of the walk in exactly
+            // the sense this file's header means.
+            int32_t child_culture = e.culture;
+            int64_t child_since   = e.since_split_cy + step;
+            if (child_since >= colonisation_split_centiyears && next_culture >= 0
+                && may_split(e.culture, at))
+            {
+                child_culture = next_culture++;
+                child_since   = 0;
+                f.spawns.push_back(culture_spawn{child_culture, e.culture,
+                                                 static_cast<int32_t>(ni)});
+            }
+            front.push(front_entry{at, static_cast<int32_t>(ni), e.source,
+                                   child_culture, child_since});
+        }
+
+        // --- The crude overseas hop (BL-857) ------------------------------
+        //
+        // Open water is impassable to the WALK above and was never impassable
+        // to people. A short crossing — to an island already visible from the
+        // shore, or over a strait — is how the awkward corners of a world get
+        // peopled, and without it they simply never do.
+        //
+        // ONLY FROM THE SHORE, and that falls out rather than being tested: a
+        // tile with no water neighbour enqueues nothing below.
+        //
+        // A BOUNDED FLOOD OVER WATER, land to land. Breadth-first over water
+        // tiles to a depth of `colonisation_max_hop_tiles`, landing on the
+        // first land it reaches. The bound is the whole of what keeps this
+        // CRUDE: three tiles crosses a strait and cannot cross an ocean, so
+        // "people got everywhere" never becomes "people sailed". A harness
+        // asserts it.
+        //
+        // DETERMINISM: the water frontier is walked in raster order and every
+        // landing is pushed onto the same totally-ordered heap as a land step,
+        // so a hop and a walk arriving in the same year break their tie on
+        // (tile, source) exactly as two walks do.
+        if (shore[i] != 0u)
+        {
+            std::vector<std::size_t> wave{i};
+            std::vector<uint8_t>     seen_water;
+            for (int depth = 1; depth <= colonisation_max_hop_tiles && !wave.empty(); ++depth)
+            {
+                std::vector<std::size_t> next;
+                for (const std::size_t wi : wave)
+                {
+                    const int wc = static_cast<int>(wi) % gw;
+                    const int wr = static_cast<int>(wi) / gw;
+                    for (int side = 0; side < 6; ++side)
+                    {
+                        const auto nb = hex_neighbors::neighbour(wc, wr, side);
+                        if (nb.gy < 0 || nb.gy >= gh) continue;
+                        int nx = nb.gx % gw;
+                        if (nx < 0) nx += gw;
+                        const std::size_t ni =
+                            static_cast<std::size_t>(nb.gy) * static_cast<std::size_t>(gw)
+                            + static_cast<std::size_t>(nx);
+
+                        if (!is_water(sub[ni]))
+                        {
+                            // LANDFALL. Already-claimed ground is skipped by the
+                            // pop guard anyway, but not queueing it keeps the
+                            // heap small.
+                            if (f.arrival_year[ni] != colonisation_never_reached) continue;
+                            const int64_t at = e.arrival_cy
+                                             + static_cast<int64_t>(depth)
+                                                   * colonisation_hop_centiyears;
+                            if (at > boundary_cy) continue;
+                            // A CROSSING AGES A STREAM like any other travel,
+                            // so a hop can coin a daughter exactly as a walk
+                            // can — which is how an island ends up with its own
+                            // people rather than a copy of the mainland's.
+                            const int64_t hop_cost = static_cast<int64_t>(depth)
+                                                   * colonisation_hop_centiyears;
+                            int32_t hop_culture = e.culture;
+                            int64_t hop_since   = e.since_split_cy + hop_cost;
+                            if (hop_since >= colonisation_split_centiyears
+                                && next_culture >= 0 && may_split(e.culture, at))
+                            {
+                                hop_culture = next_culture++;
+                                hop_since   = 0;
+                                f.spawns.push_back(culture_spawn{hop_culture, e.culture,
+                                                                 static_cast<int32_t>(ni)});
+                            }
+                            front.push(front_entry{at, static_cast<int32_t>(ni), e.source,
+                                                   hop_culture, hop_since});
+                            continue;
+                        }
+
+                        if (depth == colonisation_max_hop_tiles) continue; // No further.
+                        if (seen_water.empty()) seen_water.assign(n, 0u);
+                        if (seen_water[ni]) continue;
+                        seen_water[ni] = 1u;
+                        next.push_back(ni);
+                    }
+                }
+                wave.swap(next);
+            }
         }
     }
 

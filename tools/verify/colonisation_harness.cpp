@@ -540,6 +540,40 @@ void case_real_worlds(int seed_count)
             if (f.farmable[i]) ++farmable;
         }
 
+        // WHICH GROUND NOBODY CAN FARM (BL-859). The habitable share is a single
+        // number and a single number cannot be acted on: "43% farmable" says the
+        // map is too empty and not what to do about it. This breaks the
+        // unfarmable remainder down by farm class, which turns an unbounded
+        // tuning question -- lower the affinity floor until it looks full -- into
+        // a bounded one: if one or two classes account for most of the gap, the
+        // answer is what packages can farm THAT ground, and if it is spread
+        // evenly across all twelve then breadth itself is the constraint.
+        //
+        // REPORTED, NEVER ASSERTED. Which classes go unfarmed is a property of
+        // the world and the sweep's to argue, exactly like every other magnitude
+        // in this layer.
+        {
+            int unfarmed[farm_class_count] = {};
+            int reached_by_class[farm_class_count] = {};
+            for (std::size_t i = 0; i < f.arrival_year.size(); ++i)
+            {
+                if (i < sub.size() && is_water(sub[i])) continue;
+                if (f.arrival_year[i] == colonisation_never_reached) continue;
+                const int fc = static_cast<int>(f.ground[i]);
+                if (fc < 0 || fc >= farm_class_count) continue;
+                ++reached_by_class[fc];
+                if (!f.farmable[i]) ++unfarmed[fc];
+            }
+            static const char* nm[farm_class_count] = {
+                "floodplain","grassland","woodland","valley","highland","montane",
+                "steppe","arid","coastal","volcanic","boreal","stone"};
+            std::printf("        unfarmed by class:");
+            for (int c = 0; c < farm_class_count; ++c)
+                if (unfarmed[c] > 0)
+                    std::printf(" %s %d/%d", nm[c], unfarmed[c], reached_by_class[c]);
+            std::printf("\n");
+        }
+
         const int64_t bytes = colonisation_field_bytes(f);
         if (bytes > bytes_max) bytes_max = bytes;
 
@@ -823,6 +857,87 @@ void case_founding_schedule(int span_years)
           "un-founded, so no half-built settlement reaches the report)");
 }
 
+
+// ---------------------------------------------------------------------------
+// C13 — MIGRATION SPAWNS CULTURES (BL-856)
+// ---------------------------------------------------------------------------
+//
+// The acceptance test for Ben's "spawn new cultures". A homeworld that ends with
+// its cradle count and no more is a map of where agriculture started; one that
+// ends with a FAMILY of related peoples grouped by route is a map of a
+// migration, which is what the round is for.
+//
+// It asserts the SHAPE and reports the magnitude: how many peoples a world ends
+// with is history_sweep's to argue, exactly like the 600-year split threshold
+// that produces it.
+
+void case_spawned_cultures(int seed_count)
+{
+    std::printf("\n--- C13: does the migration coin new peoples? -----------------\n");
+
+    int worlds = 0, worlds_spawning = 0;
+
+    for (int s = 0; s < seed_count; ++s)
+    {
+        world_params wp;
+        wp.seed = static_cast<uint32_t>(s);
+        wp.prehistory_years = 400;
+
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{}, nullptr, nullptr, &fx);
+        (void)w;
+        if (!fx.ran) continue;
+        ++worlds;
+
+        const int spawned = static_cast<int>(fx.settlement.spawned_cultures.size());
+        const int total   = static_cast<int>(fx.creeds.cultures.size());
+        const int cradles = total - spawned;
+        if (spawned > 0) ++worlds_spawning;
+
+        // HOW MANY DISTINCT PEOPLES ACTUALLY HOLD GROUND -- the number that
+        // matters, since a culture nobody carries is a record and not a people.
+        std::vector<int> held;
+        for (const region& r : fx.settlement.regions)
+        {
+            const int c = r.culture.plurality();
+            if (c < 0) continue;
+            bool seen = false;
+            for (int h : held) if (h == c) { seen = true; break; }
+            if (!seen) held.push_back(c);
+        }
+
+        std::printf("seed %u  cradle cultures %d  +%d coined by migration = %d  "
+                    "distinct peoples holding ground %d\n",
+                    wp.seed, cradles, spawned, total, static_cast<int>(held.size()));
+
+        // NAMES STAY IN THE FAMILY AND STAY COINED. Print a couple so a human
+        // can see they are sci-fi/fantasy out of the seeded banks and read as
+        // kin to their parent -- never an Earth proper noun, which is exactly
+        // where culture naming is most tempted.
+        for (int i = 0; i < spawned && i < 3; ++i)
+            std::printf("        coined: %s\n",
+                        fx.settlement.spawned_cultures[static_cast<std::size_t>(i)].name.c_str());
+
+        // Every daughter must be a REAL record, not a default-constructed hole.
+        // This is the check on the parent-resolution order: a daughter whose
+        // parent is itself a daughter is read out of a vector still being
+        // appended to, and gets an empty name if that order is ever wrong.
+        int empty_named = 0;
+        for (const culture& c : fx.settlement.spawned_cultures)
+            if (c.name.empty()) ++empty_named;
+        check(empty_named == 0,
+              "C13a every coined culture is a real derived record, not an empty hole "
+              "(the daughter-of-a-daughter resolution order holds)");
+    }
+
+    if (worlds == 0) { check(false, "C13 no world ran - the case is vacuous"); return; }
+
+    check(worlds_spawning == worlds,
+          "C13  THE MIGRATION COINS NEW PEOPLES on every generated world - a homeworld "
+          "ends with a family of related cultures, not just its cradles");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -843,6 +958,7 @@ int main(int argc, char** argv)
     case_real_worlds(seed_count);
     case_route_on_real_worlds(seed_count);
     case_founding_schedule(span_years);
+    case_spawned_cultures(seed_count);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;

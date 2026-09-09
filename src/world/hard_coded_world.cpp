@@ -577,6 +577,16 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                            /*sim_start_year=*/sim_start);
         t_settlement_end = gen_clock::now(); // BL-754
 
+        // THE CULTURES THE MIGRATION COINED JOIN THE ROSTER (BL-856). Appended
+        // rather than kept in a second list, so every downstream consumer -- the
+        // sim's per-culture aggression read, the naming passes, the shares in
+        // `region::culture` -- sees ONE flat vector and needs no second lookup
+        // and no id remapping. The walk allocated their ids as
+        // `cs.cultures.size() + n`, which is exactly where they land here.
+        kepler_creeds.cultures.insert(kepler_creeds.cultures.end(),
+                                      kepler_settlement.spawned_cultures.begin(),
+                                      kepler_settlement.spawned_cultures.end());
+
         // THE POPULATION MAP, DRAWN EARLY (BL-766). Before the Era -1 sim, not
         // after it: every region whose ground farms easily is given an opening
         // urban headcount and the centres those heads stand up, so the sim runs

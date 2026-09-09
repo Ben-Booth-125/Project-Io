@@ -544,6 +544,60 @@ bool charter_copied(const charter_reach& ch, const region& p)
     return charter_contact(ch, p) <= ch.far_dist;
 }
 
+namespace
+{
+
+/// Coin a daughter culture from its parent (BL-856).
+///
+/// DERIVED, NOT ROLLED FRESH, and that is the whole of what makes the output a
+/// FAMILY of peoples rather than a bag of unrelated ones. The daughter keeps its
+/// parent's pantheon and its parent's cradle — it is the same people, later and
+/// further away — and diverges in the two places a separated people actually
+/// diverges: its NAME, and the SOUNDS it coins names from.
+///
+/// THE TONGUE DRIFTS RATHER THAN RE-ROLLING. A fresh `roll_tongue` would give a
+/// daughter a phonology unrelated to its parent's, so the two would not read as
+/// kin — and reading as kin is the entire deliverable, since it is what lets a
+/// player see at a glance that two nations on opposite coasts came from the same
+/// migration. So the inventory is inherited and perturbed: one sound dropped and
+/// one admitted, deterministically from the seed.
+///
+/// AGGRESSION DRIFTS A LITTLE, because doctrine is downstream of settlement and
+/// a people who spent six centuries walking are not quite who they were. Bounded
+/// hard, so a chain of splits cannot walk a culture to either extreme.
+///
+/// EVERY NAME STAYS SCI-FI/FANTASY, out of the seeded phoneme tables — never an
+/// Earth proper noun (.claude/rules/io-standing-rules.md § Terms & docs).
+culture derive_daughter_culture(const culture& parent, uint32_t seed, int spawn_index)
+{
+    culture d = parent;                 // Pantheon, cradle and speech inherited whole.
+    rng r(seed, static_cast<uint32_t>(0xDA05u + spawn_index));
+
+    // Drift the inventory: drop one onset, admit one from a fixed pool. Both
+    // picks are seeded, and the pool is the same table `roll_tongue` draws from,
+    // so a daughter's sounds stay inside the language family.
+    if (d.speech.onsets.size() > 4)
+        d.speech.onsets.erase(d.speech.onsets.begin()
+                              + r.pick(static_cast<int>(d.speech.onsets.size())));
+    static const char* const drift_onsets[] = { "k", "t", "m", "n", "s", "r", "l", "v",
+                                                "th", "sh", "g", "d", "b", "h", "z", "kh" };
+    d.speech.onsets.push_back(drift_onsets[r.pick(16)]);
+    if (!d.speech.vowels.empty() && d.speech.vowels.size() < 6)
+    {
+        static const char* const drift_vowels[] = { "a", "e", "i", "o", "u", "ai", "ua", "ei" };
+        d.speech.vowels.push_back(drift_vowels[r.pick(8)]);
+    }
+
+    // A NEW NAME IN THE DRIFTED TONGUE. Two syllables, as the cradle names are.
+    std::string coined = tongue_word(r, d.speech, 2);
+    d.name = coined.empty() ? parent.name : coined;
+
+    d.aggression_q = clampi(parent.aggression_q - 60 + r.pick(121), 0, 1000);
+    return d;
+}
+
+} // namespace
+
 // ---------------------------------------------------------------------------
 // The settlement pass
 // ---------------------------------------------------------------------------
@@ -576,14 +630,38 @@ settlement_state run_settlement(const planetology_state& pl,
     // same answer — this only avoids re-hashing an inventory per region. An
     // out-of-range or unusable culture yields an empty lexicon, which is exactly
     // what `quarter_word`'s fallback branch is written for.
+    // RESOLVE A CULTURE ID ACROSS BOTH LISTS (BL-856). Ids below
+    // `cs.cultures.size()` are the cradle cultures the creeds pass coined; ids
+    // at or above it are the ones the MIGRATION coined, which live in
+    // `out.spawned_cultures` until the caller appends them to the roster.
+    //
+    // THIS EXISTS BECAUSE ITS ABSENCE SEGFAULTED. The naming line below read
+    // `cs.cultures[best_c]` unguarded, which was safe for exactly as long as
+    // every culture came from the creeds pass -- and stopped being safe the
+    // moment a region could carry a culture the walk had coined. Nothing in the
+    // type system was going to catch that: the id is a plain int, and the
+    // out-of-bounds read was into a live vector, so it crashed rather than
+    // returning nonsense only because the index ran far enough past the end.
+    const auto culture_at = [&](int id) -> const ::culture* {
+        if (id < 0) return nullptr;
+        if (id < static_cast<int>(cs.cultures.size()))
+            return &cs.cultures[static_cast<std::size_t>(id)];
+        const int local = id - static_cast<int>(cs.cultures.size());
+        if (local < static_cast<int>(out.spawned_cultures.size()))
+            return &out.spawned_cultures[static_cast<std::size_t>(local)];
+        return nullptr;
+    };
+
     std::unordered_map<int, tongue_lexicon> lex_cache;
     const auto lexicon_for = [&](int culture) -> const tongue_lexicon& {
         const auto it = lex_cache.find(culture);
         if (it != lex_cache.end())
             return it->second;
         tongue_lexicon lex;
-        if (culture >= 0 && culture < static_cast<int>(cs.cultures.size()))
-            lex = coin_lexicon(cs.cultures[static_cast<std::size_t>(culture)].speech);
+        // `::culture` because this lambda's own parameter is named `culture`
+        // and shadows the type.
+        if (const ::culture* cu = culture_at(culture))
+            lex = coin_lexicon(cu->speech);
         return lex_cache.emplace(culture, std::move(lex)).first->second;
     };
 
@@ -609,6 +687,7 @@ settlement_state run_settlement(const planetology_state& pl,
                                            terrain_cover::none);
     std::vector<terrain_landform>  col_lf(static_cast<std::size_t>(total),
                                           terrain_landform::plains);
+    std::vector<uint8_t>           col_river(static_cast<std::size_t>(total), 0u);
     for (int idx = 0; idx < total; ++idx)
     {
         const tile_component* t = tile_at(w, tile_ids, idx);
@@ -616,6 +695,17 @@ settlement_state run_settlement(const planetology_state& pl,
         col_sub[static_cast<std::size_t>(idx)] = t->substrate;
         col_cov[static_cast<std::size_t>(idx)] = t->cover;
         col_lf [static_cast<std::size_t>(idx)] = t->landform;
+        // RIVERS, WHICH THE WALK COULD NOT SEE UNTIL NOW (BL-857).
+        // COLONISATION.md names river courses as the cheapest ground of all and
+        // the walk was pricing the coast as its cheapest route, because a river
+        // in this codebase is an EDGE on the tile rather than a tile property
+        // and `sim_terrain_view` carries no river array.
+        //
+        // It needs none: this pass reads `tile_component` directly, so the
+        // raster is built here from `river_edges` and BL-853 (the SIM's view
+        // carrying rivers) is not a prerequisite after all -- it stays open for
+        // the sim's own consumers, which is a different need.
+        col_river[static_cast<std::size_t>(idx)] = t->river_edges != 0 ? 1u : 0u;
     }
 
     // A CULTURE'S CRADLE IS ITS SOURCE, so the stream that arrives somewhere
@@ -650,10 +740,60 @@ settlement_state run_settlement(const planetology_state& pl,
     col_in.substrate     = &col_sub;
     col_in.cover         = &col_cov;
     col_in.landform      = &col_lf;
+    col_in.river         = &col_river;
     col_in.gw            = gw;
     col_in.gh            = gh;
+    // Daughter ids run one past the last cradle culture (BL-856).
+    col_in.first_spawn_culture = static_cast<int32_t>(cs.cultures.size());
+    // THE WALK IS NOT CAPPED BY THE CAMPAIGN EPOCH (BL-858). `stop_year` is
+    // where the GAME starts, not where the migration finishes, and capping the
+    // flood at it silently truncated any stream still walking — ground that
+    // would have been peopled read as ground nobody could reach.
+    //
+    // The flood needs no year cap at all: it is bounded by the tile count and
+    // terminates when its frontier is exhausted. `stop_year` is still passed as
+    // a far backstop so an arrival year cannot run to an absurd value on a
+    // pathological map, and `colonisation_field::last_arrival_year` reports when
+    // the migration actually ended.
     col_in.boundary_year = stop_year;
     const colonisation_field col_field = run_colonisation(col_in, col_sources);
+
+    // WHEN THE MIGRATION ENDED, for the round that displays it (BL-858). Ben's
+    // rule is "all land has some culture"; read literally that never terminates,
+    // because ground no package can farm never gets one — and BL-859's census
+    // shows that is 44-57% of every world, dominated by polar ice. What the rule
+    // MEANS is "wait until nothing more is going to happen", and the flood
+    // answers that exactly: the last landing is the end of the migration.
+    out.migration_end_year = col_field.last_arrival_year;
+
+    // MATERIALISE THE CULTURES THE MIGRATION COINED (BL-856). The walk allocates
+    // ids and records parentage; it has no vocabulary for a pantheon or a tongue
+    // and should not grow one. This turns each spawn into a real `culture`
+    // derived from its parent.
+    //
+    // IN ALLOCATION ORDER, which is arrival order, so id N is always the Nth
+    // people to come into being and the numbering is stable across machines.
+    // A spawn's parent is always ALREADY materialised when it is read: ids are
+    // handed out in ascending arrival order and a daughter's parent arrived
+    // strictly earlier, so the vector only ever grows behind the read.
+    out.spawned_cultures.reserve(col_field.spawns.size());
+    for (std::size_t si = 0; si < col_field.spawns.size(); ++si)
+    {
+        const culture_spawn& sp = col_field.spawns[si];
+        const int pid = sp.parent;
+        const culture* par = nullptr;
+        if (pid >= 0 && pid < static_cast<int>(cs.cultures.size()))
+            par = &cs.cultures[static_cast<std::size_t>(pid)];
+        else
+        {
+            const int local = pid - static_cast<int>(cs.cultures.size());
+            if (local >= 0 && local < static_cast<int>(out.spawned_cultures.size()))
+                par = &out.spawned_cultures[static_cast<std::size_t>(local)];
+        }
+        if (par == nullptr) { out.spawned_cultures.push_back(culture{}); continue; }
+        out.spawned_cultures.push_back(
+            derive_daughter_culture(*par, seed ^ 0xC0DAu, static_cast<int>(si)));
+    }
 
     // --- Score every tile once, in raster order --------------------------------
     std::vector<int> score(static_cast<std::size_t>(total), 0);
@@ -753,9 +893,8 @@ settlement_state run_settlement(const planetology_state& pl,
         // consumes randomness any more.
         p.founded_year = col_field.arrival_year[ci_tile];
 
-        const std::string people = best_c >= 0
-            ? cs.cultures[static_cast<std::size_t>(best_c)].name
-            : std::string("nameless");
+        const ::culture* named = culture_at(best_c);
+        const std::string people = named ? named->name : std::string("nameless");
         p.name = people + " " + quarter_word(lexicon_for(best_c), col, row, gw, gh);
 
         out.regions.push_back(std::move(p));

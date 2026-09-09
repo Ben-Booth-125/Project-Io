@@ -527,6 +527,32 @@ struct settlement_state
     /// it began. Colonisation and conquest become two visibly different halves
     /// of one span.
     ///
+    /// THE CULTURES THE MIGRATION COINED (BL-856), in allocation order, with
+    /// ids running one past the last cradle culture. Derived from their
+    /// parents rather than rolled fresh, so a homeworld ends with a FAMILY of
+    /// related peoples grouped by the routes their ancestors took — which is
+    /// what makes the round a map of a migration rather than of where
+    /// agriculture started.
+    ///
+    /// APPENDED TO `creed_state::cultures` by the caller immediately after this
+    /// pass, so every downstream consumer (the sim's per-culture aggression, the
+    /// naming passes) sees one flat list and needs no second lookup.
+    std::vector<culture> spawned_cultures;
+
+    /// THE YEAR THE MIGRATION ENDED (BL-858) — when the last stream that was
+    /// ever going to land, landed. The migration round's terminating condition,
+    /// carried on the settlement record because every consumer already holds
+    /// one.
+    ///
+    /// Ben's rule is "all land has some culture". Read literally it never
+    /// terminates: ground no package can farm never gets a culture by
+    /// construction, and BL-859's census shows that is 44-57% of every world,
+    /// dominated by polar ice. What the rule MEANS is *wait until nothing more
+    /// is going to happen*, and the flood answers that by finishing — so this
+    /// needs no safety stop, no cap and no watchdog. It is a reading of a walk
+    /// that terminates, not a loop that might not.
+    int64_t migration_end_year = 0;
+
     /// ASCENDING BY `founded_year`, then by placement order — a total order, so
     /// two regions dated to the same year are founded in an order that cannot
     /// depend on a sort's stability.

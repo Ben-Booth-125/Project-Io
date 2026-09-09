@@ -331,6 +331,73 @@ inline constexpr int32_t colonisation_impassable = INT32_MAX;
 /// epoch and the run puts the ancient pass at.
 inline constexpr int64_t colonisation_start_year = -4000;
 
+// ---------------------------------------------------------------------------
+// Water: the coast is the road, and a crude hop crosses a strait (BL-857)
+// ---------------------------------------------------------------------------
+//
+// **Ben, 2026-09-09: not enough emphasis on crude coastal and overseas
+// migration routes.** Two constants carry that, and both are the same claim the
+// span already makes about mountains, applied to water: the routes people
+// actually followed should be the cheap ones, and the map should show it.
+
+/// How many water tiles a stream may cross in one hop, land to land.
+///
+/// CRUDE, AND THE WORD IS THE SPECIFICATION. This is a raft across a strait or
+/// a scramble to an island already visible from the shore — not seafaring. It
+/// takes no capability, no work, no harbour and no staging hub, because this
+/// span has no infrastructure in it at all (§ No actor, and no infrastructure)
+/// and must never grow any. It is emphatically NOT the staged harbour-works
+/// model of `MILITARY_HISTORY.md` § Sea legs, which belongs to a later era with
+/// institutions in it.
+///
+/// THREE, so a strait or an island chain is crossable and an ocean is not. The
+/// bound is what keeps "people got everywhere" from becoming "people sailed",
+/// and a harness asserts it: a stream must not cross open water.
+inline constexpr int colonisation_max_hop_tiles = 3;
+
+/// Centi-years a hop costs, per water tile crossed, on top of the landing.
+///
+/// DEAR RATHER THAN IMPOSSIBLE. A crossing is the expensive way to reach ground
+/// — it should lose to any reasonable land route and win only where there is no
+/// land route at all, which is exactly the case it exists for: the awkward
+/// corners of a world that nothing walks to.
+inline constexpr int32_t colonisation_hop_centiyears = 2600;
+
+// ---------------------------------------------------------------------------
+// Migration spawns cultures (BL-856)
+// ---------------------------------------------------------------------------
+
+/// Centi-years a stream may walk before the people who arrive are no longer the
+/// people who set out.
+///
+/// **A culture is not only something a cradle coins; it is something a
+/// migration PRODUCES (Ben, 2026-09-09).** The first build carried one culture
+/// per cradle for the life of the run, so a stream that crossed a continent
+/// arrived as its own ancestors and a whole homeworld ended with five peoples.
+/// That is a map of where agriculture started, not a map of a migration.
+///
+/// TIME, NOT DISTANCE, and the choice matters. Distance walked would make a
+/// people crossing easy ground diverge as fast as one grinding over a range,
+/// which is backwards: what separates a daughter from its parent is the
+/// GENERATIONS in between, and this span already denominates everything in
+/// years. So a stream that spends six centuries getting somewhere arrives as a
+/// different people whether it walked far or walked hard.
+///
+/// A PLACEHOLDER awaiting `history_sweep`, like every magnitude here.
+inline constexpr int64_t colonisation_split_centiyears = 60000; // 600 years
+
+/// One culture the migration coined: `culture` descends from `parent`.
+///
+/// The walk allocates ids and records the parentage; it does not coin names,
+/// tongues or pantheons — that is `creeds.hpp`'s vocabulary and this header has
+/// none of it. `run_settlement` materialises the record from this list.
+struct culture_spawn
+{
+    int32_t culture = -1; ///< The new culture's id.
+    int32_t parent  = -1; ///< The culture it descends from.
+    int32_t tile    = -1; ///< Where it diverged, for naming and for the record.
+};
+
 /// Radius of the window a cradle coins its package from.
 ///
 /// The basin the ladder already scored the cradle on, in the sense
@@ -411,6 +478,34 @@ struct colonisation_field
     /// not settled, and stays empty for as long as that holds.
     std::vector<uint8_t> farmable;
 
+    /// THE YEAR THE MIGRATION FINISHED — when the last stream that was ever
+    /// going to land, landed (BL-858). `start_year` where nothing arrived.
+    ///
+    /// THIS IS THE ROUND'S TERMINATING CONDITION, and it is a READING rather
+    /// than a loop. Ben's rule is "all land has some culture"; a naive reading
+    /// of that never terminates, because ground no package can farm never gets
+    /// a culture by construction — and that is not a rare world, it is EVERY
+    /// world: 44-57% of land is unfarmable today, dominated by polar ice
+    /// (BL-859's census). So the condition cannot be "wait until every tile is
+    /// coloured".
+    ///
+    /// What it actually means is: **wait until nothing more is going to
+    /// happen.** The flood already answers that exactly — it terminates when
+    /// its frontier is exhausted, having reached everything reachable — so the
+    /// last arrival IS the moment the migration is over, and no safety stop,
+    /// no iteration cap and no watchdog is needed. The walk is bounded by the
+    /// tile count and cannot run away.
+    ///
+    /// That is why this is one field rather than a mechanism: the terminating
+    /// condition was already implicit in a walk that finishes, and the only
+    /// thing missing was reading it back.
+    int64_t last_arrival_year = 0;
+
+    /// THE CULTURES THIS MIGRATION COINED (BL-856), in allocation order — which
+    /// is arrival order, so the list is a record of the routes that produced
+    /// them. Empty when no stream walked far enough to diverge.
+    std::vector<culture_spawn> spawns;
+
     bool empty() const { return arrival_year.empty(); }
 };
 
@@ -433,9 +528,15 @@ struct colonisation_input
     int gw = 0;
     int gh = 0;
 
-    /// The year the diffusion stops. Streams still in flight past it never
-    /// arrive — the span ends, and what had not been reached stays empty.
+    /// A FAR BACKSTOP, not the migration's end (BL-858). The walk terminates on
+    /// its own when its frontier is exhausted, and `last_arrival_year` reports
+    /// when that was; this only stops an arrival year running to an absurd
+    /// value on a pathological map.
     int64_t boundary_year = 0;
+
+    /// The first id the walk may allocate to a culture it coins — one past the
+    /// last cradle culture. Below it are the cultures that already exist.
+    int32_t first_spawn_culture = 0;
 };
 
 /// Run the diffusion.
