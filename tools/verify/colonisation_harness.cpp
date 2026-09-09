@@ -634,6 +634,111 @@ void case_real_worlds(int seed_count)
           "C9  the field's size is bounded and stated (under 4 MB on a homeworld grid)");
 }
 
+
+// ---------------------------------------------------------------------------
+// C11 — BL-848's ACCEPTANCE TEST, on real generated worlds
+// ---------------------------------------------------------------------------
+//
+// C3 proves culture-by-route on a map BUILT to contain the case. This proves it
+// on the worlds the game actually generates, which is what BL-848's done-when
+// asks for: "a harness shows the god map is not reproducible by a Voronoi of
+// cradles."
+//
+// It reads generation's OWN settlement -- the regions run_settlement produced
+// after the change -- and asks two questions of it. First, how many regions
+// carry a culture that a nearest-cradle assignment would NOT have given them;
+// that share is the whole of what "earned rather than assigned" buys. Second,
+// whether founding dates SPREAD across the span rather than clustering, since a
+// route-derived date that still lands everything in one century would mean the
+// walk is not costing anything.
+
+void case_route_on_real_worlds(int seed_count)
+{
+    std::printf("\n--- C11: the god map against a Voronoi, on real worlds --------\n");
+
+    int worlds = 0, worlds_disagreeing = 0;
+
+    for (int s = 0; s < seed_count; ++s)
+    {
+        world_params wp;
+        wp.seed = static_cast<uint32_t>(s);
+        wp.prehistory_years = 400;
+
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
+                                              nullptr, nullptr, &fx);
+        (void)w;
+        const generation_report::body_entry* k = kepler_of(rep);
+        if (k == nullptr || !fx.ran) continue;
+        ++worlds;
+
+        // EACH CULTURE'S ORIGIN, RECOVERED FROM THE SETTLEMENT ITSELF: the
+        // region of that culture founded EARLIEST is where its stream started.
+        //
+        // This is a stronger test than comparing against the ladder's cradle
+        // coordinates would have been, and it is also the only one available -
+        // generation_report does not carry the ladder. It asks: given the
+        // origins the map ITSELF shows, does a nearest-origin assignment
+        // reproduce the culture map? If it does not, the distribution is a
+        // record of routes rather than a partition of space, which is exactly
+        // BL-848's claim.
+        constexpr int max_cultures = 64;
+        int   org_col[max_cultures], org_row[max_cultures];
+        int64_t org_year[max_cultures];
+        bool  org_has[max_cultures];
+        for (int i = 0; i < max_cultures; ++i) { org_has[i] = false; org_year[i] = 0; }
+
+        for (const region& r : fx.settlement.regions)
+        {
+            const int c = r.culture.plurality();
+            if (c < 0 || c >= max_cultures) continue;
+            if (!org_has[c] || r.founded_year < org_year[c])
+            {
+                org_has[c]  = true;
+                org_year[c] = r.founded_year;
+                org_col[c]  = r.col;
+                org_row[c]  = r.row;
+            }
+        }
+
+        int disagree = 0, scored = 0;
+        int64_t ymin = 1LL << 40, ymax = -(1LL << 40);
+
+        for (const region& r : fx.settlement.regions)
+        {
+            if (r.founded_year < ymin) ymin = r.founded_year;
+            if (r.founded_year > ymax) ymax = r.founded_year;
+
+            int best_c = -1, best_d = 1 << 30;
+            for (int c = 0; c < max_cultures; ++c)
+            {
+                if (!org_has[c]) continue;
+                const int d = grid_dist_flat(r.col, r.row, org_col[c], org_row[c], fx.gw);
+                if (d < best_d) { best_d = d; best_c = c; }
+            }
+            if (best_c < 0) continue;
+            ++scored;
+            if (r.culture.plurality() != best_c) ++disagree;
+        }
+
+        if (scored == 0) continue;
+        if (disagree > 0) ++worlds_disagreeing;
+
+        std::printf("seed %u  regions %d  route disagrees with a Voronoi on %d (%d%%)  "
+                    "founded_year %lld .. %lld (span %lld yr)\n",
+                    wp.seed, scored, disagree, (disagree * 100) / scored,
+                    static_cast<long long>(ymin), static_cast<long long>(ymax),
+                    static_cast<long long>(ymax - ymin));
+    }
+
+    if (worlds == 0) { check(false, "C11 no world ran - the case is vacuous"); return; }
+
+    check(worlds_disagreeing == worlds,
+          "C11 THE GOD MAP IS NOT A VORONOI OF CRADLES on any generated world - culture is "
+          "earned by arrival, not assigned by distance (BL-848's acceptance test)");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -651,6 +756,7 @@ int main(int argc, char** argv)
     case_predation();
     case_cradle_outcomes();
     case_real_worlds(seed_count);
+    case_route_on_real_worlds(seed_count);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;

@@ -319,6 +319,27 @@ inline constexpr int32_t colonisation_base_centiyears = 1200;
 /// Impassable. Open ocean, and any tile no stream may enter.
 inline constexpr int32_t colonisation_impassable = INT32_MAX;
 
+/// The calendar year every cradle's stream begins moving.
+///
+/// EVERY CRADLE STARTS AT THE SAME MOMENT, which is the honest reading of Stage
+/// 0: the cradles are where agriculture began, not a staggered set of later
+/// arrivals. What separates them afterwards is the ground and the package they
+/// carry, never a head start — and that matters, because a stagger would be a
+/// second asymmetry generator competing with the one BL-847 exists to be.
+///
+/// -4000 matches `history_sim_params::start_year`, the year HISTORY.md § The
+/// epoch and the run puts the ancient pass at.
+inline constexpr int64_t colonisation_start_year = -4000;
+
+/// Radius of the window a cradle coins its package from.
+///
+/// The basin the ladder already scored the cradle on, in the sense
+/// `agrarian_cradle::fertile_tiles` counts it. Large enough that a cradle on a
+/// terrain boundary sees BOTH sides — which is the whole of where a broad
+/// package comes from — and small enough that it is a basin rather than a
+/// continent.
+inline constexpr int colonisation_cradle_window = 6;
+
 /// Centi-years for a stream to cross the tile at @p idx.
 ///
 /// COST IS GROUND ALONE — river courses and coastal shelf cheap (the routes
@@ -432,3 +453,84 @@ colonisation_field run_colonisation(const colonisation_input& in,
 /// Bytes the field occupies — the quantity a requirement bounds, stated the way
 /// `owner_ring_bytes` states the time-lapse's.
 int64_t colonisation_field_bytes(const colonisation_field& f);
+
+// ---------------------------------------------------------------------------
+// Why a cradle stopped (BL-851)
+// ---------------------------------------------------------------------------
+
+/// WHAT HAPPENED TO ONE SOURCE'S STREAM.
+///
+/// FOUR OUTCOMES LOOK IDENTICAL FROM OUTSIDE — "the cradle stopped" — and only
+/// one of them is death. COLONISATION.md § What a cradle stopping actually
+/// means lists them, and the reason they need separating is not tidiness: a
+/// sweep that cannot tell them apart cannot argue a single constant in that
+/// document. `N cradles stopped` carries no information when SESSILE-FOREVER is
+/// a normal and frequent outcome by design — the breadth term in BL-847 makes
+/// it one deliberately — because the reading cannot distinguish the design
+/// working from a cradle that was never viable.
+enum class cradle_outcome : uint8_t
+{
+    /// It spread: it holds farmable ground beyond its own anchor.
+    spread = 0,
+
+    /// NARROW AFFINITY, no adjacent ground of a matching class. The stream
+    /// walked — it crossed real ground — and none of what it crossed could be
+    /// farmed by what it carried. Sessile, NOT dead: people persist, and the
+    /// gods never leave home.
+    sterility = 1,
+
+    /// AFFINITY IS FINE; every exit is barrier terrain whose year-cost the span
+    /// never pays. Sessile too, and distinguishable from sterility only by WHY
+    /// the stream stopped — which is exactly why both are listed. Read here as
+    /// "it barely moved at all", against sterility's "it moved and found
+    /// nothing".
+    encirclement = 2,
+
+    /// A NEIGHBOUR'S STREAM REACHED THE SAME GROUND FIRST and `culture_shares`
+    /// split. Not death: the gods survive as a minority share and the record is
+    /// intact. Read as "ground this package COULD have farmed was claimed by
+    /// somebody else".
+    dilution = 3,
+
+    /// SUSTAINABLE POPULATION SITS BELOW the density Stage 0 needs for surplus.
+    /// The only one of the four that IS death — and it should never be reached,
+    /// because `agrarian_score` reads predation, so lethal ground is never
+    /// chosen as a cradle in the first place. A cradle that forms and then
+    /// fails is the worse design of the two: it spends a simulation discovering
+    /// what a score could have said for free. Seeing this outcome at all is a
+    /// finding about the SELECTION, not about the span.
+    predation_floor = 4,
+};
+
+const char* cradle_outcome_name(cradle_outcome o);
+
+/// Per-source population facts the outcome test needs and the field does not
+/// carry. Supplied by the caller because the field is about GROUND and this is
+/// about the people standing on it.
+struct cradle_vitals
+{
+    /// Sustainable heads on this source's own ground, AFTER predation has taken
+    /// its share (`region_carrying_capacity` x `predation_capacity_mult_q`).
+    int64_t sustainable = 0;
+
+    /// The headcount below which a people raises no surplus to send at all —
+    /// Stage 0's density requirement. Below it the cradle is on the predation
+    /// floor whatever the ground around it looks like.
+    int64_t surplus_threshold = 0;
+};
+
+/// Classify every source's outcome against a finished field.
+///
+/// ORDER OF TESTS IS THE CLASSIFICATION, and it runs most-fatal first so a
+/// cradle that is BOTH penned and dying is reported as dying. Returns one entry
+/// per source, in source order.
+///
+/// PURE, and a read rather than a step: it changes nothing and the field it
+/// reads is already final. `vitals` may be empty, in which case the predation
+/// floor is never reported — the honest answer when the caller did not supply
+/// the population facts, rather than a silent zero that would read as "nobody
+/// died".
+std::vector<cradle_outcome> classify_cradle_outcomes(
+    const colonisation_field&               f,
+    const std::vector<colonisation_source>& sources,
+    const std::vector<cradle_vitals>&       vitals);

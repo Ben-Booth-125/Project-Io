@@ -1,6 +1,7 @@
 #include "settlement.hpp"
 
-#include "tongue.hpp" // BL-348: quarter words are coined, not borrowed
+#include "colonisation.hpp" // BL-846/848: the diffusion that dates and colours a founding
+#include "tongue.hpp"       // BL-348: quarter words are coined, not borrowed
 
 #include <algorithm>
 #include <array>
@@ -585,6 +586,74 @@ settlement_state run_settlement(const planetology_state& pl,
         return lex_cache.emplace(culture, std::move(lex)).first->second;
     };
 
+    // --- The colonisation diffusion, run once before anything is placed -------
+    //
+    // BL-846/BL-848. Every founding below takes its DATE and its CULTURE from
+    // this field rather than from a settle-score formula and a nearest-cradle
+    // distance. `docs/generation/COLONISATION.md` is the authority; what this
+    // block does is hand the placement loop two answers it used to invent.
+    //
+    // WHY IT RUNS HERE AND NOT INSIDE THE SIM. The sim has no world& by
+    // deliberate design (history_sim.hpp), and the walk needs the tile raster.
+    // This pass already holds both, and it is the pass that decides which ground
+    // is founded — so the flood belongs on this side of the seam and the
+    // SCHEDULE it produces is what crosses.
+    //
+    // ONE FLOOD FOR THE WHOLE MAP, seeded from the cradles alone. Not from every
+    // candidate site: a candidate is not a people, and seeding the walk from the
+    // ground it is supposed to be deciding would make the answer circular.
+    std::vector<terrain_substrate> col_sub(static_cast<std::size_t>(total),
+                                           terrain_substrate::ocean);
+    std::vector<terrain_cover>     col_cov(static_cast<std::size_t>(total),
+                                           terrain_cover::none);
+    std::vector<terrain_landform>  col_lf(static_cast<std::size_t>(total),
+                                          terrain_landform::plains);
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const tile_component* t = tile_at(w, tile_ids, idx);
+        if (t == nullptr) continue;
+        col_sub[static_cast<std::size_t>(idx)] = t->substrate;
+        col_cov[static_cast<std::size_t>(idx)] = t->cover;
+        col_lf [static_cast<std::size_t>(idx)] = t->landform;
+    }
+
+    // A CULTURE'S CRADLE IS ITS SOURCE, so the stream that arrives somewhere
+    // carries a culture index the rest of this pass already understands. Walked
+    // in culture order, which is the sorted order `creed_state` holds them in —
+    // the flood's tie-break reads `source_region`, so the walk order here is
+    // what makes two streams arriving in the same year resolve identically on
+    // every machine.
+    std::vector<colonisation_source> col_sources;
+    col_sources.reserve(cs.cultures.size());
+    for (std::size_t ci = 0; ci < cs.cultures.size(); ++ci)
+    {
+        const int cr = cs.cultures[ci].cradle;
+        if (cr < 0 || cr >= static_cast<int>(hl.cradles.size())) continue;
+        const agrarian_cradle& ac = hl.cradles[static_cast<std::size_t>(cr)];
+        const int anchor = ac.row * gw + ac.col;
+        if (anchor < 0 || anchor >= total) continue;
+        col_sources.push_back(colonisation_source{
+            anchor,
+            static_cast<int32_t>(col_sources.size()),
+            static_cast<int32_t>(ci),
+            // EVERY CRADLE STARTS AT THE SAME MOMENT, and that is the honest
+            // reading of Stage 0: the cradles are where agriculture began, not
+            // a staggered set of later arrivals. What separates them afterwards
+            // is the ground and the package, never a head start.
+            colonisation_start_year,
+            coin_package(col_sub, col_cov, col_lf, gw, gh, ac.col, ac.row,
+                         colonisation_cradle_window)});
+    }
+
+    colonisation_input col_in;
+    col_in.substrate     = &col_sub;
+    col_in.cover         = &col_cov;
+    col_in.landform      = &col_lf;
+    col_in.gw            = gw;
+    col_in.gh            = gh;
+    col_in.boundary_year = stop_year;
+    const colonisation_field col_field = run_colonisation(col_in, col_sources);
+
     // --- Score every tile once, in raster order --------------------------------
     std::vector<int> score(static_cast<std::size_t>(total), 0);
     for (int idx = 0; idx < total; ++idx)
@@ -637,18 +706,30 @@ settlement_state run_settlement(const planetology_state& pl,
         }
         p.settle_score_q = clampi(score[static_cast<std::size_t>(idx)] * 10, 0, 1000);
 
-        // WHOSE GODS. A region inherits the nearest surviving cradle's
-        // culture, so the pantheon map is a map of who actually walked where —
-        // not a per-region re-roll of belief.
-        int best_c = -1, best_d = 1 << 30;
-        for (std::size_t ci = 0; ci < cs.cultures.size(); ++ci)
-        {
-            const int cr = cs.cultures[ci].cradle;
-            if (cr < 0 || cr >= static_cast<int>(hl.cradles.size())) continue;
-            const agrarian_cradle& ac = hl.cradles[static_cast<std::size_t>(cr)];
-            const int d = grid_dist(col, row, ac.col, ac.row, gw);
-            if (d < best_d) { best_d = d; best_c = static_cast<int>(ci); }
-        }
+        // WHOSE GODS — THE CULTURE OF THE STREAM THAT REACHED IT (BL-848).
+        //
+        // This supersedes the nearest-cradle rule, which was a straight-line
+        // geometric assignment standing in for a history nothing was
+        // simulating. Under the diffusion the same field is a PATH fact:
+        // whoever's stream arrived, arrived. A cradle no longer owns the ground
+        // on the far side of its own mountains — the culture that came the long
+        // way round by the coast does, because it got there first.
+        //
+        // That is what makes CREEDS.md's "a record of who walked where" true
+        // rather than merely claimed: it could not be delivered before, because
+        // nobody walked.
+        const std::size_t ci_tile = static_cast<std::size_t>(idx);
+        const int best_c = col_field.culture.empty() ? -1 : col_field.culture[ci_tile];
+
+        // GROUND NO STREAM REACHED IS NOT SETTLED, and ground no arriving
+        // package could farm is not settled either. Emptiness is a real outcome
+        // here, not a failure to fill — so this is a `continue`, not a fallback
+        // to some nearest cradle. A candidate site that scored well and was
+        // never reached simply has nobody living on it.
+        if (best_c < 0 || col_field.arrival_year[ci_tile] == colonisation_never_reached
+            || !col_field.farmable[ci_tile])
+            continue;
+
         // BL-826: a region arrives WHOLLY its cradle's. Mixing is something
         // history does to it, never something settlement hands it.
         p.culture = culture_shares::pure(best_c);
@@ -656,10 +737,20 @@ settlement_state run_settlement(const planetology_state& pl,
 
         raw.push_back(survey_endowment(w, tile_ids, col, row, gw, gh));
 
-        // Better ground is settled earlier. Bounded on both ends so a scoring
-        // change cannot push a founding date past the industrial stage.
-        p.founded_year = -2000 + static_cast<int64_t>(1000 - p.settle_score_q) * 3
-                       + r.pick(120);
+        // WHEN THE STREAM GOT THERE, in years, over ground alone.
+        //
+        // The old rule was `-2000 + (1000 - settle_score_q) * 3 + rng(120)` —
+        // better ground settled earlier, which reads as sensible and encodes
+        // nothing about distance, route or barrier. Under it a valley forty
+        // tiles beyond a mountain range was founded on the same terms as one
+        // beside the first granary, which is exactly the missing frontier
+        // BL-847 was written about.
+        //
+        // THE RNG DRAW IS GONE, and deliberately: an arrival year is a
+        // consequence of the ground, not a roll on top of one
+        // (GENERATION_STRATEGY.md § Asymmetry is the deliverable). Nothing here
+        // consumes randomness any more.
+        p.founded_year = col_field.arrival_year[ci_tile];
 
         const std::string people = best_c >= 0
             ? cs.cultures[static_cast<std::size_t>(best_c)].name
