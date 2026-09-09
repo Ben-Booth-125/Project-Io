@@ -59,7 +59,30 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-*Nothing open.*
+### Sprint 36 — a revised look at ancient history
+*Open · opened 2026-09-09*
+
+**Goal.** Make the Era -1 ancient pass produce a history worth looking at. Sprint 35 measured it and found the sim was not simulating much: all 258 battles of the seed-0 fixture are the same dead region taken and retaken, and 66-86% of a long run is a reach cache that twelve polities evict every round. This sprint fixes the cause of both, then gives the scorer the two questions it was missing.
+
+**Planned.**
+- BL-834 (reach cache per polity) - FIRST. Cache per polity rather than one shared slot; re-measure history_span_cost; world_determinism digests bit-identical.
+- BL-835 (civilian population, armies apart) - the root fix for the dead-region ping-pong. War stops producing empty regions, so the pathology has no cause rather than a block.
+- BL-837 (ancient logistics and roads) - the scorer question "can I keep it": holding ground costs something that falls off with distance.
+- BL-838 (fear of being next) - the scorer question "will others attack me": neighbours coalesce against a riser out of fear, never out of rank.
+- BL-839 (turbulence lean) - the round 4 lean, rolling for a world with fewer or more countries. Tunes forces; never clamps a count.
+- BL-823 (anti-hegemon levers) - culture, logistics, communication and succession as the forces that keep round 4 multipolar.
+
+**Done when.** The seed-0 fixture stops flipping one dead region; battles and conquests are no longer 1:1. R5 is re-measured and either passes or fails for a stated new reason. A 4000-year run is affordable enough to be the default span. The scorer can be shown to hold ground it can supply and to abandon ground it cannot, and a large aggressive polity draws a coalition where a large peaceful one does not.
+
+**Risk.** Three traps, each already paid for once. (1) BL-838 must not become a rank term - "largest polity" is not the trigger, "the polity that has been doing this to people like me" is; a size coefficient passes every obvious check and violates the standing rule the item exists to satisfy, and the test is that a large PEACEFUL polity attracts no coalition. (2) R5 is a correct check pointing at a real defect and stays untouched until BL-835 lands and it is re-measured - do not relax it, do not add seeds until one goes green. (3) BL-839 is not a name bank; its two archetypes transfer as mechanisms and never as proper nouns. Beyond those: this is world/* and every change must be output-identical or output-intended, never output-accidental - world_determinism digests before and after, each time.
+
+SCOPE SET BY BEN 2026-09-09. Twenty-one items carry a sprint 36 tag; six are planned here. The other fifteen - the pass 2 economy span (BL-831, BL-832, BL-833, BL-818), the presentation set (BL-829, BL-830, BL-819, BL-820, BL-812, BL-822) and the smaller pass-1 defects (BL-836, BL-840, BL-841, BL-842, BL-843) - remain tagged as the pool this sprint draws its successor from. They are not in this sprint.
+
+THE STEP 4A REVIEW BARRIER OWED BY SPRINT 35 WAS DROPPED (Ben, 2026-09-09). The merged set was independently verified by the main session at merge time; a second static pass over it is not being run.
+
+BL-834 WAS PULLED IN (Ben, 2026-09-09). It sat outside the scope Ben picked, but BL-837 is precisely the item that makes reach load-bearing, so the cache thrash gets fixed before anything leans on it.
+
+THE FOUR OPEN CALLS WERE ANSWERED 2026-09-09 before the sprint opened: NR-801 the pass runs inside the round; NR-803 the 1200-1560 gap is a deliberate coast, with BL-831 owing the list of accumulators that cross it; NR-804 the pre-game wizard is out of scope for the action dictionary, now stated in ACTIONS.json and CLAUDE.md; NR-805 profiling counters in world/* stay case-by-case, with no rule written.
 
 ## Where things stand
 
@@ -118,9 +141,10 @@ and/or a version goal (v0.1.1 etc.).
 | 32c | Gamified generation, 32c - the water model finishes, and phase 6 gets its search | OPENED 2026-09-06 as the 32b continuation, carrying 28 items. Much of its water-model chain landed (BL-776 through BL-780, BL-783, BL-785, BL-786) and the phase 6 chain reached its search. SUPERSEDED 2026-09-08 on Ben's board-clearing call: the carried remainder was cancelled into the backlog archive rather than re-promoted. What landed under it is recorded in the devlog, not here. |
 | 33 | Context economy - the corpus stops charging every session for what one session needs | OPENED 2026-09-07 and ran hard: THREE blocks, 16 items delivered, retro recorded below. CLOSED 2026-09-08 on Ben's call clearing the board - "let's approach the next task with a fresh mindset" - NOT because it failed. Its unfinished remainder (BL-807 the corpus citations, BL-808 the reach defect, BL-809 the red province assertions, plus BL-810 and BL-811 filed on the way past) was cancelled into the backlog archive the same day. The retro is the record of what this sprint actually delivered and stands unchanged. |
 | 35 | Watching the world be made | CLOSED 2026-09-09 with its placeholder elements standing. The visibility scaffold landed and was verified live; the sim work it would show turned out to be much larger than the sprint assumed, and moves to 36. Three measurements refuted three assumptions, which is the sprint real output. |
+| 36 | a revised look at ancient history | OPEN 2026-09-09. Pass 1 rebuilt around a civilian population: war stops manufacturing empty regions, holding ground costs something that falls off with distance, and a riser draws a coalition. Six items; BL-834 (reach cache) runs first because BL-837 makes reach load-bearing. |
 
-**Next up.** NO SPRINT IS OPEN. Sprint 35 closed 2026-09-09 with its placeholder elements standing: the wizard runs five rounds, verified live, and rounds 4 and 5 carry honest labelled placeholders. The sim work they would show is much larger than that sprint assumed and is the whole of what remains. RESUME AT docs/development/NEXT_SESSION.md, which carries the two numbers that should shape everything next - reach is 66-86% of a long run and rebuilds 12,000 times (BL-834), and the sim battle count is one dead region flipping 258 times (BL-835). SPRINT 36 IS THE NEXT NEW SPRINT and is not yet authored; fourteen items are already tagged to it.
+**Next up.** SPRINT 36 IS OPEN (2026-09-09) - a revised look at ancient history. Six items in order: BL-834 (reach cache per polity) first, because BL-837 makes reach load-bearing; then BL-835 (civilian population, armies apart), which removes the CAUSE of the dead-region ping-pong rather than blocking it; then the two scorer questions, BL-837 (can I keep it) and BL-838 (will others attack me for fear of being next); then BL-839 (the turbulence lean) and BL-823 (the anti-hegemon levers). The fifteen other items tagged 36 are the pool, not the sprint.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*53 sprints archived cold; 0 open/gated in the hot store.*
+*53 sprints archived cold; 1 open/gated in the hot store.*

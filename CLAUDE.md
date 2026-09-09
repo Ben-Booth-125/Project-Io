@@ -112,7 +112,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | Doc | Owns |
 |---|---|
 | `docs/ai/AI_OPPONENT.md` | The whole AI direction: scored-utility rivals, the word interface, the local-model goal, the no-cloud invariant, the MCP server. **§ 11 is the grant register** — every dated exception to the AI-behaviour prohibition; read it before touching `corp_ai.cpp`. |
-| `docs/ai/ACTIONS.json` → `ACTIONS.md` | The action dictionary — every control as press/args/preconditions. Query with `tools/session/actions_query.js`; never hand-edit the mirror. **Any control change updates its entry.** |
+| `docs/ai/ACTIONS.json` → `ACTIONS.md` | The action dictionary — every control as press/args/preconditions. Query with `tools/session/actions_query.js`; never hand-edit the mirror. **Any control change updates its entry** — except the pre-game wizard, which is out of scope (Ben, 2026-09-09). |
 | `docs/ai/STRATEGIES.md` | The meta, authored ahead of the game — research, not authority. |
 | `docs/ai/LANGUAGE_POLICY_FEASIBILITY.md` | Research note: does a language-driven opponent compress and run locally. |
 | `docs/tech/TECH_FOUNDATIONS.md` | Settled technical decisions and the prototype scope/exclusions. Read before any code or architecture suggestion. |

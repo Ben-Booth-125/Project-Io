@@ -4270,6 +4270,137 @@
       "source": "Sprint 33 UI boundary lane (BL-796), confirmed independently by its second cold reviewer, 2026-09-07.",
       "what": "THREE STATEMENTS, ALL LIVE, ALL PRE-EXISTING - the batch deliberately did not resolve them.\n\n(1) LENSES.md:172-175 - \"National territory is the border band's job, and the band is SUPPRESSED while any lens is up (Ben, 2026-08-28).\" DATED.\n(2) LENSES.md:286-288 - the band is \"drawn always - under every lens and on the plain canvas - exactly as roads are.\" UNDATED.\n(3) PLANETARY.md:151 - \"Always-on political chrome (like roads, not a lens).\" UNDATED.\n\n(1) and (2) are in THE SAME DOC and contradict each other outright. Both were verified present at the batch base, so this is not damage the boundary work did; the UI lane found it, correctly declined to pick a side, and one of its agents then asserted an answer in SELECTION.md anyway - which the first cold review caught and the fix round removed.\n\nWHAT IS UNDECIDED, and both halves are yours:\n  (a) Does the band draw at all while a lens is up?\n  (b) When it does draw, does its hit corridor OUTRANK the lens's own structure for a click?\n\nWHY IT NEEDS YOU RATHER THAN A RULING FROM THE DATED LINE: newest-wins would hand it to (1), but (2) and (3) describe what two other surfaces are built to assume, and roads - the thing the band is twice compared to - are always-on. Picking by date alone would silently change what two docs promise.",
       "resolved": "2026-09-07"
+    },
+    "NR-801": {
+      "id": "NR-801",
+      "title": "Rounds 4 and 5 break the wizard promise that nothing is generated in it",
+      "raised": "2026-09-08",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Writing the sprint 35 visibility design into STARTUP.md and GENERATION_STRATEGY.md.",
+      "what": "STARTUP.md has said since BL-167 that NOTHING is generated in the wizard - every control move re-runs the chain as a pure throwaway preview and m_world is untouched. Rounds 4 and 5 cannot honour that: the history sim is the most expensive pass in the project. So I wrote them as running the REAL pass inside the round, on a Run press, drawing as it computes - the doc now says the preview model does not transfer.",
+      "why_it_matters": "That promise is not decoration. It is what makes Back a plain revision with no snapshot, and what lets the wizard reroll freely. Rounds that generate for real make Back across round 4 expensive and make a reroll a minute rather than a frame. Your \"a watched wait needs no budget\" licenses the wait; it does not by itself choose this mechanism over the alternative, which is to collect leans against an illustrative preview and run everything at Begin as today.",
+      "options": [
+        "The pass runs inside the round, on a Run press - the wait is the content (what I wrote).",
+        "Leans are collected against an illustrative preview; the real passes still run at Begin behind the loading screen."
+      ],
+      "recommendation": "Keep what I wrote. The second option gives the player a lean whose effect they cannot see when they set it, which is the one thing the planetology rounds get right and the reason the wizard works at all.",
+      "files": [
+        "docs/ui/STARTUP.md",
+        "docs/generation/GENERATION_STRATEGY.md"
+      ],
+      "resolution": "RESOLVED (Ben, 2026-09-09): keep what was written. The pass runs inside the round on a Run press, drawing as it computes; the wait is the content. STARTUP.md carries the exception to the preview promise.",
+      "resolved": "2026-09-09"
+    },
+    "NR-802": {
+      "id": "NR-802",
+      "title": "A 4000-year pass 1 ending at 1200 CE contradicts prehistory_years = 400 and epoch_year = 0",
+      "raised": "2026-09-08",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Your description of round 4 against the live app: a time-lapse of the first 4000 years, ending at 1200 CE.",
+      "what": "The code defaults are prehistory_years = 400 (hard_coded_world.hpp:73) and epoch_year = 0 CE, with era_band_for_epoch flipping to industrial at 1700. HISTORY.md carries the campaign epoch as 0 CE (your ruling, NR-177), and GENERATION_STRATEGY.md sets the pass 1 / pass 2 boundary at 400 years before the epoch. A 4000-year pass 1 ending at 1200 CE fits none of those three numbers.",
+      "why_it_matters": "It is not a naming mismatch. It reads as a re-basing of the whole calendar: pass 1 becomes 2800 BCE to 1200 CE, pass 2 runs 1200 CE to an epoch that must now be well past 1700 - which puts the campaign in the industrial band rather than the ancient one, and that band choice reaches into eras, resources and the military roster. It also multiplies the most expensive pass in the project by ten, against your other requirement for this round, which is that it be rapid.",
+      "options": [
+        "The epoch moves late (a modern arc) and 1200 CE is the pass 1 / pass 2 boundary year. Pass 1 is 4000 years, pass 2 is 1200 to the epoch.",
+        "The epoch stays at 0 CE and 1200 CE is wrong - the time-lapse ends at the epoch, whatever it is.",
+        "4000 years is the SPAN and 1200 CE is illustrative; the real numbers fall out of the cost measurement."
+      ],
+      "recommendation": "Option 1, because it is what you actually described and the arc you named - through to a stable dark age - is a medieval end point, not a classical one. But it moves the campaign into the industrial era band, so it is not a small consequence and I am not taking it on your behalf.",
+      "files": [
+        "src/world/hard_coded_world.hpp",
+        "src/world/era_band.hpp",
+        "docs/lore/HISTORY.md",
+        "docs/generation/GENERATION_STRATEGY.md"
+      ],
+      "resolution": "RESOLVED 2026-09-08 by Ben the same day: \"another focused pass on economy from 1560 to 1960\". That is option 1 - the epoch moves late. The calendar is now stated rather than derived: 4000 years to 1200 CE, a coast to 1560, then 1560-1960, epoch 1960. Written into GENERATION_STRATEGY.md § Pass 2 is the economy pass and lore/HISTORY.md § The epoch and the run. The consequence I flagged holds and is now carried by BL-831: an epoch of 1960 puts the campaign in the INDUSTRIAL era band, not the ancient one, and that owes a deliberate digest re-bless."
+    },
+    "NR-803": {
+      "id": "NR-803",
+      "title": "The 1200 - 1560 gap is unsimulated, and I have written it up as a deliberate coast",
+      "raised": "2026-09-08",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Your two spans: pass 1 ends at 1200 CE, pass 2 runs 1560 to 1960.",
+      "what": "That leaves 360 years nothing steps. I have written it into GENERATION_STRATEGY.md and HISTORY.md as a deliberate COAST rather than a gap: pass 1 ends in a stable dark age, a span defined by little changing is not worth simulating, and the world arrives at 1560 holding what 1200 left it.",
+      "why_it_matters": "It reads as intentional and it fits the arc you named - a stable dark age is precisely a span where skipping loses little. But you did not say it, I inferred it, and the alternative reading is that pass 1 should run to 1560 and 1200 was approximate. The two differ by 360 years of assimilation and grudge decay, which are the accumulators that move on their own even when borders do not.",
+      "options": [
+        "A deliberate coast, with self-moving accumulators advanced cheaply across it (what I wrote).",
+        "Pass 1 runs to 1560 and the two spans meet.",
+        "1200 was approximate; the boundary is wherever the measurement says it can afford to be."
+      ],
+      "recommendation": "Keep the coast. It is the cheapest span in the whole calendar and the one where the least is lost - but BL-831 has to name which accumulators cross it, because silently dropping 360 years of assimilation would undo the lever that makes conquest fragile.",
+      "files": [
+        "docs/generation/GENERATION_STRATEGY.md",
+        "docs/lore/HISTORY.md"
+      ],
+      "resolution": "RESOLVED (Ben, 2026-09-09): a deliberate coast, with the self-moving accumulators advanced cheaply across it. BL-831 (pass 2 economy span) must name which accumulators cross 1200-1560; dropping 360 years of assimilation silently would undo the lever that makes conquest fragile.",
+      "resolved": "2026-09-09"
+    },
+    "NR-804": {
+      "id": "NR-804",
+      "title": "The wizard has no entries in the action dictionary, and the five rounds did not add any",
+      "raised": "2026-09-08",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Merging the wizard shell (BL-816, BL-824) and verifying it live.",
+      "what": "CLAUDE.md says any control change updates its ACTIONS.json entry. The wizard gained two rounds, a per-round Reroll, and a Begin that moved. None of it was recorded, because ACTIONS.json has no startup family at all - its dictionary is gameplay.* and canvas.* only.",
+      "why_it_matters": "Either the pre-game wizard is deliberately outside the action dictionary - defensible, since the dictionary exists for an agent playing the game and nobody plays the wizard - or it is a gap that has been quietly widening since the wizard was built. The rule as written does not distinguish, so every session touching startup will face this again and answer it differently.",
+      "options": [
+        "The wizard is out of scope for ACTIONS.json; say so in the doc so it stops being a question.",
+        "Add a startup.* family and backfill the wizard."
+      ],
+      "recommendation": "Out of scope, stated explicitly. The dictionary is the AI seam and no agent presses Begin; a startup family would be inventory nobody reads. But it needs writing down, because silence is what made this a question.",
+      "files": [
+        "docs/ai/ACTIONS.json",
+        "CLAUDE.md"
+      ],
+      "resolution": "RESOLVED (Ben, 2026-09-09): the pre-game wizard is OUT OF SCOPE for the action dictionary, and that is now stated in ACTIONS.json _note and CLAUDE.md rather than left silent. The dictionary is the AI seam; no agent presses Begin.",
+      "resolved": "2026-09-09"
+    },
+    "NR-805": {
+      "id": "NR-805",
+      "title": "Profiling counters now live inside world/, and no doc owns that",
+      "raised": "2026-09-08",
+      "kind": "novel-work",
+      "status": "resolved",
+      "source": "Raised by the BL-825 agent about its own task; filed by the main session.",
+      "what": "BL-825 added history_sim_profile / history_sim_last_profile() - a report-only wall clock and rebuild counters living next to sim state in src/world/history_sim.hpp.",
+      "why_it_matters": "world/* is the deterministic core, and a wall clock is the least deterministic thing there is. The precedent it followed is real and close - era_minus_one.hpp already argues exactly this case for ms_era, kept off the save seam and out of every digest - and the instrumentation was proven output-neutral empirically rather than by assertion. But no doc owns the general question, so the next session adding a counter has the same argument again from scratch.",
+      "options": [
+        "Write the rule into DEVELOPMENT_PRACTICES.md: profiling state in world/* is permitted if it is off the save seam, out of every digest, and proven output-neutral by world_determinism.",
+        "Keep it case-by-case."
+      ],
+      "recommendation": "Write it down. The constraints are already clear from the two instances, and a stated rule is cheaper than a third argument.",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/era_minus_one.hpp",
+        "docs/development/DEVELOPMENT_PRACTICES.md"
+      ],
+      "resolution": "RESOLVED (Ben, 2026-09-09): keep it case-by-case. No rule goes into DEVELOPMENT_PRACTICES.md; the two existing instances (ms_era in era_minus_one.hpp, history_sim_profile in history_sim.hpp) argue their own case and a third one will argue its own too.",
+      "resolved": "2026-09-09"
+    },
+    "NR-806": {
+      "id": "NR-806",
+      "title": "Most of the war in the history sim is two neighbours ping-ponging one dead region",
+      "raised": "2026-09-08",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Chasing an R5 failure after the culture-shares merge. The check was right; my hypothesis about its cause was wrong, and so was the first diagnosis.",
+      "what": "On the seed-0 fixture all 258 battles of a 4000-year run are the same region, ti=348, with zero population and therefore zero defenders, taken and retaken by two neighbours. battles == conquests == 258 exactly - the shipped harness prints that 1:1 ratio without any instrumentation.",
+      "why_it_matters": "The battle count is how anyone judges whether the history sim produced a believable world, and here it is almost entirely one dead tile. This sprint is about SHOWING that history to the player: a border flickering 258 times over one region would be the single most visible thing on the time-lapse map, and it is an artefact. It also means the 1 -> 258 battle jump was never a richer history, so nothing should be tuned against it.",
+      "options": [
+        "A region with no population is not a battle target - walking in is an occupation, not a war.",
+        "Depopulated ground is released rather than held, so there is nobody to take it from.",
+        "A floor on what makes ground worth campaigning for at all."
+      ],
+      "recommendation": "The first. It says the clearest thing about what the sim thinks war is - a fight needs someone to fight - and it is the smallest change. But it is a statement about your model of war rather than a bug fix, which is why it is here rather than simply built. BL-835 and BL-836 carry the work either way.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/settlement.cpp",
+        "docs/generation/MILITARY_HISTORY.md"
+      ],
+      "resolution": "RULED by Ben, 2026-09-08, and the ruling went past all three options offered. First: a region emptied by war is immediately resettled by the attacker. Then, decisively: POPULATION IS CIVILIAN, ARMIES ARE DISTINCT FROM IT, AND STAGE 4 DOES NOT SIMULATE TOTAL WARFARE - so war stops producing empty regions at all, and the pathology has no cause rather than a block. That also dissolves the assimilation-bypass worry I raised against the first answer: with no war route to emptiness there is no massacre-and-resettle fast path. Written into GENERATION_STRATEGY.md § Population is civilian, and armies are distinct from it. Work is BL-835, re-authored around the split."
     }
   }
 }
