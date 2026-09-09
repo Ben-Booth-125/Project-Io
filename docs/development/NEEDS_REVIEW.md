@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*13 entries — 10 open, 3 resolved.*
+*17 entries — 14 open, 3 resolved.*
 
 ---
 
@@ -177,6 +177,65 @@ Two of the three candidates apply at different moments. FRACTURE is the formatio
 > **Recommendation:** Keep the pair. The open half is WHERE THE BAR SITS, and that is a measurement rather than a judgement: set it from a sweep producing both alliance-shaped and enmity-shaped worlds, never from a number picked to make one seed look right.
 
 *Files: `docs/generation/CIVILISATION.md`*
+
+### NR-819 — Twelve farm classes, four Colonisation branches — which class teaches which ground, and is there a fifth branch?
+*question · raised 2026-09-10 · from Authoring COLONISATION_TREE.md: the brief assumed one branch per origin farm class and sized the tree for four; classify_farm_class in src/world/colonisation.cpp yields twelve (boreal, volcanic, floodplain, montane, coastal, woodland, arid, valley, highland, grassland, stone, steppe) and COLONISATION.md names none.*
+
+The tree folds them into four ground families — Wet Ground (floodplain, valley), High Ground (highland, montane, volcanic), Open Ground (grassland, steppe), The Shore (coastal) — and leaves woodland, boreal, arid and stone belonging to no branch. A people coined on unowned ground climbs the spire on contact alone. Related: the gate vocabulary has no highland atom, so High Ground's majors carry no gate.
+
+**Why it matters.** Which ground teaches what is the whole content of a carried tree; a class that teaches nothing makes its peoples uniformly poor, and a fifth branch re-shapes the tree (rule 4 breadth, milestone requires_any sets). Cheap now, expensive after BL-882.
+
+- A - fold the four unowned classes into the nearest family (woodland/boreal -> High Ground, arid/stone -> Open Ground) and add a table to the doc
+- B - a fifth branch, Forest, for woodland and boreal; arid and stone stay unowned as hostile country
+- C - unowned classes teach nothing by design: peoples from hostile ground are late by construction
+
+> **Recommendation:** A, with a highland gate atom raised as its own small item only if the sweep shows High Ground nodes held by peoples who never stood on high ground. B is the deeper option and costs ~7 nodes; the cap has room.
+
+*Files: `docs/generation/trees/COLONISATION_TREE.md`, `docs/generation/trees/colonisation_tree.json`, `src/world/colonisation.cpp`*
+
+### NR-820 — DECISION TAKEN: the grammar gained requires_fork and requires_any beside the AND requirement
+*decision taken on your behalf · raised 2026-09-10 · from Authoring the Empire and Colonisation trees against the agreed grammar. The Sworn Province wants the granary fork TAKEN either way (the ladder's house rule for a fork under a vertex); the Colonisation milestones cannot demand two named branches of a people coined on one ground.*
+
+TREES.md § Milestones now carries three forms: requires (all held), requires_fork (either side of a fork pair), requires_any (any count of a set). tree_lint enforces all three at the milestone's own ring and counts guaranteed breadth for rule 4 in the worst case.
+
+**Why it matters.** Rule 2 says meaning is AND. Two softer forms are a widening of the grammar you agreed, taken so the trees could be finished; they are recorded so they can be overturned rather than become precedent.
+
+- A - keep both (ADOPTED)
+- B - keep requires_fork only; the Colonisation milestones name the spire major and ONE branch major each, accepting that peoples off that ground climb late
+- C - keep neither; the Colonisation tree becomes a documented exception
+
+> **Recommendation:** A. Both are lintable and both are used by exactly the case that needed them.
+
+*Files: `docs/generation/trees/TREES.md`, `tools/session/tree_lint.js`, `docs/generation/trees/colonisation_tree.json`, `docs/generation/trees/empire_tree.json`*
+
+### NR-821 — DECISION TAKEN: the old ladder is kept as a calibration reference with a superseded banner, not deleted
+*decision taken on your behalf · raised 2026-09-10 · from Ben, 2026-09-10: "write the docs and JSON to replace what we had pre-existing." docs/research/ANCIENT_TECH_LADDER.md (52K) and ancient_tech_ladder.json are cited by ten docs, by history_sim.hpp's own comments, by ladder_lint.js, and transcribed into scripts/tech_tree.lua's Era -1 section.*
+
+The three trees under docs/generation/trees/ are now the authority for the pre-game layer; the research doc carries a banner saying so and stays as the Earth-calibration reference (§ What "not every nation is equal" means, § Acquisition model, the band tables). ladder_lint.js still runs; the tech_tree.lua transcription retires under BL-885.
+
+**Why it matters.** Deleting would break header_graph on ten docs and orphan the calibration facts the sweep is tuned against; keeping leaves a superseded 52K research doc in the corpus. Your call which cost to pay.
+
+- A - keep with banner (ADOPTED)
+- B - delete doc + JSON + ladder_lint.js and re-point the citations at TREES.md
+- C - move both under docs/research/archive/ and re-point
+
+> **Recommendation:** A until BL-885 lands, then C — the transcription is the last thing that reads the JSON.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`*
+
+### NR-822 — DECISION TAKEN: one milestone per ring, so the trees carry 3 / 4 / 4 milestones rather than the 2 / 3 / 4 first stated
+*decision taken on your behalf · raised 2026-09-10 · from The sizing table in the 2026-09-10 assessment said 2, 3 and 4 milestones; the spire rule (one major and one milestone per ring, chained) makes the count equal the ring count.*
+
+Colonisation 3 rings / 3 milestones, Empire 4 / 4, Industry 4 / 4. The ring-1 milestone requires two ring-1 branch majors, so a polity cannot leave ring 1 by the spire alone.
+
+**Why it matters.** A rule-driven count is checkable and the stated count was not; but it means one more gate per tree than you agreed to, which slows the climb by one milestone cost.
+
+- A - one per ring (ADOPTED)
+- B - no ring-1 milestone: the root opens ring 2 directly
+
+> **Recommendation:** A.
+
+*Files: `docs/generation/trees/TREES.md`, `tools/session/tree_lint.js`*
 
 ---
 

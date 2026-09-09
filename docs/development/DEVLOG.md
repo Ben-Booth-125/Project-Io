@@ -10,6 +10,53 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-10 (sprint 40 opens) — Three trees, one grammar
+
+**Mode:** Design, out of order — sprint 40 opened ahead of 38 and 39 on Ben's call.
+**Runtime:** one session; two sub-agents authoring disjoint doc+JSON pairs in place, the main
+session authoring the grammar, the lint, the Empire tree and its scorer.
+
+### What started it
+
+Ben's sprint-40 brief: design specific technology trees for Empire, Colonisation and Industry,
+using the placeholder trees for inspiration, and consider how generation produces research points
+and what motivates a polity to pursue a branch. The first assessment found three tech objects and
+only one running — the sim held seven capacity bands and drew a picture of a tree beside them —
+and that the three trees Ben named are the three simulated spans, each with a different way of
+acquiring a node.
+
+### What was settled
+
+Ben's calls: three trees, not one web; the sim reads nodes, not bands; each tree its own doc and
+its own JSON; nodes are minor, major and milestone, with milestones unlocking the next tree; a
+central spire branching outward. Then the five grammar proposals, agreed as put: the sizes with a
+64-node cap (one 64-bit mask per tree, the `works_built` precedent); forks as majors with
+`excludes`; minors diffuse free by contact, majors by their class, milestones never; a milestone
+needs two branches at its own ring; home `docs/generation/trees/`.
+
+### What was written
+
+`TREES.md` (the grammar, the five lintable adjacency rules, the scorer shape, the JSON schema,
+where research comes from before a university exists), then three docs and three stores:
+Colonisation 29 nodes carried by time on ground, Empire 52 nodes with `pursued_when` on every
+node, Industry 62 nodes with four forks. `tools/session/tree_lint.js` enforces every rule and
+cross-checks doc and store both ways; all three pass. The Empire scorer is specified per node —
+the term that makes it the top pick and the state of the world in which that happens — with
+thirteen terms, each a reading of state the sim already carries.
+
+Two grammar additions taken on Ben's behalf while authoring and recorded to be overturned:
+`requires_fork` (either side) and `requires_any` (any N of a set), because a carried tree cannot
+demand two named branches of a people coined on one ground (NR-820). The old ladder is kept as a
+calibration reference under a superseded banner rather than deleted (NR-821).
+
+### What is open
+
+Twelve farm classes in the classifier against four Colonisation branches (NR-819). Every
+magnitude in the three stores is a placeholder; BL-886 (tree sizing sweep) prices them. How a JSON
+store reaches a Lua-free sim is BL-881's first decision. Six items minted, BL-881..BL-886.
+
+---
+
 ## 2026-09-09 (sprint 37) — The world stops opening already full
 
 **Mode:** Batch delivery in three waves, on a design pass that had closed the same morning.
