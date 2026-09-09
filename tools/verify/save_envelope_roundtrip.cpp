@@ -213,6 +213,16 @@ save_envelope make_envelope()
     // the type, and the generation-side claim (no region anchors on open ocean)
     // is sim_water_census's to make.
     r0.domain               = region_domain::coastal_water;
+    // BL-835's field, and the SECOND time this harness has met the same shape
+    // of gap: the comment above records BL-748 arriving through a merge with no
+    // assertion because its agent could not build this harness from a worktree.
+    // `army_stock` arrived exactly that way. It is written directly beside
+    // `manpower_stock`, which is the whole hazard - two adjacent i64s that both
+    // default to zero transpose CLEANLY, so a writer that swapped them would
+    // pass every other check in this file. Four distinct values, none equal to
+    // any other int in the record, is what makes the swap detectable.
+    r0.manpower_stock       = 5104;
+    r0.army_stock           = 1662;
     region r1;
     r1.name                 = "Torrend Reach";
     r1.anchor               = 274;
@@ -223,6 +233,8 @@ save_envelope make_envelope()
     r1.centres_razed        = 5;
     r1.urban_population     = 12099;
     r1.domain               = region_domain::open_ocean;
+    r1.manpower_stock       = 2873;
+    r1.army_stock           = 941;
     be.settlement.regions.push_back(r0);
     be.settlement.regions.push_back(r1);
     be.settlement.lacunae                = 6;
@@ -378,6 +390,19 @@ int main()
               "S3 the region urban record and domain survive (centres / razed / urban heads "
               "/ domain, "
               "each distinct, both regions)");
+        // BL-835, save_game_version 10. Asserted as a PAIR against its
+        // neighbour: the failure this catches is not a dropped field (which
+        // would desynchronise the whole stream and break every check below it)
+        // but a TRANSPOSED one, and only distinct values on both sides can
+        // tell those apart.
+        check(le.report.bodies.size() == 1
+                  && le.report.bodies[0].settlement.regions.size() == 2
+                  && le.report.bodies[0].settlement.regions[0].manpower_stock == 5104
+                  && le.report.bodies[0].settlement.regions[0].army_stock == 1662
+                  && le.report.bodies[0].settlement.regions[1].manpower_stock == 2873
+                  && le.report.bodies[0].settlement.regions[1].army_stock == 941,
+              "S3 the army pool survives BESIDE the manpower pool it is raised "
+              "from, unswapped (BL-835, both regions)");
         check(le.report.bodies.size() == 1
                   && le.report.bodies[0].settlement.lacunae == 6
                   && le.report.bodies[0].settlement.median_industrial_year == 1843
