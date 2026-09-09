@@ -745,6 +745,81 @@
     "tools/verify/history_sweep.cpp"
    ],
    "design": "BEN, 2026-09-09, resolving NR-808. COLONISATION.md's 'Fragmentation comes from contact' is the authority; this item is the work.\n\nRETIRE: the tribal marches in creeds.cpp (the aggression-vs-defence comparison, the weld loop at creeds.cpp:236-287, and the fragmentation_q -= welds*120 with its half floor).\n\nREPLACE WITH: fragmentation_q read off how far two peoples' streams interpenetrate. Two cultures whose shares mix heavily across a broad frontier are LESS fragmented; two that never met are MORE. The input is culture_shares, which the colonisation span already produces at every founding - so the same number comes out of a mechanism already running, with no roll and no pairwise war.\n\nTHE GRAIN WAS THE DEFECT, NOT THE TIMING. The marches compare cradle to cradle, a scalar against a scalar between two discrete points. Under diffusion a cradle is a SOURCE, not a point, and what meets at a frontier is two streams already mixing. Moving the marches past the boundary would have fixed when they ran and left that untouched.\n\nWHAT SURVIVES: aggression_q, unchanged, as the Era -1 sim's DOCTRINE input. What it stops doing is setting the nation count. Consolidation now comes from package breadth - a people who spread far ends up one culture over a lot of ground. One cause each, where aggression previously drove both.\n\nTWO THINGS THIS ITEM MUST NOT SKIP:\n  1. THE NON-HEGEMONY FLOOR. The old welding was floored at half the incoming fragmentation      precisely so creeds alone could not manufacture a hegemon. The replacement needs its own      bound; a different mechanism does not make BL-224's invariant somebody else's problem.\n  2. THE NATION COUNT MOVES, and it is a MEASUREMENT. fragmentation_q drives the seed budget      and the seed budget drives how many nations a world has. Measure the distribution across      a seed spread BEFORE the change lands - it cannot be reasoned to from the mechanism's      shape. world_audit R1/R3 and the creeds harness both read this path.\n\nDOCS ALREADY UPDATED 2026-09-09: COLONISATION.md, CREEDS.md and HISTORY.md. The CODE comments (creeds.hpp:17/87/89, hard_coded_world.cpp:520) still describe welding and are correct until this lands - fix them WITH the change, not before.\n\nDONE WHEN: no scalar-comparison war remains anywhere in the design, fragmentation derives from contact, the non-hegemony bound is re-derived and asserted, and the nation-count distribution is reported across a seed spread."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-853",
+   "short_name": "SIM_VIEW_CARRIES_RIVERS",
+   "priority": "A",
+   "difficulty": 2,
+   "category": "Generation",
+   "author": "Sprint 37 build session (2026-09-09), raised while building BL-846; Claude",
+   "title": "The sim's terrain view carries no rivers, so the colonisation walk cannot price the cheapest ground the design names",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "requires": [
+    "BL-846"
+   ],
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/sim_terrain_build.hpp",
+    "src/world/colonisation.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "THE GAP, FOUND BY BUILDING AGAINST IT. COLONISATION.md section The stream lists the cheap routes in order: river courses and coastal shelf are cheap - the routes people actually followed. The walk can price the shelf and CANNOT price a river.\n\nWHY. A river in this codebase is an EDGE, not a tile: tile_component::river_edges is a six-bit side mask written by generate_rivers, and components.hpp is explicit that a river is an EDGE, never a tile. sim_terrain_view (history_sim.hpp) carries four parallel rasters - substrate, cover, density, landform - and no river among them. So the colonisation flood, which reads that view, has nothing to test.\n\nTHE CONSEQUENCE IS NOT COSMETIC, and it is why this is its own item rather than a TODO. It is the difference between a history whose corridors are RIVERS and one whose corridors are SHORELINES. Under the shipped walk the cheapest route in the world is the coast, so every generated history is a maritime one and no interior river valley ever carries a stream faster than the open ground beside it. That contradicts the design's own first example.\n\nWHAT TO BUILD: a fifth raster on sim_terrain_arrays - one byte per tile, non-zero where river_edges is non-zero - populated by build_sim_terrain from the same tile field, and a matching pointer on sim_terrain_view. colonisation_input::river already EXISTS and is already read by tile_year_cost (it prices a river tile at 35% of base against the shelf's 55%); it is null from every caller today. So this item wires an input that is built and tested, rather than adding a mechanism.\n\nMIND THE COST OF THE VIEW. Adding a raster to sim_terrain_arrays costs one byte per tile (~31 KB on a homeworld) and nothing per year - it is fixed at generation and nothing rewrites it, exactly as substrate is.\n\nDONE WHEN: colonisation_harness shows a river valley carrying a stream faster than the plain beside it; the share of reached land whose first arrival came along a river is reported; and world_determinism is unchanged (the raster is a new input to a pass that does not yet run in generation, so it must move nothing)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-854",
+   "short_name": "B384A_ASSERTS_WAR_IS_INEVITABLE",
+   "priority": "B",
+   "difficulty": 1,
+   "category": "Generation",
+   "author": "Sprint 37 build session (2026-09-09), on NEXT_SESSION.md's explicit instruction to raise rather than delete; Claude",
+   "title": "history_sim_harness B384a asserts every world goes to war, which the colonisation design says is wrong",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "requires": [],
+   "files": [
+    "tools/verify/history_sim_harness.cpp"
+   ],
+   "design": "B384a asserts that EVERY world sees at least one region change hands by war. It fails, and has failed for some time: measured this session at 5 of 8 worlds fighting, 5 of 8 taking ground, so three seeds fight zero times.\n\nTHE DESIGN NOW SAYS THAT IS CORRECT BEHAVIOUR. COLONISATION.md's whole premise is that the opening span is a SETTLEMENT process with occasional violence - the interesting question is not who wins but who arrives - and BL-846's own record measures the ancient span at 839 foundings against 9 battles on seed 0. A world that fills peacefully is a legitimate history, not a broken one. So the harness is asserting a claim the design has since overturned, and a check that fails for a correct reason is worse than no check: it trains the reader to ignore a failure line.\n\nRAISED RATHER THAN QUIETLY DELETED, on NEXT_SESSION.md's explicit instruction. There is a real question underneath it that should not be lost with the assertion: the sim should still be CAPABLE of war, and B384b (the transfer branch fires somewhere in the set) is the assertion that actually checks that.\n\nTHE OPTIONS, and this needs Ben rather than a judgement call: (a) retire B384a outright, leaving B384b as the capability check; (b) restate it as a SET-LEVEL claim - some fraction of worlds fight - which is what the design implies and what B384b already half-says; (c) keep it and gate it on a params flag that only a war-heavy fixture sets. B384c (a polity somewhere loses its last region) is a separate failure with a separate cause and is NOT covered by this item.\n\nDONE WHEN: history_sim_harness's baseline failure count reflects only real defects, and whichever assertion replaces B384a is one the colonisation design would endorse."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-855",
+   "short_name": "ADJACENCY_CAPS_REGION_COUNT",
+   "priority": "B",
+   "difficulty": 4,
+   "category": "Generation",
+   "author": "Sprint 37 region-count sensitivity measurement (2026-09-09), NR-809; Claude",
+   "title": "The neighbour graph densifies as regions fill in, so region count still scales superlinearly after BL-844",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-844"
+   ],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/history_span_cost.cpp"
+   ],
+   "design": "WHAT BL-844 LEFT STANDING, and it said so itself. BL-844 replaced the heapless reach scan with a heap and removed the O(N^2) per rebuild; its closing note records that ms/rebuild still rises with region count (0.017 at 529 regions -> 0.079 at 1,160 on seed 0) because the neighbour graph DENSIFIES as regions fill in, so edges are not O(N) in this world and O(E log V) still grows - and declines to pursue it further on the grounds that reach is no longer what a long run is made of.\n\nRE-MEASURED INDEPENDENTLY THIS SESSION and the figures reproduce exactly: seed 0 gives 0.017 / 0.045 / 0.079 ms per rebuild at 533 / 833 / 1,174 regions; seed 1 gives 0.035 / 0.114 / 0.218 at 563 / 931 / 1,260. Fitted exponent 1.95-2.27 across both seeds. Reach is 24-37% of a 4,000-year run (history_span_cost, build_gen /O2).\n\nWHY IT MATTERS NOW, WHEN IT DID NOT BEFORE. Ben's sprint-37 brief asks to transform regions into provinces and not to aim for a small set - which spans a factor of SIXTEEN (1,372 regions against 22,153 land provinces). At an exponent of ~2 that is ~256x the reach term: seed 1's 6,541 ms run would spend roughly 400 SECONDS in reach alone. The region count is therefore capped by the ADJACENCY MODEL rather than by the pathfinder, and no further heap work reaches it.\n\nTHE SHAPE OF A FIX, none of it settled: region adjacency is Chebyshev at neighbour_radius 9 and water-blind, so a region gains neighbours as the map fills whether or not anything can move between them. Capping degree, or making adjacency a nearest-k rather than a radius, would make edges O(N) again. Both change what the sim considers a neighbour, which moves battles and campaigns - so this is a determinism-digest change and NOT a refactor.\n\nNR-809 IS THE DECISION THIS ITEM HANGS OFF. If Ben caps the region count for this sprint (the recommendation), this stays filed and unbuilt. It is what a sixteen-fold count would need.\n\nDONE WHEN: mean neighbour degree stops rising with region count, history_span_cost shows ms/rebuild flat across the span table, and world_determinism's digests are re-blessed deliberately rather than accidentally."
   }
  ]
 }
