@@ -418,7 +418,19 @@ wizard_round_head wizard_round_head_at(int r)
     }
     static const wizard_round_head passes[pass_rounds] = {
         { "The History",
-          "Who claimed this ground, and who lost it, over four thousand years?" },
+          // THE SPAN NAMED HERE IS THE SPAN THE RECORD ACTUALLY COVERS, and it
+          // is not yet the four thousand years the design asks for (NR-810).
+          // `run_settlement` places and dates every region BEFORE
+          // `run_history_sim` starts, so the record opens with the whole map
+          // already claimed and only the sim's own span is watchable. The
+          // subtitle said "four thousand years" and played four hundred.
+          //
+          // Retitled rather than left aspirational, on the rule that a surface
+          // must not assert something the code has not delivered. It goes back
+          // when BL-846 (colonisation span) makes the foundings happen INSIDE
+          // the recorded span — at which point this line is the smallest part
+          // of that change.
+          "Who claimed this ground, and who lost it, in the age before the epoch?" },
         { "The Substrate",
           "What does that ground produce, and who trades it?" },
     };

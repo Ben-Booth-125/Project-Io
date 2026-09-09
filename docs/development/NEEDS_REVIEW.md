@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*4 entries — 3 open, 1 resolved.*
+*8 entries — 7 open, 1 resolved.*
 
 ---
 
@@ -73,6 +73,65 @@ Ben's brief says 'transform regions into provinces ... we don't have to aim for 
 > **Recommendation:** Option 1 for this sprint, with option 2 filed rather than done. Two reasons, and the second is the stronger. First, Ben's stated acceptance criterion for round 4 is the ARC - origin, communication, conquest or union, a stable dark age - and that arc reads at 2,500 regions exactly as it reads at 22,000; spending the sprint on a scaling term buys resolution on a surface whose own test is shape. Second, the colonisation walk itself is NOT what scales badly here: it is a single multi-source flood over ~9,500 land tiles, linear in tiles and independent of region count. What scales is the Era -1 sim's per-region reach, which is a different pass with a different owner. So capping the region count costs the colonisation design nothing at all - it only defers how finely the sim resolves the politics on top of it.
 
 *Files: `tools/verify/history_span_cost.cpp`, `src/world/history_sim.cpp`, `docs/generation/COLONISATION.md`, `docs/generation/PROVINCES.md`*
+
+### NR-810 — Round 4 promises four thousand years and plays four hundred, because settlement places the whole map before the sim starts
+*observation · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. Found by building BL-829 (time-lapse view) and watching what it draws; confirmed in the main session from scripts/verify/history_lapse_press.lua, whose own assertion reads 'the record spans years (-400 -> 0)'.*
+
+Round 4's subtitle asks 'Who claimed this ground, and who lost it, over four thousand years?' The record it plays covers 400. On the first frame every continent is already claimed and all 12 powers already exist, because run_settlement places all ~533 regions and dates them BEFORE run_history_sim starts - so what the map animates is borders shifting, not land filling. 384 foundings do happen inside the run, but they land on ground that already has an owner colour.
+
+**Why it matters.** It is not a drawing problem and it cannot be fixed in the UI. Ben's stated acceptance criterion for round 4 is the ARC - origin, communication, conquest or diplomatic union, a stable dark age - and the origin phase is not missing from the DRAWING, it is missing from the RECORD. Round 4 is currently showing the last tenth of the story it advertises. It also means objective 2 ('make sure it works and produces interesting cultures') cannot be judged from this round yet: there is no spreading to look at.
+
+- Wire BL-846 (colonisation span) so foundings happen INSIDE the recorded span - run_settlement takes each site's founded_year and culture from the colonisation flood's arrival record instead of from a settle-score formula, and the sim's pre-boundary span plays that schedule out, emitting an ownership change as each region is reached. The flood is already built and harnessed.
+- Leave the round honest about its scope in the meantime - retitle it to the span it actually plays - and treat the arc as blocked on the colonisation integration.
+- Both: retitle now, wire BL-846 next.
+
+> **Recommendation:** Option 3. The retitle is a one-line honesty fix and should not wait; the integration is the real answer and is the natural next piece of sprint 37, since the flood exists and is green. Worth noting that this finding independently confirms an architectural reading that was genuinely ambiguous when the span was being built: COLONISATION.md could be read as colonisation dating the map before the sim, or as founding regions inside it. A round built to show the arc proves it must be the second.
+
+*Files: `src/world/settlement.cpp`, `src/world/history_sim.cpp`, `src/world/colonisation.cpp`, `src/ui/history_lapse.cpp`, `docs/ui/STARTUP.md`*
+
+### NR-811 — Round 4 pays a full world build, and Begin then pays it again
+*novel-work · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. Raised as a novelty flag by the BL-829 implementer rather than assumed acceptable.*
+
+To obtain one recorded history pass, round 4's worker runs make_hard_coded_world and throws the world away, keeping only the record. Pressing Begin at the end of the wizard then builds the world again. Roughly 73 seconds twice in Debug.
+
+**Why it matters.** The approach is defensible and was chosen for a good reason: it uses generation's own single invocation, and the alternative - re-deriving settlement and the era inside the UI layer - is precisely the drift era_minus_one.hpp exists to stop (it is the seventh-caller defect NR-733 closed). But paying a full world build twice is not an idiom any doc owns, and nobody has decided it is acceptable. STARTUP.md's 'a watched wait needs no budget' (Ben, 2026-09-08) covers the wait INSIDE round 4; it does not obviously cover paying for it a second time at Begin.
+
+- Accept it for the prototype - the wait is watched in round 4 and the Begin wait already existed.
+- Cache the round-4 world and hand it to Begin, so the second build is skipped. Needs the wizard to hold a world rather than a record, which is a bigger change than it sounds.
+- Have Begin reuse the recorded pass rather than re-running it, which is the same shape as the NR-733 fix one layer up.
+
+> **Recommendation:** Accept for now and revisit if the Debug figure is representative of Release, which has not been measured. Worth measuring before deciding - build_rel timings and build timings are not comparable, and the 73 s figure is Debug.
+
+*Files: `src/ui/startup_screens.cpp`, `src/core/app.hpp`, `docs/ui/STARTUP.md`*
+
+### NR-812 — Does the wizard's ACTIONS.json exemption cover a Run button on a pass round?
+*question · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. The BL-829 implementer was briefed that round 4 was outside the exemption, read the doc as broader than the brief, followed the doc, and flagged the disagreement rather than silently picking either way.*
+
+The brief for round 4 said the pre-game-wizard ACTIONS.json exemption covers the preference rows, so a new Run button needs an entry. ACTIONS.json's own _note (Ben, 2026-09-09, ruling on NR-804) reads wider: 'The startup wizard - its rounds, per-round Reroll, Next and Begin - gets no entries here and no startup.* family... The any-control-change-updates-its-entry rule above does not reach it.' A Run button on a wizard round arguably sits inside 'its rounds'. No entry was added.
+
+**Why it matters.** Small either way - the entry is a two-minute add - but the exemption's edge decides whether every future control on rounds 4 and 5 needs one, and those rounds are about to grow controls (transport, leans). Better settled once than re-argued per control.
+
+- The exemption covers the whole wizard including new controls on its rounds. Nothing to do.
+- The exemption covers only the rounds' NAVIGATION and preference rows; functional controls like Run get entries.
+
+> **Recommendation:** The implementer followed the doc as written, which was the right call. If option 2 is what was meant, the _note wants a sentence saying so, because as written it reads as option 1.
+
+*Files: `docs/ai/ACTIONS.json`, `src/ui/startup_screens.cpp`*
+
+### NR-813 — Should round 4's time-lapse get a scrubber?
+*decision · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. BL-829 left transport controls deliberately open, to be decided by watching rather than in advance.*
+
+The plain transport was built as briefed: Run, then it plays, then Restart. The question BL-829 parked is whether the player may scrub, pause or replay.
+
+**Why it matters.** The wizard's standing premise is 'you set conditions, you do not steer', and the globe's no-input ruling is a real precedent against any steerable control. A scrubber would be the wizard's first.
+
+- Keep it plain - Run and Restart only. Consistent with the globe ruling.
+- Add a scrubber. The argument for it: the interesting moments are unevenly spaced - most centuries are static and two or three are not - and at ~30 s for the span you cannot go back to the one you missed. Restart-and-rewatch is a 30-second answer to a 2-second question.
+- Add pause as well.
+
+> **Recommendation:** Not yet, and for a reason that outranks the argument: the round currently plays 400 years of a 4000-year record (NR-810), so how it should be steered cannot be judged from what it does now. Decide after the colonisation span is wired and there is a real arc to sit through. If it is decided sooner, a scrub earns its place and a pause does not - a frozen map is what the round already looks like most of the time. The ~30 s duration is also unvalidated and was not Ben's.
+
+*Files: `src/ui/history_lapse.cpp`, `docs/ui/STARTUP.md`*
 
 ---
 
