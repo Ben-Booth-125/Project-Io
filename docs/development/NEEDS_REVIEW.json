@@ -230,7 +230,7 @@
    "title": "Culture relations: four calls that decide whether the empire phase has an engine",
    "raised": "2026-09-09",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "The Empires design pass, 2026-09-09. Ben asked for a quick design aside on point 5 (culture relations); CIVILISATION.md sec Culture relations carries it and these are the calls it deliberately did not answer.",
    "what": "Cultures are to be alike or opposed, and that opposition is meant to be the engine of conquest. The SIMILARITY half has an answer already: the migration builds a family tree of peoples, so kinship is a similarity measure EARNED by history rather than assigned (BL-865 retains it). The OPPOSITION half does not, and kinship alone will not supply it -- kinship gives DISTANT, not OPPOSED, and two peoples on opposite sides of a continent who never met are distant with no quarrel.",
    "why_it_matters": "It decides whether the empire phase is a map of armies bumping into each other or a map of peoples who want different things. It also decides how much new machinery sprint 38 needs: three of the candidate axes are quantities that ALREADY exist and are already earned, so a good answer here may cost almost nothing, and a bad one invents a whole relations system beside the ones already running.",
@@ -246,7 +246,7 @@
     "src/world/creeds.hpp",
     "src/world/history_sim.cpp"
    ],
-   "resolution": null
+   "resolution": "PARTLY RESOLVED 2026-09-09. Ben, on call (3): 'Go with permit rather than cause for now. This is really work for sprint 38.'\n\nSO OPPOSITION PERMITS CONQUEST RATHER THAN CAUSING IT: relations feed the existing w_cult weight rather than raising a score of their own. One scorer, measurable against the sweep already in place, and raisable to CAUSE later if the histories come out flat -- whereas a second scorer would be hard to remove once other things read it.\n\nCALLS (1), (2) and (4) REMAIN OPEN and are sprint 38's, along with the build itself (BL-870). They were deliberately not answered here: (3) was the one that decides the size of the others, and answering it first is what makes them cheap.\n\nWHAT LANDED IN SPRINT 37 INSTEAD is the substrate the whole question rests on: BL-865 retains the migration's family tree, and it turns out to have real depth -- deepest descent 9 and 10 on seeds 0 and 1, across 676 and 929 cultures, every one of which walks back to a cradle. Kinship distance therefore carries actual signal rather than being flat, which is what a similarity measure needs to be worth reading."
   }
  ]
 }

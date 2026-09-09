@@ -568,9 +568,15 @@ namespace
 ///
 /// EVERY NAME STAYS SCI-FI/FANTASY, out of the seeded phoneme tables — never an
 /// Earth proper noun (.claude/rules/io-standing-rules.md § Terms & docs).
-culture derive_daughter_culture(const culture& parent, uint32_t seed, int spawn_index)
+culture derive_daughter_culture(const culture& parent, int parent_id, int8_t origin_class,
+                                uint32_t seed, int spawn_index)
 {
     culture d = parent;                 // Pantheon, cradle and speech inherited whole.
+    // DESCENT (BL-865). The tree the migration builds is retained rather than
+    // discarded, because kinship is what the empire phase reads for how alike
+    // two peoples are (CIVILISATION.md § Culture relations).
+    d.parent            = parent_id;
+    d.origin_farm_class = origin_class;
     rng r(seed, static_cast<uint32_t>(0xDA05u + spawn_index));
 
     // Drift the inventory: drop one onset, admit one from a fixed pool. Both
@@ -736,6 +742,25 @@ settlement_state run_settlement(const planetology_state& pl,
                          colonisation_cradle_window)});
     }
 
+    // A CRADLE CULTURE IS A PEOPLE OF ITS OWN COUNTRY TOO (BL-865). The daughters
+    // get their origin class from the split that made them; the twelve that were
+    // never split have to take theirs from the ground they started on, or half
+    // the tree carries the field and half does not — and an opposition axis with
+    // holes in it is worse than none.
+    //
+    // Written onto the SOURCE list rather than `cs.cultures`, which is const
+    // here; `hard_coded_world` copies it back onto the roster beside the spawned
+    // ones.
+    for (colonisation_source& src0 : col_sources)
+        if (src0.culture >= 0 && src0.tile >= 0 && src0.tile < total)
+            out.cradle_origin_class.emplace_back(
+                src0.culture,
+                static_cast<int8_t>(classify_farm_class(
+                    col_sub[static_cast<std::size_t>(src0.tile)],
+                    col_cov[static_cast<std::size_t>(src0.tile)],
+                    col_lf [static_cast<std::size_t>(src0.tile)],
+                    /*shoreline=*/false)));
+
     colonisation_input col_in;
     col_in.substrate     = &col_sub;
     col_in.cover         = &col_cov;
@@ -792,7 +817,8 @@ settlement_state run_settlement(const planetology_state& pl,
         }
         if (par == nullptr) { out.spawned_cultures.push_back(culture{}); continue; }
         out.spawned_cultures.push_back(
-            derive_daughter_culture(*par, seed ^ 0xC0DAu, static_cast<int>(si)));
+            derive_daughter_culture(*par, pid, static_cast<int8_t>(sp.origin_class),
+                                    seed ^ 0xC0DAu, static_cast<int>(si)));
     }
 
     // --- Score every tile once, in raster order --------------------------------

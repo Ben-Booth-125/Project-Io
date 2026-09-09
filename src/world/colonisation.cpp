@@ -642,7 +642,8 @@ colonisation_field run_colonisation(const colonisation_input& in,
                     child_culture = next_culture++;
                     child_since   = 0;
                     f.spawns.push_back(culture_spawn{child_culture, e.culture,
-                                                     static_cast<int32_t>(ni)});
+                                                     static_cast<int32_t>(ni),
+                                                     child_origin});
                 }
             }
             front.push(front_entry{at, static_cast<int32_t>(ni), e.source,
@@ -715,7 +716,8 @@ colonisation_field run_colonisation(const colonisation_input& in,
                                 hop_culture = next_culture++;
                                 hop_since   = 0;
                                 f.spawns.push_back(culture_spawn{hop_culture, e.culture,
-                                                                 static_cast<int32_t>(ni)});
+                                                                 static_cast<int32_t>(ni),
+                                                                 e.origin_class});
                             }
                             front.push(front_entry{at, static_cast<int32_t>(ni), e.source,
                                                    hop_culture, hop_since, e.origin_class});

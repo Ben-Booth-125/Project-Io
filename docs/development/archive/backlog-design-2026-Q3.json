@@ -10312,6 +10312,56 @@
         "design",
         "delivered"
       ]
+    },
+    "BL-865": {
+      "status": "complete",
+      "glyph": "✓",
+      "parked": false,
+      "sprint": "37",
+      "written": "2026-09-09",
+      "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+      "blocked_on": null,
+      "version_goal": null,
+      "priority": "A",
+      "category": "Generation",
+      "requires": [
+        "BL-856"
+      ],
+      "id": "BL-865",
+      "short_name": "CULTURE_KEEPS_ITS_PARENTAGE",
+      "difficulty": 2,
+      "title": "A culture records the people it descends from, so kinship survives the migration",
+      "authority_doc": "docs/generation/CIVILISATION.md",
+      "files": [
+        "src/world/creeds.hpp",
+        "src/world/colonisation.hpp",
+        "src/world/settlement.cpp",
+        "src/core/save_game.cpp",
+        "tools/verify/colonisation_harness.cpp"
+      ],
+      "design": "THE SINGLE MOST IMPORTANT THING SPRINT 37 STILL OWES, and it is small.\n\nBL-856 coins every daughter culture from a NAMED PARENT and colonisation_field::spawns records each (culture, parent) edge -- then the field is discarded at the end of run_settlement and `creed_state::culture` has no parent member. So by the time the empire phase runs, THE FACT THAT TWO PEOPLES ARE COUSINS IS UNRECOVERABLE. The migration builds a family tree of peoples and throws it away.\n\nWHY IT MATTERS MORE THAN ITS SIZE. CIVILISATION.md sec Culture relations makes kinship the similarity substrate: two peoples are alike because they SHARE AN ANCESTOR AND PARTED RECENTLY, which is a fact about the world's history rather than a number assigned to it. Without the tree, similarity has to be invented from scratch in sprint 38 -- and any invented measure would be exactly the rolled-not-earned quantity this layer keeps refusing.\n\nRETAIN TWO FIELDS, both already computed: the PARENT culture id, and the FARM CLASS the culture was coined on (front_entry::origin_class, BL-864) -- a people of the floodplain and a people of the highlands differ materially, which is one of the three candidate opposition axes.\n\nSAVE SEAM: `culture` is serialised, so this lands with its flat-binary path in the same commit or is flagged loudly as owed (src/world/CLAUDE.md).\n\nDONE WHEN: a harness walks a generated world's culture tree from any daughter back to a cradle, and the origin class of each is readable.\n\n--- DELIVERED 2026-09-09. `culture` gains `parent` and `origin_farm_class`; the flood records the class at both split sites; the daughter inherits both at materialisation. The CRADLE cultures needed theirs too -- daughters take it from the split that made them, and without this half the tree would carry the field and half would not, which is worse than no axis at all because -1 on a cradle would be ambiguous between 'unknown' and 'no country'. `run_settlement` holds the creeds by CONST reference, so it reports the pairs on settlement_state and the caller copies them onto the roster -- uglier than writing directly, and chosen over widening the parameter, which would let that pass mutate creeds anywhere.\n\nNO SAVE-FORMAT CHANGE, and that is a finding rather than a shortcut: `creed_state` never reaches the save at all. Descent exists while generation runs, which is when the empire phase runs. Regions persist their culture_shares IDS, so a loaded campaign knows which cultures are where but not what they are -- a PRE-EXISTING gap, and only a problem if the campaign ever needs to reason about relations rather than display them.\n\nMEASURED: deepest descent 9 (seed 0, 676 cultures) and 10 (seed 1, 929), every culture walking back to a cradle and every one carrying an origin class. The depth is the point -- a flat set of siblings off twelve cradles would make kinship distance carry no information, and it does not.\n\nC14 ASSERTS TERMINATION rather than assuming it: the walk is bounded by the culture count and checks each parent is strictly lower-indexed. That holds because ids are handed out in arrival order -- exactly the kind of invariant that stops being true when allocation order changes, which is what broke the polity accumulators earlier the same day.",
+      "delivered": "2026-09-09",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "parked",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "version_goal",
+        "priority",
+        "category",
+        "requires",
+        "id",
+        "short_name",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "delivered"
+      ]
     }
   }
 }

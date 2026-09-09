@@ -59,6 +59,39 @@ struct culture
     /// 0-1000 — how readily this culture's war-bands march, derived from the
     /// pantheon's zeal. Consumed by record_tribal_conflict.
     int aggression_q = 0;
+
+    // --- Descent (BL-865) --------------------------------------------------
+    //
+    // WHAT THIS IS FOR, and it is the empire phase rather than this one.
+    // `CIVILISATION.md` § Culture relations makes KINSHIP the substrate for how
+    // alike two peoples are: they are similar because they share an ancestor and
+    // parted recently, which is a fact about the world's history rather than a
+    // number assigned to it. Without descent, the empire phase would have to
+    // invent similarity from nothing — exactly the rolled-rather-than-earned
+    // quantity this layer keeps refusing.
+    //
+    // THE MIGRATION ALREADY BUILT THIS TREE AND THREW IT AWAY. BL-856 coins each
+    // daughter from a named parent and `colonisation_field::spawns` records every
+    // edge, but the field died at the end of `run_settlement` and nothing here
+    // held the link. These two members are the whole repair.
+
+    /// The culture this one descends from, or -1 for a cradle culture. Indices
+    /// are into the same `creed_state::cultures` vector, and a daughter's parent
+    /// is ALWAYS at a lower index than the daughter — ids are handed out in
+    /// arrival order — so a walk toward the root strictly decreases and cannot
+    /// loop.
+    int parent = -1;
+
+    /// The `farm_class` this people was coined on, as a plain integer so
+    /// `creeds.hpp` need not take a dependency on `colonisation.hpp` for one
+    /// field (this header has hundreds of includers). -1 where unknown.
+    ///
+    /// Its use is the OPPOSITION half of culture relations, which kinship alone
+    /// cannot supply: a people of the floodplain and a people of the highlands
+    /// want different ground and live differently, which is a material
+    /// disagreement rather than a stated one (BL-864 made a daughter a people OF
+    /// the country it settled).
+    int8_t origin_farm_class = -1;
 };
 
 /// What the creeds pass computed for one body.

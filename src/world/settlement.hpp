@@ -54,6 +54,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 /// What a region's ground is mainly good for — the ANCIENT endowment, read
@@ -527,6 +528,12 @@ struct settlement_state
     /// it began. Colonisation and conquest become two visibly different halves
     /// of one span.
     ///
+    /// The farm class each CRADLE culture was coined on, as (culture id, class)
+    /// pairs (BL-865). The daughters carry theirs on the culture record itself;
+    /// the cradles cannot, because `run_settlement` takes `creed_state` by const
+    /// reference, so the caller copies these back onto the roster.
+    std::vector<std::pair<int, int8_t>> cradle_origin_class;
+
     /// THE CULTURES THE MIGRATION COINED (BL-856), in allocation order, with
     /// ids running one past the last cradle culture. Derived from their
     /// parents rather than rolled fresh, so a homeworld ends with a FAMILY of

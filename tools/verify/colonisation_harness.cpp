@@ -938,6 +938,81 @@ void case_spawned_cultures(int seed_count)
           "ends with a family of related cultures, not just its cradles");
 }
 
+
+// ---------------------------------------------------------------------------
+// C14 — THE FAMILY TREE SURVIVES THE MIGRATION (BL-865)
+// ---------------------------------------------------------------------------
+//
+// The migration builds a tree of peoples and used to throw it away, so by the
+// time the empire phase ran, the fact that two peoples were cousins was
+// unrecoverable. CIVILISATION.md makes kinship the substrate for how alike two
+// cultures are, so this asserts the tree is actually there and actually walkable.
+//
+// IT ALSO ASSERTS TERMINATION RATHER THAN HOPING FOR IT. Ids are handed out in
+// arrival order, so a daughter's parent is always at a LOWER index and a walk
+// toward the root strictly decreases. That is what makes a cycle impossible, and
+// it is worth checking rather than trusting: if the allocation order ever
+// changed, this walk is where it would hang.
+
+void case_family_tree(int seed_count)
+{
+    std::printf("\n--- C14: does the family tree survive the migration? ----------\n");
+
+    int worlds = 0, worlds_ok = 0;
+
+    for (int s = 0; s < seed_count; ++s)
+    {
+        world_params wp;
+        wp.seed = static_cast<uint32_t>(s);
+        wp.prehistory_years = 4000;
+
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{}, nullptr, nullptr, &fx);
+        (void)w;
+        if (!fx.ran) continue;
+        ++worlds;
+
+        const std::vector<culture>& cs = fx.creeds.cultures;
+        int rooted = 0, deepest = 0, with_class = 0, monotonic = 1;
+
+        for (std::size_t i = 0; i < cs.size(); ++i)
+        {
+            if (cs[i].origin_farm_class >= 0) ++with_class;
+
+            // Walk to the root, bounded by the culture count so a broken tree
+            // fails the assertion rather than hanging the harness.
+            int depth = 0, at = static_cast<int>(i);
+            std::size_t guard = 0;
+            while (at >= 0 && cs[static_cast<std::size_t>(at)].parent >= 0
+                   && guard++ <= cs.size())
+            {
+                const int up = cs[static_cast<std::size_t>(at)].parent;
+                if (up >= at) monotonic = 0;   // must strictly decrease
+                at = up;
+                ++depth;
+            }
+            if (at >= 0 && cs[static_cast<std::size_t>(at)].parent < 0) ++rooted;
+            if (depth > deepest) deepest = depth;
+        }
+
+        std::printf("seed %u  cultures %d  reach a cradle %d  deepest descent %d  "
+                    "carry an origin class %d\n",
+                    wp.seed, static_cast<int>(cs.size()), rooted, deepest, with_class);
+
+        if (rooted == static_cast<int>(cs.size()) && monotonic
+            && with_class == static_cast<int>(cs.size()))
+            ++worlds_ok;
+    }
+
+    if (worlds == 0) { check(false, "C14 no world ran - the case is vacuous"); return; }
+
+    check(worlds_ok == worlds,
+          "C14  THE FAMILY TREE SURVIVES: every culture walks back to a cradle, parents are "
+          "strictly lower-indexed so the walk cannot loop, and every people records the "
+          "country it was coined on");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -959,6 +1034,7 @@ int main(int argc, char** argv)
     case_route_on_real_worlds(seed_count);
     case_founding_schedule(span_years);
     case_spawned_cultures(seed_count);
+    case_family_tree(seed_count);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;

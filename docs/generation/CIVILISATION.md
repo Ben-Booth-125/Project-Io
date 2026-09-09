@@ -140,8 +140,10 @@ from a named parent, and `colonisation_field::spawns` records every `(culture, p
 then discards it. `creed_state::culture` has no parent field, so by the time the empire phase
 runs, the fact that two peoples are cousins is **unrecoverable**.
 
-**That is the single most important thing sprint 37 must fix**, and it is small: retain the
-parentage. Kinship distance in that tree is then a similarity measure that is *earned by the
+**RETAINED 2026-09-09 (BL-865).** `culture` now carries its `parent` and the `origin_farm_class`
+it was coined on, and the tree has real depth: deepest descent **9 and 10** across 676 and 929
+cultures on seeds 0 and 1, every one walking back to a cradle. That depth is what makes kinship
+worth reading — a flat set of siblings off twelve cradles would carry no information. Kinship distance in that tree is then a similarity measure that is *earned by the
 migration* rather than rolled — two peoples are alike because they share an ancestor and parted
 recently, which is a fact about the world's history rather than a number assigned to it.
 
@@ -172,10 +174,10 @@ None of these should be answered at build time:
    matrix or a set of pairs.
 2. **Does kinship decay, or is the tree enough?** Two peoples five generations apart may be as
    foreign as two unrelated ones, or kinship may hold indefinitely.
-3. **Does opposition CAUSE conquest, or merely permit it?** The sim already scores campaigns with
-   `w_cult` discounting foreign ground. Relations could feed that weight (permit), or raise a
-   score of their own (cause). The first is a smaller change and keeps one scorer; the second
-   makes relations the engine Ben describes.
+3. **SETTLED (Ben, 2026-09-09): opposition PERMITS conquest, it does not cause it.** Relations
+   feed the existing `w_cult` weight rather than raising a score of their own. One scorer,
+   measurable against the sweep already in place, and raisable to *cause* later if the histories
+   come out flat — whereas a second scorer is hard to remove once other things read it.
 4. **How does a civilisation relate to the cultures inside it?** If two opposed peoples end up in
    one civilisation, does the civilisation resolve the opposition, inherit it, or fracture?
 

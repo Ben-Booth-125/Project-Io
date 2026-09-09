@@ -587,6 +587,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                       kepler_settlement.spawned_cultures.begin(),
                                       kepler_settlement.spawned_cultures.end());
 
+        // The cradle cultures' own country (BL-865). run_settlement could not
+        // write these itself -- it holds the creeds by const reference -- so it
+        // reports them and they are copied back here, beside the daughters that
+        // already carry theirs.
+        for (const auto& [cid, cls] : kepler_settlement.cradle_origin_class)
+            if (cid >= 0 && cid < static_cast<int>(kepler_creeds.cultures.size()))
+                kepler_creeds.cultures[static_cast<std::size_t>(cid)].origin_farm_class = cls;
+
         // THE POPULATION MAP, DRAWN EARLY (BL-766). Before the Era -1 sim, not
         // after it: every region whose ground farms easily is given an opening
         // urban headcount and the centres those heads stand up, so the sim runs

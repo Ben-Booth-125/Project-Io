@@ -666,34 +666,6 @@
    "status": "designed",
    "glyph": "✓",
    "parked": false,
-   "sprint": "37",
-   "written": "2026-09-09",
-   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
-   "blocked_on": null,
-   "version_goal": null,
-   "priority": "A",
-   "category": "Generation",
-   "requires": [
-    "BL-856"
-   ],
-   "id": "BL-865",
-   "short_name": "CULTURE_KEEPS_ITS_PARENTAGE",
-   "difficulty": 2,
-   "title": "A culture records the people it descends from, so kinship survives the migration",
-   "authority_doc": "docs/generation/CIVILISATION.md",
-   "files": [
-    "src/world/creeds.hpp",
-    "src/world/colonisation.hpp",
-    "src/world/settlement.cpp",
-    "src/core/save_game.cpp",
-    "tools/verify/colonisation_harness.cpp"
-   ],
-   "design": "THE SINGLE MOST IMPORTANT THING SPRINT 37 STILL OWES, and it is small.\n\nBL-856 coins every daughter culture from a NAMED PARENT and colonisation_field::spawns records each (culture, parent) edge -- then the field is discarded at the end of run_settlement and `creed_state::culture` has no parent member. So by the time the empire phase runs, THE FACT THAT TWO PEOPLES ARE COUSINS IS UNRECOVERABLE. The migration builds a family tree of peoples and throws it away.\n\nWHY IT MATTERS MORE THAN ITS SIZE. CIVILISATION.md sec Culture relations makes kinship the similarity substrate: two peoples are alike because they SHARE AN ANCESTOR AND PARTED RECENTLY, which is a fact about the world's history rather than a number assigned to it. Without the tree, similarity has to be invented from scratch in sprint 38 -- and any invented measure would be exactly the rolled-not-earned quantity this layer keeps refusing.\n\nRETAIN TWO FIELDS, both already computed: the PARENT culture id, and the FARM CLASS the culture was coined on (front_entry::origin_class, BL-864) -- a people of the floodplain and a people of the highlands differ materially, which is one of the three candidate opposition axes.\n\nSAVE SEAM: `culture` is serialised, so this lands with its flat-binary path in the same commit or is flagged loudly as owed (src/world/CLAUDE.md).\n\nDONE WHEN: a harness walks a generated world's culture tree from any daughter back to a cradle, and the origin class of each is readable."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "parked": false,
    "sprint": "38",
    "written": "2026-09-09",
    "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",

@@ -412,6 +412,11 @@ struct culture_spawn
     int32_t culture = -1; ///< The new culture's id.
     int32_t parent  = -1; ///< The culture it descends from.
     int32_t tile    = -1; ///< Where it diverged, for naming and for the record.
+    /// The farm class the daughter is a people OF (BL-864/BL-865). Equal to the
+    /// parent's for a drift or size split; the NEW country's where the split
+    /// happened because the stream settled ground of a class it was not coined
+    /// on — which is the case this field exists to carry forward.
+    farm_class origin_class = farm_class::steppe;
 };
 
 /// Radius of the window a cradle coins its package from.

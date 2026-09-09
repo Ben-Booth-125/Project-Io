@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*9 entries — 8 open, 1 resolved.*
+*9 entries — 7 open, 2 resolved.*
 
 ---
 
@@ -133,22 +133,6 @@ The plain transport was built as briefed: Run, then it plays, then Restart. The 
 
 *Files: `src/ui/history_lapse.cpp`, `docs/ui/STARTUP.md`*
 
-### NR-814 — Culture relations: four calls that decide whether the empire phase has an engine
-*question · raised 2026-09-09 · from The Empires design pass, 2026-09-09. Ben asked for a quick design aside on point 5 (culture relations); CIVILISATION.md sec Culture relations carries it and these are the calls it deliberately did not answer.*
-
-Cultures are to be alike or opposed, and that opposition is meant to be the engine of conquest. The SIMILARITY half has an answer already: the migration builds a family tree of peoples, so kinship is a similarity measure EARNED by history rather than assigned (BL-865 retains it). The OPPOSITION half does not, and kinship alone will not supply it -- kinship gives DISTANT, not OPPOSED, and two peoples on opposite sides of a continent who never met are distant with no quarrel.
-
-**Why it matters.** It decides whether the empire phase is a map of armies bumping into each other or a map of peoples who want different things. It also decides how much new machinery sprint 38 needs: three of the candidate axes are quantities that ALREADY exist and are already earned, so a good answer here may cost almost nothing, and a bad one invents a whole relations system beside the ones already running.
-
-- IS OPPOSITION SYMMETRIC? `grudge` is a DIRECTED table, so the sim already has a precedent for asymmetry -- but a disagreement about how one ought to live may be mutual. Directed makes relations a matrix; symmetric makes it a set of pairs, and halves the storage.
-- DOES KINSHIP DECAY, or is the tree enough? Two peoples five generations apart may be as foreign as two unrelated ones, or kinship may hold indefinitely and make whole branches of the tree natural allies.
-- DOES OPPOSITION CAUSE CONQUEST, OR MERELY PERMIT IT? The sim already scores campaigns with w_cult discounting foreign ground. Feeding relations into that weight is the SMALLER change and keeps one scorer; giving relations a score of their own is what would make them the engine Ben describes. This is the one that most changes sprint 38's size.
-- HOW DOES A CIVILISATION RELATE TO OPPOSED CULTURES INSIDE IT? If two opposed peoples end up in one civilisation, does it resolve the opposition, inherit it, or fracture?
-
-> **Recommendation:** Answer (3) first, because the other three are cheap once it is settled and expensive to revisit after. My lean is PERMIT rather than CAUSE for the first cut: it keeps a single scorer, it is measurable against the existing sweep, and it can be raised to CAUSE later if the histories come out flat -- whereas a second scorer is hard to remove once other things read it. On (1) I lean symmetric for similarity and directed for grievance, which is how the two already behave: kinship is a fact about a shared past, a grudge is something one party holds.
-
-*Files: `docs/generation/CIVILISATION.md`, `src/world/creeds.hpp`, `src/world/history_sim.cpp`*
-
 ---
 
 ## Resolved
@@ -178,4 +162,28 @@ WHAT IT SEPARATES: aggression_q drove both how consolidated the political map is
 Written into COLONISATION.md (new section: Fragmentation comes from contact), CREEDS.md (the creed drives, rewritten) and HISTORY.md (the ladder pass + the pipeline diagram). Work is BL-852. TWO THINGS CARRIED FORWARD, both open in COLONISATION.md: the non-hegemony floor must be re-derived for the new mechanism (the old welding carried an explicit half-fragmentation floor for BL-224's sake), and the nation-count distribution must be MEASURED across a seed spread before the change lands.
 
 *Files: `docs/lore/CREEDS.md`, `docs/generation/COLONISATION.md`, `src/world/creeds.cpp`*
+
+### NR-814 — Culture relations: four calls that decide whether the empire phase has an engine
+*question · raised 2026-09-09 · from The Empires design pass, 2026-09-09. Ben asked for a quick design aside on point 5 (culture relations); CIVILISATION.md sec Culture relations carries it and these are the calls it deliberately did not answer.*
+
+Cultures are to be alike or opposed, and that opposition is meant to be the engine of conquest. The SIMILARITY half has an answer already: the migration builds a family tree of peoples, so kinship is a similarity measure EARNED by history rather than assigned (BL-865 retains it). The OPPOSITION half does not, and kinship alone will not supply it -- kinship gives DISTANT, not OPPOSED, and two peoples on opposite sides of a continent who never met are distant with no quarrel.
+
+**Why it matters.** It decides whether the empire phase is a map of armies bumping into each other or a map of peoples who want different things. It also decides how much new machinery sprint 38 needs: three of the candidate axes are quantities that ALREADY exist and are already earned, so a good answer here may cost almost nothing, and a bad one invents a whole relations system beside the ones already running.
+
+- IS OPPOSITION SYMMETRIC? `grudge` is a DIRECTED table, so the sim already has a precedent for asymmetry -- but a disagreement about how one ought to live may be mutual. Directed makes relations a matrix; symmetric makes it a set of pairs, and halves the storage.
+- DOES KINSHIP DECAY, or is the tree enough? Two peoples five generations apart may be as foreign as two unrelated ones, or kinship may hold indefinitely and make whole branches of the tree natural allies.
+- DOES OPPOSITION CAUSE CONQUEST, OR MERELY PERMIT IT? The sim already scores campaigns with w_cult discounting foreign ground. Feeding relations into that weight is the SMALLER change and keeps one scorer; giving relations a score of their own is what would make them the engine Ben describes. This is the one that most changes sprint 38's size.
+- HOW DOES A CIVILISATION RELATE TO OPPOSED CULTURES INSIDE IT? If two opposed peoples end up in one civilisation, does it resolve the opposition, inherit it, or fracture?
+
+> **Recommendation:** Answer (3) first, because the other three are cheap once it is settled and expensive to revisit after. My lean is PERMIT rather than CAUSE for the first cut: it keeps a single scorer, it is measurable against the existing sweep, and it can be raised to CAUSE later if the histories come out flat -- whereas a second scorer is hard to remove once other things read it. On (1) I lean symmetric for similarity and directed for grievance, which is how the two already behave: kinship is a fact about a shared past, a grudge is something one party holds.
+
+> **RESOLVED.** PARTLY RESOLVED 2026-09-09. Ben, on call (3): 'Go with permit rather than cause for now. This is really work for sprint 38.'
+
+SO OPPOSITION PERMITS CONQUEST RATHER THAN CAUSING IT: relations feed the existing w_cult weight rather than raising a score of their own. One scorer, measurable against the sweep already in place, and raisable to CAUSE later if the histories come out flat -- whereas a second scorer would be hard to remove once other things read it.
+
+CALLS (1), (2) and (4) REMAIN OPEN and are sprint 38's, along with the build itself (BL-870). They were deliberately not answered here: (3) was the one that decides the size of the others, and answering it first is what makes them cheap.
+
+WHAT LANDED IN SPRINT 37 INSTEAD is the substrate the whole question rests on: BL-865 retains the migration's family tree, and it turns out to have real depth -- deepest descent 9 and 10 on seeds 0 and 1, across 676 and 929 cultures, every one of which walks back to a cradle. Kinship distance therefore carries actual signal rather than being flat, which is what a similarity measure needs to be worth reading.
+
+*Files: `docs/generation/CIVILISATION.md`, `src/world/creeds.hpp`, `src/world/history_sim.cpp`*
 
