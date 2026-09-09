@@ -9503,6 +9503,52 @@
         "design",
         "delivered"
       ]
+    },
+    "BL-844": {
+      "status": "complete",
+      "glyph": "✓",
+      "parked": false,
+      "sprint": "36",
+      "written": "2026-09-09",
+      "author": "BL-834 re-measurement (2026-09-09); Claude",
+      "blocked_on": null,
+      "version_goal": null,
+      "id": "BL-844",
+      "short_name": "REACH_DIJKSTRA_HEAP",
+      "priority": "B",
+      "difficulty": 3,
+      "category": "Generation",
+      "title": "The reach Dijkstra is heapless, and each rebuild is quadratic in a region count that quadruples",
+      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+      "requires": [
+        "BL-834"
+      ],
+      "files": [
+        "src/world/history_sim.cpp"
+      ],
+      "design": "RAISED BY BL-834 HAVING BEEN MEASURED, and deliberately parked rather than done in the same breath - BL-834 itself said to re-measure before deciding, because an unneeded rewrite of a deterministic sim path is a bad trade.\n\nWHAT THE RE-MEASUREMENT SAID. Per-polity caching cut rebuilds 12,000 -> 5,256 (seed 0) / 5,597 (seed 1) and roughly halved the 4000-year span. It did NOT reach the order of magnitude BL-834 asked for, and the reason is structural rather than fixable by more caching: a founding ANYWHERE grows the region count, which correctly invalidates every polity cache, and the sim founds constantly (149 regions -> 1,188 over the span). Reach is STILL 71% (seed 0) and 42% (seed 1) of a long run.\n\nSO THE REMAINING COST IS PER-REBUILD, NOT PER-COUNT. The Dijkstra at history_sim.cpp is heapless by deliberate choice - its comment says region counts are hundreds and a linear scan keeps the order deterministic without depending on a priority queue tie-break. The first half of that is now false: the count reaches ~1,190, and the scan makes each rebuild O(N^2) against a graph whose edges are O(N). ms/rebuild rises 0.058 -> 0.163 (seed 0) and 0.159 -> 0.321 (seed 1) across the span, which is the quadratic showing.\n\nTHE SECOND HALF OF THAT COMMENT REMAINS TRUE AND IS THE WHOLE DIFFICULTY. A heap introduces a tie-break, and a tie-break inside a priority queue is exactly the kind of container-order dependency world/* forbids. Any heap here must order on (cost, region index) so that equal costs resolve on a stable integer and never on insertion order or heap layout. That is cheap to write and easy to get subtly wrong, which is why this is its own item rather than a line inside another one.\n\nDONE WHEN: ms/rebuild stops rising with region count, the 4000-year span is re-measured on history_span_cost, and world_determinism digests are bit-identical to the pre-change run - the same gate BL-834 passed.\n\nDELIVERED 2026-09-09, on Ben's call to do it before BL-835 rather than after BL-837.\n\nTHE TIE-BREAK IS ELIMINATED, NOT TRUSTED - which is the whole reason this was its own item. The comparator orders on the PAIR (cost, region index). Region indices are unique, so no two queue entries ever compare equal and there is no tie left for the heap's layout to break. That also reproduces the scan exactly: reach[i] < best_c was strict, so the scan took the lowest cost and, among equals, the lowest index. Lazy deletion rather than decrease-key, guarded by the same `done` vector the scan used. Unreachable regions are never enqueued, which is what preserves the old `if (best < 0) break`.\n\nMEASURED, Debug build_gen tree, seeds 0 and 1. Reach at the 4000-year span 1,957 -> 533 ms (seed 0) and 3,851 -> 1,164 ms (seed 1); its share of the run 71% -> 41% and 42% -> 22%. Total span 2,742 -> 1,288 ms and 9,106 -> 5,381 ms. Against the PRE-SPRINT baseline the two fixes together are 6,923 -> 1,288 ms (5.4x) and 15,667 -> 5,381 ms (2.9x), with reach falling from 88% and 69% of the run to 41% and 22%.\n\nworld_determinism: all four digests bit-identical to the pre-sprint baseline (365A1005DECDDA8A, 5E77B09A8579289C, B43D91116F1830F9, 02E29C777AB47DAA), every battles/conquests/foundings counter unchanged, 0 failures. history_span_cost battles unchanged at 659 and 616.\n\nTHE DONE-WHEN IS MET IN PART, AND THE PART THAT IS NOT IS RECORDED. ms/rebuild fell 3.7x (0.163 -> 0.044, seed 0) and 3.3x (0.321 -> 0.097, seed 1), but it has NOT stopped rising with region count: 0.017 at 529 regions -> 0.079 at 1,160 on seed 0. The quadratic is gone; the remaining growth is the neighbour graph DENSIFYING as regions fill in, so edges are not O(N) in this world and O(E log V) still grows. That is a property of the graph rather than of the algorithm, and no further heap work fixes it. Reach is no longer what a long run is made of, so this is not pursued further.",
+      "delivered": "2026-09-09",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "parked",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "version_goal",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "category",
+        "title",
+        "authority_doc",
+        "requires",
+        "files",
+        "design",
+        "delivered"
+      ]
     }
   }
 }

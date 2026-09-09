@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <queue>
 
 // ---------------------------------------------------------------------------
 // The Era -1 history sim (BL-277 + BL-271's first slice). See history_sim.hpp
@@ -689,16 +690,41 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (capital < 0 || capital >= static_cast<int>(ss.regions.size())) return;
         reach[static_cast<std::size_t>(capital)] = 0;
 
-        // Dijkstra without a heap: region counts are hundreds, and a simple
-        // scan keeps the order deterministic without depending on a tie-break
-        // inside a priority queue.
+        // DIJKSTRA WITH A HEAP (BL-844), REPLACING A LINEAR SCAN.
+        //
+        // The scan this replaces was a deliberate choice, and half of its
+        // reasoning was right: a tie-break inside a priority queue is exactly
+        // the container-order dependency `world/*` forbids. The other half —
+        // "region counts are hundreds" — stopped being true. A run founds
+        // constantly, from ~150 regions to ~1,190 over 4,000 years, so the scan
+        // was O(N^2) against a graph whose edges are only O(N) and the cost per
+        // rebuild rose with the span (BL-834's re-measurement).
+        //
+        // THE TIE-BREAK IS ELIMINATED RATHER THAN TRUSTED. The comparator
+        // orders on the PAIR (cost, region index), and region indices are
+        // unique, so no two queue entries ever compare equal and there is no
+        // tie for the heap's layout to break. That is also precisely what the
+        // scan did: `reach[i] < best_c` is strict, so it took the lowest cost
+        // and, among equals, the lowest index. Same order, same result.
+        //
+        // Lazy deletion, not decrease-key: a relaxed region is pushed again and
+        // the stale entry is skipped when it surfaces. `done` is what makes
+        // that safe, and it is the same `done` the scan used.
+        //
+        // UNREACHABLE REGIONS ARE NEVER ENQUEUED, which preserves the scan's
+        // `if (best < 0) break`. A region enters the queue only when something
+        // relaxes it below its 1 << 28 sentinel, so the queue empties exactly
+        // when the scan would have found nothing left under the sentinel.
+        using node = std::pair<int, int>; // (cost, region index) — never equal.
+        std::priority_queue<node, std::vector<node>, std::greater<node>> frontier;
         std::vector<bool> done(ss.regions.size(), false);
-        for (std::size_t iter = 0; iter < ss.regions.size(); ++iter)
+        frontier.push({0, capital});
+        while (!frontier.empty())
         {
-            int best = -1, best_c = 1 << 28;
-            for (std::size_t i = 0; i < reach.size(); ++i)
-                if (!done[i] && reach[i] < best_c) { best_c = reach[i]; best = static_cast<int>(i); }
-            if (best < 0) break;
+            const node top = frontier.top();
+            frontier.pop();
+            const int best_c = top.first, best = top.second;
+            if (done[static_cast<std::size_t>(best)]) continue; // A stale entry.
             done[static_cast<std::size_t>(best)] = true;
 
             const region& bp = ss.regions[static_cast<std::size_t>(best)];
@@ -709,7 +735,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                * (tile_cost(bp) + tile_cost(np2)) / 200;
                 const int cand = best_c + (step > 0 ? step : 1);
                 if (cand < reach[static_cast<std::size_t>(nb)])
+                {
                     reach[static_cast<std::size_t>(nb)] = cand;
+                    frontier.push({cand, nb});
+                }
             }
         }
         rc.capital = capital;
