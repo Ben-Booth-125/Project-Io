@@ -89,6 +89,129 @@ bool same_run(const history_sim_state& a, const history_sim_state& b,
     return true;
 }
 
+/// EVERY OUTPUT EXCEPT THE PLAYBACK RECORD ITSELF (BL-817).
+///
+/// This is the non-perturbation instrument, and it is deliberately WIDER than
+/// `same_run`: it compares the ownership list, every counter the sim keeps, the
+/// road corridors, the grudge table, the polity ladder, the narration and the
+/// mutated settlement state - everything a consumer could read - while ignoring
+/// `steps`, `samples` and `culture_changes`. A recorded run and a suppressed
+/// run must agree on all of it, or the recorder is a participant rather than an
+/// observer.
+///
+/// `same_run` is not reused because it would be the wrong claim here: it checks
+/// determinism between two IDENTICAL configurations, and this checks that two
+/// DIFFERENT configurations produce the same history. Narrow coverage would let
+/// a perturbation hide in a field `same_run` never looks at.
+bool same_except_record(const history_sim_state& a, const history_sim_state& b,
+                        const settlement_state& sa, const settlement_state& sb)
+{
+    if (a.owner_changes.size() != b.owner_changes.size()) return false;
+    for (std::size_t i = 0; i < a.owner_changes.size(); ++i)
+        if (a.owner_changes[i].year   != b.owner_changes[i].year
+         || a.owner_changes[i].region != b.owner_changes[i].region
+         || a.owner_changes[i].owner  != b.owner_changes[i].owner)
+            return false;
+
+    if (a.supply_corridors.size() != b.supply_corridors.size()) return false;
+    for (std::size_t i = 0; i < a.supply_corridors.size(); ++i)
+        if (a.supply_corridors[i].a    != b.supply_corridors[i].a
+         || a.supply_corridors[i].b    != b.supply_corridors[i].b
+         || a.supply_corridors[i].uses != b.supply_corridors[i].uses)
+            return false;
+
+    if (a.grudges.size() != b.grudges.size()) return false;
+    for (std::size_t i = 0; i < a.grudges.size(); ++i)
+        if (a.grudges[i].from != b.grudges[i].from || a.grudges[i].to != b.grudges[i].to
+         || a.grudges[i].score != b.grudges[i].score || a.grudges[i].peak != b.grudges[i].peak)
+            return false;
+
+    if (a.polities.size() != b.polities.size()) return false;
+    for (std::size_t i = 0; i < a.polities.size(); ++i)
+    {
+        const polity& p = a.polities[i];
+        const polity& q = b.polities[i];
+        if (p.capital != q.capital || p.cohesion_q != q.cohesion_q
+         || p.industrial_year != q.industrial_year)
+            return false;
+        for (int d = 0; d < sim_domain_count; ++d)
+            if (p.capacity[d] != q.capacity[d] || p.progress_q[d] != q.progress_q[d])
+                return false;
+    }
+
+    if (a.history.size() != b.history.size()) return false;
+    for (std::size_t i = 0; i < a.history.size(); ++i)
+        if (a.history[i].event != b.history[i].event
+         || a.history[i].consequence != b.history[i].consequence
+         || a.history[i].years_before_epoch != b.history[i].years_before_epoch)
+            return false;
+
+    if (a.battles != b.battles || a.conquests != b.conquests || a.foundings != b.foundings
+     || a.winter_campaigns != b.winter_campaigns || a.stalled_campaigns != b.stalled_campaigns
+     || a.illegal_campaigns != b.illegal_campaigns || a.starved_campaigns != b.starved_campaigns
+     || a.naval_battles != b.naval_battles || a.sea_leg_battles != b.sea_leg_battles
+     || a.works_raised != b.works_raised
+     || a.polities_industrialised != b.polities_industrialised
+     || a.regions_industrialised != b.regions_industrialised
+     || a.peak_population != b.peak_population || a.peak_year != b.peak_year
+     || a.campaign_contacts != b.campaign_contacts || a.campaign_scored != b.campaign_scored
+     || a.campaign_chosen != b.campaign_chosen || a.campaign_cleared != b.campaign_cleared
+     || a.campaign_cleared_rounds != b.campaign_cleared_rounds
+     || a.campaign_cleared_lost != b.campaign_cleared_lost
+     || a.region_stride != b.region_stride || a.years != b.years
+     || a.start_year != b.start_year)
+        return false;
+    if (a.battles_per_century != b.battles_per_century) return false;
+    if (a.works_by_span_band != b.works_by_span_band) return false;
+    if (a.units_by_span_band != b.units_by_span_band) return false;
+
+    // THE SETTLEMENT STATE IS AN OUTPUT TOO - the sim mutates it in place, and
+    // it is the half generation actually carries forward.
+    if (sa.regions.size() != sb.regions.size()) return false;
+    for (std::size_t i = 0; i < sa.regions.size(); ++i)
+    {
+        const region& p = sa.regions[i];
+        const region& q = sb.regions[i];
+        if (p.nation != q.nation || p.population != q.population
+         || p.manpower_stock != q.manpower_stock || p.army_stock != q.army_stock
+         || p.culture != q.culture || p.contest_q != q.contest_q
+         || p.protection_q != q.protection_q || p.industrialised != q.industrialised
+         || p.industrial_year != q.industrial_year || p.works_built != q.works_built)
+            return false;
+    }
+    return true;
+}
+
+/// Byte-level equality of the playback record alone - the other half of the
+/// pair. Two runs of the same seed must record identically.
+bool same_record(const history_sim_state& a, const history_sim_state& b)
+{
+    if (a.steps.size() != b.steps.size()) return false;
+    for (std::size_t i = 0; i < a.steps.size(); ++i)
+        if (a.steps[i].year != b.steps[i].year
+         || a.steps[i].first_sample != b.steps[i].first_sample
+         || a.steps[i].sample_count != b.steps[i].sample_count)
+            return false;
+    if (a.samples.size() != b.samples.size()) return false;
+    for (std::size_t i = 0; i < a.samples.size(); ++i)
+        if (a.samples[i].polity != b.samples[i].polity
+         || a.samples[i].regions != b.samples[i].regions
+         || a.samples[i].population != b.samples[i].population
+         || a.samples[i].cap_military != b.samples[i].cap_military
+         || a.samples[i].cap_materials != b.samples[i].cap_materials)
+            return false;
+    if (a.culture_changes.size() != b.culture_changes.size()) return false;
+    for (std::size_t i = 0; i < a.culture_changes.size(); ++i)
+    {
+        const culture_change& x = a.culture_changes[i];
+        const culture_change& y = b.culture_changes[i];
+        if (x.year != y.year || x.region != y.region || x.other_q != y.other_q) return false;
+        for (int k = 0; k < timelapse_culture_slots; ++k)
+            if (x.id[k] != y.id[k] || x.weight_q[k] != y.weight_q[k]) return false;
+    }
+    return true;
+}
+
 /// A minimal two-region world: one rich target, one owner, at a chosen
 /// distance. Used to isolate the supply-decay stall from everything else.
 settlement_state two_polity_world(int separation)
@@ -919,6 +1042,105 @@ int main()
         // `top%` column and the hegemony count above are instruments. Asserting
         // a bound on them here would be writing the calibration this arc has
         // not chosen yet, and would hide the spread it needs to see.
+    }
+
+    // --- B817  THE PLAYBACK RECORD -----------------------------------------
+    //
+    // Three claims, and they are the three DONE WHEN clauses of BL-817:
+    // the record is bounded and its size is STATED; a recorded run and a
+    // suppressed run agree bit-for-bit on every other output; and the same seed
+    // records identically twice.
+    //
+    // Run at the DEFAULT span - 4000 BCE -> 0 CE, the real epoch - so the size
+    // figure printed here is the figure the item bounds, not one measured on a
+    // short arc and extrapolated.
+    {
+        history_sim_params rec = params;                 // record_playback defaults ON.
+        history_sim_params off = params; off.record_playback = false;
+
+        settlement_state s1 = k1->settlement;
+        settlement_state s2 = k1->settlement;
+        settlement_state s3 = k1->settlement;
+        const history_sim_state a  = run_history_sim(s1, nullptr, no_terrain, kgw, kgh, rec, 4242u);
+        const history_sim_state a2 = run_history_sim(s2, nullptr, no_terrain, kgw, kgh, rec, 4242u);
+        const history_sim_state n  = run_history_sim(s3, nullptr, no_terrain, kgw, kgh, off, 4242u);
+
+        const long long play  = static_cast<long long>(playback_record_bytes(a));
+        const long long ring  = static_cast<long long>(owner_ring_bytes(a));
+        // The counterfactual the encoding argument rests on: what a DENSE grid
+        // of culture shares would have cost over the same run. Printed, not
+        // asserted - it is the reason the change list was chosen, and a reader
+        // should be able to check the reasoning rather than take it.
+        const long long dense = static_cast<long long>(a.steps.size())
+                              * static_cast<long long>(a.region_stride)
+                              * static_cast<long long>(sizeof(culture_change));
+        std::printf("      playback record over %lld years: %lld steps, %lld samples, "
+                    "%lld culture changes = %lld bytes  "
+                    "(ownership ring %lld, a dense culture grid would be %lld)\n",
+                    static_cast<long long>(a.years),
+                    static_cast<long long>(a.steps.size()),
+                    static_cast<long long>(a.samples.size()),
+                    static_cast<long long>(a.culture_changes.size()),
+                    play, ring, dense);
+
+        check(!a.steps.empty() && !a.samples.empty(),
+              "B817a a full-span run emits recorded steps with per-polity samples");
+        check(play > 0 && play < 1024 * 1024,
+              "B817b the playback record stays under 1 MB over the whole 4000-year span");
+        check(a.steps.back().year == static_cast<int32_t>(rec.stop_year),
+              "B817c the closing step lands on the stop year, not wherever the interval fell");
+
+        // THE CADENCE CLAIM, asserted rather than commented: ascending years,
+        // never finer than the interval except for the closing step, and every
+        // step's sample span inside the sample array.
+        bool cadence_ok = true;
+        for (std::size_t i = 0; i < a.steps.size(); ++i)
+        {
+            const timelapse_step& st = a.steps[i];
+            if (st.first_sample < 0 || st.sample_count < 0
+             || static_cast<std::size_t>(st.first_sample) + static_cast<std::size_t>(st.sample_count)
+                    > a.samples.size())
+                cadence_ok = false;
+            if (i == 0) continue;
+            const int32_t gap = st.year - a.steps[i - 1].year;
+            if (gap <= 0) cadence_ok = false;
+            // Only the closing step may sit inside the interval.
+            if (gap < rec.record_interval_years && i + 1 != a.steps.size()) cadence_ok = false;
+        }
+        check(cadence_ok,
+              "B817d steps ascend, honour the record interval, and index inside the sample array");
+
+        // A SERIES, NOT AN ENDPOINT (BL-830's dependency). A scoreboard that
+        // re-ranks needs the same polity sampled at more than one step, and a
+        // record that only carried a final standing would pass every check
+        // above while being useless for the thing it exists for.
+        int repeated = 0;
+        if (a.steps.size() >= 2)
+        {
+            const timelapse_step& f = a.steps.front();
+            const timelapse_step& l = a.steps.back();
+            for (int i = 0; i < f.sample_count; ++i)
+                for (int j = 0; j < l.sample_count; ++j)
+                    if (a.samples[static_cast<std::size_t>(f.first_sample + i)].polity
+                     == a.samples[static_cast<std::size_t>(l.first_sample + j)].polity)
+                        ++repeated;
+        }
+        check(repeated > 0,
+              "B817e a polity is sampled at more than one step (the record is a series)");
+
+        // THE CULTURE HALF ACTUALLY MOVES. Every region emits one entry at its
+        // first recorded step, so a record equal to that count is a record of
+        // foundings and nothing else - assimilation would be invisible in it.
+        check(static_cast<int64_t>(a.culture_changes.size())
+              > static_cast<int64_t>(a.region_stride),
+              "B817f the culture record carries drift, not only each region's first appearance");
+
+        check(n.steps.empty() && n.samples.empty() && n.culture_changes.empty(),
+              "B817g record_playback=false emits nothing at all");
+        check(same_except_record(a, n, s1, s3),
+              "B817h a recorded run and a suppressed run agree on EVERY other output");
+        check(same_record(a, a2) && same_except_record(a, a2, s1, s2),
+              "B817i the same seed records identically twice");
     }
 
     std::printf("\n%s (%d failure%s)\n",
