@@ -1,4 +1,5 @@
--- Round 4's presses, made for real (BL-829, revised 2026-09-09).
+-- The lapse rounds' presses, made for real (BL-829; split into two rounds by
+-- BL-860, 2026-09-09).
 --
 --   ProjectIo --verify scripts/verify/history_lapse_press.lua
 --
@@ -30,13 +31,25 @@
 verify.window(1920, 1080)
 
 -- The wizard's left column at 1920x1080, read off captures.
+--
+-- TWO FOOTER ROWS, NOT ONE. Round 3's footer sits under its Drawdown preference
+-- block; the PASS rounds have no preference block at all, so theirs sits lower.
+-- Both were read off captures rather than derived, and a pass round's footer is
+-- the same on every one of them because the decision block is empty on all three.
 local NEXT3_X,  NEXT3_Y  = 603, 975   -- round 3's Next (its footer sits under Drawdown)
-local RESTART_X, RESTART_Y = 483, 150 -- round 4's Restart slot
-local REROLL_X, REROLL_Y = 483, 957   -- round 4's Reroll
+local RESTART_X, RESTART_Y = 483, 150 -- a lapse round's Restart slot
+local REROLL_X, REROLL_Y = 483, 957   -- a pass round's Reroll
+local BACKP_X,  BACKP_Y  = 363, 995   -- a pass round's Back
+local NEXTP_X,  NEXTP_Y  = 603, 995   -- a pass round's Next
 
 -- Park on round 3, then walk ONE round by pressing Next for real.
 verify.generation_stage(2)
 verify.frames(4)
+local round, rounds = verify.wizard_round()
+verify.expect(rounds == 6,
+              "the wizard walks SIX rounds -- 3 planetology, migration, history, "
+              .. "substrate (got " .. rounds .. ")")
+verify.expect(round == 2, "parked on round 3 (0-based " .. round .. ")")
 verify.expect(verify.history_powers() == 0,
               "round 3 carries no history record (the case is not pre-loaded)")
 verify.capture("press_00_round3_before_next")
@@ -48,9 +61,12 @@ verify.capture("press_00_round3_before_next")
 -- have run.
 verify.click(NEXT3_X, NEXT3_Y)
 verify.frames(6)
+round = select(1, verify.wizard_round())
+verify.expect(round == 3, "NEXT on round 3 lands on round 4, THE MIGRATION (0-based "
+                          .. round .. ")")
 local powers = verify.history_powers()
 verify.expect(powers > 0,
-              "NEXT on round 3 auto-starts the history -- no Run press needed ("
+              "NEXT on round 3 auto-starts round 4's pass -- no Run press needed ("
               .. powers .. " powers)")
 verify.capture("press_01_after_next")
 
@@ -87,5 +103,63 @@ verify.capture("press_02_after_restart")
 verify.click(REROLL_X, REROLL_Y)
 verify.frames(6)
 verify.expect(verify.history_powers() > 0,
-              "Reroll re-runs the pass and leaves a record on the round")
+              "Reroll re-runs round 4's pass and leaves a record on the round")
 verify.capture("press_03_after_reroll")
+
+-- ── BL-860: THE HISTORY IS ITS OWN ROUND ──────────────────────────────────
+--
+-- A5 -- ROUND 5 RUNS ITS OWN PASS ON ARRIVAL. The auto-start is generic now
+-- rather than round 4's special case, so the Next press that moves onto round 5
+-- starts round 5's pass exactly as round 3's started round 4's. `history_powers`
+-- reads the round the wizard is ON, so a record here is round 5's own record and
+-- not round 4's showing through.
+--
+-- What this does NOT claim: that the two rounds replay DIFFERENT spans. They do
+-- not yet -- generation still emits one recorded age, and the rounds say so on
+-- screen. The generation-side split is BL-858/BL-861, and asserting a difference
+-- here would be asserting a design the code has not delivered.
+verify.click(NEXTP_X, NEXTP_Y)
+verify.frames(6)
+round = select(1, verify.wizard_round())
+verify.expect(round == 4, "NEXT on round 4 lands on round 5, THE HISTORY (0-based "
+                          .. round .. ")")
+local r5 = verify.history_powers()
+verify.expect(r5 > 0,
+              "round 5 runs its OWN pass on arrival (" .. r5 .. " powers)")
+verify.capture("press_04_round5_history")
+
+-- A6 -- ROUND 5's REROLL IS ITS OWN. Same slot, different round: it must leave a
+-- record on round 5 rather than clearing it or acting on round 4's.
+verify.click(REROLL_X, REROLL_Y)
+verify.frames(6)
+verify.expect(verify.history_powers() > 0,
+              "Reroll re-runs round 5's pass and leaves a record on the round")
+verify.capture("press_05_round5_after_reroll")
+
+-- A7 -- NEXT FROM 5 LANDS ON 6, THE SUBSTRATE. The last round, so its press is
+-- "Begin" and this script does not touch it -- pressing it would generate a world
+-- and leave the wizard entirely.
+verify.click(NEXTP_X, NEXTP_Y)
+verify.frames(4)
+round = select(1, verify.wizard_round())
+verify.expect(round == 5, "NEXT on round 5 lands on round 6, THE SUBSTRATE (0-based "
+                          .. round .. ")")
+verify.capture("press_06_round6_substrate")
+
+-- A8 -- BACK WALKS THE LADDER DOWN ONE RUNG AT A TIME, and a finished record is
+-- NOT discarded and re-run on the way past. That guard is the reason the
+-- auto-start is conditioned on the arriving round being empty.
+verify.click(BACKP_X, BACKP_Y)
+verify.frames(4)
+round = select(1, verify.wizard_round())
+verify.expect(round == 4, "Back from round 6 lands on round 5 (0-based " .. round .. ")")
+verify.expect(verify.history_powers() > 0,
+              "round 5's record survived the trip to round 6 and back")
+
+verify.click(BACKP_X, BACKP_Y)
+verify.frames(4)
+round = select(1, verify.wizard_round())
+verify.expect(round == 3, "Back from round 5 lands on round 4 (0-based " .. round .. ")")
+verify.expect(verify.history_powers() > 0,
+              "round 4's record survived the walk up to round 6 and back")
+verify.capture("press_07_back_on_round4")

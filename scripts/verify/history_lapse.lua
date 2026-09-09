@@ -1,8 +1,16 @@
--- Wizard round 4: the time-lapse map and its top-16 board (BL-829 / BL-830).
+-- A lapse round's time-lapse map and its top-16 board (BL-829 / BL-830; two lapse
+-- rounds since BL-860).
+--
+-- IT CAPTURES ROUND 4, THE MIGRATION. `verify.history_run` takes an optional lapse
+-- index and defaults to 0, which is round 4; round 5 (The History) draws the same
+-- surface from its own record slot, and history_lapse_press.lua is what walks
+-- there by real presses. Both rounds replay the SAME recorded age today -- the
+-- generation-side split is BL-858/BL-861 -- so a second capture pass here would
+-- photograph the same frames under a different name.
 --
 --   ProjectIo --verify scripts/verify/history_lapse.lua
 --
--- WHAT THIS CHECKS, and what it deliberately cannot. Round 4 replaces the
+-- WHAT THIS CHECKS, and what it deliberately cannot. A lapse round replaces the
 -- wizard's globe with a 2D MAP and plays the recorded Era -1 ownership history
 -- across it, with an ordered, capped board of sixteen polities beside it. A
 -- globe shows a world; a map shows a FRONTIER (Ben, 2026-09-08, at the live

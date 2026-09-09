@@ -16,7 +16,7 @@
 #include "world/world.hpp"
 
 #include "ui/canvas_command.hpp"
-#include "ui/history_lapse.hpp"    // BL-829: the wizard round 4 time-lapse record
+#include "ui/history_lapse.hpp"    // BL-829/BL-860: the lapse rounds' time-lapse record
 #include "scripting/persona_pack.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/plot_history.hpp"
@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <deque>
 #include <future>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -262,39 +263,48 @@ private:
     void draw_main_menu();
 
     /// Discard every PASS round strictly after @p round, because something at or
-    /// above it moved. ROUNDS ARE CAUSAL (STARTUP.md § Rounds 4 and 5): rerolling
-    /// round 4 invalidates round 5, exactly as rerolling a planetology round
-    /// re-draws the ones below it. Called from the wizard's reroll and from every
-    /// planetology recompute — a planetology change moves the ground the history
-    /// pass runs on, so both pass rounds go with it.
-    ///
-    /// While both passes are placeholders this only clears flags. It is wired now
-    /// because it is nearly free while the rounds are empty, and because a stale
-    /// downstream pass is silent — it shows a plausible history of a world that no
-    /// longer exists.
+    /// above it moved. ROUNDS ARE CAUSAL (STARTUP.md § Rounds 4, 5 and 6):
+    /// rerolling round 4 invalidates rounds 5 and 6, exactly as rerolling a
+    /// planetology round re-draws the ones below it. Called from the wizard's
+    /// reroll and from every planetology recompute — a planetology change moves the
+    /// ground both lapse passes run on, so all three pass rounds go with it.
     void invalidate_wizard_rounds_below(int round)
     {
         for (int i = 0; i < wizard_pass_round_count; ++i)
             if (wizard_planetology_round_count + i > round)
                 m_wiz_pass_current[i] = false;
 
-        // Round 4's RECORD goes with it (BL-829). A history is a history OF a
-        // world, so a planetology move makes the one on screen a plausible
-        // account of ground that no longer exists — which is exactly the silent
-        // failure this function was wired ahead of the passes to prevent. A run
-        // already in flight cannot be recalled, so it is marked instead and
-        // discarded when it lands; the player presses Run again, because starting
+        // A LAPSE ROUND'S RECORD GOES WITH ITS FLAG (BL-829, generalised to both
+        // lapse rounds by BL-860). A history is a history OF a world, so a
+        // planetology move makes the one on screen a plausible account of ground
+        // that no longer exists — the silent failure this function was wired ahead
+        // of the passes to prevent. A run already in flight cannot be recalled, so
+        // it is marked instead and discarded when it lands; the round is then empty
+        // and the player's next arrival on it starts a fresh one, because starting
         // the project's most expensive pass unbidden is not a repair.
-        if (round < wizard_planetology_round_count)
+        for (int i = 0; i < wizard_lapse_round_count; ++i)
         {
-            if (m_wiz_history_future.valid()) m_wiz_history_stale = true;
-            else                              m_wiz_history = ui::history_lapse{};
-            m_wiz_history_playing = false;
+            if (wizard_planetology_round_count + i <= round) continue;
+            if (m_wiz_history_future[i].valid()) m_wiz_history_stale[i] = true;
+            else                                 m_wiz_history[i] = ui::history_lapse{};
+            m_wiz_history_playing[i] = false;
         }
     }
 
+    /// Which lapse record the wizard's CURRENT round owns, clamped into range.
+    /// A round that is not a lapse round answers 0 rather than a sentinel: every
+    /// caller is a verify hook parking or reading a record, and the wizard's own
+    /// draw gates on `lapse_round` before it asks.
+    int wizard_lapse_index() const
+    {
+        const int i = m_wiz_round - wizard_planetology_round_count;
+        if (i < 0)                            return 0;
+        if (i >= wizard_lapse_round_count)    return wizard_lapse_round_count - 1;
+        return i;
+    }
+
     /// Draw the New World wizard (BL-167) — the surface between "New Game" and the
-    /// first frame of play. The player walks FIVE rounds: the three PLANETOLOGY rounds,
+    /// first frame of play. The player walks SIX rounds: the three PLANETOLOGY rounds,
     /// each stacking the charts and explanations of its chain stages and then taking
     /// that round's preferences, then the two PASS rounds (the history, then the
     /// economic substrate). The charts come from a live resolve_preferences + preview_system
@@ -413,25 +423,43 @@ private:
     void apply_ui_scale();
 
     /// How many rounds the New World wizard walks (BL-167, extended to five by
-    /// BL-816). Declared here rather than beside the wizard code because the verify
-    /// API — registered long before it — clamps against the same count.
+    /// BL-816 and to SIX by BL-860). Declared here rather than beside the wizard
+    /// code because the verify API — registered long before it — clamps against the
+    /// same count.
     ///
     /// The first `wizard_planetology_round_count` are the PLANETOLOGY rounds, which
     /// are the chart chain's own rounds (ui::chain_round_count) and take
-    /// `world_preferences`. The remainder are the PASS rounds — round 4 the history
-    /// (4000 years to 1200 CE) and round 5 the economic substrate — which run an
-    /// expensive pass inside the round rather than previewing it per keystroke
-    /// (STARTUP.md § Rounds 4 and 5). The two counts are deliberately separate: the
-    /// wizard grew, the chart chain did not.
+    /// `world_preferences`. The remainder are the PASS rounds — round 4 the
+    /// migration, round 5 the history (the 4000 years to 1200 CE) and round 6 the
+    /// economic substrate — which run an expensive pass inside the round rather than
+    /// previewing it per keystroke (STARTUP.md § Rounds 4, 5 and 6). The two counts
+    /// are deliberately separate: the wizard grew, the chart chain did not.
+    ///
+    /// WHY MIGRATION AND HISTORY ARE TWO ROUNDS (Ben, 2026-09-09: *our rounds are
+    /// not continuous*). One round covering both the peopling of the world and the
+    /// empires that followed showed conquest with the migration already finished
+    /// off-screen, and then — once the migration was moved inside it — migration
+    /// with no conquest at all. Different subjects, different rules, different
+    /// terminating conditions; see STARTUP.md § Rounds 4, 5 and 6.
     static constexpr int wizard_planetology_round_count = 3;
-    static constexpr int wizard_round_count            = 5;
+    static constexpr int wizard_round_count            = 6;
     /// The pass rounds, which own a reroll counter each rather than a preference block.
     static constexpr int wizard_pass_round_count =
         wizard_round_count - wizard_planetology_round_count;
+    /// The pass rounds that play a TIME-LAPSE, and so own a record of their own:
+    /// round 4 (the migration) and round 5 (the history). The substrate round does
+    /// not, so it is deliberately NOT `wizard_pass_round_count`.
+    ///
+    /// BOTH LAPSE ROUNDS RUN THE SAME PASS TODAY, and the rounds say so on screen
+    /// rather than implying a separation the code has not made. The generation-side
+    /// split — a migration span with its own terminating condition, then a history
+    /// span to 1200 CE — is BL-858/BL-861. What exists here is the ROUND structure
+    /// those two spans will land into: two headers, two rerolls, two records.
+    static constexpr int wizard_lapse_round_count = 2;
 
     /// Which top-level screen is active. run() opens on the menu; "New Game" enters
     /// `generating` (the New World wizard, where the player takes the three rounds of
-    /// Planetology preferences and then the two pass rounds) and the wizard's "Begin" hands over to play; run_verify() jumps
+    /// Planetology preferences and then the three pass rounds) and the wizard's "Begin" hands over to play; run_verify() jumps
     /// straight to in_game (the harness renders the live world, not the menu, unless
     /// a script asks for it via verify.show_menu / verify.show_generation). Only
     /// `in_game` simulates.
@@ -473,24 +501,24 @@ private:
     generation_report m_generation_report;   ///< Per-body Planetology results + per-stage summaries for the world that was built.
 
     // --- New World wizard state (BL-167) ---
-    // The wizard walks FIVE rounds. The first three (the planetology rounds, each
+    // The wizard walks SIX rounds. The first three (the planetology rounds, each
     // covering several chain stages) recompute a THROWAWAY preview of the whole system whenever a preference or a reroll
     // changes. None of this touches m_world: the world is built once, on "Begin",
     // from m_pending_world_params.
     int  m_wiz_round = 0;    ///< Round the player is on, 0 .. wizard_round_count-1.
-    /// Reroll counter for each PASS round (round 4 the history, round 5 the
-    /// substrate), indexed by `m_wiz_round - wizard_planetology_round_count`. The
-    /// planetology rounds keep theirs in world_preferences::roll; these two cannot,
-    /// because they are not planetology inputs and never reach resolve_preferences.
+    /// Reroll counter for each PASS round (round 4 the migration, round 5 the
+    /// history, round 6 the substrate), indexed by `m_wiz_round -
+    /// wizard_planetology_round_count`. The planetology rounds keep theirs in
+    /// world_preferences::roll; these cannot, because they are not planetology
+    /// inputs and never reach resolve_preferences.
     ///
-    /// ROUNDS STAY CAUSAL (STARTUP.md § Rounds 4 and 5): rerolling round 4 discards
-    /// round 5, exactly as rerolling a planetology round re-draws the ones below it.
-    /// Wired here while both rounds are still placeholders — it is cheap now and a
-    /// silent stale-downstream bug once the passes actually run.
+    /// ROUNDS STAY CAUSAL (STARTUP.md § Rounds 4, 5 and 6): rerolling round 4
+    /// discards rounds 5 and 6, exactly as rerolling a planetology round re-draws
+    /// the ones below it.
     std::uint32_t m_wiz_pass_roll[wizard_pass_round_count] = {};
     /// Whether each pass round's output is current. A pass round is invalidated by
-    /// any reroll at or above it; nothing sets these true yet, because no pass runs
-    /// yet (BL-829 fills round 4, BL-819 round 5).
+    /// any reroll at or above it. The lapse rounds carry the record itself in
+    /// `m_wiz_history`; round 6's flag is still ahead of its pass (BL-819).
     bool          m_wiz_pass_current[wizard_pass_round_count] = {};
     /// --autostart-windowed wizard driver: frames spent in the wizard so far, or
     /// -1 when inactive (every interactive run). While >= 0 the wizard advances a
@@ -537,13 +565,20 @@ private:
     void launch_wizard_surface_build();       ///< Start the worker for the CURRENT pending params.
     void poll_wizard_surface();               ///< Per-frame: adopt a finished build, relaunch if stale.
 
-    // --- Round 4: the history time-lapse (BL-829 / BL-830) ------------------
+    // --- Rounds 4 and 5: the two time-lapse rounds (BL-829 / BL-830 / BL-860) --
     //
-    // THIS ROUND INVERTS THE WIZARD'S MODEL and STARTUP.md § The wait is the
+    // THESE ROUNDS INVERT THE WIZARD'S MODEL and STARTUP.md § The wait is the
     // round says why: rounds 0-2 re-run a cheap chain preview on every control
     // move, and the history sim cannot be previewed per keystroke at any budget.
-    // So the player presses RUN, the pass runs inside the round, and the wait IS
-    // the content (Ben, 2026-09-08: *a watched wait needs no budget*).
+    // So arriving on the round runs the pass, it runs inside the round, and the
+    // wait IS the content (Ben, 2026-09-08: *a watched wait needs no budget*).
+    //
+    // ONE SLOT PER LAPSE ROUND, and today both slots run the SAME pass and hold
+    // the same kind of record — which the rounds say in as many words rather than
+    // implying a separation the code has not made. The generation-side split (a
+    // migration span with its own terminating condition, then a history span to
+    // 1200 CE) is BL-858/BL-861. Indexed by `m_wiz_round -
+    // wizard_planetology_round_count`; see `wizard_lapse_index`.
     //
     // WHAT THE WORKER ACTUALLY RUNS is `make_hard_coded_world` — generation's own
     // single invocation — and it throws the world away, keeping only the recorded
@@ -554,20 +589,36 @@ private:
     // `world/era_minus_one.hpp` exists to stop (BL-462, and NR-733 for the last
     // caller that did it). No caller is added: the record is read off the report
     // the run already fills.
-    ui::history_lapse                 m_wiz_history;        ///< Round 4's record; empty until Run finishes.
-    std::future<ui::history_lapse>    m_wiz_history_future; ///< The run in flight, if any.
-    generation_progress               m_wiz_history_progress; ///< The wait's own content: which pass, which year.
-    int   m_wiz_history_year    = 0;     ///< Where playback stands, in calendar years.
-    bool  m_wiz_history_playing = false; ///< Advancing on wall time.
+    ui::history_lapse              m_wiz_history[wizard_lapse_round_count];        ///< Each lapse round's record; empty until its run finishes.
+    std::future<ui::history_lapse> m_wiz_history_future[wizard_lapse_round_count]; ///< The run in flight on that round, if any.
+    /// The wait's own content per lapse round: which pass, which year.
+    ///
+    /// ON THE HEAP, AND THAT IS LOAD-BEARING (measured 2026-09-09). A
+    /// `generation_progress` is 66,080 bytes — nearly all of it the carve sink's
+    /// per-cell atomics — and `main` declares `app a;` in SIX separate scopes.
+    /// MSVC in Debug does not overlap the frames of sibling scopes, so every byte
+    /// added to `app` is charged to the main thread's 1 MB stack SIX times: a
+    /// second inline progress block took `sizeof(app)` from 152,728 to 218,808 and
+    /// the process died at startup with 0xC00000FD before printing a line.
+    /// `app.cpp`'s own note says the repair is to heap-allocate the sink rather
+    /// than raise the bar, so that is what this does — and it leaves `app`
+    /// SMALLER than it was before the second lapse round existed.
+    ///
+    /// NOTE THE STATIC_ASSERT DID NOT CATCH IT: `sizeof(app) < 512 KB` is the
+    /// wrong bar when the true budget is 1 MB / (number of `app a;` scopes).
+    std::unique_ptr<generation_progress[]> m_wiz_history_progress =
+        std::make_unique<generation_progress[]>(wizard_lapse_round_count);
+    int   m_wiz_history_year[wizard_lapse_round_count]    = {}; ///< Where playback stands, in calendar years.
+    bool  m_wiz_history_playing[wizard_lapse_round_count] = {}; ///< Advancing on wall time.
     /// The planetology moved while a run was in flight, so what it returns is a
     /// history of a world that is gone. Discarded on arrival rather than shown.
-    bool  m_wiz_history_stale   = false;
-    float m_wiz_history_carry   = 0.0f;  ///< Sub-year accumulator for the advance.
-    /// Start the history pass for the CURRENT pending params. Synchronous under
-    /// `--verify` (a capture must never race a worker), exactly as the wizard's
-    /// surface build already is.
-    void launch_wizard_history_run();
-    /// Per-frame: adopt a finished run and park playback at its first year.
+    bool  m_wiz_history_stale[wizard_lapse_round_count]   = {};
+    float m_wiz_history_carry[wizard_lapse_round_count]   = {}; ///< Sub-year accumulator for the advance.
+    /// Start lapse round @p lapse_index's pass for the CURRENT pending params.
+    /// Synchronous under `--verify` (a capture must never race a worker), exactly
+    /// as the wizard's surface build already is.
+    void launch_wizard_history_run(int lapse_index);
+    /// Per-frame: adopt any finished run and park its playback at its first year.
     void poll_wizard_history();
 
     // --- The seat (BL-630, 2026-08-26) --------------------------------------

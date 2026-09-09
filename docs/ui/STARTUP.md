@@ -62,7 +62,7 @@ slider you cannot judge.
 The wizard is BL-167 (planetology pass). Its first **three rounds** (`wizard_planetology_round_count`),
 batched thematically from the ten-stage Planetology chain (Ben, 2026-07-22: fewer
 rounds, too slow otherwise). Each round stacks its stages' charts and
-explanations, then takes that round's preferences. Two further rounds carry the history and the economic substrate — § Rounds 4 and 5 below.
+explanations, then takes that round's preferences. Three further rounds carry the migration, the history and the economic substrate — § Rounds 4, 5 and 6 below.
 
 - **Preferences, not parameters** (`world_preferences`,
   `src/world/planetology.hpp`): a named lean per axis ("Dimmer", "Metal-rich"),
@@ -175,7 +175,7 @@ do not steer.**
 ### The wait is the round, not a loading bar
 
 The planetology rounds re-run their chain as a pure throwaway preview on every control
-move. **Rounds 4 and 5 cannot**: the history sim is the most expensive pass in the
+move. **The pass rounds cannot**: the history sim is the most expensive pass in the
 project, and a live preview per keystroke is not affordable at any budget.
 
 So these rounds invert it. The player sets the leans, and the pass runs *inside the
