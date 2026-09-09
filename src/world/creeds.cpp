@@ -1,5 +1,7 @@
 #include "creeds.hpp"
 
+#include "colonisation.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
@@ -149,7 +151,10 @@ creed_state run_creeds(const planetology_state& pl,
         const cradle_land land = survey_land(w, tile_ids, c, gw, gh);
 
         culture cu;
-        cu.cradle = static_cast<int>(ci);
+        cu.cradle      = static_cast<int>(ci);
+        // The cradle's year is the migration span's start (BL-873) — a real,
+        // meaningful date, never the never-coined sentinel.
+        cu.coined_year = colonisation_start_year;
 
         const tongue p = roll_tongue(r);
         cu.speech = p; // Retained: the nations and cities on this culture's

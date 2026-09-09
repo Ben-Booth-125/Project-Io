@@ -417,6 +417,9 @@ struct culture_spawn
     /// happened because the stream settled ground of a class it was not coined
     /// on — which is the case this field exists to carry forward.
     farm_class origin_class = farm_class::steppe;
+    /// The calendar year the daughter was coined — when its stream landed on the
+    /// tile that split it off (BL-873). Same clock as `colonisation_field::arrival_year`.
+    int64_t coined_year = 0;
 };
 
 /// Radius of the window a cradle coins its package from.

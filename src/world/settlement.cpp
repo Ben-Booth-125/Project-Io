@@ -569,7 +569,7 @@ namespace
 /// EVERY NAME STAYS SCI-FI/FANTASY, out of the seeded phoneme tables — never an
 /// Earth proper noun (.claude/rules/io-standing-rules.md § Terms & docs).
 culture derive_daughter_culture(const culture& parent, int parent_id, int8_t origin_class,
-                                uint32_t seed, int spawn_index)
+                                uint32_t seed, int spawn_index, int64_t coined_year)
 {
     culture d = parent;                 // Pantheon, cradle and speech inherited whole.
     // DESCENT (BL-865). The tree the migration builds is retained rather than
@@ -577,6 +577,7 @@ culture derive_daughter_culture(const culture& parent, int parent_id, int8_t ori
     // two peoples are (CIVILISATION.md § Culture relations).
     d.parent            = parent_id;
     d.origin_farm_class = origin_class;
+    d.coined_year       = coined_year;
     rng r(seed, static_cast<uint32_t>(0xDA05u + spawn_index));
 
     // Drift the inventory: drop one onset, admit one from a fixed pool. Both
@@ -818,7 +819,8 @@ settlement_state run_settlement(const planetology_state& pl,
         if (par == nullptr) { out.spawned_cultures.push_back(culture{}); continue; }
         out.spawned_cultures.push_back(
             derive_daughter_culture(*par, pid, static_cast<int8_t>(sp.origin_class),
-                                    seed ^ 0xC0DAu, static_cast<int>(si)));
+                                    seed ^ 0xC0DAu, static_cast<int>(si),
+                                    sp.coined_year));
     }
 
     // --- Score every tile once, in raster order --------------------------------
