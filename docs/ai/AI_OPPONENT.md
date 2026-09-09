@@ -1462,7 +1462,11 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   whole basis of the grant — the behaviour must be **pure, seeded, deterministic and replayable**,
   a scored-utility layer issuing only legal verbs, and **never a planner**. What it admits: a
   polity choosing among its sim verbs; a nation holding a treasury, setting a tariff or tax rate,
-  and enacting a law; a polity carrying pair-state toward another. What it does **not** admit:
+  and enacting a law; a polity carrying pair-state toward another. **A polity's colonial claim
+  by PURCHASE (Ben, 2026-09-09) is recorded here as a new sim verb rather than read into the
+  existing ones** — same actor, same grain, same constraints, raised because a verb that creates a
+  relationship (a province bought, its customs kept) is the shape the prohibition says to raise;
+  `docs/generation/COLONIAL_ERA.md` § Two ways to claim ground across water owns it. What it does **not** admit:
   anything whose timing, latency or ordering can vary the generated world (`docs/lore/HISTORY.md`
   is the authority for what the ladder produces, not a licence to randomise it), and any cloud
   model in the loop — the no-cloud invariant in `docs/ai/AI_OPPONENT.md` § 10 is untouched.

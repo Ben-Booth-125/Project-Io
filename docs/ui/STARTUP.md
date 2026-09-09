@@ -26,9 +26,9 @@ menu  →  generating  →  building  →  in_game
 
 `building` is the loading screen the world is carved on (CORPORATION_GENERATION.md
 § Corporate seeding is watched); it also hosts the pre-game warm start that runs
-after the carve. There is **no corp-selection stage** — the player is seated on a
-corporation drawn from the spawn shortlist once the warm start has finished. See
-§ The seat below.
+after the carve. The player is seated on a corporation drawn from the spawn shortlist
+once the warm start has finished; the intended replacement is a **corporation selection
+canvas** at Begin (Ben, 2026-09-09). See § The seat below.
 
 **Only `in_game` simulates.** On the menu and wizard the loop just pumps events
 and draws — the world, economy, and sim clock are not built until the wizard's
@@ -159,11 +159,21 @@ On the left, where the planetology rounds stack their charts, round 4 keeps a
 **research speed**, **population**, and **share of the world owned**. It is the round's
 chart surface, and it moves with the map.
 
-**Round 5 — Industrialisation.** The same globe, at the epoch, gaining four things in
-order: **metros growing** out of the population centres the history sacked and grew,
-**colonial reach across water**, **firm markers with their charters**, and the
-**market carve with its price field**. This is phase 6's search made watchable — the
-player sees the landscape that was selected, not every candidate that was scored.
+**Round 5 — The colonial era.** The span **1560 → 1960**, pass 2 on the polity engine,
+and **a still, not a time-lapse** (Ben, 2026-09-09): four hundred years on a map whose
+borders barely move would be the frozen globe § The wait is the round warns against. The
+pass runs on arrival; then four things draw in order on the epoch globe — **metros
+growing** out of the population centres the history sacked and grew, **claims across
+water by mode** (bought and taken, coloured apart), **sea lanes**, and on the left where
+round 4 kept its leaderboard, a board of **who wants what and who is rich**. Its authority
+is [`COLONIAL_ERA.md`](../generation/COLONIAL_ERA.md): this round sets the demand.
+
+**Round 6 — Corporations.** The same globe, gaining **firm markers with their charters**
+and the **market carve with its price field** — phase 6's search made watchable. The player
+sees the landscape that was selected, not every candidate that was scored. Two rounds
+rather than one because the subjects differ (Ben, 2026-09-09): *"trying to do this in one
+phase of generation complicates the story for the user."* Demand first, then the companies
+that answer it.
 
 **Each pass round is rerollable, and rerolling re-runs the pass** rather than re-drawing
 a cached one (Ben, 2026-09-08) — which is the whole reason § The wait is the round has to
@@ -231,7 +241,17 @@ selected (CANVASES.md § Default state).
 
 ## The seat
 
-The starting-corp **selection screen is retired** (Ben, 2026-08-26): which corporation
+**The seat becomes a choice again (Ben, 2026-09-09, reversing 2026-08-26).** Begin is to
+open a **corporation selection canvas** — an interactive view of the landscape round 6
+selected, on which the player picks the corporation they run — rather than drawing one.
+The draw below stays the mechanism until that canvas exists, and the shortlist and its
+weighting survive as *what the canvas offers*, not as the pick; what a selection canvas
+shows and asks is owed to this section, and the design is BL-880 (corporation selection
+canvas). The canvas needs a world that already exists at Begin, so the rounds must hand
+their world forward rather than a record (`NEEDS_REVIEW` NR-811) — a prerequisite, not a
+side effect.
+
+The starting-corp **selection screen was retired** (Ben, 2026-08-26): which corporation
 the player runs is drawn at random from a viability shortlist rather than picked. The
 mechanism — the warm start in spectate, the floor, the draw, and what the reorder costs
 in re-blessed goldens — is owned by

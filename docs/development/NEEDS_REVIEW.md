@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*13 entries — 10 open, 3 resolved.*
+*15 entries — 12 open, 3 resolved.*
 
 ---
 
@@ -177,6 +177,35 @@ Two of the three candidates apply at different moments. FRACTURE is the formatio
 > **Recommendation:** Keep the pair. The open half is WHERE THE BAR SITS, and that is a measurement rather than a judgement: set it from a sweep producing both alliance-shaped and enmity-shaped worlds, never from a number picked to make one seed look right.
 
 *Files: `docs/generation/CIVILISATION.md`*
+
+### NR-819 — A purchased province keeps its culture shares; a conquered one is digested - taken on your behalf as the data meaning of "respecting local customs"
+*decision taken on your behalf · raised 2026-09-09 · from The sprint 39 design session, 2026-09-09, writing COLONIAL_ERA.md § Two ways to claim ground across water.*
+
+You named two claim modes: "purchasing a province for the purpose of trade, and respecting local customs" against "military claims, and war for items such as gold". The doc needed both as DATA. The reading taken: a PURCHASE buys ACCESS to the province's endowment and does not move its culture shares at all - nothing is digested because nothing was conquered - while a CONQUEST transfers the province outright and its shares shift toward the holder over centuries exactly as pass 1 already does. So bought and taken differ in two places a player can read: the shares and the grudge ledger.
+
+**Why it matters.** It makes the two verbs distinguishable on the map, gives the purchase a reason to be cheaper than a war (access is not ownership), and keeps the anti-hegemony lever intact (a metropole that buys widely still carries no digested people, so its holdings are not its strength). A different reading - a purchase that slowly assimilates, or one that grants ownership - would be a different lever.
+
+- Keep it: purchase = access, shares unmoved; conquest = ownership, shares digested.
+- Purchase assimilates slowly too, at a lower rate than conquest.
+- Purchase grants ownership of the endowment outright but never moves the shares.
+
+> **Recommendation:** The first. It is the only reading in which "respecting local customs" is a mechanism rather than a mood.
+
+*Files: `docs/generation/COLONIAL_ERA.md`, `src/world/history_sim.hpp`*
+
+### NR-820 — The spawn shortlist and its weighting survive as what the corporation selection canvas OFFERS - taken on your behalf with the seat reversal
+*decision taken on your behalf · raised 2026-09-09 · from The sprint 39 design session, 2026-09-09, recording the reversal of the 2026-08-26 seat ruling into STARTUP.md § The seat and CORPORATION_GENERATION.md § The spawn shortlist.*
+
+You reversed the ruling that the seat is drawn: Begin is to open a corporation selection canvas. What was NOT said is what the canvas offers. The reading taken: the viability floor still filters and the weighted draw's ordering (processing over extraction, near population) still orders the list - the player chooses among the shortlist rather than among every corporation. The alternative is a canvas over every corporation with the shortlist as a highlight.
+
+**Why it matters.** The shortlist exists because a pure draw handed a pure-extraction corp on 13 of 24 seeds; a canvas that offers everything hands that choice back to a player who cannot yet read a balance sheet. But a canvas that offers only the shortlist may hide the corporation a player wanted. Either is buildable; BL-880 (corporation selection canvas) is designed against the first and it is B, not sprint 39's.
+
+- The canvas offers the shortlist, in its weighted order.
+- The canvas offers every corporation, with the shortlist highlighted and the floor shown.
+
+> **Recommendation:** The first for a first cut, with the second as the obvious widening once the canvas can show a quarterly return per card.
+
+*Files: `docs/ui/STARTUP.md`, `docs/generation/CORPORATION_GENERATION.md`*
 
 ---
 

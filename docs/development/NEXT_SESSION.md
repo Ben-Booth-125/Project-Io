@@ -1,5 +1,9 @@
 # Next session — decompose the Empires design into delivery
 
+> **Sprint 39 was designed on 2026-09-09 while sprint 38 runs.** Its authority is
+> `docs/generation/COLONIAL_ERA.md` (new) and its entry is in `sprints.json` as *proposed*; the
+> items are BL-874..BL-880. Nothing in it is sprint 38's — this note is still the handover for 38.
+
 Written 2026-09-09 at the close of the Empires design pass. **The design is concluded and written
 into its authority docs. Your job is to decompose it into delivery items and build them.**
 

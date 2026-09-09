@@ -94,6 +94,39 @@ THE FOUR EMPIRE-PHASE ITEMS ARE IN THE POOL, unbuilt and untouched: BL-837 (anci
 
 DESIGN PASS CLOSED 2026-09-09. docs/generation/COLONISATION.md is new and is the authority for the span - sibling to MILITARY_HISTORY.md, one doc per concern. Ben's five design calls: DIFFUSION with no actor (so no AI-behaviour grant is needed, and it must not become precedent for one); a STATED boundary year, not a derived one; a DOMESTICATION PACKAGE that spreads and gates settlement; philosophy is the EXISTING pantheon with no new axis; and colonisation SEEDS the province partition rather than drawing it. Two later rulings: predation caps a penned people's pressure and decays LOGARITHMICALLY IN POPULATION, and fragmentation is re-derived FROM CONTACT with the creeds' tribal marches retired (NR-808). Seven items minted, BL-846..BL-852. Four questions stay open in the doc and none is a design call - three magnitudes for the sweep and one derivation inside BL-852.
 
+### Sprint 39 — the colonial round sets the demand, and the corporations come after
+*Proposed*
+
+**Goal.** Ben, 2026-09-09: "We build logistics, and set demands for goods - then we build companies on top of that." The colonial era (1560 -> 1960, pass 2 on the polity engine) claims ground across water by purchase or conquest, records who discovered which luxury good, derives how wealthy each nation is, and leaves sea lanes on the map - the DEMAND SIDE of the campaign, generated as history. Then the static search selects a corporate landscape over that world, seeded from the strength of the trade network, and round 6 draws the winner. Both steps, sequenced, in one sprint; the polity engine is seconds and the search is milliseconds, so the cost objection lands on the unwatched bar rather than on the shape.
+
+**Planned.**
+- BL-874 (round 5/6 split) - round 5 the colonial era as a still with four objects; round 6 the corporations. First, because every other item draws on it.
+- BL-875 (claim by purchase) - the diplomatic claim beside BL-832's military one; a bought province keeps its culture shares.
+- BL-832 (colonial ties) - the campaign across a sea leg and the colony term; its preferred-seller half is superseded.
+- BL-876 (sea lanes from the record) - the tie as a stamped traversal-cost discount, LOGISTICS.md § 4b.
+- BL-877 (taste from history) - discovery events feeding the endemic channel's per-nation weights.
+- BL-878 (wealth from history) - the per-polity wealth scalar seeding the opening treasury.
+- BL-879 (search seeded from the network) - pass 3 re-authored from BL-770's cold row, seeded from corridor and lane strength, retiring the warm start.
+- BL-831 (pass two economy span) - the calendar, the coast and the era-band re-bless, which everything above runs inside.
+
+**Done when.** A 1960 world opens with claims across water on most seeds - some bought, some taken - lanes on the water between them, nations whose wanted-goods sets differ and whose treasuries spread wide, the search's winner drawn in round 6 in place of the warm start, and rounds 5 and 6 reached on a live click in the built app. No count is targeted; every distribution is reported.
+
+**Risk.** THE UNWATCHED WAIT IS THE COST, NOT THE PASSES. Measured 2026-09-09 at /O2: the polity engine runs 400 years in 0.9 s and 4,000 in 66 s (3,734 regions); world_determinism puts the post-era passes at 10-25 s and the warm start is 72 s. Pass 2 is expected in the low seconds and pass 3 has no clock - MEASURE PASS 2 ON LANDING, because sea legs widen the neighbour graph and NR-809's densification is the one term that could make it otherwise. Retiring the warm start (BL-879) returns ~72 s; Begin still re-pays round 4's world build (NR-811) and that is BL-880's to close, not this sprint's.
+
+THE TIE'S CONSUMER WAS DORMANT and the design moved because of it: preferred-seller routing has no writer in play, so the tie became a sea lane on traversal cost. That widens PLACEMENT REACH across the lane too - intended, but wider than a market preference, and it moves world_determinism's digests on every world with a lane. One deliberate re-bless, with the description.
+
+DISCOVERY BY REACH ALONE may make every neighbour want the same three goods. The sweep decides, not a threshold.
+
+AND THE STANDING TRAP: a metropole, a colony and a cash crop are exactly where a real proper noun is tempting. Mechanism only.
+
+DESIGNED 2026-09-09 on the elicitation form while sprint 38 runs. Ben's calls: pass 2 thin then pass 3; the tie is a haulage discount (became BL-876's sea lane); round 5 is a STILL; Begin's corporation canvas is an intent to note (BL-880), reversing the 2026-08-26 draw; the colonial round feeds data forward and does not place firms.
+
+THE SEAT REVERSAL is recorded in STARTUP.md § The seat and CORPORATION_GENERATION.md § The spawn shortlist; the shortlist survives as what the canvas offers (NR-820, taken on Ben's behalf).
+
+BL-833 (tariff posture from history) was cancelled as a duplicate of the delivered BL-750 while filing this sprint.
+
+archive_landed.js has no --help and runs on any invocation: it evicted BL-871 and BL-873 (both complete) to the cold file during this session. Correct home; recorded so the diff is not a mystery.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -153,9 +186,10 @@ DESIGN PASS CLOSED 2026-09-09. docs/generation/COLONISATION.md is new and is the
 | 35 | Watching the world be made | CLOSED 2026-09-09 with its placeholder elements standing. The visibility scaffold landed and was verified live; the sim work it would show turned out to be much larger than the sprint assumed, and moves to 36. Three measurements refuted three assumptions, which is the sprint real output. |
 | 36 | a revised look at ancient history | CLOSED 2026-09-09, REDIRECTED RATHER THAN FINISHED. Three of six items landed and are verified: the ancient pass is 5.4x/2.9x faster over 4,000 years and the dead-region ping-pong is gone at its cause. The four unbuilt items were empire-phase and went back to the pool when Ben observed that colonisation and empire want different rules. Sprint 37 takes that up. |
 | 37 | how humanity spreads before it fights | REOPENED 2026-09-09 for a design addendum, having been closed the same day. Ben: 'we have more work to do for sprint 37 ... we need to be sure we retrieve all necessary data to facilitate this.' The Empires phase needs city states growing into empires, ancient logistics expanding, and natural resources abstracted for conquest -- and the Culture phase must HAND THAT FORWARD. docs/generation/CIVILISATION.md is the new authority. The gap found: the migration builds a family tree of peoples (BL-856) and DISCARDS it, so kinship -- the natural substrate for culture similarity -- is unrecoverable by the empire phase. BL-865 closes it and is sprint 37's; BL-866..BL-870 are sprint 38's. |
+| 39 | the colonial round sets the demand, and the corporations come after | PROPOSED 2026-09-09 while sprint 38 runs. Designed in one session on the elicitation form; authority is docs/generation/COLONIAL_ERA.md (new). Shape: pass 2 THIN (claims by purchase and conquest, discovery and taste, wealth, sea lanes) then pass 3 (the static search, seeded from the network, retiring the warm start). Two wizard rounds: 5 the colonial era as a still, 6 the corporations. Begin's corporation selection canvas is NOTED (BL-880), not built. |
 
-**Next up.** SPRINT 37 IS OPEN (2026-09-09) - how humanity spreads before it fights. It is NOT YET SCOPED, and that is deliberate: the first work is a design pass, not implementation. The subject is initial colonisation and the spreading of humanity - where populations grow, how agriculture takes hold in ground that suits it, how cultures grow from that, and what philosophies emerge as the precursor to military doctrine. The open design question is where the boundary between this phase and the empire phase sits, and nothing should be built until that is answered. Sprint 36 closed with its three landed items verified; its four unbuilt empire-phase items are in the pool awaiting that same boundary.
+**Next up.** SPRINT 38 IS RUNNING (the Empires phase, BL-866..BL-872; NEXT_SESSION.md is its handover). SPRINT 39 IS PROPOSED (2026-09-09) - the colonial round sets the demand, and the corporations come after: docs/generation/COLONIAL_ERA.md is its authority, BL-874..BL-880 its items, BL-874 (round 5/6 split) its first day. It opens when 38 closes; the active-sprint cap holds.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*54 sprints archived cold; 1 open/gated in the hot store.*
+*54 sprints archived cold; 2 open/gated in the hot store.*

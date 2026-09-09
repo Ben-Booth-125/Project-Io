@@ -331,6 +331,47 @@
     "docs/ui/STARTUP.md"
    ],
    "resolution": "RESOLVED (Ben, 2026-09-09): reading A, the COAST, confirmed - and the boundary moved with it. The Culture round keeps its derived terminating condition, and the world holds what migration left it until the stated boundary, simulating nothing in between. THE BOUNDARY IS 400 BCE, NOT 0 CE, and pass 1 now covers 3,600 years rather than 4,000: Culture 2400 BCE -> 400 BCE (2,000 years), Empires 400 BCE -> 1200 CE (1,600 years). 1200 CE is unmoved, so the coast to 1560, pass 2 and the 1960 epoch are untouched. One claim written under the first cut is now FALSE and was removed: 0 CE was 'a year the engine already knows' because the sim's ancient arc ends there - 400 BCE is not, so the split is real work rather than free. Written into CIVILISATION.md sec The span is 400 BCE to 1200 CE, which owns the arithmetic; COLONISATION.md, STARTUP.md and GENERATION_STRATEGY.md take their figures from it. Carried by BL-871."
+  },
+  {
+   "id": "NR-819",
+   "title": "A purchased province keeps its culture shares; a conquered one is digested - taken on your behalf as the data meaning of \"respecting local customs\"",
+   "raised": "2026-09-09",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "The sprint 39 design session, 2026-09-09, writing COLONIAL_ERA.md § Two ways to claim ground across water.",
+   "what": "You named two claim modes: \"purchasing a province for the purpose of trade, and respecting local customs\" against \"military claims, and war for items such as gold\". The doc needed both as DATA. The reading taken: a PURCHASE buys ACCESS to the province's endowment and does not move its culture shares at all - nothing is digested because nothing was conquered - while a CONQUEST transfers the province outright and its shares shift toward the holder over centuries exactly as pass 1 already does. So bought and taken differ in two places a player can read: the shares and the grudge ledger.",
+   "why_it_matters": "It makes the two verbs distinguishable on the map, gives the purchase a reason to be cheaper than a war (access is not ownership), and keeps the anti-hegemony lever intact (a metropole that buys widely still carries no digested people, so its holdings are not its strength). A different reading - a purchase that slowly assimilates, or one that grants ownership - would be a different lever.",
+   "options": [
+    "Keep it: purchase = access, shares unmoved; conquest = ownership, shares digested.",
+    "Purchase assimilates slowly too, at a lower rate than conquest.",
+    "Purchase grants ownership of the endowment outright but never moves the shares."
+   ],
+   "recommendation": "The first. It is the only reading in which \"respecting local customs\" is a mechanism rather than a mood.",
+   "files": [
+    "docs/generation/COLONIAL_ERA.md",
+    "src/world/history_sim.hpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-820",
+   "title": "The spawn shortlist and its weighting survive as what the corporation selection canvas OFFERS - taken on your behalf with the seat reversal",
+   "raised": "2026-09-09",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "The sprint 39 design session, 2026-09-09, recording the reversal of the 2026-08-26 seat ruling into STARTUP.md § The seat and CORPORATION_GENERATION.md § The spawn shortlist.",
+   "what": "You reversed the ruling that the seat is drawn: Begin is to open a corporation selection canvas. What was NOT said is what the canvas offers. The reading taken: the viability floor still filters and the weighted draw's ordering (processing over extraction, near population) still orders the list - the player chooses among the shortlist rather than among every corporation. The alternative is a canvas over every corporation with the shortlist as a highlight.",
+   "why_it_matters": "The shortlist exists because a pure draw handed a pure-extraction corp on 13 of 24 seeds; a canvas that offers everything hands that choice back to a player who cannot yet read a balance sheet. But a canvas that offers only the shortlist may hide the corporation a player wanted. Either is buildable; BL-880 (corporation selection canvas) is designed against the first and it is B, not sprint 39's.",
+   "options": [
+    "The canvas offers the shortlist, in its weighted order.",
+    "The canvas offers every corporation, with the shortlist highlighted and the floor shown."
+   ],
+   "recommendation": "The first for a first cut, with the second as the obvious widening once the canvas can show a quarterly return per card.",
+   "files": [
+    "docs/ui/STARTUP.md",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "resolution": null
   }
  ]
 }

@@ -101,6 +101,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/generation/TILE_GENERATION.md` | The six-pass tile pipeline. |
 | `docs/generation/COLONISATION.md` | **How humanity spreads before it fights** — the opening span of the ancient pass: the domestication package, the migration stream, culture by route. A *diffusion*, with no actor and no infrastructure. `MILITARY_HISTORY.md` is its violent sibling. |
 | `docs/generation/CIVILISATION.md` | **How city states become empires** — the phase after migration: sparse settlements, materials spent on action, which creeds raise armies, what a civilisation is as distinct from a creed, and culture relations as the engine of conquest. Carries the DATA CONTRACT the Culture phase must satisfy. `COLONISATION.md` is its peaceful sibling. |
+| `docs/generation/COLONIAL_ERA.md` | **How the world comes to want what it cannot make** — pass 2, 1560 → 1960: claims across water by purchase or conquest, who discovered which luxury good, how wealthy each nation is, the sea lanes, and what the span hands the corporate search. The demand side, generated as history; the companies come after. Not `COLONISATION.md`, which is the prehistoric peopling. |
 | `docs/generation/PROVINCES.md` | The spatial unit of consequence: partition rules, three domains, walk order. |
 | `docs/generation/NATION_GENERATION.md` | Territory placement, resource profile, character, naming. |
 | `docs/generation/CORPORATION_GENERATION.md` | Nation assignment, focus, starting assets, finances. |

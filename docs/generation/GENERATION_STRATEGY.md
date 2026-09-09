@@ -291,7 +291,8 @@ They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds 4 and 5):
 | Round | Phase | The moving object |
 |---|---|---|
 | **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of 400 BCE → 1200 CE** (Ben, 2026-09-09) — the empire half of pass 1's 3,600 years; the migration half (2400 BCE → 400 BCE) is round 3's. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
-| **5** | **6 — The economic substrate** | Four, in order: **metros growing** from the population centres, **colonial reach across water**, **firm markers and their charters**, and the **market carve with its price field**. |
+| **5** | **The colonial era** (pass 2) | A **still**, not a lapse (Ben, 2026-09-09): **metros growing** from the population centres, **claims across water by mode**, **sea lanes**, and a board of **who wants what and who is rich**. `COLONIAL_ERA.md` § Round 5 is a still. |
+| **6** | **6 — The economic substrate** | The search's winner drawn: **firm markers and their charters**, and the **market carve with its price field**. Demand first, then the companies that answer it. |
 
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
 any `world_preference`, and targets no outcome — the tune-the-forces-never-the-outcome rule of
@@ -739,7 +740,7 @@ target.
 | Pass | Engine | Span | Produces |
 |---|---|---|---|
 | **1 — Ancient** | The polity sim (`history_sim`), Classical and Medieval bands | The prehistory span to the **boundary year** | Ancient borders, cultural doctrines, the lacunae — who walked where |
-| **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | **1560 → 1960** (Ben, 2026-09-08) | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
+| **2 — Colonial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open, two claim verbs | **1560 → 1960** (Ben, 2026-09-08) | Claims across water by purchase or conquest, who discovered which luxury good, how wealthy each nation is, the sea lanes, each nation's tariff posture — the demand side, generated as history. `COLONIAL_ERA.md` owns it; § Pass 2 is the economy pass owns the calendar |
 | **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which firms exist, what each market can close, the price field |
 
 **Pass 1 and pass 2 are one engine, not two.** The works roster is cumulative across its four
@@ -757,6 +758,12 @@ scalars, and neither is a roll. On an ancient epoch there is no pass 2: the boun
 the epoch and the sim stops where it stops today.
 
 ### Pass 2 is the economy pass, 1560 → 1960 (Ben, 2026-09-08)
+
+**This section owns the calendar and the handoff; `COLONIAL_ERA.md` owns the span itself** — the
+two claim verbs, discovery and taste, wealth, sea lanes, and what the span hands the search
+(Ben, 2026-09-09: *"we build logistics, and set demands for goods — then we build companies on
+top of that"*). Read that document for what pass 2 does; read on here for when it runs and what
+crosses out of it.
 
 **The calendar is now stated rather than derived.** Pass 1 runs **3,600 years, 2400 BCE → 1200 CE**,
 divided at **400 BCE** into the migration and empire rounds (Ben, 2026-09-09;
@@ -826,8 +833,12 @@ passes before the search runs, not an axis the search trades against.
   **polity map itself** — which polity held each region at the epoch, so a realm arrives as one
   nation rather than as a Voronoi cell per region — plus a nation's **tariff posture**, enacted
   as an ordinary `import_tariff` law at world setup where pass 2's polity ended up protective,
-  and its **colonial ties**, which seed the order book's preferred-seller relationships so a
-  colony's chains close through its metropole before they close anywhere else.
+  its **colonial ties** as **sea lanes** stamped onto the water, so a colony's chains close through
+  its metropole first because the landed price says so (`COLONIAL_ERA.md` § The colonial tie is a
+  sea lane) — the preferred-seller reading of a tie is superseded (Ben, 2026-09-09), since the buy
+  side that would read it is dormant — its **discoveries** and **wealth**, which set the endemic
+  demand channel's weights and the opening treasury, and the **network strength** the corporate
+  search seeds its first candidate from.
 
   **The fold is what makes phase 5 a finalisation.** Before it, the political map was re-derived
   from the region anchors as though the history had not just drawn one, and every empire the sim
@@ -850,11 +861,13 @@ is high on the real road and sea network; ties, because history routed a colony'
 its metropole. A local firm's early sales are sheltered by the same three, and a player can read
 why on the map.
 
-**The cost question is open and is measured first.** Pass 1 is already the most expensive pass;
-pass 2 doubles it and pass 3 lengthens the warm start. The budget is the generating screen's wait,
-and the affordability rungs in `../lore/COLLAPSE.md` § The 4000-year problem become load-bearing
-in the order that document gives. Whether the shape can be had cheaply is the sprint's question,
-not this document's.
+**The cost is measured, and pass 2 is not the expensive half (2026-09-09, `/O2`).** The polity
+engine runs 400 years in 0.9 s and 4,000 in 66 s at today's region counts, so pass 1 is the
+expensive pass and pass 2 — 400 years on the same engine — is expected in the low seconds and
+measured on landing (`COLONIAL_ERA.md` § Cost). Pass 3 has no clock. What remains expensive is
+the unwatched post-era bar and the warm start the search retires. The affordability rungs apply
+to pass 1 and to the region count NR-809 measured, not to the shape of the three passes
+(`../lore/COLLAPSE.md` § The 4000-year problem — making the run affordable).
 
 ## Open cross-doc items
 

@@ -10,6 +10,61 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-09 (sprint 39 design) — The colonial round sets the demand, and the corporations come after
+
+**Mode:** Design, while sprint 38 runs. No code.
+**Runtime:** one session; one background agent measuring generation cost at `/O2`.
+
+### The question
+
+Whether to approach markets directly from where the empires left them, or to run a colonial
+precursor first — and whether either can be generated fast enough that the wait does not bore.
+
+### What was settled
+
+Both, sequenced: **pass 2 thin, then pass 3.** The colonial era (1560 → 1960, on the polity engine)
+claims ground across water by **purchase** or **conquest**, records **who discovered which luxury
+good**, derives **how wealthy each nation is**, and leaves **sea lanes** on the map. Then the static
+search selects a corporate landscape over that world, seeded from the strength of the trade
+network. Two wizard rounds — 5 the colonial era as a **still**, 6 the corporations — because one
+round doing both "complicates the story for the user". Authority: `docs/generation/COLONIAL_ERA.md`
+(new); items BL-874..BL-880; sprint 39 proposed.
+
+### What moved the design
+
+**The tie's consumer was dormant.** `MARKETS.md` § Where the order book lives: no press and no
+`corp_verb` submits a buy order, so the preferred-seller routing the design had seeded ties into
+runs for nobody. The tie became a **sea lane** — a stamped discount on sea-leg traversal cost, the
+water analogue of the ancient roads — read by convoys, reach and placement alike because traversal
+cost is one weight function. Wider than a market preference, and intended.
+
+**The endemic channel was the consumer the demand output needed.** `inject_endemic_demand` already
+injects a wealth-scaled, character-flavoured want; the colonial era moves its weights, and "set
+demands for goods" is a mechanism rather than a noun.
+
+**The seat is a choice again.** Ben reversed the 2026-08-26 draw: Begin is to open a corporation
+selection canvas. Noted as BL-880 (corporation selection canvas), priority B, not sprint 39's — it
+needs the rounds to hand a world forward (NR-811), which is the larger half of it.
+
+### The numbers, and a correction
+
+Pass 1 is **not** low seconds any more. `history_span_cost` seed 0 at `/O2`: 400 years 0.9 s at
+1,742 regions; 2,000 years 34 s; 4,000 years **66 s** at 3,734 regions, reach 34–55%. So the
+3,600-year pass sits near a minute and NR-809 (region count vs adjacency) is the live cause. Pass 2
+is 400 years at the end-of-span count — expected in the low seconds, **measured on landing** because
+sea legs widen the neighbour graph. The wait the player feels is the unwatched bar: `world_determinism`
+puts post-era at 10–25 s, the warm start is 72 s and is retired by the search, and Begin re-pays
+round 4's build.
+
+### Housekeeping
+
+`archive_landed.js` has no `--help`; it ran and evicted BL-871 and BL-873 (both complete) to the
+cold file — their correct home, kept. BL-833 (tariff posture from history) cancelled as a duplicate
+of the delivered BL-750. Two calls taken on Ben's behalf: NR-819 (a purchase keeps culture shares),
+NR-820 (the canvas offers the shortlist).
+
+---
+
 ## 2026-09-09 (sprint 37) — The world stops opening already full
 
 **Mode:** Batch delivery in three waves, on a design pass that had closed the same morning.

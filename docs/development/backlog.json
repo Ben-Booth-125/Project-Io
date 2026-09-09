@@ -86,7 +86,7 @@
     "src/world/corporation_generation.cpp",
     "src/world/market.cpp"
    ],
-   "design": "FOUR OBJECTS, ALL FOUR CHOSEN BY BEN (2026-09-08), drawn in order on the epoch globe: metros growing out of the population centres the history grew and sacked; colonial reach across water; firm markers with their charters; the market carve and its price field.\n\nTHIS ROUND SHOWS THE SELECTED LANDSCAPE, NOT THE SEARCH. Phase 6 scores candidates statically in milliseconds; a ranking is not a spectacle. The player watches the winner being drawn.\n\nPLACEHOLDERS ARE EXPECTED AND ARE THE POINT. Phase 6's search is not built (BL-770 was cancelled with the board clear) and colonial ties do not cross the handoff yet. Each of the four draws from whatever is real today - centres, corporations and markets all are; reach across water is the one with nothing behind it - and is LABELLED as a placeholder where it is one. An unlabelled placeholder is a lie the next session will believe.\n\nTHIS PAYS THREE OF THE FOUR OWED VISIBILITY ITEMS: the region surface, the market-carving explanation, and background firms - the last of which stops being blocked by the worker-thread objection, because a wizard round is not the worker's loading screen.\n\nDONE WHEN: all four draw in the built app on a LIVE click-through, each placeholder is visibly marked as one, and the Visibility table's verdicts are updated to match what actually renders."
+   "design": "FOUR OBJECTS, ALL FOUR CHOSEN BY BEN (2026-09-08), drawn in order on the epoch globe: metros growing out of the population centres the history grew and sacked; colonial reach across water; firm markers with their charters; the market carve and its price field.\n\nTHIS ROUND SHOWS THE SELECTED LANDSCAPE, NOT THE SEARCH. Phase 6 scores candidates statically in milliseconds; a ranking is not a spectacle. The player watches the winner being drawn.\n\nPLACEHOLDERS ARE EXPECTED AND ARE THE POINT. Phase 6's search is not built (BL-770 was cancelled with the board clear) and colonial ties do not cross the handoff yet. Each of the four draws from whatever is real today - centres, corporations and markets all are; reach across water is the one with nothing behind it - and is LABELLED as a placeholder where it is one. An unlabelled placeholder is a lie the next session will believe.\n\nTHIS PAYS THREE OF THE FOUR OWED VISIBILITY ITEMS: the region surface, the market-carving explanation, and background firms - the last of which stops being blocked by the worker-thread objection, because a wizard round is not the worker's loading screen.\n\nDONE WHEN: all four draw in the built app on a LIVE click-through, each placeholder is visibly marked as one, and the Visibility table's verdicts are updated to match what actually renders.\n--- RE-SCOPED 2026-09-09 BY THE ROUND SPLIT (BL-874) ---\n\nRound 5 is now THE COLONIAL ERA and round 6 THE CORPORATIONS (Ben, 2026-09-09; STARTUP.md § Round 5 and § Round 6). Of this item's four objects, metros and reach across water are round 5's - reach becoming CLAIMS BY MODE and SEA LANES - and firm markers and the market carve are round 6's. BL-874 carries the split; this item's DONE WHEN stands for the objects, read against the two rounds rather than one."
   },
   {
    "status": "designed",
@@ -204,7 +204,7 @@
    "difficulty": 4,
    "category": "Generation",
    "title": "Pass 2 as the economy pass - 1560 to 1960, on the calendar Ben stated",
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "authority_doc": "docs/generation/COLONIAL_ERA.md",
    "requires": [
     "BL-825",
     "BL-828"
@@ -214,7 +214,7 @@
     "src/world/hard_coded_world.hpp",
     "src/world/era_band.hpp"
    ],
-   "design": "BEN, 2026-09-08: \"another focused pass on economy from 1560 to 1960\". With pass 1 ending at 1200 CE that fixes the whole calendar - and the calendar is now STATED rather than derived from a boundary-year default.\n\nTHE CONSEQUENCE THAT IS NOT A DETAIL: epoch_year = 1960 puts the campaign in the INDUSTRIAL era band. era_band_for_epoch flips at 1700, so every consumer keyed on the band - eras, the resource split, the unit roster - takes the industrial branch rather than the ancient one that epoch_year = 0 produced. That is a world-moving change and it owes the digest discipline in DELIVERY.md: one deliberate re-bless against a stated description of what changed.\n\nTHE 1200 -> 1560 GAP IS A COAST, NOT A HOLE. Pass 1's arc ends in a stable dark age, and a span defined by little changing is the one span not worth simulating. The world arrives at 1560 holding what 1200 left it. What this item must check is whether anything ACCUMULATING is silently lost across it - assimilation shares (BL-826) and grudge decay (BL-827) are the two that move on their own - and advance those cheaply across the gap rather than stepping it.\n\nSAME ENGINE, DIFFERENT QUESTION. Pass 1 asks who holds what ground. Pass 2 asks what that ground produces and trades. The works roster is cumulative and the unit roster is era-keyed, so this is the first span continued with more rows offered - not a second mechanism (§ Three passes of simulated history).\n\nDONE WHEN: a full run does 3,600 years to 1200 (2400 BCE -> 1200 CE, divided at 400 BCE -- BL-871, Ben 2026-09-09; the earlier figure here was 4000), coasts to 1560, runs 1560-1960, and arrives at an industrial-band epoch; the accumulators crossing the gap are named and handled; and the era-band flip is deliberately re-blessed rather than absorbed.\n\nPASS 1'S TOTAL CHANGED UNDER THIS ITEM, 2026-09-09: 3,600 years rather than 4,000, starting 2400 BCE. THE 1200 -> 1560 COAST AND THE 1960 EPOCH ARE UNAFFECTED -- only pass 1's start and its internal boundary moved. The accumulator question this item raises for the 1200 -> 1560 gap now applies a second time, at the 400 BCE boundary inside pass 1 (BL-871)."
+   "design": "BEN, 2026-09-08: \"another focused pass on economy from 1560 to 1960\". With pass 1 ending at 1200 CE that fixes the whole calendar - and the calendar is now STATED rather than derived from a boundary-year default.\n\nTHE CONSEQUENCE THAT IS NOT A DETAIL: epoch_year = 1960 puts the campaign in the INDUSTRIAL era band. era_band_for_epoch flips at 1700, so every consumer keyed on the band - eras, the resource split, the unit roster - takes the industrial branch rather than the ancient one that epoch_year = 0 produced. That is a world-moving change and it owes the digest discipline in DELIVERY.md: one deliberate re-bless against a stated description of what changed.\n\nTHE 1200 -> 1560 GAP IS A COAST, NOT A HOLE. Pass 1's arc ends in a stable dark age, and a span defined by little changing is the one span not worth simulating. The world arrives at 1560 holding what 1200 left it. What this item must check is whether anything ACCUMULATING is silently lost across it - assimilation shares (BL-826) and grudge decay (BL-827) are the two that move on their own - and advance those cheaply across the gap rather than stepping it.\n\nSAME ENGINE, DIFFERENT QUESTION. Pass 1 asks who holds what ground. Pass 2 asks what that ground produces and trades. The works roster is cumulative and the unit roster is era-keyed, so this is the first span continued with more rows offered - not a second mechanism (§ Three passes of simulated history).\n\nDONE WHEN: a full run does 3,600 years to 1200 (2400 BCE -> 1200 CE, divided at 400 BCE -- BL-871, Ben 2026-09-09; the earlier figure here was 4000), coasts to 1560, runs 1560-1960, and arrives at an industrial-band epoch; the accumulators crossing the gap are named and handled; and the era-band flip is deliberately re-blessed rather than absorbed.\n\nPASS 1'S TOTAL CHANGED UNDER THIS ITEM, 2026-09-09: 3,600 years rather than 4,000, starting 2400 BCE. THE 1200 -> 1560 COAST AND THE 1960 EPOCH ARE UNAFFECTED -- only pass 1's start and its internal boundary moved. The accumulator question this item raises for the 1200 -> 1560 gap now applies a second time, at the 400 BCE boundary inside pass 1 (BL-871).\n--- THE SPAN HAS AN AUTHORITY DOC, 2026-09-09 ---\n\ndocs/generation/COLONIAL_ERA.md now owns what pass 2 DOES - the two claim verbs, discovery and taste, wealth, sea lanes, and the handoff to the search. GENERATION_STRATEGY.md § Pass 2 is the economy pass keeps the calendar and the handoff list. This item stays the calendar-and-coast item: 3,600 years to 1200, the coast, 1560-1960, the era-band flip re-blessed. The span's content is BL-875..BL-878."
   },
   {
    "status": "designed",
@@ -231,7 +231,7 @@
    "difficulty": 4,
    "category": "Generation",
    "title": "Colonial ties - reach across water in pass 2, and the trade relationships it leaves behind",
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "authority_doc": "docs/generation/COLONIAL_ERA.md",
    "requires": [
     "BL-831"
    ],
@@ -239,10 +239,10 @@
     "src/world/history_sim.cpp",
     "src/world/market.cpp"
    ],
-   "design": "WHAT PASS 2 ADDS OVER PASS 1 is reach across water - a campaign or settle target across a sea leg, staged from harbour works, because colonisation by a major is the Metropole strategy played overseas. It culminates as every major does (../lore/COLLAPSE.md), and the epoch still arrives multipolar: the non-hegemony invariant is NOT relaxed for the sea.\n\nWHAT IT LEAVES BEHIND is the part that matters to the campaign, and it is already named in GENERATION_STRATEGY.md as crossing the handoff: COLONIAL TIES seed the order book's preferred-seller relationships, so a colony's chains close through its metropole before they close anywhere else.\n\nTHAT IS ONE OF THE THREE IN-WORLD FORCES the design relies on to make market conditions uneven WITHOUT a term inside an agent - tariffs, distance, and ties. A player can read why on the map, which is the whole test.\n\nAND IT IS ALSO ROUND 5'S SECOND OBJECT: reach across water is the one of BL-819's four with nothing behind it today. This item is what turns that placeholder into a real drawing.\n\nDONE WHEN: colonisation happens across water on a seeded sweep without producing a hegemon; ties survive the handoff into the order book; and round 5 draws real reach rather than a labelled stub."
+   "design": "WHAT PASS 2 ADDS OVER PASS 1 is reach across water - a campaign or settle target across a sea leg, staged from harbour works, because colonisation by a major is the Metropole strategy played overseas. It culminates as every major does (../lore/COLLAPSE.md), and the epoch still arrives multipolar: the non-hegemony invariant is NOT relaxed for the sea.\n\nWHAT IT LEAVES BEHIND is the part that matters to the campaign, and it is already named in GENERATION_STRATEGY.md as crossing the handoff: COLONIAL TIES seed the order book's preferred-seller relationships, so a colony's chains close through its metropole before they close anywhere else.\n\nTHAT IS ONE OF THE THREE IN-WORLD FORCES the design relies on to make market conditions uneven WITHOUT a term inside an agent - tariffs, distance, and ties. A player can read why on the map, which is the whole test.\n\nAND IT IS ALSO ROUND 5'S SECOND OBJECT: reach across water is the one of BL-819's four with nothing behind it today. This item is what turns that placeholder into a real drawing.\n\nDONE WHEN: colonisation happens across water on a seeded sweep without producing a hegemon; ties survive the handoff into the order book; and round 5 draws real reach rather than a labelled stub.\n--- WHAT IT LEAVES BEHIND CHANGED, 2026-09-09 ---\n\nTHE PREFERRED-SELLER HALF IS SUPERSEDED. MARKETS.md § Where the order book lives: no press and no corp_verb submits a buy order, so preferred-seller routing is dormant in play - a tie seeded there would be read by nothing. Ben's call on the sprint-39 form: the tie is a HAULAGE DISCOUNT on the metropole-colony route, which is BL-876 (sea lanes from the record) - a force on the map, read by everything that reads traversal cost.\n\nWHAT THIS ITEM KEEPS: reach across water as the CAMPAIGN verb across a sea leg, staged from harbour works, culminating as every major does; and the COLONY TERM on protection_q (NATIONS.md § 4) - a purchased province (BL-875) counts as a colony exactly as a conquered one. Round 5's second object is now BL-874's. COLONIAL_ERA.md § Two ways to claim ground across water owns both verbs."
   },
   {
-   "status": "designed",
+   "status": "cancelled",
    "glyph": "✓",
    "parked": false,
    "sprint": "36",
@@ -264,7 +264,9 @@
     "src/world/history_sim.cpp",
     "src/world/law.cpp"
    ],
-   "design": "A NATION THAT INDUSTRIALISED LATE RELATIVE TO ITS NEIGHBOURS PROTECTS WHAT IT HAS. That is the cause; the posture is its consequence, and pass 2 already computes the input - polity::industrial_year, the year a polity crossed the rung, is in history_sim.hpp today.\n\nWHAT MATTERS IS HOW IT IS ENACTED: as an ORDINARY import_tariff law at world setup, not as a special generation-only field. The design says so explicitly, and the reason is the one that keeps the whole economy legible - a player can open the law panel and read the tariff, repeal it, and watch prices move. A hidden generation modifier would be invisible and unrepealable, which is the shape the standing rule against invisible forces exists to prevent.\n\nRELATIVE, NOT ABSOLUTE. 'Late' means late against its neighbours, so a world where everyone industrialised late produces no protectionists - which is correct, and is why the term must not be a threshold on the raw year.\n\nDONE WHEN: postures derive from relative industrialisation dates, land as real import_tariff laws visible in the law panel, and a world with uniform timing produces no tariffs."
+   "design": "A NATION THAT INDUSTRIALISED LATE RELATIVE TO ITS NEIGHBOURS PROTECTS WHAT IT HAS. That is the cause; the posture is its consequence, and pass 2 already computes the input - polity::industrial_year, the year a polity crossed the rung, is in history_sim.hpp today.\n\nWHAT MATTERS IS HOW IT IS ENACTED: as an ORDINARY import_tariff law at world setup, not as a special generation-only field. The design says so explicitly, and the reason is the one that keeps the whole economy legible - a player can open the law panel and read the tariff, repeal it, and watch prices move. A hidden generation modifier would be invisible and unrepealable, which is the shape the standing rule against invisible forces exists to prevent.\n\nRELATIVE, NOT ABSOLUTE. 'Late' means late against its neighbours, so a world where everyone industrialised late produces no protectionists - which is correct, and is why the term must not be a threshold on the raw year.\n\nDONE WHEN: postures derive from relative industrialisation dates, land as real import_tariff laws visible in the law panel, and a world with uniform timing produces no tariffs.",
+   "resolved": "2026-09-09",
+   "resolution": "CANCELLED 2026-09-09 as a duplicate: its whole design - protection derived from relative industrialisation timing, enacted as an ordinary import_tariff law visible in the law panel, relative not absolute - was DELIVERED by BL-750 (tariff posture) on 2026-09-06 (polity::protection_q, share_ahead_q * lag_q, banded 5/10/20% over a 300 floor). The one thing BL-750 left owed, the colony term, is BL-832 (colonial ties) with BL-875 (claim by purchase) supplying its second input. Nothing here is lost; it was already built when this row was filed."
   },
   {
    "status": "designed",
@@ -786,30 +788,6 @@
    "design": "BEN, 2026-09-09: cultures have similarities, and sometimes directly opposing views. This leads to conflict, and it becomes the engine for our simulated city states to begin an idea of conquest.\n\nOPENED AS A DESIGN ASIDE (CIVILISATION.md sec Culture relations), NOT SETTLED. This item carries the work once the calls are answered.\n\nSIMILARITY IS KINSHIP, and the substrate exists: the migration's family tree (BL-865). Two peoples are alike because they share an ancestor and parted recently -- earned by the migration rather than assigned.\n\nOPPOSITION NEEDS A SECOND AXIS, because kinship alone gives DISTANT and not OPPOSED, and those differ: two peoples across a continent who never met are distant and have no quarrel. Three candidates, all from quantities that already exist -- the pantheon's own zeal/dominion; the farm class a people was coined on (BL-864), which is a material disagreement rather than a stated one; and contact itself, via culture_shares interpenetration.\n\nTHE FOUR OPEN CALLS, recorded in the doc and in the review queue: is opposition SYMMETRIC (grudges are directed; a disagreement about how to live may not be); does kinship DECAY or is the tree enough; does opposition CAUSE conquest or merely PERMIT it (feeding w_cult is the smaller change and keeps one scorer, a score of its own makes relations the engine Ben describes); and how does a civilisation relate to opposed cultures inside it.\n\nDONE WHEN: the calls are answered, relations are derived from history rather than rolled, and a sweep shows both alliance-shaped and enmity-shaped worlds.\n\nSETTLED (Ben, 2026-09-09, elicitation) -- OPPOSITION IS SUPPLIED BY TWO AXES: the PANTHEON'S TEMPERAMENT (zeal, dominion) and the ORIGIN FARM CLASS (BL-864). Together, not either alone. CONTACT IS NOT AN AXIS.\n\nWHY BOTH: the pantheon gives a STATED disagreement, the farm class a MATERIAL one. Temperament without material interest is a quarrel about nothing; material interest without temperament is a quarrel nobody will fight.\n\nWHY NOT CONTACT: interpenetration says two peoples MET, which is a precondition for a quarrel rather than a cause of one -- and w_cult already reads the shares, so counting contact inside opposition would charge the same fact twice.\n\nTHE OTHER THREE CALLS, taken on Ben's behalf and open for overturning:\n- SYMMETRIC (NR-815). Relations are a triangular matrix over cultures, not directed pairs. The directed layer already exists and does a different job: grudge records who wronged whom, at a place and a date.\n- KINSHIP IS YEARS SINCE THE COMMON ANCESTOR, not hops (NR-816). Decay without a decay constant. REQUIRES BL-873 -- the coining year is a third discarded migration fact and the measure is worthless without it.\n- FRACTURE GATES, INHERIT FOLLOWS (NR-817). No civilisation is coined across opposition above a bar; one that forms over residual opposition carries it as strain. Resolve was rejected as a forced outcome.\n\nWHERE THE BAR SITS IS A MEASUREMENT, not a judgement: set it from a sweep producing both alliance-shaped and enmity-shaped worlds, never from a number picked to make one seed look right."
   },
   {
-   "id": "BL-871",
-   "short_name": "EMPIRE_SPAN_400BCE_TO_1200",
-   "status": "complete",
-   "priority": "A",
-   "difficulty": 4,
-   "glyph": "✓",
-   "sprint": "38",
-   "written": "2026-09-09",
-   "author": "Ben (2026-09-09, elicitation); Claude (itemisation)",
-   "requires": [],
-   "parked": false,
-   "category": "Generation",
-   "title": "Split the recorded span at 400 BCE, so Empires is its own 1600 years",
-   "authority_doc": "docs/generation/CIVILISATION.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/hard_coded_world.cpp",
-    "src/ui/generation_screen.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-09, elicitation, boundary and total revised by Ben the same day): THE EMPIRES PHASE RUNS FROM 400 BCE TO 1200 CE, AND PASS 1 COVERS 3,600 YEARS.\n\nTHE ARITHMETIC, which CIVILISATION.md sec The span is 400 BCE to 1200 CE owns and every other doc takes from:\n  Culture -- the migration   2400 BCE -> 400 BCE    2,000 years\n  Empires -- this phase       400 BCE -> 1200 CE    1,600 years\n  Pass 1, total              2400 BCE -> 1200 CE    3,600 years\n\n1200 CE IS UNMOVED, so the coast to 1560, pass 2 and the 1960 epoch are untouched (BL-831). What moved is where pass 1 STARTS and where it DIVIDES. The first cut of this item said 0 CE inside an unchanged 4,000-year pass; both numbers are superseded.\n\nTHIS IS THE PIECE NEXT_SESSION.md CALLED 'the natural next piece'. Rounds Culture and Empires currently replay THE SAME RECORDED AGE and both say so on screen; generation still emits one span. This item makes the split real.\n\n400 BCE IS NOT A YEAR THE ENGINE ALREADY KNOWS, and the first cut of this item wrongly claimed the boundary was free because the sim's ancient arc ends at 0 CE. It does -- but the boundary is no longer there. Treat the split as real work: nothing in hard_coded_world.cpp or history_sim.cpp already stops at 400 BCE.\n\nTHE COAST IS CONFIRMED (Ben, 2026-09-09, resolving NR-818). COLONISATION.md ends the migration round when every habitable landmass carries some culture -- a derived year, not 400 BCE. Both rulings hold: the Culture round ends when the filling ends, and the world then COASTS to 400 BCE holding what migration left it, simulating nothing in between. Same device as 1200 -> 1560. WHAT MUST BE CHECKED ACROSS THE COAST is whatever accumulates on its own -- assimilation shares (BL-826) and grudge decay (BL-827) are the two named for the 1200 -> 1560 gap, and the same question applies here.\n\nSIXTEEN HUNDRED YEARS IS THE CONSTRAINT ON THE PHASE. The arc -- communication, then conquest or union, then a stable dark age -- must fit in it. MEASURE BEFORE TUNING: the capacity ladder was calibrated over four thousand years, and whether its rungs still turn over believably in 1,600 out of a 3,600-year pass is an open question in CIVILISATION.md sec Open questions, not a licence to adjust constants.\n\nCOST NOTE: pass 1 is 400 years SHORTER than it was, which is a small relief against the region-count risk in NR-809 and not a solution to it.\n\nRELATED READING: NR-810 (round 4 promises four thousand years and plays four hundred) is the surface symptom this boundary work should retire.\n\nDONE WHEN: the two rounds play DIFFERENT spans, neither screen still says it is replaying the same age, a world coasts cleanly from its fill year to 400 BCE with nothing reset and nothing accumulating lost, and world_determinism is unchanged.",
-   "delivered": "2026-09-09",
-   "resolution": "BUILT and merged (commits 75a06b69 empire-span-split + e5b537e6-adjacent merge). colonisation_start_year moved -4000 -> -2400 (the migration's own 2,000-year span); world_gen_config::stop_after_migration lets generation halt right after run_settlement; hard_coded_world builds a culture-keyed (not polity-keyed -- no polity exists yet at founding time) era_timelapse for round 3 to replay. Wizard wires round 3 to the new stop point and round 4 unchanged (stop_after_ancient_era). KNOWN GAP, NAMED ON SCREEN RATHER THAN HIDDEN: the Empires round still runs 400 years, not the full 1,600 CIVILISATION.md asks for -- reaching 1200 CE needs an epoch past 0 CE, and round 5 (Industrialisation) is still a placeholder. FOLDED IN: colonisation_harness C14 hardcoded a 4000-year prehistory window, stale the moment colonisation_start_year moved; now takes span_years as a parameter (matching C12/C13), harness CLI default 4000 -> 2000. Re-verified on main: world_determinism ALL PASS (0 failures), colonisation_harness (3 2000) 0 failures."
-  },
-  {
    "id": "BL-872",
    "short_name": "CENTRES_FROM_SUPPLY_AND_GOVERNANCE",
    "status": "designed",
@@ -835,27 +813,193 @@
    "design": "BEN, 2026-09-09 (elicitation notes): the sparse road network 'gives us actual population centres, DERIVED BY POSSIBLE SUPPLY AND GOVERNANCE'.\n\nTHAT GIVES region::centres A CAUSE IT CURRENTLY LACKS. Today a centre is promoted when urban_population crosses region_centre_heads (10,000) -- a threshold on demography alone, blind to whether anything can reach or rule the place. Under this item a centre stands where supply can reach it AND where a seat can govern it, so the urban map is downstream of the road map.\n\nIT IS WHAT MAKES THE SPARSE PATTERN HOLD RATHER THAN DRIFT. Centres do not appear because population crossed a threshold in isolation; they appear where a network put them, which is why the map stays legible as population grows. Without this, BL-866's sparse seats sit on a dense centre field and the two disagree.\n\nDEPENDS ON BOTH HALVES: BL-866 supplies the seat that does the governing, BL-837 supplies the reach that does the supplying. It cannot be built before either.\n\nNOT SETTLED, AND NOT TO BE GUESSED: whether governance reach and supply reach are ONE quantity or two; and whether a centre that loses its supply is razed, frozen, or demoted. Razing is the destructive reading and centres_razed already exists for the sack case -- reuse it only if the meaning really is the same.\n\nDONE WHEN: centre placement correlates with reach rather than with population alone, a region cut off from its seat stops growing centres, and a world with a poor network has visibly fewer centres than one with a good one at the same total population."
   },
   {
-   "id": "BL-873",
-   "short_name": "CULTURE_COINING_YEAR",
-   "status": "complete",
-   "priority": "A",
-   "difficulty": 2,
+   "status": "designed",
    "glyph": "✓",
-   "sprint": "38",
-   "written": "2026-09-09",
-   "author": "Claude (2026-09-09, taken on Ben's behalf under NR-816)",
-   "requires": [],
    "parked": false,
-   "category": "Generation",
-   "title": "Retain the year a culture was coined, so kinship can be measured in years",
-   "authority_doc": "docs/generation/CIVILISATION.md",
-   "files": [
-    "src/world/creeds.hpp",
-    "src/world/colonisation.cpp"
+   "sprint": "39",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the sprint 39 design session: the colonial round sets the demand, the corporations come after); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "UI",
+   "requires": [
+    "BL-816"
    ],
-   "design": "THE THIRD DISCARDED MIGRATION FACT, and the smallest of the three.\n\nBL-865 retained culture::parent and culture::origin_farm_class after CIVILISATION.md found the descent tree was being built and thrown away. The same is true of WHEN each culture was coined: the migration knows the year at every founding, and nothing keeps it.\n\nWHY IT IS NEEDED NOW: NR-816 settles kinship as YEARS SINCE THE COMMON ANCESTOR rather than tree hops, and that measure is worthless without the years. The tree runs 9-10 deep over 676 and 929 cultures, so hop count is coarse AND blind to timing -- two peoples four hops apart may have parted three thousand years ago or three hundred, and those are not the same relationship. Time is decay without a decay constant, which is the dial this layer keeps refusing.\n\nTHE SHAPE IS ALREADY ESTABLISHED. One integer on culture, written where the daughter is coined, in exactly the form BL-865 used. Ids are handed out in arrival order and a parent is always at a lower index than its daughter, so a walk toward the root strictly decreases -- the common-ancestor walk is bounded and cannot loop.\n\nBLOCKS BL-870 (culture relations). File it first because it is cheap and because the measure cannot be written without it.\n\nDONE WHEN: every culture carries its coining year, a cradle culture's year is the span's start rather than a sentinel that reads as a real date, and the years-to-common-ancestor walk is exercised by the colonisation harness.",
-   "delivered": "2026-09-09",
-   "resolution": "BUILT and merged (commit 6c67b445, integrated via merge). culture::coined_year (int64_t, sentinel INT64_MIN) added to creeds.hpp, threaded from colonisation_field::spawns through derive_daughter_culture; cradle cultures get colonisation_start_year, not a sentinel. colonisation_harness C14 extended with time-monotonicity, root-year and hop-vs-years checks: 36/0 PASS on seeds 0-2 (deepest chains 9/10/12 hops, 110/224/216 years apart -- confirming hops and years are genuinely different measures, the whole point of NR-816). Re-verified green after merge to main."
+   "id": "BL-874",
+   "short_name": "ROUND_FIVE_SIX_SPLIT",
+   "difficulty": 3,
+   "title": "Round 5 is the colonial era, a still; round 6 is the corporations - two rounds where one was planned",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/core/app.hpp",
+    "docs/ui/STARTUP.md"
+   ],
+   "design": "BEN, 2026-09-09: \"Trying to do this in one phase of generation complicates the story for the user - and if we are planning rounds to do different things in one phase, it can easily be split into separate items, and separate generation wizard steps.\"\n\nTHE SPLIT. Round 5 becomes THE COLONIAL ERA: pass 2 (1560 -> 1960) runs on arrival, and then four objects draw in order on the epoch globe - metros growing from the centres the history sacked and raised, CLAIMS ACROSS WATER BY MODE (bought and taken, coloured apart), SEA LANES, and on the left where round 4 keeps its leaderboard, a board of WHO WANTS WHAT AND WHO IS RICH. Round 6 becomes THE CORPORATIONS: firm markers with their charters and the market carve with its price field, drawn from the search's winner. BL-819 (substrate round) carried all four of the old round-5 objects; its firm-and-carve half moves to round 6 and its metros-and-reach half becomes this round.\n\nA STILL, NOT A LAPSE (Ben's call on the form). Four hundred years on a map whose borders barely move is the frozen globe STARTUP.md § The wait is the round warns against; the pass is seconds and the draw is the content.\n\nSAME IDIOM AS ROUNDS 3 AND 4: arrival runs the pass (no Run button), rerolling re-runs it and invalidates the rounds below, Begin moves to the last round. The era_seed already exists for the reroll.\n\nPLACEHOLDERS ARE LABELLED, as BL-819 already rules: metros, claims and lanes each draw from whatever is real when this lands and are marked where they are stubs. An unlabelled placeholder is a lie the next session will believe.\n\nDONE WHEN: rounds 5 and 6 exist in the built app on a LIVE click-through with their four and two objects, each placeholder visibly marked; STARTUP.md's round list and the Visibility table in GENERATION_STRATEGY.md match what renders."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "39",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the sprint 39 design session: the colonial round sets the demand, the corporations come after); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-831"
+   ],
+   "id": "BL-875",
+   "short_name": "CLAIM_BY_PURCHASE",
+   "difficulty": 4,
+   "title": "A polity may buy a province across water for trade, keeping its customs - the diplomatic claim beside the military one",
+   "authority_doc": "docs/generation/COLONIAL_ERA.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-09: \"By diplomatic, I meant something like purchasing a province for the purpose of trade, and respecting local customs. The alternative would be military claims, and war for items such as gold.\"\n\nTWO CLAIM VERBS, ONE CONTEST. The campaign verb across a sea leg is BL-832's; this item adds PURCHASE: a polity pays for a province out of the stores its seat accumulates (CIVILISATION.md § Materials are spent - the same currency, no second one) and gains ACCESS - the province's endowment becomes reachable to the buyer's network. It does not gain the people: A PURCHASED PROVINCE KEEPS ITS CULTURE SHARES. That is \"respecting local customs\" as data, and it is what makes the map readable afterwards - bought and taken differ in the shares and in the grudge ledger, and a player can point at either.\n\nTHE SCORER CHOOSES ON THE GROUND'S TERMS, never on a posture flag: rich metal behind weak defence scores the campaign; a cash-crop province under a polity with full stores scores the purchase; an empty-stored seller is cheaper to buy from.\n\nTHE GRANT. Same actor, same grain, same constraints as the 2026-08-18 nation-and-polity grant - but RAISED rather than read into the existing verbs, because a verb that creates a relationship is the shape the standing rule says to raise. Recorded in AI_OPPONENT.md § 11 on 2026-09-09.\n\nOPEN, and measured rather than chosen: what a purchase costs, and whether the seller's price rises with what its stores hold. A number picked to make one seed buy is the wrong number.\n\nDONE WHEN: purchases happen across water on a seeded sweep alongside campaigns, the sweep reports the bought/taken split per world and it is not degenerate, purchased provinces' culture shares are unmoved by the purchase, and history_sweep prints the distribution."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "39",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the sprint 39 design session: the colonial round sets the demand, the corporations come after); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-832",
+    "BL-875"
+   ],
+   "id": "BL-876",
+   "short_name": "SEA_LANES_FROM_THE_RECORD",
+   "difficulty": 3,
+   "title": "The colonial tie is a sea lane stamped from the record, read by everything that reads traversal cost",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/road_generation.cpp",
+    "src/world/logistics.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "design": "THE FINDING THAT CHANGED THE DESIGN. The earlier reading seeded the order book's preferred-seller relationships from colonial ties. MARKETS.md § Where the order book lives: the buy side is engine-only, no press and no corp_verb submits a buy order, so preferred-seller routing is dormant in play. A tie landing there would be a relationship nothing reads - not a force. Ben's call on the form (2026-09-09): the tie is a HAULAGE DISCOUNT on the metropole-colony route.\n\nTHE SHAPE IS § 4a ONE LEVEL DOWN. The colonial era RECORDS every sea leg it walked - a purchase party's crossing, a campaign's sea supply, the standing traffic between a metropole and what it holds - run-length counted like the corridors BL-768 records; a pass after it STAMPS the legs onto water tiles as a SEA LANE tier that discounts the sea-leg traversal cost in LOGISTICS.md § 1. Traffic earns the tier; a crossing made once is no lane. Purely additive and purely water. LOGISTICS.md § 4b owns it.\n\nWHAT READS IT is everything that reads tile_traversal_cost, because § 1 is one weight function: convoys (a colony's chains close through its metropole FIRST because the landed price says so), the reach-field Dijkstra, and PLACEMENT REACH (§ 3) - so a firm on one shore may legally hold a site on the other. That second effect is wider than a market preference and is intended: a tie only prices could see would be invisible to the corporate search, which reads reach cost (BL-812, phase 6 sees roads).\n\nDETERMINISM DIGEST: this changes traversal cost on every generated world that has a lane, so world_determinism's digests are re-blessed deliberately, once, with the description of what changed - and seedA/off (no prehistory) must be byte-identical, which is the control.\n\nOPEN: whether a lane decays when its traffic stops. Roads do not; the sea is not a roadbed.\n\nDONE WHEN: lanes stamp on 4 of 4 seeds where the colonial record has repeat crossings, the sea-leg cost census shows the discount on lane tiles and nowhere else, seedA/off is unmoved, and the lanes render on the planetary canvas and in round 5."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "39",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the sprint 39 design session: the colonial round sets the demand, the corporations come after); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-831"
+   ],
+   "id": "BL-877",
+   "short_name": "TASTE_FROM_HISTORY",
+   "difficulty": 3,
+   "title": "Who discovered which luxury good - the endemic demand channel's per-nation weights become a fact of the colonial era",
+   "authority_doc": "docs/generation/COLONIAL_ERA.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/nation_generation.cpp",
+    "src/world/market_clearing.cpp"
+   ],
+   "design": "BEN, 2026-09-09: the colonial round \"tells you what types of endemic resources cultures are interested in\".\n\nTHE CONSUMER ALREADY EXISTS, which is why this is a wiring item and not a new channel. inject_endemic_demand (BL-647, the Endemic trade channel; market_clearing.cpp) injects a wealth-scaled, character-flavoured want for the cash crops. Its per-nation flavour is derived from national character today. This item makes it a consequence of WHO REACHED WHAT.\n\nDISCOVERY IS A DATED EVENT WITH A PLACE. A polity discovers a good when its network first reaches a region carrying that good's source - by purchase (BL-875), by conquest (BL-832), or by supply reach from ground it holds. Recorded like a battle. The nation that inherits the discovering polity carries a weight for that good into the channel. THE COLONY GROWS IT; THE METROPOLE WANTS IT - the taste lands on the discoverer, not the ground, which is the whole reason a colonial trade exists.\n\nA NATION THAT DISCOVERED NOTHING WANTS NOTHING EXOTIC, and that falls out. It is a fact the player can read, not a penalty.\n\nNOT A DEMAND BASKET INJECTED INTO MARKET ARRAYS. The channel is the mechanism and the rule in MARKETS.md § Demand channels holds: a consumer is a mechanism, not a noun. This item moves weights only. It is owned by RESOURCES.md (§ Taste is a fact of history) and COLONIAL_ERA.md (§ Who discovered what - taste is a fact of history).\n\nOPEN: whether supply reach alone discovers, or only a claim does - reach alone makes a coastal polity discover everything on its own continent, which may be right and may make every neighbour want the same three goods. Measure on the sweep.\n\nDONE WHEN: discoveries are recorded per polity with a year and a region; the endemic channel's per-nation weights read them; a sweep shows the wanted-goods sets DIFFER between nations on most seeds; and endemic_demand_harness is green with history-derived weights."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "39",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the sprint 39 design session: the colonial round sets the demand, the corporations come after); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-831"
+   ],
+   "id": "BL-878",
+   "short_name": "WEALTH_FROM_HISTORY",
+   "difficulty": 3,
+   "title": "How wealthy a nation is - a per-polity wealth scalar over 1560-1960 that seeds the opening treasury and the endemic channel's wealth term",
+   "authority_doc": "docs/generation/COLONIAL_ERA.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/nation_generation.cpp"
+   ],
+   "design": "BEN, 2026-09-09: the colonial round tells you \"how wealthy certain nations are, and furthers the global wealth inequality for the next phase.\"\n\nTHE SHAPE IS protection_q's (BL-750): a scalar per polity computed in ONE block at the end of the span, after the loop, read by nothing inside it - so it is a DERIVED output and never a scored verb. Moved deterministically by facts the span already accumulates: furnace timing against neighbours (the axis the tariff posture reads), endemic sources reached (BL-877), provinces bought (BL-875) and spoils of provinces taken (BL-832), lanes kept open (BL-876).\n\nWHERE IT LANDS: the nation's opening treasury balance (NATIONS.md § 2 The treasury) and the wealth term the endemic channel scales its want by. Nothing else; wealth here is not a price, a market or a firm.\n\nTHE SPREAD IS THE DELIVERABLE. GENERATION_STRATEGY.md § Asymmetry is the deliverable forbids clamping any start; this is where the inequality it asks for is FURTHERED. No Gini target. history_sweep reports the distribution per seed and asserts only that it is not degenerate - a flat spread is the ONLY trigger for reweighting the terms.\n\nOPEN: the composition, term by term, and whether spoils should outweigh access. A measurement, not a judgement.\n\nDONE WHEN: every nation opens with a treasury the scalar seeded, the sweep prints the per-world spread and it is wide with real tails, and the tariff and endemic passes read the same scalar rather than re-deriving one."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "39",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the sprint 39 design session: the colonial round sets the demand, the corporations come after); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Economy",
+   "requires": [
+    "BL-812",
+    "BL-876"
+   ],
+   "id": "BL-879",
+   "short_name": "SEARCH_SEEDED_FROM_THE_NETWORK",
+   "difficulty": 5,
+   "title": "Pass 3 - the static corporate-landscape search, seeded from the strength of the prior trade network, replacing the warm start",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/world/landscape_score.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/core/app.cpp",
+    "tools/verify/landscape_score_harness.cpp"
+   ],
+   "design": "RE-AUTHORED FROM BL-770's COLD ROW (cancelled 2026-09-08 with the board clear, \"not a judgement that the work is wrong\"). Everything BL-770 settled stands and is in GENERATION_STRATEGY.md § The eight phases: a STATIC search with no clock; five scored terms (completeness, supply:demand ratio, spread scored FOR unevenness, realisation, reach quality); recipe margin as a precondition never a term; greedy refinement over FIXED rounds along three axes (rosters, placements, road tiers); deterministic argmax with an explicit tie-break, strict improvement only; one validation tick-run on the winner. Slices 1 and 2 landed - the scorer discriminates between rosters at 3.2e-01. WHAT IS NOT BUILT is the search itself: candidate generation, the rounds, the argmax, and a caller outside the harness.\n\nWHAT THIS ITEM ADDS OVER BL-770, and it is Ben's (2026-09-09): \"specific targets for corporations, based on the strength of the prior trade network.\" The SEED CANDIDATE is placed from the network - corridor traffic (BL-768), sea-lane traffic (BL-876) and junction degree per region - rather than from a placement seed alone. A junction three corridors and a lane meet at is a target; a rich province nothing reaches is not, yet. The perturbation axes are unchanged; only the starting point becomes a fact of history. COLONIAL_ERA.md § What this span hands the corporate search owns the handoff.\n\nIT RETIRES THE WARM START (BL-772's scope, cancelled the same day): the winner's firms ARE the background economy (MARKETS.md § Background corporations), and the 72 s of pre-game ticks go with it. The one validation run on the winner is the only tick the player pays for before play.\n\nROUND 6 DRAWS THE WINNER (BL-874): firm markers with their charters, the carve and its price field.\n\nDETERMINISM is the binding constraint and survived the collapse of the budget argument: a candidate is a pure function of (world, candidate seed, parameters); the winner never depends on thread count or completion order; assert same seed, different thread counts, identical winner.\n\nDONE WHEN: a full generation runs the search in place of the warm start, the winner is drawn in round 6, the seed candidate's placements provably follow the network (a census of seed-candidate sites against junction degree), the winner is identical across thread counts, and the chosen landscape's chain-completeness spread is wide rather than flat."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "39",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the sprint 39 design session: the colonial round sets the demand, the corporations come after); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "B",
+   "category": "UI",
+   "requires": [
+    "BL-879",
+    "BL-874"
+   ],
+   "id": "BL-880",
+   "short_name": "CORPORATION_SELECTION_CANVAS",
+   "difficulty": 4,
+   "title": "Begin opens a corporation selection canvas - the player picks the seat over the selected landscape, reversing the 2026-08-26 draw",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/core/app.cpp",
+    "src/core/app.hpp"
+   ],
+   "design": "BEN, 2026-09-09: \"Begin should go directly to a 'corporation selection' interactive canvas.\" And, asked whether that reverses the 2026-08-26 retirement of the selection screen: \"Yes, it's time to reverse that ruling.\" Also: \"if we do split this into multiple rounds, we will not have to worry about Begin for this sprint. Just note that we intend to build a corporation selection element.\" SO THIS ITEM IS THE NOTE - designed, priority B, NOT sprint 39's build.\n\nWHAT IT IS: an interactive canvas at Begin over the landscape round 6 selected, on which the player PICKS the corporation they run. The spawn shortlist and its weighted draw (CORPORATION_GENERATION.md § The spawn shortlist) survive as WHAT THE CANVAS OFFERS - the floor still filters, the weighting still orders - and the player chooses rather than being drawn for. That reading was taken on Ben's behalf (NR-820) and is his to overturn.\n\nTHE PREREQUISITE THAT IS NOT A DETAIL: a canvas at Begin needs a world that already exists, so the rounds must hand their WORLD forward rather than a record (NR-811, option 2). That is UI-shell work, not generation, and it is the larger half of this item.\n\nWHAT IT RETIRES, when built: the random draw as the seat mechanism; the \"no corp-selection stage\" sentence in STARTUP.md § The screen state machine.\n\nDONE WHEN: Begin opens the canvas on a live click, the offered corporations are the shortlist in its weighted order, a pick seats the player and play opens on it, and the seat is reproducible from (seed, pick) rather than from the seed alone."
   }
  ]
 }
