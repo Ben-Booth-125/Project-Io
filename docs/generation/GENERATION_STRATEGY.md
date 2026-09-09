@@ -288,7 +288,7 @@ They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds 4 and 5):
 
 | Round | Phase | The moving object |
 |---|---|---|
-| **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of the first 4000 years to 1200 CE**. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
+| **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of 0 CE → 1200 CE** (Ben, 2026-09-09) — the empire half of pass 1's four thousand years; the migration half is round 3's. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
 | **5** | **6 — The economic substrate** | Four, in order: **metros growing** from the population centres, **colonial reach across water**, **firm markers and their charters**, and the **market carve with its price field**. |
 
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like

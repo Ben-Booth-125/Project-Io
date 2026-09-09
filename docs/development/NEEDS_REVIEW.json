@@ -247,6 +247,89 @@
     "src/world/history_sim.cpp"
    ],
    "resolution": "PARTLY RESOLVED 2026-09-09. Ben, on call (3): 'Go with permit rather than cause for now. This is really work for sprint 38.'\n\nSO OPPOSITION PERMITS CONQUEST RATHER THAN CAUSING IT: relations feed the existing w_cult weight rather than raising a score of their own. One scorer, measurable against the sweep already in place, and raisable to CAUSE later if the histories come out flat -- whereas a second scorer would be hard to remove once other things read it.\n\nCALLS (1), (2) and (4) REMAIN OPEN and are sprint 38's, along with the build itself (BL-870). They were deliberately not answered here: (3) was the one that decides the size of the others, and answering it first is what makes them cheap.\n\nWHAT LANDED IN SPRINT 37 INSTEAD is the substrate the whole question rests on: BL-865 retains the migration's family tree, and it turns out to have real depth -- deepest descent 9 and 10 on seeds 0 and 1, across 676 and 929 cultures, every one of which walks back to a cradle. Kinship distance therefore carries actual signal rather than being flat, which is what a similarity measure needs to be worth reading."
+  },
+  {
+   "id": "NR-815",
+   "title": "Culture opposition is SYMMETRIC, so relations are a matrix and not directed pairs",
+   "raised": "2026-09-09",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "The Empires design pass; the elicitation form settled the two opposition AXES but not the shape of the relation.",
+   "what": "Opposition between two cultures is symmetric: a triangular matrix over cultures rather than a directed table. The directed layer is left to `grudge`, which already records who wronged whom at a place and a date.",
+   "why_it_matters": "It decides the data shape before anything reads it, and a directed table is hard to make symmetric later once consumers assume asymmetry. It also keeps two questions apart - `are we opposed` and `what did you do to me` - which would blur into one quantity if opposition were directed too.",
+   "options": [
+    "Symmetric matrix, grudges stay directed (TAKEN)",
+    "Directed, mirroring the grudge table",
+    "Symmetric with a directed override"
+   ],
+   "recommendation": "Symmetric. Ben's own phrasing is 'cultures have similarities, and sometimes directly opposing views' - a view held in opposition is held by both sides. Overturn this if a one-sided resentment should be expressible WITHOUT an event behind it; today every such case has a grudge.",
+   "files": [
+    "docs/generation/CIVILISATION.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-816",
+   "title": "Kinship is measured in YEARS since the common ancestor, not in tree hops",
+   "raised": "2026-09-09",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "The Empires design pass; the form did not carry this call, and CIVILISATION.md left it open as 'does kinship decay'.",
+   "what": "Similarity between two cultures is the time since their most recent common ancestor, not the number of hops between them in the descent tree. This needs one new retained field - the year a culture was coined - in the same shape BL-865 (culture descent retained) used for `parent`.",
+   "why_it_matters": "It answers the open 'does kinship decay' call without introducing a decay constant, which is the kind of dial this layer keeps refusing. Hop count is also coarse and blind to timing: the tree runs 9-10 deep over 676 and 929 cultures, so two peoples four hops apart may have parted three thousand years ago or three hundred, and those are not the same relationship.",
+   "options": [
+    "Years since the common ancestor (TAKEN)",
+    "Hop count alone",
+    "Hop count with an authored decay constant"
+   ],
+   "recommendation": "Years. It costs one integer per culture that the migration already knows, and it makes the measure a fact about the world's history rather than a number assigned to it. The cost is that the coining year must be RETAINED - a third discarded migration fact, alongside parentage and origin farm class.",
+   "files": [
+    "docs/generation/CIVILISATION.md",
+    "src/world/creeds.hpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-817",
+   "title": "A civilisation cannot form across opposition above a bar, and inherits what is left as strain",
+   "raised": "2026-09-09",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "The Empires design pass; CIVILISATION.md asked whether a civilisation resolves, inherits or fractures over opposed member cultures.",
+   "what": "Two of the three candidates apply at different moments. FRACTURE is the formation rule - peoples too opposed do not produce a shared answer about how to live, so no civilisation is coined there. INHERIT is the consequence - one that does form over residual opposition carries it as internal strain. RESOLVE is rejected.",
+   "why_it_matters": "Resolve would make a civilisation a peacemaker that flattens the world at exactly the scale the design wants asymmetry, which is a forced outcome. Inherit alone gives no reason for a civilisation NOT to form everywhere, so the map would carry one over every mixed region. The pair gives both a gate and a consequence.",
+   "options": [
+    "Fracture as the gate, inherit as the consequence (TAKEN)",
+    "Inherit only",
+    "Resolve - belonging softens opposition"
+   ],
+   "recommendation": "Keep the pair. The open half is WHERE THE BAR SITS, and that is a measurement rather than a judgement: set it from a sweep producing both alliance-shaped and enmity-shaped worlds, never from a number picked to make one seed look right.",
+   "files": [
+    "docs/generation/CIVILISATION.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-818",
+   "title": "Does the Culture round COAST to 0 CE, or does its terminating condition become 0 CE?",
+   "raised": "2026-09-09",
+   "kind": "question",
+   "status": "open",
+   "source": "Your elicitation answer on the span boundary: 'Run this from 0 CE to 1200 CE'. It names the Empires start and does not say what happens to the migration's own ending.",
+   "what": "Two readings. (A) THE COAST, adopted: the Culture round still ends when every habitable landmass carries some culture - a derived year - and the world then holds what migration left it until 0 CE, simulating nothing in between. (B) THE CLAMP: the Culture round's terminating condition simply becomes 0 CE.",
+   "why_it_matters": "COLONISATION.md settled the derived terminating condition on 2026-09-09, overturning a stated-year ruling made earlier the same day. Reading B would overturn it a second time within the day; reading A keeps both your rulings true at once. It also changes a written line in two authority docs, which is why it is raised rather than assumed.",
+   "options": [
+    "A - coast to 0 CE, derived ending preserved (ADOPTED)",
+    "B - the migration's terminating condition becomes 0 CE",
+    "C - derived ending, and the Empires start floats with it"
+   ],
+   "recommendation": "A, on the grounds that it is the only reading under which neither of your two rulings has to be discarded, and because the design already uses exactly this device across 1200 -> 1560. The consequence to accept is that a world filling early sits still for a while - which is what a dark age looks like, and it is cheap. Overturn to B if you want the migration span itself bounded.",
+   "files": [
+    "docs/generation/CIVILISATION.md",
+    "docs/generation/COLONISATION.md",
+    "docs/ui/STARTUP.md"
+   ],
+   "resolution": null
   }
  ]
 }

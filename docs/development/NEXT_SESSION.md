@@ -22,8 +22,30 @@ own pass on arrival — there is no Run button, because arriving is the instruct
 the history without disturbing the planetology above it (`world_params::era_seed`).
 
 Rounds **Culture** and **Empires** still replay the **same recorded age**, and both say so on
-screen. The rounds are split; generation still emits one span. Splitting it is **BL-861**'s
-neighbourhood and is the natural next piece.
+screen. The rounds are split; generation still emits one span. **Splitting it is now
+BL-871 (empire span 0 to 1200), filed 2026-09-09 with the boundary settled at 0 CE.**
+
+## The Empires design pass closed 2026-09-09
+
+Six calls settled by elicitation, written into `docs/generation/CIVILISATION.md`:
+**span 0 CE → 1200 CE** · **a settlement is a seat flag on a region**, hinterland by pointer ·
+**stores sit at the seat and fall with it** · opposition from **pantheon temperament + origin farm
+class**, not contact · **a civilisation is a named record** with an ethic · **reach GATES a
+campaign** rather than pricing it.
+
+Ben's outcome brief is the frame for all of it: a **sparse road network** connecting city states,
+forming empires, giving population centres *derived by possible supply and governance* — then
+empires that persist, expand reach, and **collapse into smaller nations ready for an industrial
+boom**. That last clause makes non-hegemony an input requirement for pass 2, not just a
+watchability one (BL-823).
+
+New items: **BL-871** (empire span), **BL-872** (centres from supply and governance), **BL-873**
+(culture coining year — small, and it blocks BL-870). Amended: **BL-837** (reach gates),
+**BL-823** (the ending), BL-866, BL-867, BL-869, BL-870.
+
+**One call is still Ben's: NR-818** — does the Culture round *coast* to 0 CE, or does its
+terminating condition *become* 0 CE? The coast is adopted because it is the only reading that
+keeps both of his 2026-09-09 rulings true; it changes a line in three docs if overturned.
 
 ---
 

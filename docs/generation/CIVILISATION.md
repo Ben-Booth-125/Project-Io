@@ -29,6 +29,36 @@ assumption that whatever happens to be in memory will do.
 
 ---
 
+## The span is 0 CE to 1200 CE
+
+**SETTLED (Ben, 2026-09-09, elicitation): this phase runs from 0 CE to 1200 CE.**
+
+Pass 1's calendar is unchanged — four thousand years, ending at 1200 CE
+(`GENERATION_STRATEGY.md` § Pass 2 is the economy pass, 1560 → 1960). What is stated now is the
+boundary
+*inside* it. Migration owns the years up to **0 CE**; this phase owns the twelve hundred after.
+The boundary falls on a year the engine already knows: 0 CE is where the sim's own ancient arc
+ends.
+
+**COLONISATION's derived terminating condition survives, and a COAST reconciles the two.** That
+document ends the migration round when every habitable landmass carries some culture, which is a
+derived year and not 0 CE. Both hold. The Culture round ends when the filling ends, and the world
+then **coasts** to 0 CE holding what migration left it — the same device the design already uses
+for 1200 → 1560, where a span whose defining property is that little changes is not worth
+simulating.
+
+**A migration unfinished at 0 CE is a defect in the migration, not in this boundary.** Unsettled
+ground is the exception marking hostile country (`../ui/STARTUP.md`
+§ Rounds — System, Life, Culture, Empires, Industrialisation), so a world still
+filling after the whole migration span has a colonisation problem to fix rather than a boundary to
+move.
+
+**Twelve hundred years, not four thousand, is a real constraint on everything below.** The arc —
+communication, then conquest or union, then a stable dark age — has to fit in it, and a mechanism
+that needs millennia to show an effect does not belong in this phase.
+
+---
+
 ## The unit is the city state, and settlements are sparse
 
 **Ben, 2026-09-09: population centres become settlements, and settlements are SPARSE.**
@@ -46,6 +76,21 @@ changes hands when its seat does.
 **A city state is therefore a settlement plus the hinterland that feeds it**, and an empire is a
 city state that holds other settlements. That is the whole political ladder for this phase, and
 it needs no new actor type — the sim's `polity` already is one.
+
+**SETTLED (Ben, 2026-09-09, elicitation): a settlement is a SEAT FLAG ON A REGION, and every
+region points at the seat it feeds.** No new table and no new id space. The region already carries
+everything a seat needs to be worth taking — population, `manpower_stock`, `army_stock`, the four
+endowment windows and the urban record — so a separate settlement record would hold pointers back
+to a region for every field that matters.
+
+**The hinterland is therefore a pointer, and that is what makes it change hands with its seat.**
+Ground is not conquered region by region; taking the seat takes what points at it. A region whose
+seat is gone is either re-pointed at the conqueror's seat or falls outside anyone's reach, which
+is how an empire's edge becomes ragged without any rule drawing a ragged edge.
+
+**`region::centres` is not retired by this and is not the same question.** Centres are how many
+urban places stand on a region; the seat flag is which region a city state is governed from. A
+seat with no centre is a poor capital, and that is a legitimate world.
 
 ---
 
@@ -71,6 +116,69 @@ thing at a time.
 
 **It is an in-world force with a visible cause**, which is the standing requirement for any brake
 in this project — never a term inside an agent's head.
+
+**SETTLED (Ben, 2026-09-09, elicitation): the stores sit AT THE SEAT, and fall with it.** Not one
+treasury per polity, and not a heap on every region. A seat holds what its hinterland produced,
+and a conqueror who takes the seat takes the stores standing in it.
+
+**That is what closes the loop between conquest and materials**, and it is why the seat had to
+exist before this section could be settled. A war that ends by taking a city ends by taking that
+city's capacity to fight the next one, so a losing polity gets materially poorer rather than
+merely smaller — the same shape `polity::cohesion_q` gives defeat, expressed in stock rather than
+in morale.
+
+**The labour split stays on the GROUND, because that is where the people are.** Subsistence,
+industry and muster divide per region, out of a region's own population; what industry makes flows
+to the seat. So the equilibrium Ben describes — a high-population province reserving people for
+work — is a property of ground, while the thing conquest captures is a property of the seat. The
+two are different questions and they get different homes.
+
+---
+
+## The road is the empire's skeleton, and reach GATES conquest
+
+**Ben, 2026-09-09 (elicitation notes): the point of this phase is a SPARSE ROAD NETWORK which
+connects city states, forms empires, and gives actual population centres, derived by possible
+supply and governance.**
+
+That sentence names the phase's output. Not a border map and not a battle count — a **network**,
+whose nodes are seats and whose edges are roads, and whose extent is the reason an empire is the
+size it is.
+
+**SETTLED (Ben, 2026-09-09, elicitation): reach GATES a campaign; it does not merely price it.**
+Beyond sustainable reach a campaign is not an expensive option, it is not an option. The
+alternative — pricing overreach so a polity may overextend and then collapse — was the
+recommendation and was declined, and the declined version is worth recording because it explains
+what the ruling buys.
+
+**Gating makes the road the mechanism instead of the flavour.** If reach only priced a campaign, a
+rich polity could buy its way past geography and roads would be a discount. Gated, the only way to
+reach further is to **build further**, so an empire's shape is the shape of what it built, and
+`BL-837 (ancient logistics and roads)` stops being a modifier and becomes the phase's spine.
+
+**It is also the shape the sim already uses.** Gating rather than pricing is what
+`MILITARY_HISTORY.md` § Forage — the simplification, and what it is a simplification OF already
+does: a force forages where it is adjacent to water or to land its own polity owns, and starves
+where it is not. Reach-gating is that rule generalised off the coast and onto the road, not a new
+kind of constraint.
+
+**And it is a brake with a visible cause**, which is the standing requirement. An empire stops
+growing at the end of its roads, on the map, for a reason a player can point at — never because a
+term inside a scorer grew with its rank.
+
+### Centres are derived by supply and governance
+
+**A population centre is not a demographic accident in this phase; it is what the network can feed
+and rule.** Ben's phrasing is exact — *derived by possible supply and governance* — and it gives
+`region::centres` a cause it currently lacks: a centre stands where supply can reach it and where
+a seat can govern it, so the urban map is downstream of the road map.
+
+**This is what makes the sparse settlement pattern hold rather than drift.** Centres do not appear
+because population crossed a threshold in isolation; they appear where a network put them, which
+is why the map stays legible as the population grows.
+
+**What is NOT settled:** whether governance reach and supply reach are one quantity or two, and
+whether a centre that loses its supply is razed, frozen, or demoted.
 
 ---
 
@@ -117,10 +225,25 @@ is why they cannot be generated at a cradle: there is nothing yet to mix.
 assimilation machinery already moves it when ground changes hands. A region carrying two peoples
 in quantity, for a long time, is precisely the condition a civilisation should arise from.
 
-**What is NOT settled** and should not be guessed at build time: whether a civilisation is a
-named record like a culture, a set of axes over the cultures that compose it, or a lens on the
-existing shares. What it means for a polity to *belong* to one. Whether a civilisation can
-outlive the polities that formed it.
+**SETTLED (Ben, 2026-09-09, elicitation): a civilisation is a NAMED RECORD, like a culture, with
+member cultures and an ethic.** Not a set of axes over the cultures that compose it, and not a
+lens on the existing shares. It is a thing with a name, and it can be pointed at.
+
+**A record is what lets a civilisation OUTLIVE the polities that formed it**, which is the
+property the other two candidates cannot supply. A lens dies the moment the shares beneath it
+move, so a civilisation would evaporate at exactly the moment the design most wants it — after the
+empire that raised it has fragmented. A record persists, and the fragments inherit it.
+
+**Its name is coined from the tongues that mixed, never from a bank of its own.** The naming
+substrate exists (`../lore/CREEDS.md`, `world/tongue.hpp`) and the standing rule holds without
+exception: generated names are sci-fi, never drawn from an Earth list.
+
+**The ETHIC is the field that makes it not-a-creed.** A creed answers *which gods there are*; the
+ethic answers *how one ought to live*. It is second-order by construction — derived from what the
+member cultures disagreed about and settled, so it can only exist where mixing happened.
+
+**What is NOT settled:** what an ethic is as data, and what it means for a polity to *belong* to a
+civilisation as opposed to merely standing on ground that carries one.
 
 ---
 
@@ -153,6 +276,20 @@ Kinship alone gives *distant* and not *opposed*, and those are different. Two pe
 sides of a continent who have never met are distant and have no quarrel. Two who share a frontier
 and disagree about how to live have one.
 
+**SETTLED (Ben, 2026-09-09, elicitation): opposition is supplied by the PANTHEON'S TEMPERAMENT
+and the ORIGIN FARM CLASS, together. Contact is not an axis of opposition.**
+
+**Two axes, and they disagree about different things.** The pantheon gives a *stated*
+disagreement — a people whose war god relishes battle and expects to prevail sits opposite one
+whose does neither. The farm class gives a *material* one — a people of the floodplain and a
+people of the highlands want different ground and live differently. Neither alone is enough:
+temperament without material interest is a quarrel about nothing, and material interest without
+temperament is a quarrel nobody is willing to fight.
+
+**Contact was considered and left out on purpose.** Interpenetration says two peoples MET, which
+is a precondition for a quarrel rather than a cause of one — and `w_cult` already reads the shares,
+so counting contact again inside opposition would charge the same fact twice.
+
 **Three candidate axes for opposition, all from quantities that already exist:**
 
 - **The pantheon's own temperament.** `culture_god` carries `zeal` and `dominion`; a people whose
@@ -165,21 +302,33 @@ and disagree about how to live have one.
   `BL-852` already reads it for fragmentation. Peoples who mix heavily are not the same as peoples
   who merely border.
 
-### The open calls
+### The calls, now settled
 
-None of these should be answered at build time:
-
-1. **Is opposition symmetric?** A grudge is directed (`grudge` is a directed table); a
-   disagreement about how to live may not be. Whichever is chosen decides whether relations are a
-   matrix or a set of pairs.
-2. **Does kinship decay, or is the tree enough?** Two peoples five generations apart may be as
-   foreign as two unrelated ones, or kinship may hold indefinitely.
-3. **SETTLED (Ben, 2026-09-09): opposition PERMITS conquest, it does not cause it.** Relations
-   feed the existing `w_cult` weight rather than raising a score of their own. One scorer,
-   measurable against the sweep already in place, and raisable to *cause* later if the histories
-   come out flat — whereas a second scorer is hard to remove once other things read it.
-4. **How does a civilisation relate to the cultures inside it?** If two opposed peoples end up in
-   one civilisation, does the civilisation resolve the opposition, inherit it, or fracture?
+1. **OPPOSITION IS SYMMETRIC** (Claude, 2026-09-09, taken on Ben's behalf; NR-815). Two peoples
+   disagree about how to live, and a disagreement has two sides. Relations are therefore a
+   triangular matrix over cultures, not a set of directed pairs. **The directed layer already
+   exists and is doing a different job**: `grudge` records who wronged whom, at a place and a
+   date. Two layers, two questions — one asks *are we opposed*, the other *what did you do to me*.
+2. **KINSHIP IS MEASURED IN YEARS SINCE THE COMMON ANCESTOR, not in hops** (Claude, 2026-09-09,
+   taken on Ben's behalf; NR-816). The tree runs 9–10 deep over 676 and 929 cultures, so a hop
+   count is coarse, and it is blind to the thing that actually matters — two peoples four hops
+   apart who parted three thousand years ago are not the cousins of two who parted three hundred
+   years ago. **Time is decay without a decay constant**, and it is earned by the migration rather
+   than assigned: it needs one retained field, the year a culture was coined, in exactly the shape
+   `BL-865 (culture descent retained)` used for `parent`.
+3. **OPPOSITION PERMITS CONQUEST, IT DOES NOT CAUSE IT** (Ben, 2026-09-09). Relations feed the
+   existing `w_cult` weight rather than raising a score of their own. One scorer, measurable
+   against the sweep already in place, and raisable to *cause* later if the histories come out
+   flat — whereas a second scorer is hard to remove once other things read it.
+4. **A CIVILISATION CANNOT FORM ACROSS AN OPPOSITION ABOVE A BAR, AND INHERITS WHAT IS LEFT AS
+   STRAIN** (Claude, 2026-09-09, taken on Ben's behalf; NR-817). The three candidates were
+   *resolve*, *inherit* and *fracture*, and the answer uses two of them at different moments.
+   **Fracture is the formation rule**: peoples too opposed to agree on how to live do not produce
+   a shared answer about it, so no civilisation is coined there. **Inheritance is the
+   consequence**: where one does form over residual opposition, it carries that opposition as
+   internal strain rather than dissolving it. Resolve was rejected outright — a civilisation that
+   makes its members agree is a forced outcome, and it would flatten the world at exactly the
+   scale the design wants asymmetry.
 
 ---
 
@@ -200,23 +349,68 @@ survived.
 | Region endowment (farm / ore / energy / port) | `region` | **carried** |
 | **Culture PARENTAGE — the family tree** | `colonisation_field::spawns` | **DISCARDED — the gap** |
 | **The farm class a culture was coined on** | `front_entry::origin_class` | **DISCARDED** |
-| Settlement seats, once centres are sparse | `region::centres` (dense today) | **owed, § The unit is the city state** |
-| Material stores per polity | — | **owed, § Materials are spent** |
+| **The year a culture was coined** — the kinship clock | `front_entry` / arrival order | **DISCARDED** |
+| Settlement seats and hinterland pointers | `region::centres` (dense today) | **owed, § The unit is the city state** |
+| Material stores at the seat | — | **owed, § Materials are spent** |
 
-**Two of those are discarded facts the migration already computed**, and both are cheap to
-retain. Everything else is either carried today or is honest new work for sprint 38.
+**Three of those are discarded facts the migration already computed**, and all three are cheap to
+retain — parentage, origin farm class, and now the coining year that § The calls makes the kinship
+measure. Everything else is either carried today or is honest new work.
+
+**The coining year is the newest of the three and it is owed by a ruling, not by an oversight.**
+Kinship in years is worth nothing without the years.
+
+---
+
+## What this phase hands the industrial era
+
+**Ben, 2026-09-09 (elicitation notes): this phase feeds directly into the industrial era sim,
+where resources are seen as CAPITAL — so it matters specifically how larger empires persist,
+expand their reach, and then collapse into smaller nations ready for an industrial boom.**
+
+**That names the arc's ENDING as a deliverable, and the ending is FRAGMENTATION.** Pass 2 is an
+economy pass over nations (`GENERATION_STRATEGY.md` § Pass 2 is the economy pass, 1560 → 1960),
+and nations are
+what an empire leaves behind when it stops being able to hold itself. So *a stable dark age* is
+not merely where the arc runs out — it is the state in which the industrial era finds its actors.
+
+**A world that ends pass 1 as one hegemon has failed this handoff**, however plausible its
+numbers, and so has a world that never assembled anything larger than a city state. Both ends of
+that range produce an industrial era with nothing to industrialise against. This is the same
+non-hegemony constraint the anti-hegemon levers serve (`BL-823 (anti-hegemon levers)`), read from
+the far end: it is not only that a hegemon is dull to watch, it is that the next pass has no input.
+
+**Reach-gating is what makes the collapse mechanical rather than scripted.** An empire persists
+while its network holds and fragments when it does not, so the number of nations at 1200 CE is a
+consequence of what got built and what stopped being maintainable — never a target count, and
+never a collapse event fired at a date.
+
+**RESOURCES BECOME CAPITAL IN PASS 2, NOT HERE.** This phase abstracts natural resources into what
+conquest consumes; the reading of ground as capital belongs to the economy pass and must not leak
+backwards into a phase that has no price
+(`../economy/MARKETS.md`, and § Materials are spent when something happens).
 
 ---
 
 ## Open questions
 
-- **Everything in § Culture relations — the design aside.** Four calls, none of them work.
-- **What a settlement IS**, once centres are sparse: a threshold on the existing urban record, a
-  separate record, or a promotion of certain regions.
-- **Whether materials are per polity or per province.** Ben's phrasing — *a high population
-  province must reserve population for work in industry* — reads as per province, which makes
-  the labour split a property of ground rather than of a realm.
-- **What a civilisation is as a record**, per § A civilisation is what mixing makes.
-- **Whether logistics reach bounds conquest in this phase.** `BL-837` (ancient logistics and
-  roads) is open and is where "expanding ancient logistics networks" lands; whether reach *gates*
-  a campaign or merely prices it is unsettled.
+The six calls this section used to carry were settled on 2026-09-09 and now live in the sections
+that own them — the span, the seat, the stores, the two opposition axes, the civilisation record
+and reach-gating. What is left is genuinely downstream of those.
+
+- **Does the Culture round COAST to 0 CE, or does its terminating condition become 0 CE?**
+  § The span adopts the coast, because it preserves COLONISATION's derived condition alongside the
+  stated boundary — but the ruling named a start year and not a coast, so this reading is Claude's
+  (NR-818) and it is the one call here that changes another document.
+- **What an ETHIC is as data**, and what it means for a polity to *belong* to a civilisation
+  rather than merely stand on ground carrying one (§ A civilisation is what mixing makes).
+- **Are governance reach and supply reach one quantity or two**, and is a centre that loses its
+  supply razed, frozen or demoted (§ Centres are derived by supply and governance)?
+- **Where the opposition BAR sits** — the threshold above which no civilisation is coined. A
+  measurement, not a judgement: it should be set from a sweep that produces both alliance-shaped
+  and enmity-shaped worlds, never from a number picked to make one seed look right.
+- **Whether a seat can be FOUNDED mid-span**, or whether the set is fixed at 0 CE. An empire that
+  can raise a new city has a second growth mode; one that cannot has a fixed board.
+- **How the twelve-hundred-year span interacts with the capacity ladder.** The ladder was
+  calibrated over four thousand years, and § The span now gives this phase 1,200 — whether the
+  rungs still turn over at a believable rate is a measurement owed before any of them are tuned.
