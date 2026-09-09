@@ -10,6 +10,107 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-09 (sprint 37) — The world stops opening already full
+
+**Mode:** Batch delivery in three waves, on a design pass that had closed the same morning.
+**Runtime:** one long session; 3 sub-agents in worktrees; all lanes merged, built and verified in the main session.
+
+### What started it
+
+`docs/generation/COLONISATION.md` had landed that morning and the build objective was Ben's: a
+wizard page carrying the 2D grid-map, evidence it produces interesting cultures, and regions
+becoming provinces without aiming for a small set.
+
+The sprint's real subject turned out to be narrower and better: **the world used to open already
+full.** `run_settlement` placed and dated every region before the sim's first tick, so a time-lapse
+of the ancient era could only ever show borders moving. There was no origin to watch. Everything
+below follows from fixing that and then looking at what the fix revealed.
+
+### What landed
+
+**The migration happens on camera.** Settlement now hands the sim a *founding schedule* and the
+year loop founds each region as its year arrives. Measured at the 4,000-year span: 10 ownership
+changes at the opening frame, 523 during, across 319 distinct years. The world opens as ten cradles
+and fills.
+
+**Culture is earned rather than assigned.** `run_settlement` takes each founding's date *and*
+culture from a single multi-source flood over the tile raster. C11 is the acceptance test on real
+worlds: 23–33% of regions carry a culture a Voronoi over the map's own observed origins would not
+have given them. The RNG draw in the founding date is gone — an arrival year is a consequence of
+the ground, not a roll on top of one.
+
+**The coast became the road**, rivers cheaper still, and streams cross straits by a *crude* bounded
+hop of at most three water tiles. The bound is the specification: it crosses a strait and never an
+ocean, which is what keeps "people got everywhere" from becoming "people sailed".
+
+**Migration coins its own peoples**, derived from their parents — the tongue drifts rather than
+re-rolling, so daughters read as kin. They divide on **country** (settling a farm class they were
+not coined on) and on **size**. Distinct peoples holding ground: **12 → 38 / 56 / 33**.
+
+**The wizard walks five named rounds** — System, Life, Culture, Empires, Industrialisation — each
+pass round starting its own pass on arrival, with no Run button: arriving *is* the instruction.
+
+### The corrections that mattered more than the features
+
+**A ruling was overturned the same day it was made.** COLONISATION.md settled the span's end as a
+*stated* year and explicitly recorded the derived alternative as considered-and-rejected. A fixed
+span then left seed 0's last 1,300 years measurably static, and the terminating condition became
+derived. The replacement turned out to need no safety stop at all: "wait until nothing more is
+going to happen" is answered by a flood that finishes, so it is one field read off a walk that
+terminates, not the mechanism the item budgeted for.
+
+**Round 4 was split in two after watching it.** Fused, it showed conquest with the migration
+already finished off-screen; once migration moved inside it, it showed migration with no conquest
+at all. Two subjects, two rounds.
+
+**Half a continent of "unsettled" land was settled.** Ben's screenshot showed grey masses that
+never took a colour. The cause was arithmetic: 604 foundings against 523 ownership changes — 81
+regions founded and owned by nobody, because polities are seeded once from the cradle cultures and
+a region carrying a coined culture matched none. Seeding a polity on demand fixed it, and brought
+conquest with it (~472 ownership transfers where the span had zero).
+
+### The failure mode of the sprint, in six costumes
+
+Every one of these looked like coverage and was not:
+
+1. A synthetic route case whose two cradles were **equidistant**, so its proximity assertion was a tie.
+2. A cradle-outcome classifier that asked *how much ground* and so measured **crowding**, reporting 317 encircled / 0 sterile — a number a sweep would have tuned the barrier costs against.
+3. `stop_after_ancient_era` shipping an **empty map for 4,000 years** while its header reported 611 foundings, because `--verify` adopts the harness's own world and never takes that branch.
+4. A harness **segfault reported as exit 0**, because it was piped through `grep` and a pipeline returns the *filter's* status.
+5. A `sizeof(app)` `static_assert` whose bar was **~6× too loose** while the process died at startup with `0xC00000FD` and no output.
+6. An out-of-bounds write that **both** harness builds passed — `/O2` because it is silent there, `--debug` because that flag drops optimisation but not MSVC's `_ITERATOR_DEBUG_LEVEL`. Only the app's real Debug build caught it.
+
+The standing lesson, adopted mid-session: **run verification to a file and read the exit code**, and
+never let a pipeline's status stand in for a program's.
+
+### What actually found the defects
+
+Driving the built app. The empty map, the fused round and the grey continents were all found by
+opening the game and looking, and every one of them sat behind green harnesses. The live-click rule
+earned its place three times in one day.
+
+### Two diagnoses I got wrong
+
+**BL-862** said coined cultures never win a region anchor. They win 81 of them — the measurement
+behind the claim was taken at the 400-year span, where the founding schedule is *empty*, so it never
+tested the case that mattered.
+
+**The Begin crash** I reasoned was pre-existing (three worlds in Debug, likely `bad_alloc`) and gave
+better-than-even odds. One bisect refuted it flatly. The cause was my own change breaking an
+invariant a *comment* was holding — *"sized to the polity table, which the sim never grows"* — true
+when written, false the moment a polity could be born mid-run. The comment is rewritten to what is
+now true rather than deleted.
+
+### Left open
+
+- **The roads pass crashes the full generation pipeline** (Ben, known) — the autostart never reaches in-game.
+- The scoreboard normalises **Land%** over *claimed* land, understating how empty the world is.
+- The **drawdown lean** is editable nowhere until the Industrialisation round is built.
+- **~95% of coined cultures never hold ground** — bounded and harmless, but most are ephemeral.
+- Regions are **~3× where the day started** (609 → 1,906), which lands on the watched wait and on Begin; NR-809 measured reach as roughly quadratic in region count, and BL-844 is already spent, so the cap is the **adjacency model** (BL-855).
+
+---
+
 ## 2026-09-08/09 (sprint 35) — Generation gets two more rounds, and the measurements refute nearly everything
 
 **Mode:** Design → Batch delivery in waves → paused mid-sprint on Ben's call → review barrier and close.

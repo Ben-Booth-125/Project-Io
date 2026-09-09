@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**52 surfaces** — 6 settled, 46 awaiting Ben's wording.
+**54 surfaces** — 8 settled, 46 awaiting Ben's wording.
 
 ---
 
@@ -382,21 +382,21 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 *Demanded by BL-785 · `src/ui/selection_panel.cpp` · id `water_tile_selection`*
 
-### New World wizard - round 4, The History
+### New World wizard - round 5, The History
 
-**Answers:** Who claimed this ground, and who lost it, over four thousand years?
+**Answers:** Who claimed this ground, and who lost it, in the age before the epoch?
 
-**Because:** The wizard's first three rounds settle what the world IS; round 4 settles who was on it. The frontier is the round's whole subject, so it earns a page rather than a line in a report the player reads after generation. Currently an honest labelled placeholder: the round exists in the wizard's chrome, the pass it will run does not.
+**Because:** Origin belongs to round 4; this round is the rest of the arc - communication, then conquest or diplomatic union, then a stable dark age - over the 4000 years ending at 1200 CE. It earns a page of its own rather than a section of round 4's because it has its own span, its own rules and its own reroll: a history you cannot reject is a history you were assigned, and rejecting it must not re-draw the migration above it (world_params::era_seed exists for exactly that). Its chart surface is the leaderboard, which moves with the map. WHAT IT DOES NOT YET CLAIM: generation still emits ONE recorded age, so this round replays the same record round 4 does, and it says so on screen rather than implying a separation the code has not made - the generation-side split is BL-858/BL-861.
 
-*Demanded by BL-816, BL-829 · `src/ui/startup_screens.cpp` · id `wizard_round_history`*
+*Demanded by BL-816, BL-829, BL-860 · `src/ui/startup_screens.cpp`, `src/ui/history_lapse.cpp`, `src/core/app.hpp` · id `wizard_round_history`*
 
-### New World wizard - round 5, The Substrate
+### New World wizard - round 6, The Substrate
 
 **Answers:** What does that ground produce, and who trades it?
 
-**Because:** Round 4 settles who holds what ground; what that ground produces is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Currently an honest labelled placeholder.
+**Because:** Rounds 4 and 5 settle who reached this ground and who then held it; what that ground PRODUCES is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Currently an honest labelled placeholder.
 
-*Demanded by BL-816, BL-819, BL-824 · `src/ui/startup_screens.cpp` · id `wizard_round_substrate`*
+*Demanded by BL-816, BL-819, BL-824, BL-860 · `src/ui/startup_screens.cpp` · id `wizard_round_substrate`*
 
 ---
 
@@ -449,4 +449,20 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 **Because:** Comparison is impossible when every selection replaces the last. The card frame is what makes drill-through (BL-214) a shared idiom rather than a per-panel behaviour. Pairs existed here before BL-247's log was removed.
 
 *Demanded by BL-196, BL-213, BL-214 · `src/ui/selection_card.cpp` · id `selection_card`*
+
+### New World wizard - the lapse rounds' top-sixteen board
+
+**Answers:** Which powers are rising and which are falling as the centuries pass?
+
+**Because:** Ordered and capped is the design, not a display convenience: sixteen rows re-ranking is the surface that shows RISE AND FALL, and an uncapped list of everything would show none of it. It orders by SHARE OF LAND - the honest default for rounds about ground, and the one metric the ownership record alone can answer. Rows are POLITIES, not settlements, because a settlement cannot rise and fall against a rival. Drawn on BOTH lapse rounds (4 and 5) from that round's own record, rather than once on a fused round. Population and military columns are owed on BL-817's sample series; a RESEARCH column is refused outright, because research points accrue from population under BL-822 and the column would show a correlation it never measured - on the board Ben is judging the research levers with.
+
+*Demanded by BL-830, BL-860 · `src/ui/history_lapse.cpp` · id `wizard_round_history_board`*
+
+### New World wizard - round 4, The Migration
+
+**Answers:** Who reached this ground first, and by which routes?
+
+**Because:** THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09). One round covering both the peopling of the world and the empires that followed was tried and failed twice: it drew conquest with the migration already finished off-screen, and then - once the migration was moved inside it - migration with no conquest at all and a static final third. The peopling of an empty world and the contest over it have different subjects, different rules and different terminating conditions, so they are two rounds. This one is the diffusion: where people started, the routes they took, and the cultures those routes produced, ending when all land has some culture rather than at a calendar year. It keeps the 2D map, because a globe shows a world and a map shows a FRONTIER (Ben, 2026-09-08, at the live app), and it keeps the inverted model - the pass cannot be previewed per keystroke, so arriving on the round runs it and the wait IS the content.
+
+*Demanded by BL-816, BL-829, BL-860 · `src/ui/startup_screens.cpp`, `src/ui/history_lapse.cpp` · id `wizard_round_migration`*
 

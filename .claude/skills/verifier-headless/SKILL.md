@@ -674,6 +674,31 @@ in `tools/verify/README.md`.
   silently measures the old economy. S4 asserts the census is identical across two generations of one
   seed; S0–S3 report and assert nothing about the finding.
 
+- **`colonisation_harness`** — the colonisation span's mechanisms (BL-846/847/848/850, sprint 37).
+  Takes an optional seed count (`colonisation_harness 3`), default 3.
+
+  **It asserts SHAPE and never a magnitude**, because `COLONISATION.md` puts every magnitude in
+  this layer — the boundary year, the predation coefficient, the tiles-per-year rate — in
+  `history_sweep`'s hands and explicitly not in a harness's. Nine cases: the walk is deterministic
+  (C1); nothing arrives after the boundary (C2); **culture arrives by ROUTE and the god map is not
+  reproducible by a Voronoi of cradles** (C3, the one this file exists for); ground no package suits
+  is crossed but never farmable (C4); breadth spreads rather than clustering (C5); crossing is a
+  floored union (C6); predation decays logarithmically and never reaches zero (C7); a sack re-wilds
+  the ground (C8); the field's size is bounded and stated (C9).
+
+  **C2–C4 and C6–C8 run on SYNTHETIC maps, deliberately.** A generated world cannot isolate "the
+  long way round by the coast beat the short way over the mountains" — it either happens to contain
+  that case or it does not, and a check that cannot aim is not a check. C3's map is one mountain
+  wall and one coastal corridor, built so the target tile is six tiles NEARER the cradle that does
+  not get it. C5 and C9 then run against real generated worlds, where a spread and a size are the
+  only things that mean anything.
+
+  **Two things it has already caught, both of which look like tuning and were not.** C7 found the
+  predation decay saturating at 1,024 heads, so across every population the game actually has it
+  was a CONSTANT wearing a decay's name — a coefficient sized without reference to the range it
+  would meet. C3a found its own map to be a wrapped-Chebyshev TIE, so the proximity half of the
+  route claim was asserting nothing while reading green.
+
 - **`history_conquest_gap`** — WHY the Era −1 sim fights and never conquers (BL-384), measured on
   **the era generation actually runs** (BL-462, 2026-08-23). Takes an optional sweep width:
   `history_conquest_gap 32`. Instruments rather than re-asserts — `history_sim_harness`'s

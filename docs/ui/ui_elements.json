@@ -1552,22 +1552,23 @@
    "source": [
     "docs/ui/STARTUP.md § New World wizard — draw_generation_screen (BL-167)"
    ],
-   "summary": "Three thematic rounds over the ten-stage Planetology chain; every control move re-runs a throwaway preview (no world state touched) resolved against named preferences, not raw parameters.",
+   "summary": "Six rounds: three thematic rounds over the ten-stage Planetology chain, then three PASS rounds (4 the migration, 5 the history, 6 the substrate). The planetology rounds re-run a throwaway preview on every control move (no world state touched) resolved against named preferences, not raw parameters; the pass rounds cannot be previewed per keystroke, so arriving on one runs its pass and the wait is the content. Only the last round commits.",
    "interesting_question": "Rounds are stated to be causal — rerolling round A re-draws rounds B and C downstream — and Back is 'a plain revision with no per-round snapshot.' Does a player who liked round B's preview lose it irrecoverably by going back to tweak round A?",
    "resolution": "Confirmed as the accepted cost, not mitigated: STARTUP.md states this plainly — 'Rounds are causal... so Back is a plain revision with no per-round snapshot' — no undo/snapshot mechanism is described.",
    "checks": [
-    "planetology_generation"
+    "planetology_generation",
+    "history_lapse_press"
    ]
   },
   {
    "id": "UI-093",
-   "name": "Wizard round (one of three)",
+   "name": "Wizard planetology round (one of three)",
    "kind": "sub-element",
    "parent": "UI-092",
    "source": [
     "docs/ui/STARTUP.md § New World wizard"
    ],
-   "summary": "Each round stacks its Planetology-stage charts + explanations, then takes that round's preference inputs; charts are shared verbatim with the History ledger's Chain view.",
+   "summary": "Each of the first three rounds stacks its Planetology-stage charts + explanations, then takes that round's preference inputs; charts are shared verbatim with the History ledger's Chain view. The three pass rounds that follow take no preference rows yet.",
    "interesting_question": "n/a — see UI-092 for the causal-rounds open question this sub-element is part of.",
    "resolution": "n/a",
    "checks": [
@@ -1862,6 +1863,53 @@
    "checks": [
     "nav_rail_fit",
     "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-118",
+   "name": "Wizard lapse-round time-lapse map (rounds 4 and 5)",
+   "kind": "sub-element",
+   "parent": "UI-092",
+   "source": [
+    "docs/ui/STARTUP.md § Rounds 4, 5 and 6"
+   ],
+   "summary": "A 2D political map in place of the globe, replaying a recorded ownership history (era_timelapse / owner_slice_at) at tile resolution with every land tile assigned to its nearest region; run-merged per row so a 261x121 raster stays inside ImGui 16-bit draw indices. Drawn by BOTH lapse rounds - round 4 The Migration and round 5 The History - each from its own record slot. Takes no mouse input, inheriting the globe rule; playback frozen under --verify.",
+   "interesting_question": "The wizard walks the two rounds the design asks for, but generation still emits ONE recorded age: rounds 4 and 5 run the same pass and replay the same span, so the migration does not yet stop where the history begins. Does a player read two rounds showing the same map as a bug?",
+   "resolution": "Open, and named on screen rather than hidden: each round's caption says it replays the same recorded age as the other and why. The generation-side split - a migration span with its own terminating condition, then a history span to 1200 CE - is BL-858/BL-861.",
+   "checks": [
+    "history_lapse",
+    "history_lapse_press"
+   ]
+  },
+  {
+   "id": "UI-119",
+   "name": "Wizard lapse-round top-sixteen board (rounds 4 and 5)",
+   "kind": "sub-element",
+   "parent": "UI-092",
+   "source": [
+    "docs/ui/STARTUP.md § Rounds 4, 5 and 6"
+   ],
+   "summary": "An ordered, capped board of the sixteen polities holding the most land at the played year, re-ranking as the time-lapse advances. Share of LAND (region areas from the same nearest-region assignment the map draws), rows named by the seat each polity first held, rank delta and entry marks measured against a slice a twelfth of the span earlier. Drawn on both lapse rounds from that round's own record. Population and military columns are owed on BL-817; a research column is refused, not deferred.",
+   "interesting_question": "Generation produces about twelve polities on the cradle, so a board of sixteen never fills and no polity is ever pushed OUT of it - which BL-830 names as the whole story of the round.",
+   "resolution": "Open, and it is a sim fact rather than a board fact: the cap is right and the population of polities is below it. Entries and exits become visible only when the era ends with more than sixteen powers.",
+   "checks": [
+    "history_lapse",
+    "history_lapse_press"
+   ]
+  },
+  {
+   "id": "UI-120",
+   "name": "Wizard pass round (one of three)",
+   "kind": "sub-element",
+   "parent": "UI-092",
+   "source": [
+    "docs/ui/STARTUP.md § Rounds 4, 5 and 6"
+   ],
+   "summary": "Rounds 4-6 invert the wizard's model: no per-keystroke preview, no Run button. The Next press that MOVES ONTO a pass round starts that round's pass, so it is already under way as the round's first frame draws; each carries its own reroll, which re-runs the pass rather than re-drawing a cached one, and advances world_params::era_seed so the same ground plays through a different age without disturbing the planetology rounds above. Rounds stay causal: a reroll invalidates every pass round below it, and a finished record survives a Back-and-forward walk rather than being discarded and re-run. Round 6 is still an honest labelled placeholder.",
+   "interesting_question": "Arriving is the instruction to run, so a player who steps Back to round 3 and forward again must not be charged the project's most expensive pass a second time - and equally, a stale record of a world they have rerolled away from must never be shown as current.",
+   "resolution": "Both are guarded rather than assumed: the arrival launch is conditioned on the arriving round holding neither a record nor a run in flight, and invalidate_wizard_rounds_below clears - or marks in-flight and drops on arrival - every lapse record below the round that moved. history_lapse_press.lua asserts both by real presses.",
+   "checks": [
+    "history_lapse_press"
    ]
   }
  ]

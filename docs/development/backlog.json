@@ -39,31 +39,6 @@
    "status": "designed",
    "glyph": "✓",
    "parked": false,
-   "sprint": "35",
-   "written": "2026-09-08",
-   "author": "Ben (2026-09-08, on the visibility form: extra wizard rounds, leans per pass); Claude (itemisation)",
-   "blocked_on": null,
-   "version_goal": null,
-   "id": "BL-817",
-   "short_name": "HISTORY_PLAYBACK_RECORD",
-   "priority": "A",
-   "difficulty": 3,
-   "category": "Generation",
-   "title": "The playback record - what pass 1 emits per step so 4000 years can be watched and handed on",
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-   "requires": [
-    "BL-816"
-   ],
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp"
-   ],
-   "design": "THE SIM ALREADY WRITES OWNERSHIP AS IT GOES. history_sim.hpp says it plainly: run_settlement leaves region::nation at -1 and the sim writes it during the loop, so by the stop year the political map IS the loop's output. What does not exist is a record of the INTERMEDIATE states - and a time-lapse is exactly a sequence of intermediate states.\n\nWHAT THIS ITEM EMITS, one entry per RECORDED step (which is coarser than a decision step, and much coarser than a year): the owner of every region, each region's culture shares (BL-826), and the population and land share per polity for the scoreboard (BL-830). Sized so the record does not rival the world - a few hundred regions by a few hundred recorded steps is small; a per-year record over 4000 years is not, and that is the trap.\n\nIT MUST NOT PERTURB THE SIM IT RECORDS. The precedent is right there in the same header: trace_battles is off by default, no decision reads a trace field, no trace field feeds a draw, and a HARNESS ASSERTS that a traced run and an untraced run agree in every other output rather than a comment claiming it. Do the same here - it is the cheapest way to keep a watchable sim and a deterministic one from becoming two different sims.\n\nDONE WHEN: a full run emits a record whose size is bounded and stated; a recorded run and an unrecorded run agree bit-for-bit on every other output, asserted by a harness; and the same seed records identically twice."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "parked": false,
    "sprint": "36",
    "written": "2026-09-08",
    "author": "Ben (2026-09-08, on the visibility form: extra wizard rounds, leans per pass); Claude (itemisation)",
@@ -213,56 +188,6 @@
    "design": "\"THE IMPORTANT PART IS THAT WE TAKE BACK SOMETHING USEFUL\" (Ben, 2026-09-08). This item is that sentence made checkable.\n\nGENERATION_STRATEGY.md already names what crosses each handoff and adds 'and nothing else'. That clause is currently a promise in prose with nothing enforcing it. Pass 1 now produces three more things - grudges, cultural mixes, and the provinces each polity holds - and a fourth pass will want a fifth thing unless the boundary is written down as a TYPE.\n\nTHE WORK: one struct that is the whole of what pass 1 hands forward, with every consumer taking it rather than reaching into the sim state. Then the doc's list and the struct's fields are the same list, and a change to either shows up as a change to the other.\n\nWHY IT IS WORTH A SEPARATE ITEM rather than a tidy-up inside BL-826: a handoff that is a struct is the difference between 'the history informed the world' and 'the history IS the world's cause'. It is also what makes pass 1 re-runnable in a wizard round without dragging the entire sim state into the UI layer.\n\nDONE WHEN: one type carries the handoff, no consumer reaches past it, and the doc's list matches its fields.",
    "resolved": "2026-09-09",
    "resolution": "PARTIALLY DELIVERED and closed as partial rather than complete, on the author's own admission. pass_one_output, make_pass_one_output and pass_one_output_valid exist and are asserted by tools/verify/pass_one_handoff.cpp (C7a-C7h, 0 failures, re-run in the main session). What is NOT done is the item's actual point: settlement_seed_polities, generate_nations and hard_coded_world still reach into settlement_state and history_sim_state directly rather than taking the struct, so \"every consumer takes it, and nothing else crosses\" is still a promise in prose. The review barrier confirmed the remainder is INCOMPLETE rather than INCONSISTENT - no consumer reads a field whose meaning changed under it - so it is safe to leave, and it is the seam BL-843 also wants (the load path skips pass_one_output_valid, which already checks what the seam does not). Re-file the rewiring with the stage 4 work."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "parked": false,
-   "sprint": "36",
-   "written": "2026-09-08",
-   "author": "Ben (2026-09-08: get the sim right first - grudges, cultural mixes, provinces owned); Claude (itemisation, against the sim as it stands)",
-   "blocked_on": null,
-   "version_goal": null,
-   "id": "BL-829",
-   "short_name": "TIMELAPSE_VIEW",
-   "priority": "A",
-   "difficulty": 4,
-   "category": "UI",
-   "title": "The time-lapse view - a 2D map in the globe pane, playing the record back",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "requires": [
-    "BL-816",
-    "BL-817"
-   ],
-   "files": [
-    "src/ui/startup_screens.cpp"
-   ],
-   "design": "SPLIT OUT OF BL-817 so the record and the view can be built and judged separately - the record is generation-layer work and the view is UI work, and bundling them would have put one agent across both layers.\n\nWHAT BEN ASKED FOR (2026-09-08, at the live app): the globe is REPLACED by a 2D MAP occupying the same pane on the right, playing back the first 4000 years. A globe shows a world; a map shows a FRONTIER, and the frontier is this round's whole subject - a border that stalls at a strait reads as a stall on a map and as foreshortening on a sphere.\n\nWHAT IT DRAWS: polity colour per region from the BL-817 record, advanced through recorded steps. Culture mixes are available (BL-826) and are NOT drawn by default - two overlapping colour meanings on one map is how a legible surface becomes a plaid.\n\nTRANSPORT CONTROLS ARE THE OPEN QUESTION and should be decided by watching, not in advance: whether the player can pause, scrub or replay, or whether it simply runs. The wizard's standing premise - you set conditions, you do not steer - argues for the plainer answer, and the globe's own no-input ruling is the precedent.\n\nDONE WHEN: a full span plays back in the built app on a live watch; the arc in GENERATION_STRATEGY.md § Round 4's arc is legible from the map alone without narration; and a capture exists at three points across the span."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "parked": false,
-   "sprint": "36",
-   "written": "2026-09-08",
-   "author": "Ben (2026-09-08: get the sim right first - grudges, cultural mixes, provinces owned); Claude (itemisation, against the sim as it stands)",
-   "blocked_on": null,
-   "version_goal": null,
-   "id": "BL-830",
-   "short_name": "TOP_SIXTEEN_SCOREBOARD",
-   "priority": "A",
-   "difficulty": 3,
-   "category": "UI",
-   "title": "An ordered scoreboard of the top 16, moving with the time-lapse",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "requires": [
-    "BL-817",
-    "BL-829"
-   ],
-   "files": [
-    "src/ui/startup_screens.cpp"
-   ],
-   "design": "BEN, 2026-09-08: an ORDERED scoreboard for the TOP 16 countries/settlements. It supersedes the unordered leaderboard sketch in BL-821, which is cancelled into this item.\n\nORDERED AND CAPPED IS THE DESIGN, not a display convenience. Sixteen rows re-ranking as the centuries pass is the surface that shows RISE AND FALL - a polity climbing into the board and dropping out of it is the whole story of the round, and an uncapped list of everything would show none of it.\n\nTHE METRICS ARE BEN'S FOUR: military might, research speed, population, share of the world owned. Share is of the homeworld's LAND, not its surface - an ocean nobody can hold would otherwise compress every culture into the bottom of the axis.\n\nWHICH COLUMN ORDERS THE BOARD is unsettled and matters more than it looks, because it decides which story the round tells. Share of land is the honest default for a round about borders.\n\nCOUNTRIES OR SETTLEMENTS - Ben said both, and they are different rows. A polity is the actor; a settlement is a place. Recommend POLITIES, since the round is about who holds what and a settlement cannot rise and fall against a rival. Raise it rather than assume it if the distinction turns out to matter to him.\n\nTHE RESEARCH COLUMN LIES WHILE RESEARCH IS PARKED. Under BL-822 the placeholder accrues points from population, so research speed and population are the same number in two columns and the board shows a correlation it never measured - while Ben is using this very board to judge whether BL-823's levers work. Either label the column population-derived, or do not show it yet.\n\nDONE WHEN: sixteen rows re-rank live across the span on a watched run, entries and exits are visible, and the research column is either honestly labelled or absent."
   },
   {
    "status": "designed",
@@ -566,86 +491,6 @@
    "version_goal": null,
    "priority": "A",
    "category": "Generation",
-   "requires": [],
-   "id": "BL-846",
-   "short_name": "COLONISATION_SPAN",
-   "difficulty": 4,
-   "title": "The colonisation span - humanity spreads by diffusion before the polity loop starts",
-   "authority_doc": "docs/generation/COLONISATION.md",
-   "files": [
-    "src/world/colonisation.cpp",
-    "src/world/colonisation.hpp",
-    "src/world/era_minus_one.cpp",
-    "src/world/history_sim.cpp",
-    "tools/verify/colonisation_harness.cpp"
-   ],
-   "design": "THE SPINE. COLONISATION.md is the authority; this item is the work.\n\nWHAT IT ADDS: an opening span of the ancient pass, start_year -> a STATED boundary year on history_sim_params, in which no polity verb runs and population spreads as a DIFFUSION - surplus over region_carrying_capacity(farm_q) flowing to the cheapest reachable ground its package can farm, cost denominated in YEARS over terrain alone.\n\nNO ACTOR. There is no verb, no score, no utility comparison. This is why the span needs NO AI-behaviour grant and must never be read as precedent for one; see COLONISATION.md's boxed note and .claude/rules/io-standing-rules.md.\n\nNO INFRASTRUCTURE (Ben, 2026-09-09): no roads, no works, no logistics, no supply. The only cost of colonisation is that people physically move.\n\nTHE WALK: river courses and coastal shelf cheap, open lowland ordinary, barrier terrain dear, open ocean impassable via region::domain (already exists, already the real water test - MILITARY_HISTORY.md).\n\nWHY IT PAYS TWICE: the ranges that stall a stream are the ranges that stall an army, read from one terrain table by two consumers. Stage 2's non-hegemony lore claim stops being an assertion and becomes a property of the map.\n\nTHE EVIDENCE IT IS A REAL SEAM (measured in sprint 36, not inherited): seed 0 over 4000 years is 533 regions -> 1372 with 839 foundings and 9 battles, and B384a fails because several seeds fight zero times. The ancient span is overwhelmingly a settlement process.\n\nDONE WHEN: the span runs, a harness asserts the STRUCTURE (no polity verb before the boundary, no diffusion after it), and world_determinism stays ALL PASS. The boundary year's VALUE is history_sweep's to argue, never a harness's."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "parked": false,
-   "sprint": "37",
-   "written": "2026-09-09",
-   "author": "Ben (2026-09-09, colonisation design form); Claude (itemisation)",
-   "blocked_on": null,
-   "version_goal": null,
-   "priority": "A",
-   "category": "Generation",
-   "requires": [
-    "BL-846"
-   ],
-   "id": "BL-847",
-   "short_name": "DOMESTICATION_PACKAGE",
-   "difficulty": 3,
-   "title": "The domestication package - what a cradle can farm, and what that gates",
-   "authority_doc": "docs/generation/COLONISATION.md",
-   "files": [
-    "src/world/colonisation.cpp",
-    "src/world/colonisation.hpp",
-    "src/world/history_ladder.cpp",
-    "tools/verify/colonisation_harness.cpp"
-   ],
-   "design": "THE MISSING MECHANISM, and the reason the span is worth building at all.\n\nNothing in the stack currently makes distance from a cradle cost anything: a region 40 tiles from the first granary is founded on the same terms as one beside it. So there is no frontier, nothing stalls, and a migration route carries nothing but headcount.\n\nONE PACKAGE PER CRADLE, coined exactly as one pantheon is (CREEDS.md), from the endemics the cradle window holds - already the input to agrarian_score. Package and pantheon are the same act read on two axes, which is WHY the map of gods and the map of farming end up being the same map.\n\nTWO FIELDS: AFFINITY (which terrain classes it farms, over TILES.md's two axes, derived from the cradle's own ground) and BREADTH (how many it tolerates, derived from how varied the cradle window was).\n\nBREADTH IS THE ASYMMETRY GENERATOR. A broad package colonises a continent; a narrow one fills its valley and stops. This is the instrument GENERATION_STRATEGY.md's Asymmetry-is-the-deliverable section asks for and currently does not have - nothing today measures or produces spread.\n\nGROUND NO PACKAGE SUITS IS NOT SETTLED. Emptiness is a real outcome, not a failure to fill.\n\nCROSSING SURVIVES, kept deliberately rather than by default (Ben, 2026-09-09; cutting it was the live alternative): a daughter founded on ground marginal for A beside a people carrying B takes the floored union of both affinities. It is the only way a stalled frontier ever moves again.\n\nDONE WHEN: packages are coined deterministically per cradle, the founding gate reads affinity, and a harness shows breadth spread across a seed set is WIDE rather than clustered."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "parked": false,
-   "sprint": "37",
-   "written": "2026-09-09",
-   "author": "Ben (2026-09-09, colonisation design form); Claude (itemisation)",
-   "blocked_on": null,
-   "version_goal": null,
-   "priority": "A",
-   "category": "Generation",
-   "requires": [
-    "BL-846"
-   ],
-   "id": "BL-848",
-   "short_name": "CULTURE_BY_ROUTE",
-   "difficulty": 2,
-   "title": "A region inherits the culture of the stream that reached it, not its nearest cradle",
-   "authority_doc": "docs/generation/COLONISATION.md",
-   "files": [
-    "src/world/settlement.cpp",
-    "src/world/settlement.hpp",
-    "src/world/hard_coded_world.cpp",
-    "tools/verify/creeds_harness.cpp"
-   ],
-   "design": "THE PHILOSOPHY DELIVERABLE, and it needs no new axis (Ben, 2026-09-09: 'just the existing pantheon, mapped by route').\n\nTODAY a region inherits its NEAREST cradle's culture - a straight-line geometric assignment standing in for a history nothing was simulating. CREEDS.md already claims the god map is 'a record of who walked where' and cannot deliver it, because nobody walked.\n\nAFTER: the culture of the stream that ARRIVED. A path fact, not a distance fact. A cradle stops owning the ground on the far side of its own mountains; the culture that came the long way round by the coast owns it.\n\nNO NEW TYPE NEEDED: region::culture is already a culture_shares distribution, so ground reached from two directions inside the span carries both, and the assimilation machinery that resolves it already exists.\n\nNO NEW AXIS: the pantheon IS the philosophy; aggression_q off the war god remains exactly the doctrine input the sim reads. What changes is that the distribution is EARNED rather than assigned - the same data, arrived at causally. This is what makes doctrine downstream of settlement rather than an axis beside it.\n\nDOCS ALREADY UPDATED 2026-09-09: HISTORY.md, CREEDS.md and NATION_GENERATION.md were pointed at COLONISATION.md and no longer assert the nearest-cradle rule. The CODE comments (settlement.hpp:18, hard_coded_world.cpp:532) still describe the proximity rule and are correct until this item lands - fix them WITH the change, not before.\n\nDONE WHEN: culture is assigned by arrival, and a harness shows the god map is not reproducible by a Voronoi of cradles."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "parked": false,
-   "sprint": "37",
-   "written": "2026-09-09",
-   "author": "Ben (2026-09-09, colonisation design form); Claude (itemisation)",
-   "blocked_on": null,
-   "version_goal": null,
-   "priority": "A",
-   "category": "Generation",
    "requires": [
     "BL-846"
    ],
@@ -660,60 +505,6 @@
     "tools/verify/province_harness.cpp"
    ],
    "design": "BEN, 2026-09-09, ruling on the direct question: colonisation SEEDS the partition; the late pass still DRAWS it.\n\nPROVINCES.md keeps its ordering (after the sim, before roads) and keeps its nation lock. What it gains is the colonisation span's settled cells and their anchors as a HARD INPUT, the way it already takes the national assignment.\n\nTHE ROAD NOT TAKEN, recorded so it is not rediscovered: colonisation drawing the REAL partition, with the nation carve then assigning whole provinces rather than tiles. That would make ruling 5's single-nation guarantee true BY CONSTRUCTION rather than by a check, and it answers Ben's own 2026-08-21 objection that packed provinces are 'scarcely how borders were defined in history'. It reorders the generation chain, which is why it was not taken now.\n\nDONE WHEN: the partition reads the settled cells, P9c and the nation-lock scan still pass, and province shapes visibly follow settlement history rather than centre geometry alone."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "parked": false,
-   "sprint": "37",
-   "written": "2026-09-09",
-   "author": "Ben (2026-09-09, colonisation design session); Claude (itemisation)",
-   "blocked_on": null,
-   "version_goal": null,
-   "priority": "A",
-   "category": "Generation",
-   "requires": [
-    "BL-846"
-   ],
-   "id": "BL-850",
-   "short_name": "PREDATION_CAPS_PRESSURE",
-   "difficulty": 3,
-   "title": "Predation - wildlife danger caps a penned people, and prices wild ground twice",
-   "authority_doc": "docs/generation/COLONISATION.md",
-   "files": [
-    "src/world/colonisation.cpp",
-    "src/world/colonisation.hpp",
-    "src/world/settlement.cpp",
-    "src/world/history_ladder.cpp",
-    "tools/verify/colonisation_harness.cpp"
-   ],
-   "design": "BEN, 2026-09-09, answering what a penned people does with surplus it cannot send anywhere: \"Death from natural causes can put a cap on said pressure. We won't model the whole tree of life, but we can make certain areas start with varying wildlife safety measures.\"\n\nA REGION-GRAIN SCALAR, derived not rolled, from two terms that already exist upstream: the BODY term from PLANETOLOGY.md's simulated biosphere (how far life got, how productive - a world that never reached land animals carries none), and the REGION term from terrain cover (dense forest and wetland dangerous, open lowland and cold country much less so).\n\nWHAT IT DOES: raises baseline mortality, holding sustainable population BELOW region_carrying_capacity(farm_q). That is the cap - surplus is consumed by death rather than accumulating into a pressure the model has nowhere to send. The brake is an in-world force with a visible cause, never a term inside an agent.\n\nIT PRICES THE SAME GROUND TWICE, which is why it earns its place: dense forest is dear for a stream to cross AND dangerous to live in once crossed, so forest colonisation stalls on both terms with no constant tuned to make it happen.\n\nSETTLEMENT CLEARS PREDATORS, and the decay is LOGARITHMIC IN POPULATION (Ben, 2026-09-09): each doubling of headcount buys the same fixed reduction, so returns diminish forever and no population ever quite clears the ground. Transient frontier cost, never fully bought off. A permanent wall would make the long run static; a decay reaching zero would make every frontier temporary - the same defect wearing the opposite sign.\n\nIT READS CURRENT POPULATION, SO PREDATION COMES BACK. A region the sim sacks loses the heads holding the wild down and its predation rises again. CONQUEST RE-WILDS GROUND, free, out of a rule written for something else - and it gives centres_razed a consequence beyond the record.\n\nIT IS NOT hazard, AND MUST NOT BE FOLDED INTO IT. tile_component::hazard_level is an EXTRACTION danger consumed by the economy's site draw, and Ben ruled against 'hazard' as a body-scale state on 2026-08-31 (its design job is off-world). Distinct quantity, distinct consumer; sharing the name would silently couple two unrelated models.\n\nAGRARIAN_SCORE READS IT. The predation floor is a SELECTION test, not a failure mode: lethal ground is never picked as a cradle. A cradle that forms and then fails spends a simulation discovering what a score could have said for free.\n\nDONE WHEN: predation is derived deterministically per region, mortality reads it, agrarian_score reads it at cradle selection, and a harness shows sustainable population sits below carrying capacity in wild country and converges to it as density rises. The decay FORM is settled (log in population); only its COEFFICIENT is open, and that is history_sweep's to argue, never a harness's."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "parked": false,
-   "sprint": "37",
-   "written": "2026-09-09",
-   "author": "Ben (2026-09-09, colonisation design session); Claude (itemisation)",
-   "blocked_on": null,
-   "version_goal": null,
-   "priority": "A",
-   "category": "Generation",
-   "requires": [
-    "BL-846",
-    "BL-847"
-   ],
-   "id": "BL-851",
-   "short_name": "SWEEP_SEPARATES_CRADLE_OUTCOMES",
-   "difficulty": 2,
-   "title": "history_sweep reports why a cradle stopped, because four outcomes currently look identical",
-   "authority_doc": "docs/generation/COLONISATION.md",
-   "files": [
-    "tools/verify/history_sweep.cpp",
-    "src/world/colonisation.hpp"
-   ],
-   "design": "THE INSTRUMENTATION THAT MAKES THE REST TUNABLE, and the finding that produced it: under the colonisation model a cradle almost never DIES, but four different outcomes all read as 'the cradle stopped' and the sweep cannot tell them apart.\n\n  STERILITY   - narrow affinity, no adjacent ground of a matching class. Sessile, not dead.\n  ENCIRCLEMENT- affinity fine, every exit barrier terrain the span never pays for. Sessile.\n  DILUTION    - a neighbour's stream reached the same ground, culture_shares split. Not death;\n                the gods survive as a minority share and the record stays intact.\n  PREDATION FLOOR - sustainable population below the density Stage 0 needs. The only real\n                death, and BL-850 makes it a selection test so it should never be reached.\n\nWHY IT MATTERS MORE THAN IT LOOKS: sessile-forever is a NORMAL and frequent outcome by design (the breadth term in BL-847 makes it so). So a sweep reading 'N cradles stopped' carries no information at all - it cannot separate the design working from a cradle that was never viable, and nobody can argue a single constant in COLONISATION.md against it.\n\nDONE WHEN: the sweep reports the four outcomes separately across a seed spread, and the reading distinguishes a cradle that filled its window from one that never had one."
   },
   {
    "status": "designed",
@@ -745,6 +536,254 @@
     "tools/verify/history_sweep.cpp"
    ],
    "design": "BEN, 2026-09-09, resolving NR-808. COLONISATION.md's 'Fragmentation comes from contact' is the authority; this item is the work.\n\nRETIRE: the tribal marches in creeds.cpp (the aggression-vs-defence comparison, the weld loop at creeds.cpp:236-287, and the fragmentation_q -= welds*120 with its half floor).\n\nREPLACE WITH: fragmentation_q read off how far two peoples' streams interpenetrate. Two cultures whose shares mix heavily across a broad frontier are LESS fragmented; two that never met are MORE. The input is culture_shares, which the colonisation span already produces at every founding - so the same number comes out of a mechanism already running, with no roll and no pairwise war.\n\nTHE GRAIN WAS THE DEFECT, NOT THE TIMING. The marches compare cradle to cradle, a scalar against a scalar between two discrete points. Under diffusion a cradle is a SOURCE, not a point, and what meets at a frontier is two streams already mixing. Moving the marches past the boundary would have fixed when they ran and left that untouched.\n\nWHAT SURVIVES: aggression_q, unchanged, as the Era -1 sim's DOCTRINE input. What it stops doing is setting the nation count. Consolidation now comes from package breadth - a people who spread far ends up one culture over a lot of ground. One cause each, where aggression previously drove both.\n\nTWO THINGS THIS ITEM MUST NOT SKIP:\n  1. THE NON-HEGEMONY FLOOR. The old welding was floored at half the incoming fragmentation      precisely so creeds alone could not manufacture a hegemon. The replacement needs its own      bound; a different mechanism does not make BL-224's invariant somebody else's problem.\n  2. THE NATION COUNT MOVES, and it is a MEASUREMENT. fragmentation_q drives the seed budget      and the seed budget drives how many nations a world has. Measure the distribution across      a seed spread BEFORE the change lands - it cannot be reasoned to from the mechanism's      shape. world_audit R1/R3 and the creeds harness both read this path.\n\nDOCS ALREADY UPDATED 2026-09-09: COLONISATION.md, CREEDS.md and HISTORY.md. The CODE comments (creeds.hpp:17/87/89, hard_coded_world.cpp:520) still describe welding and are correct until this lands - fix them WITH the change, not before.\n\nDONE WHEN: no scalar-comparison war remains anywhere in the design, fragmentation derives from contact, the non-hegemony bound is re-derived and asserted, and the nation-count distribution is reported across a seed spread."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-853",
+   "short_name": "SIM_VIEW_CARRIES_RIVERS",
+   "priority": "A",
+   "difficulty": 2,
+   "category": "Generation",
+   "author": "Sprint 37 build session (2026-09-09), raised while building BL-846; Claude",
+   "title": "The sim's terrain view carries no rivers, so the colonisation walk cannot price the cheapest ground the design names",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "requires": [
+    "BL-846"
+   ],
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/sim_terrain_build.hpp",
+    "src/world/colonisation.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "THE GAP, FOUND BY BUILDING AGAINST IT. COLONISATION.md section The stream lists the cheap routes in order: river courses and coastal shelf are cheap - the routes people actually followed. The walk can price the shelf and CANNOT price a river.\n\nWHY. A river in this codebase is an EDGE, not a tile: tile_component::river_edges is a six-bit side mask written by generate_rivers, and components.hpp is explicit that a river is an EDGE, never a tile. sim_terrain_view (history_sim.hpp) carries four parallel rasters - substrate, cover, density, landform - and no river among them. So the colonisation flood, which reads that view, has nothing to test.\n\nTHE CONSEQUENCE IS NOT COSMETIC, and it is why this is its own item rather than a TODO. It is the difference between a history whose corridors are RIVERS and one whose corridors are SHORELINES. Under the shipped walk the cheapest route in the world is the coast, so every generated history is a maritime one and no interior river valley ever carries a stream faster than the open ground beside it. That contradicts the design's own first example.\n\nWHAT TO BUILD: a fifth raster on sim_terrain_arrays - one byte per tile, non-zero where river_edges is non-zero - populated by build_sim_terrain from the same tile field, and a matching pointer on sim_terrain_view. colonisation_input::river already EXISTS and is already read by tile_year_cost (it prices a river tile at 35% of base against the shelf's 55%); it is null from every caller today. So this item wires an input that is built and tested, rather than adding a mechanism.\n\nMIND THE COST OF THE VIEW. Adding a raster to sim_terrain_arrays costs one byte per tile (~31 KB on a homeworld) and nothing per year - it is fixed at generation and nothing rewrites it, exactly as substrate is.\n\nDONE WHEN: colonisation_harness shows a river valley carrying a stream faster than the plain beside it; the share of reached land whose first arrival came along a river is reported; and world_determinism is unchanged (the raster is a new input to a pass that does not yet run in generation, so it must move nothing)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-854",
+   "short_name": "B384A_ASSERTS_WAR_IS_INEVITABLE",
+   "priority": "B",
+   "difficulty": 1,
+   "category": "Generation",
+   "author": "Sprint 37 build session (2026-09-09), on NEXT_SESSION.md's explicit instruction to raise rather than delete; Claude",
+   "title": "history_sim_harness B384a asserts every world goes to war, which the colonisation design says is wrong",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "requires": [],
+   "files": [
+    "tools/verify/history_sim_harness.cpp"
+   ],
+   "design": "B384a asserts that EVERY world sees at least one region change hands by war. It fails, and has failed for some time: measured this session at 5 of 8 worlds fighting, 5 of 8 taking ground, so three seeds fight zero times.\n\nTHE DESIGN NOW SAYS THAT IS CORRECT BEHAVIOUR. COLONISATION.md's whole premise is that the opening span is a SETTLEMENT process with occasional violence - the interesting question is not who wins but who arrives - and BL-846's own record measures the ancient span at 839 foundings against 9 battles on seed 0. A world that fills peacefully is a legitimate history, not a broken one. So the harness is asserting a claim the design has since overturned, and a check that fails for a correct reason is worse than no check: it trains the reader to ignore a failure line.\n\nRAISED RATHER THAN QUIETLY DELETED, on NEXT_SESSION.md's explicit instruction. There is a real question underneath it that should not be lost with the assertion: the sim should still be CAPABLE of war, and B384b (the transfer branch fires somewhere in the set) is the assertion that actually checks that.\n\nTHE OPTIONS, and this needs Ben rather than a judgement call: (a) retire B384a outright, leaving B384b as the capability check; (b) restate it as a SET-LEVEL claim - some fraction of worlds fight - which is what the design implies and what B384b already half-says; (c) keep it and gate it on a params flag that only a war-heavy fixture sets. B384c (a polity somewhere loses its last region) is a separate failure with a separate cause and is NOT covered by this item.\n\nDONE WHEN: history_sim_harness's baseline failure count reflects only real defects, and whichever assertion replaces B384a is one the colonisation design would endorse."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "blocked_on": null,
+   "version_goal": null,
+   "id": "BL-855",
+   "short_name": "ADJACENCY_CAPS_REGION_COUNT",
+   "priority": "B",
+   "difficulty": 4,
+   "category": "Generation",
+   "author": "Sprint 37 region-count sensitivity measurement (2026-09-09), NR-809; Claude",
+   "title": "The neighbour graph densifies as regions fill in, so region count still scales superlinearly after BL-844",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [
+    "BL-844"
+   ],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/history_span_cost.cpp"
+   ],
+   "design": "WHAT BL-844 LEFT STANDING, and it said so itself. BL-844 replaced the heapless reach scan with a heap and removed the O(N^2) per rebuild; its closing note records that ms/rebuild still rises with region count (0.017 at 529 regions -> 0.079 at 1,160 on seed 0) because the neighbour graph DENSIFIES as regions fill in, so edges are not O(N) in this world and O(E log V) still grows - and declines to pursue it further on the grounds that reach is no longer what a long run is made of.\n\nRE-MEASURED INDEPENDENTLY THIS SESSION and the figures reproduce exactly: seed 0 gives 0.017 / 0.045 / 0.079 ms per rebuild at 533 / 833 / 1,174 regions; seed 1 gives 0.035 / 0.114 / 0.218 at 563 / 931 / 1,260. Fitted exponent 1.95-2.27 across both seeds. Reach is 24-37% of a 4,000-year run (history_span_cost, build_gen /O2).\n\nWHY IT MATTERS NOW, WHEN IT DID NOT BEFORE. Ben's sprint-37 brief asks to transform regions into provinces and not to aim for a small set - which spans a factor of SIXTEEN (1,372 regions against 22,153 land provinces). At an exponent of ~2 that is ~256x the reach term: seed 1's 6,541 ms run would spend roughly 400 SECONDS in reach alone. The region count is therefore capped by the ADJACENCY MODEL rather than by the pathfinder, and no further heap work reaches it.\n\nTHE SHAPE OF A FIX, none of it settled: region adjacency is Chebyshev at neighbour_radius 9 and water-blind, so a region gains neighbours as the map fills whether or not anything can move between them. Capping degree, or making adjacency a nearest-k rather than a radius, would make edges O(N) again. Both change what the sim considers a neighbour, which moves battles and campaigns - so this is a determinism-digest change and NOT a refactor.\n\nNR-809 IS THE DECISION THIS ITEM HANGS OFF. If Ben caps the region count for this sprint (the recommendation), this stays filed and unbuilt. It is what a sixteen-fold count would need.\n\nDONE WHEN: mean neighbour degree stops rising with region count, history_span_cost shows ms/rebuild flat across the span table, and world_determinism's digests are re-blessed deliberately rather than accidentally."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, watching round 4 at the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [],
+   "id": "BL-859",
+   "short_name": "MOST_LAND_HABITABLE",
+   "difficulty": 3,
+   "title": "Most of the land ends habitable and peopled, and emptiness stops being the default",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/colonisation.cpp",
+    "src/world/colonisation.hpp",
+    "tools/verify/history_sweep.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "BEN, 2026-09-09: we aim for most of the land to be habitable, and include human populations.\n\nMEASURED: the first build leaves roughly HALF the homeworld permanently grey, and it is visible on screen as unclaimed ground that never fills. The harness reads 51-61% of land farmable across three seeds, and one seed (2) reached only 34% farmable with 62% of land reached at all.\n\nEMPTINESS STAYS A REAL OUTCOME AND STOPS BEING THE DEFAULT ONE. COLONISATION.md's 'ground no package suits is not settled' is unchanged as a RULE. What changes is the calibration target it is measured against: a finished migration round should leave the map substantially peopled, with unsettled ground the exception marking genuinely hostile country.\n\nTHE FIX IS IN THE PACKAGE, NEVER IN A FLOOR THAT FILLS THE MAP REGARDLESS. The levers are what a package can farm (the affinity floor, currently 120 per-mille) and how it broadens -- both magnitudes, so this is history_sweep's to argue. A clamp that settles ground no package can farm would delete the frontier mechanism BL-847 exists to create, which is the failure mode this item must not produce.\n\nDONE WHEN: history_sweep reports the habitable/peopled share across a seed spread, most land is peopled on most seeds, and the frontier still stalls somewhere on every world.\n\n--- MEASURED 2026-09-09, AND IT OVERTURNS THIS ITEM'S PREMISE ---\nThe route work (BL-857) alone moved farmable share 50->56%, 46->52%, 34->43% across seeds 0/1/2. Rather than reach for the affinity floor to close the rest, a per-farm-class census of the UNFARMED remainder was added to colonisation_harness. It is decisive:\n\n  seed 0  boreal 2154/3842 unfarmed, montane 241/275   (boreal = 45% of all unfarmed land)\n  seed 1  boreal 2393/3400 unfarmed, montane 505/507   (boreal = 43%)\n  seed 2  boreal  974/2055 unfarmed, montane 221/270   (boreal = 35%)\n\nTHE SHORTFALL IS POLAR ICE AND MOUNTAINS, NOT A BROKEN PACKAGE GATE. Boreal is cold ground (snow cover or icy substrate) and it is 24-30% of the whole homeworld -- the polar caps of a 261x121 grid. Montane is near-totally unfarmed and small. Both are exactly the classes that SHOULD be sparsely peopled, and no cradle forms in either, so no package carries affinity for them.\n\nEXCLUDING BOREAL AND MONTANE, roughly 70% of reached temperate land is farmable on seed 0 -- which is 'most', as asked.\n\nSO THE LEVER THIS ITEM NAMED IS THE WRONG ONE. Lowering package_affinity_floor would have raised the headline number by making cradle packages farm glaciers, satisfying the metric while deleting the frontier mechanism BL-847 exists to create. That is the exact failure the item's own text forbids, and the census is what caught it.\n\nWHAT IS ACTUALLY OPEN, and it is Ben's rather than a constant to tune: (a) accept it -- polar ice is not meant to be farmed, and 'most land habitable' should be read as most TEMPERATE land; (b) reduce how much of the map is boreal, which is a PLANETOLOGY question about ice-cap extent, not a colonisation one; or (c) let some packages coin cold affinity, which needs a cradle to form on cold ground and is a real design change.\n\nThe census is committed and reports rather than asserts, so the sweep can argue it."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, watching round 4 at the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-860"
+   ],
+   "id": "BL-861",
+   "short_name": "NO_CONQUEST_IN_THE_SPAN",
+   "difficulty": 4,
+   "title": "The 4000-year run fights zero battles, so the arc has no conquest in it",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "design": "FOUND BY DRIVING THE BUILT APP, 2026-09-09, and not by any harness.\n\nTHE READING: '0 battles, 0 conquests, 611 foundings in the full run' across four thousand years on seed 0, with five powers holding ground and none ever taking any from another. Ben's arc -- origin, communication, conquest or diplomatic union, a stable dark age -- has only its first act.\n\nTHE LIKELY CAUSE, and it needs confirming rather than assuming. Culture-by-route (BL-848) gives each stream a CONTIGUOUS block, so a region's neighbours are overwhelmingly kin; the objective scorer's w_cult discount for foreign ground therefore never fires. Large unclaimed buffers (BL-859) compound it by leaving polities without shared frontiers at all.\n\nTHE EVIDENCE IS AMBIGUOUS AND MUST NOT BE ARGUED FROM ONE ARC. At the 4000-year span battles fell 567 -> 70 after culture-by-route; on the 1960 two-span arc they ROSE 30 -> 141. Both are real measurements of different arcs. A tidy story about kinship suppressing war fits the first and not the second, so the cause is to be MEASURED across history_sweep before anything is changed.\n\nTHIS IS THE COUNTERWEIGHT TO BL-854. That item argues B384a (every world sees a region change hands by war) should be retired because a warless settlement span is correct behaviour. This item is the reason that argument cannot be taken on faith: a span with NO war in it at all is not a peaceful settlement process, it is a missing mechanism. Settle the two together.\n\nDONE WHEN: the cause is measured rather than reasoned, and the history round (BL-860) produces conquest without the migration round being made violent."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "38",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [],
+   "id": "BL-866",
+   "short_name": "SETTLEMENTS_ARE_SPARSE",
+   "difficulty": 3,
+   "title": "Population centres become settlements, and a settlement is a place worth taking",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/population_generation.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "BEN, 2026-09-09: population centres become settlements, and settlements are SPARSE.\n\nToday centres are drawn broadly across the map (POPULATION.md sec Generation). That is right for a populated world and wrong for a world of CITY STATES: if everywhere is a settlement, nowhere is a seat, and an empire is just a larger blob of the same stuff.\n\nSPARSE MAKES CONQUEST MEAN SOMETHING. A settlement holds the stores, is where the muster forms, and taking it is how a war ends. Ground between settlements is HINTERLAND: it feeds a seat, is walked through, and changes hands when its seat does. A city state is a settlement plus its hinterland; an empire is a city state holding other settlements. No new actor type -- the sim's `polity` already is one.\n\nOPEN AND NOT TO BE GUESSED: whether a settlement is a threshold on the existing urban record, a separate record, or a promotion of certain regions.\n\nDONE WHEN: settlements are visibly sparse on the round-4 map, each has a hinterland that changes hands with it, and the count is stable across a seed spread."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "38",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [],
+   "id": "BL-867",
+   "short_name": "MATERIALS_SPENT_ON_ACTION",
+   "difficulty": 4,
+   "title": "Materials are spent when something happens, and labour divides three ways",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/settlement.hpp"
+   ],
+   "design": "BEN, 2026-09-09: materials are spent when actions happen -- NOT via markets or buildings. And: a high population province must reserve population for work in industry to feed the settlements, raising a natural equilibrium between civilian and military strength.\n\nNO ECONOMY, AND IT MUST NOT GROW ONE. No price, no order book, no firm, no building stack -- MARKETS.md and PRODUCTION.md own those and they belong to a later era. What this phase has is STORES AND EXPENDITURE: a polity holds materials, an action consumes them.\n\nTHE EQUILIBRIUM IS A CONSEQUENCE, NOT A DIAL. Labour divides three ways -- subsistence, industry, muster -- and the division is forced by what the ground and the population can bear. That is what makes conquest COST something without an economy: an army in the field is labour not farming and not making, so a polity that musters too hard starves or stops producing.\n\nAN IN-WORLD FORCE WITH A VISIBLE CAUSE, which is this project's standing requirement for a brake -- never a term inside an agent's head.\n\nOPEN: whether stores are per polity or per province. Ben's phrasing reads as per PROVINCE, which makes the labour split a property of ground rather than of a realm.\n\nDONE WHEN: a campaign visibly costs materials and labour, a polity that over-musters is measurably worse off, and no market or building appears anywhere in the path."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "38",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-865"
+   ],
+   "id": "BL-868",
+   "short_name": "CREEDS_RAISE_ARMIES",
+   "difficulty": 3,
+   "title": "Some peoples grow armies and begin to conquer, and which ones is downstream of their route",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-09: depending on their creed, some cultures grow armies and begin to conquer.\n\nTHE INPUT ALREADY EXISTS AND IS ALREADY EARNED. culture::aggression_q derives from the pantheon's war god, and COLONISATION.md sec Culture arrives by route made the distribution of pantheons a RECORD OF ROUTES. So which peoples turn warlike is downstream of where their ancestors walked -- which is exactly the ordering the colonisation design set out to establish: doctrine is downstream of how a people came to live where it lives.\n\nNOT EVERY PEOPLE CONQUERS, AND THAT IS THE POINT. A world where every culture musters is as flat as one where none does.\n\nNOT A NEW AI GRANT. A polity choosing to campaign is a decision, and this phase HAS actors where the migration span deliberately has none -- but it is the Era -1 sim's EXISTING scored-utility verb set, already covered by the dated register in AI_OPPONENT.md sec 11, bound by the same constraints: pure, seeded, deterministic, replayable, only legal verbs, never a planner. ANYTHING BEYOND THOSE FIVE VERBS IS A NEW WIDENING AND IS BEN'S TO GIVE -- raised, never assumed.\n\nDONE WHEN: the spread of who conquers correlates with route-derived aggression across a seed sweep, and a warlike people and a peaceable one are both normal outcomes."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "38",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-865"
+   ],
+   "id": "BL-869",
+   "short_name": "CIVILISATIONS_FROM_MIXING",
+   "difficulty": 4,
+   "title": "A civilisation is what mixing makes, and it is not a creed",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/creeds.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "BEN, 2026-09-09: some civilisations form, whereby mixing cultures gives rise to philosophy and ethics, as removed from the initial religion-based creeds.\n\nTHE DISTINCTION IS LOAD-BEARING. A CREED is what a people brought with them: a pantheon coined at a cradle, carried along a route, inherited by every daughter. A CIVILISATION is what happens when peoples MIX -- second-order, belonging to no single culture, about how one ought to live rather than which gods there are. Creeds are the migration's output and are already built; civilisations are the empire phase's output and CANNOT be generated at a cradle, because there is nothing yet to mix.\n\nTHE MIXING IS ALREADY THERE: region::culture is a culture_shares distribution and the assimilation machinery already moves it when ground changes hands. A region carrying two peoples in quantity, for a long time, is the condition to grow one from.\n\nNOT SETTLED, AND NOT TO BE GUESSED AT BUILD TIME: whether a civilisation is a named record like a culture, a set of axes over the cultures composing it, or a lens on the existing shares; what it means for a polity to BELONG to one; whether it can outlive the polities that formed it.\n\nDONE WHEN: civilisations arise only where mixing actually happened, are legible as distinct from the creeds beneath them, and a world with little mixing produces few or none."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "38",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-865"
+   ],
+   "id": "BL-870",
+   "short_name": "CULTURE_RELATIONS",
+   "difficulty": 4,
+   "title": "Cultures are alike or opposed, and that is the engine of conquest",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/creeds.hpp",
+    "src/world/history_sim.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-09: cultures have similarities, and sometimes directly opposing views. This leads to conflict, and it becomes the engine for our simulated city states to begin an idea of conquest.\n\nOPENED AS A DESIGN ASIDE (CIVILISATION.md sec Culture relations), NOT SETTLED. This item carries the work once the calls are answered.\n\nSIMILARITY IS KINSHIP, and the substrate exists: the migration's family tree (BL-865). Two peoples are alike because they share an ancestor and parted recently -- earned by the migration rather than assigned.\n\nOPPOSITION NEEDS A SECOND AXIS, because kinship alone gives DISTANT and not OPPOSED, and those differ: two peoples across a continent who never met are distant and have no quarrel. Three candidates, all from quantities that already exist -- the pantheon's own zeal/dominion; the farm class a people was coined on (BL-864), which is a material disagreement rather than a stated one; and contact itself, via culture_shares interpenetration.\n\nTHE FOUR OPEN CALLS, recorded in the doc and in the review queue: is opposition SYMMETRIC (grudges are directed; a disagreement about how to live may not be); does kinship DECAY or is the tree enough; does opposition CAUSE conquest or merely PERMIT it (feeding w_cult is the smaller change and keeps one scorer, a score of its own makes relations the engine Ben describes); and how does a civilisation relate to opposed cultures inside it.\n\nDONE WHEN: the calls are answered, relations are derived from history rather than rolled, and a sweep shows both alliance-shaped and enmity-shaped worlds."
   }
  ]
 }

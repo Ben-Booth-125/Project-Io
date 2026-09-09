@@ -417,6 +417,30 @@ void w_timelapse(std::ostream& o, const era_timelapse& t)
         w_u16(s, c.region);
         w_u16(s, c.owner);
     });
+    // save_game_version 11 (BL-817, the playback record) -- keep r_timelapse in
+    // step. Three flat arrays: the steps, the per-polity samples they index,
+    // and the delta-encoded culture mix. `int16_t` fields go out as i32 rather
+    // than as a reinterpreted u16, so the wire form needs no signedness
+    // assumption and the reader can range-check before it narrows.
+    w_vec(o, t.steps, [](std::ostream& s, const timelapse_step& v) {
+        w_i32(s, v.year);
+        w_i32(s, v.first_sample);
+        w_i32(s, v.sample_count);
+    });
+    w_vec(o, t.samples, [](std::ostream& s, const polity_sample& v) {
+        w_i64(s, v.population);
+        w_u16(s, v.polity);
+        w_u16(s, v.regions);
+        w_u8(s, v.cap_military);
+        w_u8(s, v.cap_materials);
+    });
+    w_vec(o, t.culture_changes, [](std::ostream& s, const culture_change& v) {
+        w_i32(s, v.year);
+        w_u16(s, v.region);
+        for (int k = 0; k < timelapse_culture_slots; ++k) w_i32(s, v.id[k]);
+        for (int k = 0; k < timelapse_culture_slots; ++k) w_i32(s, v.weight_q[k]);
+        w_i32(s, v.other_q);
+    });
 }
 
 bool r_timelapse(std::istream& i, era_timelapse& t)
@@ -432,6 +456,58 @@ bool r_timelapse(std::istream& i, era_timelapse& t)
     if (t.region_stride < 0 || t.years < 0)
         return false;
     for (const owner_change& c : t.changes)
+        if (c.region >= static_cast<uint16_t>(t.region_stride) && t.region_stride > 0)
+            return false;
+
+    // save_game_version 11 (BL-817) -- keep w_timelapse in step.
+    if (!r_vec(i, t.steps, [](std::istream& s, timelapse_step& v) {
+            return r_i32(s, v.year) && r_i32(s, v.first_sample) && r_i32(s, v.sample_count);
+        }))
+        return false;
+    if (!r_vec(i, t.samples, [](std::istream& s, polity_sample& v) {
+            uint8_t cm = 0, cx = 0;
+            if (!(r_i64(s, v.population) && r_u16(s, v.polity) && r_u16(s, v.regions)
+                  && r_u8(s, cm) && r_u8(s, cx)))
+                return false;
+            v.cap_military  = cm;
+            v.cap_materials = cx;
+            return true;
+        }))
+        return false;
+    if (!r_vec(i, t.culture_changes, [](std::istream& s, culture_change& v) {
+            if (!(r_i32(s, v.year) && r_u16(s, v.region))) return false;
+            // WIDE ON THE WIRE, NARROW IN THE STRUCT -- so the range check runs
+            // on the value that was written rather than on a value already
+            // wrapped by the cast. A culture index is int16_t and a per-mille
+            // weight is 0..1000; anything else is corrupt, not merely odd.
+            int32_t tmp = 0;
+            for (int k = 0; k < timelapse_culture_slots; ++k)
+            {
+                if (!r_i32(s, tmp) || tmp < -1 || tmp > 32767) return false;
+                v.id[k] = static_cast<int16_t>(tmp);
+            }
+            for (int k = 0; k < timelapse_culture_slots; ++k)
+            {
+                if (!r_i32(s, tmp) || tmp < 0 || tmp > 1000) return false;
+                v.weight_q[k] = static_cast<int16_t>(tmp);
+            }
+            if (!r_i32(s, tmp) || tmp < 0 || tmp > 1000) return false;
+            v.other_q = static_cast<int16_t>(tmp);
+            return true;
+        }))
+        return false;
+
+    // The step index is the one field a corrupt stream could use to walk off
+    // the sample array, so it is checked against what was actually read rather
+    // than trusted -- the same argument `region_stride` gets above.
+    for (const timelapse_step& st : t.steps)
+    {
+        if (st.first_sample < 0 || st.sample_count < 0) return false;
+        if (static_cast<int64_t>(st.first_sample) + st.sample_count
+            > static_cast<int64_t>(t.samples.size()))
+            return false;
+    }
+    for (const culture_change& c : t.culture_changes)
         if (c.region >= static_cast<uint16_t>(t.region_stride) && t.region_stride > 0)
             return false;
     return true;

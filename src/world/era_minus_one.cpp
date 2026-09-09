@@ -89,5 +89,17 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
 
 uint32_t era_minus_one_sim_seed(const world_params& params)
 {
-    return params.seed ^ 0x415C1E17u;
+    // `era_seed` lets the SAME ground be played through twice and come out
+    // differently — the wizard's history round rerolls it and nothing else, so
+    // the planetology rounds above it are untouched (world_params::era_seed).
+    //
+    // ADDED, NOT XORed, and multiplied by an odd constant first. XOR would let
+    // an era_seed that happened to equal a low bit pattern of the fold collapse
+    // two different rolls onto one history; the odd multiplier scatters
+    // consecutive roll counters (1, 2, 3...) across the whole word, which is
+    // what a reroll counter actually produces.
+    //
+    // AT era_seed 0 THIS IS THE ORIGINAL EXPRESSION, digit for digit, so every
+    // existing world, golden and fixture is unmoved.
+    return (params.seed ^ 0x415C1E17u) + params.era_seed * 0x9E3779B9u;
 }

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*3 entries — 2 open, 1 resolved.*
+*9 entries — 7 open, 2 resolved.*
 
 ---
 
@@ -59,6 +59,80 @@ CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch
 
 *Files: `docs/CONCEPT.md`, `docs/generation/GENERATION_STRATEGY.md`, `src/world/era_band.hpp`*
 
+### NR-809 — Region count still scales ~quadratically AFTER BL-844, so regions cannot become provinces one-for-one - and no optimisation is waiting to change that
+*decision · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. The region-count sensitivity measurement NEXT_SESSION.md asks for before any scale decision. Measured with history_span_cost, build_gen (/O2), seeds 0 and 1.*
+
+Ben's brief says 'transform regions into provinces ... we don't have to aim for a small set'. That spans a factor of sixteen: 1,372 regions after 4,000 years against 22,153 land provinces. The measurement says the cost of that factor is not sixteen. Reading reach cost against region count across the span table, the exponent is 1.95-2.27 on seed 0 and 2.13-2.27 on seed 1 - reach is QUADRATIC in regions, as expected from a per-region Dijkstra (BL-844). Seed 0: 533 regions = 0.017 ms/rebuild, 833 = 0.045, 1174 = 0.079. Seed 1: 563 = 0.035, 931 = 0.114, 1260 = 0.218. Reach is 24-37% of the whole run. Sixteen times the regions is therefore ~256x the reach term: seed 1's 4,000-year run (6,541 ms total, 1,546 ms reach) would spend roughly 400 SECONDS in reach alone. CHECKED AGAINST BL-844 (reach Dijkstra heap), WHICH IS ALREADY COMPLETE - delivered 2026-09-09, the same day. These figures are the POST-FIX state, and they reproduce BL-844's own closing measurement exactly (it records 0.017 ms/rebuild at 529 regions rising to 0.079 at 1,160 on seed 0; this session measured 0.017 at 533 and 0.079 at 1,174). BL-844's delivery note is explicit that the remaining growth is NOT the algorithm: the heapless scan's quadratic is gone, and what is left is the NEIGHBOUR GRAPH DENSIFYING as regions fill in, so edges are not O(N) in this world and O(E log V) still grows. In its own words, that is a property of the graph rather than of the algorithm, and no further heap work fixes it.
+
+**Why it matters.** It bounds objective 3 before a line of it is written. At today's per-region Dijkstra the region count can roughly DOUBLE inside a 4x wall-clock budget - about 2,500-3,000 regions on seed 0, which STARTUP.md's watched-wait ruling can absorb ('a watched wait needs no budget', Ben 2026-09-08). It cannot go to sixteen. That is not an argument against the design - BL-849 already ruled that colonisation SEEDS the partition and the late pass still DRAWS it, so regions never had to map one-for-one - but it does decide how far 'don't aim for a small set' can be taken in THIS sprint. AND THE CHEAP WAY OUT IS ALREADY SPENT. The first draft of this entry offered 'do BL-844 first' as the route to the sixteen-fold; BL-844 is done, and it explicitly declines to pursue the residual growth because reach is no longer what a long run is made of. So the choice is not between optimising and capping - it is between capping the region count and changing the ADJACENCY MODEL, which is a much larger piece of work than this sprint.
+
+- Cap the colonisation span at roughly 2-3x today's region count (~2,500-3,000) and let the province partition keep doing the rest. BL-849 already rules that colonisation SEEDS the partition and the late pass still DRAWS it, so regions never had to map to provinces one-for-one. Ships this sprint; nothing new is needed.
+- File a new item against the ADJACENCY MODEL itself - the neighbour graph densifies as regions fill in, which is what BL-844 left standing. Capping neighbour degree, or moving reach off a per-region graph entirely, is what a sixteen-fold region count would need. That is a sprint of its own and it goes in front of the span Ben asked for.
+- Raise the region count anyway and accept a multi-minute watched wait in round 4, on the grounds that STARTUP.md rules the wait IS the content.
+
+> **Recommendation:** Option 1 for this sprint, with option 2 filed rather than done. Two reasons, and the second is the stronger. First, Ben's stated acceptance criterion for round 4 is the ARC - origin, communication, conquest or union, a stable dark age - and that arc reads at 2,500 regions exactly as it reads at 22,000; spending the sprint on a scaling term buys resolution on a surface whose own test is shape. Second, the colonisation walk itself is NOT what scales badly here: it is a single multi-source flood over ~9,500 land tiles, linear in tiles and independent of region count. What scales is the Era -1 sim's per-region reach, which is a different pass with a different owner. So capping the region count costs the colonisation design nothing at all - it only defers how finely the sim resolves the politics on top of it.
+
+*Files: `tools/verify/history_span_cost.cpp`, `src/world/history_sim.cpp`, `docs/generation/COLONISATION.md`, `docs/generation/PROVINCES.md`*
+
+### NR-810 — Round 4 promises four thousand years and plays four hundred, because settlement places the whole map before the sim starts
+*observation · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. Found by building BL-829 (time-lapse view) and watching what it draws; confirmed in the main session from scripts/verify/history_lapse_press.lua, whose own assertion reads 'the record spans years (-400 -> 0)'.*
+
+Round 4's subtitle asks 'Who claimed this ground, and who lost it, over four thousand years?' The record it plays covers 400. On the first frame every continent is already claimed and all 12 powers already exist, because run_settlement places all ~533 regions and dates them BEFORE run_history_sim starts - so what the map animates is borders shifting, not land filling. 384 foundings do happen inside the run, but they land on ground that already has an owner colour.
+
+**Why it matters.** It is not a drawing problem and it cannot be fixed in the UI. Ben's stated acceptance criterion for round 4 is the ARC - origin, communication, conquest or diplomatic union, a stable dark age - and the origin phase is not missing from the DRAWING, it is missing from the RECORD. Round 4 is currently showing the last tenth of the story it advertises. It also means objective 2 ('make sure it works and produces interesting cultures') cannot be judged from this round yet: there is no spreading to look at.
+
+- Wire BL-846 (colonisation span) so foundings happen INSIDE the recorded span - run_settlement takes each site's founded_year and culture from the colonisation flood's arrival record instead of from a settle-score formula, and the sim's pre-boundary span plays that schedule out, emitting an ownership change as each region is reached. The flood is already built and harnessed.
+- Leave the round honest about its scope in the meantime - retitle it to the span it actually plays - and treat the arc as blocked on the colonisation integration.
+- Both: retitle now, wire BL-846 next.
+
+> **Recommendation:** Option 3. The retitle is a one-line honesty fix and should not wait; the integration is the real answer and is the natural next piece of sprint 37, since the flood exists and is green. Worth noting that this finding independently confirms an architectural reading that was genuinely ambiguous when the span was being built: COLONISATION.md could be read as colonisation dating the map before the sim, or as founding regions inside it. A round built to show the arc proves it must be the second.
+
+*Files: `src/world/settlement.cpp`, `src/world/history_sim.cpp`, `src/world/colonisation.cpp`, `src/ui/history_lapse.cpp`, `docs/ui/STARTUP.md`*
+
+### NR-811 — Round 4 pays a full world build, and Begin then pays it again
+*novel-work · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. Raised as a novelty flag by the BL-829 implementer rather than assumed acceptable.*
+
+To obtain one recorded history pass, round 4's worker runs make_hard_coded_world and throws the world away, keeping only the record. Pressing Begin at the end of the wizard then builds the world again. Roughly 73 seconds twice in Debug.
+
+**Why it matters.** The approach is defensible and was chosen for a good reason: it uses generation's own single invocation, and the alternative - re-deriving settlement and the era inside the UI layer - is precisely the drift era_minus_one.hpp exists to stop (it is the seventh-caller defect NR-733 closed). But paying a full world build twice is not an idiom any doc owns, and nobody has decided it is acceptable. STARTUP.md's 'a watched wait needs no budget' (Ben, 2026-09-08) covers the wait INSIDE round 4; it does not obviously cover paying for it a second time at Begin.
+
+- Accept it for the prototype - the wait is watched in round 4 and the Begin wait already existed.
+- Cache the round-4 world and hand it to Begin, so the second build is skipped. Needs the wizard to hold a world rather than a record, which is a bigger change than it sounds.
+- Have Begin reuse the recorded pass rather than re-running it, which is the same shape as the NR-733 fix one layer up.
+
+> **Recommendation:** Accept for now and revisit if the Debug figure is representative of Release, which has not been measured. Worth measuring before deciding - build_rel timings and build timings are not comparable, and the 73 s figure is Debug.
+
+*Files: `src/ui/startup_screens.cpp`, `src/core/app.hpp`, `docs/ui/STARTUP.md`*
+
+### NR-812 — Does the wizard's ACTIONS.json exemption cover a Run button on a pass round?
+*question · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. The BL-829 implementer was briefed that round 4 was outside the exemption, read the doc as broader than the brief, followed the doc, and flagged the disagreement rather than silently picking either way.*
+
+The brief for round 4 said the pre-game-wizard ACTIONS.json exemption covers the preference rows, so a new Run button needs an entry. ACTIONS.json's own _note (Ben, 2026-09-09, ruling on NR-804) reads wider: 'The startup wizard - its rounds, per-round Reroll, Next and Begin - gets no entries here and no startup.* family... The any-control-change-updates-its-entry rule above does not reach it.' A Run button on a wizard round arguably sits inside 'its rounds'. No entry was added.
+
+**Why it matters.** Small either way - the entry is a two-minute add - but the exemption's edge decides whether every future control on rounds 4 and 5 needs one, and those rounds are about to grow controls (transport, leans). Better settled once than re-argued per control.
+
+- The exemption covers the whole wizard including new controls on its rounds. Nothing to do.
+- The exemption covers only the rounds' NAVIGATION and preference rows; functional controls like Run get entries.
+
+> **Recommendation:** The implementer followed the doc as written, which was the right call. If option 2 is what was meant, the _note wants a sentence saying so, because as written it reads as option 1.
+
+*Files: `docs/ai/ACTIONS.json`, `src/ui/startup_screens.cpp`*
+
+### NR-813 — Should round 4's time-lapse get a scrubber?
+*decision · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. BL-829 left transport controls deliberately open, to be decided by watching rather than in advance.*
+
+The plain transport was built as briefed: Run, then it plays, then Restart. The question BL-829 parked is whether the player may scrub, pause or replay.
+
+**Why it matters.** The wizard's standing premise is 'you set conditions, you do not steer', and the globe's no-input ruling is a real precedent against any steerable control. A scrubber would be the wizard's first.
+
+- Keep it plain - Run and Restart only. Consistent with the globe ruling.
+- Add a scrubber. The argument for it: the interesting moments are unevenly spaced - most centuries are static and two or three are not - and at ~30 s for the span you cannot go back to the one you missed. Restart-and-rewatch is a 30-second answer to a 2-second question.
+- Add pause as well.
+
+> **Recommendation:** Not yet, and for a reason that outranks the argument: the round currently plays 400 years of a 4000-year record (NR-810), so how it should be steered cannot be judged from what it does now. Decide after the colonisation span is wired and there is a real arc to sit through. If it is decided sooner, a scrub earns its place and a pause does not - a frozen map is what the round already looks like most of the time. The ~30 s duration is also unvalidated and was not Ben's.
+
+*Files: `src/ui/history_lapse.cpp`, `docs/ui/STARTUP.md`*
+
 ---
 
 ## Resolved
@@ -88,4 +162,28 @@ WHAT IT SEPARATES: aggression_q drove both how consolidated the political map is
 Written into COLONISATION.md (new section: Fragmentation comes from contact), CREEDS.md (the creed drives, rewritten) and HISTORY.md (the ladder pass + the pipeline diagram). Work is BL-852. TWO THINGS CARRIED FORWARD, both open in COLONISATION.md: the non-hegemony floor must be re-derived for the new mechanism (the old welding carried an explicit half-fragmentation floor for BL-224's sake), and the nation-count distribution must be MEASURED across a seed spread before the change lands.
 
 *Files: `docs/lore/CREEDS.md`, `docs/generation/COLONISATION.md`, `src/world/creeds.cpp`*
+
+### NR-814 — Culture relations: four calls that decide whether the empire phase has an engine
+*question · raised 2026-09-09 · from The Empires design pass, 2026-09-09. Ben asked for a quick design aside on point 5 (culture relations); CIVILISATION.md sec Culture relations carries it and these are the calls it deliberately did not answer.*
+
+Cultures are to be alike or opposed, and that opposition is meant to be the engine of conquest. The SIMILARITY half has an answer already: the migration builds a family tree of peoples, so kinship is a similarity measure EARNED by history rather than assigned (BL-865 retains it). The OPPOSITION half does not, and kinship alone will not supply it -- kinship gives DISTANT, not OPPOSED, and two peoples on opposite sides of a continent who never met are distant with no quarrel.
+
+**Why it matters.** It decides whether the empire phase is a map of armies bumping into each other or a map of peoples who want different things. It also decides how much new machinery sprint 38 needs: three of the candidate axes are quantities that ALREADY exist and are already earned, so a good answer here may cost almost nothing, and a bad one invents a whole relations system beside the ones already running.
+
+- IS OPPOSITION SYMMETRIC? `grudge` is a DIRECTED table, so the sim already has a precedent for asymmetry -- but a disagreement about how one ought to live may be mutual. Directed makes relations a matrix; symmetric makes it a set of pairs, and halves the storage.
+- DOES KINSHIP DECAY, or is the tree enough? Two peoples five generations apart may be as foreign as two unrelated ones, or kinship may hold indefinitely and make whole branches of the tree natural allies.
+- DOES OPPOSITION CAUSE CONQUEST, OR MERELY PERMIT IT? The sim already scores campaigns with w_cult discounting foreign ground. Feeding relations into that weight is the SMALLER change and keeps one scorer; giving relations a score of their own is what would make them the engine Ben describes. This is the one that most changes sprint 38's size.
+- HOW DOES A CIVILISATION RELATE TO OPPOSED CULTURES INSIDE IT? If two opposed peoples end up in one civilisation, does it resolve the opposition, inherit it, or fracture?
+
+> **Recommendation:** Answer (3) first, because the other three are cheap once it is settled and expensive to revisit after. My lean is PERMIT rather than CAUSE for the first cut: it keeps a single scorer, it is measurable against the existing sweep, and it can be raised to CAUSE later if the histories come out flat -- whereas a second scorer is hard to remove once other things read it. On (1) I lean symmetric for similarity and directed for grievance, which is how the two already behave: kinship is a fact about a shared past, a grudge is something one party holds.
+
+> **RESOLVED.** PARTLY RESOLVED 2026-09-09. Ben, on call (3): 'Go with permit rather than cause for now. This is really work for sprint 38.'
+
+SO OPPOSITION PERMITS CONQUEST RATHER THAN CAUSING IT: relations feed the existing w_cult weight rather than raising a score of their own. One scorer, measurable against the sweep already in place, and raisable to CAUSE later if the histories come out flat -- whereas a second scorer would be hard to remove once other things read it.
+
+CALLS (1), (2) and (4) REMAIN OPEN and are sprint 38's, along with the build itself (BL-870). They were deliberately not answered here: (3) was the one that decides the size of the others, and answering it first is what makes them cheap.
+
+WHAT LANDED IN SPRINT 37 INSTEAD is the substrate the whole question rests on: BL-865 retains the migration's family tree, and it turns out to have real depth -- deepest descent 9 and 10 on seeds 0 and 1, across 676 and 929 cultures, every one of which walks back to a cradle. Kinship distance therefore carries actual signal rather than being flat, which is what a similarity measure needs to be worth reading.
+
+*Files: `docs/generation/CIVILISATION.md`, `src/world/creeds.hpp`, `src/world/history_sim.cpp`*
 

@@ -556,11 +556,44 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
         bump(7);
         t_settlement_begin = gen_clock::now(); // BL-754
+        // THE SIM'S OWN START YEAR, so settlement knows which foundings to hand
+        // forward rather than place (BL-846). Derived from the same helper the
+        // era invocation uses a hundred lines below — there is no second
+        // construction here, only an earlier read of the same one.
+        //
+        // INT64_MAX WHERE THE ERA WILL NOT RUN, and that guard is load-bearing:
+        // a schedule with no sim to play it is a set of regions that never get
+        // founded at all. `prehistory_years == 0` is exactly how the harnesses
+        // that do not test the era avoid paying for it, so this path is taken
+        // often and must leave the map complete.
+        const int64_t sim_start = era_minus_one_enabled(params)
+                                      ? era_minus_one_sim_params(params).start_year
+                                      : INT64_MAX;
+
         kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
                                            kepler_tiles, home_grid_width, home_grid_height, budget,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
-                                           /*stop_year=*/params.epoch_year);
+                                           /*stop_year=*/params.epoch_year,
+                                           /*sim_start_year=*/sim_start);
         t_settlement_end = gen_clock::now(); // BL-754
+
+        // THE CULTURES THE MIGRATION COINED JOIN THE ROSTER (BL-856). Appended
+        // rather than kept in a second list, so every downstream consumer -- the
+        // sim's per-culture aggression read, the naming passes, the shares in
+        // `region::culture` -- sees ONE flat vector and needs no second lookup
+        // and no id remapping. The walk allocated their ids as
+        // `cs.cultures.size() + n`, which is exactly where they land here.
+        kepler_creeds.cultures.insert(kepler_creeds.cultures.end(),
+                                      kepler_settlement.spawned_cultures.begin(),
+                                      kepler_settlement.spawned_cultures.end());
+
+        // The cradle cultures' own country (BL-865). run_settlement could not
+        // write these itself -- it holds the creeds by const reference -- so it
+        // reports them and they are copied back here, beside the daughters that
+        // already carry theirs.
+        for (const auto& [cid, cls] : kepler_settlement.cradle_origin_class)
+            if (cid >= 0 && cid < static_cast<int>(kepler_creeds.cultures.size()))
+                kepler_creeds.cultures[static_cast<std::size_t>(cid)].origin_farm_class = cls;
 
         // THE POPULATION MAP, DRAWN EARLY (BL-766). Before the Era -1 sim, not
         // after it: every region whose ground farms easily is given an opening
@@ -751,6 +784,33 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // in the nearest region's tongue.
         name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
                                 /*seed=*/params.seed ^ 0xC17910E6u);
+    }
+
+    // THE ANCIENT ERA HAS RUN. A caller that only wanted the history — the
+    // wizard's history round — stops here rather than paying for borders, roads
+    // and companies it will discard (about 95% of the wall clock; see
+    // world_gen_config::stop_after_ancient_era). The world left behind is
+    // deliberately half-built and must not be played.
+    //
+    // THE REPORT IS FINISHED FIRST, AND THAT ORDERING IS THE WHOLE OF THIS
+    // BLOCK. The first cut returned immediately and shipped a report carrying
+    // the era's TIME-LAPSE but not its SETTLEMENT — `be.settlement` is assigned
+    // a hundred lines below, past the return — so the wizard's round got an
+    // ownership record with no region coordinates to draw it against and
+    // rendered an empty map for four thousand years while its own header
+    // reported 611 foundings.
+    //
+    // It survived the scripted check because that check cannot see this path:
+    // under `--verify` the round ADOPTS the harness's own fully-built world
+    // rather than running a stopped one, so five green assertions said nothing
+    // about the branch. Caught by driving the built app, which is what the
+    // live-click rule is for.
+    if (gen_cfg.stop_after_ancient_era)
+    {
+        if (report)
+            for (generation_report::body_entry& be : report->bodies)
+                if (be.id == kepler) { be.settlement = kepler_settlement; break; }
+        return w;
     }
 
     bump(9);
