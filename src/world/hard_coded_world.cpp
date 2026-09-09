@@ -4,6 +4,7 @@
 
 #include "body_names.hpp"
 #include "city_names.hpp"
+#include "colonisation.hpp"      // BL-871: colonisation_start_year, for the migration's own time-lapse
 #include "continents.hpp"
 #include "corporation_generation.hpp"
 #include "creeds.hpp"
@@ -49,6 +50,62 @@ float deposit_scalar_for(abundance_level a, const world_gen_config& cfg)
         case abundance_level::standard: return cfg.deposit_scalar[2];
     }
     return cfg.deposit_scalar[2];
+}
+
+// ---------------------------------------------------------------------------
+// The migration's own time-lapse (BL-871).
+// ---------------------------------------------------------------------------
+//
+// `run_settlement` already dates every region it founds (`region::founded_year`)
+// and reports when the flood itself finished (`settlement_state::
+// migration_end_year`, BL-858 — "all habitable land has some culture"). Round
+// 3 (Culture) wants a REPLAY of that walk, in the same `era_timelapse` shape
+// round 4 already replays its own history through — one `owner_change` per
+// founding, ascending by year, region-indexed exactly as `settlement.regions`
+// is.
+//
+// THE "OWNER" IS A CULTURE, NOT A POLITY, and that is a deliberate departure
+// from what `owner_change` names everywhere else it is produced
+// (`history_sim.cpp`): there is no polity yet at founding time, only the
+// people who reached the ground. `draw_lapse_map` colours by the index alone,
+// so a culture id in this slot paints a map of PEOPLES rather than of REALMS —
+// which is exactly what "who reached this ground first, and by which routes"
+// (STARTUP.md § Round 3) is asking to see. The scoreboard's polity-keyed
+// fields (`steps` / `samples` / `culture_changes`) are left empty: the
+// migration has no living polities to rank, and an empty playback record is
+// the documented "never ran" reading (era_timelapse.hpp), which is honest
+// here — round 3 has no scoreboard content, not a broken one.
+//
+// PURE AND READ-ONLY: folds `settlement_state` as it stood the instant
+// `run_settlement` returned, before the empire sim (or anything else) has
+// touched it. No randomness, no clock, no write-back.
+era_timelapse build_migration_timelapse(const settlement_state& ss, int64_t start_year,
+                                        int64_t end_year)
+{
+    era_timelapse t;
+    t.start_year    = static_cast<int32_t>(start_year);
+    t.years         = static_cast<int32_t>(std::max<int64_t>(0, end_year - start_year));
+    t.region_stride = static_cast<int32_t>(ss.regions.size());
+
+    t.changes.reserve(ss.regions.size());
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
+    {
+        const region& r = ss.regions[i];
+        const int plurality = r.culture.plurality();
+        if (plurality < 0) continue; // Unpeopled ground never founded a region.
+        t.changes.push_back(owner_change{
+            static_cast<int32_t>(r.founded_year),
+            static_cast<uint16_t>(i),
+            static_cast<uint16_t>(plurality)});
+    }
+    // ASCENDING BY YEAR, matching every other producer of this format
+    // (`era_timelapse.hpp`'s "the replay substrate" contract) — `owner_slice_at`
+    // walks it in order and stops at the first change past the query year.
+    std::stable_sort(t.changes.begin(), t.changes.end(),
+                     [](const owner_change& a, const owner_change& b) {
+                         return a.year < b.year;
+                     });
+    return t;
 }
 
 // ---------------------------------------------------------------------------
@@ -609,6 +666,41 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // Pure and seedless: a deterministic consequence of `farm_q`, which is
         // the shape the generation layer asks new stages to take.
         draw_urban_map(kepler_settlement);
+
+        // THE MIGRATION HAS RUN (BL-871). A caller that only wants the Culture
+        // round's own record — the wizard's round 3 — stops here, before the
+        // Empires round's history sim has run at all. This is what makes round
+        // 3's span the migration's OWN span (`colonisation_start_year` to
+        // `settlement_state::migration_end_year`, a derived year) rather than
+        // the fused span both rounds used to share: nothing below this point
+        // has executed, so there is no empire history for round 3 to leak.
+        //
+        // Same pattern as `stop_after_ancient_era` below: the report is
+        // finished before returning, because a caller wants
+        // `generation_report` and must discard the half-built `world`.
+        if (gen_cfg.stop_after_migration)
+        {
+            const era_timelapse migration_lapse =
+                build_migration_timelapse(kepler_settlement, colonisation_start_year,
+                                          kepler_settlement.migration_end_year);
+            if (report)
+            {
+                report->prehistory_years     = kepler_settlement.migration_end_year
+                                              - colonisation_start_year;
+                report->prehistory_battles   = 0;   // The migration is a diffusion, not a
+                report->prehistory_conquests = 0;   // contest — COLONISATION.md owns why
+                report->prehistory_foundings = static_cast<int64_t>(kepler_settlement.regions.size());
+                for (generation_report::body_entry& be : report->bodies)
+                    if (be.id == kepler)
+                    {
+                        be.settlement           = kepler_settlement;
+                        be.prehistory_timelapse = migration_lapse;
+                        break;
+                    }
+            }
+            return w;
+        }
+
         // ------------------------------------------------------------------
         // The year-tick sim, wired into generation (Ben, 2026-08-12).
         //

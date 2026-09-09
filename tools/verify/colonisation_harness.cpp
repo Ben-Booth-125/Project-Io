@@ -954,7 +954,7 @@ void case_spawned_cultures(int seed_count)
 // it is worth checking rather than trusting: if the allocation order ever
 // changed, this walk is where it would hang.
 
-void case_family_tree(int seed_count)
+void case_family_tree(int seed_count, int span_years)
 {
     std::printf("\n--- C14: does the family tree survive the migration? ----------\n");
 
@@ -964,7 +964,12 @@ void case_family_tree(int seed_count)
     {
         world_params wp;
         wp.seed = static_cast<uint32_t>(s);
-        wp.prehistory_years = 4000;
+        // BL-871: this was a hardcoded 4000, stale against the OLD undifferentiated
+        // span. colonisation_start_year is now -2400 (2,000-year migration), so a
+        // fixed 4000-year prehistory window no longer lines up with where the walk
+        // actually starts -- take it from the harness's own span argument instead,
+        // matching case_founding_schedule (C12) and case_spawned_cultures (C13).
+        wp.prehistory_years = span_years;
 
         generation_report     rep;
         era_minus_one_fixture fx;
@@ -1048,7 +1053,12 @@ void case_family_tree(int seed_count)
 int main(int argc, char** argv)
 {
     const int seed_count = argc > 1 ? std::atoi(argv[1]) : 3;
-    const int span_years = argc > 2 ? std::atoi(argv[2]) : 4000;
+    // BL-871: was 4000, matching the OLD undifferentiated pass. The migration is
+    // now its own 2,000-year span (colonisation_start_year -2400 -> 400 BCE), and
+    // that is what this harness exercises -- a caller wanting the old figure must
+    // now say so explicitly, per the standing rule against silently absorbing a
+    // changed baseline.
+    const int span_years = argc > 2 ? std::atoi(argv[2]) : 2000;
 
     std::printf("\n=== colonisation_harness — BL-846/847/848/850 ===\n");
     std::printf("Asserts STRUCTURE only. Every magnitude in this layer is history_sweep's\n"
@@ -1064,7 +1074,7 @@ int main(int argc, char** argv)
     case_route_on_real_worlds(seed_count);
     case_founding_schedule(span_years);
     case_spawned_cultures(seed_count);
-    case_family_tree(seed_count);
+    case_family_tree(seed_count, span_years);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;

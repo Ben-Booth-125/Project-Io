@@ -327,9 +327,15 @@ inline constexpr int32_t colonisation_impassable = INT32_MAX;
 /// carry, never a head start — and that matters, because a stagger would be a
 /// second asymmetry generator competing with the one BL-847 exists to be.
 ///
-/// -4000 matches `history_sim_params::start_year`, the year HISTORY.md § The
-/// epoch and the run puts the ancient pass at.
-inline constexpr int64_t colonisation_start_year = -4000;
+/// -2400 (2400 BCE), matching `CIVILISATION.md` § The span is 400 BCE to
+/// 1200 CE: pass 1 runs 2400 BCE -> 1200 CE, 3,600 years, divided at 400 BCE
+/// into the migration (this constant -> 400 BCE, 2,000 years) and the empire
+/// round (400 BCE -> 1200 CE, 1,600 years). BL-871 moved this from -4000
+/// (which matched the OLD, undifferentiated `history_sim_params::start_year`
+/// before the two rounds split) — the migration and the empire sim are no
+/// longer one continuous span, so this constant now names the migration's
+/// own start rather than borrowing the sim's.
+inline constexpr int64_t colonisation_start_year = -2400;
 
 // ---------------------------------------------------------------------------
 // Water: the coast is the road, and a crude hop crosses a strait (BL-857)
