@@ -3,9 +3,10 @@
 > **Settles:** what the colonisation span is and where it ends · what a domestication
 > package is, how it spreads, and what it gates · what makes people move and what that
 > movement costs · what caps the pressure on a people that cannot spread, and what a
-> cradle stopping actually means · which culture a founded region inherits, and on what
-> terms · what the span hands the settlement, sim and province layers · why no actor and
-> no infrastructure appear anywhere in it.
+> cradle stopping actually means · where fragmentation comes from once no creed marches ·
+> which culture a founded region inherits, and on what terms · what the span hands the
+> settlement, sim and province layers · why no actor and no infrastructure appear anywhere
+> in it.
 > **Not here:** what a pantheon is or how a tongue is coined (../lore/CREEDS) · the stage
 > ladder this span sits inside (../lore/HISTORY) · how force resolves once polities contest
 > ground (MILITARY_HISTORY) · how the partition is drawn from what this span leaves
@@ -122,10 +123,11 @@ This is the only way a stalled frontier ever moves again, and it makes **contact
 productive** rather than exclusively violent — which a peaceful span needs, since contact is
 otherwise only ever the thing that ends it.
 
-> **This is the one rule here that could be cut.** Without it the world's settlement pattern is
-> fully determined at Stage 0 by the cradle windows, which is simpler and defensible. It is
-> included because a frontier that can never unstick makes the long run static, and the
-> 4000-year ladder is the target (`../lore/COLLAPSE.md` § The 4000-year problem).
+> **Kept deliberately, not by default (Ben, 2026-09-09).** Cutting it was the live alternative:
+> the world's settlement pattern would then be fully determined at Stage 0 by the cradle windows,
+> which is simpler and defensible. It survives because a frontier that can never unstick makes the
+> long run static, and the 4000-year ladder is the target (`../lore/COLLAPSE.md` § The 4000-year
+> problem).
 
 ---
 
@@ -187,11 +189,22 @@ a stream to cross *and* dangerous to live in once crossed, so forest colonisatio
 terms at once — with no constant tuned to make it happen. Good farming ground in dangerous country
 becomes a real dilemma rather than a free pick.
 
-**Settlement clears predators, so predation decays with density.** The first settlers pay the most
-and their grandchildren pay little. Predation is therefore a **transient frontier cost**, not a
-permanent ceiling: ground that killed a cradle's founders can be taken by its descendants. A
-permanent wall would be the cheaper model and the worse one, because it would make the long run
-static in exactly the way § Packages broaden by crossing exists to avoid.
+**Settlement clears predators, and the decay is LOGARITHMIC IN POPULATION (Ben, 2026-09-09).**
+Predation falls with the log of the region's headcount, so **each doubling of population buys the
+same fixed reduction** and the returns diminish forever. The first settlers pay the most and their
+descendants pay steadily less, without any population ever quite clearing the ground.
+
+That form answers the open call this section previously carried. Predation is a **transient
+frontier cost** rather than a permanent wall — ground that killed a cradle's founders can be taken
+by its descendants — but it is **never fully bought off**, because a log curve has no population at
+which it is done. Wild country stays marginally wild. A permanent wall would have made the long run
+static in exactly the way § Packages broaden by crossing exists to avoid; a decay that reached zero
+would have made every frontier temporary, which is the same defect wearing the opposite sign.
+
+**It reads CURRENT population, so predation comes back.** A region the sim sacks loses the heads
+that were holding the wild down, and its predation rises again toward what the ground carries on
+its own. **Conquest re-wilds ground** — for free, out of a rule written for something else, and it
+gives `centres_razed` (`../economy/POPULATION.md` § Generation) a consequence beyond the record.
 
 **It is not `hazard`, and must not be folded into it.** `tile_component::hazard_level` is an
 *extraction* danger consumed by the economy's site draw, and Ben ruled against `hazard` as a
@@ -218,6 +231,43 @@ free.
 **Sessile is a normal outcome and not a defect.** A cradle that fills its valley and stops for four
 thousand years is a legitimate history, and § The domestication package's breadth term makes it a
 frequent one by design.
+
+---
+
+## Fragmentation comes from contact
+
+**Ben, 2026-09-09, resolving where the creeds' tribal marches sit: they retire, and
+fragmentation is re-derived from contact.**
+
+`fragmentation_q` drives the seed budget, and the seed budget drives how many nations a world
+has — so something must produce it. It used to be produced by war: a culture whose
+`aggression_q` cleared its neighbour's defence marched, and a won war **welded** two cradles into
+one (`../lore/CREEDS.md` § The creed drives). That is retired.
+
+**It is now read off how far two peoples' streams interpenetrate.** Two cultures whose shares mix
+heavily across a broad frontier are **less** fragmented; two that never met are **more**. The
+input is `culture_shares`, which the span already produces at every founding — so the same number
+comes out of a mechanism already running, with no roll, no pairwise comparison, and no war.
+
+**The grain was the real defect, not the timing.** The marches compared *cradle to cradle*: a
+scalar against a scalar, between two discrete points. Under diffusion a cradle is a **source**,
+not a point, and what meets at a frontier is two streams that are already mixing. The marches
+were comparing objects that had stopped describing where contact happens. Moving them past the
+boundary would have fixed when they ran and left that untouched.
+
+**And it separates two causes that were tangled.** `aggression_q` used to drive both how
+consolidated the political map is *and* how a polity fights once it exists. Now **package
+breadth** drives consolidation — a people who spread far ends up one culture over a lot of ground
+— and aggression drives only conduct after the boundary. One cause each.
+
+**The non-hegemony floor survives the change and must be re-derived, not assumed.** The old
+welding was floored at half the incoming fragmentation precisely so creeds alone could not
+manufacture a hegemon. Contact-derived fragmentation needs its own equivalent bound; that it is
+a different mechanism does not make BL-224's invariant somebody else's problem.
+
+**This moves the nation count, and that is a measurement.** The seed budget is downstream, so the
+distribution across a seed spread must be measured before the change lands — not argued from the
+mechanism's shape. It is the one thing in this document whose consequence cannot be reasoned to.
 
 ---
 
@@ -277,16 +327,12 @@ than left to be rediscovered.
 
 - **The boundary year's value.** Stated by design, unargued as yet; `history_sweep` is where it is
   settled, against the shape of the histories it produces.
-- **Where the creeds' tribal marches sit.** `../lore/CREEDS.md` § The creed drives — the tribal-conflict stage resolves
-  single-round pairwise wars at cradle grain and welds cradles. Those are wars, inside a span
-  whose premise is that war is not yet the interesting process. They plausibly belong at or just
-  after the boundary; they are not moved here, because moving them changes `fragmentation_q` and
-  therefore the seed budget — a measured change rather than a design one.
-- **Whether package crossing survives** — see the note under § Packages broaden by crossing.
-- **How fast predation decays with density, and how far.** § Predation makes it a transient
-  frontier cost; the rate is a magnitude, so it is `history_sweep`'s to argue. Whether it decays
-  to *zero* is the design half of the same question, and that one is a call: a floor that never
-  reaches zero keeps a permanent tax on wild country, which may or may not be wanted.
+- **The non-hegemony floor on contact-derived fragmentation.** § Fragmentation comes from contact
+  retires a welding rule that carried an explicit half-fragmentation floor for BL-224's sake. The
+  replacement needs its own bound, and what that bound is has not been derived.
+- **The predation decay's coefficient.** The *form* is settled — logarithmic in population
+  (§ Predation) — so what remains is one magnitude: how much a doubling buys. `history_sweep`'s
+  to argue, like every other magnitude here.
 - **What a package costs to represent.** Affinity over the two-axis terrain is a small fixed-width
   field per cradle, but the founding-time affinity test runs inside the walk, and the walk is the
   span's whole cost. Whether it is a table lookup or something cheaper is an implementation

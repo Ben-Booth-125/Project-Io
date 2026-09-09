@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*3 entries — 3 open, 0 resolved.*
+*3 entries — 2 open, 1 resolved.*
 
 ---
 
@@ -59,6 +59,13 @@ CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch
 
 *Files: `docs/CONCEPT.md`, `docs/generation/GENERATION_STRATEGY.md`, `src/world/era_band.hpp`*
 
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-808 — The creeds' tribal marches are wars, sitting inside a span whose premise is that war is not yet the process
 *question · raised 2026-09-09 · from The colonisation design session, 2026-09-09. Recorded as an open question in COLONISATION.md and raised here because it is a call, not work.*
 
@@ -72,12 +79,13 @@ CREEDS.md's tribal marches resolve single-round pairwise wars at cradle grain an
 
 > **Recommendation:** Do not decide it dry. Whoever builds BL-846 (colonisation span) should measure the nation-count distribution across a seed spread with the marches in each position, and bring you the three numbers. The third option is the most interesting design and the least measured.
 
+> **RESOLVED.** BEN, 2026-09-09: option 3, re-derive fragmentation from contact. The tribal marches RETIRE; fragmentation_q is read off how far two peoples' streams interpenetrate, which the colonisation span already produces in culture_shares.
+
+THE FINDING THAT REFRAMED THE QUESTION: the marches' TIMING was the lesser problem and their GRAIN the greater one. They compare cradle to cradle - a scalar against a scalar between two discrete points - but under diffusion a cradle is a SOURCE, not a point, and what meets at a frontier is two streams already mixing. Moving them past the boundary would have fixed when they ran and left that untouched.
+
+WHAT IT SEPARATES: aggression_q drove both how consolidated the political map is and how a polity fights once it exists. It now drives only the second; package breadth drives the first. One cause each.
+
+Written into COLONISATION.md (new section: Fragmentation comes from contact), CREEDS.md (the creed drives, rewritten) and HISTORY.md (the ladder pass + the pipeline diagram). Work is BL-852. TWO THINGS CARRIED FORWARD, both open in COLONISATION.md: the non-hegemony floor must be re-derived for the new mechanism (the old welding carried an explicit half-fragmentation floor for BL-224's sake), and the nation-count distribution must be MEASURED across a seed spread before the change lands.
+
 *Files: `docs/lore/CREEDS.md`, `docs/generation/COLONISATION.md`, `src/world/creeds.cpp`*
-
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
 

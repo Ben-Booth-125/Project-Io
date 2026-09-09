@@ -262,8 +262,9 @@ more densely and lets smaller nations survive the merge. Asserted, not assumed �
 assertions. We will simulate war to narrow down the count if needed. Just let naturally different
 cultures emerge here."* `world_audit`'s R1 asserts the ladder's construction guarantee (the
 derived floor can never fall below half the base) rather than a literal, and R3's ceiling is a
-runaway guard rather than a target. Consolidation is the war stages' job — the creeds' tribal
-marches and the Era −1 sim — never a dial.
+runaway guard rather than a target. Consolidation is never a dial: it comes from how far a people
+spread (`../generation/COLONISATION.md` § Fragmentation comes from contact) and from the Era −1
+sim's wars. The creeds' tribal marches were the third source and are retired (Ben, 2026-09-09).
 
 **The cradle score.** `agrarian_score` scores cradles from arable terrain, landform,
 habitability, coastal access and the biosphere's generated `endemics`. It marks where river
@@ -288,7 +289,8 @@ sequenced between the creeds and the political map; verified by
 
 ```
 run_history_ladder            ->  cradles, fragmentation
-run_creeds / tribal conflict  ->  one pantheon per cradle; welding
+run_creeds                    ->  one pantheon per cradle
+run_colonisation              ->  people spread; contact sets fragmentation
 run_settlement                ->  REGIONS: culture, ancient endowment, furnaces
 run_history_sim               ->  the polities play forward to the epoch
 generate_nations                  seeded on the region anchors, FOLDED BY POLITY
