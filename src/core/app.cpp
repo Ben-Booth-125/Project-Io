@@ -132,11 +132,22 @@ static const std::array<key_binding, 24> s_bindings = {{
     {SDL_SCANCODE_F10,          false, ui::canvas_command::options_toggle, "Options",         "F10"},
 }};
 
-// main.cpp constructs `app{}` as a temporary, so the whole object lives on the
-// main thread's 1 MB stack. BL-305's carve sink put ~92 KB of atomics inside it
+// main.cpp declares `app a;` as a local, so the whole object lives on the main
+// thread's 1 MB stack. BL-305's carve sink put ~92 KB of atomics inside it
 // (312 x 145 int16 owners), which is fine but is the kind of growth that ends
 // in a stack overflow at startup rather than a compile error. Half the stack is
 // the bar; if this ever trips, heap-allocate the sink rather than raising it.
+//
+// THIS BAR IS LOOSER THAN THE REAL BUDGET, measured 2026-09-09 (BL-860). `main`
+// declares `app a;` in SIX separate scopes, and MSVC in Debug does not overlap
+// the frames of sibling scopes — so every byte here is charged to the 1 MB stack
+// six times over. A second inline `generation_progress` (66,080 bytes) took
+// `sizeof(app)` from 152,728 to 218,808 and the process died at startup with
+// 0xC00000FD, having printed nothing, while this assert stayed green. The repair
+// was the one the paragraph above prescribes — the wizard's progress blocks moved
+// to the heap (app.hpp, m_wiz_history_progress) — but the assert is left as it
+// stands rather than re-derived from a `main` this file cannot see. Read it as a
+// smoke alarm, not a budget: the true ceiling is nearer 1 MB / 6.
 static_assert(sizeof(app) < 512u * 1024u,
               "app is approaching the main thread's stack budget");
 

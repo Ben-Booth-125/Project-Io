@@ -1034,7 +1034,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_wiz_dirty = true;
     });
 
-    // Park the wizard on a specific ROUND (0-4) so a visual check can capture each
+    // Park the wizard on a specific ROUND (0-5) so a visual check can capture each
     // one. Clamped by draw_generation_screen, so an out-of-range index is harmless —
     // the name is kept for the scripts that already call it. Every round is a stable
     // capture: the wizard is driven by the preferences and the seed, not by
@@ -1045,13 +1045,30 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_wiz_dirty = true;
     });
 
-    // Round 4's Run press (BL-829), from the same call site the button uses.
-    // Under --verify the run is SYNCHRONOUS — it adopts the record the harness's
-    // own world already carries, or resolves a deferred run in place — so the
-    // call returns with the record in hand and a capture can never race it.
-    v.set_function("history_run", [this]() {
+    // Which round the wizard is actually ON, 0-based, and how many there are.
+    //
+    // WHY A READBACK EXISTS AT ALL (BL-860). "Back from round 6 lands on round 5"
+    // is a navigation claim, and until this binding the only way a script could
+    // check it was to read a capture with human eyes — so a Back press that went
+    // nowhere would have passed. Every other wizard hook SETS state; this is the
+    // one that reads it, which is what turns a walk into an assertion.
+    v.set_function("wizard_round", [this]() {
+        return std::make_tuple(m_wiz_round, wizard_round_count);
+    });
+
+    // A LAPSE ROUND'S pass, run from the same call site arriving on the round
+    // uses (BL-829, generalised to both lapse rounds by BL-860). Under --verify
+    // the run is SYNCHRONOUS — it adopts the record the harness's own world
+    // already carries, or resolves a deferred run in place — so the call returns
+    // with the record in hand and a capture can never race it.
+    //
+    // @param which  0 = round 4 (the migration), 1 = round 5 (the history).
+    //               Omitted means round 4, which is what every existing script
+    //               asked for when there was only one lapse round.
+    v.set_function("history_run", [this](sol::optional<int> which) {
+        const int i = std::clamp(which.value_or(0), 0, wizard_lapse_round_count - 1);
         m_screen    = app_screen::generating;
-        m_wiz_round = wizard_planetology_round_count;
+        m_wiz_round = wizard_planetology_round_count + i;
         // ORDER MATTERS. The preview is refreshed FIRST because the map's land
         // mask is the wizard's own packed surface, and because the wizard's draw
         // re-runs the chain whenever the preview is empty — which invalidates
@@ -1059,28 +1076,33 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // took. Refreshing here leaves nothing for the draw to redo.
         refresh_wizard_preview();
         m_wiz_dirty = false;
-        launch_wizard_history_run();
+        launch_wizard_history_run(i);
     });
 
-    // Park round 4's playback at a calendar year, so a check can capture three
-    // points across one span. Playback does not advance under --verify (all
-    // animation is frozen there), so this is the ONLY thing that moves it; the
-    // wizard clamps the year to the record's own span.
+    // Park the CURRENT lapse round's playback at a calendar year, so a check can
+    // capture three points across one span. Which round that is follows the
+    // wizard rather than taking an argument: a script parks on a round and then
+    // drives it, so a second way to name the round is a second way to get it
+    // wrong. Playback does not advance under --verify (all animation is frozen
+    // there), so this is the ONLY thing that moves it; the wizard clamps the year
+    // to the record's own span.
     v.set_function("history_year", [this](int year) {
-        m_wiz_history_year    = year;
-        m_wiz_history_playing = false;
+        const int i = wizard_lapse_index();
+        m_wiz_history_year[i]    = year;
+        m_wiz_history_playing[i] = false;
     });
 
-    // How many polities hold ground on round 4 right now, and 0 when no record
-    // has been taken. It is what lets an ACCEPTANCE script assert that a CLICK on
-    // Run actually landed — without a readout the only provable thing is that a
-    // Lua binding works, which is not the question BL-829's live half asks.
-    // Ownership-only, and per-year: it says nothing a slice of the record does
-    // not already say on screen.
+    // How many polities hold ground on the CURRENT lapse round right now, and 0
+    // when no record has been taken. It is what lets an ACCEPTANCE script assert
+    // that a real press actually landed — without a readout the only provable
+    // thing is that a Lua binding works, which is not the question BL-829's live
+    // half asks. Ownership-only, and per-year: it says nothing a slice of the
+    // record does not already say on screen.
     v.set_function("history_powers", [this]() -> int {
-        if (m_wiz_history.empty()) return 0;
+        const int i = wizard_lapse_index();
+        if (m_wiz_history[i].empty()) return 0;
         const std::vector<uint16_t> slice =
-            owner_slice_at(m_wiz_history.lapse, m_wiz_history_year);
+            owner_slice_at(m_wiz_history[i].lapse, m_wiz_history_year[i]);
         std::vector<uint16_t> seen;
         for (uint16_t o : slice)
             if (o != owner_none
@@ -1089,12 +1111,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return static_cast<int>(seen.size());
     });
 
-    // The record's own span, so a script walks the years the run actually
-    // produced rather than the years a doc says it should have.
+    // The current lapse round's own span, so a script walks the years the run
+    // actually produced rather than the years a doc says it should have.
     v.set_function("history_span", [this]() {
-        return std::make_tuple(m_wiz_history.lapse.start_year,
-                               m_wiz_history.lapse.start_year
-                                   + m_wiz_history.lapse.years);
+        const int i = wizard_lapse_index();
+        return std::make_tuple(m_wiz_history[i].lapse.start_year,
+                               m_wiz_history[i].lapse.start_year
+                                   + m_wiz_history[i].lapse.years);
     });
 
     v.set_function("show_panel", [this](const std::string& name, bool open) {
