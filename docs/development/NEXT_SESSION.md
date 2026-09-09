@@ -1,121 +1,102 @@
-# Next session — sprint 37, the colonisation span is half-wired
+# Next session — sprint 37 is closed; the roads pass is what blocks a playable world
 
-Written 2026-09-09 at the close of the build session that followed the design pass.
-`docs/generation/COLONISATION.md` is still the authority and none of it was re-opened.
+Written 2026-09-09 at the close of sprint 37. **Sprint 37 is complete and archived.** The
+migration span exists, runs inside the recorded history, and has its own wizard round.
 
-## What landed, and what it is verified by
+## The one thing that blocks everything
 
-| Item | State | Evidence |
+**The roads pass crashes the full generation pipeline (Ben, 2026-09-09).** `--autostart-windowed`
+walks the wizard, presses Begin, and never reaches in-game — the frames-rendered line is absent.
+Until that is fixed there is no playable world at the end of the wizard, however good the rounds
+look.
+
+**Do not read `exit=0` as success on that command.** It exits cleanly via a window close; the
+proof of success is the line `[autostart-windowed] OK  N in-game frames rendered`. Grep for it.
+
+---
+
+## What the wizard is now
+
+Five rounds: **System · Life · Culture · Empires · Industrialisation**. Each pass round starts its
+own pass on arrival — there is no Run button, because arriving is the instruction. Reroll varies
+the history without disturbing the planetology above it (`world_params::era_seed`).
+
+Rounds **Culture** and **Empires** still replay the **same recorded age**, and both say so on
+screen. The rounds are split; generation still emits one span. Splitting it is **BL-861**'s
+neighbourhood and is the natural next piece.
+
+---
+
+## Numbers to quote rather than re-derive
+
+All `build_gen` (/O2) unless stated. **Debug timings are not comparable; quote the tree.**
+
+| | start of sprint | end |
 |---|---|---|
-| **BL-817** (playback record) | **complete** | `world_determinism` ALL PASS · `save_envelope_roundtrip` PASS · 9 new assertions |
-| **BL-848** (culture by route) | **built, acceptance test green** | `colonisation_harness` C11 on real worlds |
-| **BL-846/847/850** (span, package, predation) | **mechanisms built, not yet wired into the sim** | `colonisation_harness` 28 assertions, 0 failures |
-| **BL-851** (cradle outcomes) | **built** | C10a–f + a real-world census |
-| **BL-829/830** (round 4) | **merged, press-check green** | `history_lapse_press.lua`, 5 assertions |
+| Regions at the epoch | 609 | **1,906** |
+| Ownership changes | 533 | **4,432** |
+| Distinct peoples holding ground | 12 | **38 / 56 / 33** |
+| Route divergence from a Voronoi | — | **23–33%** |
+| Conquests in the span | 0 | ~472 transfers |
 
-`src/world/colonisation.{hpp,cpp}` is the whole span as pure functions over a tile raster.
-`run_settlement` now takes every founding's **date and culture** from it.
-
----
-
-## The one thing that decides the next session
-
-**Round 4 still cannot show the arc, and it is now precisely diagnosed.** Two causes, and only
-the first is a decision:
-
-1. **The sim watches 400 years of a 4,000-year story.** `prehistory_years = 400`, so by the time
-   the record opens, every region already exists. Fixing it means the sim spans the whole 4,000
-   years and settlement hands it a **founding schedule** rather than a finished map — and that
-   makes every world build pay ~6.5 s of era instead of ~60 ms, **which every harness in the
-   project then pays**. That cost is the decision; the code is not hard. **NR-810.**
-2. **The flood fills the map in ~1,600 years, not 4,000.** Founding years span `-4000..-2378`
-   (seed 0), `-4000..-3132` (seed 2). The rate is `colonisation_base_centiyears` = 12 years a
-   tile. **It is a MAGNITUDE and COLONISATION.md puts every magnitude here in `history_sweep`'s
-   hands** — do not retune it to make a chart look right. That is the whole failure mode this
-   layer's calibration rule exists to prevent.
-
-**Do not start (1) without Ben's answer.** It is a project-wide cost, not a local one.
+**Regions are ~3× where the day started, and that is the live cost risk.** NR-809 measured reach as
+roughly quadratic in region count; **BL-844 is already spent**, so no optimisation is waiting — the
+cap is the **adjacency model** (BL-855), which is a sprint of its own.
 
 ---
 
-## Ben's open calls, all filed and none of them work
+## Open calls, none of them work
 
 | Entry | Question |
 |---|---|
-| **NR-809** | Region count: cap at ~2–3× this sprint, or chase the sixteen-fold? **BL-844 is already complete**, so no optimisation is waiting — the cap is the adjacency model (BL-855). |
-| **NR-810** | The arc gap above. Recommended: retitle now (**done**), wire the span next. |
-| **NR-811** | Round 4 pays a full world build and Begin pays it again (~73 s twice, **Debug** — Release unmeasured). |
-| **NR-812** | Does the wizard's `ACTIONS.json` exemption reach a Run button? The implementer read the doc as broader than its brief, followed the doc, and flagged it. |
-| **NR-813** | A scrubber for the time-lapse. Recommended: defer until there is a real arc to sit through. |
+| **NR-809** | Region count vs the adjacency model. Sharper now that regions tripled. |
+| **NR-811** | Round pays a world build and Begin pays another. |
+| **NR-812** | Does the wizard's `ACTIONS.json` exemption reach a Run button? (Run is now retired, so this may be moot.) |
+| **NR-813** | A scrubber for the time-lapse. Defer until the spans are actually split. |
 
-New items: **BL-853** (the sim's terrain view carries no rivers, so the walk prices the coast as
-the cheapest route — contradicting the design's own first example), **BL-854** (B384a asserts
-every world goes to war; the colonisation design says that is wrong — raise, don't delete),
-**BL-855** (the neighbour graph densifies, which is what actually caps the region count).
-
----
-
-## Measurements taken this session — quote these, do not re-derive them
-
-All `build_gen` (/O2). **Debug timings are not comparable; quote the tree.**
-
-**Region-count sensitivity** (the thing NEXT_SESSION asked for first). Reach cost is
-**~quadratic in region count** — exponent 1.95–2.27 across seeds 0 and 1. Seed 0: 0.017 / 0.045 /
-0.079 ms per rebuild at 533 / 833 / 1,174 regions. Seed 1: 0.035 / 0.114 / 0.218 at 563 / 931 /
-1,260. Reach is 24–37% of a 4,000-year run. **These reproduce BL-844's own closing figures
-exactly** — it is the post-fix state, and BL-844 says the residual is the graph densifying, not
-the algorithm.
-
-**After culture-by-route:** regions hold on two seeds of three (149→149, 195→182) and thin on the
-third (**162→101**, 62% of land reached, 34% farmable). Whether that is emptiness working as
-designed or packages coming out too narrow **cannot be told from three seeds** — it is the
-sweep's.
-
-**The world changed.** Two-span digest `FD92A6F981DA6E67` → `4FCA63A24E05406D`. `world_determinism`
-is still ALL PASS because it compares same-seed runs **to each other** — it asserts determinism,
-not stability, and pins no literal. Nothing needed re-blessing. Worth knowing: there is less
-pinning here than "the digests" suggests.
+Open items worth pairing: **BL-859** (most land habitable — its premise was overturned by the
+unfarmed-class census: the shortfall is polar ice and mountains, so the lever is planetology or a
+cold-affinity package, **not** the affinity floor) and **BL-861** (no conquest — which today's
+polity fix may have resolved as a side effect; **measure before believing it**).
 
 ---
 
-## Traps, including three new ones
+## Traps this sprint paid for, all of them the same shape
 
-- **A decay coefficient is meaningless without the population range it will meet.** Predation's
-  first cut used 90 per doubling, which exhausted its floor at 1,024 heads — so across every
-  population the game actually has it was a **constant wearing a decay's name**. It read as a
-  tuning choice and was a dead mechanism. Sized to the range, it is 40.
-- **A classifier that asks "how much" when it should ask "why".** The cradle-outcome test first
-  reported 317 encircled / 186 spread / **0 sterile**, because it asked whether a source got much
-  ground. With 149 streams on one map most are simply born into ground their neighbours hold —
-  being outnumbered is not being penned. Reading each source's own frontier (wall against rival)
-  gives 316 dilution / 4 encirclement. **A sweep told the first version would have tuned the
-  barrier costs to fix a crowding effect.**
-- **A synthetic test case can assert nothing while reading green.** C3a's map put the target
-  equidistant from both cradles under the wrapped Chebyshev metric, so the proximity half of the
-  route claim was a tie. The margin is now six tiles.
-- **`save_envelope_roundtrip` still cannot be built by either headless builder** (`core/save_game.hpp`
-  links imgui) or in a worktree (no CMake tree). Build it from the main checkout:
-  `cmd //c` a batch file that calls the BuildTools vcvars then
-  `cmake --build build --target save_envelope_roundtrip`. **Bash quoting mangles the vcvars path —
-  use a .bat file, not an inline `cmd //c` string.** BL-817's save field carries an assertion this
-  time *because* this was done; it had landed unasserted twice before.
-- **The computer-use grant for "ProjectIo" resolves to a stale Sep-2 build in the orphaned
-  worktree `elated-mclean-7dd61c`**, which is not in `git worktree list`. Screenshot filtering is
-  `mask`, so both monitors come back black. **The live watch on round 4 is still owed** and could
-  not be taken this session.
+**A check that looks like coverage and is not**, six times:
+
+- **Never pipe a harness into `grep`.** A pipeline returns the *filter's* status, and a segfault
+  read as `exit 0`. Run to a file, then read `$?`.
+- **`--verify` adopts the harness's own world** on the lapse rounds, so the wizard's *stopped*
+  generation path has no coverage at all. That shipped an empty map for 4,000 years while the
+  header reported 611 foundings.
+- **`--debug` on `build_harness.js` does not set `_ITERATOR_DEBUG_LEVEL`.** An out-of-bounds write
+  passed both harness builds and aborted only in the app's real CMake Debug build, with exit 3 and
+  no message.
+- **A `static_assert` can be far too loose to fire** — `sizeof(app)`'s bar is ~6× the real limit
+  while the process died at startup.
+- **A synthetic case can assert a tie.** C3a's two cradles were equidistant under the wrapped
+  metric.
+- **A classifier can measure the wrong thing entirely** — "how much ground" measured crowding, not
+  encirclement.
+
+**What found the real defects was driving the app.** Three separate times, behind green harnesses.
+
+**And a comment can hold an invariant nothing checks.** *"Sized to the polity table, which the sim
+never grows"* was true when written and false the moment a polity could be born mid-run.
 
 ---
 
 ## Reproduce
 
 ```
-node tools/verify/build_harness.js colonisation_harness && build_gen/verify/colonisation_harness.exe 3
-node tools/verify/build_harness.js history_sim_harness  && build_gen/verify/history_sim_harness.exe
+node tools/verify/build_harness.js colonisation_harness && build_gen/verify/colonisation_harness.exe 3 4000
 node tools/verify/build_harness.js world_determinism    && build_gen/verify/world_determinism.exe
-node tools/verify/build_harness.js history_span_cost    && build_gen/verify/history_span_cost.exe 2
 build/ProjectIo.exe --verify scripts/verify/history_lapse_press.lua
+build/ProjectIo.exe --autostart-windowed     # grep for "in-game frames rendered"
 ```
 
-**Baselines:** `colonisation_harness` 28/0. `history_sim_harness` **4 known failures** (R3a2,
-R3a3, B384a, B384c) with 5/8 worlds fighting. `world_determinism` ALL PASS. Take them before the
-first edit.
+**Baselines:** `colonisation_harness` 35/0. `world_determinism` 0 failures.
+`history_lapse_press` **has 4 failures** — the round renumbering moved the pass-round footer, and
+the coordinates must be **read off a capture, never guessed**. It fails loudly rather than silently
+only because `verify.wizard_round()` reads the round back.
