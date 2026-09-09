@@ -241,6 +241,43 @@ save_envelope make_envelope()
     be.settlement.median_industrial_year = 1843;
     be.settlement.urban_map_drawn        = true;
 
+    // THE PLAYBACK RECORD, save_game_version 11 (BL-817). Distinct values in
+    // every field of every entry, and DIFFERENT BETWEEN the two entries of each
+    // array, for the reason the army-pool check above states: a dropped field
+    // desynchronises the whole stream and fails everything after it, but a
+    // TRANSPOSED pair reads back clean unless the two sides differ.
+    be.prehistory_timelapse.region_stride = 2;
+    be.prehistory_timelapse.start_year    = -4000;
+    be.prehistory_timelapse.years         = 4000;
+    be.prehistory_timelapse.changes.push_back(owner_change{-4000, 0, 3});
+    be.prehistory_timelapse.changes.push_back(owner_change{-1200, 1, 7});
+
+    be.prehistory_timelapse.steps.push_back(timelapse_step{-4000, 0, 2});
+    be.prehistory_timelapse.steps.push_back(timelapse_step{-1200, 2, 1});
+
+    polity_sample ps0; ps0.population = 84213; ps0.polity = 3; ps0.regions = 11;
+    ps0.cap_military = 2; ps0.cap_materials = 5;
+    polity_sample ps1; ps1.population = 19507; ps1.polity = 7; ps1.regions = 4;
+    ps1.cap_military = 6; ps1.cap_materials = 1;
+    polity_sample ps2; ps2.population = 550021; ps2.polity = 3; ps2.regions = 29;
+    ps2.cap_military = 4; ps2.cap_materials = 3;
+    be.prehistory_timelapse.samples.push_back(ps0);
+    be.prehistory_timelapse.samples.push_back(ps1);
+    be.prehistory_timelapse.samples.push_back(ps2);
+
+    culture_change cc0;
+    cc0.year = -4000; cc0.region = 0;
+    cc0.id[0] = 2; cc0.id[1] = 5; cc0.id[2] = -1;
+    cc0.weight_q[0] = 610; cc0.weight_q[1] = 300; cc0.weight_q[2] = 0;
+    cc0.other_q = 90;
+    culture_change cc1;
+    cc1.year = -1200; cc1.region = 1;
+    cc1.id[0] = 9; cc1.id[1] = -1; cc1.id[2] = -1;
+    cc1.weight_q[0] = 1000; cc1.weight_q[1] = 0; cc1.weight_q[2] = 0;
+    cc1.other_q = 0;
+    be.prehistory_timelapse.culture_changes.push_back(cc0);
+    be.prehistory_timelapse.culture_changes.push_back(cc1);
+
     e.report.bodies.push_back(be);
 
     // BL-768's three report counters, at DISTINCT non-default values.
@@ -403,6 +440,43 @@ int main()
                   && le.report.bodies[0].settlement.regions[1].army_stock == 941,
               "S3 the army pool survives BESIDE the manpower pool it is raised "
               "from, unswapped (BL-835, both regions)");
+        // BL-817, save_game_version 11 -- the playback record. Written as one
+        // predicate over every field of every entry, because the failure worth
+        // catching here is a transposition inside a fixed-size array (the three
+        // culture slots) and only distinct values on both sides can see it.
+        {
+            const era_timelapse& t = le.report.bodies.empty()
+                                   ? env.report.bodies[0].prehistory_timelapse
+                                   : le.report.bodies[0].prehistory_timelapse;
+            const era_timelapse& o = env.report.bodies[0].prehistory_timelapse;
+            bool play_ok = le.report.bodies.size() == 1
+                        && t.steps.size() == o.steps.size()
+                        && t.samples.size() == o.samples.size()
+                        && t.culture_changes.size() == o.culture_changes.size();
+            for (std::size_t i = 0; play_ok && i < o.steps.size(); ++i)
+                play_ok = t.steps[i].year == o.steps[i].year
+                       && t.steps[i].first_sample == o.steps[i].first_sample
+                       && t.steps[i].sample_count == o.steps[i].sample_count;
+            for (std::size_t i = 0; play_ok && i < o.samples.size(); ++i)
+                play_ok = t.samples[i].population == o.samples[i].population
+                       && t.samples[i].polity == o.samples[i].polity
+                       && t.samples[i].regions == o.samples[i].regions
+                       && t.samples[i].cap_military == o.samples[i].cap_military
+                       && t.samples[i].cap_materials == o.samples[i].cap_materials;
+            for (std::size_t i = 0; play_ok && i < o.culture_changes.size(); ++i)
+            {
+                play_ok = t.culture_changes[i].year == o.culture_changes[i].year
+                       && t.culture_changes[i].region == o.culture_changes[i].region
+                       && t.culture_changes[i].other_q == o.culture_changes[i].other_q;
+                for (int k = 0; play_ok && k < timelapse_culture_slots; ++k)
+                    play_ok = t.culture_changes[i].id[k] == o.culture_changes[i].id[k]
+                           && t.culture_changes[i].weight_q[k]
+                                  == o.culture_changes[i].weight_q[k];
+            }
+            check(play_ok,
+                  "S3 the playback record survives whole -- steps, per-polity samples and "
+                  "the culture-share change list, slot for slot (BL-817)");
+        }
         check(le.report.bodies.size() == 1
                   && le.report.bodies[0].settlement.lacunae == 6
                   && le.report.bodies[0].settlement.median_industrial_year == 1843

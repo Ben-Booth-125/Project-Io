@@ -756,6 +756,105 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 static_cast<uint16_t>(i),
                 static_cast<uint16_t>(owner[i])});
 
+
+    // --- THE PLAYBACK RECORD (BL-817) -------------------------------------
+    //
+    // Ownership above is one third of a time-lapse. These two closures record
+    // the other two: the per-polity SERIES the scoreboard re-ranks off, and the
+    // culture mix as it drifts. era_timelapse.hpp § The playback record carries
+    // the encoding argument; what matters here is the direction of the arrows.
+    //
+    // THE RECORDER ONLY READS THE SIM. It touches `owner`, `ss.regions` and
+    // `out.polities` as const, and writes into `out.steps` / `out.samples` /
+    // `out.culture_changes` and its own two locals. It draws no random number,
+    // it advances no clock, and nothing below reads a field it wrote — so a run
+    // with `record_playback` off differs from a recorded run in the three
+    // vectors and in nothing else. `history_sim_harness` asserts that on the
+    // same seed rather than trusting this paragraph.
+    const int record_interval = params.record_interval_years > 0
+                              ? params.record_interval_years : 1;
+    // Last shares WRITTEN for each region, so a change is a change since the
+    // last RECORDED step rather than since the last year. Grows with the region
+    // vector, which only ever appends (Settle), so an index is stable for life.
+    std::vector<culture_shares> last_shares;
+    std::vector<char>           shares_seen;
+    int64_t                     last_record_year = INT64_MIN;
+
+    // Per-polity accumulators, hoisted so a 200-step run does not allocate 200
+    // times. Sized to the polity table, which the sim never grows.
+    std::vector<int64_t> step_pop(out.polities.size(), 0);
+    std::vector<int32_t> step_regions(out.polities.size(), 0);
+
+    const auto record_step = [&](int64_t y_now) {
+        if (!params.record_playback) return;
+
+        std::fill(step_pop.begin(), step_pop.end(), 0);
+        std::fill(step_regions.begin(), step_regions.end(), 0);
+
+        const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+        if (last_shares.size() < ss.regions.size())
+        {
+            last_shares.resize(ss.regions.size());
+            shares_seen.resize(ss.regions.size(), 0);
+        }
+
+        timelapse_step st;
+        st.year         = static_cast<int32_t>(y_now);
+        st.first_sample = static_cast<int32_t>(out.samples.size());
+
+        // ONE walk in ascending region index — the raster order the rest of this
+        // file walks in — folding both halves of the record at once. The culture
+        // entries therefore come out ascending by region within a year without
+        // a sort, which is the ordering era_timelapse.hpp promises.
+        for (std::size_t i = 0; i < n_reg; ++i)
+        {
+            const region& r = ss.regions[i];
+            const int     o = owner[i];
+            if (o >= 0 && o < static_cast<int>(step_pop.size()))
+            {
+                step_pop[static_cast<std::size_t>(o)] += r.population;
+                ++step_regions[static_cast<std::size_t>(o)];
+            }
+
+            if (!shares_seen[i] || last_shares[i] != r.culture)
+            {
+                last_shares[i] = r.culture;
+                shares_seen[i] = 1;
+                culture_change c;
+                c.year    = static_cast<int32_t>(y_now);
+                c.region  = static_cast<uint16_t>(i);
+                for (int k = 0; k < timelapse_culture_slots && k < culture_share_slots; ++k)
+                {
+                    c.id[k]       = r.culture.id[k];
+                    c.weight_q[k] = r.culture.weight_q[k];
+                }
+                c.other_q = r.culture.other_q;
+                out.culture_changes.push_back(c);
+            }
+        }
+
+        // Ascending polity id, LIVING ONLY — a realm holding nothing is absent
+        // from the step rather than present with zeros, the same rule
+        // `make_pass_one_output` applies to holdings.
+        for (std::size_t pi = 0; pi < out.polities.size(); ++pi)
+        {
+            if (step_regions[pi] <= 0) continue;
+            polity_sample smp;
+            smp.polity        = static_cast<uint16_t>(pi);
+            smp.regions       = static_cast<uint16_t>(step_regions[pi]);
+            smp.population    = step_pop[pi];
+            smp.cap_military  = static_cast<uint8_t>(clampi(
+                out.polities[pi].capacity[static_cast<int>(sim_domain::military)], 0, 255));
+            smp.cap_materials = static_cast<uint8_t>(clampi(
+                out.polities[pi].capacity[static_cast<int>(sim_domain::materials)], 0, 255));
+            out.samples.push_back(smp);
+        }
+
+        st.sample_count = static_cast<int32_t>(out.samples.size()) - st.first_sample;
+        out.steps.push_back(st);
+        last_record_year = y_now;
+    };
+
     const int64_t years = params.stop_year - params.start_year;
     out.battles_per_century.assign(static_cast<std::size_t>(years / 100 + 1), 0);
 
@@ -2372,7 +2471,28 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
         // Ownership changes are appended where they happen (conquest, founding),
         // so there is nothing to snapshot at the end of a year.
+
+        // ---- THE RECORDED STEP (BL-817) ----------------------------------
+        //
+        // Reached only on a decision round — the gate above `continue`s past it
+        // on every other year — and then only once the interval has elapsed, so
+        // the cadence is max(decision band, record_interval_years). Sampling
+        // between two rounds would record the same numbers twice.
+        //
+        // AFTER the verbs execute, so a step shows the world the round left
+        // behind rather than the one it started from.
+        if (params.record_playback
+            && (last_record_year == INT64_MIN || y - last_record_year >= record_interval))
+            record_step(y);
     }
+
+    // THE CLOSING STEP, always taken, at the stop year. Without it the record's
+    // last step is wherever the interval happened to land — up to one interval
+    // short of the epoch — and a scoreboard would show a standing that is not
+    // the standing the world was handed on with.
+    if (params.record_playback
+        && (out.steps.empty() || out.steps.back().year != static_cast<int32_t>(params.stop_year)))
+        record_step(params.stop_year);
 
     out.region_stride = static_cast<int>(ss.regions.size());
     out.years           = years;

@@ -662,6 +662,30 @@ struct history_sim_params
     /// agree in every other output. The harness asserts that rather than
     /// trusting this sentence.
     bool trace_battles = false;
+
+    // --- The playback record (BL-817) --------------------------------------
+    //
+    // ON BY DEFAULT, unlike `trace_battles`, because generation is the consumer
+    // rather than a harness — the wizard's round 4 replays this, and a record
+    // that had to be asked for would be missing on every real world.
+    //
+    // The suppression switch exists for exactly one purpose: so the harness can
+    // run the SAME seed twice, once recorded and once not, and assert every
+    // other output agrees bit-for-bit. That is the check that keeps a watchable
+    // sim and a deterministic one from becoming two different sims, and it is
+    // the reason this is a param rather than a compile-time constant.
+    bool record_playback = true;
+
+    /// Minimum years between recorded steps. The record samples on a DECISION
+    /// ROUND once this many years have passed since the last sample, so it is
+    /// never finer than the sim's own decisions and never coarser than the
+    /// decision band by more than one round.
+    ///
+    /// 20 puts a 4000-year run at ~200 steps. A per-YEAR record would be 4000,
+    /// and the per-step cost is a full pass over the polity table — which is
+    /// the trap `owner_changes` already avoided once by not being a grid.
+    /// Values below 1 are treated as 1.
+    int record_interval_years = 20;
 };
 
 // ---------------------------------------------------------------------------
@@ -1047,6 +1071,20 @@ struct history_sim_state
     /// exactly that for a caller that wants one year materialised.
     std::vector<owner_change> owner_changes;
 
+    /// THE PLAYBACK RECORD (BL-817) — the OTHER TWO THIRDS of a time-lapse.
+    ///
+    /// `owner_changes` above draws the spreading colour and nothing else. These
+    /// three carry the leaderboard's series and the culture mix's drift, on the
+    /// recorded-step cadence `history_sim_params::record_interval_years` sets.
+    /// See era_timelapse.hpp § The playback record for the encoding argument
+    /// and for why a sampled record cannot move the run that produced it.
+    ///
+    /// Empty when `params.record_playback` is false — which is the control arm
+    /// of the harness assertion, not a debug mode.
+    std::vector<timelapse_step>  steps;
+    std::vector<polity_sample>   samples;
+    std::vector<culture_change>  culture_changes;
+
     /// THE ANCIENT ROAD RECORD (BL-768) — every region-to-region corridor the
     /// history actually moved along, deduplicated and counted.
     ///
@@ -1301,6 +1339,16 @@ inline int64_t owner_ring_bytes(const history_sim_state& s)
     return static_cast<int64_t>(s.owner_changes.size()) * static_cast<int64_t>(sizeof(owner_change));
 }
 
+/// Bytes the PLAYBACK record occupies (BL-817) — the steps, the per-polity
+/// samples and the culture-share change list. Disjoint from `owner_ring_bytes`,
+/// so the two add to the whole time-lapse rather than overlapping.
+inline int64_t playback_record_bytes(const history_sim_state& s)
+{
+    return static_cast<int64_t>(s.steps.size())           * static_cast<int64_t>(sizeof(timelapse_step))
+         + static_cast<int64_t>(s.samples.size())         * static_cast<int64_t>(sizeof(polity_sample))
+         + static_cast<int64_t>(s.culture_changes.size()) * static_cast<int64_t>(sizeof(culture_change));
+}
+
 /// Materialise the ownership map as it stood at the END of @p year — the
 /// time-lapse read. Returns `region_stride` entries, `owner_none` where the
 /// region did not exist yet or was unowned.
@@ -1315,7 +1363,10 @@ inline int64_t owner_ring_bytes(const history_sim_state& s)
 inline era_timelapse as_timelapse(const history_sim_state& s)
 {
     era_timelapse t;
-    t.changes       = s.owner_changes;
+    t.changes         = s.owner_changes;
+    t.steps           = s.steps;
+    t.samples         = s.samples;
+    t.culture_changes = s.culture_changes;
     t.region_stride = s.region_stride;
     t.start_year    = static_cast<int32_t>(s.start_year);
     t.years         = static_cast<int32_t>(s.years);
