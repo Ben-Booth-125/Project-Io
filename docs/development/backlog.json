@@ -661,6 +661,157 @@
     "tools/verify/history_sweep.cpp"
    ],
    "design": "FOUND BY DRIVING THE BUILT APP, 2026-09-09, and not by any harness.\n\nTHE READING: '0 battles, 0 conquests, 611 foundings in the full run' across four thousand years on seed 0, with five powers holding ground and none ever taking any from another. Ben's arc -- origin, communication, conquest or diplomatic union, a stable dark age -- has only its first act.\n\nTHE LIKELY CAUSE, and it needs confirming rather than assuming. Culture-by-route (BL-848) gives each stream a CONTIGUOUS block, so a region's neighbours are overwhelmingly kin; the objective scorer's w_cult discount for foreign ground therefore never fires. Large unclaimed buffers (BL-859) compound it by leaving polities without shared frontiers at all.\n\nTHE EVIDENCE IS AMBIGUOUS AND MUST NOT BE ARGUED FROM ONE ARC. At the 4000-year span battles fell 567 -> 70 after culture-by-route; on the 1960 two-span arc they ROSE 30 -> 141. Both are real measurements of different arcs. A tidy story about kinship suppressing war fits the first and not the second, so the cause is to be MEASURED across history_sweep before anything is changed.\n\nTHIS IS THE COUNTERWEIGHT TO BL-854. That item argues B384a (every world sees a region change hands by war) should be retired because a warless settlement span is correct behaviour. This item is the reason that argument cannot be taken on faith: a span with NO war in it at all is not a peaceful settlement process, it is a missing mechanism. Settle the two together.\n\nDONE WHEN: the cause is measured rather than reasoned, and the history round (BL-860) produces conquest without the migration round being made violent."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-856"
+   ],
+   "id": "BL-865",
+   "short_name": "CULTURE_KEEPS_ITS_PARENTAGE",
+   "difficulty": 2,
+   "title": "A culture records the people it descends from, so kinship survives the migration",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/creeds.hpp",
+    "src/world/colonisation.hpp",
+    "src/world/settlement.cpp",
+    "src/core/save_game.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "THE SINGLE MOST IMPORTANT THING SPRINT 37 STILL OWES, and it is small.\n\nBL-856 coins every daughter culture from a NAMED PARENT and colonisation_field::spawns records each (culture, parent) edge -- then the field is discarded at the end of run_settlement and `creed_state::culture` has no parent member. So by the time the empire phase runs, THE FACT THAT TWO PEOPLES ARE COUSINS IS UNRECOVERABLE. The migration builds a family tree of peoples and throws it away.\n\nWHY IT MATTERS MORE THAN ITS SIZE. CIVILISATION.md sec Culture relations makes kinship the similarity substrate: two peoples are alike because they SHARE AN ANCESTOR AND PARTED RECENTLY, which is a fact about the world's history rather than a number assigned to it. Without the tree, similarity has to be invented from scratch in sprint 38 -- and any invented measure would be exactly the rolled-not-earned quantity this layer keeps refusing.\n\nRETAIN TWO FIELDS, both already computed: the PARENT culture id, and the FARM CLASS the culture was coined on (front_entry::origin_class, BL-864) -- a people of the floodplain and a people of the highlands differ materially, which is one of the three candidate opposition axes.\n\nSAVE SEAM: `culture` is serialised, so this lands with its flat-binary path in the same commit or is flagged loudly as owed (src/world/CLAUDE.md).\n\nDONE WHEN: a harness walks a generated world's culture tree from any daughter back to a cradle, and the origin class of each is readable."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "38",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [],
+   "id": "BL-866",
+   "short_name": "SETTLEMENTS_ARE_SPARSE",
+   "difficulty": 3,
+   "title": "Population centres become settlements, and a settlement is a place worth taking",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/population_generation.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "BEN, 2026-09-09: population centres become settlements, and settlements are SPARSE.\n\nToday centres are drawn broadly across the map (POPULATION.md sec Generation). That is right for a populated world and wrong for a world of CITY STATES: if everywhere is a settlement, nowhere is a seat, and an empire is just a larger blob of the same stuff.\n\nSPARSE MAKES CONQUEST MEAN SOMETHING. A settlement holds the stores, is where the muster forms, and taking it is how a war ends. Ground between settlements is HINTERLAND: it feeds a seat, is walked through, and changes hands when its seat does. A city state is a settlement plus its hinterland; an empire is a city state holding other settlements. No new actor type -- the sim's `polity` already is one.\n\nOPEN AND NOT TO BE GUESSED: whether a settlement is a threshold on the existing urban record, a separate record, or a promotion of certain regions.\n\nDONE WHEN: settlements are visibly sparse on the round-4 map, each has a hinterland that changes hands with it, and the count is stable across a seed spread."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "38",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [],
+   "id": "BL-867",
+   "short_name": "MATERIALS_SPENT_ON_ACTION",
+   "difficulty": 4,
+   "title": "Materials are spent when something happens, and labour divides three ways",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/settlement.hpp"
+   ],
+   "design": "BEN, 2026-09-09: materials are spent when actions happen -- NOT via markets or buildings. And: a high population province must reserve population for work in industry to feed the settlements, raising a natural equilibrium between civilian and military strength.\n\nNO ECONOMY, AND IT MUST NOT GROW ONE. No price, no order book, no firm, no building stack -- MARKETS.md and PRODUCTION.md own those and they belong to a later era. What this phase has is STORES AND EXPENDITURE: a polity holds materials, an action consumes them.\n\nTHE EQUILIBRIUM IS A CONSEQUENCE, NOT A DIAL. Labour divides three ways -- subsistence, industry, muster -- and the division is forced by what the ground and the population can bear. That is what makes conquest COST something without an economy: an army in the field is labour not farming and not making, so a polity that musters too hard starves or stops producing.\n\nAN IN-WORLD FORCE WITH A VISIBLE CAUSE, which is this project's standing requirement for a brake -- never a term inside an agent's head.\n\nOPEN: whether stores are per polity or per province. Ben's phrasing reads as per PROVINCE, which makes the labour split a property of ground rather than of a realm.\n\nDONE WHEN: a campaign visibly costs materials and labour, a polity that over-musters is measurably worse off, and no market or building appears anywhere in the path."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "38",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-865"
+   ],
+   "id": "BL-868",
+   "short_name": "CREEDS_RAISE_ARMIES",
+   "difficulty": 3,
+   "title": "Some peoples grow armies and begin to conquer, and which ones is downstream of their route",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-09: depending on their creed, some cultures grow armies and begin to conquer.\n\nTHE INPUT ALREADY EXISTS AND IS ALREADY EARNED. culture::aggression_q derives from the pantheon's war god, and COLONISATION.md sec Culture arrives by route made the distribution of pantheons a RECORD OF ROUTES. So which peoples turn warlike is downstream of where their ancestors walked -- which is exactly the ordering the colonisation design set out to establish: doctrine is downstream of how a people came to live where it lives.\n\nNOT EVERY PEOPLE CONQUERS, AND THAT IS THE POINT. A world where every culture musters is as flat as one where none does.\n\nNOT A NEW AI GRANT. A polity choosing to campaign is a decision, and this phase HAS actors where the migration span deliberately has none -- but it is the Era -1 sim's EXISTING scored-utility verb set, already covered by the dated register in AI_OPPONENT.md sec 11, bound by the same constraints: pure, seeded, deterministic, replayable, only legal verbs, never a planner. ANYTHING BEYOND THOSE FIVE VERBS IS A NEW WIDENING AND IS BEN'S TO GIVE -- raised, never assumed.\n\nDONE WHEN: the spread of who conquers correlates with route-derived aggression across a seed sweep, and a warlike people and a peaceable one are both normal outcomes."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "38",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-865"
+   ],
+   "id": "BL-869",
+   "short_name": "CIVILISATIONS_FROM_MIXING",
+   "difficulty": 4,
+   "title": "A civilisation is what mixing makes, and it is not a creed",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/creeds.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "BEN, 2026-09-09: some civilisations form, whereby mixing cultures gives rise to philosophy and ethics, as removed from the initial religion-based creeds.\n\nTHE DISTINCTION IS LOAD-BEARING. A CREED is what a people brought with them: a pantheon coined at a cradle, carried along a route, inherited by every daughter. A CIVILISATION is what happens when peoples MIX -- second-order, belonging to no single culture, about how one ought to live rather than which gods there are. Creeds are the migration's output and are already built; civilisations are the empire phase's output and CANNOT be generated at a cradle, because there is nothing yet to mix.\n\nTHE MIXING IS ALREADY THERE: region::culture is a culture_shares distribution and the assimilation machinery already moves it when ground changes hands. A region carrying two peoples in quantity, for a long time, is the condition to grow one from.\n\nNOT SETTLED, AND NOT TO BE GUESSED AT BUILD TIME: whether a civilisation is a named record like a culture, a set of axes over the cultures composing it, or a lens on the existing shares; what it means for a polity to BELONG to one; whether it can outlive the polities that formed it.\n\nDONE WHEN: civilisations arise only where mixing actually happened, are legible as distinct from the creeds beneath them, and a world with little mixing produces few or none."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "38",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-865"
+   ],
+   "id": "BL-870",
+   "short_name": "CULTURE_RELATIONS",
+   "difficulty": 4,
+   "title": "Cultures are alike or opposed, and that is the engine of conquest",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/creeds.hpp",
+    "src/world/history_sim.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-09: cultures have similarities, and sometimes directly opposing views. This leads to conflict, and it becomes the engine for our simulated city states to begin an idea of conquest.\n\nOPENED AS A DESIGN ASIDE (CIVILISATION.md sec Culture relations), NOT SETTLED. This item carries the work once the calls are answered.\n\nSIMILARITY IS KINSHIP, and the substrate exists: the migration's family tree (BL-865). Two peoples are alike because they share an ancestor and parted recently -- earned by the migration rather than assigned.\n\nOPPOSITION NEEDS A SECOND AXIS, because kinship alone gives DISTANT and not OPPOSED, and those differ: two peoples across a continent who never met are distant and have no quarrel. Three candidates, all from quantities that already exist -- the pantheon's own zeal/dominion; the farm class a people was coined on (BL-864), which is a material disagreement rather than a stated one; and contact itself, via culture_shares interpenetration.\n\nTHE FOUR OPEN CALLS, recorded in the doc and in the review queue: is opposition SYMMETRIC (grudges are directed; a disagreement about how to live may not be); does kinship DECAY or is the tree enough; does opposition CAUSE conquest or merely PERMIT it (feeding w_cult is the smaller change and keeps one scorer, a score of its own makes relations the engine Ben describes); and how does a civilisation relate to opposed cultures inside it.\n\nDONE WHEN: the calls are answered, relations are derived from history rather than rolled, and a sweep shows both alliance-shaped and enmity-shaped worlds."
   }
  ]
 }

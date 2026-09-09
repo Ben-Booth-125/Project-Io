@@ -73,10 +73,10 @@
   {
    "id": "37",
    "theme": "how humanity spreads before it fights",
-   "state": "complete",
-   "status_line": "CLOSED 2026-09-09. Design pass and build in one day. The migration span exists, runs inside the recorded history, and has its own wizard round: the world now OPENS as a handful of cradles and fills on camera, where it used to open already full. 14 items delivered (BL-829/830/846/847/848/850/851/856/857/858/860/862/863/864, on top of BL-817). The wizard walks five named rounds -- System, Life, Culture, Empires, Industrialisation.",
+   "state": "open",
+   "status_line": "REOPENED 2026-09-09 for a design addendum, having been closed the same day. Ben: 'we have more work to do for sprint 37 ... we need to be sure we retrieve all necessary data to facilitate this.' The Empires phase needs city states growing into empires, ancient logistics expanding, and natural resources abstracted for conquest -- and the Culture phase must HAND THAT FORWARD. docs/generation/CIVILISATION.md is the new authority. The gap found: the migration builds a family tree of peoples (BL-856) and DISCARDS it, so kinship -- the natural substrate for culture similarity -- is unrecoverable by the empire phase. BL-865 closes it and is sprint 37's; BL-866..BL-870 are sprint 38's.",
    "opened_date": "2026-09-09",
-   "closed_date": "2026-09-09",
+   "closed_date": null,
    "author": null,
    "goal": "Ben, 2026-09-09: focus on the initial colonisation and spreading of humanity - how populations grow and develop agriculture in appropriate locations, how cultures grow out of that, and what philosophies emerge as A PRECURSOR TO MILITARY DOCTRINE. The ordering is the point: doctrine should be downstream of how a people came to live where they live, not an independent axis bolted on beside it.\n\nThe evidence that this is a separate phase and not a mood: over 4,000 years seed 0 goes from 533 to 1,372 regions with 839 foundings and 9 battles. B384a - every world sees at least one region change hands by war - FAILS because several seeds fight zero times. The 258-battle pathology sprint 36 removed was war logic operating on ground colonisation had produced and had no answer for. One loop with one parameter set is being asked to serve both, which is why a dial like defence_levy_q has to satisfy empty frontiers and contested borders at once.",
    "planned": [

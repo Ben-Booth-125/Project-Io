@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*8 entries — 7 open, 1 resolved.*
+*9 entries — 8 open, 1 resolved.*
 
 ---
 
@@ -132,6 +132,22 @@ The plain transport was built as briefed: Run, then it plays, then Restart. The 
 > **Recommendation:** Not yet, and for a reason that outranks the argument: the round currently plays 400 years of a 4000-year record (NR-810), so how it should be steered cannot be judged from what it does now. Decide after the colonisation span is wired and there is a real arc to sit through. If it is decided sooner, a scrub earns its place and a pause does not - a frozen map is what the round already looks like most of the time. The ~30 s duration is also unvalidated and was not Ben's.
 
 *Files: `src/ui/history_lapse.cpp`, `docs/ui/STARTUP.md`*
+
+### NR-814 — Culture relations: four calls that decide whether the empire phase has an engine
+*question · raised 2026-09-09 · from The Empires design pass, 2026-09-09. Ben asked for a quick design aside on point 5 (culture relations); CIVILISATION.md sec Culture relations carries it and these are the calls it deliberately did not answer.*
+
+Cultures are to be alike or opposed, and that opposition is meant to be the engine of conquest. The SIMILARITY half has an answer already: the migration builds a family tree of peoples, so kinship is a similarity measure EARNED by history rather than assigned (BL-865 retains it). The OPPOSITION half does not, and kinship alone will not supply it -- kinship gives DISTANT, not OPPOSED, and two peoples on opposite sides of a continent who never met are distant with no quarrel.
+
+**Why it matters.** It decides whether the empire phase is a map of armies bumping into each other or a map of peoples who want different things. It also decides how much new machinery sprint 38 needs: three of the candidate axes are quantities that ALREADY exist and are already earned, so a good answer here may cost almost nothing, and a bad one invents a whole relations system beside the ones already running.
+
+- IS OPPOSITION SYMMETRIC? `grudge` is a DIRECTED table, so the sim already has a precedent for asymmetry -- but a disagreement about how one ought to live may be mutual. Directed makes relations a matrix; symmetric makes it a set of pairs, and halves the storage.
+- DOES KINSHIP DECAY, or is the tree enough? Two peoples five generations apart may be as foreign as two unrelated ones, or kinship may hold indefinitely and make whole branches of the tree natural allies.
+- DOES OPPOSITION CAUSE CONQUEST, OR MERELY PERMIT IT? The sim already scores campaigns with w_cult discounting foreign ground. Feeding relations into that weight is the SMALLER change and keeps one scorer; giving relations a score of their own is what would make them the engine Ben describes. This is the one that most changes sprint 38's size.
+- HOW DOES A CIVILISATION RELATE TO OPPOSED CULTURES INSIDE IT? If two opposed peoples end up in one civilisation, does it resolve the opposition, inherit it, or fracture?
+
+> **Recommendation:** Answer (3) first, because the other three are cheap once it is settled and expensive to revisit after. My lean is PERMIT rather than CAUSE for the first cut: it keeps a single scorer, it is measurable against the existing sweep, and it can be raised to CAUSE later if the histories come out flat -- whereas a second scorer is hard to remove once other things read it. On (1) I lean symmetric for similarity and directed for grievance, which is how the two already behave: kinship is a fact about a shared past, a grudge is something one party holds.
+
+*Files: `docs/generation/CIVILISATION.md`, `src/world/creeds.hpp`, `src/world/history_sim.cpp`*
 
 ---
 

@@ -104,7 +104,14 @@ subdivided in latitude, every cell a quad — not a per-pixel inverse projection
 into a texture. Both avoid projecting ~7,500 hexes as polygons against ImGui's
 16-bit draw indices; the slice path gets there with less machinery.
 
-## Rounds 4, 5 and 6 — migration, history, substrate (Ben, 2026-09-08; reframed 2026-09-09)
+## Rounds — System, Life, Culture, Empires, Industrialisation (Ben, 2026-09-08; reframed and renamed 2026-09-09)
+
+**FIVE ROUNDS, AND THE SPENDING ROUND RETIRED (Ben, 2026-09-09).** The third planetology round —
+*Inheritance*, which asked what the era before you already took and carried the **drawdown** lean —
+is no longer a round of its own: its subject belongs with industrialisation, which is what draws a
+world down in the first place. The chart chain keeps all three of its groups, because the in-game
+History ledger reads the same table; only the wizard stops walking the third. **Owed, and recorded
+rather than dropped: the drawdown lean is editable nowhere until round 5 is built.**
 
 The wizard does not stop at planetology. Three further rounds carry the generation
 phases — [`GENERATION_STRATEGY.md`](../generation/GENERATION_STRATEGY.md) § The eight
@@ -120,7 +127,7 @@ produced a round that showed conquest with the migration already finished off-sc
 then — once the migration was moved inside it — a round with **no conquest at all** and a
 static final third. They are separate rounds now, each with its own span.
 
-**Round 4 — The Migration.** A 2D map replacing the globe, playing the peopling of an
+**Round 3 — Culture.** A 2D map replacing the globe, playing the peopling of an
 empty world: where people started, the routes they took, and the cultures those routes
 produced. Its authority is [`COLONISATION.md`](../generation/COLONISATION.md).
 
@@ -135,19 +142,19 @@ produced. Its authority is [`COLONISATION.md`](../generation/COLONISATION.md).
 - **Most of the land ends habitable and peopled.** Unsettled ground is the exception
   marking hostile country, never the background state of half a continent.
 
-**Round 5 — The History.** The 4000-year span **ending at 1200 CE**, which is what the
+**Round 4 — Empires.** The 4000-year span **ending at 1200 CE**, which is what the
 original round 4 named and what this round now owns alone: polities contesting the world
 migration left them. Origin is round 4's; this round is *communication → conquest or
 diplomatic union → a stable dark age*, and that arc is its acceptance criterion. A run
 reaching 1200 CE without that shape has failed even if every number is plausible.
 **Asymmetry is completely fine and expected** — it is the deliverable, not a defect.
 
-On the left, where the planetology rounds stack their charts, round 5 keeps a
+On the left, where the planetology rounds stack their charts, round 4 keeps a
 **leaderboard** — how cultures grew and fell, on four metrics: **military might**,
 **research speed**, **population**, and **share of the world owned**. It is the round's
 chart surface, and it moves with the map.
 
-**Round 6 — The Substrate.** The same globe, at the epoch, gaining four things in
+**Round 5 — Industrialisation.** The same globe, at the epoch, gaining four things in
 order: **metros growing** out of the population centres the history sacked and grew,
 **colonial reach across water**, **firm markers with their charters**, and the
 **market carve with its price field**. This is phase 6's search made watchable — the
