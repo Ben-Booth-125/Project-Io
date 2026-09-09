@@ -69,6 +69,25 @@ struct world_gen_config
     /// balance value, and it is the one field here that is not.
     bool stop_after_ancient_era = false;
 
+    /// STOP GENERATION ONCE THE MIGRATION HAS RUN, before the Empires round's
+    /// history sim ever starts (BL-871).
+    ///
+    /// WHAT IT IS FOR. The wizard's round 3 (Culture) wants the migration's own
+    /// record — colonisation's founding walk, 2400 BCE to wherever it
+    /// terminates — and NOT the Empires round's conquest history that used to
+    /// be fused into the same run. Mutually exclusive with
+    /// `stop_after_ancient_era` in practice: a caller wants one stop point or
+    /// the other, never both, though nothing here enforces that (the earlier
+    /// check wins if both are set).
+    ///
+    /// THE WORLD IS NOT USABLE WHEN THIS IS SET, for the same reason
+    /// `stop_after_ancient_era` is not: `run_history_sim` has not run at all,
+    /// so no region founded after `sim_start_year` exists yet, there are no
+    /// polities, and nothing downstream may be built from it.
+    ///
+    /// Default false: every existing caller is unaffected.
+    bool stop_after_migration = false;
+
     /// Deposit-density multiplier per abundance_level (sparse/lean/standard),
     /// authored under `world_gen.deposit_scalar`. Indexed by abundance_level.
     std::array<float, 3> deposit_scalar = { 0.40f, 0.65f, 1.00f };
