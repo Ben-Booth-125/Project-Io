@@ -385,6 +385,11 @@ struct front_entry
     /// Centi-years since this stream last diverged. Crossing
     /// `colonisation_split_centiyears` coins a daughter and resets it.
     int64_t since_split_cy = 0;
+    /// The farm class this stream's culture was coined on (BL-864). Settling
+    /// ground of a DIFFERENT class is what makes a daughter: a people that
+    /// comes down from the highlands onto a floodplain farms differently, eats
+    /// differently, and within a few centuries is different.
+    farm_class origin_class = farm_class::steppe;
 };
 
 /// Greater-than, because std::priority_queue is a MAX heap and we want the
@@ -461,7 +466,8 @@ colonisation_field run_colonisation(const colonisation_input& in,
         if (s.tile < 0 || static_cast<std::size_t>(s.tile) >= n) continue;
         if (is_water(sub[static_cast<std::size_t>(s.tile)])) continue;
         front.push(front_entry{static_cast<int64_t>(s.ready_year) * 100,
-                               s.tile, static_cast<int32_t>(si), s.culture, 0});
+                               s.tile, static_cast<int32_t>(si), s.culture, 0,
+                               f.ground[static_cast<std::size_t>(s.tile)]});
     }
 
     const int64_t boundary_cy = static_cast<int64_t>(in.boundary_year) * 100;
@@ -491,6 +497,28 @@ colonisation_field run_colonisation(const colonisation_input& in,
     // are stable integers, so this adds no order dependence: two tiles crossing
     // in the same year still resolve on the heap's (year, tile, source) order.
     std::vector<int64_t> last_split_cy;
+
+    // PER-CULTURE BOOKKEEPING FOR THE TWO NEW TRIGGERS (BL-864). Both are
+    // consequences of the walk rather than decisions, so the span keeps its
+    // no-actor rule: nothing here chooses to divide, it simply has.
+    //
+    //  * `culture_tiles` -- how much ground this people holds, counted as tiles
+    //    are claimed. Reset on a split, so the SIZE trigger is bounded by
+    //    (land tiles / colonisation_culture_max_tiles).
+    //  * `class_seen` -- a 12-bit mask of the farm classes this culture has
+    //    already spawned a daughter for, so the BIOME trigger fires at most ONCE
+    //    per (culture, class) pair. Bounded by construction rather than by a
+    //    threshold tuned until it looked right: BL-856's first cut had no such
+    //    bound and coined 1,739 peoples on one world.
+    std::vector<int32_t>  culture_tiles;
+    std::vector<uint16_t> class_seen;
+    const auto grow_culture_state = [&](std::size_t k) {
+        if (k >= culture_tiles.size())
+        {
+            culture_tiles.resize(k + 1, 0);
+            class_seen.resize(k + 1, 0u);
+        }
+    };
     const auto may_split = [&](int32_t parent, int64_t at) {
         if (parent < 0) return false;
         const std::size_t k = static_cast<std::size_t>(parent);
@@ -528,6 +556,11 @@ colonisation_field run_colonisation(const colonisation_input& in,
         if (!any_arrival) { f.last_arrival_year = f.arrival_year[i]; any_arrival = true; }
         else if (f.arrival_year[i] > f.last_arrival_year)
             f.last_arrival_year = f.arrival_year[i];
+        if (e.culture >= 0)
+        {
+            grow_culture_state(static_cast<std::size_t>(e.culture));
+            ++culture_tiles[static_cast<std::size_t>(e.culture)];
+        }
         f.source_region[i] = src.region;
         f.culture[i]       = e.culture; // The stream's, which may be a daughter.
         // GROUND NO PACKAGE SUITS IS NOT SETTLED. The stream still CROSSES it —
@@ -562,18 +595,58 @@ colonisation_field run_colonisation(const colonisation_input& in,
             // the clock restarts. No actor: distance and time do this, not a
             // decision, and the split is a consequence of the walk in exactly
             // the sense this file's header means.
-            int32_t child_culture = e.culture;
-            int64_t child_since   = e.since_split_cy + step;
-            if (child_since >= colonisation_split_centiyears && next_culture >= 0
-                && may_split(e.culture, at))
+            int32_t    child_culture = e.culture;
+            int64_t    child_since   = e.since_split_cy + step;
+            farm_class child_origin  = e.origin_class;
+            const farm_class g       = f.ground[ni];
+
+            // THREE WAYS A PEOPLE BECOMES TWO, and none of them is a decision.
+            //
+            //  COUNTRY -- it has settled ground of a class it was not coined on
+            //    (BL-864). The truest of the three: the package IS coined from a
+            //    class, so "this is different country" is a question the model
+            //    can already answer about itself.
+            //  SIZE -- it holds more ground than one people holds (BL-864).
+            //  DRIFT -- it has simply been walking long enough (BL-856).
+            //
+            // COUNTRY is tested first: where a stream crosses into new country
+            // AND has been walking a long time, the country is the better
+            // explanation of why its children differ -- and the daughter becomes
+            // a people OF that country, inheriting the class as its own origin.
+            if (next_culture >= 0 && e.culture >= 0)
             {
-                child_culture = next_culture++;
-                child_since   = 0;
-                f.spawns.push_back(culture_spawn{child_culture, e.culture,
-                                                 static_cast<int32_t>(ni)});
+                const std::size_t k = static_cast<std::size_t>(e.culture);
+                grow_culture_state(k);
+                const uint16_t bit = static_cast<uint16_t>(1u << static_cast<int>(g));
+
+                bool split = false;
+                if (g != e.origin_class && (class_seen[k] & bit) == 0)
+                {
+                    class_seen[k] = static_cast<uint16_t>(class_seen[k] | bit);
+                    child_origin  = g;
+                    split         = true;
+                }
+                else if (culture_tiles[k] >= colonisation_culture_max_tiles)
+                {
+                    culture_tiles[k] = 0;
+                    split            = true;
+                }
+                else if (child_since >= colonisation_split_centiyears
+                         && may_split(e.culture, at))
+                {
+                    split = true;
+                }
+
+                if (split)
+                {
+                    child_culture = next_culture++;
+                    child_since   = 0;
+                    f.spawns.push_back(culture_spawn{child_culture, e.culture,
+                                                     static_cast<int32_t>(ni)});
+                }
             }
             front.push(front_entry{at, static_cast<int32_t>(ni), e.source,
-                                   child_culture, child_since});
+                                   child_culture, child_since, child_origin});
         }
 
         // --- The crude overseas hop (BL-857) ------------------------------
@@ -645,7 +718,7 @@ colonisation_field run_colonisation(const colonisation_input& in,
                                                                  static_cast<int32_t>(ni)});
                             }
                             front.push(front_entry{at, static_cast<int32_t>(ni), e.source,
-                                                   hop_culture, hop_since});
+                                                   hop_culture, hop_since, e.origin_class});
                             continue;
                         }
 

@@ -386,6 +386,22 @@ inline constexpr int32_t colonisation_hop_centiyears = 2600;
 /// A PLACEHOLDER awaiting `history_sweep`, like every magnitude here.
 inline constexpr int64_t colonisation_split_centiyears = 60000; // 600 years
 
+/// Tiles one culture may hold before it divides on its next founding (BL-864).
+///
+/// **A people spread over a continent is not one people.** Ben, 2026-09-09:
+/// the Culture round is the INPUT to the conquest round, and a handful of vast
+/// cultures gives Empires nothing to contest — no frontiers that mean anything,
+/// few neighbours who are recognisably foreign.
+///
+/// A SIZE TRIGGER NEEDS NO NEW STATE: the walk already claims tiles one at a
+/// time in arrival order, so counting them per culture is free. The counter
+/// resets on the split, so this is bounded by (land tiles / this) rather than
+/// by a threshold picked to look right — which is the discipline BL-856's first
+/// cut lacked when it coined 1,739 peoples on one world.
+///
+/// `history_sweep`'s magnitude like every other here.
+inline constexpr int colonisation_culture_max_tiles = 340;
+
 /// One culture the migration coined: `culture` descends from `parent`.
 ///
 /// The walk allocates ids and records the parentage; it does not coin names,

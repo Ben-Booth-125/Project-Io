@@ -1023,6 +1023,32 @@
     "docs/ui/STARTUP.md"
    ],
    "design": "BEN, 2026-09-09: 'we can in fact retire the spending round. That will be better fit into what you've called Substrate.' The wizard becomes FIVE rounds:\n\n  1. System   2. Life   3. Culture   4. Empires   5. Industrialisation\n\nWHAT RETIRES. The third planetology round -- 'Inheritance', which asked what the era before you already took and carried the DRAWDOWN lean -- stops being a round of its own. Its subject belongs with industrialisation, which is what draws a world down in the first place, so it folds into round 5.\n\nWHAT IS RENAMED. The Migration -> Culture, The History -> Empires, The Substrate -> Industrialisation. The names say what the round is ABOUT rather than what the code calls the pass, which is the right register for a player-facing wizard.\n\nTHE CHART CHAIN KEEPS ALL THREE GROUPS. `ui::chain_round_count` stays 3 because tile_inspector.cpp's History ledger Chain view reads the same table -- deleting the third entry would silently drop the legacy/spend charts from the IN-GAME ledger, which is not what was asked. Only the WIZARD stops walking it, so the assert binding the two counts relaxes from == to >=: the chart chain must cover AT LEAST the wizard's planetology rounds.\n\nworld_preferences::roll KEEPS THREE COUNTERS and its assert relaxes the same way, rather than dropping to two. Shrinking it would be a SAVE-FORMAT change for a UI reorder (save_envelope_roundtrip asserts 8 leans + roll[3] survive), and the third counter is not dead -- it is reserved for the drawdown lean when round 5 takes it.\n\nOWED, AND RECORDED RATHER THAN DROPPED: the drawdown lean is no longer editable anywhere until round 5 is built, so it sits at lean::any. That is a real loss of player control and it should not be forgotten because a round was renamed.\n\nDONE WHEN: five pips navigate, the names read as above, Back walks down one rung at a time, and a live click confirms it."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, watching the Culture round); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "Generation",
+   "requires": [
+    "BL-856"
+   ],
+   "id": "BL-864",
+   "short_name": "CULTURES_SPLIT_ON_SIZE_AND_BIOME",
+   "difficulty": 3,
+   "title": "A culture divides when it grows too large, or when it settles different country",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/colonisation.cpp",
+    "src/world/colonisation.hpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "BEN, 2026-09-09: 'Can we tune this phase to leave more cultures? We want a richer map for when conquest arrives in the next phase. For this, we need some mechanic which separates cultures when they grow too big, or when the culture grows onto a different biome.'\n\nTHE PHASE IS THE INPUT TO THE NEXT ONE. Empires contests what migration left it, and a handful of vast cultures gives it almost nothing to work with -- no frontiers that mean anything, few neighbours who are recognisably foreign. The richness of the conquest phase is decided here.\n\nTWO NEW TRIGGERS, both consequences of the walk rather than decisions, so the span keeps its no-actor rule (COLONISATION.md sec No actor):\n\n  SIZE. A culture holding more than a stated number of tiles divides on its next founding. A people spread over a continent is not one people; distance alone stops them being so.\n\n  BIOME. A stream settling ground of a farm class its culture was NOT coined on founds a new people. This is the truer of the two and it fits what is already built: the walk classifies every tile (farm_class), and the package is coined FROM a class, so 'this is different country' is a question the model can already answer. A people that comes down from the highlands onto a floodplain farms differently, eats differently and within a few centuries is different.\n\nBOUNDED, BECAUSE THE FIRST SPLIT MECHANISM WAS NOT. BL-856's first cut split per TILE and coined 1,739 cultures on one world. The biome trigger fires at most ONCE per (culture, class) pair and the size trigger resets its counter, so both are bounded by construction rather than by a threshold chosen to look right.\n\nTHE MAGNITUDES -- how many tiles is 'too big', and whether every class change counts or only a substantial one -- are history_sweep's, as every magnitude in this layer is.\n\nDONE WHEN: a homeworld ends with substantially more distinct peoples HOLDING GROUND than its cradle count, the count is bounded across a seed spread, and the harness asserts both rather than reporting them."
   }
  ]
 }
