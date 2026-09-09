@@ -835,7 +835,7 @@
   {
    "id": "BL-873",
    "short_name": "CULTURE_COINING_YEAR",
-   "status": "designed",
+   "status": "complete",
    "priority": "A",
    "difficulty": 2,
    "glyph": "✓",
@@ -851,7 +851,9 @@
     "src/world/creeds.hpp",
     "src/world/colonisation.cpp"
    ],
-   "design": "THE THIRD DISCARDED MIGRATION FACT, and the smallest of the three.\n\nBL-865 retained culture::parent and culture::origin_farm_class after CIVILISATION.md found the descent tree was being built and thrown away. The same is true of WHEN each culture was coined: the migration knows the year at every founding, and nothing keeps it.\n\nWHY IT IS NEEDED NOW: NR-816 settles kinship as YEARS SINCE THE COMMON ANCESTOR rather than tree hops, and that measure is worthless without the years. The tree runs 9-10 deep over 676 and 929 cultures, so hop count is coarse AND blind to timing -- two peoples four hops apart may have parted three thousand years ago or three hundred, and those are not the same relationship. Time is decay without a decay constant, which is the dial this layer keeps refusing.\n\nTHE SHAPE IS ALREADY ESTABLISHED. One integer on culture, written where the daughter is coined, in exactly the form BL-865 used. Ids are handed out in arrival order and a parent is always at a lower index than its daughter, so a walk toward the root strictly decreases -- the common-ancestor walk is bounded and cannot loop.\n\nBLOCKS BL-870 (culture relations). File it first because it is cheap and because the measure cannot be written without it.\n\nDONE WHEN: every culture carries its coining year, a cradle culture's year is the span's start rather than a sentinel that reads as a real date, and the years-to-common-ancestor walk is exercised by the colonisation harness."
+   "design": "THE THIRD DISCARDED MIGRATION FACT, and the smallest of the three.\n\nBL-865 retained culture::parent and culture::origin_farm_class after CIVILISATION.md found the descent tree was being built and thrown away. The same is true of WHEN each culture was coined: the migration knows the year at every founding, and nothing keeps it.\n\nWHY IT IS NEEDED NOW: NR-816 settles kinship as YEARS SINCE THE COMMON ANCESTOR rather than tree hops, and that measure is worthless without the years. The tree runs 9-10 deep over 676 and 929 cultures, so hop count is coarse AND blind to timing -- two peoples four hops apart may have parted three thousand years ago or three hundred, and those are not the same relationship. Time is decay without a decay constant, which is the dial this layer keeps refusing.\n\nTHE SHAPE IS ALREADY ESTABLISHED. One integer on culture, written where the daughter is coined, in exactly the form BL-865 used. Ids are handed out in arrival order and a parent is always at a lower index than its daughter, so a walk toward the root strictly decreases -- the common-ancestor walk is bounded and cannot loop.\n\nBLOCKS BL-870 (culture relations). File it first because it is cheap and because the measure cannot be written without it.\n\nDONE WHEN: every culture carries its coining year, a cradle culture's year is the span's start rather than a sentinel that reads as a real date, and the years-to-common-ancestor walk is exercised by the colonisation harness.",
+   "delivered": "2026-09-09",
+   "resolution": "BUILT and merged (commit 6c67b445, integrated via merge). culture::coined_year (int64_t, sentinel INT64_MIN) added to creeds.hpp, threaded from colonisation_field::spawns through derive_daughter_culture; cradle cultures get colonisation_start_year, not a sentinel. colonisation_harness C14 extended with time-monotonicity, root-year and hop-vs-years checks: 36/0 PASS on seeds 0-2 (deepest chains 9/10/12 hops, 110/224/216 years apart -- confirming hops and years are genuinely different measures, the whole point of NR-816). Re-verified green after merge to main."
   }
  ]
 }
