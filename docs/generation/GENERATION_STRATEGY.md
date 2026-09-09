@@ -31,7 +31,9 @@ The subject docs:
   driven by the pre-national history ladder.
 - **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
   market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the ancient arc's epoch (Ben, 2026-08-12, NR-177)** — § Pass 2 is the economy pass owns the calendar — and
-  generation runs a stepped 4000 BCE → 0 CE prehistory. Stages 5–6 (the energy transition and
+  generation runs a stepped pre-campaign history whose span § Pass 2 is the economy pass states
+  (3,600 years, 2400 BCE → 1200 CE, divided at 400 BCE — Ben, 2026-09-09). The figure restated here
+  was 4000 BCE → 0 CE, which contradicted the section it defers to. Stages 5–6 (the energy transition and
   saturation) fall *past* the epoch entirely and are DLC-era material (BL-223, averted rupture,
   owns their reshaping).
 - **`CORPORATION_GENERATION.md`** — corporation placement, focus, holdings, and finance.
@@ -288,7 +290,7 @@ They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds 4 and 5):
 
 | Round | Phase | The moving object |
 |---|---|---|
-| **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of 0 CE → 1200 CE** (Ben, 2026-09-09) — the empire half of pass 1's four thousand years; the migration half is round 3's. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
+| **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of 400 BCE → 1200 CE** (Ben, 2026-09-09) — the empire half of pass 1's 3,600 years; the migration half (2400 BCE → 400 BCE) is round 3's. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
 | **5** | **6 — The economic substrate** | Four, in order: **metros growing** from the population centres, **colonial reach across water**, **firm markers and their charters**, and the **market carve with its price field**. |
 
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
@@ -756,7 +758,10 @@ the epoch and the sim stops where it stops today.
 
 ### Pass 2 is the economy pass, 1560 → 1960 (Ben, 2026-09-08)
 
-**The calendar is now stated rather than derived.** Pass 1 runs 4000 years and ends at **1200 CE**;
+**The calendar is now stated rather than derived.** Pass 1 runs **3,600 years, 2400 BCE → 1200 CE**,
+divided at **400 BCE** into the migration and empire rounds (Ben, 2026-09-09;
+`CIVILISATION.md` § The span is 400 BCE to 1200 CE owns the arithmetic). The earlier figure here was
+4000 years, before the boundary and the total were revised. Pass 1 ends at **1200 CE**;
 pass 2 runs **1560 → 1960**; the epoch is **1960**. That makes the campaign an **industrial-band**
 world (`era_band_for_epoch` flips at 1700), not the ancient one the 0 CE default produced.
 

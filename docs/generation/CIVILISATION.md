@@ -29,33 +29,46 @@ assumption that whatever happens to be in memory will do.
 
 ---
 
-## The span is 0 CE to 1200 CE
+## The span is 400 BCE to 1200 CE
 
-**SETTLED (Ben, 2026-09-09, elicitation): this phase runs from 0 CE to 1200 CE.**
+**SETTLED (Ben, 2026-09-09, elicitation; boundary and total revised by Ben the same day): this
+phase runs from 400 BCE to 1200 CE, and pass 1 covers three thousand six hundred years.**
 
-Pass 1's calendar is unchanged — four thousand years, ending at 1200 CE
-(`GENERATION_STRATEGY.md` § Pass 2 is the economy pass, 1560 → 1960). What is stated now is the
-boundary
-*inside* it. Migration owns the years up to **0 CE**; this phase owns the twelve hundred after.
-The boundary falls on a year the engine already knows: 0 CE is where the sim's own ancient arc
-ends.
+The first cut of this ruling put the boundary at 0 CE inside an unchanged four-thousand-year pass.
+Both numbers moved. The arithmetic is stated here because every other document takes its figures
+from this one:
 
-**COLONISATION's derived terminating condition survives, and a COAST reconciles the two.** That
-document ends the migration round when every habitable landmass carries some culture, which is a
-derived year and not 0 CE. Both hold. The Culture round ends when the filling ends, and the world
-then **coasts** to 0 CE holding what migration left it — the same device the design already uses
-for 1200 → 1560, where a span whose defining property is that little changes is not worth
-simulating.
+| | from | to | years |
+|---|---|---|---|
+| **Culture** — the migration | 2400 BCE | 400 BCE | 2,000 |
+| **Empires** — this phase | 400 BCE | 1200 CE | 1,600 |
+| **Pass 1**, total | 2400 BCE | 1200 CE | **3,600** |
 
-**A migration unfinished at 0 CE is a defect in the migration, not in this boundary.** Unsettled
-ground is the exception marking hostile country (`../ui/STARTUP.md`
-§ Rounds — System, Life, Culture, Empires, Industrialisation), so a world still
-filling after the whole migration span has a colonisation problem to fix rather than a boundary to
-move.
+**1200 CE is unmoved**, so everything downstream of it — the coast to 1560, pass 2, the 1960 epoch
+— is untouched (`GENERATION_STRATEGY.md` § Pass 2 is the economy pass, 1560 → 1960). What moved is
+where pass 1 *starts* and where it *divides*.
 
-**Twelve hundred years, not four thousand, is a real constraint on everything below.** The arc —
+**400 BCE is NOT a year the engine already knows.** The sim's ancient arc ends at 0 CE, so the
+boundary is not free the way the first cut of this section claimed — the split is real work, and
+`BL-871 (empire span)` carries it.
+
+**COLONISATION's derived terminating condition survives, and a COAST reconciles the two (Ben,
+2026-09-09, confirming NR-818).** That document ends the migration round when every habitable
+landmass carries some culture, which is a derived year and not 400 BCE. Both hold. The Culture
+round ends when the filling ends, and the world then **coasts** to 400 BCE holding what migration
+left it — the same device the design already uses for 1200 → 1560, where a span whose defining
+property is that little changes is not worth simulating.
+
+**A migration unfinished at 400 BCE is a defect in the migration, not in this boundary.**
+Unsettled ground is the exception marking hostile country (`../ui/STARTUP.md`
+§ Rounds — System, Life, Culture, Empires, Industrialisation), so a world still filling after two
+thousand years has a colonisation problem to fix rather than a boundary to move.
+
+**Sixteen hundred years, not four thousand, is the constraint on everything below.** The arc —
 communication, then conquest or union, then a stable dark age — has to fit in it, and a mechanism
-that needs millennia to show an effect does not belong in this phase.
+that needs millennia to show an effect does not belong in this phase. Moving the boundary from
+0 CE to 400 BCE gave this phase four hundred more years and took them from the migration, which is
+the practical effect of the revision.
 
 ---
 
@@ -398,10 +411,6 @@ The six calls this section used to carry were settled on 2026-09-09 and now live
 that own them — the span, the seat, the stores, the two opposition axes, the civilisation record
 and reach-gating. What is left is genuinely downstream of those.
 
-- **Does the Culture round COAST to 0 CE, or does its terminating condition become 0 CE?**
-  § The span adopts the coast, because it preserves COLONISATION's derived condition alongside the
-  stated boundary — but the ruling named a start year and not a coast, so this reading is Claude's
-  (NR-818) and it is the one call here that changes another document.
 - **What an ETHIC is as data**, and what it means for a polity to *belong* to a civilisation
   rather than merely stand on ground carrying one (§ A civilisation is what mixing makes).
 - **Are governance reach and supply reach one quantity or two**, and is a centre that loses its
@@ -409,8 +418,9 @@ and reach-gating. What is left is genuinely downstream of those.
 - **Where the opposition BAR sits** — the threshold above which no civilisation is coined. A
   measurement, not a judgement: it should be set from a sweep that produces both alliance-shaped
   and enmity-shaped worlds, never from a number picked to make one seed look right.
-- **Whether a seat can be FOUNDED mid-span**, or whether the set is fixed at 0 CE. An empire that
+- **Whether a seat can be FOUNDED mid-span**, or whether the set is fixed at 400 BCE. An empire that
   can raise a new city has a second growth mode; one that cannot has a fixed board.
-- **How the twelve-hundred-year span interacts with the capacity ladder.** The ladder was
-  calibrated over four thousand years, and § The span now gives this phase 1,200 — whether the
-  rungs still turn over at a believable rate is a measurement owed before any of them are tuned.
+- **How the sixteen-hundred-year span interacts with the capacity ladder.** The ladder was
+  calibrated over four thousand years, and § The span now gives this phase 1,600 inside a
+  3,600-year pass — whether the rungs still turn over at a believable rate is a measurement owed
+  before any of them are tuned.

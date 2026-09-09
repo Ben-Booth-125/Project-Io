@@ -78,7 +78,7 @@
    "kind": "question",
    "status": "open",
    "source": "The doc-contradiction sweep at the close of sprint 35.",
-   "what": "CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch is 0 CE, the player a mercenary company. Your 2026-09-08 calendar makes the epoch 1960, and era_band_for_epoch flips to industrial at 1700 - so generation now runs the INDUSTRIAL arc.",
+   "what": "CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch is 0 CE, the player a mercenary company. Your 2026-09-08 calendar makes the epoch 1960, and era_band_for_epoch flips to industrial at 1700 - so generation now runs the INDUSTRIAL arc. ALSO MANUAL.md (found 2026-09-09 during the Empires respan): lines 115 and 423 both say 'generation runs 4000 years of history, from 4000 BCE to the campaign epoch of 0 CE'. That is stale twice over -- the 2026-09-08 calendar moved the epoch to 1960, and the 2026-09-09 ruling made pass 1 3,600 years from 2400 BCE. It is the SAME call as CONCEPT.md's, so it is added here rather than opened as its own entry: whether the player-facing docs describe the ancient arc or the arc generation actually runs.",
    "why_it_matters": "I fixed the generation-side citation because the calendar is that doc subject. I did NOT touch this one, because it is not a date - it names WHO THE PLAYER IS and which product is live. Changing the live arc from ancient to industrial in the doc that owns player identity is a product call, not a reconciliation, and CONCEPT.md is the authority the rest of the corpus reads for it.",
    "options": [
     "The live product is now the industrial arc; CONCEPT.md is updated and the mercenary-company framing revisited with it.",
@@ -89,7 +89,8 @@
    "files": [
     "docs/CONCEPT.md",
     "docs/generation/GENERATION_STRATEGY.md",
-    "src/world/era_band.hpp"
+    "src/world/era_band.hpp",
+    "docs/MANUAL.md"
    ],
    "resolution": null
   },
@@ -311,10 +312,10 @@
   },
   {
    "id": "NR-818",
-   "title": "Does the Culture round COAST to 0 CE, or does its terminating condition become 0 CE?",
+   "title": "Does the Culture round COAST to the boundary, or does its terminating condition become it?",
    "raised": "2026-09-09",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Your elicitation answer on the span boundary: 'Run this from 0 CE to 1200 CE'. It names the Empires start and does not say what happens to the migration's own ending.",
    "what": "Two readings. (A) THE COAST, adopted: the Culture round still ends when every habitable landmass carries some culture - a derived year - and the world then holds what migration left it until 0 CE, simulating nothing in between. (B) THE CLAMP: the Culture round's terminating condition simply becomes 0 CE.",
    "why_it_matters": "COLONISATION.md settled the derived terminating condition on 2026-09-09, overturning a stated-year ruling made earlier the same day. Reading B would overturn it a second time within the day; reading A keeps both your rulings true at once. It also changes a written line in two authority docs, which is why it is raised rather than assumed.",
@@ -329,7 +330,7 @@
     "docs/generation/COLONISATION.md",
     "docs/ui/STARTUP.md"
    ],
-   "resolution": null
+   "resolution": "RESOLVED (Ben, 2026-09-09): reading A, the COAST, confirmed - and the boundary moved with it. The Culture round keeps its derived terminating condition, and the world holds what migration left it until the stated boundary, simulating nothing in between. THE BOUNDARY IS 400 BCE, NOT 0 CE, and pass 1 now covers 3,600 years rather than 4,000: Culture 2400 BCE -> 400 BCE (2,000 years), Empires 400 BCE -> 1200 CE (1,600 years). 1200 CE is unmoved, so the coast to 1560, pass 2 and the 1960 epoch are untouched. One claim written under the first cut is now FALSE and was removed: 0 CE was 'a year the engine already knows' because the sim's ancient arc ends there - 400 BCE is not, so the split is real work rather than free. Written into CIVILISATION.md sec The span is 400 BCE to 1200 CE, which owns the arithmetic; COLONISATION.md, STARTUP.md and GENERATION_STRATEGY.md take their figures from it. Carried by BL-871."
   }
  ]
 }

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*13 entries — 11 open, 2 resolved.*
+*13 entries — 10 open, 3 resolved.*
 
 ---
 
@@ -47,7 +47,7 @@ BL-813, BL-814 and BL-815 were deleted outright under the 2026-08-24 unstarted-p
 ### NR-807 — CONCEPT.md still names the ancient arc as the live product, and the epoch moved to 1960
 *question · raised 2026-09-09 · from The doc-contradiction sweep at the close of sprint 35.*
 
-CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch is 0 CE, the player a mercenary company. Your 2026-09-08 calendar makes the epoch 1960, and era_band_for_epoch flips to industrial at 1700 - so generation now runs the INDUSTRIAL arc.
+CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch is 0 CE, the player a mercenary company. Your 2026-09-08 calendar makes the epoch 1960, and era_band_for_epoch flips to industrial at 1700 - so generation now runs the INDUSTRIAL arc. ALSO MANUAL.md (found 2026-09-09 during the Empires respan): lines 115 and 423 both say 'generation runs 4000 years of history, from 4000 BCE to the campaign epoch of 0 CE'. That is stale twice over -- the 2026-09-08 calendar moved the epoch to 1960, and the 2026-09-09 ruling made pass 1 3,600 years from 2400 BCE. It is the SAME call as CONCEPT.md's, so it is added here rather than opened as its own entry: whether the player-facing docs describe the ancient arc or the arc generation actually runs.
 
 **Why it matters.** I fixed the generation-side citation because the calendar is that doc subject. I did NOT touch this one, because it is not a date - it names WHO THE PLAYER IS and which product is live. Changing the live arc from ancient to industrial in the doc that owns player identity is a product call, not a reconciliation, and CONCEPT.md is the authority the rest of the corpus reads for it.
 
@@ -57,7 +57,7 @@ CONCEPT.md line 74 says: the live product is the ancient arc, the campaign epoch
 
 > **Recommendation:** The second, provisionally - both arcs already exist in the code (era_band_for_epoch branches on the epoch, and HISTORY.md was already written arc-aware), so nothing forces a product choice yet. But it should be YOUR sentence, not mine, and it is the kind of thing that quietly becomes true by being left alone.
 
-*Files: `docs/CONCEPT.md`, `docs/generation/GENERATION_STRATEGY.md`, `src/world/era_band.hpp`*
+*Files: `docs/CONCEPT.md`, `docs/generation/GENERATION_STRATEGY.md`, `src/world/era_band.hpp`, `docs/MANUAL.md`*
 
 ### NR-809 — Region count still scales ~quadratically AFTER BL-844, so regions cannot become provinces one-for-one - and no optimisation is waiting to change that
 *decision · raised 2026-09-09 · from Sprint 37 build session, 2026-09-09. The region-count sensitivity measurement NEXT_SESSION.md asks for before any scale decision. Measured with history_span_cost, build_gen (/O2), seeds 0 and 1.*
@@ -178,21 +178,6 @@ Two of the three candidates apply at different moments. FRACTURE is the formatio
 
 *Files: `docs/generation/CIVILISATION.md`*
 
-### NR-818 — Does the Culture round COAST to 0 CE, or does its terminating condition become 0 CE?
-*question · raised 2026-09-09 · from Your elicitation answer on the span boundary: 'Run this from 0 CE to 1200 CE'. It names the Empires start and does not say what happens to the migration's own ending.*
-
-Two readings. (A) THE COAST, adopted: the Culture round still ends when every habitable landmass carries some culture - a derived year - and the world then holds what migration left it until 0 CE, simulating nothing in between. (B) THE CLAMP: the Culture round's terminating condition simply becomes 0 CE.
-
-**Why it matters.** COLONISATION.md settled the derived terminating condition on 2026-09-09, overturning a stated-year ruling made earlier the same day. Reading B would overturn it a second time within the day; reading A keeps both your rulings true at once. It also changes a written line in two authority docs, which is why it is raised rather than assumed.
-
-- A - coast to 0 CE, derived ending preserved (ADOPTED)
-- B - the migration's terminating condition becomes 0 CE
-- C - derived ending, and the Empires start floats with it
-
-> **Recommendation:** A, on the grounds that it is the only reading under which neither of your two rulings has to be discarded, and because the design already uses exactly this device across 1200 -> 1560. The consequence to accept is that a world filling early sits still for a while - which is what a dark age looks like, and it is cheap. Overturn to B if you want the migration span itself bounded.
-
-*Files: `docs/generation/CIVILISATION.md`, `docs/generation/COLONISATION.md`, `docs/ui/STARTUP.md`*
-
 ---
 
 ## Resolved
@@ -246,4 +231,21 @@ CALLS (1), (2) and (4) REMAIN OPEN and are sprint 38's, along with the build its
 WHAT LANDED IN SPRINT 37 INSTEAD is the substrate the whole question rests on: BL-865 retains the migration's family tree, and it turns out to have real depth -- deepest descent 9 and 10 on seeds 0 and 1, across 676 and 929 cultures, every one of which walks back to a cradle. Kinship distance therefore carries actual signal rather than being flat, which is what a similarity measure needs to be worth reading.
 
 *Files: `docs/generation/CIVILISATION.md`, `src/world/creeds.hpp`, `src/world/history_sim.cpp`*
+
+### NR-818 — Does the Culture round COAST to the boundary, or does its terminating condition become it?
+*question · raised 2026-09-09 · from Your elicitation answer on the span boundary: 'Run this from 0 CE to 1200 CE'. It names the Empires start and does not say what happens to the migration's own ending.*
+
+Two readings. (A) THE COAST, adopted: the Culture round still ends when every habitable landmass carries some culture - a derived year - and the world then holds what migration left it until 0 CE, simulating nothing in between. (B) THE CLAMP: the Culture round's terminating condition simply becomes 0 CE.
+
+**Why it matters.** COLONISATION.md settled the derived terminating condition on 2026-09-09, overturning a stated-year ruling made earlier the same day. Reading B would overturn it a second time within the day; reading A keeps both your rulings true at once. It also changes a written line in two authority docs, which is why it is raised rather than assumed.
+
+- A - coast to 0 CE, derived ending preserved (ADOPTED)
+- B - the migration's terminating condition becomes 0 CE
+- C - derived ending, and the Empires start floats with it
+
+> **Recommendation:** A, on the grounds that it is the only reading under which neither of your two rulings has to be discarded, and because the design already uses exactly this device across 1200 -> 1560. The consequence to accept is that a world filling early sits still for a while - which is what a dark age looks like, and it is cheap. Overturn to B if you want the migration span itself bounded.
+
+> **RESOLVED.** RESOLVED (Ben, 2026-09-09): reading A, the COAST, confirmed - and the boundary moved with it. The Culture round keeps its derived terminating condition, and the world holds what migration left it until the stated boundary, simulating nothing in between. THE BOUNDARY IS 400 BCE, NOT 0 CE, and pass 1 now covers 3,600 years rather than 4,000: Culture 2400 BCE -> 400 BCE (2,000 years), Empires 400 BCE -> 1200 CE (1,600 years). 1200 CE is unmoved, so the coast to 1560, pass 2 and the 1960 epoch are untouched. One claim written under the first cut is now FALSE and was removed: 0 CE was 'a year the engine already knows' because the sim's ancient arc ends there - 400 BCE is not, so the split is real work rather than free. Written into CIVILISATION.md sec The span is 400 BCE to 1200 CE, which owns the arithmetic; COLONISATION.md, STARTUP.md and GENERATION_STRATEGY.md take their figures from it. Carried by BL-871.
+
+*Files: `docs/generation/CIVILISATION.md`, `docs/generation/COLONISATION.md`, `docs/ui/STARTUP.md`*
 

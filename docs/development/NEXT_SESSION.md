@@ -23,12 +23,12 @@ the history without disturbing the planetology above it (`world_params::era_seed
 
 Rounds **Culture** and **Empires** still replay the **same recorded age**, and both say so on
 screen. The rounds are split; generation still emits one span. **Splitting it is now
-BL-871 (empire span 0 to 1200), filed 2026-09-09 with the boundary settled at 0 CE.**
+BL-871 (empire span 400 BCE to 1200 CE), filed 2026-09-09.**
 
 ## The Empires design pass closed 2026-09-09
 
 Six calls settled by elicitation, written into `docs/generation/CIVILISATION.md`:
-**span 0 CE → 1200 CE** · **a settlement is a seat flag on a region**, hinterland by pointer ·
+**span 400 BCE → 1200 CE** · **a settlement is a seat flag on a region**, hinterland by pointer ·
 **stores sit at the seat and fall with it** · opposition from **pantheon temperament + origin farm
 class**, not contact · **a civilisation is a named record** with an ethic · **reach GATES a
 campaign** rather than pricing it.
@@ -43,9 +43,13 @@ New items: **BL-871** (empire span), **BL-872** (centres from supply and governa
 (culture coining year — small, and it blocks BL-870). Amended: **BL-837** (reach gates),
 **BL-823** (the ending), BL-866, BL-867, BL-869, BL-870.
 
-**One call is still Ben's: NR-818** — does the Culture round *coast* to 0 CE, or does its
-terminating condition *become* 0 CE? The coast is adopted because it is the only reading that
-keeps both of his 2026-09-09 rulings true; it changes a line in three docs if overturned.
+**The calendar, restated (Ben, 2026-09-09, confirming NR-818 and revising the numbers).** Pass 1
+covers **3,600 years, 2400 BCE → 1200 CE**, divided at **400 BCE**: Culture 2,000 years, Empires
+1,600. **1200 CE is unmoved**, so the coast to 1560, pass 2 and the 1960 epoch are untouched. The
+Culture round keeps its derived ending and the world **coasts** to 400 BCE.
+
+**One claim from the first cut was false and is gone:** 400 BCE is *not* a year the engine already
+knows — the ancient arc ends at 0 CE — so the split is real work, not free. NR-818 is resolved.
 
 ---
 
