@@ -41,6 +41,34 @@ struct endemic_pricing_params
 /// the pre-BL-236 hard-coded generation exactly.
 struct world_gen_config
 {
+    /// STOP GENERATION ONCE THE ANCIENT ERA HAS RUN, leaving the world
+    /// half-built and the REPORT complete (Ben, 2026-09-09).
+    ///
+    /// WHAT IT IS FOR. The wizard's history round wants one thing from
+    /// generation — the recorded Era -1 time-lapse — and the only entry point
+    /// that produces it is `make_hard_coded_world`. Calling that ran all
+    /// thirteen stages: the era is stage 8, and stages 9-12 (borders, roads,
+    /// companies, finishing) were computed and thrown away. Measured, that is
+    /// 10,805 ms of 11,316 — about 95% of the round's wait spent on passes it
+    /// discards, and it is why the round visibly hung on "Laying roads".
+    ///
+    /// WHY A KNOB RATHER THAN A SECOND ENTRY POINT. A second function that
+    /// "just runs the early passes" is a second construction of the
+    /// invocation, which is precisely the drift `era_minus_one.hpp` exists to
+    /// stop — six divergent axes, found the hard way by BL-462, and a seventh
+    /// caller found again by NR-733. There is still exactly ONE path through
+    /// generation; this only says where to stop walking it.
+    ///
+    /// THE WORLD IS NOT USABLE WHEN THIS IS SET, and that is the whole contract.
+    /// No nations, no roads, no corporations, no markets. A caller that sets it
+    /// wants `generation_report` and must discard the `world`. Nothing in the
+    /// campaign path may ever set it.
+    ///
+    /// Default false: every existing caller builds a whole world, exactly as
+    /// before. Authored nowhere in Lua — this is a call-site scope knob, not a
+    /// balance value, and it is the one field here that is not.
+    bool stop_after_ancient_era = false;
+
     /// Deposit-density multiplier per abundance_level (sparse/lean/standard),
     /// authored under `world_gen.deposit_scalar`. Indexed by abundance_level.
     std::array<float, 3> deposit_scalar = { 0.40f, 0.65f, 1.00f };

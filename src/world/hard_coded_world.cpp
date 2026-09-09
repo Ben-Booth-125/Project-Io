@@ -753,6 +753,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                 /*seed=*/params.seed ^ 0xC17910E6u);
     }
 
+    // THE ANCIENT ERA HAS RUN AND THE REPORT IS COMPLETE. A caller that only
+    // wanted the history — the wizard's history round — stops here rather than
+    // paying for borders, roads and companies it will discard (about 95% of the
+    // wall clock; see world_gen_config::stop_after_ancient_era). The world left
+    // behind is deliberately half-built and must not be played.
+    if (gen_cfg.stop_after_ancient_era)
+        return w;
+
     bump(9);
     const std::vector<entity_id> kepler_nations =
         generate_nations(w, kepler, kepler_tiles, home_grid_width, home_grid_height, kepler_np,

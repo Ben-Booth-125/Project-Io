@@ -39,6 +39,27 @@ enum class abundance_level : uint8_t { sparse, lean, standard };
 struct world_params
 {
     uint32_t        seed       = 0;                         ///< Master seed, XOR-folded into each per-body seed. 0 reproduces the legacy world.
+
+    /// A SECOND SEED FOR THE ANCIENT ERA ALONE, so the same ground can be
+    /// played through twice and come out differently (Ben, 2026-09-09:
+    /// "reroll should produce differences regardless").
+    ///
+    /// THE PROBLEM IT SOLVES. `era_minus_one_sim_seed` folds `params.seed`, so
+    /// the era was a pure function of the master seed. The wizard's history
+    /// round could therefore re-RUN the pass on Reroll but could not vary it —
+    /// pressing Reroll reproduced the same history exactly. Folding the round's
+    /// roll into `params.seed` instead was the obvious repair and is the wrong
+    /// one: `seed` drives the planetology rounds ABOVE this one, so it would
+    /// re-draw the star, the world and its surface, and rounds-are-causal says
+    /// a round may only invalidate the rounds BELOW it.
+    ///
+    /// So the era gets a seed of its own. Rerolling the history round moves
+    /// this and nothing else: the same planet, a different four thousand years.
+    ///
+    /// DEFAULT 0 CHANGES NO WORLD. The fold below is an addition, so at 0 the
+    /// derivation is `params.seed ^ 0x415C1E17u` — exactly what it has always
+    /// been. Every existing seed, golden and fixture is untouched.
+    uint32_t        era_seed   = 0;
     abundance_level abundance  = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
 
     /// Calendar year the generated world BEGINS at (BL-271, the Era -1 sandbox).

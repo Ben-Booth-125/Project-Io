@@ -170,12 +170,25 @@ void app::launch_wizard_history_run()
     cfg.load_from_lua(m_lua);
     ensure_works_loaded();
 
-    auto run = [this, cfg, params = m_pending_world_params]() {
+    // STOP ONCE THE ERA HAS RUN. Everything this round draws comes out of the
+    // report by the end of stage 8; stages 9-12 (borders, roads, companies,
+    // finishing) were being computed and thrown away, which measured 10,805 ms
+    // of 11,316 — about 95% of the wait — and is why the round visibly hung on
+    // "Laying roads" (Ben, 2026-09-09).
+    //
+    // Note this is set on the COPY the worker takes, never on the campaign's:
+    // `begin_new_game` builds a whole world from its own config, and a world
+    // stopped at stage 8 has no nations, roads or corporations in it.
+    world_gen_config hist_cfg = cfg;
+    hist_cfg.stop_after_ancient_era = true;
+
+    auto run = [this, hist_cfg, params = m_pending_world_params]() {
         generation_report rep;
         // The world itself is DISCARDED. What the round wants is the era it
         // recorded, and holding the world would only invite a second, divergent
         // copy of the campaign's own.
-        (void)make_hard_coded_world(params, &rep, cfg, &m_wiz_history_progress, &m_works);
+        (void)make_hard_coded_world(params, &rep, hist_cfg, &m_wiz_history_progress,
+                                    &m_works);
         return lapse_from_report(rep);
     };
 
@@ -801,14 +814,20 @@ void app::draw_generation_screen()
             }
             else if (m_wiz_history.empty())
             {
-                if (ImGui::Button("Run##wizhistrun",
-                                  {ImGui::GetContentRegionAvail().x, 30.0f}))
-                    launch_wizard_history_run();
-                ImGui::Spacing();
+                // NO RUN BUTTON (Ben, 2026-09-09: "we can retire the 'run'
+                // button. Wire that to auto start when next is clicked in phase
+                // 3"). Arriving on the round IS the instruction to run it —
+                // there was never a second thing the player might have wanted
+                // here, so the button asked a question with one answer.
+                //
+                // The launch itself is on the round-3 Next press rather than
+                // here, so the pass is already under way by the time this frame
+                // draws; see the navigation block below. This branch is only
+                // reached if a run has not been started or has been cleared.
                 dim_text("Four thousand years of claim and counter-claim, run here rather "
                          "than previewed: the history is the most expensive pass in the "
                          "project, and it cannot be re-rolled on every keystroke the way "
-                         "the planetology rounds are. Press Run and watch it.");
+                         "the planetology rounds are.");
             }
             else
             {
@@ -841,9 +860,9 @@ void app::draw_generation_screen()
                 // planetology reproduces it exactly; folding the round's reroll into
                 // `params.seed` would re-draw the planetology rounds above it, which
                 // rounds-are-causal forbids in that direction.
-                dim_text("Reroll re-runs the pass. Until the era carries a seed of its "
-                         "own, a re-run on the same world reproduces this same history "
-                         "- reroll a planetology round to change the ground first.");
+                dim_text("Reroll plays the same ground through again. The land, the seas "
+                         "and the peoples are the ones you chose; what changes is the "
+                         "four thousand years that ran over them.");
             }
         }
         else
@@ -945,6 +964,14 @@ void app::draw_generation_screen()
                 // this cannot yet vary.
                 if (history_round && !m_wiz_history_future.valid())
                 {
+                    // A DIFFERENT FOUR THOUSAND YEARS OVER THE SAME GROUND
+                    // (Ben, 2026-09-09: "reroll should produce differences
+                    // regardless"). The era carries its own seed now, so this
+                    // moves the history without touching the planetology rounds
+                    // above it — folding the roll into `params.seed` would
+                    // re-draw the star and the surface, which rounds-are-causal
+                    // forbids in that direction. See world_params::era_seed.
+                    ++m_pending_world_params.era_seed;
                     m_wiz_history = ui::history_lapse{};
                     launch_wizard_history_run();
                 }
@@ -972,7 +999,23 @@ void app::draw_generation_screen()
             if (last)
                 begin_new_game(); // async since 2026-08-12 — see app::begin_new_game
             else
+            {
                 ++m_wiz_round;
+                // THE HISTORY STARTS WHEN THE PLAYER ARRIVES, NOT WHEN THEY ASK
+                // (Ben, 2026-09-09: "wire that to auto start when next is
+                // clicked in phase 3"). Retiring the Run button means the press
+                // that MOVES ONTO the round is the press that begins it, so the
+                // pass is already under way while the round's first frame draws
+                // — which is the difference between a wait that started when
+                // you arrived and one that started when you found the button.
+                //
+                // Guarded on there being nothing already in flight or landed, so
+                // stepping Back to round 3 and forward again does not throw away
+                // a finished history and re-run it.
+                if (m_wiz_round == wizard_planetology_round_count
+                    && m_wiz_history.empty() && !m_wiz_history_future.valid())
+                    launch_wizard_history_run();
+            }
         }
         ImGui::EndChild(); // ##wiz_left
 
@@ -996,7 +1039,7 @@ void app::draw_generation_screen()
                 ImGui::TextWrapped(
                     m_wiz_history_future.valid()
                         ? "  The history is running. The map fills in when it lands."
-                        : "  No history yet. Press Run.");
+                        : "  The history has not been run for this world yet.");
                 ImGui::PopStyleColor();
             }
             else
