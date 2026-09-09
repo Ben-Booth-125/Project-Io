@@ -78,8 +78,9 @@ The settlement pass is BL-218 (nations rewrite). Between the ladder and the seed
 the ladder's cradles and the creeds' pantheons into **regions** — the unit that actually gets
 settled, industrialised, fought over, and read by corporation generation.
 
-Per region it records: the anchor tile, the **culture it inherits** (its nearest cradle's, so
-the pantheon distribution is a map of who walked where rather than a per-region re-roll), its
+Per region it records: the anchor tile, the **culture it inherits** (the culture of the stream
+that reached it — [COLONISATION.md](COLONISATION.md) § Culture arrives by route — so the pantheon
+distribution is a map of who walked where rather than a per-region re-roll), its
 **ancient endowment** (farm / ore / energy / harbour, surveyed once over the anchor's window), a
 founding year derived from how strongly the ground invited settlement, and — where the ground can
 pay for it — the year its furnaces lit.

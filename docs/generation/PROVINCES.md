@@ -128,6 +128,18 @@ a pure-ice province gets its anchor on its least-bad tile, counted rather than h
 the lowest tile id. The spaced hinterland survives for the water domains and for the land of an
 unsettled body (no centres anywhere), where there is nothing else to seed from.
 
+### The settled cells are a binding input (Ben, 2026-09-09)
+
+**Colonisation seeds the partition; this pass still draws it.** The colonisation span
+([COLONISATION.md](COLONISATION.md)) leaves a set of settled cells and their anchors, and the
+partition takes them as a **hard input** the way it already takes the national assignment — the
+ordering is unchanged (after the sim, before roads), and so is the nation lock.
+
+The alternative was considered and not taken: colonisation drawing the real partition, with the
+nation carve then assigning whole provinces rather than tiles, which would make ruling 5's
+single-nation guarantee true by construction rather than by a check. It reorders the generation
+chain, so it stays the road not taken and is recorded rather than rediscovered.
+
 ### The size band, and why it has three numbers
 
 | Constant | Value | Meaning |

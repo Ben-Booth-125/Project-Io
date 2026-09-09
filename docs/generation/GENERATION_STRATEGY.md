@@ -22,12 +22,15 @@ The subject docs:
 - **`CONTINENTS.md`** — the plate-drift pass: plates derived from Planetology's Engine output,
   feeding a height bias into the tile pipeline's Pass 1.
 - **`TILE_GENERATION.md`** — the procedural tile pipeline (terrain, ocean, deposits) per body.
+- **`COLONISATION.md`** — the opening span of the ancient pass: how people spread out of the
+  cradles into empty ground, what gates them, and which culture arrives where. A diffusion with
+  no actor and no infrastructure; `MILITARY_HISTORY.md` is its violent sibling.
 - **`PROVINCES.md`** — the partition of every body's tiles into small spatial cells, the grain a
   battle, a unit position and a building ceiling are measured in.
 - **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map,
   driven by the pre-national history ladder.
 - **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
-  market-based and non-hegemonic. **The campaign epoch is 0 CE (Ben, 2026-08-12, NR-177)**, and
+  market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the ancient arc's epoch (Ben, 2026-08-12, NR-177)** — § Pass 2 is the economy pass owns the calendar — and
   generation runs a stepped 4000 BCE → 0 CE prehistory. Stages 5–6 (the energy transition and
   saturation) fall *past* the epoch entirely and are DLC-era material (BL-223, averted rupture,
   owns their reshaping).
@@ -274,6 +277,187 @@ Four owed items, none of them blocking: the tile-derivation ledger (designed in
 which the worker split puts out of the loading screen's reach. Recorded here rather than filed as
 items so the map stays in one place; promote from this table when one is picked up.
 
+### The two watched passes (Ben, 2026-09-08)
+
+The table above is honest about a structural gap: **everything after planetology is a bar.** The
+wizard is the one generation surface that works — the player sets a lean, watches a globe resolve,
+and understands what they chose — and it stops at phase 1. Phases 4 and 6 produce the two things a
+player would most want to have watched, and neither has a surface.
+
+They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds 4 and 5):
+
+| Round | Phase | The moving object |
+|---|---|---|
+| **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of the first 4000 years to 1200 CE**. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
+| **5** | **6 — The economic substrate** | Four, in order: **metros growing** from the population centres, **colonial reach across water**, **firm markers and their charters**, and the **market carve with its price field**. |
+
+**Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
+any `world_preference`, and targets no outcome — the tune-the-forces-never-the-outcome rule of
+§ Asymmetry is the deliverable is not relaxed for being player-facing. The wizard's standing
+premise carries over unchanged: **you set conditions, you do not steer.**
+
+**Round 5 shows the selected landscape, not the search.** Phase 6 scores candidates statically in
+milliseconds and the ranking is not a spectacle; what the player watches is the winner being drawn.
+
+**And the wait becomes the round.** The planetology rounds preview by re-running a cheap pure
+chain per control move; the history sim cannot be previewed that way at any budget. So rounds 4
+and 5 run the real pass *inside the round*, drawing as they compute. Ben, 2026-09-08: *a watched
+wait needs no budget.* The obligation that replaces the budget is sharper, not looser — a watched
+wait must be **worth watching**, and a round that shows a still globe for ninety seconds is worse
+than the bar it replaced.
+
+### Round 4's arc, and the levers that keep it multipolar (Ben, 2026-09-08)
+
+**The shape the time-lapse must produce**, and it is an acceptance criterion rather than a
+description: *origin → communication → conquest or diplomatic union → a stable dark age.* Reaching
+1200 CE with plausible numbers and none of that shape is a failure of the pass, not of the surface
+drawing it. **Asymmetry is completely fine and expected.**
+
+**And it must be RAPID.** That pulls directly against a 4000-year span — `prehistory_years`
+defaults to 400 today — so the span is a cost question answered by measurement before it is a
+design question. If 4000 years cannot be had at watchable speed, the honest answers are a coarser
+step or a cheaper step, never a shorter history quietly relabelled.
+
+**The levers against a total hegemon.** BL-224's non-hegemony invariant is what these serve, and
+each is a **force with a visible cause on the map** — never a term inside an actor, and never a
+penalty that scales with a polity's rank (`../../.claude/rules/io-standing-rules.md`; Ben's
+standing preference for systemic forces over agent handicaps):
+
+| Lever | The force | State today |
+|---|---|---|
+| **Cultures in a region** | Ground of a foreign culture costs cohesion to hold and assimilates slowly, so conquest buys unrest rather than strength. | Partly built — `w_cult` and a per-region culture index exist in `history_sim.hpp`. |
+| **Simple logistics** | Reach falls with distance from the seat along real terrain, so a campaign past reach cannot be sustained. This is what makes a strait or a mountain stall a frontier without special-casing either. | Owed. |
+| **Communication** | Before a communication rung is reached, a polity cannot act on ground it cannot hear from — which bounds early growth by geography rather than by a cap. | Owed; it is also the second rung of Ben's own arc. |
+| **Succession** | A large polity fractures on a leadership transition, weighted by cohesion. This is the dark-age rung, and `../lore/COLLAPSE.md` already owns culmination. | Partly owned by COLLAPSE.md. |
+| **Strain** | Growth raises strain and strain caps growth; the accumulators already cross the pass 1 → pass 2 handoff. | Built. |
+| **Balancing coalitions** | Neighbours' stance moves against the largest polity. | Owed, and the most dangerous of the six — it is one step from an agent handicap. It is admissible only as a **stance the player can read on the map** (`../politics/RELATIONS.md`), never as a hidden coefficient on the leader. |
+
+**What pass 1 hands back (Ben, 2026-09-08).** *"The important part is that we take back
+something useful."* Three things, and they are the reason the pass is worth 4000 years at all:
+
+- **Grudges** — a directed, decaying ledger of who did what to whom, raised by named events with a
+  place and a date. Directed because resentment is not symmetric; decaying because a 4000-year run
+  would otherwise reach the epoch with every pair maximally aggrieved, which carries no information.
+  It is an **input to sentiment** at world setup, not a fifth quantity beside the four
+  `../politics/RELATIONS.md` already distinguishes.
+- **Cultural mixes** — a region holds *shares* of several cultures, not one index. This is both the
+  take-back and § Round 4's lever 1 made real: holding foreign ground shifts the shares slowly, so a
+  conquest is digested over centuries and a fast conqueror is fragile rather than compounding.
+- **The provinces each polity holds** — already the loop's output; the sim writes region ownership as
+  it goes. What was missing was the *intermediate* states, which is what a time-lapse is.
+
+**4000 years is NOT free, and the cost is one call site (measured 2026-09-08).** The span was
+expected to be near-linear — the sim works on the region graph, the O(N²) neighbour build sits
+outside the year loop, and the stepped decision clock already amortises decisions. It is not.
+Per-year cost at 4000 years is **6–9× its cost at 400**, so ten times the years costs seventy to
+eighty times the time.
+
+**Reach is the whole of it**, at 66–86% of the run. `rebuild_reach` is a heapless O(N²) Dijkstra
+from a polity's capital, cached — and the cache is a *single* shared slot. Every polity in a round
+evicts the previous one's, so a cache written to survive until a capital moves does not survive one
+iteration, and the run pays a full Dijkstra per polity per round. The region count then grows
+*inside* the run as polities found new ground, so each later rebuild is more expensive than the
+last. Both facts compound; neither is the span's fault.
+
+`step_years` is the clean lever, at a true 1/step: it halves the cost and it also halves the
+battles, so it trades fidelity, not waste. It is the fallback, not the fix.
+
+### The scorer asks two more questions (Ben, 2026-09-08)
+
+The campaign scorer today asks *can I take this region?* — and on empty ground the answer is
+always yes, which is how one dead region came to be four thousand years of war. Two further
+questions make the answer holistic rather than local:
+
+**A. Can I keep it?** Not "can I reach it once", but can it be *held* — supplied, garrisoned,
+governed at that distance. This is why **simple logistics and ancient roads are load-bearing rather
+than flavour**: without a reach cost that falls off with distance over real terrain, holding is free
+and the only limit on an empire is how fast it can walk. A road is then the thing that makes a
+frontier *stay* where it is.
+
+**B. Will others attack me for it?** A polity that advances rapidly, and especially one that empties
+ground and resettles it, teaches its neighbours what losing to it means. They move against it out of
+**fear of being next**.
+
+**This is what makes the balancing-coalition lever admissible**, and the distinction is the whole
+point. § Round 4's levers marked it the dangerous one, because a term that reads a polity's *rank*
+and pushes back is an agent handicap wearing a diplomacy costume. Fear of annihilation reads a
+**behaviour** instead — what this polity has actually done, to whom, on ground the player can point
+at. It is an in-world cause with a visible history, which is exactly the bar the standing rule sets.
+The grudge ledger is already the record it reads.
+
+### Population is civilian, and armies are distinct from it (Ben, 2026-09-08)
+
+**Stage 4 does not simulate total warfare.** Population is a **civilian** quantity — it grows and
+thins on demography, habitability, famine and plague — and an **army is a distinct pool**, raised
+from that population at a cost and tracked apart from it. Battles destroy armies. They do not
+annihilate the people living on the ground.
+
+**This dissolves the dead-region loop at its root rather than patching it.** The pathology in
+§ Round 4's levers came from an *owned region with zero population*: no population meant no
+manpower, no manpower meant no defence, and a permanently undefendable region outscored every real
+objective forever. Under a civilian population that war does not consume, war stops producing empty
+regions at all. A conquered region keeps its people.
+
+**A region's defence reads the army standing on it**, not its population directly. So an undefended
+region is a normal and *temporary* state — an army marched away, a levy not yet raised — rather
+than a permanent property of dead ground. Walking into it is cheap exactly once, and the ground is
+worth holding afterwards because the people are still there.
+
+**And conquest transfers people, which is what culture shares are for.** The population that changes
+hands is the population that must then be digested — so § Round 4's lever 1 gets its subject back.
+An emptied region had nobody to assimilate, which is precisely why conquest had become free.
+
+**Repopulation-by-settle survives, narrowed.** Ground can still be genuinely empty from plague,
+famine or demographic collapse, and the existing `sim_verb::settle` resettling it — paid out of the
+settler's own population, never minted — is the right answer there. What is gone is the *war* route
+to emptiness, and with it the massacre-and-resettle fast path around slow assimilation. That worry
+does not need a counterweight; it needs the model above, which is Ben's.
+
+**What this asks of the scorer** is question A in a sharper form: an army is a thing you must
+**raise, pay for and move**, so *can I keep this region?* becomes *can I keep an army there?* That
+is what makes logistics and ancient roads load-bearing rather than decorative — reach is the limit
+on where force can be sustained, and it is the honest brake on an empire's size.
+
+### Turbulence is the parameter, and it is round 4's lean (Ben, 2026-09-08)
+
+**What the player rolls for is historical turbulence** — worlds that arrive at the epoch with fewer
+countries, or with more. That is the axis round 4's lean sets (`../ui/STARTUP.md` § Leans per pass),
+and it is the clearest one the wizard could offer, because the player can *watch* it resolve on the
+map they are being shown.
+
+It **tunes forces and never clamps a count.** A turbulence lean moves the spread of culture
+aggression, how sharply neighbours coalesce against a riser, and how fast reach decays with
+distance. It does not target a number of nations. The 2026-07-30 emergent-nation-count ruling,
+BL-224's non-hegemony invariant and § Asymmetry is the deliverable all survive intact — a world that
+comes out fragmented or consolidated is an outcome, not a quota.
+
+**Culture aggression is where the tuning lands.** `polity::aggression_q` already exists, derived
+from the culture's own `aggression_q`. Two archetypes are worth having and they are not the same
+shape: one that **expands and incorporates** — absorbing the conquered into itself, growing large
+and durable — and one that **cycles**, unifying, stabilising, fragmenting and re-unifying on a
+rhythm. Those produce different turbulence signatures from the same engine, which is what makes a
+spread of aggression profiles worth more than a single dial.
+
+**A note the standing rules make necessary.** Both archetypes above are drawn from real history as
+*mechanisms*, exactly as `../lore/HISTORY.md`'s ladder is. **What transfers is the mechanism; a
+proper noun never does.** Nothing in the generated world is named after an Earth polity, and a
+future session reading this section must not turn either archetype into a name bank — see § Real
+history in, invented names out, which is not softened here.
+
+**Research is PARKED, and the placeholder is stated rather than designed (Ben, 2026-09-08).**
+Research points accumulate in proportion to a culture's population. Nothing else: no tree, no
+rates, no unlocks in this pass.
+
+That has one consequence the leaderboard must not hide. Under the placeholder, *research speed* and
+*population* are the same number in two columns, so the board shows a correlation it did not
+measure. Either the column is **labelled as population-derived** while the placeholder stands, or
+it is not shown until research is real. An unlabelled duplicate column is a chart that lies.
+
+**Three of the four owed items above are paid by this.** The region surface is round 4's globe;
+the market-carving explanation is round 5's carve; background firms are round 5's markers, which
+also settles the "runs after the worker" objection — a wizard round is not the worker's loading
+screen and does not inherit its threading constraint.
+
 ---
 
 ## Real history in, invented names out (Ben, 2026-08-03)
@@ -413,9 +597,9 @@ loss-making. The cheap proxy is a per-resource supply-to-demand **ratio** per ma
 static, and it is what drives a price to the ceiling in the first place. The validation run is what
 confirms the proxy was good enough.
 
-**What the objective is made of (Ben, 2026-09-06).** **Four terms.** The third is what makes it an
-*asymmetry* objective rather than a coverage one, and the fourth is the only one that can see a
-candidate at all:
+**What the objective is made of (Ben, 2026-09-06; the fifth term, Ben, 2026-09-08).** **Five
+terms.** The third is what makes it an *asymmetry* objective rather than a coverage one, and the
+fourth and fifth are the ones that can see a candidate at all:
 
 1. **Chain completeness** — terminals closed over terminals total, per market. Does a chain reach a
    sink here at all.
@@ -431,6 +615,41 @@ candidate at all:
    close, how many are closed by a building that actually exists in its catchment. A landscape
    with rich ground and no firms scores near 0; one whose firms close every chain the ground
    allows scores 1.
+5. **Reach quality — at what traversal cost a market's catchment is actually crossed.** Not
+   *whether* a resource is reachable, which terms 1 and 4 already read as a boolean, but how
+   dearly. This is the only term a **road tier** can move, and it is read per market so that its
+   spread feeds term 3 like the others.
+
+**Why the fifth term exists, and why roads are invisible without it (Ben, 2026-09-08: “roads
+should be visible in phase 6 too”).** A road tier scales traversal **cost** — a continuous
+quantity. Terms 1 and 4 read reach through a **per-resource coverage boolean**: is there any
+reachable deposit of resource R in this catchment. That boolean saturates. Once a catchment
+already covers every resource it is ever going to cover, pulling more ground inside the reach
+budget introduces no pair that was not already covered, and the score cannot move however much
+cheaper the ground became. So an objective built only of terms 1–4 ranks every road tier
+identically while the world underneath it genuinely changes — and the search then spends a third
+of every round proposing a change it cannot score, looking like it explores three axes when it
+explores two.
+
+This is the **same shape** as the fourth term's own reason for existing, one level down: an axis
+the objective is asked to choose along, and cannot see. The fix is the same — a term that reads
+the axis in the currency the axis moves in.
+
+**The constraint that makes it hard, and it must not be dodged.** Cheaper traversal everywhere is
+trivially “better”, so a reach-quality term entered as a flat viability bonus would reward a
+uniformly well-connected map — which is precisely the evenness § Asymmetry is the deliverable
+and term 3 exist to prevent. A landscape where every market is equally cheap to cross must not
+beat one with a well-served core and an expensive frontier at the same mean. The term is
+therefore a **per-market reading whose spread is scored**, exactly like terms 1 and 2, never a
+single global number added to the composite.
+
+**What the term reads is left open, deliberately, and settled by measurement rather than by
+argument.** Two candidates answer the axis: the mean traversal cost from a market to the tiles
+in its catchment, and the in-reach tile **count** rather than the coverage boolean. Both are
+continuous and both move when a tier does. The first slice's job is the one § The first slice is
+the scorer already states — score candidates that differ only in road tier and ask whether the
+chosen reading **discriminates between them at all**. A reading that does not is not worth
+keeping, and finding that out is cheaper than building the rest on it.
 
 **Why the fourth term is not optional, and why the first three could not do its job.** Terms 1–3
 are computed from tiles, markets and population — none of which a candidate changes. Phase 6
@@ -518,7 +737,7 @@ target.
 | Pass | Engine | Span | Produces |
 |---|---|---|---|
 | **1 — Ancient** | The polity sim (`history_sim`), Classical and Medieval bands | The prehistory span to the **boundary year** | Ancient borders, cultural doctrines, the lacunae — who walked where |
-| **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | The boundary year to the epoch | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture |
+| **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | **1560 → 1960** (Ben, 2026-09-08) | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
 | **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which firms exist, what each market can close, the price field |
 
 **Pass 1 and pass 2 are one engine, not two.** The works roster is cumulative across its four
@@ -534,6 +753,27 @@ the epoch, so that on a 1960 arc pass 2 is 1560 → 1960 and pass 1 is whatever
 furnace — is the better-founded alternative and is open; both are consequences of upstream
 scalars, and neither is a roll. On an ancient epoch there is no pass 2: the boundary falls past
 the epoch and the sim stops where it stops today.
+
+### Pass 2 is the economy pass, 1560 → 1960 (Ben, 2026-09-08)
+
+**The calendar is now stated rather than derived.** Pass 1 runs 4000 years and ends at **1200 CE**;
+pass 2 runs **1560 → 1960**; the epoch is **1960**. That makes the campaign an **industrial-band**
+world (`era_band_for_epoch` flips at 1700), not the ancient one the 0 CE default produced.
+
+**The 1200 → 1560 gap is deliberate and is the dark age.** Pass 1's arc ends in *a stable dark age*
+(§ Round 4's arc), and a span whose defining property is that little changes is the one span not
+worth simulating. It is a **coast**, not an omission: the world arrives at 1560 holding what 1200
+left it. If that turns out to lose something — a slow assimilation, a decaying grudge — the honest
+fix is to advance those accumulators across the gap cheaply, never to simulate it.
+
+**Where pass 1 is a polity pass, pass 2 is an ECONOMY pass.** Same engine, different question. Pass
+1 asks who holds what ground; pass 2 asks what that ground *produces and trades* — which polities
+industrialised and when, what colonisation carried where, and what each nation's tariff posture is
+by 1960. This is what makes pass 2 the bridge to phase 6: the substrate search selects a corporate
+landscape over a world whose trade relationships already have a cause.
+
+**Its output is round 5's**, exactly as pass 1's is round 4's: metros grown from the centres pass 1
+sacked, reach across water, firms and their charters, the market carve and its price field.
 
 **Pass 3 SELECTS a landscape; it does not settle one.** The earlier design made pass 3 the warm
 start promoted — the same undirected pre-game ticks, run longer, with firm spawn added and firm
@@ -558,7 +798,25 @@ passes before the search runs, not an axis the search trades against.
 
 **What crosses each handoff, and nothing else.**
 
-- Pass 1 → pass 2: the region table, cultures, works, the strain accumulators. Nothing is reset.
+- Pass 1 → pass 2: the region table, cultures, works, the strain accumulators, the **grudges**,
+  and the **provinces each polity holds**. Nothing is reset.
+
+  **The list is a struct, not a promise.** `pass_one_output` is the whole of what crosses, and
+  every consumer takes it rather than reaching into the sim's live state — so this clause and
+  the struct's fields are the same list, and a validator checks them rather than a reader
+  trusting the sentence. What that buys is the take-back: **cultures cross as SHARES**, a
+  per-mille distribution over a small number of peoples rather than one index, so a conquest
+  arrives half-digested and says how far; and **grudges cross as directed, decaying, named
+  causes**, so a nation can be asked *why* it resents its neighbour rather than only *how much*.
+
+  A grudge is an **input to sentiment at world setup**, never a fifth quantity beside sentiment,
+  stance, reputation and standing (`../politics/RELATIONS.md`).
+
+  **Cultural shares are also the first anti-hegemony lever that is a force rather than a cap.**
+  Holding foreign ground shifts its shares toward the holder slowly, so the foreign-ground
+  discount on a conquest fades over centuries instead of at the instant the border moves — a
+  realm that expands fast carries a long tail of ground still charging it, and a realm that
+  expands slowly does not. Nothing is clamped; the cost is in the world.
 - Pass 2 → the political map: the same outputs `generate_nations` reads today, plus the
   **polity map itself** — which polity held each region at the epoch, so a realm arrives as one
   nation rather than as a Voronoi cell per region — plus a nation's **tariff posture**, enacted

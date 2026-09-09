@@ -260,10 +260,29 @@ private:
     /// capture path so the menu is golden-verifiable.
     void draw_main_menu();
 
+    /// Discard every PASS round strictly after @p round, because something at or
+    /// above it moved. ROUNDS ARE CAUSAL (STARTUP.md § Rounds 4 and 5): rerolling
+    /// round 4 invalidates round 5, exactly as rerolling a planetology round
+    /// re-draws the ones below it. Called from the wizard's reroll and from every
+    /// planetology recompute — a planetology change moves the ground the history
+    /// pass runs on, so both pass rounds go with it.
+    ///
+    /// While both passes are placeholders this only clears flags. It is wired now
+    /// because it is nearly free while the rounds are empty, and because a stale
+    /// downstream pass is silent — it shows a plausible history of a world that no
+    /// longer exists.
+    void invalidate_wizard_rounds_below(int round)
+    {
+        for (int i = 0; i < wizard_pass_round_count; ++i)
+            if (wizard_planetology_round_count + i > round)
+                m_wiz_pass_current[i] = false;
+    }
+
     /// Draw the New World wizard (BL-167) — the surface between "New Game" and the
-    /// first frame of play. The player walks THREE rounds, each stacking the charts
-    /// and explanations of its chain stages and then taking that round's
-    /// preferences. The charts come from a live resolve_preferences + preview_system
+    /// first frame of play. The player walks FIVE rounds: the three PLANETOLOGY rounds,
+    /// each stacking the charts and explanations of its chain stages and then taking
+    /// that round's preferences, then the two PASS rounds (the history, then the
+    /// economic substrate). The charts come from a live resolve_preferences + preview_system
     /// run, so they show the world the roll actually produced.
     ///
     /// NOTHING is generated here. Every frame runs the chain over the prototype body
@@ -378,14 +397,26 @@ private:
     /// Re-load the UI font atlas at the size for m_settings.ui_scale_step (BL-063).
     void apply_ui_scale();
 
-    /// How many rounds the New World wizard walks (BL-167). Declared here rather than
-    /// beside the wizard code because the verify API — registered long before it —
-    /// clamps against the same count.
-    static constexpr int wizard_round_count = 3;
+    /// How many rounds the New World wizard walks (BL-167, extended to five by
+    /// BL-816). Declared here rather than beside the wizard code because the verify
+    /// API — registered long before it — clamps against the same count.
+    ///
+    /// The first `wizard_planetology_round_count` are the PLANETOLOGY rounds, which
+    /// are the chart chain's own rounds (ui::chain_round_count) and take
+    /// `world_preferences`. The remainder are the PASS rounds — round 4 the history
+    /// (4000 years to 1200 CE) and round 5 the economic substrate — which run an
+    /// expensive pass inside the round rather than previewing it per keystroke
+    /// (STARTUP.md § Rounds 4 and 5). The two counts are deliberately separate: the
+    /// wizard grew, the chart chain did not.
+    static constexpr int wizard_planetology_round_count = 3;
+    static constexpr int wizard_round_count            = 5;
+    /// The pass rounds, which own a reroll counter each rather than a preference block.
+    static constexpr int wizard_pass_round_count =
+        wizard_round_count - wizard_planetology_round_count;
 
     /// Which top-level screen is active. run() opens on the menu; "New Game" enters
     /// `generating` (the New World wizard, where the player takes the three rounds of
-    /// Planetology preferences) and the wizard's "Begin" hands over to play; run_verify() jumps
+    /// Planetology preferences and then the two pass rounds) and the wizard's "Begin" hands over to play; run_verify() jumps
     /// straight to in_game (the harness renders the live world, not the menu, unless
     /// a script asks for it via verify.show_menu / verify.show_generation). Only
     /// `in_game` simulates.
@@ -427,11 +458,25 @@ private:
     generation_report m_generation_report;   ///< Per-body Planetology results + per-stage summaries for the world that was built.
 
     // --- New World wizard state (BL-167) ---
-    // The wizard walks THREE rounds (each covering several chain stages), recomputing
-    // a THROWAWAY preview of the whole system whenever a preference or a reroll
+    // The wizard walks FIVE rounds. The first three (the planetology rounds, each
+    // covering several chain stages) recompute a THROWAWAY preview of the whole system whenever a preference or a reroll
     // changes. None of this touches m_world: the world is built once, on "Begin",
     // from m_pending_world_params.
     int  m_wiz_round = 0;    ///< Round the player is on, 0 .. wizard_round_count-1.
+    /// Reroll counter for each PASS round (round 4 the history, round 5 the
+    /// substrate), indexed by `m_wiz_round - wizard_planetology_round_count`. The
+    /// planetology rounds keep theirs in world_preferences::roll; these two cannot,
+    /// because they are not planetology inputs and never reach resolve_preferences.
+    ///
+    /// ROUNDS STAY CAUSAL (STARTUP.md § Rounds 4 and 5): rerolling round 4 discards
+    /// round 5, exactly as rerolling a planetology round re-draws the ones below it.
+    /// Wired here while both rounds are still placeholders — it is cheap now and a
+    /// silent stale-downstream bug once the passes actually run.
+    std::uint32_t m_wiz_pass_roll[wizard_pass_round_count] = {};
+    /// Whether each pass round's output is current. A pass round is invalidated by
+    /// any reroll at or above it; nothing sets these true yet, because no pass runs
+    /// yet (BL-829 fills round 4, BL-819 round 5).
+    bool          m_wiz_pass_current[wizard_pass_round_count] = {};
     /// --autostart-windowed wizard driver: frames spent in the wizard so far, or
     /// -1 when inactive (every interactive run). While >= 0 the wizard advances a
     /// round every ~20 frames and presses Begin from inside its own draw — the

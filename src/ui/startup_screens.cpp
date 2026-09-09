@@ -250,8 +250,82 @@ namespace {
 /// How many preference rows a round owns, and how many dim caption lines sit under
 /// them. Both feed the height reserved for the decision block, which is pinned to
 /// the bottom so the charts get everything left over.
-int round_pref_count(int r) { return (r == 0) ? 4 : (r == 1) ? 3 : 1; }
-int round_note_lines(int r) { return (r == 1) ? 3 : 1; } ///< B carries the iron/coal caption.
+/// File-local mirrors of app's round counts: those are private to `app`, and these
+/// helpers are free functions. draw_generation_screen static_asserts the pair against
+/// the real constants, so a drift here is a compile error, not a wrong layout.
+constexpr int planetology_rounds = 3;
+constexpr int pass_rounds        = 2;
+
+/// The pass rounds take no preference rows yet — their leans arrive with the passes
+/// themselves (BL-829 round 4, BL-819 round 5) — so they reserve nothing but the
+/// placeholder caption.
+int round_pref_count(int r)
+{
+    if (r >= planetology_rounds) return 0;
+    return (r == 0) ? 4 : (r == 1) ? 3 : 1;
+}
+int round_note_lines(int r)
+{
+    if (r >= planetology_rounds) return 0;
+    return (r == 1) ? 3 : 1; ///< B carries the iron/coal caption.
+}
+
+/// A round's header text. The planetology rounds take theirs from the shared chain
+/// table (so the wizard and the History ledger name them identically); the two pass
+/// rounds are not chain rounds and carry their own, from STARTUP.md § Rounds 4 and 5.
+struct wizard_round_head
+{
+    const char* name;
+    const char* question;
+};
+
+wizard_round_head wizard_round_head_at(int r)
+{
+    if (r < planetology_rounds)
+    {
+        const ui::chain_round& cr = ui::chain_round_at(r);
+        return { cr.name, cr.question };
+    }
+    static const wizard_round_head passes[pass_rounds] = {
+        { "The History",
+          "Who claimed this ground, and who lost it, over four thousand years?" },
+        { "The Substrate",
+          "What does that ground produce, and who trades it?" },
+    };
+    int i = r - planetology_rounds;
+    if (i < 0)                              i = 0;
+    if (i >= pass_rounds)  i = pass_rounds - 1;
+    return passes[i];
+}
+
+/// The honest placeholder a pass round rests as until its pass is built. Labelled as
+/// a placeholder in as many words: an unlabelled empty pane reads as a finished
+/// surface, and the next session believes it.
+void draw_pass_round_placeholder(int pass_index)
+{
+    constexpr ImU32 col_dim   = IM_COL32(120, 128, 145, 255);
+    constexpr ImU32 col_label = IM_COL32(205, 170, 90, 255);
+
+    ImGui::PushStyleColor(ImGuiCol_Text, col_label);
+    ImGui::TextUnformatted("PLACEHOLDER - this round is not built yet");
+    ImGui::PopStyleColor();
+    ImGui::Spacing();
+
+    ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+    if (pass_index == 0)
+        ImGui::TextWrapped(
+            "Round 4 will run the history pass: four thousand years to 1200 CE, drawn as a "
+            "time-lapse on a 2D map in place of the globe, with a leaderboard here on the "
+            "left. Nothing runs yet; the globe beside this is still the planetology globe.");
+    else
+        ImGui::TextWrapped(
+            "Round 5 will run the economy pass: 1560 to 1960, then the substrate carve - "
+            "metros, colonial reach, firms and their charters, and the market carve. "
+            "Nothing runs yet; the globe beside this is still the planetology globe.");
+    ImGui::Spacing();
+    ImGui::TextWrapped("Reroll and Back work. Nothing on this round changes the world yet.");
+    ImGui::PopStyleColor();
+}
 
 /// One preference row: a name, then four segmented options with `Any` first.
 ///
@@ -298,11 +372,14 @@ void app::draw_generation_screen()
     const ImVec2      disp  = ImGui::GetIO().DisplaySize;
     const ImGuiStyle& style = ImGui::GetStyle();
 
-    // One reroll counter per round; the wizard and the resolver have to agree on
-    // how many rounds there are.
+    // One reroll counter per PLANETOLOGY round: `roll` is a planetology input and
+    // reaches resolve_preferences, so it is keyed to the chain's rounds, not to the
+    // wizard's total. The wizard's two pass rounds carry their own counters
+    // (m_wiz_pass_roll) because they are not planetology inputs at all.
     static_assert(sizeof(world_preferences::roll)
-                      == sizeof(uint32_t) * static_cast<std::size_t>(wizard_round_count),
-                  "world_preferences::roll must carry one counter per wizard round");
+                      == sizeof(uint32_t)
+                             * static_cast<std::size_t>(wizard_planetology_round_count),
+                  "world_preferences::roll must carry one counter per planetology round");
 
     // Clamp first — Back/Continue and verify.generation_stage all write this.
     if (m_wiz_round < 0)                   m_wiz_round = 0;
@@ -315,6 +392,9 @@ void app::draw_generation_screen()
     {
         refresh_wizard_preview();
         m_wiz_dirty = false;
+        // The planetology chain just moved, so both pass rounds are stale: the
+        // history runs ON this world. Causality flows one way, downstream only.
+        invalidate_wizard_rounds_below(wizard_planetology_round_count - 1);
     }
     if (m_wiz_preview.empty())
         return; // defensive: the preview is the wizard's only data source
@@ -323,11 +403,30 @@ void app::draw_generation_screen()
     // moved mid-build). Cheap zero-wait probe; runs every wizard frame.
     poll_wizard_surface();
 
-    static_assert(ui::chain_round_count == wizard_round_count,
-                  "the wizard's round count and the shared chain-round table must agree");
+    // What this GUARDED, before the wizard grew past the chain (BL-816): that every
+    // wizard round the code hands to ui::chain_round_at has a chart-round entry
+    // behind it. It was written as an equality only because the two numbers happened
+    // to be the same when the wizard was planetology and nothing else. They are not
+    // the same number any more — the wizard walks five rounds, the chart chain still
+    // covers three — so the equality is re-expressed as the two facts it stood for:
+    // the chart chain covers exactly the planetology rounds, and the planetology
+    // rounds are a strict prefix of the wizard. Every chain_round_at call below is
+    // gated on `planetology_round` accordingly.
+    static_assert(ui::chain_round_count == wizard_planetology_round_count,
+                  "the chart chain must cover exactly the wizard's planetology rounds");
+    static_assert(wizard_planetology_round_count < wizard_round_count,
+                  "the planetology rounds are a strict prefix of the wizard's rounds");
+    static_assert(planetology_rounds == wizard_planetology_round_count
+                      && pass_rounds == wizard_pass_round_count,
+                  "the file-local round-count mirrors must track app's constants");
 
-    const ui::chain_round& wr       = ui::chain_round_at(m_wiz_round);
-    const int              n_bodies = std::min(static_cast<int>(m_wiz_preview.size()),
+    // Which kind of round is on screen. The planetology rounds preview a pure chain
+    // per keystroke; the pass rounds cannot (STARTUP.md § The wait is the round).
+    const bool planetology_round = (m_wiz_round < wizard_planetology_round_count);
+    const int  pass_index        = m_wiz_round - wizard_planetology_round_count;
+
+    const wizard_round_head wr       = wizard_round_head_at(m_wiz_round);
+    const int               n_bodies = std::min(static_cast<int>(m_wiz_preview.size()),
                                                prototype_body_count());
 
     // The homeworld is the subject of every single-body chart. Located by its
@@ -410,7 +509,8 @@ void app::draw_generation_screen()
         }
         dim_text(wr.question);
 
-        // Three pips, the current one lit: past rounds filled dim, future ones hollow.
+        // One pip per wizard round, the current one lit: past rounds filled dim,
+        // future ones hollow. Drives off wizard_round_count, so it grew with it.
         {
             ImDrawList*  dl = ImGui::GetWindowDrawList();
             const ImVec2 p  = ImGui::GetCursorScreenPos();
@@ -453,9 +553,20 @@ void app::draw_generation_screen()
         // opens. It also turns a long scroll into a readable chain: the round's
         // stages fit on one screen as verdicts, and the player opens the ones the
         // roll made interesting.
-        for (int s = static_cast<int>(wr.first); s <= static_cast<int>(wr.last); ++s)
-            ui::draw_stage_fold(chart_src, static_cast<chain_stage>(s), m_ui,
-                                detail_surface::generation_stage);
+        if (planetology_round)
+        {
+            const ui::chain_round& cr = ui::chain_round_at(m_wiz_round);
+            for (int s = static_cast<int>(cr.first); s <= static_cast<int>(cr.last); ++s)
+                ui::draw_stage_fold(chart_src, static_cast<chain_stage>(s), m_ui,
+                                    detail_surface::generation_stage);
+        }
+        else
+        {
+            // The pass rounds' real chart surfaces — round 4's culture leaderboard,
+            // round 5's substrate readout — arrive with their passes. Until then the
+            // round says so in as many words rather than showing an empty column.
+            draw_pass_round_placeholder(pass_index);
+        }
 
         ImGui::EndChild();
 
@@ -528,8 +639,20 @@ void app::draw_generation_screen()
         // Reroll full-width and first — it is the wizard's main verb now.
         if (ImGui::Button("Reroll##wizroll", {bar_w, 34.0f}))
         {
-            ++pf.roll[m_wiz_round];
-            m_wiz_dirty = true;
+            if (planetology_round)
+            {
+                ++pf.roll[m_wiz_round];
+                m_wiz_dirty = true;
+            }
+            else
+            {
+                // Each pass round keeps its OWN reroll (Ben, 2026-09-08): the 4000
+                // years can be rerolled, and the focused 400-year economy pass is its
+                // own page with its own run and reroll.
+                ++m_wiz_pass_roll[pass_index];
+                m_wiz_pass_current[pass_index] = false; // re-run, not yet accepted
+                invalidate_wizard_rounds_below(m_wiz_round);
+            }
         }
 
         // Back always steps out one level, and the level outside round 0 is the main
@@ -545,7 +668,10 @@ void app::draw_generation_screen()
                 --m_wiz_round;
         }
         ImGui::SameLine();
-        if (ImGui::Button(last ? "Begin##wizgo" : "Continue##wizgo", {half, 34.0f}))
+        // "Begin" is the wizard's ONLY generating press and it belongs on the LAST
+        // round alone (Ben, 2026-09-08: "in place of begin we should see next").
+        // Rounds 1-4 advance; only round 5 commits.
+        if (ImGui::Button(last ? "Begin##wizgo" : "Next##wizgo", {half, 34.0f}))
         {
             if (last)
                 begin_new_game(); // async since 2026-08-12 — see app::begin_new_game
@@ -611,8 +737,18 @@ void app::draw_generation_screen()
         // seed's resolved family and misses every reroll-dependent world.
         if (m_autostart_wizard % 20 == 10)
         {
-            ++m_pending_world_params.preferences.roll[m_wiz_round];
-            m_wiz_dirty = true;
+            // GATED ON THE PLANETOLOGY ROUNDS, exactly as the Reroll button is.
+            // `roll` is uint32_t[3] and is the last member of world_preferences,
+            // itself the last member of world_params — so indexing it with a
+            // round of 3 or 4 wrote past the end of m_pending_world_params into
+            // whatever followed it. The Reroll path was gated when the wizard
+            // grew to five rounds (BL-816); this driver was missed, and it is
+            // the path nobody eyeballs, which is why it survived.
+            if (m_wiz_round < wizard_planetology_round_count)
+            {
+                ++m_pending_world_params.preferences.roll[m_wiz_round];
+                m_wiz_dirty = true;
+            }
         }
         if (m_autostart_wizard % 20 == 0)
         {

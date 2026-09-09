@@ -135,7 +135,8 @@ int main()
     {
         bool all_have_culture = true;
         for (const region& p : s1.regions)
-            if (p.culture < 0 || p.founding_culture < 0) { all_have_culture = false; break; }
+            // BL-826: "carries a culture" is now "the shares name somebody".
+            if (p.culture.empty() || p.founding_culture < 0) { all_have_culture = false; break; }
         check(all_have_culture, "S2a  every region carries a cradle culture (whose gods it keeps)");
 
         // More than one culture reaches the map: if every region inherited the
@@ -258,7 +259,8 @@ int main()
         {
             if (!p.creed_conquered) continue;
             ++conquered;
-            if (p.founding_culture < 0 || p.founding_culture == p.culture)
+            // BL-826: plurality — the conquerors are the largest people here.
+            if (p.founding_culture < 0 || p.founding_culture == p.culture.plurality())
                 founders_kept = false;
         }
         check(founders_kept,

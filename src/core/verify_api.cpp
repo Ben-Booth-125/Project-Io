@@ -1033,7 +1033,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_wiz_dirty = true;
     });
 
-    // Park the wizard on a specific ROUND (0-2) so a visual check can capture each
+    // Park the wizard on a specific ROUND (0-4) so a visual check can capture each
     // one. Clamped by draw_generation_screen, so an out-of-range index is harmless —
     // the name is kept for the scripts that already call it. Every round is a stable
     // capture: the wizard is driven by the preferences and the seed, not by

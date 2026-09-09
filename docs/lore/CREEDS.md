@@ -52,31 +52,43 @@ god's zeal floor: mountains breed harder creeds.
 
 Inherited from the ladder's rule: **it drives, it does not narrate.** A
 culture's `aggression_q` is derived from its war god's zeal and dominion and
-its chief god's zeal. A culture whose aggression clears its neighbour's
-defence *plus the ladder's conquest cost* marches; a won war **welds** two
-cradles and lowers `fragmentation_q` before `nation_params_from_ladder`
-reads it. Peaceable creeds (aggression at or below 550) farm instead.
-Warlike creeds therefore grow fewer, larger polities — the first, cradle-grain
-form of the war simulation nation-count consolidation is left to. Welding is
-floored at half the incoming fragmentation, so creeds alone cannot
-manufacture a hegemon (BL-224's non-hegemony invariant is respected, not
-resolved, here).
+its chief god's zeal, and it is the **doctrine input** the Era −1 sim reads.
+That is the whole of what a creed does to force.
 
-The tribal marches are single-round pairwise comparisons at cradle grain —
-a scalar attack against a scalar defence, seeded. They are the one place a
-war in Kepler resolves that way: Ben overturned abstract war for **simulated
-history** on 2026-08-02, so once the Era −1 sim takes over (HISTORY.md § The
-Era −1 sim) every war fights with real typed units and doctrine through
-`resolve_battle`. The creeds hand that sim its input — a polity's doctrine
-is read off its culture's `aggression_q` — rather than fighting its wars.
+**A creed no longer fights its own war, and no longer sets the nation count
+(Ben, 2026-09-09).** The tribal marches — single-round pairwise comparisons
+at cradle grain, a scalar attack against a scalar defence, welding two
+cradles and lowering `fragmentation_q` — are retired.
+[`../generation/COLONISATION.md`](../generation/COLONISATION.md)
+§ Fragmentation comes from contact owns what replaced them.
+
+Two reasons, and the second is the load-bearing one. Their **timing** was
+wrong: they are wars, inside a span whose premise is that spreading rather
+than fighting is the process. Their **grain** was wronger still: a cradle
+under diffusion is a source, not a point, so the objects the marches compared
+had stopped describing where two peoples actually meet.
+
+What this separates is worth stating, because it was tangled before.
+`aggression_q` used to drive both *how consolidated the political map is* and
+*how a polity fights once it exists*. It now drives only the second; how far
+a people spread drives the first. Two causes for two effects.
+
+The overturning that stands unchanged: Ben replaced abstract war with
+**simulated history** on 2026-08-02, so every war in Kepler fights with real
+typed units and doctrine through `resolve_battle` (HISTORY.md § The Era −1
+sim). The marches were the last scalar-comparison war anywhere in the design;
+retiring them finishes that ruling rather than amending it.
 
 ## Where a pantheon sits on the ground
 
 The culture unit is the **cradle**; settlement refines it into **regions**
-(`src/world/settlement.cpp`) without replacing it. A region inherits its
-nearest cradle's culture, so a pantheon is mapped onto specific ground and
-specific ancient deposits, and the distribution of gods across the map is a
-record of who walked where.
+(`src/world/settlement.cpp`) without replacing it. A region inherits the
+culture of **the stream that reached it**, so a pantheon is mapped onto
+specific ground and specific ancient deposits, and the distribution of gods
+across the map is a record of who walked where.
+[`../generation/COLONISATION.md`](../generation/COLONISATION.md) § Culture
+arrives by route owns which stream that is — and supersedes the straight-line
+nearest-cradle assignment this section previously stated (Ben, 2026-09-09).
 
 Pantheons do three things: write history, drive fragmentation, and **bias
 industrialisation timing** — a forge culture's ore regions light up earlier,

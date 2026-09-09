@@ -281,7 +281,17 @@ void w_region(std::ostream& o, const region& r)
     w_int(o, r.anchor);
     w_int(o, r.col);
     w_int(o, r.row);
-    w_int(o, r.culture);
+    // save_game_version 10 (BL-835, the army pool) -- keep r_region in step.
+    //
+    // FIXED WIDTH IS WHAT KEEPS THIS SIMPLE. `region::culture` became a
+    // distribution, and a length-prefixed list would have made the seam a
+    // variable field count in the middle of the record. Three ids, three
+    // weights and the tail are seven fixed fields written IN PLACE OF the one
+    // int that used to sit here — the layout moved, so the version moved with
+    // it and the strict-equality check refuses a v8 stream.
+    for (int k = 0; k < culture_share_slots; ++k) w_int(o, static_cast<int>(r.culture.id[k]));
+    for (int k = 0; k < culture_share_slots; ++k) w_int(o, static_cast<int>(r.culture.weight_q[k]));
+    w_int(o, static_cast<int>(r.culture.other_q));
     w_int(o, r.founding_culture);
     w_bool(o, r.creed_conquered);
     w_str(o, r.name);
@@ -300,6 +310,14 @@ void w_region(std::ostream& o, const region& r)
     w_i64(o, r.population);
     w_i64(o, r.last_demography_year);
     w_i64(o, r.manpower_stock);
+    // save_game_version 10 (BL-835, the army pool) -- keep r_region in step.
+    // APPENDED IN PLACE, next to the pool it is raised from, because that is
+    // where a reader looking for "how many soldiers" will look. Nothing before
+    // it moved; the strict-equality version check is what refuses a v9 stream,
+    // and there is deliberately no v9 read path -- an army_stock defaulted to
+    // zero on load would be a world whose every region is undefended, which is
+    // the exact pathology this field exists to remove.
+    w_i64(o, r.army_stock);
     w_u32(o, r.works_built);
     w_int(o, r.work_capacity_mod);
     w_int(o, r.work_manpower_mod);
@@ -319,14 +337,35 @@ void w_region(std::ostream& o, const region& r)
 
 bool r_region(std::istream& i, region& r)
 {
-    return r_int(i, r.anchor) && r_int(i, r.col) && r_int(i, r.row) && r_int(i, r.culture)
-        && r_int(i, r.founding_culture) && r_bool(i, r.creed_conquered) && r_str(i, r.name)
+    // save_game_version 9 (BL-826) -- keep w_region in step. Read into ints and
+    // narrow deliberately: the on-disk field is an int and the in-memory one an
+    // int16_t, and an unchecked narrowing read is the failure the version guard
+    // exists to make impossible rather than merely unlikely.
+    if (!(r_int(i, r.anchor) && r_int(i, r.col) && r_int(i, r.row))) return false;
+    {
+        int v[culture_share_slots * 2 + 1];
+        for (int k = 0; k < culture_share_slots * 2 + 1; ++k)
+            if (!r_int(i, v[k])) return false;
+        for (int k = 0; k < culture_share_slots; ++k)
+        {
+            if (v[k] < -1 || v[k] > 0x7FFF) return false;
+            if (v[culture_share_slots + k] < 0 || v[culture_share_slots + k] > 1000) return false;
+            r.culture.id[k]       = static_cast<int16_t>(v[k]);
+            r.culture.weight_q[k] = static_cast<int16_t>(v[culture_share_slots + k]);
+        }
+        const int tail = v[culture_share_slots * 2];
+        if (tail < 0 || tail > 1000) return false;
+        r.culture.other_q = static_cast<int16_t>(tail);
+        if (r.culture.total_q() != 1000) return false; // The invariant, enforced at the seam.
+    }
+    return r_int(i, r.founding_culture) && r_bool(i, r.creed_conquered) && r_str(i, r.name)
         && r_int(i, r.settle_score_q) && r_int(i, r.farm_q) && r_int(i, r.ore_q)
         && r_int(i, r.energy_q) && r_int(i, r.port_q) && r_enum(i, r.dominant, max_region_cls)
         && r_i64(i, r.founded_year) && r_i64(i, r.industrial_year) && r_bool(i, r.industrialised)
         && r_int(i, r.industrial_lag_years) // save_game_version 6
         && r_int(i, r.nation) && r_int(i, r.contest_q) && r_i64(i, r.population)
         && r_i64(i, r.last_demography_year) && r_i64(i, r.manpower_stock)
+        && r_i64(i, r.army_stock) // save_game_version 10 (BL-835)
         && r_u32(i, r.works_built) && r_int(i, r.work_capacity_mod)
         && r_int(i, r.work_manpower_mod) && r_int(i, r.work_reach_mod)
         && r_int(i, r.work_defence_mod) && r_int(i, r.work_industrial_mod)

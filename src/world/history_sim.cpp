@@ -4,6 +4,8 @@
 #include "terrain_combat.hpp" // BL-384 trace: the defence term the scorer never sees
 
 #include <algorithm>
+#include <chrono>
+#include <queue>
 
 // ---------------------------------------------------------------------------
 // The Era -1 history sim (BL-277 + BL-271's first slice). See history_sim.hpp
@@ -332,6 +334,38 @@ int step_for_year(const history_sim_params& p, int64_t y)
 
 // ---------------------------------------------------------------------------
 
+// --- BL-825: the REPORT-ONLY cost split ------------------------------------
+//
+// Four wall-clock accumulators, written and never read by this file. They exist
+// so a measurement harness can say where a 4000-year span's time goes without
+// having to guess it from differential runs. The sim does not branch on them,
+// they are not part of `history_sim_state`, and they must never reach a digest
+// or a save — see the type comment in history_sim.hpp.
+history_sim_profile& history_sim_last_profile()
+{
+    static history_sim_profile prof;
+    return prof;
+}
+
+namespace
+{
+using prof_clock = std::chrono::steady_clock;
+
+/// Adds its own lifetime to one accumulator. Construction and destruction only;
+/// no control flow of the sim depends on it.
+struct scoped_ns
+{
+    int64_t*               sink;
+    prof_clock::time_point t0;
+    explicit scoped_ns(int64_t& s_) : sink(&s_), t0(prof_clock::now()) {}
+    ~scoped_ns()
+    {
+        *sink += std::chrono::duration_cast<std::chrono::nanoseconds>(
+                     prof_clock::now() - t0).count();
+    }
+};
+} // namespace
+
 history_sim_state run_history_sim(settlement_state&         ss,
                                   const creed_state*        cs,
                                   const sim_terrain_view&   terrain,
@@ -342,6 +376,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                   std::atomic<int>*         year_progress,
                                   const works_registry*     works)
 {
+    history_sim_profile& prof = history_sim_last_profile();
+    prof = history_sim_profile{}; // this run's split, never the last one's.
+
     history_sim_state out;
     if (ss.regions.empty() || params.stop_year <= params.start_year)
         return out;
@@ -353,10 +390,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // sim writes `nation` as it goes, so the political map is this loop's
     // output rather than its input.
     {
+        // BL-826 — PLURALITY. A polity is seeded per distinct people on the
+        // map, and a people is present where it is the largest share. At the
+        // seed the shares are pure (settlement writes `pure`), so this is
+        // exactly the old set; it only differs on a state handed in mid-history.
         std::vector<int> cultures;
         for (const region& p : ss.regions)
-            if (p.culture >= 0 && std::find(cultures.begin(), cultures.end(), p.culture) == cultures.end())
-                cultures.push_back(p.culture);
+        {
+            const int pc = p.culture.plurality();
+            if (pc >= 0 && std::find(cultures.begin(), cultures.end(), pc) == cultures.end())
+                cultures.push_back(pc);
+        }
         std::sort(cultures.begin(), cultures.end()); // Order must not depend on placement.
 
         for (int c : cultures)
@@ -375,7 +419,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             for (std::size_t i = 0; i < ss.regions.size(); ++i)
             {
                 const region& p = ss.regions[i];
-                if (p.culture != c) continue;
+                // BL-826 — PLURALITY. A seat sits where this people is the
+                // largest, which is the same question the seed above asked.
+                if (p.culture.plurality() != c) continue;
                 if (p.settle_score_q > best_q) { best_q = p.settle_score_q; best = static_cast<int>(i); }
             }
             q.capital = best;
@@ -398,8 +444,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
         std::vector<std::pair<int, int>> by_size; // (count, id)
         for (const polity& q : out.polities)
         {
-            int n = 0;
-            for (const region& p : ss.regions) if (p.culture == q.culture) ++n;
+            // BL-826 — SHARE-WEIGHTED, and this is the one place a plurality
+            // count would have been actively wrong. "Largest two by starting
+            // holdings" is a MEASURE OF SIZE, and a half-held region is half a
+            // holding; counting it as a whole one (or as none) makes the
+            // great-power seed jump on a single per-mille crossing 500. The sum
+            // of shares is the continuous reading and it is exactly the old
+            // count on the pure shares the seed actually sees.
+            int64_t share_sum = 0;
+            for (const region& p : ss.regions) share_sum += p.culture.share_of(q.culture);
+            const int n = static_cast<int>(share_sum / 1000);
             by_size.push_back({n, q.id});
         }
         std::sort(by_size.begin(), by_size.end(),
@@ -420,7 +474,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
     std::vector<int> owner(ss.regions.size(), -1);
     for (std::size_t i = 0; i < ss.regions.size(); ++i)
         for (const polity& q : out.polities)
-            if (q.culture == ss.regions[i].culture) { owner[i] = q.id; break; }
+            // BL-826 — PLURALITY, matching the seed: a polity exists per
+            // distinct plurality culture, so this assigns each region to the
+            // polity of the people who are largest on it.
+            if (q.culture == ss.regions[i].culture.plurality()) { owner[i] = q.id; break; }
 
     for (std::size_t i = 0; i < ss.regions.size(); ++i)
     {
@@ -433,10 +490,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                                              // shared with `draw_urban_map`.
         p.last_demography_year = params.start_year;
         replenish_manpower(p);
+        // BL-835 — THE WORLD OPENS WITH ARMIES ALREADY STANDING. Seeded at the
+        // target rather than at zero: a run that began with every region bare
+        // would spend its first century as a free-for-all of undefended ground,
+        // which is an artefact of the start and not a fact about the world.
+        p.army_stock = garrison_target(p, params.garrison_fraction_q);
+        p.manpower_stock = clampi64(p.manpower_stock - p.army_stock, 0, p.manpower_stock);
     }
-
-    // --- Per-year war pressure, reset each tick ---------------------------
-    std::vector<int> war_pressure(ss.regions.size(), 0);
 
     // --- THE ANCIENT ROAD RECORD (BL-768) ---------------------------------
     //
@@ -457,6 +517,96 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
         const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
         corridor_uses.push_back({lo, hi});
+    };
+
+    // --- GRUDGES (BL-827) -------------------------------------------------
+    //
+    // Directed, sparse, decaying, and carrying its cause. The table is a sorted
+    // vector searched by binary search — never a keyed map — so its order is a
+    // property of the integers in it rather than of a container's layout.
+    //
+    // NOTHING BELOW READS A GRUDGE TO MAKE A DECISION. It is the same pure-
+    // observation contract `battle_trace` holds, and it is what keeps this a
+    // data-model change rather than an agent term: the scorer's inputs are
+    // identical with this block deleted.
+    const auto grudge_slot = [&](int from, int to) -> grudge* {
+        if (from < 0 || to < 0 || from == to) return nullptr;
+        if (from > 0xFFFE || to > 0xFFFE) return nullptr;
+        const uint16_t f = static_cast<uint16_t>(from), t = static_cast<uint16_t>(to);
+        const auto it = std::lower_bound(
+            out.grudges.begin(), out.grudges.end(), std::pair<uint16_t, uint16_t>{f, t},
+            [](const grudge& g, const std::pair<uint16_t, uint16_t>& k) {
+                if (g.from != k.first) return g.from < k.first;
+                return g.to < k.second;
+            });
+        if (it != out.grudges.end() && it->from == f && it->to == t) return &*it;
+        grudge g;
+        g.from = f;
+        g.to   = t;
+        return &*out.grudges.insert(it, g);
+    };
+
+    /// Raise one named event. Magnitude, place and date all recorded; the top
+    /// few by magnitude are kept and the rest fall into the scalar, which is
+    /// what makes the record bounded without making it a bare number.
+    const auto raise_grudge = [&](int from, int to, grudge_kind kind,
+                                  int region_idx, int64_t year, int magnitude) {
+        if (magnitude <= 0) return;
+        grudge* g = grudge_slot(from, to);
+        if (!g) return;
+        g->score = static_cast<int32_t>(
+            clampi(g->score + magnitude, 0, std::max(1, params.grudge_cap)));
+        if (g->score > g->peak) g->peak = g->score;
+        ++g->event_count;
+
+        grudge_event e;
+        e.year      = static_cast<int32_t>(year);
+        e.region    = (region_idx >= 0 && region_idx < static_cast<int>(owner_index_limit))
+                        ? static_cast<uint16_t>(region_idx) : owner_none;
+        e.kind      = kind;
+        e.magnitude = static_cast<int32_t>(magnitude);
+
+        // Keep the largest few, sorted descending by magnitude, ties on the
+        // LATER year, then on the lower kind. A total order with an explicit
+        // tie-break, so the kept set cannot depend on arrival order.
+        const auto beats = [](const grudge_event& a, const grudge_event& b) {
+            if (a.magnitude != b.magnitude) return a.magnitude > b.magnitude;
+            if (a.year != b.year)           return a.year > b.year;
+            return static_cast<int>(a.kind) < static_cast<int>(b.kind);
+        };
+        int at = static_cast<int>(g->events_kept);
+        if (at < grudge_events_kept) { g->events[at] = e; g->events_kept = at + 1; }
+        else if (beats(e, g->events[grudge_events_kept - 1]))
+            g->events[grudge_events_kept - 1] = e;
+        else return;
+        for (int i = static_cast<int>(g->events_kept) - 1; i > 0; --i)
+            if (beats(g->events[i], g->events[i - 1]))
+                std::swap(g->events[i], g->events[i - 1]);
+    };
+
+    /// A polity died. ITS GRUDGES ARE LOST, IN BOTH DIRECTIONS — see the
+    /// `history_sim_state::grudges` note for why that is the call rather than
+    /// inheritance. What survives is `realm_ended`, raised from every surviving
+    /// polity of the dead realm's people toward its killer, walked in polity-id
+    /// order so the set and its order are both deterministic.
+    const auto extinguish_polity = [&](int dead, int killer, int region_idx, int64_t year) {
+        const int dead_culture = (dead >= 0 && dead < static_cast<int>(out.polities.size()))
+                               ? out.polities[static_cast<std::size_t>(dead)].culture : -1;
+        out.grudges.erase(
+            std::remove_if(out.grudges.begin(), out.grudges.end(),
+                           [&](const grudge& g) {
+                               return g.from == static_cast<uint16_t>(dead)
+                                   || g.to   == static_cast<uint16_t>(dead);
+                           }),
+            out.grudges.end());
+        if (killer < 0 || dead_culture < 0) return;
+        for (const polity& kin : out.polities)
+        {
+            if (!kin.alive || kin.id == dead || kin.id == killer) continue;
+            if (kin.culture != dead_culture) continue;
+            raise_grudge(kin.id, killer, grudge_kind::realm_ended,
+                         region_idx, year, params.grudge_realm_ended);
+        }
     };
 
     // --- Neighbour index --------------------------------------------------
@@ -494,8 +644,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // plains does, using the landform ratios logistics.cpp already defines for
     // the 1960 era. Computed by Dijkstra from the capital and cached until the
     // capital moves, so the per-year cost stays a lookup.
-    std::vector<int> reach;            // Per-region cost from the current capital.
-    int reach_capital = -2;            // Which capital `reach` was built for.
+    //
+    // ONE SLOT PER POLITY, NOT ONE SHARED SLOT (BL-834). The paragraph above is
+    // true of a single polity and false of twelve. A shared slot holds the
+    // PREVIOUS polity's capital when the next one asks for reach, so the cache
+    // never survived one iteration of the round and every polity paid a full
+    // Dijkstra every round: 12,000 rebuilds over a 1,000-round run, and 66-86%
+    // of the whole span. That is measured rather than suspected (BL-825).
+    //
+    // The key is `polity::id`, which is that polity's index in `out.polities`
+    // and is assigned once at seeding, so the container is a plain vector and
+    // there is no iteration order for a result to depend on.
+    //
+    // WHY THIS IS OUTPUT-IDENTICAL, which is the only property that matters in
+    // `world/*`: the cost vector is a function of the capital, the neighbour
+    // graph and the terrain under each region's anchor. Terrain is fixed for the
+    // run and an anchor is written once, at founding. The graph is mutated in
+    // exactly one place — `link_region`, called only when a region is founded —
+    // and that founding also grows `ss.regions`. So the region-count check below
+    // catches every graph mutation, and the capital check catches the only two
+    // places a capital is assigned. There is no third input to go stale.
+    struct reach_cache
+    {
+        std::vector<int> cost;    ///< Per-region cost from `capital`.
+        int              capital = -2; ///< Which capital `cost` was built for.
+    };
+    std::vector<reach_cache> reach_by_polity;
 
     const auto tile_cost = [&](const region& p) {
         // Landform ratios, x100: plains 100, highland 125, mountain 200, ...
@@ -511,21 +685,49 @@ history_sim_state run_history_sim(settlement_state&         ss,
         }
     };
 
-    const auto rebuild_reach = [&](int capital) {
+    const auto rebuild_reach = [&](reach_cache& rc, int capital) {
+        const scoped_ns prof_reach(prof.ns_reach); // BL-825, report-only
+        ++prof.reach_rebuilds;
+        std::vector<int>& reach = rc.cost;
         reach.assign(ss.regions.size(), 1 << 28);
         if (capital < 0 || capital >= static_cast<int>(ss.regions.size())) return;
         reach[static_cast<std::size_t>(capital)] = 0;
 
-        // Dijkstra without a heap: region counts are hundreds, and a simple
-        // scan keeps the order deterministic without depending on a tie-break
-        // inside a priority queue.
+        // DIJKSTRA WITH A HEAP (BL-844), REPLACING A LINEAR SCAN.
+        //
+        // The scan this replaces was a deliberate choice, and half of its
+        // reasoning was right: a tie-break inside a priority queue is exactly
+        // the container-order dependency `world/*` forbids. The other half —
+        // "region counts are hundreds" — stopped being true. A run founds
+        // constantly, from ~150 regions to ~1,190 over 4,000 years, so the scan
+        // was O(N^2) against a graph whose edges are only O(N) and the cost per
+        // rebuild rose with the span (BL-834's re-measurement).
+        //
+        // THE TIE-BREAK IS ELIMINATED RATHER THAN TRUSTED. The comparator
+        // orders on the PAIR (cost, region index), and region indices are
+        // unique, so no two queue entries ever compare equal and there is no
+        // tie for the heap's layout to break. That is also precisely what the
+        // scan did: `reach[i] < best_c` is strict, so it took the lowest cost
+        // and, among equals, the lowest index. Same order, same result.
+        //
+        // Lazy deletion, not decrease-key: a relaxed region is pushed again and
+        // the stale entry is skipped when it surfaces. `done` is what makes
+        // that safe, and it is the same `done` the scan used.
+        //
+        // UNREACHABLE REGIONS ARE NEVER ENQUEUED, which preserves the scan's
+        // `if (best < 0) break`. A region enters the queue only when something
+        // relaxes it below its 1 << 28 sentinel, so the queue empties exactly
+        // when the scan would have found nothing left under the sentinel.
+        using node = std::pair<int, int>; // (cost, region index) — never equal.
+        std::priority_queue<node, std::vector<node>, std::greater<node>> frontier;
         std::vector<bool> done(ss.regions.size(), false);
-        for (std::size_t iter = 0; iter < ss.regions.size(); ++iter)
+        frontier.push({0, capital});
+        while (!frontier.empty())
         {
-            int best = -1, best_c = 1 << 28;
-            for (std::size_t i = 0; i < reach.size(); ++i)
-                if (!done[i] && reach[i] < best_c) { best_c = reach[i]; best = static_cast<int>(i); }
-            if (best < 0) break;
+            const node top = frontier.top();
+            frontier.pop();
+            const int best_c = top.first, best = top.second;
+            if (done[static_cast<std::size_t>(best)]) continue; // A stale entry.
             done[static_cast<std::size_t>(best)] = true;
 
             const region& bp = ss.regions[static_cast<std::size_t>(best)];
@@ -536,10 +738,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                * (tile_cost(bp) + tile_cost(np2)) / 200;
                 const int cand = best_c + (step > 0 ? step : 1);
                 if (cand < reach[static_cast<std::size_t>(nb)])
+                {
                     reach[static_cast<std::size_t>(nb)] = cand;
+                    frontier.push({cand, nb});
+                }
             }
         }
-        reach_capital = capital;
+        rc.capital = capital;
     };
 
     // --- Time-lapse change list -------------------------------------------
@@ -573,15 +778,37 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
         // ---- Demography -------------------------------------------------
         int64_t total_pop = 0;
+        {
+        const scoped_ns prof_demo(prof.ns_demography); // BL-825, report-only
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {
-            advance_region_demography(ss.regions[i], 1, war_pressure[i]);
+            // BL-835 — WAR PRESSURE IS NO LONGER A DEMOGRAPHIC INPUT, and the
+            // literal 0 is the change rather than an omission.
+            //
+            // `advance_region_demography`'s third argument is a battle-intensity
+            // drawdown: up to ~4% of a region's people a year, killed by the
+            // fighting standing on them. That is total warfare, and Ben's ruling
+            // is that stage 4 does not simulate it. Population moves on
+            // demography, habitability, famine and plague; the war is fought by
+            // `army_stock`, one field over, and it is spent there.
+            //
+            // The settlement-level API keeps the parameter — it is a correct
+            // model of something, `demography_harness` asserts it, and the
+            // campaign era may yet want it. This sim just stops feeding it.
+            advance_region_demography(ss.regions[i], 1, /*war_pressure_q=*/0);
             // BL-766: the cities drawn before this loop started live through it
             // — they grow with the region and thin when it thins.
             advance_region_urban(ss.regions[i]);
-            war_pressure[i] = 0;
+            // BL-835 — ONE YEAR OF THE MUSTER, for every region whether or not
+            // anyone is fighting over it. This is what makes an undefended
+            // region a TEMPORARY state: a region stripped by a march away, or
+            // by a garrison broken in battle, is rebuilding from the year after
+            // it happened, at the pace its own people can pay for.
+            muster_garrison(ss.regions[i], params.garrison_fraction_q,
+                            params.garrison_muster_q, params.garrison_disband_q);
             total_pop += ss.regions[i].population;
         }
+        } // BL-825 demography timer
         if (total_pop > out.peak_population)
         {
             out.peak_population = total_pop;
@@ -601,7 +828,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
         step_years    = step_for_year(params, y);
         next_decision = y + step_years;
 
+        // ---- GRUDGE DECAY (BL-827) ---------------------------------------
+        //
+        // A RATE, so it is multiplied by the step exactly like tech progress,
+        // cohesion recovery and contest decay — see § The stepped decision
+        // clock. Without it a 4000-year run reaches the epoch with every pair
+        // maximally aggrieved, which carries no information at all.
+        //
+        // Entries that decay under the floor are DROPPED, which is what keeps
+        // the table sparse across four millennia rather than merely starting
+        // sparse. `peak` is not decayed: it is the record of how bad it once
+        // got, and a decayed peak would be a second copy of `score`.
+        if (params.grudge_decay_per_year_q > 0 && !out.grudges.empty())
+        {
+            const int shed = clampi(params.grudge_decay_per_year_q * step_years, 0, 1000);
+            for (grudge& g : out.grudges)
+                g.score -= (g.score * shed) / 1000;
+            const int floor_q = std::max(0, params.grudge_floor);
+            out.grudges.erase(
+                std::remove_if(out.grudges.begin(), out.grudges.end(),
+                               [&](const grudge& g) { return g.score <= floor_q; }),
+                out.grudges.end());
+        }
+
         // ---- Each polity acts, in id order (deterministic) ---------------
+        const scoped_ns prof_dec(prof.ns_decisions); // BL-825, report-only
+        ++prof.decision_rounds;
         for (polity& q : out.polities)
         {
             if (!q.alive) continue;
@@ -619,11 +871,42 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // holding" the first cut's comment claimed (BL-312).
                 q.capital = held.front();
 
+            // ---- ASSIMILATION (BL-826) --------------------------------
+            //
+            // HOLDING GROUND DIGESTS IT, SLOWLY. This is the whole anti-hegemony
+            // half of the shares change: the conquest that used to flip a
+            // region's culture at the instant the border moved now shifts it a
+            // couple of per-mille of the foreign remainder a year, so a realm
+            // that took a province four centuries ago is roughly half way and
+            // one that took it last century has barely started. The score's
+            // `w_cult` term reads that share, so wide recent conquest keeps
+            // charging its owner and narrow old holdings stop.
+            //
+            // A RATE x THE STEP, like the three rates above it. Walked over
+            // `held`, which is built in region-index order, so the order is a
+            // property of the map and not of anything transient. Nothing is
+            // appended to `ss.regions` here, so no reference taken below is
+            // invalidated by it.
+            if (params.assimilation_per_year_q > 0)
+            {
+                const int shift_q = clampi(params.assimilation_per_year_q * step_years, 0, 1000);
+                for (int hi : held)
+                    ss.regions[static_cast<std::size_t>(hi)].culture.shift_toward(q.culture, shift_q);
+            }
+
             const region& cap = ss.regions[static_cast<std::size_t>(q.capital)];
             const uint32_t  qs  = salt(seed, static_cast<uint32_t>(q.id));
 
-            if (reach_capital != q.capital || reach.size() != ss.regions.size())
-                rebuild_reach(q.capital);
+            // This polity's own slot, grown on demand: `id` is an index into
+            // `out.polities`, and nothing appends a polity mid-run, but sizing
+            // here rather than up front keeps the two facts independent.
+            if (reach_by_polity.size() <= static_cast<std::size_t>(q.id))
+                reach_by_polity.resize(static_cast<std::size_t>(q.id) + 1);
+            reach_cache& rc = reach_by_polity[static_cast<std::size_t>(q.id)];
+
+            if (rc.capital != q.capital || rc.cost.size() != ss.regions.size())
+                rebuild_reach(rc, q.capital);
+            const std::vector<int>& reach = rc.cost;
 
             // ---- What this polity's WORKS are worth it (BL-321) -----------
             //
@@ -777,6 +1060,59 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
                 return false;
             };
+            // BL-835 — THE FIELD ARMY A CAMPAIGN CAN CONCENTRATE AT ONE HUB.
+            //
+            // The hub's own garrison, plus what the polity's holdings ADJACENT
+            // to the hub can spare, and no more than double the hub's own.
+            //
+            // WHY THE POOL CANNOT BE ONE REGION'S GARRISON ALONE. Measured:
+            // with the attacker fielding a single region's army against a
+            // single region's army, the defender's terrain multiplier and works
+            // made every campaign a losing proposition, `p_win_q` collapsed to
+            // roughly a fifth of what it had been, and the seed-0 fixture went
+            // from 258 battles to 0. A model in which no polity can ever
+            // profitably attack is not a better model than one in which the
+            // same region is taken 258 times; it is the same failure mirrored.
+            //
+            // WHY IT IS CAPPED AT 2x THE HUB'S OWN. `neighbours` is a radius,
+            // not a border, so an uncapped sum would let a large realm mass
+            // twenty garrisons on one frontier and roll the map. The cap says
+            // a march can roughly double itself from what it picks up on the
+            // way and no more, which keeps the contest inside the range the
+            // resolver was calibrated on.
+            //
+            // THE SUPPORTING HOLDINGS SPARE HALF, because they are still
+            // covering their own ground — and what they spare is genuinely
+            // GONE from them while the campaign runs, which is what makes a
+            // wide offensive an uncovered frontier rather than a free action.
+            //
+            // `commit` is the only difference between the estimate and the
+            // execution: the scorer asks the question, the campaign takes the
+            // men. One rule, read twice, so a polity cannot be offered a force
+            // it then fails to raise (this file's standing thesis — a cost
+            // authored on one scale and spent on another is the bug).
+            const auto gather_army = [&](int hub, bool commit) -> int64_t {
+                const std::size_t hs = static_cast<std::size_t>(hub);
+                int64_t total = ss.regions[hs].army_stock;
+                if (total <= 0) return 0;
+                if (commit) ss.regions[hs].army_stock = 0;
+
+                int64_t budget = total; // The cap: support may match the hub, not exceed it.
+                for (int n : neighbours[hs])
+                {
+                    if (budget <= 0) break;
+                    const std::size_t ni = static_cast<std::size_t>(n);
+                    if (owner[ni] != q.id) continue;
+                    const int64_t spare = ss.regions[ni].army_stock / 2;
+                    if (spare <= 0) continue;
+                    const int64_t take = std::min(spare, budget);
+                    total  += take;
+                    budget -= take;
+                    if (commit) ss.regions[ni].army_stock -= take;
+                }
+                return total;
+            };
+
             // The staging holding reaches the target overland (or over its own
             // lakes) — no sea in the line at all.
             const auto dry_contact = [&](int hub, std::size_t ti) {
@@ -822,6 +1158,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // -- Campaign --------------------------------------------------
             for (int hi : held)
             {
+                // BL-835 — A HUB WITH NO ARMY STAGES NOTHING. Hoisted above the
+                // target loop rather than repeated inside it: whether this
+                // holding has a force to march is a property of the holding,
+                // and the execute path filters staging holdings by the same
+                // test, so the scorer cannot offer a campaign execute would
+                // then refuse to launch.
+                const int64_t hub_army = gather_army(hi, /*commit=*/false);
+                if (hub_army <= 0) continue;
+
                 for (int tn : neighbours[static_cast<std::size_t>(hi)])
                 {
                     const std::size_t ti = static_cast<std::size_t>(tn);
@@ -874,7 +1219,29 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // could not see would be making the decision on stale
                     // information every time, and the work would read as bad
                     // luck rather than as the defender's choice it is.
-                    const int64_t def_men = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
+                    //
+                    // BL-835 — IT READS THE ARMY STANDING ON THE REGION. This
+                    // was `tgt.manpower_stock * levy_fraction_q`, i.e. a share
+                    // of the target's recruitable CIVILIANS, which is how a
+                    // region emptied of people became permanently undefendable.
+                    // The question the scorer asks is now "what is standing
+                    // there", and its answer changes from year to year.
+                    // ...AND IT INCLUDES THE LEVY THE TARGET WILL CALL UP. The
+                    // execute path musters the defender to its garrison target
+                    // out of its manpower pool before the fight, so a scorer
+                    // reading the bare `army_stock` would be pricing a province
+                    // it can never actually meet — this file's standing thesis
+                    // again, a cost authored on one scale and paid on another.
+                    // The two lines below are `muster_garrison`'s arithmetic
+                    // asked as a question instead of applied as a mutation.
+                    const int64_t def_target = garrison_target(tgt, params.garrison_fraction_q);
+                    int64_t def_men = tgt.army_stock;
+                    if (def_men < def_target)
+                    {
+                        const int64_t gap  = def_target - def_men;
+                        const int64_t want = (gap * clampi(params.defence_levy_q, 0, 1000)) / 1000;
+                        def_men += std::min(want, tgt.manpower_stock);
+                    }
                     const int def_works   = clampi(tgt.work_defence_mod, 0, 1000);
                     const int def_scaled  = static_cast<int>(clampi64(
                         (def_men / 64) * (1000 + def_works) / 1000, 0, 1000));
@@ -916,13 +1283,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int supply_here =
                         forages ? campaign_supply(hub_dist, ti, hi) : 0;
 
-                    int64_t atk_men = 0;
-                    for (int hi2 : held)
-                        if (ss.regions[static_cast<std::size_t>(hi2)].manpower_stock > atk_men)
-                            atk_men = ss.regions[static_cast<std::size_t>(hi2)].manpower_stock;
+                    // BL-835 — THE ARMY AT THE HUB IT WOULD ACTUALLY MARCH FROM.
+                    //
+                    // This was the LARGEST manpower stock anywhere in the realm,
+                    // which was wrong twice over and is now wrong zero times.
+                    // It read a civilian pool rather than an army, and it read
+                    // it in a region the campaign would never stage from — the
+                    // execute path marches from the nearest legal holding, and
+                    // `hi` IS that holding for this candidate. A polity now
+                    // scores the force it can actually put on the objective,
+                    // which is the sharpened question the item asks for: not
+                    // "can I take this" but "can I get an army there".
+                    const int64_t atk_men = hub_army;
                     const int64_t atk_est = (atk_men * supply_here / 1000)
                                           * clampi(q.cohesion_q, 1, 1000) / 1000;
-                    const int64_t def_est = tgt.manpower_stock > 0 ? tgt.manpower_stock : 1;
+                    const int64_t def_est = def_men > 0 ? def_men : 1;
                     const int p_win_q = static_cast<int>(
                         clampi64((atk_est * 1000) / (atk_est + def_est), 0, 1000));
 
@@ -969,8 +1344,30 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // value — foreign ground is worth (1000 - w_cult)/1000 of
                     // what home ground is — so the signal survives and the veto
                     // does not.
-                    if (tgt.culture != q.culture)
-                        value = (value * (1000 - clampi(params.w_cult, 0, 1000))) / 1000;
+                    //
+                    // BL-826 — AND NOW IT IS A QUESTION ABOUT THE DISTRIBUTION
+                    // RATHER THAN AN EQUALITY TEST, which is the second half of
+                    // making assimilation a real lever. `tgt.culture != q.culture`
+                    // was a step function: ground was foreign or it was not, so
+                    // a conquest flipped the whole discount off the instant the
+                    // border moved and a conqueror was charged for ground only
+                    // once. Charged against the FOREIGN SHARE instead, the
+                    // discount fades exactly as fast as the ground stops being
+                    // foreign — which is centuries, at
+                    // `assimilation_per_year_q`. A realm that has just taken a
+                    // province still pays nearly the full discount to take the
+                    // next one beside it, and that is the anti-hegemony force:
+                    // conquest is digested, not annexed.
+                    //
+                    // Recovers the old behaviour exactly at the two ends: pure
+                    // foreign ground pays 1000/1000 of w_cult, pure own ground
+                    // pays none.
+                    {
+                        const int foreign_q = 1000 - tgt.culture.share_of(q.culture);
+                        const int cult_q    =
+                            (clampi(params.w_cult, 0, 1000) * clampi(foreign_q, 0, 1000)) / 1000;
+                        value = (value * (1000 - cult_q)) / 1000;
+                    }
 
                     // Season as an action axis: summer and winter are two
                     // candidates over the same objective, not two ticks.
@@ -1286,6 +1683,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 for (int hi : held)
                 {
                     const std::size_t hs = static_cast<std::size_t>(hi);
+                    // BL-835 — and it must have an ARMY, by the same test the
+                    // scorer used. Nearest-with-a-force, not merely nearest:
+                    // without this, execute could stage from a bare region the
+                    // scorer had already skipped and the round would fall
+                    // through having chosen a verb it could not perform.
+                    if (ss.regions[hs].army_stock <= 0) continue;
                     if (!dry_contact(hi, ti) && !tgt_shore
                      && !can_field_naval(ss.regions[hs], mil_band))
                         continue;
@@ -1295,8 +1698,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (src < 0) break; // no legal staging holding — nothing marches
                 region& home = ss.regions[static_cast<std::size_t>(src)];
 
-                const int64_t want   = (home.manpower_stock * params.levy_fraction_q) / 1000;
-                const int64_t raised = raise_manpower(home, want);
+                // BL-835 — THE FIELD ARMY MARCHES, AND IT LEAVES. The staging
+                // holding's whole garrison goes; `home.army_stock` is zero
+                // until the survivors come back, which is a real and visible
+                // cost rather than a bookkeeping one — a polity that campaigns
+                // out of a frontier march has just uncovered that march, and
+                // its neighbours' scorers can see it.
+                //
+                // This is the line that used to read
+                // `raise_manpower(home, manpower_stock * levy_fraction_q)`:
+                // an army conjured out of civilians at the moment of battle
+                // and never seen again, which is precisely the accounting that
+                // let war eat the population.
+                const int64_t raised = gather_army(src, /*commit=*/true);
                 if (raised <= 0) break;
 
                 // FORCE COMMITMENT (BL-277 Q2), priced by the SAME lambda the
@@ -1360,14 +1774,45 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     build_stack(raised, home, q, 1000, sim_band_ceiling(params, y),
                                 !exec_dry, &atk_band);
                 note_units_fielded(out, params, y, atk_band, atk);
-                const int64_t def_want = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
-                const int64_t def_men  = raise_manpower(tgt, def_want);
+                // BL-835 — THE EMERGENCY LEVY. A province being invaded calls
+                // up its own people, now, rather than at the 25%-a-year pace of
+                // the peacetime muster: `muster_rate_q` of 1000 fills the
+                // garrison to its target in one act, BOUNDED BY THE REGION'S
+                // OWN MANPOWER POOL, which is what a levy actually is.
+                //
+                // IT IS THE MECHANISM THAT MAKES GROUND EXPENSIVE TO TAKE
+                // TWICE, and it was measured into existence. Without it the
+                // attacker's survivors marched home intact while the defender
+                // rebuilt at a quarter of a quarter, so the second battle on any
+                // frontier was a walkover: the synthetic fixture fell in two
+                // battles where it used to grind for sixty-six, and four of
+                // eight real seeds showed every single battle ending in a
+                // conquest.
+                //
+                // AND THE POOL IS FINITE, which is the other half. A frontier
+                // attacked year after year empties its manpower and then really
+                // is defenceless — honestly, temporarily, and with a cause you
+                // can point at. That is BL-308's "a ground-down frontier
+                // eventually gives", arriving through exhaustion rather than
+                // through the transfer bar alone.
+                muster_garrison(tgt, params.garrison_fraction_q,
+                                params.defence_levy_q, params.garrison_disband_q);
+
+                // THE DEFENDER FIELDS WHAT IS STANDING THERE, all of
+                // it. There is no sense in a garrison holding half itself back
+                // from the fight on the ground it is garrisoning, and reading
+                // the whole pool keeps the two sides symmetric: attacker and
+                // defender each commit one region's field army, which is the
+                // same 1:1 shape the old `levy_fraction_q` of `manpower_stock`
+                // gave both of them.
+                const int64_t def_men = tgt.army_stock;
                 roster_band def_band = roster_band::classical;
                 std::vector<army_stack_entry> def =
                     build_stack(def_men, tgt, dq ? *dq : q, def_ready, sim_band_ceiling(params, y),
                                 !exec_dry, &def_band);
                 note_units_fielded(out, params, y, def_band, def);
 
+                const prof_clock::time_point prof_bat0 = prof_clock::now(); // BL-825
                 const battle_outcome bo = resolve_battle(
                     atk, doctrine_for(q),
                     def, dq ? doctrine_for(*dq) : doctrine_for(q),
@@ -1375,6 +1820,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     den_at(terrain, tgt.anchor), lf_at(terrain, tgt.anchor),
                     best_winter ? season::winter : season::summer,
                     atk_supply, def_supply);
+                prof.ns_battles += std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    prof_clock::now() - prof_bat0).count(); // BL-825, report-only
 
                 ++out.battles;
                 // BL-779's calibration reading: how often naval combat actually
@@ -1391,11 +1838,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // is this caller's job (combat.hpp § battle_outcome).
                 const int64_t atk_lost = (stack_size(atk) * bo.attacker_losses_permille) / 1000;
                 const int64_t def_lost = (stack_size(def) * bo.defender_losses_permille) / 1000;
-                home.population = clampi64(home.population - atk_lost / 4, 0, 1LL << 40);
-                tgt.population  = clampi64(tgt.population  - def_lost / 4, 0, 1LL << 40);
 
-                war_pressure[static_cast<std::size_t>(src)] = clampi(bo.decisiveness / 2, 0, 1000);
-                war_pressure[ti] = clampi(bo.decisiveness, 0, 1000);
+                // BL-835 — THE BATTLE IS SPENT ON THE ARMIES, AND ONLY ON THEM.
+                //
+                // These two lines were `home.population -= atk_lost / 4` and
+                // `tgt.population -= def_lost / 4`: a battle killed civilians in
+                // both regions, on both sides, whoever won, and the arbitrary
+                // /4 is the tell that nobody could say what the quantity meant.
+                // The soldiers now come out of the pool the soldiers are in.
+                //
+                // `atk_survivors` is carried rather than spent here because
+                // where it ends up depends on the outcome — see the conquest
+                // block below. The defender's remnant is settled immediately:
+                // it is standing where it fought.
+                const int64_t atk_survivors = clampi64(raised - atk_lost, 0, raised);
+                tgt.army_stock = clampi64(def_men - def_lost, 0, def_men);
+
                 tgt.contest_q = clampi(tgt.contest_q + bo.decisiveness / 4, 0, 1000);
 
                 // TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE.
@@ -1456,28 +1914,133 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                                   params.cohesion_floor_q, 1000);
                     }
 
-                    // The sack — the collapse path the first sweep had none of.
-                    tgt.population = clampi64(
-                        tgt.population - (tgt.population * params.sack_population_loss_q) / 1000,
-                        0, 1LL << 40);
-                    // BL-766: and it falls hardest on the walls. This is the
+                    // BL-835 — THE COUNTRYSIDE KEEPS ITS PEOPLE. The line that
+                    // stood here took `sack_population_loss_q` (22%) off
+                    // `tgt.population` on every conquest, and 258 conquests of
+                    // one region is how a province ends a 4000-year run with
+                    // nobody living on it. Ben's ruling is that population is
+                    // civilian and war does not consume it; a conquest is now a
+                    // change of flag over the same people, which is also what
+                    // gives BL-826's culture shares a subject to assimilate.
+                    //
+                    // BL-766: and the sack still falls on the walls. This is the
                     // one place history DESTROYS a centre rather than thinning
                     // it, so a sacked city reads as a smaller or absent centre
                     // on the epoch map.
                     sack_region_urban(tgt, params.sack_population_loss_q);
 
+                    // BL-835 — THE ARMY THAT TOOK IT IS THE ARMY THAT HOLDS IT,
+                    // and this is the line that breaks the ping-pong.
+                    //
+                    // The defeated garrison is dispersed with the province it
+                    // was defending, and the victors garrison the ground they
+                    // just walked onto. So a region that has just changed hands
+                    // is the BEST-defended region on that frontier, not the
+                    // worst — where before it was left bare, and therefore the
+                    // top-scoring objective for the polity that had just lost
+                    // it, on the very next round, for the rest of the run.
+                    //
+                    // The cost is paid at the other end: `home` is now empty
+                    // and re-mustering from its own people, so a conqueror is
+                    // holding a forward province with an uncovered rear. That
+                    // is question A in the shape the item asks for — not "can I
+                    // take this" but "can I keep an army there".
+                    tgt.army_stock = atk_survivors;
+
+                    const int loser_id = dq ? dq->id : -1;
+                    const bool was_seat =
+                        dq && dq->capital == static_cast<int>(ti);
+
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
-                    tgt.culture = q.culture;      // The conqueror's gods arrive...
-                    tgt.creed_conquered = true;   // ...but founding_culture is never overwritten.
+                    // BL-826 — THE CONQUEROR'S GODS NO LONGER ARRIVE THE SAME
+                    // AFTERNOON. This was `tgt.culture = q.culture`, an instant
+                    // replacement, and it is the single line that made conquest
+                    // free: the ground stopped being foreign the moment it was
+                    // taken, so `w_cult` charged a conqueror once and never
+                    // again. The shares are left exactly as the battle found
+                    // them and the ASSIMILATION block at the top of the round
+                    // moves them, a couple of per-mille of the foreign
+                    // remainder a year, for as long as the conqueror holds on.
+                    //
+                    // `creed_conquered` still fires here, because the fact
+                    // being recorded is that a conqueror's pantheon was imposed
+                    // — an event, at a date — and `founding_culture` is still
+                    // never overwritten. What changed is how long the people
+                    // take to follow the flag.
+                    tgt.creed_conquered = true;
                     ++out.conquests;
+
+                    // BL-827 — THE NAMED EVENT, with its place and its date.
+                    // Directed from the LOSER: the realm that lost the province
+                    // resents the one that took it, and not the reverse.
+                    // Magnitude carries the seat distinction, which is the
+                    // difference between losing a frontier march and losing the
+                    // capital.
+                    if (loser_id >= 0)
+                        raise_grudge(loser_id, q.id,
+                                     was_seat ? grudge_kind::seat_sacked
+                                              : grudge_kind::ground_taken,
+                                     static_cast<int>(ti), y,
+                                     was_seat ? params.grudge_seat_sacked
+                                              : params.grudge_ground_taken);
                     out.owner_changes.push_back(owner_change{
                         static_cast<int32_t>(y), static_cast<uint16_t>(ti),
                         static_cast<uint16_t>(q.id)});
                     out.history.push_back(history_event{
                         years_from_calendar_year(y), chain_stage::legacy,
                         tgt.name + " changes hands", std::string{}});
+
+                    // BL-827 — DID THAT END A REALM? Detected here, at the
+                    // conquest, rather than at the top of the next round where
+                    // `alive` is refreshed: the killer is only knowable at the
+                    // moment of the killing, and reconstructing it afterwards
+                    // from ids is exactly the accident the successor call
+                    // rejects.
+                    if (loser_id >= 0)
+                    {
+                        bool any_left = false;
+                        for (int o : owner) if (o == loser_id) { any_left = true; break; }
+                        if (!any_left)
+                        {
+                            out.polities[static_cast<std::size_t>(loser_id)].alive = false;
+                            extinguish_polity(loser_id, q.id, static_cast<int>(ti), y);
+                        }
+                    }
                 }
+                else if (dq)
+                {
+                    // BL-827 — A BATTLE THAT MOVED NOTHING is still a raid on
+                    // somebody's ground, and it is the event that makes a
+                    // centuries-long frontier read as a feud rather than as
+                    // silence. Small, because it is: the grinding is in the
+                    // repetition, and `contest_q` above is what the frontier
+                    // itself accumulates.
+                    raise_grudge(dq->id, q.id, grudge_kind::border_raided,
+                                 static_cast<int>(ti), y, params.grudge_border_raided);
+                }
+
+                // BL-835 — AND IF IT DID NOT TAKE THE GROUND, THE ARMY MARCHES
+                // HOME. Placed after the whole if/else rather than inside the
+                // `else if (dq)` arm, because a repulsed army comes back
+                // whether or not the defender had a polity to be resented by.
+                //
+                // THIS IS WHY AN ARMY IS A POOL AND NOT AN EXPENDITURE. Under
+                // the old accounting every campaign consumed its levy outright,
+                // so a polity's capacity to fight was set entirely by how fast
+                // civilians regrew — war was a demographic process wearing a
+                // military costume. Survivors returning make a standing army a
+                // thing a polity HAS, which can be worn down over a campaign
+                // season and rebuilt over a generation, and which can be
+                // somewhere other than where it is needed.
+                // The whole column comes back to the STAGING hub rather than
+                // dispersing to the holdings it was drawn from. Deliberate: an
+                // army that fought together is standing together, and the next
+                // round's `gather_army` will redistribute it through the same
+                // half-share rule if it marches again.
+                if (!takes_it)
+                    home.army_stock = clampi64(home.army_stock + atk_survivors,
+                                               0, 1LL << 40);
                 break;
             }
             case sim_verb::settle:
@@ -1559,7 +2122,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.port_q = (src.port_q * 700) / 1000;
                 np.energy_q = (src.energy_q * 700) / 1000;
                 np.settle_score_q = (src.settle_score_q * 800) / 1000;
-                np.culture = q.culture;
+                // BL-826: a daughter is founded WHOLLY by its founders. A
+                // settling party carries one people, so the shares start pure
+                // and only conquest can mix them.
+                np.culture = culture_shares::pure(q.culture);
                 np.founding_culture = q.culture;
                 np.name = src.name + " Reach";
                 np.founded_year = y;
@@ -1567,6 +2133,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.nation = q.id;
                 np.population = clampi64(region_carrying_capacity(np.farm_q) / 16, 1, 1 << 30);
                 replenish_manpower(np);
+                // BL-835 — A NEW REGION HAS NO ARMY YET, and that is the
+                // correct opening state rather than an oversight: a frontier
+                // settlement musters its garrison over its first decades like
+                // every other region, out of the people who walked there. The
+                // world-opening seed above is the exception, and it is one
+                // because a run cannot begin mid-muster.
+                np.army_stock = 0;
                 // BL-766: a region founded HERE gets its settlement on the same
                 // terms as one drawn before the sim ran — one rule, not two.
                 draw_region_urban(np);
@@ -1626,7 +2199,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 ss.regions.push_back(np);
                 owner.push_back(q.id);
-                war_pressure.push_back(0);
                 neighbours.emplace_back();
                 link_region(ss.regions.size() - 1); // Keep the index complete.
 
@@ -1932,4 +2504,203 @@ history_sim_state run_history_sim(settlement_state&         ss,
     }
 
     return out;
+}
+
+// ---------------------------------------------------------------------------
+// Grudge reads (BL-827)
+// ---------------------------------------------------------------------------
+
+int grudge_between(const history_sim_state& s, int from, int to)
+{
+    if (from < 0 || to < 0 || from > 0xFFFE || to > 0xFFFE) return 0;
+    const uint16_t f = static_cast<uint16_t>(from), t = static_cast<uint16_t>(to);
+    const auto it = std::lower_bound(
+        s.grudges.begin(), s.grudges.end(), std::pair<uint16_t, uint16_t>{f, t},
+        [](const grudge& g, const std::pair<uint16_t, uint16_t>& k) {
+            if (g.from != k.first) return g.from < k.first;
+            return g.to < k.second;
+        });
+    if (it != s.grudges.end() && it->from == f && it->to == t) return it->score;
+    return 0;
+}
+
+std::vector<grudge> top_grudges(const history_sim_state& s, int n)
+{
+    std::vector<grudge> v = s.grudges;
+    // A TOTAL order with an explicit tie-break, so the listing is identical on
+    // every machine — the discipline GENERATION_STRATEGY.md § What keeps it
+    // deterministic requires of every argmax in the generation layer.
+    std::sort(v.begin(), v.end(), [](const grudge& a, const grudge& b) {
+        if (a.score != b.score) return a.score > b.score;
+        if (a.peak  != b.peak)  return a.peak  > b.peak;
+        if (a.from  != b.from)  return a.from  < b.from;
+        return a.to < b.to;
+    });
+    if (n >= 0 && static_cast<std::size_t>(n) < v.size())
+        v.resize(static_cast<std::size_t>(n));
+    return v;
+}
+
+std::string grudge_event_line(const grudge_event& e, const settlement_state& ss)
+{
+    const char* what = "a wrong";
+    switch (e.kind)
+    {
+    case grudge_kind::ground_taken:  what = "ground taken";      break;
+    case grudge_kind::seat_sacked:   what = "the seat sacked";   break;
+    case grudge_kind::border_raided: what = "the border raided"; break;
+    case grudge_kind::realm_ended:   what = "a realm ended";     break;
+    }
+
+    std::string where = "somewhere";
+    if (e.region != owner_none
+        && static_cast<std::size_t>(e.region) < ss.regions.size()
+        && !ss.regions[static_cast<std::size_t>(e.region)].name.empty())
+        where = ss.regions[static_cast<std::size_t>(e.region)].name;
+
+    // Year first, because the date is what makes it a cause rather than a
+    // modifier. Signed calendar year, the same convention the sim runs on.
+    return std::to_string(static_cast<long long>(e.year)) + ": " + what
+         + " at " + where + " (+" + std::to_string(static_cast<long long>(e.magnitude)) + ")";
+}
+
+// ---------------------------------------------------------------------------
+// The pass 1 -> pass 2 handoff (BL-828)
+// ---------------------------------------------------------------------------
+
+pass_one_output make_pass_one_output(const settlement_state&  ss,
+                                     const history_sim_state& hs,
+                                     int                      culture_count)
+{
+    pass_one_output o;
+    o.regions             = ss.regions;
+    o.polities            = hs.polities;
+    o.culture_count       = culture_count;
+    o.works_by_span_band  = hs.works_by_span_band;
+    o.grudges             = hs.grudges;
+    o.timelapse           = as_timelapse(hs);
+    o.start_year          = hs.start_year;
+    o.stop_year           = hs.start_year + hs.years;
+
+    // THE PROVINCES EACH POLITY HOLDS, derived from the region table's own
+    // `nation` field — which the sim writes as it goes — rather than from a
+    // second copy of ownership kept beside it. One source, so the holdings and
+    // the map cannot disagree.
+    //
+    // Walked in region-index order into a vector indexed by polity id, so both
+    // the outer order (ascending polity id) and the inner order (ascending
+    // region index) are properties of the data. A map keyed on polity id would
+    // have been the shorter spelling and the wrong one.
+    std::vector<std::vector<int>> by_polity(o.polities.size());
+    for (std::size_t i = 0; i < o.regions.size(); ++i)
+    {
+        const int n = o.regions[i].nation;
+        if (n >= 0 && n < static_cast<int>(by_polity.size()))
+            by_polity[static_cast<std::size_t>(n)].push_back(static_cast<int>(i));
+    }
+    for (std::size_t pi = 0; pi < o.polities.size(); ++pi)
+    {
+        if (by_polity[pi].empty()) continue; // A realm holding nothing crosses as nothing.
+        polity_holdings h;
+        h.polity  = static_cast<int>(pi);
+        h.regions = by_polity[pi];
+        o.holdings.push_back(std::move(h));
+    }
+    return o;
+}
+
+bool pass_one_output_valid(const pass_one_output& o, std::string* why)
+{
+    const auto fail = [&](const std::string& msg) {
+        if (why) *why = msg;
+        return false;
+    };
+
+    // 1. The culture shares. THE INVARIANT THE WHOLE OF BL-826 RESTS ON: the
+    //    per-mille weights sum to exactly 1000, and every named slot is in
+    //    range, sorted descending, with no culture named twice.
+    for (std::size_t i = 0; i < o.regions.size(); ++i)
+    {
+        const culture_shares& c = o.regions[i].culture;
+        if (c.total_q() != 1000)
+            return fail("region " + std::to_string(i) + " culture shares sum to "
+                        + std::to_string(c.total_q()) + ", not 1000");
+        if (c.other_q < 0)
+            return fail("region " + std::to_string(i) + " has a negative culture tail");
+        for (int k = 0; k < culture_share_slots; ++k)
+        {
+            if (c.id[k] < 0)
+            {
+                if (c.weight_q[k] != 0)
+                    return fail("region " + std::to_string(i) + " slot "
+                                + std::to_string(k) + " is empty but weighted");
+                continue;
+            }
+            if (c.weight_q[k] <= 0)
+                return fail("region " + std::to_string(i) + " slot "
+                            + std::to_string(k) + " is named but unweighted");
+            if (o.culture_count > 0 && c.id[k] >= o.culture_count)
+                return fail("region " + std::to_string(i) + " names culture "
+                            + std::to_string(c.id[k]) + " out of range");
+            if (k > 0 && c.id[k - 1] >= 0 && c.weight_q[k - 1] < c.weight_q[k])
+                return fail("region " + std::to_string(i) + " culture shares are not sorted");
+            for (int j = 0; j < k; ++j)
+                if (c.id[j] == c.id[k])
+                    return fail("region " + std::to_string(i) + " names culture "
+                                + std::to_string(c.id[k]) + " twice");
+        }
+    }
+
+    // 2. The holdings. Ascending polity ids, ascending region indices, every
+    //    region held at most once, and every holder a living polity.
+    std::vector<char> claimed(o.regions.size(), 0);
+    int last_polity = -1;
+    for (const polity_holdings& h : o.holdings)
+    {
+        if (h.polity <= last_polity)
+            return fail("holdings are not in ascending polity order");
+        last_polity = h.polity;
+        if (h.polity < 0 || h.polity >= static_cast<int>(o.polities.size()))
+            return fail("holdings name polity " + std::to_string(h.polity) + " out of range");
+        if (!o.polities[static_cast<std::size_t>(h.polity)].alive)
+            return fail("polity " + std::to_string(h.polity) + " holds ground but is not alive");
+        int last_region = -1;
+        for (int r : h.regions)
+        {
+            if (r <= last_region) return fail("holdings are not in ascending region order");
+            last_region = r;
+            if (r < 0 || r >= static_cast<int>(o.regions.size()))
+                return fail("holdings name region " + std::to_string(r) + " out of range");
+            if (claimed[static_cast<std::size_t>(r)])
+                return fail("region " + std::to_string(r) + " is held twice");
+            claimed[static_cast<std::size_t>(r)] = 1;
+            if (o.regions[static_cast<std::size_t>(r)].nation != h.polity)
+                return fail("region " + std::to_string(r) + " holdings disagree with its nation");
+        }
+    }
+
+    // 3. The grudges. Sorted, directed, in range, and CARRYING THEIR CAUSE — an
+    //    entry with a score and no event is the modifier this design refuses.
+    std::pair<int, int> last_key{-1, -1};
+    for (const grudge& g : o.grudges)
+    {
+        const std::pair<int, int> key{g.from, g.to};
+        if (!(last_key < key)) return fail("grudges are not sorted by (from, to)");
+        last_key = key;
+        if (g.from == g.to) return fail("a polity holds a grudge against itself");
+        if (g.from >= o.polities.size() || g.to >= o.polities.size())
+            return fail("a grudge names a polity out of range");
+        if (g.score < 0 || g.peak < g.score)
+            return fail("a grudge's peak is below its standing score");
+        if (g.event_count <= 0 || g.events_kept <= 0)
+            return fail("a grudge carries a score with no cause");
+        if (g.events_kept > grudge_events_kept || g.events_kept > g.event_count)
+            return fail("a grudge keeps more events than it has");
+        for (int k = 1; k < g.events_kept; ++k)
+            if (g.events[k - 1].magnitude < g.events[k].magnitude)
+                return fail("a grudge's kept events are not sorted by magnitude");
+    }
+
+    if (why) why->clear();
+    return true;
 }

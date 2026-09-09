@@ -20,7 +20,9 @@
   "tick, so an agent's standing order behaves exactly as a player's does. Two honest narrowings",
   "remain, and neither is a gameplay press: the buy side of the book (buy_order) has a shape and a",
   "save format but no verb and no surface, and the canvas/lens/ledger/chrome families are view",
-  "controls that were never on the command seam by design."
+  "controls that were never on the command seam by design.",
+  "",
+  "THE PRE-GAME WIZARD IS OUT OF SCOPE (Ben, 2026-09-09, ruling on NR-804). The startup wizard - its rounds, per-round Reroll, Next and Begin - gets no entries here and no startup.* family. The dictionary exists for an agent playing the game, and nobody plays the wizard; a startup family would be inventory with no reader. The \"any control change updates its entry\" rule above does not reach it. Stated rather than left silent because the silence is what made it a question."
  ],
  "entries": [
   {

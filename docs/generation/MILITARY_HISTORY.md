@@ -1,7 +1,9 @@
 # Project Io — Military history
 
 > **Settles:** how force works **inside the Era −1 sim**, a generation pass and not the game
-> — how `resolve_battle` settles a war at nation scale · how a polity's roster advances up
+> — how `resolve_battle` settles a war at nation scale · why an army is a pool distinct from
+> the population that raised it, and what that makes an undefended region ·
+> how a polity's roster advances up
 > the band ladder as its institutions do · what domain a region carries, and what it gates ·
 > how naval is scored and exercised here · what forage simplifies, and what it is a
 > simplification *of* · how sea legs produce colonisation, and where a Settle may found.
@@ -138,6 +140,82 @@ is the caller's job.
 
 Loss shape: the loser takes `400 + 0.6 × decisiveness`, the winner `200 − 0.2 × decisiveness`,
 both clamped to 0..1000.
+
+---
+
+## Armies are distinct from population (Ben, 2026-09-08)
+
+**Ben's ruling, in his words:** *"population as a civilian thing — where armies are distinct
+from population, and we don't simulate total warfare in stage 4."* BL-835 (civilian population,
+armies apart) owns the design.
+
+**Population is civilian.** It moves on demography, habitability, famine and plague. It does not
+move for war — not for a battle, not for a sack of the countryside, not as an ambient drawdown
+under war pressure. A conquest is a change of flag over the same people.
+
+**An army is a separate pool**, held per region as `region::army_stock`. Three quantities sit in
+a line and each answers a different question:
+
+| Quantity | Answers |
+|---|---|
+| `population` | How many people live here |
+| `manpower_stock` | How many of them could be called up — a bounded fraction of the population, refilling slowly |
+| `army_stock` | How many are under arms **right now**, standing on this region |
+
+**Raising an army costs manpower, not population.** The muster draws from `manpower_stock`,
+which refills off a population war never touched — so an army destroyed is rebuilt over
+decades, through two stages that each move a fraction of their own gap per year. Discharged
+soldiers return to the pool, never to the civilian count, because they were never subtracted
+from it.
+
+**A region's defence is the army standing on it**, plus the levy it can call up in the year it
+is attacked. Both the scorer's estimate and the battle itself read the same rule — the standing
+trap in this layer is a cost authored on one scale and paid on another, so the estimate is the
+mutation asked as a question.
+
+**Therefore an undefended region is NORMAL and TEMPORARY.** An army marched away; a levy was not
+raised; a garrison was broken last spring. It is not a property of dead ground. Walking in is
+cheap exactly once, because the army that walked in is then the army standing there — a region
+that has just changed hands is the best-defended province on that frontier, not the worst.
+
+> **This replaces a model in which population WAS the army, and the replacement is a root fix
+> rather than a refinement.** Under the old accounting a battle killed civilians in both
+> regions, a conquest sacked a fifth of the countryside, and defence was read off the manpower
+> a population could support. Those compound: a region taken and retaken empties, an empty
+> region can field nothing, and a region that can field nothing outscores every real objective
+> on the map for the rest of the run. It is not a tuning failure. **Measured on the seed-0
+> fixture: 258 battles and 258 conquests over four thousand years, all of them the same
+> region.** `battles == conquests`, exactly 1:1, is the signature.
+>
+> Three patches were considered and are superseded: a no-battle-target flag, a release rule, and
+> a value floor. Each blocks the symptom. Under a civilian population that war does not consume,
+> the empty region is never produced.
+
+**And it gives the culture shares their subject back.** Conquest transfers *people*, and the
+people transferred are what the assimilation pass then digests. A region emptied by the taking
+had nobody to assimilate, which is how conquest had become free of the cohesion cost that lever
+depends on.
+
+**What it asks of the scorer.** Question A sharpens from *can I take this* to **can I keep an
+army there** — which is what makes logistics and roads load-bearing rather than decorative. A
+campaign concentrates the staging hub's garrison plus what the holdings around it can spare,
+bounded at double the hub's own; those holdings are genuinely uncovered while the campaign runs,
+and the survivors have to be somewhere. An offensive is a bet made with a finite object that can
+be in only one place.
+
+**The collapse path survives, in the shape that was always the legible one.** A sack still falls
+on the walls: `sack_region_urban` razes centres and records every one it took, so a sacked city
+reads as smaller or absent on the epoch map and still says it was sacked if it regrows. What is
+gone is war as a demographic event.
+
+**And that is the settled position, not an implementation consequence (Ben, 2026-09-09).** The
+question was put explicitly, because removing the countryside sack and the ambient war-pressure
+drawdown leaves **plague as the only force that lowers a civilian count** — which is a larger claim
+than the ruling above literally made. The answer is that war stays non-demographic and only the
+sacking of walls touches people at all. Armies die; farmers do not. If a war should ever shrink a
+population, it does so through a **famine or displacement mechanism of its own**, authored as such
+and visible as such — never as a coefficient hidden inside a battle. A battle that quietly killed
+farmers is exactly the accounting this section replaced.
 
 ---
 

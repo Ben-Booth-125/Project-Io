@@ -118,7 +118,7 @@ settlement_state strip_world(int n, int farm_q, int ore_q, int port_q, int cultu
     {
         region p;
         p.col = i * 3; p.row = 0; p.anchor = i * 3;
-        p.culture = culture; p.founding_culture = culture;
+        p.culture = culture_shares::pure(culture); p.founding_culture = culture;
         p.farm_q = farm_q; p.ore_q = ore_q; p.port_q = port_q;
         p.settle_score_q = 900 - i;
         p.name = "Strip" + std::to_string(i);

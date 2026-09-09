@@ -8,6 +8,148 @@
 #include <unordered_map>
 #include <utility>
 
+// ---------------------------------------------------------------------------
+// culture_shares (BL-826)
+// ---------------------------------------------------------------------------
+//
+// INTEGER ONLY, AND THE 1000 TOTAL IS CONSERVED TO THE UNIT. Every quantity
+// below is per-mille; the floor losses of the proportional take are handed back
+// in a fixed order so the result cannot depend on iteration order or on a
+// compiler's evaluation order. See settlement.hpp § culture_shares.
+
+void culture_shares::shift_toward(int c, int amount_q)
+{
+    if (c < 0) return;
+    if (amount_q <= 0) return;
+    if (amount_q > 1000) amount_q = 1000;
+
+    // Working set: the three slots plus the tail as a fourth component.
+    // `tail` is index culture_share_slots and always counts as foreign.
+    constexpr int n_comp = culture_share_slots + 1;
+    int cid[n_comp];
+    int cw[n_comp];
+    for (int i = 0; i < culture_share_slots; ++i)
+    {
+        cid[i] = static_cast<int>(id[i]);
+        cw[i]  = static_cast<int>(weight_q[i]);
+    }
+    cid[culture_share_slots] = -1;
+    cw[culture_share_slots]  = static_cast<int>(other_q);
+
+    int foreign_total = 0;
+    for (int i = 0; i < n_comp; ++i)
+        if (cid[i] != c) foreign_total += cw[i];
+    if (foreign_total <= 0) return; // Already wholly this people.
+
+    const int want = (foreign_total * amount_q) / 1000;
+    if (want <= 0) return;
+
+    int take[n_comp] = {0, 0, 0, 0};
+    int taken = 0;
+    for (int i = 0; i < n_comp; ++i)
+    {
+        if (cid[i] == c) continue;
+        take[i] = (cw[i] * amount_q) / 1000;
+        if (take[i] > cw[i]) take[i] = cw[i];
+        taken += take[i];
+    }
+
+    // Hand back the floor losses, largest component first, ties on the lower
+    // index, the tail last. At most one unit per component is ever owed, since
+    // each floor discards strictly less than one.
+    int order[n_comp] = {0, 1, 2, 3};
+    for (int a = 0; a < n_comp; ++a)
+        for (int b = a + 1; b < n_comp; ++b)
+        {
+            const int x = order[a], y = order[b];
+            const bool x_tail = (x == culture_share_slots);
+            const bool y_tail = (y == culture_share_slots);
+            bool swap = false;
+            if (x_tail != y_tail)      swap = x_tail;          // tail sinks
+            else if (cw[x] != cw[y])   swap = cw[x] < cw[y];   // larger first
+            else                       swap = x > y;           // lower index first
+            if (swap) { order[a] = y; order[b] = x; }
+        }
+    for (int k = 0; k < n_comp && taken < want; ++k)
+    {
+        const int i = order[k];
+        if (cid[i] == c) continue;
+        if (take[i] >= cw[i]) continue;
+        ++take[i];
+        ++taken;
+    }
+
+    for (int i = 0; i < n_comp; ++i) cw[i] -= take[i];
+
+    // The gain lands on c's own slot, or claims the smallest named slot if it
+    // is now larger than it, or falls into the tail. It NEVER silently
+    // overwrites a larger culture.
+    int ci = -1;
+    for (int i = 0; i < culture_share_slots; ++i)
+        if (cid[i] == c) { ci = i; break; }
+    if (ci < 0)
+        for (int i = 0; i < culture_share_slots; ++i)
+            if (cid[i] < 0) { ci = i; cid[i] = c; cw[i] = 0; break; }
+    if (ci < 0)
+    {
+        // All slots named, none is c. The smallest slot is the only one it may
+        // displace, and only on a strict improvement — a tie leaves the
+        // incumbent standing, the same tie-break discipline the sim's argmax
+        // uses.
+        int smallest = 0;
+        for (int i = 1; i < culture_share_slots; ++i)
+            if (cw[i] < cw[smallest] || (cw[i] == cw[smallest] && cid[i] > cid[smallest]))
+                smallest = i;
+        if (taken > cw[smallest])
+        {
+            cw[culture_share_slots] += cw[smallest]; // Demoted into the tail.
+            cid[smallest] = c;
+            cw[smallest]  = 0;
+            ci = smallest;
+        }
+    }
+    if (ci >= 0) cw[ci] += taken;
+    else         cw[culture_share_slots] += taken; // Too small to be named yet.
+
+    // Re-sort the named slots descending, ties on the lower culture index.
+    for (int a = 0; a < culture_share_slots; ++a)
+        for (int b = a + 1; b < culture_share_slots; ++b)
+        {
+            const bool a_dead = (cid[a] < 0 || cw[a] <= 0);
+            const bool b_dead = (cid[b] < 0 || cw[b] <= 0);
+            bool swap = false;
+            if (a_dead != b_dead)     swap = a_dead;
+            else if (a_dead)          swap = false;
+            else if (cw[a] != cw[b])  swap = cw[a] < cw[b];
+            else                      swap = cid[a] > cid[b];
+            if (swap)
+            {
+                const int ti = cid[a], tw = cw[a];
+                cid[a] = cid[b]; cw[a] = cw[b];
+                cid[b] = ti;     cw[b] = tw;
+            }
+        }
+
+    int named = 0;
+    for (int i = 0; i < culture_share_slots; ++i)
+    {
+        if (cid[i] < 0 || cw[i] <= 0)
+        {
+            // An emptied slot returns whatever rounding left in it to the tail.
+            if (cw[i] > 0) cw[culture_share_slots] += cw[i];
+            id[i] = -1;
+            weight_q[i] = 0;
+            continue;
+        }
+        id[i] = static_cast<int16_t>(cid[i]);
+        weight_q[i] = static_cast<int16_t>(cw[i]);
+        named += cw[i];
+    }
+    // The tail is the residual by DEFINITION, so the invariant holds by
+    // construction rather than by the arithmetic above happening to balance.
+    other_q = static_cast<int16_t>(1000 - named);
+}
+
 namespace {
 
 // ---------------------------------------------------------------------------
@@ -382,14 +524,22 @@ bool charter_lived(const charter_reach& ch, const region& p)
     // are. Read from the CURRENT culture, not the founding one, so a conquest
     // that replaced the founders' gods took their institutions with them, and
     // a charter people who conquered outward carried theirs along.
-    if (ch.culture >= 0 && p.culture == ch.culture) return true;
+    //
+    // BL-826 — MAJORITY, not plurality. A sealed oath is an institution, and an
+    // institution does not survive on a third of the ground: a region where the
+    // oath-keepers are merely the largest of three peoples has stopped keeping
+    // it. Half-digested ground therefore falls back to the CONTACT test below,
+    // which is the honest answer for a place the charter reaches but no longer
+    // holds. On unconquered ground (pure shares) this is exactly the old test.
+    if (ch.culture >= 0 && p.culture.majority(ch.culture)) return true;
     return charter_contact(ch, p) <= ch.near_dist;
 }
 
 bool charter_copied(const charter_reach& ch, const region& p)
 {
     if (!ch.written) return false;
-    if (ch.culture >= 0 && p.culture == ch.culture) return true;
+    // BL-826 — majority, for the same reason `charter_lived` uses it.
+    if (ch.culture >= 0 && p.culture.majority(ch.culture)) return true;
     return charter_contact(ch, p) <= ch.far_dist;
 }
 
@@ -499,7 +649,9 @@ settlement_state run_settlement(const planetology_state& pl,
             const int d = grid_dist(col, row, ac.col, ac.row, gw);
             if (d < best_d) { best_d = d; best_c = static_cast<int>(ci); }
         }
-        p.culture = best_c;
+        // BL-826: a region arrives WHOLLY its cradle's. Mixing is something
+        // history does to it, never something settlement hands it.
+        p.culture = culture_shares::pure(best_c);
         p.founding_culture = best_c;
 
         raw.push_back(survey_endowment(w, tile_ids, col, row, gw, gh));
@@ -601,8 +753,8 @@ settlement_state run_settlement(const planetology_state& pl,
                      - arable_q / 200          // A fed population industrialises sooner.
                      + rf.pick(45);
 
-        if (creed_holds(cs, p.culture, "the forge"))       year -= 25;
-        if (creed_holds(cs, p.culture, "the sealed oath")) year -= 15; // Stage 3: contract law reaches capital.
+        if (creed_holds(cs, p.culture.plurality(), "the forge"))       year -= 25;
+        if (creed_holds(cs, p.culture.plurality(), "the sealed oath")) year -= 15; // Stage 3: contract law reaches capital.
         if (p.founded_year > 0) year += p.founded_year / 8;            // Late settlement, late furnaces.
 
         // THE SAME NUMBER, RE-ANCHORED. The clamp's own floor (1700) becomes
@@ -928,7 +1080,7 @@ void derive_national_character(settlement_state& ss,
         const region& p = ss.regions[static_cast<std::size_t>(by_year[static_cast<std::size_t>(i)])];
         const auto it = w.nations.find(nation_ids[static_cast<std::size_t>(p.nation)]);
         const std::string nation = it != w.nations.end() ? it->second.name : std::string("a realm");
-        const bool forge = creed_holds(cs, p.culture, "the forge");
+        const bool forge = creed_holds(cs, p.culture.plurality(), "the forge");
         ss.history.push_back(history_event{
             years_from_calendar_year(p.industrial_year), chain_stage::spend,
             nation + " lights the first coke furnaces of the " + p.name + ".",
@@ -1240,7 +1392,7 @@ void resolve_historical_ruptures(settlement_state& ss,
                 int converted = 0;
                 int victor_culture = -1;
                 for (const region& p : ss.regions)
-                    if (p.nation == win_ni) { victor_culture = p.culture; break; }
+                    if (p.nation == win_ni) { victor_culture = p.culture.plurality(); break; }
 
                 for (region& p : ss.regions)
                 {
@@ -1253,9 +1405,15 @@ void resolve_historical_ruptures(settlement_state& ss,
                     if (!near_front) continue;
 
                     p.nation = win_ni;
-                    if (victor_culture >= 0 && victor_culture != p.culture)
+                    // BL-826 — TOTAL here, and deliberately so. This is the
+                    // settlement pass's own prehistoric conflict, resolved
+                    // millennia before the year-tick sim starts; there is no
+                    // clock in this pass for a gradual shift to run on, and the
+                    // gradual model belongs to the sim that has one. Written as
+                    // `pure` rather than left implicit so the choice is visible.
+                    if (victor_culture >= 0 && victor_culture != p.culture.plurality())
                     {
-                        p.culture = victor_culture;
+                        p.culture = culture_shares::pure(victor_culture);
                         p.creed_conquered = true;
                         ++converted;
                     }
@@ -1435,6 +1593,60 @@ int64_t raise_manpower(region& p, int64_t want)
     const int64_t raised = std::min(want, p.manpower_stock);
     p.manpower_stock -= raised; // Bounded by construction: never negative, never over-drawn.
     return raised;
+}
+
+// ---------------------------------------------------------------------------
+// The army pool (BL-835) — armies are distinct from population
+// ---------------------------------------------------------------------------
+
+int64_t garrison_target(const region& p, int garrison_fraction_q)
+{
+    const int64_t ceiling = manpower_ceiling(p.population, p.work_manpower_mod);
+    if (ceiling <= 0) return 0;
+    // Clamped at 1000: a garrison larger than the recruitable ceiling would be
+    // an army with no pool to have come out of, and the muster below would
+    // then chase a target it can never reach for the rest of the run.
+    const int q = clampi(garrison_fraction_q, 0, 1000);
+    return (ceiling * q) / 1000;
+}
+
+void muster_garrison(region& p, int garrison_fraction_q,
+                     int muster_rate_q, int disband_rate_q)
+{
+    const int64_t target = garrison_target(p, garrison_fraction_q);
+
+    if (p.army_stock < target)
+    {
+        const int64_t gap  = target - p.army_stock;
+        const int64_t want = (gap * clampi(muster_rate_q, 0, 1000)) / 1000;
+        // THE COST, and the only place it is charged: bodies come out of the
+        // recruitable pool. `raise_manpower` is self-limiting, so a region
+        // whose people are already under arms simply musters nothing this year
+        // rather than conjuring soldiers off a population it cannot spare.
+        p.army_stock += raise_manpower(p, want);
+        return;
+    }
+
+    if (p.army_stock > target)
+    {
+        const int64_t excess = p.army_stock - target;
+        const int64_t home   = (excess * clampi(disband_rate_q, 0, 1000)) / 1000;
+        p.army_stock -= home;
+        // Discharged, back to the pool they were raised from — NOT to
+        // `population`, which never lost them. Capped at the ceiling by the
+        // same rule `replenish_manpower` uses, so a demobilisation cannot bank
+        // more manpower than the living population could ever field.
+        const int64_t ceiling = manpower_ceiling(p.population, p.work_manpower_mod);
+        p.manpower_stock = clampi64(p.manpower_stock + home, 0, ceiling);
+    }
+}
+
+int64_t spend_army(region& p, int64_t lost)
+{
+    if (lost <= 0 || p.army_stock <= 0) return 0;
+    const int64_t spent = std::min(lost, p.army_stock);
+    p.army_stock -= spent;
+    return spent;
 }
 
 // ---------------------------------------------------------------------------

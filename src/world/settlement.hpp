@@ -105,6 +105,115 @@ constexpr region_domain region_domain_of(terrain_substrate s)
     return region_domain::land;
 }
 
+// ---------------------------------------------------------------------------
+// Culture shares (BL-826)
+// ---------------------------------------------------------------------------
+
+/// Cultures a region may carry EXPLICITLY. Fixed width on purpose: the region
+/// stays POD-ish, the playback record stays bounded, and the flat-binary seam
+/// stays a fixed field count rather than a length-prefixed list.
+inline constexpr int culture_share_slots = 3;
+
+/// WHOSE PEOPLE LIVE HERE, AS A DISTRIBUTION (BL-826).
+///
+/// This replaces `region::culture`, which was a single index — a region was
+/// wholly one people or wholly another, and there was no way to say a conquest
+/// was half digested. Two things ride on the change:
+///
+///   1. It is the TAKE-BACK. A cultural mix is a fact pass 1 hands forward that
+///      a downstream pass could not have re-derived, because it is the residue
+///      of who walked where over four thousand years.
+///   2. It is an ANTI-HEGEMONY LEVER MADE REAL. Foreign ground shifts toward
+///      its holder SLOWLY (`history_sim_params::assimilation_per_year_q`), so a
+///      conquest is digested over centuries rather than at the instant the
+///      border moves — and `w_cult` becomes a question about the distribution
+///      rather than an equality test, so the discount on foreign ground fades
+///      as the ground stops being foreign.
+///
+/// INTEGER PER-MILLE, AND THE SUM IS EXACTLY 1000. No floats: this accumulates
+/// over four thousand years of decision rounds, which is precisely how a float
+/// invariant is lost. `slots` carry the largest cultures, sorted DESCENDING by
+/// weight with ties broken on the lower culture index, and `other_q` is the
+/// tail bucket holding everything that fell off the end. `total_q()` is 1000
+/// always, including for an unsettled region — which is all tail.
+struct culture_shares
+{
+    /// Culture index into `creed_state::cultures`; -1 for an unused slot.
+    /// Sorted descending by `weight_q`, ties on the lower index.
+    int16_t id[culture_share_slots] = {-1, -1, -1};
+    /// Per-mille weight of the matching slot. 0 exactly where `id` is -1.
+    int16_t weight_q[culture_share_slots] = {0, 0, 0};
+    /// The remainder — peoples too small to name. Never negative.
+    int16_t other_q = 1000;
+
+    /// A region nobody has settled: no named culture at all, all tail.
+    bool empty() const { return id[0] < 0; }
+
+    /// The largest named culture, or -1. THE PLURALITY, not the majority — use
+    /// `majority` where a bare plurality should not be enough.
+    int plurality() const { return id[0] >= 0 ? static_cast<int>(id[0]) : -1; }
+
+    /// Per-mille of this region that is culture @p c. 0 for -1 and for any
+    /// culture that has fallen into the tail — the tail is deliberately NOT
+    /// attributable, which is what makes it cheap.
+    int share_of(int c) const
+    {
+        if (c < 0) return 0;
+        for (int i = 0; i < culture_share_slots; ++i)
+            if (id[i] == static_cast<int16_t>(c)) return static_cast<int>(weight_q[i]);
+        return 0;
+    }
+
+    /// Strictly more than half the region. The test an institution that cannot
+    /// survive on a plurality should use.
+    bool majority(int c) const { return share_of(c) > 500; }
+
+    /// Always 1000. Exposed so callers and harnesses can assert it rather than
+    /// trust this comment.
+    int total_q() const
+    {
+        int t = static_cast<int>(other_q);
+        for (int i = 0; i < culture_share_slots; ++i) t += static_cast<int>(weight_q[i]);
+        return t;
+    }
+
+    /// A region wholly one people. `pure(-1)` is the unsettled default.
+    static culture_shares pure(int c)
+    {
+        culture_shares s;
+        if (c < 0) return s;
+        s.id[0] = static_cast<int16_t>(c);
+        s.weight_q[0] = 1000;
+        s.other_q = 0;
+        return s;
+    }
+
+    /// ASSIMILATION. Move @p amount_q per-mille OF THE FOREIGN REMAINDER toward
+    /// culture @p c, conserving the 1000 total exactly.
+    ///
+    /// Proportional rather than flat, for the reason `w_cult` had to become
+    /// proportional (history_sim.hpp § The corollary): a flat transfer converts
+    /// the last sliver of a minority at the same speed as the first half of a
+    /// majority, so it reads as a deadline rather than as a force. Proportional
+    /// means the same thing at any starting mix, and it never reaches 1000, so
+    /// a conquered people is never arithmetically erased.
+    ///
+    /// Integer throughout. The floor losses of the proportional take are
+    /// redistributed deterministically (largest component first, ties on the
+    /// lower slot, tail last), so the total is conserved to the unit and the
+    /// result cannot depend on iteration order.
+    void shift_toward(int c, int amount_q);
+
+    bool operator==(const culture_shares& o) const
+    {
+        if (other_q != o.other_q) return false;
+        for (int i = 0; i < culture_share_slots; ++i)
+            if (id[i] != o.id[i] || weight_q[i] != o.weight_q[i]) return false;
+        return true;
+    }
+    bool operator!=(const culture_shares& o) const { return !(*this == o); }
+};
+
 /// One settled region — the unit of settlement history, and the unit BL-219
 /// reads a corporation's focus from.
 struct region
@@ -124,9 +233,17 @@ struct region
     /// default ground `sub_at` hands out, which is dry.
     region_domain domain = region_domain::land;
 
-    /// Index into `creed_state::cultures` — WHOSE GODS this region keeps.
-    /// Starts as the nearest cradle's and can be overwritten by conquest.
-    int culture = -1;
+    /// WHOSE GODS THIS REGION KEEPS, as a DISTRIBUTION (BL-826).
+    ///
+    /// Was a single `int` index; a region was wholly one people. It starts as
+    /// the nearest cradle's, pure, and conquest then shifts it SLOWLY toward
+    /// the holder rather than flipping it — see `culture_shares` above and
+    /// `history_sim_params::assimilation_per_year_q`.
+    ///
+    /// EVERY former `p.culture == q.culture` test had to be answered
+    /// deliberately as plurality, majority or share-weighted; the type change
+    /// is what forced each one to be answered rather than defaulted.
+    culture_shares culture;
     /// The culture that FOUNDED it. Never overwritten, so a conquered region
     /// still records who built it — the erasure is of the record, not of this.
     int founding_culture = -1;
@@ -202,7 +319,39 @@ struct region
     /// Recruitable manpower currently banked — the army budget BL-273 closes
     /// the loop with. A bounded fraction of `population` (`manpower_ceiling`),
     /// refilled gradually by `replenish_manpower`, spent by `raise_manpower`.
+    ///
+    /// BL-835 — THIS IS A POOL OF ELIGIBLE CIVILIANS, NOT AN ARMY. Drawing it
+    /// is what raising an army COSTS; the soldiers themselves stand in
+    /// `army_stock` below. Nothing in the sim fights out of this field.
     int64_t manpower_stock = 0;
+
+    /// BL-835 — THE ARMY STANDING ON THIS REGION, in heads. Separate from
+    /// `population` and from `manpower_stock`, and that separation is the
+    /// whole point of the field.
+    ///
+    /// BEN'S RULING, 2026-09-08: "population as a civilian thing — where
+    /// armies are distinct from population, and we don't simulate total
+    /// warfare in stage 4." Population moves on demography, habitability,
+    /// famine and plague. Battles destroy ARMIES; they do not thin the people
+    /// living on the ground.
+    ///
+    /// WHY IT HAD TO EXIST. Before it, a region's defence was read straight
+    /// off `manpower_stock`, which is capped by `manpower_ceiling(population)`
+    /// — so a region war had emptied of people had no manpower, therefore no
+    /// defence, FOREVER. It outscored every real objective on every round of
+    /// the rest of the run. In the seed-0 fixture all 258 battles were that
+    /// one region: `battles == conquests == 258`, exactly 1:1.
+    ///
+    /// Under an army pool an undefended region is a NORMAL and TEMPORARY
+    /// state — an army marched away, a levy not yet raised — rather than a
+    /// permanent property of dead ground. Walking in is cheap exactly once,
+    /// because the army that walked in is then standing there.
+    ///
+    /// RAISED by `muster_garrison` out of `manpower_stock` (the cost, in
+    /// bodies that leave the fields and come back only slowly), SPENT by
+    /// `spend_army` when a battle goes against it, and MOVED between regions
+    /// by the sim's campaign verb. `population` is untouched by all three.
+    int64_t army_stock = 0;
 
     // --- The urban record (BL-766, the population map is drawn early) ------
     // WHY IT LIVES HERE AND NOT AS ENTITIES. The Era -1 sim has no ECS access
@@ -620,6 +769,54 @@ void replenish_manpower(region& p);
 /// unbounded — the self-limiting close BL-273 asks for (ancient hegemonies
 /// stall on manpower exhaustion rather than being capped by fiat).
 int64_t raise_manpower(region& p, int64_t want);
+
+// ---------------------------------------------------------------------------
+// The army pool (BL-835) — armies are distinct from population
+//
+// Three calls, and between them they are the whole model: what size of army
+// this ground keeps under arms, one year of raising or disbanding toward it,
+// and spending the army when a battle goes against it. NONE of the three
+// reads or writes `population`. That is the invariant the item exists for and
+// `demography_harness` asserts it directly.
+//
+// The tuning lives in the CALLER (`history_sim_params`) rather than as
+// constants here, because the Era -1 sim is the only consumer with a view on
+// how militarised an ancient polity should be, and a second consumer would
+// want a different answer.
+// ---------------------------------------------------------------------------
+
+/// The standing army this region's people can keep under arms — a fraction of
+/// the recruitable manpower ceiling, NOT of the population directly. It is a
+/// second bound below `manpower_ceiling`, so a region always keeps a reserve
+/// of eligible civilians it has not called up.
+///
+/// @param p                    The region; reads `population` and `work_manpower_mod`.
+/// @param garrison_fraction_q  Per-mille of the manpower ceiling to hold under arms.
+int64_t garrison_target(const region& p, int garrison_fraction_q);
+
+/// ONE YEAR of the muster. Below target, close `muster_rate_q` per-mille of
+/// the shortfall by drawing from `manpower_stock` — which is what raising an
+/// army COSTS, and the reason recovery is slow: the pool itself only refills
+/// at `replenish_manpower`'s rate off a population that war never touched.
+/// Above target (the ground can no longer feed the host it is carrying, after
+/// a plague or a lost hinterland), `disband_rate_q` per-mille of the excess
+/// goes home — and it goes home to `manpower_stock`, not to `population`,
+/// because a discharged soldier was never subtracted from the civilian count
+/// in the first place.
+///
+/// Pure in `p` and its three arguments; no RNG. Deterministic and idempotent
+/// per call, so a caller replaying the same year sequence replays the same
+/// muster (`world_determinism`'s requirement, and the sim runs this over every
+/// region of every year).
+void muster_garrison(region& p, int garrison_fraction_q,
+                     int muster_rate_q, int disband_rate_q);
+
+/// Spend `lost` heads off `army_stock`, bounded at zero. Returns the number
+/// actually spent, which is less than `lost` when the army was already smaller
+/// than its casualties — the caller's loss figure is a per-mille of a
+/// COMMITTED stack and this pool is the region's whole army, so the two can
+/// disagree and the bound is the honest answer rather than a negative pool.
+int64_t spend_army(region& p, int64_t lost);
 
 /// Resolve one plague-event checkpoint over a body's settled regions,
 /// reusing `resolve_checkpoint`'s class-agnostic mechanism from
