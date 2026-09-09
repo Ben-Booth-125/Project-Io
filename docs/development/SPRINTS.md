@@ -67,19 +67,32 @@ and/or a version goal (v0.1.1 etc.).
 The evidence that this is a separate phase and not a mood: over 4,000 years seed 0 goes from 533 to 1,372 regions with 839 foundings and 9 battles. B384a - every world sees at least one region change hands by war - FAILS because several seeds fight zero times. The 258-battle pathology sprint 36 removed was war logic operating on ground colonisation had produced and had no answer for. One loop with one parameter set is being asked to serve both, which is why a dial like defence_levy_q has to satisfy empty frontiers and contested borders at once.
 
 **Planned.**
-- NOT YET SCOPED. The first work of this sprint is the design pass, not implementation. Read docs/economy/POPULATION.md, docs/economy/TILES.md, docs/lore/CREEDS.md, docs/lore/HISTORY.md and docs/generation/GENERATION_STRATEGY.md before minting a single item.
+- BL-846 (colonisation span) - the diffusion loop, the stated boundary, the year-cost walk over terrain alone.
+- BL-847 (domestication package) - affinity and breadth; the settlement gate; crossing.
+- BL-848 (culture by route) - inheritance by arrival, superseding nearest-cradle.
+- BL-849 (colonisation seeds partition) - settled cells as a hard input to the province partition.
+- BL-850 (predation caps pressure) - wildlife danger, logarithmic decay in population, re-wilding on a sack.
+- BL-851 (sweep separates cradle outcomes) - four outcomes currently read as one.
+- BL-852 (fragmentation from contact) - the tribal marches retire; fragmentation from interpenetration.
+- BL-817 (history playback record) + BL-829 (time-lapse view) + BL-830 (top-sixteen scoreboard) - the wizard round 4 surface, which is the INSTRUMENT the cultures are judged on, not decoration.
 
-**Done when.** NOT YET SET. It belongs to the design pass, not to this entry.
+**Done when.** Round 4 of the wizard plays a 4,000-year time-lapse on a 2D grid-map in the built app, on a live click and not a capture; the arc STARTUP.md sets as the criterion is legible from the map alone - origin, communication, conquest or diplomatic union, a stable dark age; and the cultures it produces are ones Ben judges worth having. Region count is NOT trimmed toward a target: regions become provinces and the country count is the empire phase's to reduce.
 
-**Risk.** THE PHASE BOUNDARY IS THE OPEN DESIGN QUESTION AND IT HAS NO OBVIOUS ANSWER. A year? A settled-density threshold? First sustained contact between polities? Each gives a different world, and picking one by convenience is how this becomes another dial nobody can justify.
+**Risk.** THE SCALE QUESTION IS OPEN AND ITS COST IS SUPERLINEAR. Ben's brief says transform regions into provinces and do not aim for a small set. Regions are ~1,372 after 4,000 years; land provinces are ~22,153 - a factor of sixteen. BL-849 already rules that colonisation SEEDS the partition rather than drawing it, so they need not be one-for-one, but how far the region count grows is unsettled. Sprint 36 took the span from 6,923 to 1,288 ms and reach is STILL 41% of the run as a per-region Dijkstra, so sixteen times the regions is not sixteen times the cost. MEASURE REGION-COUNT SENSITIVITY BEFORE PICKING A NUMBER.
 
-IT PARTIALLY RE-OPENS BL-835, which closed this sprint. Its model is right and its verification stands, but which phase owns armies becomes a live question the moment there are two phases.
+THE VIEW HAS A DEPENDENCY THAT IS NOT BUILT. BL-829 draws from the BL-817 playback record, and BL-817 is designed only. The wizard shell IS built (BL-816, complete, live-verified) - round 4 exists as an honest amber placeholder. So the first day is the record, not the page.
 
-AND THE STANDING TRAP APPLIES DOUBLE HERE: creeds, philosophies and cultures are exactly where a real proper noun is most tempting. Every generated name stays sci-fi/fantasy out of the seeded banks. Real history transfers as MECHANISM only - how a frontier stalls, how a charter binds - never as a name.
+B384a MAY WANT RETIRING RATHER THAN FIXING. It asserts every world sees a region change hands by war and fails because several seeds fight zero times. This sprint's design says that is correct behaviour. Raise it; do not quietly delete it.
+
+CODE COMMENTS DESCRIBE SUPERSEDED RULES AND ARE CORRECT UNTIL THEIR ITEMS LAND - nearest-cradle inheritance (BL-848) and welding (BL-852). Fix each WITH its change.
+
+AND THE STANDING TRAP APPLIES DOUBLE HERE: creeds, philosophies and cultures are exactly where a real proper noun is most tempting. Real history transfers as MECHANISM only.
 
 OPENED 2026-09-09 out of sprint 36's redirect. Sprint 36 was closed rather than renamed so its landed military work stays attached to the sprint that did it.
 
 THE FOUR EMPIRE-PHASE ITEMS ARE IN THE POOL, unbuilt and untouched: BL-837 (ancient logistics and roads), BL-838 (fear of being next), BL-823 (anti-hegemon levers), BL-839 (turbulence lean). Each carries a note to re-scope against whatever boundary this sprint settles. BL-845 (the quiet worlds' 1:1 battle/conquest ratio) may well be answered by this sprint rather than by any work of its own.
+
+DESIGN PASS CLOSED 2026-09-09. docs/generation/COLONISATION.md is new and is the authority for the span - sibling to MILITARY_HISTORY.md, one doc per concern. Ben's five design calls: DIFFUSION with no actor (so no AI-behaviour grant is needed, and it must not become precedent for one); a STATED boundary year, not a derived one; a DOMESTICATION PACKAGE that spreads and gates settlement; philosophy is the EXISTING pantheon with no new axis; and colonisation SEEDS the province partition rather than drawing it. Two later rulings: predation caps a penned people's pressure and decays LOGARITHMICALLY IN POPULATION, and fragmentation is re-derived FROM CONTACT with the creeds' tribal marches retired (NR-808). Seven items minted, BL-846..BL-852. Four questions stay open in the doc and none is a design call - three magnitudes for the sweep and one derivation inside BL-852.
 
 ## Where things stand
 
@@ -139,7 +152,7 @@ THE FOUR EMPIRE-PHASE ITEMS ARE IN THE POOL, unbuilt and untouched: BL-837 (anci
 | 33 | Context economy - the corpus stops charging every session for what one session needs | OPENED 2026-09-07 and ran hard: THREE blocks, 16 items delivered, retro recorded below. CLOSED 2026-09-08 on Ben's call clearing the board - "let's approach the next task with a fresh mindset" - NOT because it failed. Its unfinished remainder (BL-807 the corpus citations, BL-808 the reach defect, BL-809 the red province assertions, plus BL-810 and BL-811 filed on the way past) was cancelled into the backlog archive the same day. The retro is the record of what this sprint actually delivered and stands unchanged. |
 | 35 | Watching the world be made | CLOSED 2026-09-09 with its placeholder elements standing. The visibility scaffold landed and was verified live; the sim work it would show turned out to be much larger than the sprint assumed, and moves to 36. Three measurements refuted three assumptions, which is the sprint real output. |
 | 36 | a revised look at ancient history | CLOSED 2026-09-09, REDIRECTED RATHER THAN FINISHED. Three of six items landed and are verified: the ancient pass is 5.4x/2.9x faster over 4,000 years and the dead-region ping-pong is gone at its cause. The four unbuilt items were empire-phase and went back to the pool when Ben observed that colonisation and empire want different rules. Sprint 37 takes that up. |
-| 37 | how humanity spreads before it fights | OPEN 2026-09-09. The ancient span is a settlement process, not a war - 839 foundings against 9 battles on seed 0 - and it has been running on empire rules. This sprint takes the colonisation half on its own terms: where people settle, how agriculture takes hold, how cultures grow, and what philosophies come out of that ground as the precursor to military doctrine. NOT YET SCOPED INTO ITEMS. |
+| 37 | how humanity spreads before it fights | OPEN 2026-09-09. Design pass CLOSED the same day: docs/generation/COLONISATION.md is the authority and seven items are minted (BL-846..BL-852). The build objective is Ben's - a wizard page carrying the 2D grid-map, then evidence it produces interesting cultures. Regions become provinces; trimming the country count belongs to the empire phase. |
 
 **Next up.** SPRINT 37 IS OPEN (2026-09-09) - how humanity spreads before it fights. It is NOT YET SCOPED, and that is deliberate: the first work is a design pass, not implementation. The subject is initial colonisation and the spreading of humanity - where populations grow, how agriculture takes hold in ground that suits it, how cultures grow from that, and what philosophies emerge as the precursor to military doctrine. The open design question is where the boundary between this phase and the empire phase sits, and nothing should be built until that is answered. Sprint 36 closed with its three landed items verified; its four unbuilt empire-phase items are in the pool awaiting that same boundary.
 
