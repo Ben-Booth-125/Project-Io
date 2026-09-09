@@ -781,12 +781,36 @@ history_sim_state run_history_sim(settlement_state&         ss,
     int64_t                     last_record_year = INT64_MIN;
 
     // Per-polity accumulators, hoisted so a 200-step run does not allocate 200
-    // times. Sized to the polity table, which the sim never grows.
+    // times.
+    //
+    // THE SIM DOES GROW THE POLITY TABLE NOW, and this comment used to say the
+    // opposite. It was true when it was written: polities were seeded once and
+    // the table was fixed for the run. BL-846's founding schedule meeting
+    // BL-856's coined cultures broke it — a region founded mid-span carrying a
+    // culture the migration invented needs a seat, so one is created on the
+    // spot (see the schedule block in the year loop).
+    //
+    // These two vectors were sized ONCE against the old invariant while the
+    // sample loop below walks `out.polities.size()` as it stands NOW, so every
+    // polity born mid-run indexed past the end. In Release that is a silent
+    // out-of-bounds write and the run appears to work; in a Debug build the
+    // bounds check aborts the process, which is how it was found — the wizard
+    // died on "Begin" with exit 3 and no message, while both harness builds
+    // passed.
+    //
+    // Grown to fit at the top of the record instead. A stale invariant in a
+    // comment is worth more than no comment only while it is true.
     std::vector<int64_t> step_pop(out.polities.size(), 0);
     std::vector<int32_t> step_regions(out.polities.size(), 0);
 
     const auto record_step = [&](int64_t y_now) {
         if (!params.record_playback) return;
+
+        if (step_pop.size() < out.polities.size())
+        {
+            step_pop.resize(out.polities.size(), 0);
+            step_regions.resize(out.polities.size(), 0);
+        }
 
         std::fill(step_pop.begin(), step_pop.end(), 0);
         std::fill(step_regions.begin(), step_regions.end(), 0);
@@ -909,9 +933,49 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // same plurality rule the world-opening seed uses, so a region
             // founded in year -3000 is owned on identical terms to one that was
             // there at tick zero.
+            const int np_culture = np.culture.plurality();
             int np_owner = -1;
             for (const polity& q : out.polities)
-                if (q.culture == np.culture.plurality()) { np_owner = q.id; break; }
+                if (q.culture == np_culture) { np_owner = q.id; break; }
+
+            // A PEOPLE THAT COMES INTO BEING AND SETTLES GROUND IS A POWER
+            // (Ben, 2026-09-09, choosing this over adopting daughters into their
+            // parent's polity).
+            //
+            // THE DEFECT THIS CLOSES, and it was measured rather than guessed:
+            // polities are seeded ONCE, at the top of this function, from the
+            // cultures present in the opening region set — the cradle cultures.
+            // A region founded mid-span carrying a culture the MIGRATION coined
+            // (BL-856) therefore matched no polity, took `nation = -1`, and
+            // never entered the ownership record at all. On seed 0 that was 604
+            // foundings against 523 ownership changes: EIGHTY-ONE regions
+            // founded and owned by nobody, whose ground the wizard's map drew as
+            // permanent grey wilderness. Half a continent of "unsettled" land
+            // was in fact settled by peoples the sim had no seat for.
+            //
+            // Seeding on demand is the honest reading: a people exists, it holds
+            // ground, so it is a power — however small, and it starts with
+            // exactly one region because it has only just arrived.
+            //
+            // DETERMINISTIC: the schedule is drained in (year, anchor) order, so
+            // ids are handed out in that order on every machine. `reach_by_polity`
+            // is keyed on `polity::id` and resizes on demand, so a polity
+            // appearing mid-run costs it nothing. No iterator over `out.polities`
+            // is live here — this block runs before the decision round opens.
+            if (np_owner < 0 && np_culture >= 0)
+            {
+                polity q;
+                q.id      = static_cast<int>(out.polities.size());
+                q.culture = np_culture;
+                q.aggression_q =
+                    (cs && np_culture < static_cast<int>(cs->cultures.size()))
+                        ? cs->cultures[static_cast<std::size_t>(np_culture)].aggression_q
+                        : 500;
+                // Its seat is the region it just founded — the only one it has.
+                q.capital = static_cast<int>(ss.regions.size());
+                np_owner  = q.id;
+                out.polities.push_back(q);
+            }
             np.nation = np_owner;
 
             ss.regions.push_back(std::move(np));

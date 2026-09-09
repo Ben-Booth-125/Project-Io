@@ -441,8 +441,12 @@ private:
     /// off-screen, and then — once the migration was moved inside it — migration
     /// with no conquest at all. Different subjects, different rules, different
     /// terminating conditions; see STARTUP.md § Rounds 4, 5 and 6.
-    static constexpr int wizard_planetology_round_count = 3;
-    static constexpr int wizard_round_count            = 6;
+    // FIVE ROUNDS, TWO OF THEM PLANETOLOGY (BL-863; Ben, 2026-09-09).
+    // System, Life, Culture, Empires, Industrialisation. The third planetology
+    // round -- 'Inheritance', which carried the drawdown lean -- retires into
+    // Industrialisation, which is what draws a world down in the first place.
+    static constexpr int wizard_planetology_round_count = 2;
+    static constexpr int wizard_round_count            = 5;
     /// The pass rounds, which own a reroll counter each rather than a preference block.
     static constexpr int wizard_pass_round_count =
         wizard_round_count - wizard_planetology_round_count;

@@ -998,6 +998,31 @@
     "tools/verify/colonisation_harness.cpp"
    ],
    "design": "BL-856 COINS THE CULTURES AND NOTHING CARRIES THEM. Measured on seeds 0/1/2: 12 cradle cultures + 15/19/7 coined by the migration, and DISTINCT PEOPLES HOLDING GROUND = 12 EXACTLY on every seed. The daughters are real, derived records (C13a passes) and no region's plurality is ever one of them.\n\nIT IS NOT THE SPLIT THRESHOLD, AND THAT WAS TESTED RATHER THAN ASSUMED. Dropping it 600 -> 250 years raised coined cultures 15 -> 43 and 19 -> 53 and left peoples-holding-ground at 12 on both seeds. Tuning the magnitude cannot fix this.\n\nTHE CAUSE IS WHERE A DAUGHTER IS COINED. A split happens on the frontier's LEADING EDGE, and a daughter is carried only by the tiles that descend from that one tile in the flood. Late in the walk there is almost no ground left below the edge, so a daughter's territory is a handful of tiles. Region anchors are then chosen by settle_score descending -- the best ground, which is overwhelmingly the early-reached ground the cradle cultures already hold -- so a daughter's marginal late-reached scraps never win one.\n\nTWO CANDIDATE FIXES, and both are design rather than tuning. (a) Coin the daughter for the whole forward CONE of the stream at the moment it crosses, not for the single tile at the edge, so a people that diverges takes its whole onward migration with it. (b) Let region culture read the neighbourhood rather than the anchor tile alone, so a region sitting in mixed ground carries the shares actually around it -- which region::culture is already a distribution for.\n\n(a) is the truer reading of COLONISATION.md sec Migration spawns cultures: a stream that has walked far enough IS a new people from then on, and everything it goes on to settle is theirs. (b) is cheaper and independently defensible. Ben's call.\n\nDONE WHEN: distinct peoples holding ground substantially exceeds the cradle count on every seed, and the harness asserts it rather than reporting it."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "sprint": "37",
+   "written": "2026-09-09",
+   "author": "Ben (2026-09-09, at the live app); Claude (itemisation)",
+   "blocked_on": null,
+   "version_goal": null,
+   "priority": "A",
+   "category": "UI",
+   "requires": [],
+   "id": "BL-863",
+   "short_name": "FIVE_ROUNDS_RENAMED",
+   "difficulty": 2,
+   "title": "The wizard walks five named rounds and the spending round retires",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/core/app.hpp",
+    "src/ui/startup_screens.cpp",
+    "scripts/verify/history_lapse_press.lua",
+    "docs/ui/STARTUP.md"
+   ],
+   "design": "BEN, 2026-09-09: 'we can in fact retire the spending round. That will be better fit into what you've called Substrate.' The wizard becomes FIVE rounds:\n\n  1. System   2. Life   3. Culture   4. Empires   5. Industrialisation\n\nWHAT RETIRES. The third planetology round -- 'Inheritance', which asked what the era before you already took and carried the DRAWDOWN lean -- stops being a round of its own. Its subject belongs with industrialisation, which is what draws a world down in the first place, so it folds into round 5.\n\nWHAT IS RENAMED. The Migration -> Culture, The History -> Empires, The Substrate -> Industrialisation. The names say what the round is ABOUT rather than what the code calls the pass, which is the right register for a player-facing wizard.\n\nTHE CHART CHAIN KEEPS ALL THREE GROUPS. `ui::chain_round_count` stays 3 because tile_inspector.cpp's History ledger Chain view reads the same table -- deleting the third entry would silently drop the legacy/spend charts from the IN-GAME ledger, which is not what was asked. Only the WIZARD stops walking it, so the assert binding the two counts relaxes from == to >=: the chart chain must cover AT LEAST the wizard's planetology rounds.\n\nworld_preferences::roll KEEPS THREE COUNTERS and its assert relaxes the same way, rather than dropping to two. Shrinking it would be a SAVE-FORMAT change for a UI reorder (save_envelope_roundtrip asserts 8 leans + roll[3] survive), and the third counter is not dead -- it is reserved for the drawdown lean when round 5 takes it.\n\nOWED, AND RECORDED RATHER THAN DROPPED: the drawdown lean is no longer editable anywhere until round 5 is built, so it sits at lean::any. That is a real loss of player control and it should not be forgotten because a round was renamed.\n\nDONE WHEN: five pips navigate, the names read as above, Back walks down one rung at a time, and a live click confirms it."
   }
  ]
 }

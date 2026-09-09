@@ -36,22 +36,22 @@ verify.window(1920, 1080)
 -- block; the PASS rounds have no preference block at all, so theirs sits lower.
 -- Both were read off captures rather than derived, and a pass round's footer is
 -- the same on every one of them because the decision block is empty on all three.
-local NEXT3_X,  NEXT3_Y  = 603, 975   -- round 3's Next (its footer sits under Drawdown)
+local NEXT3_X,  NEXT3_Y  = 603, 975   -- the last planetology round's Next
 local RESTART_X, RESTART_Y = 483, 150 -- a lapse round's Restart slot
 local REROLL_X, REROLL_Y = 483, 957   -- a pass round's Reroll
 local BACKP_X,  BACKP_Y  = 363, 995   -- a pass round's Back
 local NEXTP_X,  NEXTP_Y  = 603, 995   -- a pass round's Next
 
 -- Park on round 3, then walk ONE round by pressing Next for real.
-verify.generation_stage(2)
+verify.generation_stage(1)
 verify.frames(4)
 local round, rounds = verify.wizard_round()
-verify.expect(rounds == 6,
-              "the wizard walks SIX rounds -- 3 planetology, migration, history, "
-              .. "substrate (got " .. rounds .. ")")
-verify.expect(round == 2, "parked on round 3 (0-based " .. round .. ")")
+verify.expect(rounds == 5,
+              "the wizard walks FIVE rounds -- System, Life, Culture, Empires, "
+              .. "Industrialisation (got " .. rounds .. ")")
+verify.expect(round == 1, "parked on round 2, Life (0-based " .. round .. ")")
 verify.expect(verify.history_powers() == 0,
-              "round 3 carries no history record (the case is not pre-loaded)")
+              "round 2 carries no history record (the case is not pre-loaded)")
 verify.capture("press_00_round3_before_next")
 
 -- A1 -- THE HISTORY AUTO-STARTS ON THE ROUND-3 NEXT PRESS. No Run button
@@ -62,11 +62,11 @@ verify.capture("press_00_round3_before_next")
 verify.click(NEXT3_X, NEXT3_Y)
 verify.frames(6)
 round = select(1, verify.wizard_round())
-verify.expect(round == 3, "NEXT on round 3 lands on round 4, THE MIGRATION (0-based "
+verify.expect(round == 2, "NEXT on round 2 lands on round 3, CULTURE (0-based "
                           .. round .. ")")
 local powers = verify.history_powers()
 verify.expect(powers > 0,
-              "NEXT on round 3 auto-starts round 4's pass -- no Run press needed ("
+              "NEXT on round 2 auto-starts round 3's pass -- no Run press needed ("
               .. powers .. " powers)")
 verify.capture("press_01_after_next")
 
@@ -103,7 +103,7 @@ verify.capture("press_02_after_restart")
 verify.click(REROLL_X, REROLL_Y)
 verify.frames(6)
 verify.expect(verify.history_powers() > 0,
-              "Reroll re-runs round 4's pass and leaves a record on the round")
+              "Reroll re-runs round 3's pass and leaves a record on the round")
 verify.capture("press_03_after_reroll")
 
 -- ── BL-860: THE HISTORY IS ITS OWN ROUND ──────────────────────────────────
@@ -121,11 +121,11 @@ verify.capture("press_03_after_reroll")
 verify.click(NEXTP_X, NEXTP_Y)
 verify.frames(6)
 round = select(1, verify.wizard_round())
-verify.expect(round == 4, "NEXT on round 4 lands on round 5, THE HISTORY (0-based "
+verify.expect(round == 3, "NEXT on round 3 lands on round 4, EMPIRES (0-based "
                           .. round .. ")")
 local r5 = verify.history_powers()
 verify.expect(r5 > 0,
-              "round 5 runs its OWN pass on arrival (" .. r5 .. " powers)")
+              "round 4 runs its OWN pass on arrival (" .. r5 .. " powers)")
 verify.capture("press_04_round5_history")
 
 -- A6 -- ROUND 5's REROLL IS ITS OWN. Same slot, different round: it must leave a
@@ -133,7 +133,7 @@ verify.capture("press_04_round5_history")
 verify.click(REROLL_X, REROLL_Y)
 verify.frames(6)
 verify.expect(verify.history_powers() > 0,
-              "Reroll re-runs round 5's pass and leaves a record on the round")
+              "Reroll re-runs round 4's pass and leaves a record on the round")
 verify.capture("press_05_round5_after_reroll")
 
 -- A7 -- NEXT FROM 5 LANDS ON 6, THE SUBSTRATE. The last round, so its press is
@@ -142,7 +142,7 @@ verify.capture("press_05_round5_after_reroll")
 verify.click(NEXTP_X, NEXTP_Y)
 verify.frames(4)
 round = select(1, verify.wizard_round())
-verify.expect(round == 5, "NEXT on round 5 lands on round 6, THE SUBSTRATE (0-based "
+verify.expect(round == 4, "NEXT on round 4 lands on round 5, INDUSTRIALISATION (0-based "
                           .. round .. ")")
 verify.capture("press_06_round6_substrate")
 

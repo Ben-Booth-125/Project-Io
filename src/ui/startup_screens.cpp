@@ -423,8 +423,8 @@ namespace {
 /// File-local mirrors of app's round counts: those are private to `app`, and these
 /// helpers are free functions. draw_generation_screen static_asserts the pair against
 /// the real constants, so a drift here is a compile error, not a wrong layout.
-constexpr int planetology_rounds = 3;
-constexpr int pass_rounds        = 3;
+constexpr int planetology_rounds = 2;  // System, Life (BL-863)
+constexpr int pass_rounds        = 3;  // Culture, Empires, Industrialisation
 constexpr int lapse_rounds       = 2;
 
 /// The pass rounds take no preference rows yet — their leans arrive with the passes
@@ -464,9 +464,9 @@ wizard_round_head wizard_round_head_at(int r)
         // failed twice over: it drew conquest with the migration already finished
         // off-screen, then — once migration moved inside it — migration with no
         // conquest at all. Two subjects, two rounds.
-        { "The Migration",
+        { "Culture",
           "Who reached this ground first, and by which routes?" },
-        { "The History",
+        { "Empires",
           // THE SPAN NAMED HERE IS THE SPAN THE RECORD ACTUALLY COVERS, and it
           // is not yet the four thousand years the design asks for (NR-810).
           // `run_settlement` places and dates every region BEFORE
@@ -476,7 +476,7 @@ wizard_round_head wizard_round_head_at(int r)
           // Titled to what it plays rather than left aspirational, on the rule
           // that a surface must not assert something the code has not delivered.
           "Who claimed this ground, and who lost it, in the age before the epoch?" },
-        { "The Substrate",
+        { "Industrialisation",
           "What does that ground produce, and who trades it?" },
     };
     int i = r - planetology_rounds;
@@ -560,8 +560,13 @@ void app::draw_generation_screen()
     // reaches resolve_preferences, so it is keyed to the chain's rounds, not to the
     // wizard's total. The wizard's two pass rounds carry their own counters
     // (m_wiz_pass_roll) because they are not planetology inputs at all.
+    // AT LEAST ONE COUNTER PER ROUND (BL-863). `roll` keeps THREE rather than
+    // shrinking with the round count: it is on the save format
+    // (save_envelope_roundtrip asserts 8 leans + roll[3] survive), and shrinking
+    // it would make a UI reorder a save-format change. The spare counter is not
+    // dead -- it is the drawdown lean's, for when round 5 takes it.
     static_assert(sizeof(world_preferences::roll)
-                      == sizeof(uint32_t)
+                      >= sizeof(uint32_t)
                              * static_cast<std::size_t>(wizard_planetology_round_count),
                   "world_preferences::roll must carry one counter per planetology round");
 
@@ -600,8 +605,14 @@ void app::draw_generation_screen()
     // the chart chain covers exactly the planetology rounds, and the planetology
     // rounds are a strict prefix of the wizard. Every chain_round_at call below is
     // gated on `planetology_round` accordingly.
-    static_assert(ui::chain_round_count == wizard_planetology_round_count,
-                  "the chart chain must cover exactly the wizard's planetology rounds");
+    // COVERS AT LEAST, NOT EXACTLY (BL-863). The chart chain keeps all THREE
+    // groups because tile_inspector.cpp's History ledger reads the same table --
+    // dropping the third would delete the legacy/spend charts from the in-game
+    // ledger, which is not what retiring a WIZARD round asked for. The wizard
+    // walks the first two; the invariant that matters is that every round it
+    // hands to chain_round_at has an entry.
+    static_assert(ui::chain_round_count >= wizard_planetology_round_count,
+                  "the chart chain must cover at least the wizard's planetology rounds");
     static_assert(wizard_planetology_round_count < wizard_round_count,
                   "the planetology rounds are a strict prefix of the wizard's rounds");
     static_assert(planetology_rounds == wizard_planetology_round_count
