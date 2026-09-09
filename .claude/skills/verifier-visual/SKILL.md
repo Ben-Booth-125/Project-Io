@@ -46,6 +46,21 @@ NR-738). All four drive REAL PRESSES rather than only capturing frames, for the 
   conquest counts are the assertion that matters; they read 0 and 0 for as long as the view
   re-derived the era instead of replaying generation's own (NR-733).
 
+- **`history_lapse.lua`** (BL-829) — the New World wizard's **round 4** time-lapse: the 2D
+  political map that replaces the globe, captured at three points across the recorded era (400
+  BCE / 200 BCE / 0 CE) with its ordered top-sixteen board beside it. Its own script for the
+  reason `ages_replay` is: the subject is **time**, so one frame proves nothing and the review
+  question is a comparison across years — does the frontier move, and does the board re-rank.
+  Cheap because the run is synchronous under `--verify`: it adopts the record the harness's own
+  world already carries rather than re-running the project's most expensive pass.
+
+- **`history_lapse_press.lua`** (BL-829) — round 4's **Run**, **Restart** and **Reroll** as REAL
+  PRESSES through ImGui's own hit-test, in the `click_injection` idiom, with `verify.expect` as
+  the verdict. Its companion above captures the surface; a capture proves a surface renders and
+  says nothing about whether a press on it lands. It does **not** replace a human watching the
+  span play — the playhead is frozen under `--verify`, so nothing here observes motion on wall
+  time.
+
 - **`generation_ledger.lua`** (NR-738) — the Generation ledger's six collapsing sections: the
   resting index, every section open, the distributions scrolled to the foot, and **the state after
   a real header press**. That last frame is the standing "a UI requirement needs a live check" rule
