@@ -1013,6 +1013,88 @@ void case_family_tree(int seed_count)
           "country it was coined on");
 }
 
+// ---------------------------------------------------------------------------
+// D — SETTLEMENT SEATS ARE SPARSE, AND THE HINTERLAND IS A POINTER (BL-866)
+// ---------------------------------------------------------------------------
+//
+// CIVILISATION.md § The unit is the city state: "a settlement is a SEAT FLAG
+// on a region, and every region points at the seat it feeds", and "taking the
+// seat takes what points at it." This is the acceptance test for that shape,
+// against real generated worlds after the Era -1 sim has run wars over them.
+//
+// D1  every region resolves to a seat or to none — never a dangling pointer
+// D2  seats are a SPARSE minority of the settled map
+// D3  A TAKEN SEAT CARRIES ITS HINTERLAND — the load-bearing invariant: at
+//     any region whose `seat_region` points somewhere, that region's nation
+//     and its seat's nation agree. This holds from the opening map (every
+//     region seeded under its own polity's capital) and must still hold after
+//     however many centuries of conquest the sim ran, because every seat
+//     capture in `history_sim.cpp` carries its hinterland in the same event.
+// D4  the seat count is reported across a seed spread — not pinned (every
+//     magnitude in this layer is the sweep's to argue), but never zero on a
+//     world that settled at all.
+
+void case_settlement_seats(int seed_count)
+{
+    std::printf("\n--- D: are settlement seats sparse, and does a taken seat carry its "
+                "hinterland? (BL-866) ---\n");
+
+    int worlds = 0, worlds_consistent = 0, worlds_sparse = 0;
+
+    for (int s = 0; s < seed_count; ++s)
+    {
+        world_params wp;
+        wp.seed             = static_cast<uint32_t>(s);
+        wp.prehistory_years = 2000; // BL-871: the Empires span; long enough for real wars.
+
+        generation_report rep;
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{});
+        (void)w;
+        const generation_report::body_entry* k = kepler_of(rep);
+        // READ THE POST-SIM SETTLEMENT, NOT THE FIXTURE'S. `era_minus_one_fixture`
+        // (BL-462) deliberately captures the settlement BEFORE `run_history_sim`
+        // mutates it in place, for a harness that wants to re-run the sim itself
+        // — so seats and ownership are still the OPENING map there. The report's
+        // own body entry is assigned AFTER the sim (hard_coded_world.cpp), which
+        // is the settlement this case needs to see conquest carry a hinterland.
+        if (k == nullptr || k->settlement.regions.empty()) continue;
+        ++worlds;
+
+        const std::vector<region>& regions = k->settlement.regions;
+        const int n = static_cast<int>(regions.size());
+
+        int seats = 0, dangling = 0, mismatched = 0, no_seat = 0;
+        for (const region& r : regions)
+        {
+            if (r.is_seat) ++seats;
+
+            if (r.seat_region < 0) { ++no_seat; continue; }
+            if (r.seat_region >= n) { ++dangling; continue; }
+            const region& seat = regions[static_cast<std::size_t>(r.seat_region)];
+            if (!seat.is_seat) ++dangling; // Points somewhere that is not a seat at all.
+            else if (seat.nation != r.nation) ++mismatched;
+        }
+
+        const bool consistent = (dangling == 0 && mismatched == 0);
+        const bool sparse = seats > 0 && seats * 2 < n; // Under half, on any settled world.
+        if (consistent) ++worlds_consistent;
+        if (sparse) ++worlds_sparse;
+
+        std::printf("seed %u  regions %d  seats %d (%d%%)  no-seat %d  dangling %d  "
+                    "hinterland/seat nation mismatches %d\n",
+                    wp.seed, n, seats, n ? (seats * 100) / n : 0, no_seat, dangling, mismatched);
+    }
+
+    if (worlds == 0) { check(false, "D no world ran - the case is vacuous"); return; }
+
+    check(worlds_sparse == worlds,
+          "D2  SEATS ARE SPARSE on every world — fewer than half of settled regions are one");
+    check(worlds_consistent == worlds,
+          "D1/D3  EVERY REGION RESOLVES TO A SEAT OR TO NONE, and A TAKEN SEAT CARRIES ITS "
+          "HINTERLAND — every hinterland region shares its seat's nation, on the opening map "
+          "and after however many centuries of conquest the sim ran");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -1035,6 +1117,7 @@ int main(int argc, char** argv)
     case_founding_schedule(span_years);
     case_spawned_cultures(seed_count);
     case_family_tree(seed_count);
+    case_settlement_seats(seed_count);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;
