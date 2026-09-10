@@ -514,6 +514,20 @@ int main(int argc, char** argv)
     history_sim_params params =
         derive_from_generation ? era_minus_one_sim_params(sweep_wp) : history_sim_params{};
 
+    // TRACING ON, BECAUSE THE FUNNEL IS VACUOUS WITHOUT IT (BL-889, 2026-09-10).
+    // campaign_contacts / scored / cleared / chosen are ALL gated on
+    // `trace_battles` (history_sim.cpp lines ~1774, ~2049, ~2061, ~2330). With
+    // it off they read 0 in a run that fought 61 battles and took 35 regions --
+    // a set of zeros that looks like a finding and is an artefact. That exact
+    // trap cost BL-868 its first three verification passes; sprint 38's risk
+    // note records it, and this harness walked into it again the first time
+    // the funnel was printed.
+    //
+    // `illegal_campaigns` and `reach_denied_campaigns` are NOT gated and were
+    // trustworthy already -- which is why the reading that the reach gate
+    // denies nothing in a generated world survives this correction.
+    params.trace_battles = true;
+
     // The tuning overrides (BL-767), applied to the derived params and printed.
     // A name the whitelist does not know is an ERROR, not a shrug: a silently
     // ignored `--set` would produce a table labelled as a trial of a force that
