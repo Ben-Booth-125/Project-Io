@@ -346,14 +346,19 @@ consolidated the political map is *and* how a polity fights once it exists. Now 
 breadth** drives consolidation — a people who spread far ends up one culture over a lot of ground
 — and aggression drives only conduct after the boundary. One cause each.
 
-**The non-hegemony floor survives the change and must be re-derived, not assumed.** The old
-welding was floored at half the incoming fragmentation precisely so creeds alone could not
-manufacture a hegemon. Contact-derived fragmentation needs its own equivalent bound; that it is
-a different mechanism does not make BL-224's invariant somebody else's problem.
+**The non-hegemony floor survives the change, re-derived over the same base value (BL-852).** The
+old welding was floored at half the INCOMING fragmentation, so creeds alone could not manufacture
+a hegemon. The replacement keeps the identical shape: contact can pull `fragmentation_q` down but
+never below half the STRUCTURAL reading Stage 0/3 computed from terrain and cradle count alone,
+before any culture existed to meet another. Same invariant, same base value, a different force
+doing the pulling.
 
-**This moves the nation count, and that is a measurement.** The seed budget is downstream, so the
-distribution across a seed spread must be measured before the change lands — not argued from the
-mechanism's shape. It is the one thing in this document whose consequence cannot be reasoned to.
+**This moved the nation count, and it was measured.** The seed budget is downstream, so the
+distribution across a seed spread was measured before the change landed (`world_audit`'s six-seed
+sweep) rather than argued from the mechanism's shape — it was the one thing in this document whose
+consequence could not be reasoned to. It moved modestly: median nation count within a few nations
+of the pre-BL-852 reading, same order of magnitude, no seed pushed outside `BL-053`'s runaway
+guard.
 
 ---
 
@@ -424,9 +429,6 @@ than left to be rediscovered.
 - **What share of land counts as "most".** § Most of the land is habitable states the target and
   deliberately does not put a number on it; the sweep argues it against the package's affinity
   floor and breadth, never against a floor that fills the map regardless.
-- **The non-hegemony floor on contact-derived fragmentation.** § Fragmentation comes from contact
-  retires a welding rule that carried an explicit half-fragmentation floor for BL-224's sake. The
-  replacement needs its own bound, and what that bound is has not been derived.
 - **The predation decay's coefficient.** The *form* is settled — logarithmic in population
   (§ Predation) — so what remains is one magnitude: how much a doubling buys. `history_sweep`'s
   to argue, like every other magnitude here.

@@ -573,14 +573,15 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // Creeds (BL-235, docs/lore/CREEDS.md): one pantheon per cradle-culture,
     // each in its own generated tongue. Runs BEFORE generate_nations because
-    // its tribal-conflict stage DRIVES the map the same way the ladder does:
-    // won wars weld cradles together and lower fragmentation_q before
-    // nation_params_from_ladder reads it into the seed budget.
+    // run_settlement (below) needs a pantheon and an aggression reading for
+    // every cradle it may found from. Fragmentation no longer moves here
+    // (BL-852) — the tribal marches retired; `record_cultural_contact` reads
+    // the settled map's own culture shares once settlement has run, further
+    // down this function.
     bump(6);
     creed_state kepler_creeds =
         run_creeds(kepler_pl, kepler_hist, w, kepler_tiles, home_grid_width, home_grid_height,
                    /*seed=*/params.seed ^ 0xC4EED5u);
-    record_tribal_conflict(kepler_creeds, kepler_hist, /*seed=*/params.seed ^ 0xC4EED5u);
 
     // Settlement & industrialisation (BL-218, docs/lore/HISTORY.md Stages 3-4).
     // Regions are placed BEFORE the political map and become its seeds, so
@@ -674,6 +675,59 @@ world make_hard_coded_world(world_params params, generation_report* report,
         for (const auto& [cid, year] : kepler_settlement.cradle_coined_year)
             if (cid >= 0 && cid < static_cast<int>(kepler_creeds.cultures.size()))
                 kepler_creeds.cultures[static_cast<std::size_t>(cid)].coined_year = year;
+
+        // Fragmentation from contact (BL-852, resolving NR-808;
+        // docs/generation/COLONISATION.md § Fragmentation comes from
+        // contact). The tribal marches retired: `record_cultural_contact`
+        // reads how far two peoples' settlements interpenetrate off the
+        // founding map itself — no pantheon comparison, no roll, no war.
+        //
+        // For each settled region, its NEAREST OTHER region (grid distance,
+        // columns wrapping, lowest index breaks a tie — the same rule the
+        // retired marches used for their own nearest-cradle search) tells
+        // whether a different founding culture sits close enough to count as
+        // contact; averaged over the whole settled map this is exactly the
+        // breadth of frontier the doc asks for, with `founding_culture`
+        // (`region::founding_culture`, never overwritten by a later
+        // conquest) standing in for `culture_shares`'s plurality so this
+        // reads the map colonisation actually drew rather than anything the
+        // Era -1 sim has since fought over.
+        {
+            std::vector<int> region_mix_q;
+            region_mix_q.reserve(kepler_settlement.regions.size());
+            for (std::size_t i = 0; i < kepler_settlement.regions.size(); ++i)
+            {
+                const region& ri = kepler_settlement.regions[i];
+                if (ri.anchor < 0 || ri.founding_culture < 0) continue;
+
+                int best = -1, best_d = 1 << 30;
+                for (std::size_t j = 0; j < kepler_settlement.regions.size(); ++j)
+                {
+                    if (j == i) continue;
+                    const region& rj = kepler_settlement.regions[j];
+                    if (rj.anchor < 0) continue;
+                    const int dc = std::abs(ri.col - rj.col);
+                    const int dr = std::abs(ri.row - rj.row);
+                    const int d  = std::min(dc, home_grid_width - dc) + dr;
+                    if (d < best_d) { best_d = d; best = static_cast<int>(j); }
+                }
+                if (best < 0) continue;
+                region_mix_q.push_back(
+                    kepler_settlement.regions[static_cast<std::size_t>(best)].founding_culture
+                            != ri.founding_culture ? 1000 : 0);
+            }
+            record_cultural_contact(kepler_hist, region_mix_q);
+
+            // The seed budget nation_params_from_ladder derives depends on
+            // fragmentation_q, which just moved. Re-derive it over the
+            // CONTACT reading so generate_nations (further down) inherits
+            // the measured value; `land_tiles_per_seed` already did its one
+            // job sizing the region budget above and is moot from here —
+            // `seed_tiles`/`seed_polities` below override it from the
+            // concrete settled map regardless.
+            kepler_np = nation_params_from_ladder(
+                kepler_hist, nation_params{ .min_seed_separation = 5 });
+        }
 
         // THE POPULATION MAP, DRAWN EARLY (BL-766). Before the Era -1 sim, not
         // after it: every region whose ground farms easily is given an opening
