@@ -1075,10 +1075,18 @@ int main()
         // changing hands is that world again — the pass ran and produced the
         // state it was written to prevent.
         //
-        // The achieved share is printed above regardless, so a later decision
-        // to accept some peaceful worlds has the number to argue from.
-        check(worlds_with_conquest == n,
-              "B384a every world sees at least one region change hands by war");
+        // The achieved share is printed above regardless.
+        //
+        // B384a RETIRED (BL-854, Ben's ruling 2026-09-10): "for this round of
+        // generation we should not see war — inevitable means we carry the
+        // capacity for war to the next round." COLONISATION.md's premise is
+        // that the migration span is a settlement process with occasional
+        // violence, not a war-every-world guarantee — measured at 5/8 worlds
+        // fighting, so the old claim failed for a reason the design now says
+        // is correct. What must still hold is CAPABILITY, carried forward
+        // into the history round rather than asserted here, and B384b below
+        // is what actually checks that the transfer branch fires somewhere
+        // in the set.
 
         // THE DEFECT EXACTLY AS FILED: 267 battles, zero conquests. A world
         // that campaigns for an era and takes nothing means the transfer branch
