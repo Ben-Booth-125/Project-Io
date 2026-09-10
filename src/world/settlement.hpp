@@ -429,6 +429,32 @@ struct region
     /// quantity the campaign-era centre count and scale carve reads.
     int64_t urban_population = 0;
 
+    /// BL-872 (CIVILISATION.md "Centres are derived by supply and
+    /// governance") — 0-1000, how well THIS region's own seat can still
+    /// reach it: `history_sim.cpp`'s terrain-and-road Dijkstra reach from
+    /// the polity's capital, the SAME quantity BL-837 already prices a
+    /// campaign at and attrites an unsustained garrison with. Governance
+    /// ("can the seat rule this ground") and supply ("can materials reach
+    /// it") are read as ONE quantity here — a settled call, not an
+    /// oversight: this sim has one network, one Dijkstra, one seat per
+    /// region, so a second number would only ever restate the first.
+    ///
+    /// Written by `run_history_sim` once per decision round for every
+    /// region a living polity holds (a region nobody holds keeps its last
+    /// value); read by `advance_region_urban`'s caller to decide whether
+    /// `centres` may still grow. Defaults to 1000 (full supply) so a region
+    /// not yet touched by a decision round — the opening seed, a region
+    /// founded this very year — is never spuriously frozen before the
+    /// network model has had a chance to price it.
+    ///
+    /// GENERATION SCRATCH, NOT SAVED. Like `is_seat`/`seat_region`/
+    /// `material_stock` before it (BL-866/BL-867), this is a fact the Era -1
+    /// sim maintains about ground it is actively simulating, not a fact the
+    /// campaign era reads afterwards — `w_region`/`r_region`
+    /// (`src/core/save_game.cpp`) do not carry any of those four fields, and
+    /// this one follows the same precedent rather than adding one.
+    int network_supply_q = 1000;
+
     // --- Era -1 works (BL-321) --------------------------------------------
     // What this region has BUILT, and what those works are worth. The works
     // TABLE lives in works_roster.hpp/works.lua; only the per-region record
@@ -864,12 +890,22 @@ void draw_urban_map(settlement_state& s);
 
 /// Advance one region's urban headcount by one simulated year: converge a
 /// fraction of the gap toward `population * region_urban_share_q(farm_q)`,
-/// then promote `centres` to whatever the surviving heads stand up.
+/// then promote `centres` to whatever the surviving heads stand up —
+/// PROVIDED the network still reaches this ground.
 ///
-/// GROWTH ONLY PROMOTES. A shrinking city keeps its centre — POPULATION.md's
-/// asymmetry, that passive failure shrinks a centre and never destroys one.
-/// Destruction is `sack_region_urban`, a deliberate act of history.
-void advance_region_urban(region& p);
+/// @param network_ok  BL-872 (CIVILISATION.md "Centres are derived by supply
+///                    and governance") — whether `region::network_supply_q`
+///                    is still above the caller's sustainable-settlement
+///                    floor. True is the old behaviour unchanged. False
+///                    FREEZES `centres`: it neither grows nor shrinks here,
+///                    because a network cut is not the deliberate act of
+///                    history `sack_region_urban` exists for.
+///
+/// GROWTH ONLY PROMOTES, and only while the network holds. A shrinking city
+/// keeps its centre and a cut-off one keeps its centres too — POPULATION.md's
+/// asymmetry, now covering both kinds of passive failure. Destruction is
+/// `sack_region_urban` alone, a deliberate act of history.
+void advance_region_urban(region& p, bool network_ok);
 
 /// SACK a region's cities. `population_loss_q` is the per-mille the
 /// countryside lost; the city loses a multiple of it, because a sack falls on
