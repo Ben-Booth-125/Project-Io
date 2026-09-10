@@ -2034,6 +2034,27 @@ int64_t spend_army(region& p, int64_t lost)
 }
 
 // ---------------------------------------------------------------------------
+// Materials and labour (BL-867)
+// ---------------------------------------------------------------------------
+
+int64_t region_industry_capacity(const region& p)
+{
+    const int64_t ceiling = manpower_ceiling(p.population, p.work_manpower_mod);
+    return clampi64(ceiling - p.army_stock, 0, ceiling);
+}
+
+int region_industry_yield_q(const region& p)
+{
+    return clampi(p.ore_q, 0, 1000);
+}
+
+int64_t region_industry_output(const region& p)
+{
+    const int64_t heads = region_industry_capacity(p);
+    return (heads * region_industry_yield_q(p)) / 1000;
+}
+
+// ---------------------------------------------------------------------------
 // The urban record (BL-766) — the population map, drawn early and then lived in
 // ---------------------------------------------------------------------------
 

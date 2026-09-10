@@ -154,6 +154,8 @@ bool same_except_record(const history_sim_state& a, const history_sim_state& b,
      || a.polities_industrialised != b.polities_industrialised
      || a.regions_industrialised != b.regions_industrialised
      || a.peak_population != b.peak_population || a.peak_year != b.peak_year
+     || a.materials_produced != b.materials_produced
+     || a.materials_spent_on_campaigns != b.materials_spent_on_campaigns
      || a.campaign_contacts != b.campaign_contacts || a.campaign_scored != b.campaign_scored
      || a.campaign_chosen != b.campaign_chosen || a.campaign_cleared != b.campaign_cleared
      || a.campaign_cleared_rounds != b.campaign_cleared_rounds
@@ -176,7 +178,9 @@ bool same_except_record(const history_sim_state& a, const history_sim_state& b,
          || p.manpower_stock != q.manpower_stock || p.army_stock != q.army_stock
          || p.culture != q.culture || p.contest_q != q.contest_q
          || p.protection_q != q.protection_q || p.industrialised != q.industrialised
-         || p.industrial_year != q.industrial_year || p.works_built != q.works_built)
+         || p.industrial_year != q.industrial_year || p.works_built != q.works_built
+         || p.material_stock != q.material_stock || p.is_seat != q.is_seat
+         || p.seat_region != q.seat_region)
             return false;
     }
     return true;
@@ -1141,6 +1145,109 @@ int main()
               "B817h a recorded run and a suppressed run agree on EVERY other output");
         check(same_record(a, a2) && same_except_record(a, a2, s1, s2),
               "B817i the same seed records identically twice");
+    }
+
+    // --- M1  over-muster starves industry (BL-867) --------------------------
+    //
+    // CIVILISATION.md § Materials are spent: "a polity that musters too hard
+    // starves or stops producing." Isolated from combat entirely — separation
+    // 60 is far past `neighbour_radius` (9), so neither polity ever contacts
+    // the other and the only thing that differs between the two runs is how
+    // much of each region's recruitable ceiling is kept under arms.
+    {
+        history_sim_params p_low = params;
+        p_low.start_year = 0;
+        p_low.stop_year  = 200;
+        p_low.garrison_fraction_q = 50;
+
+        history_sim_params p_high = p_low;
+        p_high.garrison_fraction_q = 1000; // the WHOLE manpower ceiling, standing.
+
+        settlement_state w_low  = two_polity_world(60);
+        settlement_state w_high = two_polity_world(60);
+
+        const history_sim_state lo =
+            run_history_sim(w_low,  nullptr, no_terrain, syn_gw, syn_gh, p_low,  4101u);
+        const history_sim_state hi =
+            run_history_sim(w_high, nullptr, no_terrain, syn_gw, syn_gh, p_high, 4101u);
+
+        std::printf("      overmuster: garrison 5%% -> %lld materials produced | "
+                    "garrison 100%% -> %lld (no contact either way: %lld / %lld battles)\n",
+                    static_cast<long long>(lo.materials_produced),
+                    static_cast<long long>(hi.materials_produced),
+                    static_cast<long long>(lo.battles), static_cast<long long>(hi.battles));
+
+        check(lo.battles == 0 && hi.battles == 0,
+              "M1a  separation 60 keeps the two polities out of contact — the isolation holds");
+        check(lo.materials_produced > hi.materials_produced,
+              "M1b  a heavier standing garrison leaves less labour for industry, and produces less");
+    }
+
+    // --- M2  a campaign visibly costs materials (BL-867) --------------------
+    //
+    // THE SAME SEED B318c ALREADY PROVES REACHES CAMPAIGN (2024u) — not an
+    // arbitrary pick. The first cut of this case used 8670u, which B318 never
+    // vouches for; found by this item's own re-verification (2026-09-10) to
+    // be a quiet world under default params (conquests == 0), which made
+    // M2b fail for a reason that had nothing to do with materials at all.
+    // Reusing 2024u means "does this run fight" is already someone else's
+    // proven claim, so a failure here is about materials, never about
+    // whether the seed happens to go to war.
+    {
+        settlement_state s = k1->settlement;
+        const history_sim_state a =
+            run_history_sim(s, nullptr, no_terrain, kgw, kgh, params, 2024u);
+
+        std::printf("      materials: %lld produced / %lld spent on campaigns, over %lld conquests\n",
+                    static_cast<long long>(a.materials_produced),
+                    static_cast<long long>(a.materials_spent_on_campaigns),
+                    static_cast<long long>(a.conquests));
+
+        check(a.materials_produced > 0,
+              "M2a  industry credits real material stock to real seats over the run");
+        check(a.conquests > 0 && a.materials_spent_on_campaigns > 0,
+              "M2b  a run that fights ALSO visibly spends materials on the campaigns it launches");
+    }
+
+    // --- M3  taking a seat takes its stores (BL-867) -------------------------
+    //
+    // CIVILISATION.md § Materials are spent: "the stores sit AT THE SEAT, and
+    // fall with it." Preload the prize region with a stock no industry this
+    // short a run could produce on its own (`region_seed_population` at
+    // `farm_q=950` is a few hundred thousand at most, and 200 years of that
+    // region's own OWN industry cannot manufacture this number from nothing)
+    // — so if the conqueror ends the run holding at least this much on that
+    // region, the ONLY explanation left is that the flag carried the stock
+    // with it, per settlement.hpp's design: nothing copies `material_stock`
+    // anywhere, ownership just moves over it.
+    {
+        history_sim_params p3 = params;
+        p3.start_year = 0;
+        p3.stop_year  = 400;
+        p3.neighbour_radius = 40;
+        p3.w_dist = 0;
+
+        settlement_state w3 = two_polity_world(3);
+        w3.regions[1].material_stock = 5000000;
+
+        const history_sim_state m =
+            run_history_sim(w3, nullptr, no_terrain, syn_gw, syn_gh, p3, 4103u);
+
+        int  last_owner_of_1 = -1;
+        bool captured = false;
+        for (const owner_change& c : m.owner_changes)
+            if (c.region == 1) { captured = true; last_owner_of_1 = c.owner; }
+
+        std::printf("      seat capture: region 1 captured=%s, final owner %d, "
+                    "material_stock now %lld (preloaded 5000000)\n",
+                    captured ? "yes" : "no", last_owner_of_1,
+                    static_cast<long long>(w3.regions[1].material_stock));
+
+        check(captured, "M3a  the prize seat changes hands inside the run");
+        check(w3.regions[1].nation == last_owner_of_1,
+              "M3b  the region's own settled nation field agrees with the recorded owner change");
+        check(w3.regions[1].material_stock >= 5000000,
+              "M3c  the captured seat's preloaded stock is carried by the ownership change, never reset");
     }
 
     std::printf("\n%s (%d failure%s)\n",

@@ -1011,6 +1011,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
             np.nation = np_owner;
 
+            // BL-867 — EVERY FOUNDING GETS A SEAT POINTER, on the same rule
+            // the opening map uses (above): a brand-new polity's first
+            // region IS its seat (its `capital` was just set to this very
+            // index, above), an existing polity's new region is ordinary
+            // hinterland pointing at the capital it already has. Without
+            // this a region founded here defaults to `seat_region == -1` —
+            // "falls outside anyone's reach", the honest reading for ground
+            // no seat touches, but the wrong one for ground a seat's own
+            // people just walked onto.
+            if (np_owner >= 0)
+            {
+                const int cap = out.polities[static_cast<std::size_t>(np_owner)].capital;
+                np.seat_region = cap;
+                if (cap == static_cast<int>(ss.regions.size())) np.is_seat = true;
+            }
+
             ss.regions.push_back(std::move(np));
             owner.push_back(np_owner);
             neighbours.emplace_back();
@@ -1058,6 +1074,26 @@ history_sim_state run_history_sim(settlement_state&         ss,
             muster_garrison(ss.regions[i], params.garrison_fraction_q,
                             params.garrison_muster_q, params.garrison_disband_q);
             total_pop += ss.regions[i].population;
+
+            // BL-867 — INDUSTRY FLOWS TO THE SEAT, EVERY REGION, EVERY YEAR.
+            // Computed AFTER this year's muster, so a garrison mustered up
+            // this round already shows in the labour left for industry —
+            // CIVILISATION.md's "starves or stops producing" as arithmetic on
+            // `manpower_ceiling` and `army_stock`, both already advanced
+            // above. `seat_region` is never -1 for a region the owning loop
+            // has reached (the opening seed and both founding sites below all
+            // set it), so this is unconditional rather than a defensive
+            // check on a case that should not occur.
+            const int64_t produced = region_industry_output(ss.regions[i]);
+            if (produced > 0)
+            {
+                const int seat_idx = ss.regions[i].seat_region;
+                if (seat_idx >= 0 && static_cast<std::size_t>(seat_idx) < ss.regions.size())
+                {
+                    ss.regions[static_cast<std::size_t>(seat_idx)].material_stock += produced;
+                    out.materials_produced += produced;
+                }
+            }
         }
         } // BL-825 demography timer
         if (total_pop > out.peak_population)
@@ -2029,6 +2065,52 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // Fort at +640 is worth about +64 against row power values of
                 // 90..380 — it tilts a fight rather than deciding one, so a
                 // fortress buys the defender an edge and never immunity.
+                // BL-867 — MATERIALS ARE SPENT WHEN THE ACTION HAPPENS
+                // (CIVILISATION.md § Materials are spent when something
+                // happens). Drawn from the acting polity's OWN seat — never
+                // the staging holding, which may be a bare frontier march
+                // with no stock of its own, because the design puts the
+                // stores at the realm's capital and nowhere else. SPENT, not
+                // borrowed: a seat with nothing standing in it pays what it
+                // can and the campaign marches anyway, understocked.
+                int64_t material_cost = 0, material_spent = 0;
+                int material_penalty_q = 0;
+                if (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                {
+                    region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
+                    // FLOORED AT 1, NOT TRUNCATED TO 0 (found by M2 against a
+                    // real generated world, 2026-09-10): integer division
+                    // rounds `raised * campaign_material_cost_per_head_q /
+                    // 1000` down to zero for any force under 250 heads at the
+                    // default coefficient, which is most real campaigns —
+                    // the cost silently vanished while materials still
+                    // accumulated, so nothing was ever visibly spent.
+                    material_cost  = raised > 0
+                                    ? std::max<int64_t>(
+                                          1, (raised * params.campaign_material_cost_per_head_q) / 1000)
+                                    : 0;
+                    material_spent = std::min(material_cost, seat.material_stock);
+                    seat.material_stock -= material_spent;
+                    out.materials_spent_on_campaigns += material_spent;
+
+                    // THE SHORTFALL IS WHAT MAKES OVER-MUSTER MEASURABLY
+                    // WORSE OFF. A polity whose garrisons have been eating its
+                    // own industry (`region_industry_capacity`, spent every
+                    // year above) arrives here with an empty seat, and the
+                    // army that marches anyway is visibly weaker for it —
+                    // through the SAME readiness channel works and winter
+                    // already share, so it tilts a fight rather than deciding
+                    // one, exactly as those two do.
+                    if (material_cost > 0)
+                    {
+                        const int covered_q = clampi(
+                            static_cast<int>((material_spent * 1000) / material_cost), 0, 1000);
+                        material_penalty_q =
+                            ((1000 - covered_q) * params.material_shortfall_penalty_q) / 1000;
+                    }
+                }
+                const int atk_ready = clampi(1000 - material_penalty_q, 0, 1000);
+
                 const int def_works_q = clampi(tgt.work_defence_mod, 0, 1000);
                 const int def_ready = (best_winter ? (1000 - params.winter_readiness_penalty_q) : 1000)
                                     + def_works_q;
@@ -2039,7 +2121,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 roster_band atk_band = roster_band::classical;
                 std::vector<army_stack_entry> atk =
-                    build_stack(raised, home, q, 1000, sim_band_ceiling(params, y),
+                    build_stack(raised, home, q, atk_ready, sim_band_ceiling(params, y),
                                 !exec_dry, &atk_band);
                 note_units_fielded(out, params, y, atk_band, atk);
                 // BL-835 — THE EMERGENCY LEVY. A province being invaded calls
@@ -2429,6 +2511,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.founded_year = y;
                 np.last_demography_year = y;
                 np.nation = q.id;
+                // BL-867 — ORDINARY HINTERLAND, POINTING AT THE FOUNDER'S
+                // SEAT. `q` already exists and already has a capital (it is
+                // the polity performing this verb), so a region it settles
+                // is never itself a new seat — the sparse first cut names
+                // that "one seat per polity", and a Settle never mints one.
+                np.seat_region = q.capital;
                 np.population = clampi64(region_carrying_capacity(np.farm_q) / 16, 1, 1 << 30);
                 replenish_manpower(np);
                 // BL-835 — A NEW REGION HAS NO ARMY YET, and that is the
