@@ -180,7 +180,10 @@ bool same_except_record(const history_sim_state& a, const history_sim_state& b,
          || p.protection_q != q.protection_q || p.industrialised != q.industrialised
          || p.industrial_year != q.industrial_year || p.works_built != q.works_built
          || p.material_stock != q.material_stock || p.is_seat != q.is_seat
-         || p.seat_region != q.seat_region)
+         || p.seat_region != q.seat_region
+         // BL-872 — the new per-region reach reading and what it gates.
+         || p.network_supply_q != q.network_supply_q || p.centres != q.centres
+         || p.centres_razed != q.centres_razed || p.urban_population != q.urban_population)
             return false;
     }
     return true;
@@ -1581,6 +1584,97 @@ int main()
               "BL837c2 a garrison beyond sustainable reach DOES attrite — it cannot be maintained");
         check(w_far.regions[1].army_stock < w_near.regions[1].army_stock,
               "BL837c3 the unsustained outpost ends the run with a smaller standing army");
+    }
+
+    // ---------------------------------------------------------------------
+    // BL-872 — centres are derived by supply and governance (CIVILISATION.md
+    // § Centres are derived by supply and governance). Same shape as BL837c:
+    // one polity, two regions, no rival anywhere on the map, so the ONLY
+    // thing that can move `region::centres` on the Outpost is demography
+    // and this item's network gate — never the campaign/conquest machinery.
+    // Long enough a run (600 years) for the Outpost's population, and so its
+    // urban share, to converge well past the first `region_centre_heads`
+    // rung several times over, so "did NOT grow past its opening seed" is a
+    // real, load-bearing claim and not an artefact of the run ending early.
+    // ---------------------------------------------------------------------
+    {
+        history_sim_params ps = params;
+        ps.start_year = 0;
+        ps.stop_year  = 600;
+
+        history_sim_params near = ps;
+        near.terrain_reach_cost_q = 10; // the shipped default — comfortably sustained.
+
+        history_sim_params far = ps;
+        // Calibrated (printed below) to land the Outpost's network_supply_q
+        // BETWEEN the garrison floor (0) and the settlement floor (40) — a
+        // marginal case that freezes GROWTH without also starving the
+        // standing garrison, so this test is honestly exercising BL-872's
+        // OWN new floor rather than riding on BL-837's pre-existing one.
+        far.terrain_reach_cost_q = 19600;
+
+        settlement_state w_near = one_polity_two_regions(5);
+        settlement_state w_far  = one_polity_two_regions(5);
+        // BL-872 FIX (2026-09-10): `one_polity_two_regions` builds raw
+        // `region` structs directly, never through `draw_region_urban` — so
+        // without this, BOTH regions start at `centres == 0` (the struct's
+        // bare default), not the `1` every REAL generated region gets the
+        // instant it is settled (settlement.cpp: "ground that farms gets a
+        // settlement, whenever it is settled"). The far case's own claim is
+        // "keeps its OPENING SEED, no more" — that claim is meaningless
+        // against a fixture that never planted one.
+        for (settlement_state* w : {&w_near, &w_far})
+            for (region& r : w->regions)
+                draw_region_urban(r);
+        const history_sim_state a =
+            run_history_sim(w_near, nullptr, no_terrain, syn_gw, syn_gh, near, 812u);
+        const history_sim_state b =
+            run_history_sim(w_far,  nullptr, no_terrain, syn_gw, syn_gh, far,  812u);
+
+        const region& outpost_near = w_near.regions[1];
+        const region& outpost_far  = w_far.regions[1];
+
+        std::printf("      near: supply_q=%d centres=%d urban_pop=%lld population=%lld | "
+                    "far: supply_q=%d centres=%d urban_pop=%lld population=%lld\n",
+                    outpost_near.network_supply_q, outpost_near.centres,
+                    static_cast<long long>(outpost_near.urban_population),
+                    static_cast<long long>(outpost_near.population),
+                    outpost_far.network_supply_q, outpost_far.centres,
+                    static_cast<long long>(outpost_far.urban_population),
+                    static_cast<long long>(outpost_far.population));
+
+        // The scenario is only proving what it claims to prove if the "far"
+        // reading actually lands BELOW the settlement floor and the "near"
+        // one comfortably above it — printed above for a human to check,
+        // asserted here so a future recalibration of either floor cannot
+        // silently turn this into a vacuous pass.
+        check(outpost_far.network_supply_q < params.sustainable_settlement_floor_q,
+              "BL872a0 the far case actually lands below the settlement floor (not vacuous)");
+        check(outpost_near.network_supply_q > params.sustainable_settlement_floor_q,
+              "BL872a1 the near case actually lands above the settlement floor (not vacuous)");
+
+        check(outpost_near.centres > 1,
+              "BL872a2 well-supplied ground grows PAST its opening seed as population arrives");
+        check(outpost_far.centres == 1,
+              "BL872a3 CUT OFF ground stops growing centres — it keeps its opening seed, no more");
+        check(outpost_near.centres > outpost_far.centres,
+              "BL872a4 the SAME ground grows strictly more centres well-supplied than cut off");
+
+        // FREEZE, NOT RAZE (this item's other open question). The cut-off
+        // Outpost's `centres_razed` must stay zero — nobody sacked these
+        // walls, the network merely stopped reaching them, and that is
+        // deliberately NOT the same event `sack_region_urban` records.
+        check(outpost_far.centres_razed == 0,
+              "BL872a5 a network cut FREEZES growth, it does not RAZE what already stands "
+              "(centres_razed is sack_region_urban's field alone)");
+
+        // The demographic engine itself is untouched by the gate: the
+        // Outpost's headcount and urban share still converge on the SAME
+        // ground whether or not the network can feed a NEW centre from it —
+        // this item gates `centres`, nothing upstream of it.
+        check(outpost_far.population > 0 && outpost_far.urban_population > region_centre_heads,
+              "BL872a6 population and urban share still grow on cut-off ground — only NEW "
+              "centres are gated, not the demography the gate reads");
     }
 
     // --- M1  over-muster starves industry (BL-867) --------------------------

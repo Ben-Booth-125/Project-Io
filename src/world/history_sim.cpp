@@ -1183,7 +1183,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
             advance_region_demography(ss.regions[i], 1, /*war_pressure_q=*/0);
             // BL-766: the cities drawn before this loop started live through it
             // — they grow with the region and thin when it thins.
-            advance_region_urban(ss.regions[i]);
+            //
+            // BL-872 — GATED ON LAST DECISION ROUND'S NETWORK READING. This
+            // demography loop runs every year; `region::network_supply_q` is
+            // only refreshed once per DECISION round, inside the per-polity
+            // loop further down (the same place BL-837 prices a garrison's
+            // upkeep). So this reads a value up to one decision-round stale —
+            // deliberate, deterministic, and the same lag `mean_reach_q` and
+            // every other per-round aggregate in this file already carries.
+            // On year one, before any decision round has run at all, the
+            // field's own default (1000, full supply) is what is read.
+            advance_region_urban(ss.regions[i],
+                ss.regions[i].network_supply_q > params.sustainable_settlement_floor_q);
             // BL-835 — ONE YEAR OF THE MUSTER, for every region whether or not
             // anyone is fighting over it. This is what makes an undefended
             // region a TEMPORARY state: a region stripped by a march away, or
@@ -1463,29 +1474,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // A RATE x THE STEP, like every other per-year accumulator in
             // this loop. `held` is already region-index order, so the walk
             // order is a property of the map, not of anything transient.
-            if (params.unsustained_army_attrition_q > 0)
+            //
+            // BL-872 — `region::network_supply_q` IS COMPUTED HERE FOR EVERY
+            // HELD REGION, UNCONDITIONALLY, not only ones carrying an army.
+            // CIVILISATION.md's open question ("one reach quantity or two")
+            // is answered ONE: governance ("can the seat rule this ground")
+            // and supply ("can materials reach it") are the SAME terrain-
+            // and-road Dijkstra reach from a polity's own seat that this
+            // block already priced a garrison's upkeep with, before this
+            // item. There is one network and one seat per region in this
+            // sim, so a second number here would only restate the first.
+            // `advance_region_urban`'s caller (the demography loop, above,
+            // one decision round behind) is what reads it to gate
+            // `region::centres` growth.
+            for (int hi : held)
             {
-                for (int hi : held)
+                region& hp = ss.regions[static_cast<std::size_t>(hi)];
+                const std::size_t hidx = static_cast<std::size_t>(hi);
+                const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
+                                      ? reach[hidx] : (1 << 27);
+                const int hub_reach_q = clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
+                const int terrain_cost = reach_here * params.terrain_reach_cost_q / 100;
+                const int terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
+                const int supply_at_q  = clampi(1000 - terrain_paid, 0, 1000);
+                hp.network_supply_q = supply_at_q;
+
+                if (params.unsustained_army_attrition_q > 0 && hp.army_stock > 0
+                 && supply_at_q <= params.sustainable_garrison_floor_q)
                 {
-                    region& hp = ss.regions[static_cast<std::size_t>(hi)];
-                    if (hp.army_stock <= 0) continue;
-
-                    const std::size_t hidx = static_cast<std::size_t>(hi);
-                    const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
-                                          ? reach[hidx] : (1 << 27);
-                    const int hub_reach_q = clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
-                    const int terrain_cost = reach_here * params.terrain_reach_cost_q / 100;
-                    const int terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
-                    const int supply_at_q  = clampi(1000 - terrain_paid, 0, 1000);
-
-                    if (supply_at_q <= params.sustainable_garrison_floor_q)
-                    {
-                        ++out.unsustained_attrition_events;
-                        const int64_t lost = (hp.army_stock
-                                             * clampi(params.unsustained_army_attrition_q, 0, 1000)
-                                             * step_years) / 1000;
-                        hp.army_stock = std::max<int64_t>(0, hp.army_stock - lost);
-                    }
+                    ++out.unsustained_attrition_events;
+                    const int64_t lost = (hp.army_stock
+                                         * clampi(params.unsustained_army_attrition_q, 0, 1000)
+                                         * step_years) / 1000;
+                    hp.army_stock = std::max<int64_t>(0, hp.army_stock - lost);
                 }
             }
 

@@ -2085,8 +2085,15 @@ namespace {
 /// Promote `centres` to whatever `urban_population` now stands up, never
 /// demote. POPULATION.md's asymmetry: passive failure shrinks a centre and
 /// never destroys one, so only `sack_region_urban` takes a centre off the map.
-void promote_centres(region& p)
+///
+/// BL-872 — `network_ok` false FREEZES this outright: the ground the network
+/// can no longer feed or govern stands up no NEW centre, but nothing already
+/// standing is touched here either. Freeze, not raze — `sack_region_urban`
+/// stays the only place `centres` goes down, and a supply cut is not the
+/// deliberate act of history that function represents.
+void promote_centres(region& p, bool network_ok)
 {
+    if (!network_ok) return;
     const int stood = static_cast<int>(
         clampi64(p.urban_population / region_centre_heads, 0, region_centre_limit));
     if (stood > p.centres)
@@ -2129,8 +2136,14 @@ void draw_region_urban(region& p)
     //     zero centres. The rule is now ONE rule — ground that farms gets a
     //     settlement, whenever it is settled — rather than one rule for the
     //     opening map and another for everything history founded after it.
+    // BL-872 — this draw runs BEFORE any seat or road exists (the opening
+    // map, or a founding whose seat pointer this same call's caller has not
+    // necessarily set yet), so there is no network for `network_supply_q` to
+    // describe. Ungated here on purpose: the gate is on GROWTH
+    // (`advance_region_urban`), never on the one-centre opening seed every
+    // farmable region gets regardless of network, above.
     p.centres = 1;
-    promote_centres(p);
+    promote_centres(p, /*network_ok=*/true);
 }
 
 void draw_urban_map(settlement_state& s)
@@ -2140,7 +2153,7 @@ void draw_urban_map(settlement_state& s)
     s.urban_map_drawn = true;
 }
 
-void advance_region_urban(region& p)
+void advance_region_urban(region& p, bool network_ok)
 {
     if (p.population <= 0)
     {
@@ -2159,7 +2172,7 @@ void advance_region_urban(region& p)
     // which is the correct behaviour for a town already at its ground's size.
     p.urban_population = clampi64(p.urban_population + (gap * urban_converge_q) / 1000,
                                   0, 1LL << 40);
-    promote_centres(p);
+    promote_centres(p, network_ok);
 }
 
 void sack_region_urban(region& p, int population_loss_q)

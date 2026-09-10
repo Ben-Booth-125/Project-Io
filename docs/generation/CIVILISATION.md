@@ -190,8 +190,25 @@ a seat can govern it, so the urban map is downstream of the road map.
 because population crossed a threshold in isolation; they appear where a network put them, which
 is why the map stays legible as the population grows.
 
-**What is NOT settled:** whether governance reach and supply reach are one quantity or two, and
-whether a centre that loses its supply is razed, frozen, or demoted.
+**SETTLED (Claude, 2026-09-10, taken on Ben's behalf under BL-872): ONE quantity, not two.** A
+region's own `network_supply_q` — the terrain-and-road Dijkstra reach from its polity's seat that
+`BL-837` already prices a campaign at and attrites an unsustained garrison with — answers both
+questions at once. Governance ("can the seat rule this ground") and supply ("can materials reach
+it") are the same fact in a sim with one network, one seat per region and one Dijkstra: a second
+number would only ever restate the first, and building one would be inventing a distinction this
+sim's own model of the world does not carry. Two numbers become worth separating only if a later
+item gives them genuinely different inputs — a naval-only supply line, say, that governs nothing —
+and that is a new design question for whoever proposes it, not a gap in this one.
+
+**SETTLED (Claude, 2026-09-10, taken on Ben's behalf under BL-872): FROZEN, not razed.** A region
+whose `network_supply_q` falls at or below `sustainable_settlement_floor_q` stops growing new
+centres — `region::centres` holds at whatever it already stood, promoted no further — but nothing
+already standing is destroyed. Razing was the candidate `centres_razed` already exists for, and it
+is the wrong shape here: that field and `sack_region_urban` represent a deliberate act of history
+with an actor and a date, and a road falling into disuse is neither. Freezing is also the reading
+`POPULATION.md`'s own asymmetry already uses for the ordinary demographic case (a shrinking city
+keeps its centre); this extends the same asymmetry to a second kind of passive failure rather than
+inventing a harsher one for the network specifically.
 
 ---
 
@@ -413,8 +430,6 @@ and reach-gating. What is left is genuinely downstream of those.
 
 - **What an ETHIC is as data**, and what it means for a polity to *belong* to a civilisation
   rather than merely stand on ground carrying one (§ A civilisation is what mixing makes).
-- **Are governance reach and supply reach one quantity or two**, and is a centre that loses its
-  supply razed, frozen or demoted (§ Centres are derived by supply and governance)?
 - **Where the opposition BAR sits** — the threshold above which no civilisation is coined. A
   measurement, not a judgement: it should be set from a sweep that produces both alliance-shaped
   and enmity-shaped worlds, never from a number picked to make one seed look right.

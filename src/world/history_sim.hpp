@@ -592,6 +592,23 @@ struct history_sim_params
     /// question B: not "can I take this" but "can I KEEP AN ARMY THERE".
     int sustainable_garrison_floor_q = 0;
 
+    /// SUSTAINABLE-REACH FLOOR FOR A REGION'S CENTRES TO GROW (BL-872,
+    /// CIVILISATION.md § Centres are derived by supply and governance). The
+    /// SAME 0-1000 currency as the two floors above, read from
+    /// `region::network_supply_q` rather than re-derived, and deliberately a
+    /// third named floor rather than reusing either: growing a town is
+    /// neither "launch a campaign" (`sustainable_campaign_floor_q`, 80) nor
+    /// merely "keep an army fed at home" (`sustainable_garrison_floor_q`,
+    /// 0) — it needs a network that can carry ordinary trade, which this
+    /// project's design places above bare survival and at or below what a
+    /// march demands. AT OR BELOW this, `advance_region_urban` FREEZES
+    /// `region::centres`: no new centre stands up on ground the network can
+    /// no longer feed or govern, but nothing already standing is razed —
+    /// see the field comment on `region::network_supply_q` and
+    /// `settlement.cpp`'s `promote_centres` for why freeze, not raze, is
+    /// this item's answer to its own open question.
+    int sustainable_settlement_floor_q = 40;
+
     /// Per-mille of `army_stock` lost per YEAR to a garrison standing beyond
     /// `sustainable_garrison_floor_q`. An army beyond sustainable reach cannot
     /// be maintained — this is what makes that literally true rather than a
