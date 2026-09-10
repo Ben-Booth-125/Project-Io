@@ -1,18 +1,14 @@
 # REFINED — active worklist
 
-**Empty.** Sprint 35 is open and unpromoted.
+**Empty.** Sprint 37 closed 2026-09-10 (all seven owed items delivered); sprint 38 is open and
+unpromoted. See `docs/development/NEXT_SESSION.md` for the handoff and `SPRINTS.md` § Sprint 38 for
+the plan.
 
-The whole board was cleared on 2026-09-08 on Ben's call — too many items hung off sprint plans that
-should have been better planned — and the first planning pass after it opened **sprint 35** with four
-items. See `docs/development/NEXT_SESSION.md` for the handoff and `SPRINTS.md` § Sprint 35 for the plan.
+Ten open items in sprint 38 (`node tools/session/backlog_query.js --sprint 38`), with the real
+subject named in `NEXT_SESSION.md`'s "The work now" table: **BL-889** (conquest must compound) is
+the sprint's crux, **BL-892** (reach_mod inert on supply) is where to start.
 
-Two chains to promote from, independent in their code:
-
-- **The startup budget** — BL-813 (re-measure the warm start on this base) → BL-814 (retire it into
-  phase 6) → BL-815 (state the budget on screen, against the 3–6 minute target).
-- **The axis phase 6 could not see** — BL-812 (a reach-quality term, so a road tier is scorable).
-
-Everything archived in the board clear is whole and cold in
+Everything archived in the earlier board clears is whole and cold in
 `docs/development/archive/backlog-design-2026-Q3.json` — read it with
 `node tools/session/backlog_query.js --status cancelled --full`. Nothing from it carries forward as a
 commitment; re-author fresh against the docs rather than copying a cold row back.

@@ -3,6 +3,29 @@
 Written 2026-09-10, replacing the earlier note of the same day. **That note's central diagnosis
 was wrong and this one says why**, because the mistake is worth not repeating.
 
+## Sprint 37 closed and merged since this note was first written
+
+Sprint 37's seven owed items (BL-849, BL-852, BL-853, BL-854, BL-855, BL-859→BL-888, BL-861) all
+landed and are now on `main` — merged after this note's own session had already reasoned about
+`c83a0d74`. Two things from that merge matter here:
+
+- **BL-861 stays cancelled**, exactly as this note already says (NR-824) — sprint 37's own
+  independent measurement (a different fix chain: settlement-locked provinces, contact-derived
+  fragmentation, degree-capped adjacency, narrower ice caps) converged on the same "every seed now
+  fights" conclusion sprint 38 reached first. Nothing to reconcile; both chains agree.
+- **`history_sim.cpp`/`.hpp` moved under you.** BL-855 capped region-adjacency degree
+  (`max_neighbour_degree = 10`, alongside `neighbour_radius`) — a determinism-digest change,
+  already landed and `world_determinism`-verified. Read its comment before touching neighbour
+  logic for BL-889; a merge here is easy (different sections) but the two changes now share a file
+  and a mental model of "what counts as a neighbour."
+- **NR-825 (open, filed by sprint 37):** BL-855's degree cap reduces reach-rebuild cost growth but
+  measured NOT fully flat at 4,000+ regions (`history_span_cost`) — reach-rebuild count is also
+  driven by battle frequency, which BL-889 is about to increase substantially if it succeeds. Worth
+  a `history_span_cost` re-run once BL-889 lands, since a world with real compounding conquest will
+  run more decision rounds with more battles than the worlds NR-825 was measured against — if wall
+  time gets bad, this is the first place to look, and the cap (currently 10) is the lever.
+- **`build_rel` is fresh** as of this session's close (2026-09-10) — Ben has already looked at it.
+
 ## What changed
 
 The previous handover said sprint 38 had one holdout, BL-868 (creeds raise armies), blocked by a

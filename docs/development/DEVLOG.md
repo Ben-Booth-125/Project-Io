@@ -10,6 +10,56 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-10 (sprint 37 closes) — The seven owed items, and a delegation bug caught mid-flight
+
+**Mode:** Full, batch delivery, closing a reopened sprint.
+
+Delivered sprint 37's full owed list: BL-849 (province partition takes settled cells as a hard
+input, via a settlement lock mirroring the existing nation lock), BL-852 (fragmentation now
+derives from culture-contact interpenetration, retiring the kinship-blind tribal marches), BL-853
+(the sim's shared terrain view carries rivers — turned out narrower than filed, since production
+colonisation already had them via BL-857), BL-854 (B384a retired per Ben's ruling — capability
+carries to the history round, not asserted in the migration round), BL-855 (region adjacency
+degree-capped at 10, bounding the graph BL-844's heap fix could not reach), BL-859 (cancelled,
+redirected to BL-888: narrowed the polar/subpolar latitude bands, shrinking ice-cap extent ~36%),
+BL-861 (measured rather than fixed directly — resolved as a side effect of the other four,
+confirmed via `history_sweep` across 16 seeds; later found superseded by sprint 38's own
+independent resolution of the same pathology, reached first with Ben's ruling — NR-824).
+
+**A genuine tooling failure cost real time, caught and reported rather than worked around.** The
+`generation-dev` sub-agent, given the Agent tool via a blanket "All tools" grant, recursively
+spawned further sub-agents instead of implementing directly — eight runaway agents made zero
+commits before this was caught and killed via `TaskStop`. A same-session self-correction agent,
+launched without worktree isolation by mistake, then discarded a set of legitimate uncommitted
+edits from the *shared* worktree along with the duplicate's — caught immediately via the
+on-disk-change warning and redone before anything was lost. Filed a background investigation task;
+Ben (in a separate session) fixed the root cause mid-session (`Agent` removed from
+`generation-dev`/`economy-dev`/`ui-dev`'s toolset, commit `eb3c1186`). A second wave of agents,
+post-fix, still hit assorted glitches (one losing all tool access mid-task, one resuming into a
+tools-less spawn) but did real, mergeable work before stalling — every stall was recovered by
+treating the stalled agent's worktree as a diff to inspect and finish directly (build it, run its
+own stated verification, commit) rather than trying to "resume" it (no such tool exists in this
+environment; a second Agent call is always a fresh spawn in a fresh worktree).
+
+**Honesty over a clean number, twice.** BL-855's own measured result did not cleanly hit its
+stated "flat ms/rebuild" criterion at the larger region counts this run reached — reported as
+such, with NR-825 filed rather than the number quietly rounded up to a pass. BL-888's
+boreal-share-of-unfarmed-land number moved more modestly than its raw tile-incidence number, for a
+real and stated reason (freed ground reclassifies into other marginal cold-adjacent classes, not
+farmland) — also reported plainly.
+
+**Merging surfaced concurrent sprint-38 work.** Root `main` had moved 2 commits ahead (a backlog
+purge/consolidation, plus sprint 38's own independent resolution of the no-conquest pathology and
+BL-868) while this session worked in its worktree. Merged cleanly with real conflict resolution in
+`backlog.json`/`sprints.json`/`NEEDS_REVIEW.json` (one NR-id collision, renumbered), rather than
+force-pushing over either side. `build_rel` rebuilt and confirmed working after the merge.
+
+**Runtime:** several hours, spanning a sub-agent-heavy delivery pass, a debugging detour into the
+delegation bug, and a merge/build/verify pass. Items: BL-849, BL-852, BL-853, BL-854, BL-855,
+BL-859 (cancelled), BL-861 (cancelled), BL-888 (new). NR-825 filed and open.
+
+---
+
 ## 2026-09-10 (sprint 38) — City states become empires, eight of nine
 
 **Mode:** Full, batch delivery.
