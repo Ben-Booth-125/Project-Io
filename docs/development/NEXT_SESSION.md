@@ -55,6 +55,12 @@ The pass-6/7 code sits uncommitted in `.claude/worktrees/agent-aec88315766979641
 (commit `b6d04c6c`, rebased cleanly onto main at `ed229efb`). The test design (hold defender
 neutral, measure time-to-first-conquest) is worth keeping; only the fixture needs redoing.
 
+**Read this alongside BL-861 (sprint 37, still open, kept open 2026-09-10).** BL-861 found the
+same symptom a sprint earlier — seed 0's full 4000-year span fights zero battles — and was never
+resolved; its own notes name culture-by-route's contiguous kin blocks and large unclaimed
+buffers as the likely causes. Worth diagnosing BL-868's silent fixture and BL-861's silent world
+together rather than as two separate no-conquest mysteries.
+
 ## Also worth knowing
 
 - **BL-887 (reach-as-centre-chains)** was filed out of this sprint, priority B, no sprint —

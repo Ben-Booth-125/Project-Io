@@ -74,7 +74,7 @@
    "id": "37",
    "theme": "how humanity spreads before it fights",
    "state": "open",
-   "status_line": "REOPENED 2026-09-09 for a design addendum, having been closed the same day. Ben: 'we have more work to do for sprint 37 ... we need to be sure we retrieve all necessary data to facilitate this.' The Empires phase needs city states growing into empires, ancient logistics expanding, and natural resources abstracted for conquest -- and the Culture phase must HAND THAT FORWARD. docs/generation/CIVILISATION.md is the new authority. The gap found: the migration builds a family tree of peoples (BL-856) and DISCARDS it, so kinship -- the natural substrate for culture similarity -- is unrecoverable by the empire phase. BL-865 closes it and is sprint 37's; BL-866..BL-870 are sprint 38's.",
+   "status_line": "REOPENED 2026-09-09 for a design addendum, having been closed the same day. The gap found: the migration builds a family tree of peoples (BL-856) and DISCARDS it, so kinship -- the natural substrate for culture similarity -- is unrecoverable by the empire phase. BL-865 (the addendum's whole reason to reopen) LANDED 2026-09-09 and is verified on main -- culture now carries `parent`/`origin_farm_class`, walking every daughter back to a cradle. KEPT OPEN ANYWAY (Ben, 2026-09-10): seven items from the original close's owed list are still untouched -- BL-849, BL-852, BL-853, BL-854, BL-855, BL-859, BL-861. BL-861 (no conquest across the 4000-year span) is the same symptom sprint 38's BL-868 is blocked on, diagnosed a sprint earlier and never resolved -- read the two together.",
    "opened_date": "2026-09-09",
    "closed_date": null,
    "author": null,
