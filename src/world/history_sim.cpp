@@ -1806,8 +1806,46 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // pays none.
                     {
                         const int foreign_q = 1000 - tgt.culture.share_of(q.culture);
-                        const int cult_q    =
-                            (clampi(params.w_cult, 0, 1000) * clampi(foreign_q, 0, 1000)) / 1000;
+
+                        // OPPOSITION SCALES THE WEIGHT, PER PAIR (BL-870;
+                        // CIVILISATION.md § Culture relations). `w_cult` stays
+                        // exactly the kind of number it always was — a
+                        // per-mille discount on foreign ground — this only
+                        // asks a queryable opposition value
+                        // (`culture_opposition_q`) to set it per attacker/
+                        // target pair instead of once for the whole world.
+                        // OPPOSITION PERMITS CONQUEST, IT DOES NOT SCORE IT
+                        // (Ben, 2026-09-09): one scorer term, `w_cult` itself,
+                        // reads a richer input rather than a second term
+                        // being added beside it.
+                        //
+                        // OPPOSITION *PERMITS* THE DISCOUNT TO BE WAIVED, it
+                        // does not add to it (fixed 2026-09-10 — the first
+                        // cut of this line had the sense of `op_q` backwards,
+                        // making an OPPOSED pair pay MORE of w_cult and a KIN
+                        // pair pay LESS, which is the opposite of "opposition
+                        // permits conquest": a fresh, amicable split should
+                        // still read as close to home soil, while genuine
+                        // enemies should find that foreignness alone no
+                        // longer holds them back). So the weight is anchored
+                        // at op_q == 500 exactly as before, but runs the
+                        // OTHER way: kin/like-minded pairs (op_q toward 0)
+                        // pay up to five-thirds of the flat w_cult discount,
+                        // opposed strangers (op_q toward 1000) nearly waive
+                        // it. Falls back to the flat weight with no creeds
+                        // supplied (every harness fixture in this repo that
+                        // isolates one mechanism passes `cs == nullptr` on
+                        // purpose; only the real generation path and BL-870's
+                        // own case feed a `creed_state` in here).
+                        int cult_w = params.w_cult;
+                        if (cs != nullptr)
+                        {
+                            const int op_q = culture_opposition_q(
+                                cs->cultures, q.culture, tgt.culture.plurality());
+                            cult_w = clampi((params.w_cult * (1250 - op_q)) / 750, 0, 1000);
+                        }
+                        const int cult_q =
+                            (clampi(cult_w, 0, 1000) * clampi(foreign_q, 0, 1000)) / 1000;
                         value = (value * (1000 - cult_q)) / 1000;
                     }
 

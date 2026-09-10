@@ -762,6 +762,15 @@ settlement_state run_settlement(const planetology_state& pl,
                     col_lf [static_cast<std::size_t>(src0.tile)],
                     /*shoreline=*/false)));
 
+    // EVERY CRADLE CULTURE IS COINED THE SAME MOMENT (BL-870) — the flood
+    // seeds every source at `colonisation_start_year` (see `col_sources`
+    // above), so that is each cradle's `coined_year` too. Round-tripped
+    // through the caller for the same reason `cradle_origin_class` is: this
+    // pass holds `cs` by const reference.
+    for (const colonisation_source& src0 : col_sources)
+        if (src0.culture >= 0)
+            out.cradle_coined_year.emplace_back(src0.culture, src0.ready_year);
+
     colonisation_input col_in;
     col_in.substrate     = &col_sub;
     col_in.cover         = &col_cov;
@@ -817,10 +826,11 @@ settlement_state run_settlement(const planetology_state& pl,
                 par = &out.spawned_cultures[static_cast<std::size_t>(local)];
         }
         if (par == nullptr) { out.spawned_cultures.push_back(culture{}); continue; }
-        out.spawned_cultures.push_back(
+        culture daughter =
             derive_daughter_culture(*par, pid, static_cast<int8_t>(sp.origin_class),
                                     seed ^ 0xC0DAu, static_cast<int>(si),
-                                    sp.coined_year));
+                                    sp.coined_year);
+        out.spawned_cultures.push_back(std::move(daughter));
     }
 
     // --- Score every tile once, in raster order --------------------------------

@@ -97,7 +97,8 @@ struct culture
     /// The calendar year this culture was coined — a cradle culture at the span's
     /// start (`colonisation_start_year`), a daughter at the year its stream
     /// diverged. NR-816 makes kinship a YEARS-SINCE-COMMON-ANCESTOR measure, and
-    /// that measure is worthless without the years themselves (BL-873).
+    /// that measure is worthless without the years themselves (BL-873). Read by
+    /// `culture_kinship_years` (BL-870) below.
     int64_t coined_year = INT64_MIN;
 };
 
@@ -141,3 +142,40 @@ void record_tribal_conflict(creed_state& cs,
 /// record_institutional_history uses), so the caller passes the world rather
 /// than re-deriving a number two functions already agree on.
 void record_globalisation(creed_state& cs, const world& w, entity_id body_id);
+
+// ---------------------------------------------------------------------------
+// Culture relations (BL-870; CIVILISATION.md § Culture relations)
+// ---------------------------------------------------------------------------
+
+/// Years between @p a and @p b's most recent common ancestor and the YOUNGER
+/// of the two — NR-816's measure of kinship, chosen over a hop count because
+/// two cultures nine `parent` hops apart may have parted four centuries ago or
+/// four thousand years ago, and only the calendar distinguishes them.
+///
+/// Walks both `parent` chains toward the root. BOUNDED AND CANNOT LOOP: ids
+/// are handed out in arrival order, so a parent is always lower-indexed than
+/// its child (BL-865) — the same fact `colonisation_harness::case_family_tree`
+/// already exercises. Returns -1 if either index is out of range, or if the
+/// ancestor or either culture's `coined_year` is unknown (-1) — an
+/// unmeasurable pair, not a zero-year one.
+int64_t culture_kinship_years(const std::vector<culture>& cultures, int a, int b);
+
+/// Opposition between cultures @p a and @p b, 0-1000. SYMMETRIC (NR-815) — a
+/// value over an unordered pair, not a directed relation like `grudge` (which
+/// answers a different question: who wronged whom, at a place and date).
+///
+/// Combines the two axes CIVILISATION.md names for opposition — the war god's
+/// own TEMPERAMENT (`culture_god::zeal`/`dominion` on `pantheon[1]`, the god
+/// every creed raises) and the COUNTRY each was coined on
+/// (`culture::origin_farm_class`) — then discounts the result by how recently
+/// the two share an ancestor (`culture_kinship_years`): a people that split
+/// off a few centuries ago reads as the same people even where it has since
+/// settled different ground, and the discount fades toward the full weight of
+/// the two axes as the shared ancestor recedes into the past or is unknown.
+///
+/// PERMITS conquest, does not score it (Ben, 2026-09-09): this is a queryable
+/// value for a caller's OWN weight to read — `run_history_sim`'s campaign
+/// scorer feeds it into `history_sim_params::w_cult` per attacker/target pair
+/// — never a second scorer term of its own. Returns 0 for the same culture or
+/// an out-of-range index.
+int culture_opposition_q(const std::vector<culture>& cultures, int a, int b);

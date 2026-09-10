@@ -325,3 +325,100 @@ void record_globalisation(creed_state& cs, const world& w, entity_id body_id)
         "-> " + std::to_string(std::max(realms, 1)) +
             " realms, one trade language; the old tongues survive in the names of gods" });
 }
+
+// ---------------------------------------------------------------------------
+// Culture relations (BL-870; CIVILISATION.md § Culture relations)
+// ---------------------------------------------------------------------------
+
+int64_t culture_kinship_years(const std::vector<culture>& cultures, int a, int b)
+{
+    const int n = static_cast<int>(cultures.size());
+    if (a < 0 || b < 0 || a >= n || b >= n) return -1;
+    if (a == b) return 0;
+
+    // Collect a's chain to the root, itself included. Bounded by the culture
+    // count so a corrupt tree fails this read rather than hanging it — the
+    // same guard `case_family_tree` checks the walk actually needs.
+    std::vector<int> chain_a;
+    chain_a.reserve(16);
+    for (int at = a, guard = 0; at >= 0 && guard <= n; ++guard)
+    {
+        chain_a.push_back(at);
+        at = cultures[static_cast<std::size_t>(at)].parent;
+    }
+
+    // Walk b's chain until it lands on one of a's ancestors — the first hit
+    // IS the most recent common ancestor, because both walks strictly
+    // decrease toward the root and neither can loop (BL-865).
+    for (int at = b, guard = 0; at >= 0 && guard <= n; ++guard)
+    {
+        if (std::find(chain_a.begin(), chain_a.end(), at) != chain_a.end())
+        {
+            const culture& anc = cultures[static_cast<std::size_t>(at)];
+            const culture& ca  = cultures[static_cast<std::size_t>(a)];
+            const culture& cb  = cultures[static_cast<std::size_t>(b)];
+            if (anc.coined_year < 0 || ca.coined_year < 0 || cb.coined_year < 0)
+                return -1; // Ancestry known, dates are not — unmeasurable.
+            return std::max(ca.coined_year, cb.coined_year) - anc.coined_year;
+        }
+        at = cultures[static_cast<std::size_t>(at)].parent;
+    }
+    return -1; // No shared ancestor found within a rooted tree — treat as unrelated.
+}
+
+namespace {
+/// Years apart at which kinship stops discounting opposition at all. A
+/// PLACEHOLDER awaiting `history_sweep`, like every magnitude in this layer:
+/// the migration's own deepest descent runs 9-10 generations over roughly the
+/// whole 4000-year span (BL-865's census), so this puts "fully foreign" a
+/// little short of the oldest splits rather than at the horizon itself.
+constexpr int64_t kinship_full_weight_years = 3000;
+}
+
+int culture_opposition_q(const std::vector<culture>& cultures, int a, int b)
+{
+    const int n = static_cast<int>(cultures.size());
+    if (a < 0 || b < 0 || a >= n || b >= n || a == b) return 0;
+
+    const culture& ca = cultures[static_cast<std::size_t>(a)];
+    const culture& cb = cultures[static_cast<std::size_t>(b)];
+
+    // AXIS ONE — TEMPERAMENT. The war god specifically (`pantheon[1]`, the god
+    // every creed raises — creeds.cpp's `add_god("war", ...)`), not the whole
+    // pantheon: a daughter inherits its parent's pantheon UNCHANGED
+    // (`derive_daughter_culture` copies it whole), so comparing the full list
+    // would mostly re-measure kinship a second time. The war god's zeal and
+    // dominion each run 0-10, so the raw difference runs 0-20.
+    int temper_q = 0;
+    if (ca.pantheon.size() > 1 && cb.pantheon.size() > 1)
+    {
+        const culture_god& wa = ca.pantheon[1];
+        const culture_god& wb = cb.pantheon[1];
+        const int diff = std::abs(wa.zeal - wb.zeal) + std::abs(wa.dominion - wb.dominion);
+        temper_q = clampi((diff * 1000) / 20, 0, 1000);
+    }
+
+    // AXIS TWO — COUNTRY. A binary disagreement about how to live
+    // (CIVILISATION.md: "a people of the floodplain and a people of the
+    // highlands... a material disagreement rather than a stated one") rather
+    // than a graded one — there is no natural ordering over farm classes to
+    // grade a difference by.
+    const int farm_q = (ca.origin_farm_class >= 0 && cb.origin_farm_class >= 0
+                      && ca.origin_farm_class != cb.origin_farm_class) ? 1000 : 0;
+
+    const int raw_q = (temper_q + farm_q) / 2;
+
+    // KINSHIP DISCOUNTS THE RESULT. A people that split off a few centuries
+    // ago still largely shares its parent's pantheon (temperament differences
+    // are then near zero already) but may already have settled different
+    // ground (BL-864) — the discount is what stops a fresh, amicable split
+    // from reading as a settled cross-cultural rivalry on farm class alone.
+    // UNKNOWN ancestry (-1) gets NO discount, the safe default: opposition
+    // should never read as lower for a pair the tree cannot actually relate.
+    const int64_t years = culture_kinship_years(cultures, a, b);
+    const int kin_q = years < 0
+        ? 1000
+        : clampi(static_cast<int>((years * 1000) / kinship_full_weight_years), 0, 1000);
+
+    return (raw_q * kin_q) / 1000;
+}
