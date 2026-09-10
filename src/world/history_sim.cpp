@@ -5,7 +5,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <queue>
+#include <unordered_map>
 
 // ---------------------------------------------------------------------------
 // The Era -1 history sim (BL-277 + BL-271's first slice). See history_sim.hpp
@@ -498,6 +500,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
         p.manpower_stock = clampi64(p.manpower_stock - p.army_stock, 0, p.manpower_stock);
     }
 
+    // --- SETTLEMENT SEATS, SPARSE FROM THE OPENING MAP (BL-866) -----------
+    //
+    // CIVILISATION.md § The unit is the city state: "a settlement is a SEAT
+    // FLAG on a region, and every region points at the seat it feeds." Each
+    // polity's `capital` above is already derived as "the best-settled region
+    // of this culture" — exactly what a founding city state's seat is — so
+    // this reuses that choice rather than running a second placement pass.
+    // One seat per polity is the sparse first cut: with dozens to hundreds of
+    // regions per surviving culture, seats land at a small fraction of the
+    // map, and an empire's later seat count (several, once it has conquered
+    // other polities' capitals — see the conquest block below) is a
+    // consequence of war, not of this seeding.
+    //
+    // EVERY REGION RESOLVES TO A SEAT HERE: `owner[i]` was just derived from
+    // `out.polities`, and every polity's `capital` is a valid index (the loop
+    // above never leaves one at -1 when regions exist), so no region opens
+    // the run already outside anyone's reach.
+    for (const polity& q : out.polities)
+    {
+        if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= ss.regions.size())
+            continue;
+        region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
+        seat.is_seat     = true;
+        seat.seat_region = q.capital;
+    }
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
+    {
+        region& p = ss.regions[i];
+        if (p.is_seat) continue; // Already points at itself, above.
+        if (p.nation < 0 || p.nation >= static_cast<int>(out.polities.size())) continue;
+        p.seat_region = out.polities[static_cast<std::size_t>(p.nation)].capital;
+    }
+
     // --- THE ANCIENT ROAD RECORD (BL-768) ---------------------------------
     //
     // Appended raw as events happen, then sorted and run-length-encoded into
@@ -506,10 +541,54 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // integers, so the result cannot depend on a container's layout, and the
     // hot loop pays a push_back rather than a tree lookup.
     //
-    // PURE OBSERVATION. Nothing below reads this back, so it cannot move a
-    // decision — the same contract `battle_trace` holds, and the reason both
-    // can be recorded unconditionally without a determinism argument.
+    // NO LONGER PURE OBSERVATION (BL-837). Until this item nothing below read
+    // this back — the record existed only for `road_generation.cpp` to stamp
+    // onto the FINISHED world's tile grid, one pass removed from the sim that
+    // produced it. `road_uses_live` is the same count, kept live, and
+    // `rebuild_reach` below reads it: a corridor this run has actually walked
+    // repeatedly is cheaper for the REST OF THIS RUN, which is what makes a
+    // road something a polity BUILDS rather than a label applied afterwards
+    // (CIVILISATION.md's outcome brief: "a sparse road network which connects
+    // city-states, forms empires"). `battle_trace` still holds the
+    // pure-observation contract; this record no longer does.
     std::vector<std::pair<uint16_t, uint16_t>> corridor_uses;
+
+    // Canonical (lo, hi) edge key -> live use count, read by `rebuild_reach`
+    // and gated by `road_tier1_uses`/`road_tier2_uses` below. A plain
+    // `unordered_map` is safe here (unlike the ownership/political state)
+    // because nothing iterates it — every read is a point lookup on a key
+    // computed from region indices, never a walk in map order.
+    std::unordered_map<uint64_t, int> road_uses_live;
+    // Bumped every time an edge's tier (0/1/2, from `road_tier_for_uses`)
+    // actually changes, so `reach_cache` can invalidate on "a road changed"
+    // without invalidating on every single use — most uses do not cross a
+    // tier boundary, and re-running a polity's Dijkstra on every one of them
+    // would revive the per-round-rebuild cost BL-834 just eliminated.
+    int roads_version = 0;
+
+    const auto edge_key = [](int a, int b) -> uint64_t {
+        const uint32_t lo = static_cast<uint32_t>(a < b ? a : b);
+        const uint32_t hi = static_cast<uint32_t>(a < b ? b : a);
+        return (static_cast<uint64_t>(lo) << 32) | static_cast<uint64_t>(hi);
+    };
+    const auto road_tier_for_uses = [&](int uses) {
+        if (uses >= params.road_tier2_uses) return 2;
+        if (uses >= params.road_tier1_uses) return 1;
+        return 0;
+    };
+    // Mirrors logistics.hpp's `road_traversal_multiplier` exactly (1 / (1 +
+    // 0.5 x tier): Track ~0.67, Road 0.50) — the SAME discount shape the
+    // campaign-era A* already applies for the same reason, restated here
+    // rather than called across the ECS boundary this file is deliberately
+    // free of (settlement.hpp: "no `world&`, no tile ids, no allocator").
+    const auto road_discount = [](int tier) {
+        return 1.0f / (1.0f + 0.5f * static_cast<float>(tier));
+    };
+    const auto road_tier_between = [&](int a, int b) {
+        const auto it = road_uses_live.find(edge_key(a, b));
+        return it != road_uses_live.end() ? road_tier_for_uses(it->second) : 0;
+    };
+
     const auto note_corridor = [&](int a, int b) {
         if (a < 0 || b < 0 || a == b) return;
         if (a >= static_cast<int>(owner_index_limit)
@@ -517,6 +596,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
         const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
         corridor_uses.push_back({lo, hi});
+
+        int& uses = road_uses_live[edge_key(a, b)];
+        const int before = road_tier_for_uses(uses);
+        ++uses;
+        const int after = road_tier_for_uses(uses);
+        if (after != before) ++roads_version;
     };
 
     // --- GRUDGES (BL-827) -------------------------------------------------
@@ -668,6 +753,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
     {
         std::vector<int> cost;    ///< Per-region cost from `capital`.
         int              capital = -2; ///< Which capital `cost` was built for.
+        /// BL-837: `roads_version` this cost vector was built against. A road
+        /// crossing a tier changes an edge weight without moving the capital
+        /// or growing the region count, so it is a THIRD invalidation input
+        /// alongside the two the header comment above names.
+        int              roads_version = -1;
     };
     std::vector<reach_cache> reach_by_polity;
 
@@ -734,9 +824,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
             for (int nb : neighbours[static_cast<std::size_t>(best)])
             {
                 const region& np2 = ss.regions[static_cast<std::size_t>(nb)];
-                const int step = region_distance(bp, np2, gw)
-                               * (tile_cost(bp) + tile_cost(np2)) / 200;
-                const int cand = best_c + (step > 0 ? step : 1);
+                const int raw_step = region_distance(bp, np2, gw)
+                                    * (tile_cost(bp) + tile_cost(np2)) / 200;
+                // BL-837 — THE ROAD DISCOUNT, applied to the SAME edge this
+                // history's own corridors have actually walked. A tier-2 edge
+                // costs half what an unroaded one does, mirroring
+                // logistics.cpp's `road_traversal_multiplier` exactly (see
+                // `road_discount` above). This is what makes "the only way to
+                // reach further is to BUILD further" literally true of the
+                // Dijkstra: the capital's effective reach grows along lines
+                // the polity has actually used, never along a straight-line
+                // radius.
+                const float discount = road_discount(road_tier_between(best, nb));
+                const int step = raw_step > 0
+                                ? std::max(1, static_cast<int>(raw_step * discount + 0.5f))
+                                : 1;
+                const int cand = best_c + step;
                 if (cand < reach[static_cast<std::size_t>(nb)])
                 {
                     reach[static_cast<std::size_t>(nb)] = cand;
@@ -744,7 +847,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
         }
-        rc.capital = capital;
+        rc.capital       = capital;
+        rc.roads_version = roads_version;
     };
 
     // --- Time-lapse change list -------------------------------------------
@@ -978,6 +1082,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
             np.nation = np_owner;
 
+            // BL-867 — EVERY FOUNDING GETS A SEAT POINTER, on the same rule
+            // the opening map uses (above): a brand-new polity's first
+            // region IS its seat (its `capital` was just set to this very
+            // index, above), an existing polity's new region is ordinary
+            // hinterland pointing at the capital it already has. Without
+            // this a region founded here defaults to `seat_region == -1` —
+            // "falls outside anyone's reach", the honest reading for ground
+            // no seat touches, but the wrong one for ground a seat's own
+            // people just walked onto.
+            if (np_owner >= 0)
+            {
+                const int cap = out.polities[static_cast<std::size_t>(np_owner)].capital;
+                np.seat_region = cap;
+                if (cap == static_cast<int>(ss.regions.size())) np.is_seat = true;
+            }
+
             ss.regions.push_back(std::move(np));
             owner.push_back(np_owner);
             neighbours.emplace_back();
@@ -1025,6 +1145,26 @@ history_sim_state run_history_sim(settlement_state&         ss,
             muster_garrison(ss.regions[i], params.garrison_fraction_q,
                             params.garrison_muster_q, params.garrison_disband_q);
             total_pop += ss.regions[i].population;
+
+            // BL-867 — INDUSTRY FLOWS TO THE SEAT, EVERY REGION, EVERY YEAR.
+            // Computed AFTER this year's muster, so a garrison mustered up
+            // this round already shows in the labour left for industry —
+            // CIVILISATION.md's "starves or stops producing" as arithmetic on
+            // `manpower_ceiling` and `army_stock`, both already advanced
+            // above. `seat_region` is never -1 for a region the owning loop
+            // has reached (the opening seed and both founding sites below all
+            // set it), so this is unconditional rather than a defensive
+            // check on a case that should not occur.
+            const int64_t produced = region_industry_output(ss.regions[i]);
+            if (produced > 0)
+            {
+                const int seat_idx = ss.regions[i].seat_region;
+                if (seat_idx >= 0 && static_cast<std::size_t>(seat_idx) < ss.regions.size())
+                {
+                    ss.regions[static_cast<std::size_t>(seat_idx)].material_stock += produced;
+                    out.materials_produced += produced;
+                }
+            }
         }
         } // BL-825 demography timer
         if (total_pop > out.peak_population)
@@ -1083,11 +1223,28 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
             if (held.empty()) { q.alive = false; continue; }
             if (q.capital < 0 || owner[static_cast<std::size_t>(q.capital)] != q.id)
+            {
                 // Capital fell. The successor is the polity's lowest-indexed
                 // surviving region — placement order, which is best-ground
                 // first, so it is a reasonable seat without being "the largest
                 // holding" the first cut's comment claimed (BL-312).
+                const int old_capital = q.capital;
                 q.capital = held.front();
+
+                // BL-866 — THE SURVIVING HINTERLAND FOLLOWS ITS REALM'S NEW
+                // SEAT. The old capital is no longer this polity's seat (it
+                // now belongs to whoever just took it, and stays a seat in
+                // its own right there — see the conquest block), so the
+                // regions this polity still holds that pointed at it would
+                // otherwise be feeding ground they no longer own.
+                region& new_seat = ss.regions[static_cast<std::size_t>(q.capital)];
+                new_seat.is_seat     = true;
+                new_seat.seat_region = q.capital;
+                for (int h : held)
+                    if (h != q.capital
+                     && ss.regions[static_cast<std::size_t>(h)].seat_region == old_capital)
+                        ss.regions[static_cast<std::size_t>(h)].seat_region = q.capital;
+            }
 
             // ---- ASSIMILATION (BL-826) --------------------------------
             //
@@ -1122,7 +1279,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 reach_by_polity.resize(static_cast<std::size_t>(q.id) + 1);
             reach_cache& rc = reach_by_polity[static_cast<std::size_t>(q.id)];
 
-            if (rc.capital != q.capital || rc.cost.size() != ss.regions.size())
+            if (rc.capital != q.capital || rc.cost.size() != ss.regions.size()
+             || rc.roads_version != roads_version) // BL-837: a road crossed a tier
                 rebuild_reach(rc, q.capital);
             const std::vector<int>& reach = rc.cost;
 
@@ -1152,6 +1310,50 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const int mean_holding_value = static_cast<int>(holdings_value_sum / n_held);
             const int mean_reach_q       = static_cast<int>(works_reach_sum / n_held);
             const int mean_industrial_q  = static_cast<int>(works_ind_sum / n_held);
+
+            // ---- BL-837 — AN ARMY BEYOND SUSTAINABLE REACH CANNOT BE
+            // MAINTAINED. The campaign gate below stops a polity PROJECTING
+            // force past its roads; this is that rule's standing-army twin,
+            // and it is what makes holding distant ground cost something
+            // even when nobody ever contests it.
+            //
+            // Read the SAME terrain-and-road reach `campaign_supply` prices a
+            // campaign at (`reach[hi]`, already road-discounted by
+            // `rebuild_reach` above), but WITHOUT the staging-hub relief or
+            // the burden-of-breadth term: a garrison standing at home pays
+            // neither a march's cost nor the empire's own overextension
+            // penalty, only the ground's terrain price back to the capital.
+            // `sustainable_garrison_floor_q` is deliberately below the
+            // campaign floor for exactly that reason (see the field comment).
+            //
+            // A RATE x THE STEP, like every other per-year accumulator in
+            // this loop. `held` is already region-index order, so the walk
+            // order is a property of the map, not of anything transient.
+            if (params.unsustained_army_attrition_q > 0)
+            {
+                for (int hi : held)
+                {
+                    region& hp = ss.regions[static_cast<std::size_t>(hi)];
+                    if (hp.army_stock <= 0) continue;
+
+                    const std::size_t hidx = static_cast<std::size_t>(hi);
+                    const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
+                                          ? reach[hidx] : (1 << 27);
+                    const int hub_reach_q = clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
+                    const int terrain_cost = reach_here * params.terrain_reach_cost_q / 100;
+                    const int terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
+                    const int supply_at_q  = clampi(1000 - terrain_paid, 0, 1000);
+
+                    if (supply_at_q <= params.sustainable_garrison_floor_q)
+                    {
+                        ++out.unsustained_attrition_events;
+                        const int64_t lost = (hp.army_stock
+                                             * clampi(params.unsustained_army_attrition_q, 0, 1000)
+                                             * step_years) / 1000;
+                        hp.army_stock = std::max<int64_t>(0, hp.army_stock - lost);
+                    }
+                }
+            }
 
             // ---- THE MATERIALS BAND, DERIVED ONCE (BL-748) ----------------
             //
@@ -1500,6 +1702,28 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // § Forage). No new constant: it is the same 0..1000.
                     const int supply_here =
                         forages ? campaign_supply(hub_dist, ti, hi) : 0;
+
+                    // BL-837 — REACH GATES A CAMPAIGN; IT DOES NOT MERELY
+                    // PRICE IT (Ben, 2026-09-09 elicitation). Everything
+                    // above already prices distance and terrain into
+                    // `supply_here`; what was missing is that pricing alone
+                    // never actually STOPS a rich-enough polity, it only
+                    // discourages it. Applied only when the force forages at
+                    // all — a `!forages` crossing is the water/forage rule's
+                    // business (MILITARY_HISTORY.md § Forage) and stays
+                    // priced at zero rather than gated a second time by an
+                    // unrelated rule.
+                    //
+                    // NOT A CANDIDATE, exactly like the water-legality gate
+                    // above: `continue` before anything scores, counted
+                    // separately from `illegal_campaigns` so the two refusals
+                    // — no legal line at all, versus a legal line too far to
+                    // supply — stay distinguishable in the trace.
+                    if (forages && supply_here <= params.sustainable_campaign_floor_q)
+                    {
+                        ++out.reach_denied_campaigns;
+                        continue;
+                    }
 
                     // BL-835 — THE ARMY AT THE HUB IT WOULD ACTUALLY MARCH FROM.
                     //
@@ -2017,6 +2241,52 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // Fort at +640 is worth about +64 against row power values of
                 // 90..380 — it tilts a fight rather than deciding one, so a
                 // fortress buys the defender an edge and never immunity.
+                // BL-867 — MATERIALS ARE SPENT WHEN THE ACTION HAPPENS
+                // (CIVILISATION.md § Materials are spent when something
+                // happens). Drawn from the acting polity's OWN seat — never
+                // the staging holding, which may be a bare frontier march
+                // with no stock of its own, because the design puts the
+                // stores at the realm's capital and nowhere else. SPENT, not
+                // borrowed: a seat with nothing standing in it pays what it
+                // can and the campaign marches anyway, understocked.
+                int64_t material_cost = 0, material_spent = 0;
+                int material_penalty_q = 0;
+                if (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                {
+                    region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
+                    // FLOORED AT 1, NOT TRUNCATED TO 0 (found by M2 against a
+                    // real generated world, 2026-09-10): integer division
+                    // rounds `raised * campaign_material_cost_per_head_q /
+                    // 1000` down to zero for any force under 250 heads at the
+                    // default coefficient, which is most real campaigns —
+                    // the cost silently vanished while materials still
+                    // accumulated, so nothing was ever visibly spent.
+                    material_cost  = raised > 0
+                                    ? std::max<int64_t>(
+                                          1, (raised * params.campaign_material_cost_per_head_q) / 1000)
+                                    : 0;
+                    material_spent = std::min(material_cost, seat.material_stock);
+                    seat.material_stock -= material_spent;
+                    out.materials_spent_on_campaigns += material_spent;
+
+                    // THE SHORTFALL IS WHAT MAKES OVER-MUSTER MEASURABLY
+                    // WORSE OFF. A polity whose garrisons have been eating its
+                    // own industry (`region_industry_capacity`, spent every
+                    // year above) arrives here with an empty seat, and the
+                    // army that marches anyway is visibly weaker for it —
+                    // through the SAME readiness channel works and winter
+                    // already share, so it tilts a fight rather than deciding
+                    // one, exactly as those two do.
+                    if (material_cost > 0)
+                    {
+                        const int covered_q = clampi(
+                            static_cast<int>((material_spent * 1000) / material_cost), 0, 1000);
+                        material_penalty_q =
+                            ((1000 - covered_q) * params.material_shortfall_penalty_q) / 1000;
+                    }
+                }
+                const int atk_ready = clampi(1000 - material_penalty_q, 0, 1000);
+
                 const int def_works_q = clampi(tgt.work_defence_mod, 0, 1000);
                 const int def_ready = (best_winter ? (1000 - params.winter_readiness_penalty_q) : 1000)
                                     + def_works_q;
@@ -2027,7 +2297,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 roster_band atk_band = roster_band::classical;
                 std::vector<army_stack_entry> atk =
-                    build_stack(raised, home, q, 1000, sim_band_ceiling(params, y),
+                    build_stack(raised, home, q, atk_ready, sim_band_ceiling(params, y),
                                 !exec_dry, &atk_band);
                 note_units_fielded(out, params, y, atk_band, atk);
                 // BL-835 — THE EMERGENCY LEVY. A province being invaded calls
@@ -2209,6 +2479,36 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
+
+                    // BL-866 — GROUND IS NOT CONQUERED REGION BY REGION.
+                    // Taking a SEAT takes every region that points at it, in
+                    // this same event (CIVILISATION.md § The unit is the city
+                    // state). `seat_region` is left unchanged on every one of
+                    // them: `ti` is still a seat, only its flag moved, the
+                    // same way `founding_culture` survives a conquest below.
+                    //
+                    // A region taken on ITS OWN — decoupled from a seat it no
+                    // longer shares an owner with — re-points at the
+                    // conqueror's own seat, or falls outside anyone's reach
+                    // if the conqueror somehow holds none (never observed:
+                    // every living polity's `capital` is a valid seat by
+                    // construction, above and at the reassignment site).
+                    if (tgt.is_seat)
+                    {
+                        for (std::size_t hi = 0; hi < ss.regions.size(); ++hi)
+                        {
+                            if (hi == ti) continue;
+                            region& h = ss.regions[hi];
+                            if (h.seat_region != static_cast<int>(ti)) continue;
+                            owner[hi] = q.id;
+                            h.nation  = q.id;
+                        }
+                    }
+                    else
+                    {
+                        tgt.seat_region = (q.capital >= 0) ? q.capital : -1;
+                    }
+
                     // BL-826 — THE CONQUEROR'S GODS NO LONGER ARRIVE THE SAME
                     // AFTERNOON. This was `tgt.culture = q.culture`, an instant
                     // replacement, and it is the single line that made conquest
@@ -2387,6 +2687,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.founded_year = y;
                 np.last_demography_year = y;
                 np.nation = q.id;
+                // BL-867 — ORDINARY HINTERLAND, POINTING AT THE FOUNDER'S
+                // SEAT. `q` already exists and already has a capital (it is
+                // the polity performing this verb), so a region it settles
+                // is never itself a new seat — the sparse first cut names
+                // that "one seat per polity", and a Settle never mints one.
+                np.seat_region = q.capital;
                 np.population = clampi64(region_carrying_capacity(np.farm_q) / 16, 1, 1 << 30);
                 replenish_manpower(np);
                 // BL-835 — A NEW REGION HAS NO ARMY YET, and that is the

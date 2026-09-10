@@ -27,6 +27,7 @@
 #include "planetology.hpp"
 #include "tongue.hpp"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -93,20 +94,12 @@ struct culture
     /// the country it settled).
     int8_t origin_farm_class = -1;
 
-    // --- Coining year (BL-870) ---------------------------------------------
-    //
-    // THE OTHER HALF OF THE KINSHIP MEASURE. `parent` says WHO a culture
-    // descends from; this says WHEN it came to be its own people — a cradle
-    // culture at the migration's start year, a daughter at the calendar year
-    // its stream diverged (BL-856's flood already dates every tile it claims;
-    // this is that date, kept). NR-816 settled kinship as YEARS SINCE THE
-    // COMMON ANCESTOR rather than hop count, and a hop count is all `parent`
-    // alone can give — two cultures nine hops apart could be four thousand
-    // years or four hundred apart depending how long each hop took, and the
-    // difference is exactly what CIVILISATION.md means by "parted recently".
-    //
-    // -1 where unknown, matching `parent` and `origin_farm_class`'s sentinel.
-    int64_t coined_year = -1;
+    /// The calendar year this culture was coined — a cradle culture at the span's
+    /// start (`colonisation_start_year`), a daughter at the year its stream
+    /// diverged. NR-816 makes kinship a YEARS-SINCE-COMMON-ANCESTOR measure, and
+    /// that measure is worthless without the years themselves (BL-873). Read by
+    /// `culture_kinship_years` (BL-870) below.
+    int64_t coined_year = INT64_MIN;
 };
 
 /// What the creeds pass computed for one body.

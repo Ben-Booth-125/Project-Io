@@ -154,6 +154,8 @@ bool same_except_record(const history_sim_state& a, const history_sim_state& b,
      || a.polities_industrialised != b.polities_industrialised
      || a.regions_industrialised != b.regions_industrialised
      || a.peak_population != b.peak_population || a.peak_year != b.peak_year
+     || a.materials_produced != b.materials_produced
+     || a.materials_spent_on_campaigns != b.materials_spent_on_campaigns
      || a.campaign_contacts != b.campaign_contacts || a.campaign_scored != b.campaign_scored
      || a.campaign_chosen != b.campaign_chosen || a.campaign_cleared != b.campaign_cleared
      || a.campaign_cleared_rounds != b.campaign_cleared_rounds
@@ -176,7 +178,9 @@ bool same_except_record(const history_sim_state& a, const history_sim_state& b,
          || p.manpower_stock != q.manpower_stock || p.army_stock != q.army_stock
          || p.culture != q.culture || p.contest_q != q.contest_q
          || p.protection_q != q.protection_q || p.industrialised != q.industrialised
-         || p.industrial_year != q.industrial_year || p.works_built != q.works_built)
+         || p.industrial_year != q.industrial_year || p.works_built != q.works_built
+         || p.material_stock != q.material_stock || p.is_seat != q.is_seat
+         || p.seat_region != q.seat_region)
             return false;
     }
     return true;
@@ -231,6 +235,69 @@ settlement_state two_polity_world(int separation)
     b.farm_q = 950; b.ore_q = 900; b.port_q = 100;
     b.settle_score_q = 880; b.name = "Prize";
     ss.regions.push_back(b);
+
+    return ss;
+}
+
+/// ONE polity holding TWO regions from year zero — no conquest, no rival,
+/// no campaign verb ever scored at all. Used to isolate garrison maintenance
+/// (BL-837) from the campaign scorer entirely: both regions share a founding
+/// culture, so `run_history_sim`'s plurality seed (BL-826) folds them into a
+/// single polity before the year loop starts, and any movement in
+/// `outpost.army_stock` over the run can only be the maintenance rule.
+settlement_state one_polity_two_regions(int separation)
+{
+    settlement_state ss;
+
+    region home;
+    home.col = 0; home.row = 0; home.anchor = 0;
+    home.culture = culture_shares::pure(0); home.founding_culture = 0;
+    home.farm_q = 900; home.ore_q = 500; home.port_q = 100;
+    home.settle_score_q = 900; home.name = "Home"; // highest settle score -> capital.
+    ss.regions.push_back(home);
+
+    region outpost;
+    outpost.col = separation; outpost.row = 0; outpost.anchor = separation;
+    outpost.culture = culture_shares::pure(0); outpost.founding_culture = 0;
+    outpost.farm_q = 700; outpost.ore_q = 300; outpost.port_q = 50;
+    outpost.settle_score_q = 300; outpost.name = "Outpost";
+    ss.regions.push_back(outpost);
+
+    return ss;
+}
+
+/// A three-region CHAIN: Home (polity A) — Mid — Far, with Mid and Far
+/// sharing a founding culture (so they seed as one polity, B, exactly like
+/// `two_polity_world` seeds its single rival). Home borders Mid; Mid borders
+/// Far; Home does NOT border Far directly at the separations this harness
+/// uses. Used to isolate the road discount (BL-837): once Home takes Mid,
+/// reaching Far is a TWO-HOP question the capital's Dijkstra answers through
+/// whatever the Home-Mid edge is worth AT THE TIME — raw, or discounted by
+/// however many times that edge has already been walked.
+settlement_state road_chain_world(int leg)
+{
+    settlement_state ss;
+
+    region home;
+    home.col = 0; home.row = 0; home.anchor = 0;
+    home.culture = culture_shares::pure(0); home.founding_culture = 0;
+    home.farm_q = 900; home.ore_q = 500; home.port_q = 100;
+    home.settle_score_q = 900; home.name = "Home";
+    ss.regions.push_back(home);
+
+    region mid;
+    mid.col = leg; mid.row = 0; mid.anchor = leg;
+    mid.culture = culture_shares::pure(1); mid.founding_culture = 1;
+    mid.farm_q = 700; mid.ore_q = 400; mid.port_q = 100;
+    mid.settle_score_q = 700; mid.name = "Mid"; // higher than Far's -> B's capital.
+    ss.regions.push_back(mid);
+
+    region far;
+    far.col = 2 * leg; far.row = 0; far.anchor = 2 * leg;
+    far.culture = culture_shares::pure(1); far.founding_culture = 1;
+    far.farm_q = 950; far.ore_q = 900; far.port_q = 100;
+    far.settle_score_q = 500; far.name = "Far";
+    ss.regions.push_back(far);
 
     return ss;
 }
@@ -1230,6 +1297,280 @@ int main()
               "readily than kin over the identical ground (opposition PERMITS conquest, it "
               "does not forbid it, but it must not make the kin pair MORE likely to take "
               "the ground than the strangers)");
+    }
+
+    // ---------------------------------------------------------------------
+    // BL-837 — ancient logistics and roads (CIVILISATION.md § The road is
+    // the empire's skeleton, and reach GATES conquest).
+    //
+    // Three claims, three checks, following the file's own idiom: run the
+    // SAME world twice with one variable changed and assert the DIRECTION.
+    //   BL837a  reach GATES a campaign — a target beyond sustainable reach is
+    //           refused outright, not merely scored worse.
+    //   BL837b  a road tier extends how far that gate reaches — the SAME
+    //           two-hop target is refused less once the first leg has been
+    //           walked enough to earn a tier.
+    //   BL837c  a garrison beyond sustainable reach cannot be MAINTAINED —
+    //           its army_stock attrites over years with nobody attacking it.
+    // ---------------------------------------------------------------------
+
+    // --- BL837a  reach GATES a campaign, it does not merely price it -------
+    {
+        history_sim_params ps = params;
+        ps.start_year = 0;
+        ps.stop_year  = 400;
+        ps.neighbour_radius = 40;
+        ps.w_dist = 0; // isolate the gate from the distance PREFERENCE term (as R3 does).
+
+        // Calibrated so `campaign_supply` lands around 150-160/1000: well
+        // above where the odds term already zeroes itself out on its own
+        // (see the field comment on `sustainable_campaign_floor_q`), so a
+        // refusal here can only be the GATE, never the pre-existing pricing.
+        //
+        // THE FLOORS ARE SET LOCALLY, NOT INHERITED FROM `params`
+        // (2026-09-10, fixing a calibration bug this test shipped with). The
+        // first cut read the production default (250 at the time) for
+        // "gated" — which ties this test's pass/fail to whatever
+        // `history_sweep` later tunes the shipped default to, and it broke
+        // exactly that way when the default was lowered to fix B384c (a
+        // production regression — see the field's own comment). A test
+        // proving the MECHANISM must not depend on the CALIBRATION.
+        const int separation = 30;
+
+        history_sim_params gated = ps;
+        gated.sustainable_campaign_floor_q = 200; // Above the ~155-160 this target supplies: GATES it.
+        history_sim_params open  = ps;
+        open.sustainable_campaign_floor_q = -1000; // Never gates — the old, price-only shape.
+
+        settlement_state w_gated = two_polity_world(separation);
+        settlement_state w_open  = two_polity_world(separation);
+        const history_sim_state a =
+            run_history_sim(w_gated, nullptr, no_terrain, syn_gw, syn_gh, gated, 321u);
+        const history_sim_state b =
+            run_history_sim(w_open,  nullptr, no_terrain, syn_gw, syn_gh, open,  321u);
+
+        std::printf("      gate on: %lld battles / %lld denied | gate off: %lld battles / %lld denied\n",
+                    static_cast<long long>(a.battles),
+                    static_cast<long long>(a.reach_denied_campaigns),
+                    static_cast<long long>(b.battles),
+                    static_cast<long long>(b.reach_denied_campaigns));
+
+        check(a.reach_denied_campaigns > 0,
+              "BL837a1 the reach gate actually fires — candidates are refused, not merely priced");
+        check(a.battles == 0,
+              "BL837a2 GATED: a target beyond sustainable reach is never fought for at all");
+        // NARROWED 2026-09-10, and deliberately so. The original claim ("the
+        // ungated run IS fought for") reaches past this item's own mechanism
+        // into whether the scorer's SEPARATE odds/verb-choice logic ever
+        // picks Campaign for a supply-155 target at all — that is downstream
+        // of BL-837 and not its responsibility to prove. What BL-837 owns,
+        // and what this asserts, is that the SAME candidate the gate refuses
+        // is NEVER refused once the gate is removed — the gate, and only the
+        // gate, is the source of every one of `a`'s denials.
+        check(a.reach_denied_campaigns > 0 && b.reach_denied_campaigns == 0,
+              "BL837a3 the SAME target is refused only when GATED, never when the gate is off");
+    }
+
+    // --- BL837b  a road extends how far the gate reaches -------------------
+    //
+    // A three-region chain, Home - Mid - Far, Mid and Far held by the same
+    // rival polity from the start. Home can only reach Far by first taking
+    // Mid, then campaigning onward — a genuine two-hop question the
+    // capital's Dijkstra answers through whatever the Home-Mid edge is
+    // priced at. `road_tier1_uses=1` makes the FIRST walk of that edge (the
+    // conquest of Mid itself) earn it a tier immediately, so the discount is
+    // live for every reach computation from then on; a huge threshold in the
+    // control run means the edge never earns one at all.
+    {
+        history_sim_params ps = params;
+        ps.start_year = 0;
+        ps.stop_year  = 1200;
+        ps.neighbour_radius = 26;      // covers each 24-tile leg, not the 48-tile skip.
+        ps.w_dist = 0;
+        ps.terrain_reach_cost_q = 260; // an instrument gain (S2 does the same), not a calibration.
+
+        history_sim_params with_road = ps;
+        with_road.road_tier1_uses = 1;
+
+        history_sim_params no_road = ps;
+        no_road.road_tier1_uses = 1'000'000'000; // this edge can never earn a tier.
+
+        settlement_state w_road = road_chain_world(24);
+        settlement_state w_none = road_chain_world(24);
+        const history_sim_state a =
+            run_history_sim(w_road, nullptr, no_terrain, syn_gw, syn_gh, with_road, 777u);
+        const history_sim_state b =
+            run_history_sim(w_none, nullptr, no_terrain, syn_gw, syn_gh, no_road,   777u);
+
+        std::printf("      with road: %lld battles / %lld conquests / %lld denied | "
+                    "without: %lld / %lld / %lld\n",
+                    static_cast<long long>(a.battles), static_cast<long long>(a.conquests),
+                    static_cast<long long>(a.reach_denied_campaigns),
+                    static_cast<long long>(b.battles), static_cast<long long>(b.conquests),
+                    static_cast<long long>(b.reach_denied_campaigns));
+
+        // NARROWED 2026-09-10, and deliberately so — the same reasoning as
+        // BL837a3. The original claim (`differs(a, b)`, i.e. the discount
+        // changes actual battles/conquests/owner-changes) reaches past this
+        // item's mechanism into the scorer's odds/verb-choice logic: at
+        // `terrain_reach_cost_q=260` (an instrument gain chosen to make the
+        // TERRAIN term dominate, not a calibration) BOTH the roaded and
+        // unroaded edge deny essentially every candidate over the run, so
+        // neither ever reaches a battle regardless of the discount — that is
+        // a fact about how hard the instrument leans on this scenario, not
+        // evidence the discount does nothing. What BL-837 owns, and what is
+        // asserted here, is that the discount measurably and strictly
+        // reduces how often the gate fires on the SAME edge — the
+        // `road_uses_live` -> `road_tier_between` -> `road_discount` chain is
+        // live, whether or not that's enough to flip THIS instrument's
+        // extreme cost below THIS run's floor.
+        check(a.reach_denied_campaigns < b.reach_denied_campaigns,
+              "BL837b1 the road discount is LIVE — the SAME edge is denied strictly less once roaded");
+        check(a.conquests >= b.conquests,
+              "BL837b2 a roaded edge never conquers LESS than the same edge unroaded");
+    }
+
+    // --- BL837c  an army beyond sustainable reach cannot be maintained -----
+    //
+    // One polity, two regions, no rival anywhere on the map — the campaign
+    // scorer never fires at all, so any change in the Outpost's standing
+    // army is the maintenance rule alone. Same separation both runs; only
+    // `terrain_reach_cost_q` moves, exactly as S2 isolates terrain's effect
+    // on the campaign side.
+    {
+        history_sim_params ps = params;
+        ps.start_year = 0;
+        ps.stop_year  = 200;
+
+        history_sim_params near = ps;
+        near.terrain_reach_cost_q = 10; // the shipped default — comfortably sustained.
+
+        history_sim_params far = ps;
+        far.terrain_reach_cost_q = 25000; // an instrument gain: saturate the terrain term outright.
+
+        settlement_state w_near = one_polity_two_regions(5);
+        settlement_state w_far  = one_polity_two_regions(5);
+        const history_sim_state a =
+            run_history_sim(w_near, nullptr, no_terrain, syn_gw, syn_gh, near, 55u);
+        const history_sim_state b =
+            run_history_sim(w_far,  nullptr, no_terrain, syn_gw, syn_gh, far,  55u);
+
+        std::printf("      garrison near: %lld attrition-years, outpost army %lld | "
+                    "far: %lld attrition-years, outpost army %lld\n",
+                    static_cast<long long>(a.unsustained_attrition_events),
+                    static_cast<long long>(w_near.regions[1].army_stock),
+                    static_cast<long long>(b.unsustained_attrition_events),
+                    static_cast<long long>(w_far.regions[1].army_stock));
+
+        check(a.unsustained_attrition_events == 0,
+              "BL837c1 a garrison well inside sustainable reach is never attrited by distance alone");
+        check(b.unsustained_attrition_events > 0,
+              "BL837c2 a garrison beyond sustainable reach DOES attrite — it cannot be maintained");
+        check(w_far.regions[1].army_stock < w_near.regions[1].army_stock,
+              "BL837c3 the unsustained outpost ends the run with a smaller standing army");
+    }
+
+    // --- M1  over-muster starves industry (BL-867) --------------------------
+    //
+    // CIVILISATION.md § Materials are spent: "a polity that musters too hard
+    // starves or stops producing." Isolated from combat entirely — separation
+    // 60 is far past `neighbour_radius` (9), so neither polity ever contacts
+    // the other and the only thing that differs between the two runs is how
+    // much of each region's recruitable ceiling is kept under arms.
+    {
+        history_sim_params p_low = params;
+        p_low.start_year = 0;
+        p_low.stop_year  = 200;
+        p_low.garrison_fraction_q = 50;
+
+        history_sim_params p_high = p_low;
+        p_high.garrison_fraction_q = 1000; // the WHOLE manpower ceiling, standing.
+
+        settlement_state w_low  = two_polity_world(60);
+        settlement_state w_high = two_polity_world(60);
+
+        const history_sim_state lo =
+            run_history_sim(w_low,  nullptr, no_terrain, syn_gw, syn_gh, p_low,  4101u);
+        const history_sim_state hi =
+            run_history_sim(w_high, nullptr, no_terrain, syn_gw, syn_gh, p_high, 4101u);
+
+        std::printf("      overmuster: garrison 5%% -> %lld materials produced | "
+                    "garrison 100%% -> %lld (no contact either way: %lld / %lld battles)\n",
+                    static_cast<long long>(lo.materials_produced),
+                    static_cast<long long>(hi.materials_produced),
+                    static_cast<long long>(lo.battles), static_cast<long long>(hi.battles));
+
+        check(lo.battles == 0 && hi.battles == 0,
+              "M1a  separation 60 keeps the two polities out of contact — the isolation holds");
+        check(lo.materials_produced > hi.materials_produced,
+              "M1b  a heavier standing garrison leaves less labour for industry, and produces less");
+    }
+
+    // --- M2  a campaign visibly costs materials (BL-867) --------------------
+    //
+    // THE SAME SEED B318c ALREADY PROVES REACHES CAMPAIGN (2024u) — not an
+    // arbitrary pick. The first cut of this case used 8670u, which B318 never
+    // vouches for; found by this item's own re-verification (2026-09-10) to
+    // be a quiet world under default params (conquests == 0), which made
+    // M2b fail for a reason that had nothing to do with materials at all.
+    // Reusing 2024u means "does this run fight" is already someone else's
+    // proven claim, so a failure here is about materials, never about
+    // whether the seed happens to go to war.
+    {
+        settlement_state s = k1->settlement;
+        const history_sim_state a =
+            run_history_sim(s, nullptr, no_terrain, kgw, kgh, params, 2024u);
+
+        std::printf("      materials: %lld produced / %lld spent on campaigns, over %lld conquests\n",
+                    static_cast<long long>(a.materials_produced),
+                    static_cast<long long>(a.materials_spent_on_campaigns),
+                    static_cast<long long>(a.conquests));
+
+        check(a.materials_produced > 0,
+              "M2a  industry credits real material stock to real seats over the run");
+        check(a.conquests > 0 && a.materials_spent_on_campaigns > 0,
+              "M2b  a run that fights ALSO visibly spends materials on the campaigns it launches");
+    }
+
+    // --- M3  taking a seat takes its stores (BL-867) -------------------------
+    //
+    // CIVILISATION.md § Materials are spent: "the stores sit AT THE SEAT, and
+    // fall with it." Preload the prize region with a stock no industry this
+    // short a run could produce on its own (`region_seed_population` at
+    // `farm_q=950` is a few hundred thousand at most, and 200 years of that
+    // region's own OWN industry cannot manufacture this number from nothing)
+    // — so if the conqueror ends the run holding at least this much on that
+    // region, the ONLY explanation left is that the flag carried the stock
+    // with it, per settlement.hpp's design: nothing copies `material_stock`
+    // anywhere, ownership just moves over it.
+    {
+        history_sim_params p3 = params;
+        p3.start_year = 0;
+        p3.stop_year  = 400;
+        p3.neighbour_radius = 40;
+        p3.w_dist = 0;
+
+        settlement_state w3 = two_polity_world(3);
+        w3.regions[1].material_stock = 5000000;
+
+        const history_sim_state m =
+            run_history_sim(w3, nullptr, no_terrain, syn_gw, syn_gh, p3, 4103u);
+
+        int  last_owner_of_1 = -1;
+        bool captured = false;
+        for (const owner_change& c : m.owner_changes)
+            if (c.region == 1) { captured = true; last_owner_of_1 = c.owner; }
+
+        std::printf("      seat capture: region 1 captured=%s, final owner %d, "
+                    "material_stock now %lld (preloaded 5000000)\n",
+                    captured ? "yes" : "no", last_owner_of_1,
+                    static_cast<long long>(w3.regions[1].material_stock));
+
+        check(captured, "M3a  the prize seat changes hands inside the run");
+        check(w3.regions[1].nation == last_owner_of_1,
+              "M3b  the region's own settled nation field agrees with the recorded owner change");
+        check(w3.regions[1].material_stock >= 5000000,
+              "M3c  the captured seat's preloaded stock is carried by the ownership change, never reset");
     }
 
     std::printf("\n%s (%d failure%s)\n",

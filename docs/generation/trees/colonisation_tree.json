@@ -1,0 +1,771 @@
+{
+  "_schema": "tree/io-v1",
+  "_note": [
+    "The Colonisation tree — the store COLONISATION_TREE.md transcribes. The schema is TREES.md § The store — `*_tree.json`, and tree_lint.js cross-checks doc and store both ways.",
+    "No actor, so no scorer: there is no pursued_when and no scorer_terms. A culture acquires a node by time on ground that satisfies its gate, or by contact; a daughter copies its parent's mask at coining.",
+    "Ids are CO-<branch>-<ring><seq>; 'm' is the one milestone per ring, on the spire. Each edge is listed once, from the lower id.",
+    "A milestone's requires names the spire major at its ring (AND); requires_any names the four branch majors at its ring, ANY TWO of which satisfy it (TREES.md § Milestones, and how a tree unlocks the next; COLONISATION_TREE.md § Milestones).",
+    "Magnitudes are placeholders by judgement — per_mille 20–80 on minors, 60–200 on majors — and the sweep re-prices them.",
+    "Names are generic mechanism nouns; earth_ref is calibration prose and never a place or a people."
+  ],
+  "tree": "colonisation",
+  "cap": 64,
+  "branches": [
+    {
+      "key": "SP",
+      "name": "The Domestication Package",
+      "concern": "the spire — gathering to cultivation, storage to the village, the village to the seat-able town"
+    },
+    {
+      "key": "FL",
+      "name": "Wet Ground",
+      "concern": "what floodplain and valley ground teach: the flood, the channel, the basin"
+    },
+    {
+      "key": "HL",
+      "name": "High Ground",
+      "concern": "what highland, montane and volcanic ground teach: the terrace, the flock, the pack animal"
+    },
+    {
+      "key": "GR",
+      "name": "Open Ground",
+      "concern": "what grassland and steppe teach: the herd followed, the herd kept, the horse"
+    },
+    {
+      "key": "CS",
+      "name": "The Shore",
+      "concern": "what the coast teaches: the net, the dried catch, the boat"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "CO-SP-1a",
+      "name": "Seed Selection",
+      "kind": "major",
+      "ring": 1,
+      "branch": "SP",
+      "links": [
+        "CO-SP-1m"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 100
+        }
+      ],
+      "earth_ref": "the Neolithic package's first act — keeping the best seed back, ~9th millennium equivalent"
+    },
+    {
+      "id": "CO-SP-1m",
+      "name": "The Fed Band",
+      "kind": "milestone",
+      "ring": 1,
+      "branch": "SP",
+      "links": [
+        "CO-SP-2a"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [
+        "CO-SP-1a"
+      ],
+      "effects": [
+        {
+          "kind": "open",
+          "target": "ring_2"
+        }
+      ],
+      "earth_ref": "a band that eats more than it gathers — the surplus that makes a second ground worth learning",
+      "requires_any": {
+        "count": 2,
+        "of": [
+          "CO-CS-1a",
+          "CO-FL-1a",
+          "CO-GR-1a",
+          "CO-HL-1a"
+        ]
+      }
+    },
+    {
+      "id": "CO-SP-2a",
+      "name": "Granary Pit",
+      "kind": "major",
+      "ring": 2,
+      "branch": "SP",
+      "links": [
+        "CO-SP-2m"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 150
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 60
+        }
+      ],
+      "earth_ref": "lined storage pits and raised granaries, ~8th–7th millennium equivalents"
+    },
+    {
+      "id": "CO-SP-2m",
+      "name": "The Settled Village",
+      "kind": "milestone",
+      "ring": 2,
+      "branch": "SP",
+      "links": [
+        "CO-SP-3a"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [
+        "CO-SP-2a"
+      ],
+      "effects": [
+        {
+          "kind": "open",
+          "target": "ring_3"
+        }
+      ],
+      "earth_ref": "the year-round village — a store worth staying beside",
+      "requires_any": {
+        "count": 2,
+        "of": [
+          "CO-CS-2a",
+          "CO-FL-2a",
+          "CO-GR-2a",
+          "CO-HL-2a"
+        ]
+      }
+    },
+    {
+      "id": "CO-SP-3a",
+      "name": "Common Store",
+      "kind": "major",
+      "ring": 3,
+      "branch": "SP",
+      "links": [
+        "CO-SP-3m"
+      ],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 100
+        },
+        {
+          "kind": "modifier",
+          "target": "manpower",
+          "per_mille": 60
+        },
+        {
+          "kind": "modifier",
+          "target": "assimilation",
+          "per_mille": 60
+        }
+      ],
+      "earth_ref": "the store held in common under a keeper — the town before the tally, ~4th millennium equivalent"
+    },
+    {
+      "id": "CO-SP-3m",
+      "name": "The Standing Seat",
+      "kind": "milestone",
+      "ring": 3,
+      "branch": "SP",
+      "links": [],
+      "gate": null,
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [
+        "CO-SP-3a"
+      ],
+      "effects": [
+        {
+          "kind": "open",
+          "target": "empire"
+        }
+      ],
+      "earth_ref": "a town that can be seated — the condition for a polity, not a polity",
+      "requires_any": {
+        "count": 2,
+        "of": [
+          "CO-CS-3a",
+          "CO-FL-3a",
+          "CO-GR-3a",
+          "CO-HL-3a"
+        ]
+      }
+    },
+    {
+      "id": "CO-FL-1a",
+      "name": "Flood-Basin Sowing",
+      "kind": "major",
+      "ring": 1,
+      "branch": "FL",
+      "links": [
+        "CO-SP-1a",
+        "CO-FL-1b"
+      ],
+      "gate": "arable",
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 120
+        }
+      ],
+      "earth_ref": "sowing into the receding flood's silt — the first floodplain harvest, ~7th millennium equivalent"
+    },
+    {
+      "id": "CO-FL-1b",
+      "name": "Silt Reading",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "FL",
+      "links": [
+        "CO-FL-2a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 30
+        }
+      ],
+      "earth_ref": "knowing where the flood will lay good ground next year"
+    },
+    {
+      "id": "CO-FL-2a",
+      "name": "Channel Cutting",
+      "kind": "major",
+      "ring": 2,
+      "branch": "FL",
+      "links": [
+        "CO-FL-2b",
+        "CO-FL-2c"
+      ],
+      "gate": "arable",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 150
+        },
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 40
+        }
+      ],
+      "earth_ref": "the first cut channels leading water to a field, ~6th millennium equivalent"
+    },
+    {
+      "id": "CO-FL-2b",
+      "name": "Levee Raising",
+      "kind": "minor",
+      "ring": 2,
+      "branch": "FL",
+      "links": [
+        "CO-FL-3a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "plague",
+          "per_mille": 30
+        }
+      ],
+      "earth_ref": "banking the flood off the village — drained ground breeds less"
+    },
+    {
+      "id": "CO-FL-2c",
+      "name": "Reed Bundling",
+      "kind": "minor",
+      "ring": 2,
+      "branch": "FL",
+      "links": [],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 30
+        }
+      ],
+      "earth_ref": "bundled reed as basket, wall and raft — the wet ground's gift to the shore"
+    },
+    {
+      "id": "CO-FL-3a",
+      "name": "Basin Irrigation Works",
+      "kind": "major",
+      "ring": 3,
+      "branch": "FL",
+      "links": [],
+      "gate": "arable",
+      "diffusion": "capacity",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 200
+        },
+        {
+          "kind": "modifier",
+          "target": "manpower",
+          "per_mille": 60
+        }
+      ],
+      "earth_ref": "basin systems that hold the flood on the field for weeks, ~4th millennium equivalent"
+    },
+    {
+      "id": "CO-HL-1a",
+      "name": "Hill Terracing",
+      "kind": "major",
+      "ring": 1,
+      "branch": "HL",
+      "links": [
+        "CO-SP-1a",
+        "CO-HL-1b"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 100
+        }
+      ],
+      "earth_ref": "stepped hillside plots holding soil against the slope, ~7th millennium equivalent"
+    },
+    {
+      "id": "CO-HL-1b",
+      "name": "Stone Clearing",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "HL",
+      "links": [
+        "CO-HL-2a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 30
+        }
+      ],
+      "earth_ref": "the cleared stone becomes the field wall"
+    },
+    {
+      "id": "CO-HL-2a",
+      "name": "Flock Keeping",
+      "kind": "major",
+      "ring": 2,
+      "branch": "HL",
+      "links": [
+        "CO-HL-2b",
+        "CO-HL-2c"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 80
+        },
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 60
+        }
+      ],
+      "earth_ref": "small stock penned on ground too steep to sow, ~8th millennium equivalent"
+    },
+    {
+      "id": "CO-HL-2b",
+      "name": "Seasonal Pasture",
+      "kind": "minor",
+      "ring": 2,
+      "branch": "HL",
+      "links": [
+        "CO-HL-3a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 40
+        }
+      ],
+      "earth_ref": "the flock walked up in summer and down in winter"
+    },
+    {
+      "id": "CO-HL-2c",
+      "name": "Wool Working",
+      "kind": "minor",
+      "ring": 2,
+      "branch": "HL",
+      "links": [],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 30
+        }
+      ],
+      "earth_ref": "fleece spun and woven — cold ground becomes country a people can winter on"
+    },
+    {
+      "id": "CO-HL-3a",
+      "name": "Pack Animal",
+      "kind": "major",
+      "ring": 3,
+      "branch": "HL",
+      "links": [],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "access",
+          "target": "mountain"
+        },
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 60
+        }
+      ],
+      "earth_ref": "a beast that carries what a person cannot — the range becomes a road, ~4th millennium equivalent"
+    },
+    {
+      "id": "CO-GR-1a",
+      "name": "Herd Following",
+      "kind": "major",
+      "ring": 1,
+      "branch": "GR",
+      "links": [
+        "CO-SP-1a",
+        "CO-GR-1b"
+      ],
+      "gate": "grassland",
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 100
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 60
+        }
+      ],
+      "earth_ref": "walking behind the wild herd through its year — the grassland's first subsistence"
+    },
+    {
+      "id": "CO-GR-1b",
+      "name": "Fire Clearing",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "GR",
+      "links": [
+        "CO-GR-2a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 30
+        }
+      ],
+      "earth_ref": "burning old grass so the herd comes back to the new"
+    },
+    {
+      "id": "CO-GR-2a",
+      "name": "Cattle Penning",
+      "kind": "major",
+      "ring": 2,
+      "branch": "GR",
+      "links": [
+        "CO-GR-2b",
+        "CO-HL-2c"
+      ],
+      "gate": "grassland",
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 100
+        },
+        {
+          "kind": "modifier",
+          "target": "manpower",
+          "per_mille": 40
+        }
+      ],
+      "earth_ref": "large stock held rather than followed, ~7th–6th millennium equivalents"
+    },
+    {
+      "id": "CO-GR-2b",
+      "name": "Milk Keeping",
+      "kind": "minor",
+      "ring": 2,
+      "branch": "GR",
+      "links": [
+        "CO-GR-3a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 40
+        }
+      ],
+      "earth_ref": "a living animal fed on twice — dairying as a second harvest"
+    },
+    {
+      "id": "CO-GR-3a",
+      "name": "Horse Taming",
+      "kind": "major",
+      "ring": 3,
+      "branch": "GR",
+      "links": [
+        "CO-GR-3b"
+      ],
+      "gate": "grassland",
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "access",
+          "target": "steppe"
+        },
+        {
+          "kind": "modifier",
+          "target": "manpower",
+          "per_mille": 80
+        },
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 60
+        }
+      ],
+      "earth_ref": "the ridden horse — open ground crossed in days rather than seasons, ~4th millennium equivalent"
+    },
+    {
+      "id": "CO-GR-3b",
+      "name": "Cart Haulage",
+      "kind": "minor",
+      "ring": 3,
+      "branch": "GR",
+      "links": [],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 40
+        }
+      ],
+      "earth_ref": "the drawn cart — a harvest moves to the store instead of the store to the harvest"
+    },
+    {
+      "id": "CO-CS-1a",
+      "name": "Shore Foraging",
+      "kind": "major",
+      "ring": 1,
+      "branch": "CS",
+      "links": [
+        "CO-SP-1a",
+        "CO-CS-1b"
+      ],
+      "gate": "coastal",
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 100
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 60
+        }
+      ],
+      "earth_ref": "the tideline that feeds a people while it walks — the shell middens, Mesolithic equivalent"
+    },
+    {
+      "id": "CO-CS-1b",
+      "name": "Net Weaving",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "CS",
+      "links": [
+        "CO-CS-2a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 30
+        }
+      ],
+      "earth_ref": "the knotted net — a catch taken by the hundred rather than the one"
+    },
+    {
+      "id": "CO-CS-2a",
+      "name": "Fish Drying",
+      "kind": "major",
+      "ring": 2,
+      "branch": "CS",
+      "links": [
+        "CO-CS-2b",
+        "CO-FL-2c"
+      ],
+      "gate": "coastal",
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 100
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 60
+        }
+      ],
+      "earth_ref": "the catch racked and smoked — the shore's answer to the granary"
+    },
+    {
+      "id": "CO-CS-2b",
+      "name": "Salt Gathering",
+      "kind": "minor",
+      "ring": 2,
+      "branch": "CS",
+      "links": [
+        "CO-CS-3a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 40
+        }
+      ],
+      "earth_ref": "salt from the pan — what is cured keeps"
+    },
+    {
+      "id": "CO-CS-3a",
+      "name": "Hollow-Log Boat",
+      "kind": "major",
+      "ring": 3,
+      "branch": "CS",
+      "links": [],
+      "gate": "coastal",
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "access",
+          "target": "strait"
+        },
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 40
+        }
+      ],
+      "earth_ref": "the dugout — a visible island becomes a crossing of days, never a voyage, Mesolithic equivalent"
+    }
+  ]
+}

@@ -132,7 +132,10 @@ empty world: where people started, the routes they took, and the cultures those 
 produced. Its authority is [`COLONISATION.md`](../generation/COLONISATION.md).
 
 - **It ends when all land has some culture** — a derived terminating condition, not a
-  calendar year, so the round is exactly as long as the filling took on this world.
+  calendar year, so the round is exactly as long as the filling took on this world. **The world
+  then coasts to 400 BCE** holding what the migration left it, because round 4's span is stated
+  (Ben, 2026-09-09; `../generation/CIVILISATION.md` § The span is 400 BCE to 1200 CE). The round's
+  own span is **2400 BCE → 400 BCE**, two thousand years.
 - **Coastal and overseas routes are the emphasis.** The first cultures should string out
   along shorelines and hop crude, short water crossings, because that is how people
   actually moved; an inland-first map is the tell that the walk is mispriced.
@@ -142,9 +145,11 @@ produced. Its authority is [`COLONISATION.md`](../generation/COLONISATION.md).
 - **Most of the land ends habitable and peopled.** Unsettled ground is the exception
   marking hostile country, never the background state of half a continent.
 
-**Round 4 — Empires.** The 4000-year span **ending at 1200 CE**, which is what the
-original round 4 named and what this round now owns alone: polities contesting the world
-migration left them. Origin is round 4's; this round is *communication → conquest or
+**Round 4 — Empires.** The span **400 BCE → 1200 CE**, sixteen hundred years (Ben, 2026-09-09),
+which is the second half of pass 1's three thousand six hundred and what this round owns alone:
+polities contesting the world migration left them. The earlier text gave this round the whole
+four thousand years; that was before the migration became a round of its own. Its authority is
+[`CIVILISATION.md`](../generation/CIVILISATION.md). Origin is round 4's; this round is *communication → conquest or
 diplomatic union → a stable dark age*, and that arc is its acceptance criterion. A run
 reaching 1200 CE without that shape has failed even if every number is plausible.
 **Asymmetry is completely fine and expected** — it is the deliverable, not a defect.
