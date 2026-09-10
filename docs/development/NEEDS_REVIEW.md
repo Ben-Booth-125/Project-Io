@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*17 entries — 14 open, 3 resolved.*
+*18 entries — 15 open, 3 resolved.*
 
 ---
 
@@ -236,6 +236,21 @@ Colonisation 3 rings / 3 milestones, Empire 4 / 4, Industry 4 / 4. The ring-1 mi
 > **Recommendation:** A.
 
 *Files: `docs/generation/trees/TREES.md`, `tools/session/tree_lint.js`*
+
+### NR-823 — BL-855's degree cap (10) reduces reach-rebuild growth but doesn't cleanly flatten it at 4,000+ regions
+*question · raised 2026-09-10 · from BL-855 (adjacency caps region count), delivered 2026-09-10 per your NR-809 call to pursue the fix now.*
+
+max_neighbour_degree=10 was measured (mean degree ~7-9 early game, climbing past 20 by 4,000yr uncapped) and chosen to sit at the top of the early-game band. history_span_cost post-fix shows ms/rebuild growth reduced (roughly region^1.5 instead of region^2) but not fully flat at the larger region counts this run reached (up to ~4,400) -- e.g. seed 0: 0.084/0.164/0.235/0.156 ms/rebuild at 1748/2931/3601/3718 regions, with a drop at the final checkpoint rather than a plateau. Reach-rebuild count is also driven by battle frequency independent of the fix, which confounds a clean read.
+
+**Why it matters.** The mechanism (bounding E) is real and correctly deterministic. Whether 10 is the right cap, or whether flatness at this scale needs a lower cap or a different structure (nearest-k rather than radius+cap), is a magnitude question this harness reports but does not resolve on its own.
+
+- A - accept as delivered: the mechanism is sound, the item's own risk section already flagged the scale question as unsettled
+- B - lower the cap further (e.g. 6-8) and re-measure
+- C - investigate whether reach-rebuild frequency itself (not just degree) needs bounding, since battle-heavy seeds dominate wall time regardless of degree
+
+> **Recommendation:** A, unless the play build feels slow at the 4,000-year end of a run once BL-855 is exercised live.
+
+*Files: `src/world/history_sim.hpp`, `src/world/history_sim.cpp`, `tools/verify/history_span_cost.cpp`*
 
 ---
 
