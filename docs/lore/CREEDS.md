@@ -107,6 +107,60 @@ bias which culmination a strained polity falls toward, and the myth bank that
 tells it — is BL-487 (polity creed axes) and BL-300 (myth/theology), designed
 in `COLLAPSE.md` § Telling the story.
 
+## A creed that spans cultures — the universalising turn (Ben, 2026-09-11)
+
+> *"We should use this phase to deepen religious understanding and turmoil... the prior work done
+> on pantheons, being subsumed by [a universal faith], and providing a unity which spans through
+> culture and language difference. This also provides another angle from which empires fall."*
+
+**THE NAME IN THE QUOTE IS AN ANALOGY FOR THE READER AND NEVER CONTENT.** The standing rule is
+unconditional: real history is a mechanism reference, never a name source. What transfers is the
+*mechanism* — a creed that stops being one people's pantheon and starts being an answer for
+everyone. What must never transfer is the proper noun. The universalising creed is generated and
+named by the same phoneme banks and template tables as every other creed in this document.
+
+**WHAT IT IS, AS A DEPARTURE FROM § The rule: one pantheon, one tongue.** Every creed above is
+*local by construction* — a pantheon belongs to a cradle culture and travels only as that people
+travels, which is what made the distribution of pantheons a record of routes
+(`../generation/COLONISATION.md` § Culture arrives by route). A universalising creed inverts
+exactly that property: it **subsumes** the pantheons it meets rather than displacing their
+peoples, and it therefore spreads along contact rather than along ancestry.
+
+**WHY IT EARNS ITS PLACE — it does three jobs no existing mechanism does.**
+
+1. **UNITY ACROSS DIFFERENCE.** `../generation/CIVILISATION.md` § Culture relations makes kinship
+   and opposition the engine of conquest, and both are computed from *descent* — how long ago two
+   peoples parted. A shared creed is the first thing in the design that can bind two peoples who
+   are **not kin and do not share a tongue**. That is a genuinely new axis, not a re-weighting of
+   an existing one, and it is what makes an empire able to hold ground its own culture never
+   walked.
+2. **A MOTIVE FOR EXPANSION THAT IS NOT HUNGER FOR LAND.** The colonial era the Empires phase must
+   set up (§ What the dark age must leave) is historically driven as much by mission as by
+   material want. A creed that believes it is *for everyone* supplies a reason to cross water
+   toward people rather than toward ground — which is the reason a colonial era looks different
+   from a border war.
+3. **A NEW WAY FOR AN EMPIRE TO FALL.** This is the half Ben names last and it is the sharpest.
+   § What the dark age must leave settles collapse as **network failure** — a realm that cannot
+   reach itself. A creed adds a second, independent fracture: an empire whose subject peoples
+   share its faith is held by something its roads do not carry, and an empire that **splits over
+   the faith** — schism, or a subsumed pantheon reasserting itself — fractures along lines that
+   have nothing to do with distance. Two failure modes that can fire separately is what stops the
+   dark age having a single shape.
+
+**THE TURMOIL IS THE POINT, NOT A SIDE EFFECT.** "Deepen religious understanding AND turmoil"
+names both halves. A creed that only ever unified would flatten the world — the same objection
+`../generation/CIVILISATION.md` § A civilisation is what mixing makes raised against *resolve* as
+a formation rule, and rejected there for the same reason. Subsumption must leave residue: the
+pantheon that was absorbed is still underneath, and it is what a schism is made of.
+
+**OPEN, AND DELIBERATELY NOT SETTLED HERE.** Whether a universalising creed arises from an
+existing pantheon or is coined new; what makes one arise at all rather than being scheduled;
+whether a people may hold both its pantheon and the universal creed at once, or must choose; and
+what the conversion of a *polity* means as against the conversion of a *people*. These want their
+own design pass — this section establishes that the mechanism exists and what it is for.
+
+---
+
 ## Globalisation and the common tongue
 
 For a modern-era epoch, generation closes with one fixed event (1951): the

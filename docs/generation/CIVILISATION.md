@@ -470,6 +470,62 @@ Kinship in years is worth nothing without the years.
 
 ---
 
+## What the dark age must leave (Ben, 2026-09-11)
+
+The section below names *fragmentation* as the ending. This one names what the fragments have to
+**carry**, and it is settled by the outcome test Ben set: the phase must leave a world in which a
+**colonial era** is possible, as the precursor to global trade.
+
+**THREE OUTPUTS, ALL CHOSEN; ONE CANDIDATE DECLINED.**
+
+1. **Nations of unequal strength.** Some large enough to colonise, some only large enough to be
+   colonised. This is `GENERATION_STRATEGY.md` § The asymmetry is POLITICAL as well as economic
+   read from the far end — the asymmetry is not decoration, it is the input the next phase needs.
+2. **Roads that outlive their builders.** The network survives the empire that built it, so
+   whoever inherits the ground starts ahead of whoever does not. Infrastructure is the empire's
+   estate, and it is inherited unevenly.
+3. **Grudges that still bite.** `pass_one_output::grudges` is already *carried* (§ What the
+   Culture phase must hand forward) and is currently inert. It must be consequential: who
+   colonises whom is not a fresh roll, it is the last quarrel continued by other means.
+
+**GROUND RELEASED BACK TO NOBODY WAS DECLINED, and the reason matters.** Collapse does not
+re-wild what it cannot hold. That looks at first like a contradiction with `BL-887`'s note about
+leaving "a new world" for a later phase to find — and it is not, because **a colonial era
+colonises INHABITED ground.** The thing a coloniser wants is not empty land; it is land held by
+someone weaker, with people on it already. Unequal nations *are* the new world. Nothing needs to
+be emptied for the next phase to have somewhere to go.
+
+**THE CAUSE OF COLLAPSE IS NETWORK FAILURE (Ben, 2026-09-11).** An empire persists while its
+network holds and fragments when it does not — which is the mechanism § What this phase hands the
+industrial era already names ("reach-gating is what makes the collapse mechanical rather than
+scripted... never a collapse event fired at a date"). That is now a ruling rather than an
+incumbent reading. Succession, exhaustion and external shock were all available and none was
+chosen: collapse is what happens when a realm can no longer reach itself.
+
+### War is paid for, and trade is what pays (Ben, 2026-09-11)
+
+**A campaign costs materials** — `BL-867 (materials spent on action)`, already built. What was
+missing is where a polity gets them, and the answer is **rich trade**, with a hard constraint:
+this phase still has **no market**. § Materials are spent when something happens is unchanged —
+no order book, no firm, no building stack, no price.
+
+**So the income is a property of the NETWORK, not of a market.** A road joining ground that holds
+*different* things yields materials; a road joining two places that hold the same thing yields
+little. That is a crude trade model with a visible cause on the map, and it does three jobs at
+once:
+
+- it makes **roads worth building** for a reason other than reach;
+- it makes **war affordable to the rich** and unaffordable to the poor, which is where asymmetry
+  in campaigning comes from without a term inside any actor;
+- it makes **network failure expensive**, so the collapse ruling above has teeth — a realm whose
+  roads fail loses its income before it loses its ground.
+
+**The resource reading stays abstract.** § What this phase hands the industrial era is explicit
+that resources become capital in pass 2 and that reading must not leak backwards. What this phase
+needs is only *difference* — that two places hold unlike things — never a price for either.
+
+---
+
 ## What this phase hands the industrial era
 
 **Ben, 2026-09-09 (elicitation notes): this phase feeds directly into the industrial era sim,
