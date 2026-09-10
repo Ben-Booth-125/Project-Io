@@ -743,6 +743,33 @@ struct history_sim_params
     /// over a run without paying for a full scan every round.
     int work_candidate_regions = 2;
 
+    // --- Materials and labour (BL-867) --------------------------------------
+    // CIVILISATION.md § Materials are spent when something happens. Industry
+    // accumulates at every seat for free (`region_industry_output`, no dial
+    // here — it is a pure consequence of population/army/ore); these two are
+    // the only knobs this item needs, because they are the only place an
+    // ACTION prices itself against the stock rather than deriving it.
+
+    /// Material units a Campaign spends per head of the army it raises,
+    /// drawn from the acting polity's CAPITAL seat and clamped at what is
+    /// actually standing there — an action consumes stock, it never goes
+    /// into debt for one. Small by design: a campaign should visibly cost
+    /// something without making the seat's stock the thing that decides
+    /// whether a campaign is legal at all (reach does that — CIVILISATION.md
+    /// § The road is the empire's skeleton — and gating on stock too would be
+    /// a second, uncoordinated gate on the same verb).
+    int campaign_material_cost_per_head_q = 4;
+
+    /// How hard a materials SHORTFALL tells on the army that marches anyway,
+    /// per-mille of the readiness channel `def_ready`/works/cohesion already
+    /// share (roster_stack turns it into an additive offset on
+    /// `type_power_mod`). At the default this bounds the whole effect to the
+    /// same band those three sit in — "tilts a fight, never decides one" —
+    /// so an empty seat fields a visibly weaker army rather than an
+    /// impossible one. Zero would make the cost above purely cosmetic
+    /// bookkeeping with no consequence a battle could show.
+    int material_shortfall_penalty_q = 120;
+
     // --- Great-power seed (BL-299) ----------------------------------------
     /// Seed two opposed majors: one preserving, one expansionist. Off by
     /// default so the ordinary sweep measures an unseeded world.
@@ -1341,6 +1368,14 @@ struct history_sim_state
     /// show a world that grew, collapsed and never recovered.
     int64_t peak_population = 0;
     int64_t peak_year       = 0;
+
+    /// BL-867 — total material units ever credited to a seat, and ever spent
+    /// launching a Campaign. Neither is a stock (that lives on the regions
+    /// themselves); these are RUN TOTALS, the observable that lets a caller
+    /// tell "materials exist but nothing spends them" from "the loop is
+    /// live" without reading every region's `material_stock` by hand.
+    int64_t materials_produced           = 0;
+    int64_t materials_spent_on_campaigns = 0;
 };
 
 /// Sentinel for "no polity owns this region in this year slice".

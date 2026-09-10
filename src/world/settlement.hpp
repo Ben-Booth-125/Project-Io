@@ -333,6 +333,22 @@ struct region
     /// seat, is re-pointed at its new owner's seat instead of left dangling.
     int seat_region = -1;
 
+    // --- Materials and labour (BL-867) --------------------------------------
+    // CIVILISATION.md § Materials are spent when something happens. SETTLED
+    // (Ben, 2026-09-09): "the stores sit AT THE SEAT, and fall with it." No
+    // polity-level treasury and no per-region heap — a hinterland region's
+    // industry flows OUT through `seat_region` and only ever accumulates on
+    // the region that IS a seat (`is_seat`). That is what makes conquest of
+    // the seat conquest of the hoard FOR FREE: nothing here is copied when
+    // ownership changes above, only `nation`/`owner[]` move, and this field
+    // travels with the region exactly as `population` and `army_stock` do.
+
+    /// Material units standing at this region, if it is a seat. Zero and
+    /// permanently unused on every ordinary hinterland region — industry
+    /// produced there is credited to `seat_region`'s stock, never banked
+    /// locally.
+    int64_t material_stock = 0;
+
     // --- Demography (BL-273) ----------------------------------------------
     // The region is the unit of population as well as of settlement — see
     // demography.md's section header below for the model. Left at zero here;
@@ -921,6 +937,43 @@ void muster_garrison(region& p, int garrison_fraction_q,
 /// COMMITTED stack and this pool is the region's whole army, so the two can
 /// disagree and the bound is the honest answer rather than a negative pool.
 int64_t spend_army(region& p, int64_t lost);
+
+// ---------------------------------------------------------------------------
+// Materials and labour (BL-867) — CIVILISATION.md § Materials are spent when
+// something happens
+//
+// THE THREE-WAY SPLIT, WITHOUT A THIRD FIELD. Subsistence is not modelled as
+// a share to spend, because it already has a home: `manpower_ceiling` IS the
+// ground's non-subsistence surplus — the population minus whatever it takes
+// to feed itself — so a region's people are, by construction, either
+// growing food (the untouched remainder of `population`), standing under
+// arms (`army_stock`, drawn from the ceiling), or making things (the
+// ceiling's remainder below). The equilibrium Ben asked for — "a high
+// population province must reserve population for work in industry to feed
+// the settlements" — is exactly `manpower_ceiling` doing double duty as the
+// budget both muster and industry draw against: a garrison mustered to its
+// full ceiling leaves nothing over, which is "starves or stops producing"
+// arriving as arithmetic on fields that already existed, never as a term
+// invented for this item alone.
+// ---------------------------------------------------------------------------
+
+/// Heads this region has left for INDUSTRY once the standing muster has
+/// taken its share of the recruitable surplus (`manpower_ceiling`). Floored
+/// at zero: a garrison holding the whole ceiling under arms leaves nothing,
+/// it does not go negative and it does not touch `population`.
+int64_t region_industry_capacity(const region& p);
+
+/// Per-mille yield the ground's own ORE endowment gives that labour —
+/// `ore_q`, because ore is materials' domain (history_sim.hpp's own mapping:
+/// "ore to materials, energy to energy"). Zero ore is zero yield: the labour
+/// is there, there is simply nothing under it to work.
+int region_industry_yield_q(const region& p);
+
+/// One simulated year of this region's industrial output, in material
+/// units — the quantity a caller credits to `seat_region`'s `material_stock`.
+/// Pure function of `p`'s own fields; this function has no view of the rest
+/// of `settlement_state::regions` so it does not do the crediting itself.
+int64_t region_industry_output(const region& p);
 
 /// Resolve one plague-event checkpoint over a body's settled regions,
 /// reusing `resolve_checkpoint`'s class-agnostic mechanism from
