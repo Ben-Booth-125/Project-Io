@@ -424,3 +424,15 @@ and reach-gating. What is left is genuinely downstream of those.
   calibrated over four thousand years, and § The span now gives this phase 1,600 inside a
   3,600-year pass — whether the rungs still turn over at a believable rate is a measurement owed
   before any of them are tuned.
+- **Reach as a single capital radius versus a network of centres (Ben, 2026-09-10, watching Round
+  4 live).** `BL-837 (ancient logistics and roads)` gates a campaign off ONE Dijkstra from the
+  polity's capital, and the visible cost is real: too few small polities survive the round, and
+  B384c (a death spiral must terminate somewhere in a sweep) fails because a shrinking realm's
+  last holdout can end up permanently beyond its own contracting reach. Ben's proposed fix is
+  architectural, not a recalibration — reach PROPAGATES through CHAINS of population centres
+  rather than radiating from one capital, with Logistic Points (`../economy/LOGISTICS.md`) as a
+  byproduct of larger centres feeding that propagation. This also bears on how many polities
+  survive into a "new world" a later exploration/colonisation phase could still find unclaimed.
+  DELIBERATELY NOT BUILT YET: it wants tech progression wired into these generation rounds first,
+  so a later sprint owns it (`BL-887`, filed, no sprint yet). B384c stays a known, accepted
+  failure until then.
