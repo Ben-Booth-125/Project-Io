@@ -1376,6 +1376,19 @@ struct history_sim_state
     /// live" without reading every region's `material_stock` by hand.
     int64_t materials_produced           = 0;
     int64_t materials_spent_on_campaigns = 0;
+
+    /// BL-869 — every civilisation mixing actually grew, in formation order.
+    /// A NAMED RECORD each (creeds.hpp), never a creed: `region::civilisation`
+    /// indexes into this. Empty on a world where little or no mixing happened
+    /// — CIVILISATION.md's "done when": "a world with little mixing produces
+    /// few or none".
+    std::vector<civilisation> civilisations;
+
+    /// How many civilisation records were ever created (== civilisations.size()
+    /// today, but counted alongside the run's other formation-style counters
+    /// — `foundings`, `polities_industrialised` — for the same reason: a
+    /// harness reads this list, not the vector, when it only wants the count).
+    int64_t civilisations_formed = 0;
 };
 
 /// Sentinel for "no polity owns this region in this year slice".

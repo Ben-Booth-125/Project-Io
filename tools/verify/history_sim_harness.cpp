@@ -1299,6 +1299,119 @@ int main()
               "the ground than the strangers)");
     }
 
+    // --- R10  civilisations form only where mixing actually happened (BL-869) --
+    //
+    // THE SAME IDIOM AGAIN: one fixture, one variable changed, the DIRECTION
+    // (here: forms / does not form) asserted rather than a magic count.
+    // `one_polity_two_regions` is reused rather than `two_polity_world`
+    // because it puts BOTH regions under one polity from year zero — no
+    // campaign is ever scored, so nothing here can be confused with R9's
+    // conquest-permission question. The mix itself is HAND-SET rather than
+    // grown by conquest, with `assimilation_per_year_q = 0` so it cannot
+    // drift during the run: this isolates "does a long-held mix form a
+    // civilisation" from "does assimilation move a mix at all", which R9's
+    // own creed_state fixtures already cover.
+    {
+        auto war_pantheon10 = [](int zeal, int dominion) {
+            std::vector<culture_god> p(2);
+            p[0].domain = "the storm"; p[0].zeal = 5; p[0].dominion = 5; // chief god, inert here
+            p[1].domain = "war";       p[1].zeal = zeal; p[1].dominion = dominion;
+            return p;
+        };
+
+        // LOW opposition: same temperament, same country, a fresh split —
+        // exactly R9's "kin" shape, so a mix of these two should settle.
+        creed_state near_kin;
+        {
+            culture c0; c0.pantheon = war_pantheon10(5, 5);
+            c0.origin_farm_class = 0; c0.parent = -1; c0.coined_year = -4000;
+            culture c1 = c0;
+            c1.parent = 0; c1.coined_year = -3900;
+            near_kin.cultures = { c0, c1 };
+        }
+
+        // HIGH opposition: opposite war-god extremes, opposite countries, no
+        // shared ancestor — R9's "strangers" shape, above the formation bar.
+        creed_state enemies;
+        {
+            culture c0; c0.pantheon = war_pantheon10(0, 0);
+            c0.origin_farm_class = 0; c0.parent = -1; c0.coined_year = -4000;
+            culture c1; c1.pantheon = war_pantheon10(10, 10);
+            c1.origin_farm_class = 5; c1.parent = -1; c1.coined_year = -4000;
+            enemies.cultures = { c0, c1 };
+        }
+
+        const int op_kin    = culture_opposition_q(near_kin.cultures, 0, 1);
+        const int op_enemy  = culture_opposition_q(enemies.cultures, 0, 1);
+        std::printf("      R10 opposition: near-kin %d/1000 (bar %d), enemies %d/1000\n",
+                    op_kin, civilisation_opposition_bar_q, op_enemy);
+        check(op_kin <= civilisation_opposition_bar_q,
+              "R10 fixture sanity: the near-kin pair sits AT OR BELOW the formation bar");
+        check(op_enemy > civilisation_opposition_bar_q,
+              "R10 fixture sanity: the severed-enemies pair sits ABOVE the formation bar");
+
+        history_sim_params p10 = params;
+        p10.start_year = 0;
+        // Comfortably past `civilisation_mix_years_bar` (300) at any tick
+        // band this file's default params use, so the check is about the
+        // MECHANISM crossing its bar, not about outrunning a coarse step.
+        p10.stop_year  = 800;
+        p10.assimilation_per_year_q = 0; // The mix must not drift — see comment above.
+
+        // Two peoples "in quantity" — the second culture at exactly the
+        // mixing threshold (200/1000) — so the fixture exercises the
+        // threshold itself rather than an unambiguously large mix.
+        culture_shares mixed;
+        mixed.id[0] = 0; mixed.weight_q[0] = 800;
+        mixed.id[1] = 1; mixed.weight_q[1] = 200;
+        mixed.other_q = 0;
+
+        settlement_state w_kin = one_polity_two_regions(6);
+        w_kin.regions[0].culture = mixed; // "Home" carries the mix; "Outpost" stays pure.
+
+        settlement_state w_enemy = one_polity_two_regions(6);
+        w_enemy.regions[0].culture = mixed;
+
+        // CONTROL: no second culture anywhere, ever — the doc's own "done
+        // when": "a world with little mixing produces few or none".
+        settlement_state w_pure = one_polity_two_regions(6);
+
+        const history_sim_state a =
+            run_history_sim(w_kin,   &near_kin, no_terrain, syn_gw, syn_gh, p10, 91u);
+        const history_sim_state b =
+            run_history_sim(w_enemy, &enemies,  no_terrain, syn_gw, syn_gh, p10, 91u);
+        const history_sim_state c =
+            run_history_sim(w_pure,  &near_kin, no_terrain, syn_gw, syn_gh, p10, 91u);
+
+        std::printf("      R10 civilisations formed: near-kin %lld, enemies %lld, pure %lld\n",
+                    static_cast<long long>(a.civilisations_formed),
+                    static_cast<long long>(b.civilisations_formed),
+                    static_cast<long long>(c.civilisations_formed));
+
+        check(a.civilisations_formed >= 1,
+              "R10a  a long-held, low-opposition mix DOES grow a civilisation");
+        check(!a.civilisations.empty() && !a.civilisations.front().name.empty(),
+              "R10b  the formed record carries a coined name, not a blank one");
+        check(!a.civilisations.empty()
+              && a.civilisations.front().members.size() == 2
+              && a.civilisations.front().members[0] == 0
+              && a.civilisations.front().members[1] == 1,
+              "R10c  the record names exactly the two cultures that actually mixed");
+        check(!a.civilisations.empty() && a.civilisations.front().strain_q <= civilisation_opposition_bar_q,
+              "R10d  a formed civilisation's inherited strain never exceeds the formation bar");
+        check(w_kin.regions[0].civilisation >= 0 && w_kin.regions[1].civilisation < 0,
+              "R10e  only the region that actually carried the mix points at the record — "
+              "the untouched 'Outpost' does not");
+
+        check(b.civilisations_formed == 0,
+              "R10f  FRACTURE (NR-817): the same long-held mix, above the opposition bar, "
+              "coins NO civilisation at all");
+
+        check(c.civilisations_formed == 0,
+              "R10g  a region with no second culture never forms one, however long it runs "
+              "(CIVILISATION.md: \"a world with little mixing produces few or none\")");
+    }
+
     // ---------------------------------------------------------------------
     // BL-837 — ancient logistics and roads (CIVILISATION.md § The road is
     // the empire's skeleton, and reach GATES conquest).

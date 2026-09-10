@@ -4,6 +4,7 @@
 #include "terrain_combat.hpp" // BL-384 trace: the defence term the scorer never sees
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <queue>
@@ -53,6 +54,52 @@ int jitter(int base, uint32_t s, uint32_t axis, int spread)
     if (spread <= 0) return base;
     const int d = static_cast<int>(salt(s, axis) % static_cast<uint32_t>(2 * spread + 1)) - spread;
     return base + (base * d) / 1000;
+}
+
+/// BL-869 — wears `tongue_word`'s `pick(int)` contract off `salt`, so coining
+/// a civilisation's name costs no RNG stream of its own — consistent with
+/// this file's own rule (top of file): "there is no RNG... nothing here
+/// consumes a stream."
+struct hash_picker
+{
+    uint32_t s;
+    int pick(int n)
+    {
+        s = salt(s, 0xC1F1u);
+        return n <= 1 ? 0 : static_cast<int>(s % static_cast<uint32_t>(n));
+    }
+};
+
+/// Coin a civilisation's name FROM THE TONGUES THAT MIXED (CIVILISATION.md:
+/// "never from a bank of its own"), drawing each syllable's onset/vowel/coda
+/// from one or the other founding culture's OWN phonology in turn — so the
+/// result is built entirely out of sounds its members already speak, never a
+/// third invented accent, exactly the substrate `world/tongue.hpp` exists for.
+///
+/// PURE in (@p cultures, @p a, @p b, @p seed) alone — not in region, year or
+/// call order — so the same founding pair coins the same name wherever and
+/// whenever its mix first crosses the bar.
+std::string coin_civilisation_name(const std::vector<culture>& cultures, int a, int b,
+                                   uint32_t seed)
+{
+    const tongue& ta = cultures[static_cast<std::size_t>(a)].speech;
+    const tongue& tb = cultures[static_cast<std::size_t>(b)].speech;
+    hash_picker r{salt(seed, salt(static_cast<uint32_t>(a), static_cast<uint32_t>(b)))};
+
+    const int syllables = 2 + r.pick(2);
+    std::string name;
+    for (int i = 0; i < syllables; ++i)
+    {
+        const tongue& t = (r.pick(2) == 0 && ta.usable()) ? ta : (tb.usable() ? tb : ta);
+        if (!t.usable()) continue;
+        name += t.onsets[static_cast<std::size_t>(r.pick(static_cast<int>(t.onsets.size())))];
+        name += t.vowels[static_cast<std::size_t>(r.pick(static_cast<int>(t.vowels.size())))];
+        if (!t.codas.empty() && r.pick(3) == 0)
+            name += t.codas[static_cast<std::size_t>(r.pick(static_cast<int>(t.codas.size())))];
+    }
+    if (name.empty()) name = "mix"; // Both tongues unusable — should not occur in practice.
+    name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+    return name;
 }
 
 /// THE COMMON CURRENCY (BL-309). Every verb scores in ONE unit: expected
@@ -1267,6 +1314,93 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int shift_q = clampi(params.assimilation_per_year_q * step_years, 0, 1000);
                 for (int hi : held)
                     ss.regions[static_cast<std::size_t>(hi)].culture.shift_toward(q.culture, shift_q);
+            }
+
+            // ---- CIVILISATIONS FROM MIXING (BL-869) -----------------------
+            //
+            // CIVILISATION.md § A civilisation is what mixing makes: "a region
+            // carrying two peoples in quantity, for a long time" is the
+            // trigger. ASSIMILATION just above is what MOVES the shares; this
+            // is what reads how long they have sat mixed, using the same
+            // `held` this round already built and the same `step_years`
+            // clock the rate above it uses. NO ACTOR: nothing here is a
+            // polity choice, exactly like the founding schedule earlier in
+            // this loop — a mix either has settled into an answer or it has
+            // not, and the sim only reports which.
+            if (cs != nullptr)
+            {
+                for (int hi : held)
+                {
+                    region& rg = ss.regions[static_cast<std::size_t>(hi)];
+                    if (rg.civilisation >= 0) continue; // Formed once, never revisited.
+
+                    const int second = rg.culture.id[1];
+                    const bool mixed_now =
+                        second >= 0 && rg.culture.weight_q[1] >= civilisation_mix_threshold_q;
+                    // UNBROKEN, not cumulative (settlement.hpp: "a mix that
+                    // digests away and later returns starts the clock over").
+                    rg.mix_years = mixed_now ? rg.mix_years + step_years : 0;
+                    if (!mixed_now || rg.mix_years < civilisation_mix_years_bar) continue;
+
+                    const int a = std::min(static_cast<int>(rg.culture.id[0]), second);
+                    const int b = std::max(static_cast<int>(rg.culture.id[0]), second);
+                    if (a < 0 || b >= static_cast<int>(cs->cultures.size())) continue;
+                    const int op_q = culture_opposition_q(cs->cultures, a, b);
+
+                    // NR-817 — FRACTURE IS THE FORMATION RULE. Too opposed to
+                    // settle a shared answer about how to live, so no
+                    // civilisation is coined here at all. The region tries
+                    // again next round: assimilation runs every round too, so
+                    // the mix itself — and therefore the pair being read —
+                    // can still change.
+                    if (op_q > civilisation_opposition_bar_q) continue;
+
+                    // Find the record for exactly this pair, or found one.
+                    // MANY regions sharing the same two peoples grow ONE
+                    // civilisation, not one each — the record is a fact about
+                    // the pair, not about any single region's ground.
+                    int idx = -1;
+                    for (std::size_t i = 0; i < out.civilisations.size(); ++i)
+                    {
+                        const civilisation& cv = out.civilisations[i];
+                        if (cv.members.size() == 2 && cv.members[0] == a && cv.members[1] == b)
+                        { idx = static_cast<int>(i); break; }
+                    }
+                    if (idx < 0)
+                    {
+                        civilisation cv;
+                        cv.members = { a, b };
+                        cv.name    = coin_civilisation_name(cs->cultures, a, b, seed);
+
+                        // THE ETHIC — the settled answer to the same two
+                        // questions a war god's temperament asks
+                        // (CIVILISATION.md: "derived from what the member
+                        // cultures disagreed about and settled"). The mean of
+                        // the founding pair's own war gods (`pantheon[1]`,
+                        // the same god `culture_opposition_q`'s temperament
+                        // axis reads), integer-rounded down on a tie so the
+                        // result needs no stream of its own.
+                        const culture& ca = cs->cultures[static_cast<std::size_t>(a)];
+                        const culture& cb = cs->cultures[static_cast<std::size_t>(b)];
+                        if (ca.pantheon.size() > 1 && cb.pantheon.size() > 1)
+                        {
+                            cv.ethic.zeal     = (ca.pantheon[1].zeal     + cb.pantheon[1].zeal)     / 2;
+                            cv.ethic.dominion = (ca.pantheon[1].dominion + cb.pantheon[1].dominion) / 2;
+                        }
+                        cv.strain_q    = op_q; // INHERITED, not resolved (NR-817).
+                        cv.formed_year = y;
+
+                        idx = static_cast<int>(out.civilisations.size());
+                        out.civilisations.push_back(std::move(cv));
+                        ++out.civilisations_formed;
+                        out.history.push_back(history_event{
+                            years_from_calendar_year(y), chain_stage::legacy,
+                            out.civilisations.back().name
+                                + " is settled as a shared way of life",
+                            std::string{}});
+                    }
+                    rg.civilisation = idx;
+                }
             }
 
             const region& cap = ss.regions[static_cast<std::size_t>(q.capital)];
