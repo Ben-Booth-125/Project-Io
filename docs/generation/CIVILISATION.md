@@ -237,6 +237,41 @@ flat as one where none does. The asymmetry is the deliverable
 
 ---
 
+## Land is already settled when this phase opens (Ben, 2026-09-11)
+
+> *"For our stage, land should already be settled. Settle in our stage is just a consequence of
+> when polities decide to raze settlements and destroy cultures."*
+
+**This phase does not colonise.** § The span is 400 BCE to 1200 CE hands this round a world the
+migration has already filled; `COLONISATION.md` owns the filling and is emphatic that it is a
+diffusion with no actor. What arrives here is a settled map, and an empire is built by taking
+someone else's ground rather than by finding more.
+
+**SO `Settle` MEANS SOMETHING DIFFERENT HERE, AND ONLY ONE THING.** It is the RE-founding of
+ground that was emptied — a razed seat resettled, a culture destroyed and replaced. It is a
+*consequence* of violence, downstream of a sack, and it cannot fire on ground nobody has
+harmed. What it must NOT be in this phase is the growth-without-war axis it is in the migration
+span: a population-pressure verb that manufactures new ground indefinitely.
+
+**WHY THIS IS THE FIX AND A SCORER WEIGHT IS NOT.** `history_sim.cpp` § Settle currently fires
+on population pressure against carrying capacity, with a comment stating its purpose plainly —
+*"without this verb a 2000-year run has a frozen region count"*. That is a migration-era
+justification applied to an empire-era round, and it makes peaceful expansion permanently
+available. A verb that is always available and always cheap wins the argmax, which is exactly
+what the sweep measures: Campaign is in the running thousands of rounds per world and wins
+about one in a hundred.
+
+The tempting repair — weight Campaign higher, or drop its threshold — is a term inside the
+actor, which `.claude/rules/io-standing-rules.md` forbids and which Ben declined for the reach
+gate on 2026-09-09 (NR-823). **Re-scoping what `Settle` MEANS in this phase is not a weight.**
+It changes what is legal, not what is preferred, and it leaves the scorer honest: with no free
+ground to take, Campaign clears on its own merits because it is the only way to grow.
+
+**The frontier closing is the in-world force with the visible cause** that § The arc the phase
+must produce asks for. Empires form when expansion stops being free.
+
+---
+
 ## The arc the phase must produce (Ben, 2026-09-10)
 
 > *"Really I want to see polities be eliminated and empires to form, before collapsing back
