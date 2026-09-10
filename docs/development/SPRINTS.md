@@ -59,10 +59,12 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 38 — how city states become empires
+### Sprint 38 — empire — the whole phase
 *Open · opened 2026-09-09*
 
-**Goal.** Decompose CIVILISATION.md's Empires design (settled 2026-09-09) into delivery and build it: sparse settlements with seats and hinterlands, roads that gate reach, materials spent on action, culture relations as the engine of conquest, civilisations formed by mixing, and centres that grow only where the road network can supply and govern them.
+**Goal.** THE SPRINT IS THE PHASE (Ben, 2026-09-11). Sprint 38 owns the Empires phase of generation entire -- 400 BCE to 1200 CE -- rather than a fixed list of items. It closes when the phase produces what CIVILISATION.md says it must, not when a count is exhausted.
+
+Decompose CIVILISATION.md's Empires design (settled 2026-09-09) into delivery and build it: sparse settlements with seats and hinterlands, roads that gate reach, materials spent on action, culture relations as the engine of conquest, civilisations formed by mixing, and centres that grow only where the road network can supply and govern them.
 
 **Planned.**
 - BL-873 (culture coining year) - retains when a culture split off; feeds kinship.
@@ -81,6 +83,12 @@ and/or a version goal (v0.1.1 etc.).
 - BL-823 (anti-hegemon levers) - culture, logistics, communication, succession. Folded in 2026-09-10.
 - BL-838 (fear of being next) - neighbours coalesce against a riser. Folded in 2026-09-10.
 - BL-887 (reach as centre chains) - reach propagates through a network of centres. Folded in 2026-09-10.
+- BL-893 (amphibious capture by weight) - a coastal target is takeable when the land behind the attacker outweighs the defender.
+- BL-894 (Settle is re-settlement here) - land is already settled; Settle stops manufacturing new ground. This is BL-889's admissible fix.
+- BL-895 (network income funds war) - a road joining UNLIKE ground yields materials. No market, no price.
+- BL-896 (collapse is network failure) - an empire fragments when it can no longer reach itself; what it leaves is the next phase's input.
+- BL-897 (universalising creed) - a creed that subsumes pantheons and binds peoples who are neither kin nor share a tongue. DESIGN-OWED: four questions to settle first.
+- BL-898 (grudges must bite) - carried across the handoff today and read by nothing.
 
 **Done when.** Across a history_sweep spread, generated worlds show the arc Ben named on 2026-09-10 -- polities eliminated, empires forming, those empires collapsing back, and surviving fragments of unequal size (GENERATION_STRATEGY.md sec The asymmetry is POLITICAL as well as economic). DISTRIBUTIONAL, never per-world: a seed that refuses war is a legitimate outcome and must not be forced. No target number is set ahead of the measured spread. Plus: the wizard opens on a rolled seed (BL-890), the player can see whether a rolled world contains the arc (BL-891), and the sweep's W7b red is resolved (BL-892).
 
@@ -113,6 +121,14 @@ RULED 2026-09-10 (Ben, NR-823): THE WALL MOVES WHEN YOU WIN. The 2026-09-09 reac
 RULED 2026-09-10 (Ben, NR-824): BL-861 CANCELLED as superseded, rather than closed as delivered. The honest record is that the item asked for a cause to be measured, the measurement happened, and it found a different defect than the one described. BL-889 carries the surviving question.
 
 BL-823, BL-838 and BL-887 FOLDED IN 2026-09-10 (Ben), rather than deferred to a sprint of their own. All three are brakes on a riser or the reach model that shapes one, and all three had been sitting sprintless since sprint 36 was redirected. Read them against BL-889's result: on 2026-09-10 the sweep measured no riser to brake (largest polity 3.3%, zero eliminations in 16 of 16 worlds), so they are levers whose premise BL-889 has to make true first.
+
+SCOPING RULED 2026-09-11 (Ben): "we are looking at just one phase of generation - Empire". The sprint grew from a close (9 items) to the whole phase (16) across two design sessions, and the question was raised whether to split it. Ben's answer is that the PHASE is the boundary. That is the better rule -- an item count is arbitrary, and the backlog drift this project fixed on 2026-09-10 came from MANY OPEN SPRINTS, not from one large one. Splitting would recreate exactly the failure that was just cleaned up.
+
+CONSEQUENCE OF THAT RULE: the sprint has no natural close by exhaustion, so its done_when does the work. It is distributional and already written -- the arc must appear across a history_sweep spread. Read it, not the item count.
+
+THE PHASE-OUTCOME DESIGN SESSION, 2026-09-11, settled four things and they are in the docs that own them, not here: what the dark age must leave (unequal nations, orphan roads, live grudges -- released ground DECLINED because a colonial era colonises INHABITED ground); collapse is NETWORK FAILURE; war is funded by crude NETWORK INCOME with the no-market exclusion re-affirmed; and a UNIVERSALISING CREED as a second, independent collapse vector. CIVILISATION.md and CREEDS.md carry them.
+
+A SPAN FIX WAS ATTEMPTED AND REVERTED 2026-09-11. The Culture round was believed to end at 0 CE while the Empires round started at 400 BCE, a 400-year overlap. It does not: BL-846's founding schedule already splits regions on sim_start_year, and the 0 CE found in hard_coded_world.cpp is the colonisation flood's BACKSTOP, which settlement.cpp:783 states outright. The change was a no-op that would have deleted the scheduled foundings had it fired. Caught by a digit-identical 4-seed sweep. No doc change was needed -- CIVILISATION.md's span table already matches the code.
 
 ### Sprint 39 — the new world
 *Open · opened 2026-09-10 · Claude (2026-09-10 sprint-assignment sweep)*
@@ -183,7 +199,7 @@ THE DEPENDENCY IS REAL AND RUNS THROUGH SPRINT 38. Whether there is a new world 
 | 36 | a revised look at ancient history | CLOSED 2026-09-09, REDIRECTED RATHER THAN FINISHED. Three of six items landed and are verified: the ancient pass is 5.4x/2.9x faster over 4,000 years and the dead-region ping-pong is gone at its cause. The four unbuilt items were empire-phase and went back to the pool when Ben observed that colonisation and empire want different rules. Sprint 37 takes that up. |
 | 37 | how humanity spreads before it fights | CLOSED 2026-09-10. REOPENED 2026-09-09 for a design addendum, having been closed the same day. The gap found: the migration builds a family tree of peoples (BL-856) and DISCARDS it, so kinship -- the natural substrate for culture similarity -- is unrecoverable by the empire phase. BL-865 (the addendum's whole reason to reopen) LANDED 2026-09-09 and is verified on main -- culture now carries `parent`/`origin_farm_class`, walking every daughter back to a cradle. KEPT OPEN 2026-09-10 for seven owed items -- BL-849, BL-852, BL-853, BL-854, BL-855, BL-859, BL-861 -- ALL NOW DELIVERED (BL-859 cancelled and redirected to BL-888, also delivered). BL-861 (no conquest across the 4000-year span) resolved as a measured SIDE EFFECT of BL-849/852/855/888 together, not a direct fix to war logic -- history_sweep across 16 seeds now shows every seed fighting (median 61 battles, range 7-141; seed 0 specifically went from 0 to 61). Sprint 38's BL-868 is blocked on the same symptom and should be re-checked against this before further diagnosis. |
 | 40 | three trees, one grammar | CLOSED 2026-09-10, the same day it opened, as a DESIGN sprint: the three trees, the grammar, the lint and the Empire scorer are written and linted; the six build items BL-881..BL-886 go to the pool. Ben: "I'm reluctant to push further when Empire and Industry have not landed yet" - the build waits on sprints 38 and 39. |
-| 38 | how city states become empires | 8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). REFRAMED 2026-09-10 on Ben's call (option B): the sprint no longer closes on BL-868's harness, but on a DISTRIBUTIONAL reading of history_sweep. The sweep was run and the reading is in: conflict is fixed, asymmetry and volatility are not. BL-889, BL-890, BL-891 and BL-892 were added to the sprint on that basis; BL-868 is now blocked on BL-889. |
+| 38 | empire — the whole phase | 8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). REFRAMED 2026-09-10 on Ben's call (option B): the sprint no longer closes on BL-868's harness, but on a DISTRIBUTIONAL reading of history_sweep. The sweep was run and the reading is in: conflict is fixed, asymmetry and volatility are not. BL-889, BL-890, BL-891 and BL-892 were added to the sprint on that basis; BL-868 is now blocked on BL-889. |
 | 39 | the new world | OPEN AND EMPTY BY DESIGN. The phase is named and reserved; no items are decomposed for it yet. Its first input is whatever round 4 leaves unpartitioned once sprint 38 settles how far empires actually spread. |
 
 **Next up.** SPRINT 38 IS OPEN (opened 2026-09-09, given its own entry 2026-09-10) - how city states become empires. 8 of 9 items are landed and verified on main; BL-868 (creeds raise armies) is the sole holdout after seven verification attempts, now understood to be a fixture problem entangled with BL-837/BL-872's reach and supply mechanics rather than a wiring defect. Next session's whole focus here is BL-868: redesign its test fixture for the post-BL-837/872 world, or give it a longer stop_year, before attempting an eighth pass. Sprint 37 remains open pending its reopened design addendum (Ben, 2026-09-09: 'we have more work to do for sprint 37').
