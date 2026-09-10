@@ -504,6 +504,102 @@ struct history_sim_params
     /// same landform ratios logistics.cpp already defines for the 1960 era.
     int terrain_reach_cost_q = 10;
 
+    // --- Ancient roads and the reach GATE (BL-837) -------------------------
+    //
+    // CIVILISATION.md § The road is the empire's skeleton, and reach GATES
+    // conquest — Ben's elicitation ruling (2026-09-09): "REACH GATES A
+    // CAMPAIGN; IT DOES NOT MERELY PRICE IT." Everything above this block
+    // (terrain_reach_cost_q, the burden of breadth) still PRICES distance —
+    // it makes a far campaign worse, never impossible. That is precisely what
+    // the ruling declines: a rich enough polity could always buy past
+    // geography. These four fields are what makes reach a WALL rather than a
+    // toll, and what lets a road move the wall.
+    //
+    // THE NETWORK ALREADY EXISTS, ONE STEP REMOVED FROM THE SIM. BL-768's
+    // `supply_corridors` already record every region-to-region line a
+    // campaign or a Settle actually walked, deduplicated with a use count —
+    // but only as a POST-SIM artefact `road_generation.cpp` stamps onto the
+    // campaign-era tile grid. The sim itself never read its own corridors
+    // back. These fields close that loop: a LIVE copy of the same use count,
+    // read by `rebuild_reach` while the sim is still running, so a heavily
+    // walked line is cheaper for the REST OF THE RUN, not just for the
+    // finished world. Nodes are seats, edges are these corridors — exactly
+    // the network CIVILISATION.md's outcome brief names, now load-bearing
+    // rather than decorative.
+
+    /// Corridor uses (BL-768's own count, read live) before a line is
+    /// considered a Track (tier 1) at all. Below this a corridor is a route
+    /// that has been walked, not one worth widening — mirrors
+    /// `road_generation.cpp`'s measured `kAncientRoadUses` (4: one journey is
+    /// a founding party that never returns, four is repeat traffic).
+    int road_tier1_uses = 4;
+    /// Uses before a Track becomes a Road (tier 2), the ancient network's
+    /// busiest lines. No tier 3 in the sim itself — Highway-grade promotion
+    /// wants a built work at both ends (`road_generation.cpp::ancient_tier`),
+    /// which is campaign-era-only bookkeeping this pass does not carry.
+    int road_tier2_uses = 12;
+
+    /// SUSTAINABLE-REACH FLOOR FOR LAUNCHING A CAMPAIGN, in the same 0..1000
+    /// supply currency `campaign_supply` already prices. At or below this,
+    /// the target is not scored at all — GATED, not merely priced down — so
+    /// a rich polity cannot outbid geography for a target its roads have not
+    /// earned it. Deliberately ABOVE zero: at literally zero supply the
+    /// existing arithmetic already zeroes the odds term, so a floor of zero
+    /// would be a gate in name only. NOT A MEASUREMENT — exactly the
+    /// magnitude `history_sweep` is meant to tune.
+    ///
+    /// FIRST CUT WAS 250, AND B384c EXPOSED A DEEPER PROBLEM THAN A BAD
+    /// NUMBER (2026-09-10). `history_sim_harness`'s B384c ("a polity
+    /// somewhere in the set loses its last region", BL-308's death-spiral
+    /// invariant) passes on main today with 6/8 seeds eliminating a polity.
+    /// At floor=250 it failed on all 8. Lowering to 80, then to 20 — TWO
+    /// FULL ORDERS OF MAGNITUDE APART — produced IDENTICAL per-seed battle,
+    /// conquest and elimination counts (0/8 both times), despite battle
+    /// volume comparable to or higher than the no-gate baseline. That rules
+    /// out a calibration fix: the floor's exact value is not what is
+    /// suppressing eliminations.
+    ///
+    /// THE LIKELY MECHANISM, and it follows directly from Ben's own ruling
+    /// that reach GATES rather than prices: a polity reduced toward its last
+    /// region is exactly the case where pure pricing used to still let a
+    /// low-probability killing blow occasionally land. A hard gate removes
+    /// that long tail entirely — if a shrinking polity's last holdout ever
+    /// sits beyond every neighbour's CURRENT road reach (and a shrinking
+    /// realm is also a realm whose roads are contracting), it can become
+    /// permanently unconquerable rather than merely unlikely to fall. That
+    /// is a genuine tension with B384c's invariant, not a bug in this field.
+    ///
+    /// 80 IS WHERE THIS SHIPS, PENDING BEN'S CALL. It is the value BL837a's
+    /// synthetic far-target case was calibrated against and is defensible on
+    /// its own terms; B384c is left failing and UNRESOLVED rather than
+    /// forced green by further lowering a floor already shown not to move
+    /// it. See the sprint 38 delivery note for the options put to Ben.
+    ///
+    /// `campaign_supply` stacks several decay terms (distance, terrain, the
+    /// burden of breadth) that a genuinely overextended ORDINARY target
+    /// still drives below this floor, so BL837a's synthetic far-target case
+    /// stays refused. Re-tune from here with `history_sweep`, not by
+    /// re-guessing a round number.
+    int sustainable_campaign_floor_q = 80;
+
+    /// SUSTAINABLE-REACH FLOOR FOR A STANDING GARRISON. Lower than the
+    /// campaign floor on purpose: an army already standing on ground it holds
+    /// can live thinner than one being asked to march onto new ground, so a
+    /// region only starves once reach has eaten essentially ALL of its
+    /// terrain-priced supply. At or below this, the garrison cannot be
+    /// maintained and attrites (see `unsustained_army_attrition_q`) — the
+    /// standing-army half of "reach gates", CIVILISATION.md's sharpened
+    /// question B: not "can I take this" but "can I KEEP AN ARMY THERE".
+    int sustainable_garrison_floor_q = 0;
+
+    /// Per-mille of `army_stock` lost per YEAR to a garrison standing beyond
+    /// `sustainable_garrison_floor_q`. An army beyond sustainable reach cannot
+    /// be maintained — this is what makes that literally true rather than a
+    /// sentence in a doc: it starves at home the same way a campaign starves
+    /// crossing open water (MILITARY_HISTORY.md § Forage), on the same
+    /// per-mille scale, just priced by distance instead of by domain.
+    int unsustained_army_attrition_q = 300;
+
     /// THE BURDEN OF BREADTH. Supply lost per region held beyond
     /// `free_holdings`, in per-mille. An empire spread thin supplies every
     /// campaign worse, so expansion eventually pays for itself in reach — the
@@ -1160,6 +1256,23 @@ struct history_sim_state
     /// (MILITARY_HISTORY.md § Forage) — it reached ground adjacent to neither
     /// land nor water its own polity holds. A subset of `stalled_campaigns`.
     int64_t starved_campaigns = 0;
+
+    // --- BL-837: ancient roads and the reach GATE ---------------------------
+
+    /// Campaign candidates REFUSED because the target sits beyond
+    /// `sustainable_campaign_floor_q` — the GATE, not the price. Distinct
+    /// from `illegal_campaigns` (a water-domain refusal): this one fires on
+    /// ordinary dry or forage-legal ground that is simply too far, unroaded,
+    /// to project force onto. A world with roads and one without should
+    /// differ here first, before either differs in battles.
+    int64_t reach_denied_campaigns = 0;
+
+    /// Years in which a standing garrison's own ground could not supply it
+    /// (`sustainable_garrison_floor_q`) and its `army_stock` attrited as a
+    /// result — "an army beyond sustainable reach cannot be maintained",
+    /// counted where it happens. Zero on a world where every holding sits
+    /// inside its capital's roaded reach.
+    int64_t unsustained_attrition_events = 0;
 
     /// Battles in which EITHER stack committed a naval entry (BL-779).
     ///
