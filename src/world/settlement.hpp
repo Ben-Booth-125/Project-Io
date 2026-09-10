@@ -534,6 +534,15 @@ struct settlement_state
     /// reference, so the caller copies these back onto the roster.
     std::vector<std::pair<int, int8_t>> cradle_origin_class;
 
+    /// The year each CRADLE culture was coined, as (culture id, year) pairs
+    /// (BL-870) — the other half of `cradle_origin_class`'s round-trip, and
+    /// for the same reason: `run_settlement` cannot write `creed_state`
+    /// itself, so the caller copies these back onto the roster. Every cradle
+    /// is `colonisation_start_year` (BL-856: "EVERY CRADLE STARTS AT THE SAME
+    /// MOMENT"); daughters carry their own arrival year on the culture record
+    /// directly, set where they are derived.
+    std::vector<std::pair<int, int64_t>> cradle_coined_year;
+
     /// THE CULTURES THE MIGRATION COINED (BL-856), in allocation order, with
     /// ids running one past the last cradle culture. Derived from their
     /// parents rather than rolled fresh, so a homeworld ends with a FAMILY of

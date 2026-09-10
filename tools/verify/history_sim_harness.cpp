@@ -1143,6 +1143,95 @@ int main()
               "B817i the same seed records identically twice");
     }
 
+    // --- R9  culture relations: opposition permits conquest (BL-870) -------
+    //
+    // THE SAME IDIOM AS R3/S1/S2/S3/B318 ABOVE: one world, one variable
+    // changed, the DIRECTION asserted rather than a count. Here the variable
+    // is the `creed_state` fed to the scorer, not a param — `two_polity_world`
+    // already seeds region "Home" pure culture 0 and region "Prize" pure
+    // culture 1, which makes `foreign_q` exactly 1000 for the only campaign
+    // candidate on the board and isolates `w_cult`'s new per-pair term from
+    // everything else the scorer weighs.
+    //
+    // TWO SYNTHETIC WORLDS OF CULTURES, not two synthetic worlds of ground:
+    // "kin" makes cultures 0 and 1 the same war-god temperament, the same
+    // country, freshly split (low kinship-years) — an alliance-shaped pair,
+    // opposition near zero. "strangers" makes them opposite war-god extremes,
+    // opposite countries, and severs the family tree (`parent = -1` on both)
+    // so no kinship discount can soften it — an enmity-shaped pair,
+    // opposition at its ceiling. Every other input — the regions, the
+    // distance, the params — is identical between the two runs.
+    {
+        auto war_pantheon = [](int zeal, int dominion) {
+            std::vector<culture_god> p(2);
+            p[0].domain = "the storm"; p[0].zeal = 5; p[0].dominion = 5; // chief god, inert here
+            p[1].domain = "war";       p[1].zeal = zeal; p[1].dominion = dominion;
+            return p;
+        };
+
+        creed_state kin;
+        {
+            culture c0; c0.pantheon = war_pantheon(5, 5);
+            c0.origin_farm_class = 0; c0.parent = -1; c0.coined_year = -4000;
+            culture c1 = c0; // SAME pantheon, SAME country: a daughter fresh off the split.
+            c1.parent = 0; c1.coined_year = -3900; // 100 years apart, the same people still.
+            kin.cultures = { c0, c1 };
+        }
+
+        creed_state strangers;
+        {
+            culture c0; c0.pantheon = war_pantheon(0, 0);
+            c0.origin_farm_class = 0; c0.parent = -1; c0.coined_year = -4000;
+            culture c1; c1.pantheon = war_pantheon(10, 10);
+            c1.origin_farm_class = 5; c1.parent = -1; c1.coined_year = -4000; // no shared ancestor
+            strangers.cultures = { c0, c1 };
+        }
+
+        // Sanity on the value BEFORE it ever reaches the scorer — a directly
+        // queryable check on the function BL-869 is meant to read later.
+        const int op_kin      = culture_opposition_q(kin.cultures, 0, 1);
+        const int op_strangers = culture_opposition_q(strangers.cultures, 0, 1);
+        std::printf("      opposition: kin %d/1000, strangers %d/1000\n",
+                    op_kin, op_strangers);
+        check(op_kin < op_strangers,
+              "R9a  opposition is symmetric axes discounted by kinship — a fresh split of "
+              "identical temperament and country reads far less opposed than two severed "
+              "strangers at both extremes");
+        check(op_kin == culture_opposition_q(kin.cultures, 1, 0)
+           && op_strangers == culture_opposition_q(strangers.cultures, 1, 0),
+              "R9b  opposition is SYMMETRIC (NR-815) — a matrix, not a directed pair like grudge");
+
+        history_sim_params p9 = params;
+        p9.start_year = 0; p9.stop_year = 400;
+        p9.neighbour_radius = 40; // Same widening R3 needed: the radius must not be what stops it.
+        p9.w_dist = 0;            // Isolate w_cult; distance is not under test here.
+
+        settlement_state w_kin       = two_polity_world(6);
+        settlement_state w_strangers = two_polity_world(6);
+
+        const history_sim_state a =
+            run_history_sim(w_kin, &kin, no_terrain, syn_gw, syn_gh, p9, 4713u);
+        const history_sim_state b =
+            run_history_sim(w_strangers, &strangers, no_terrain, syn_gw, syn_gh, p9, 4713u);
+
+        std::printf("      R9 kin: %lld battles / %lld conquests | strangers: %lld / %lld\n",
+                    static_cast<long long>(a.battles), static_cast<long long>(a.conquests),
+                    static_cast<long long>(b.battles), static_cast<long long>(b.conquests));
+
+        // DIRECTION FIXED 2026-09-10: opposition PERMITS conquest (it waives
+        // the foreignness discount), so the ENMITY-shaped pair is the one
+        // expected to conquer AT LEAST as readily, never the kin pair — the
+        // first cut of this assertion had it backwards, matching a scorer
+        // bug (see history_sim.cpp) it was written to confirm rather than
+        // catch.
+        check(a.battles > 0, "R9c  the near, kin pair is still campaigned for at all");
+        check(b.conquests >= a.conquests,
+              "R9d  ENMITY-SHAPED beats ALLIANCE-SHAPED: severed strangers conquer no less "
+              "readily than kin over the identical ground (opposition PERMITS conquest, it "
+              "does not forbid it, but it must not make the kin pair MORE likely to take "
+              "the ground than the strangers)");
+    }
+
     std::printf("\n%s (%d failure%s)\n",
                 g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");

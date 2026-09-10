@@ -595,6 +595,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
             if (cid >= 0 && cid < static_cast<int>(kepler_creeds.cultures.size()))
                 kepler_creeds.cultures[static_cast<std::size_t>(cid)].origin_farm_class = cls;
 
+        // The cradle cultures' own coining year (BL-870), the same round-trip
+        // for the same reason, one line above.
+        for (const auto& [cid, year] : kepler_settlement.cradle_coined_year)
+            if (cid >= 0 && cid < static_cast<int>(kepler_creeds.cultures.size()))
+                kepler_creeds.cultures[static_cast<std::size_t>(cid)].coined_year = year;
+
         // THE POPULATION MAP, DRAWN EARLY (BL-766). Before the Era -1 sim, not
         // after it: every region whose ground farms easily is given an opening
         // urban headcount and the centres those heads stand up, so the sim runs
