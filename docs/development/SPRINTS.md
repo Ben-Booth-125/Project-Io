@@ -59,41 +59,6 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 37 — how humanity spreads before it fights
-*Open · opened 2026-09-09*
-
-**Goal.** Ben, 2026-09-09: focus on the initial colonisation and spreading of humanity - how populations grow and develop agriculture in appropriate locations, how cultures grow out of that, and what philosophies emerge as A PRECURSOR TO MILITARY DOCTRINE. The ordering is the point: doctrine should be downstream of how a people came to live where they live, not an independent axis bolted on beside it.
-
-The evidence that this is a separate phase and not a mood: over 4,000 years seed 0 goes from 533 to 1,372 regions with 839 foundings and 9 battles. B384a - every world sees at least one region change hands by war - FAILS because several seeds fight zero times. The 258-battle pathology sprint 36 removed was war logic operating on ground colonisation had produced and had no answer for. One loop with one parameter set is being asked to serve both, which is why a dial like defence_levy_q has to satisfy empty frontiers and contested borders at once.
-
-**Planned.**
-- BL-846 (colonisation span) - the diffusion loop, the stated boundary, the year-cost walk over terrain alone.
-- BL-847 (domestication package) - affinity and breadth; the settlement gate; crossing.
-- BL-848 (culture by route) - inheritance by arrival, superseding nearest-cradle.
-- BL-849 (colonisation seeds partition) - settled cells as a hard input to the province partition.
-- BL-850 (predation caps pressure) - wildlife danger, logarithmic decay in population, re-wilding on a sack.
-- BL-851 (sweep separates cradle outcomes) - four outcomes currently read as one.
-- BL-852 (fragmentation from contact) - the tribal marches retire; fragmentation from interpenetration.
-- BL-817 (history playback record) + BL-829 (time-lapse view) + BL-830 (top-sixteen scoreboard) - the wizard round 4 surface, which is the INSTRUMENT the cultures are judged on, not decoration.
-
-**Done when.** Round 4 of the wizard plays a 4,000-year time-lapse on a 2D grid-map in the built app, on a live click and not a capture; the arc STARTUP.md sets as the criterion is legible from the map alone - origin, communication, conquest or diplomatic union, a stable dark age; and the cultures it produces are ones Ben judges worth having. Region count is NOT trimmed toward a target: regions become provinces and the country count is the empire phase's to reduce.
-
-**Risk.** THE SCALE QUESTION IS OPEN AND ITS COST IS SUPERLINEAR. Ben's brief says transform regions into provinces and do not aim for a small set. Regions are ~1,372 after 4,000 years; land provinces are ~22,153 - a factor of sixteen. BL-849 already rules that colonisation SEEDS the partition rather than drawing it, so they need not be one-for-one, but how far the region count grows is unsettled. Sprint 36 took the span from 6,923 to 1,288 ms and reach is STILL 41% of the run as a per-region Dijkstra, so sixteen times the regions is not sixteen times the cost. MEASURE REGION-COUNT SENSITIVITY BEFORE PICKING A NUMBER.
-
-THE VIEW HAS A DEPENDENCY THAT IS NOT BUILT. BL-829 draws from the BL-817 playback record, and BL-817 is designed only. The wizard shell IS built (BL-816, complete, live-verified) - round 4 exists as an honest amber placeholder. So the first day is the record, not the page.
-
-B384a MAY WANT RETIRING RATHER THAN FIXING. It asserts every world sees a region change hands by war and fails because several seeds fight zero times. This sprint's design says that is correct behaviour. Raise it; do not quietly delete it.
-
-CODE COMMENTS DESCRIBE SUPERSEDED RULES AND ARE CORRECT UNTIL THEIR ITEMS LAND - nearest-cradle inheritance (BL-848) and welding (BL-852). Fix each WITH its change.
-
-AND THE STANDING TRAP APPLIES DOUBLE HERE: creeds, philosophies and cultures are exactly where a real proper noun is most tempting. Real history transfers as MECHANISM only.
-
-OPENED 2026-09-09 out of sprint 36's redirect. Sprint 36 was closed rather than renamed so its landed military work stays attached to the sprint that did it.
-
-THE FOUR EMPIRE-PHASE ITEMS ARE IN THE POOL, unbuilt and untouched: BL-837 (ancient logistics and roads), BL-838 (fear of being next), BL-823 (anti-hegemon levers), BL-839 (turbulence lean). Each carries a note to re-scope against whatever boundary this sprint settles. BL-845 (the quiet worlds' 1:1 battle/conquest ratio) may well be answered by this sprint rather than by any work of its own.
-
-DESIGN PASS CLOSED 2026-09-09. docs/generation/COLONISATION.md is new and is the authority for the span - sibling to MILITARY_HISTORY.md, one doc per concern. Ben's five design calls: DIFFUSION with no actor (so no AI-behaviour grant is needed, and it must not become precedent for one); a STATED boundary year, not a derived one; a DOMESTICATION PACKAGE that spreads and gates settlement; philosophy is the EXISTING pantheon with no new axis; and colonisation SEEDS the province partition rather than drawing it. Two later rulings: predation caps a penned people's pressure and decays LOGARITHMICALLY IN POPULATION, and fragmentation is re-derived FROM CONTACT with the creeds' tribal marches retired (NR-808). Seven items minted, BL-846..BL-852. Four questions stay open in the doc and none is a design call - three magnitudes for the sweep and one derivation inside BL-852.
-
 ### Sprint 38 — how city states become empires
 *Open · opened 2026-09-09*
 
@@ -180,12 +145,12 @@ BL-861 (no-conquest measurement, sprint 37) and BL-823 (anti-hegemon levers, no 
 | 33 | Context economy - the corpus stops charging every session for what one session needs | OPENED 2026-09-07 and ran hard: THREE blocks, 16 items delivered, retro recorded below. CLOSED 2026-09-08 on Ben's call clearing the board - "let's approach the next task with a fresh mindset" - NOT because it failed. Its unfinished remainder (BL-807 the corpus citations, BL-808 the reach defect, BL-809 the red province assertions, plus BL-810 and BL-811 filed on the way past) was cancelled into the backlog archive the same day. The retro is the record of what this sprint actually delivered and stands unchanged. |
 | 35 | Watching the world be made | CLOSED 2026-09-09 with its placeholder elements standing. The visibility scaffold landed and was verified live; the sim work it would show turned out to be much larger than the sprint assumed, and moves to 36. Three measurements refuted three assumptions, which is the sprint real output. |
 | 36 | a revised look at ancient history | CLOSED 2026-09-09, REDIRECTED RATHER THAN FINISHED. Three of six items landed and are verified: the ancient pass is 5.4x/2.9x faster over 4,000 years and the dead-region ping-pong is gone at its cause. The four unbuilt items were empire-phase and went back to the pool when Ben observed that colonisation and empire want different rules. Sprint 37 takes that up. |
+| 37 | how humanity spreads before it fights | CLOSED 2026-09-10. REOPENED 2026-09-09 for a design addendum, having been closed the same day. The gap found: the migration builds a family tree of peoples (BL-856) and DISCARDS it, so kinship -- the natural substrate for culture similarity -- is unrecoverable by the empire phase. BL-865 (the addendum's whole reason to reopen) LANDED 2026-09-09 and is verified on main -- culture now carries `parent`/`origin_farm_class`, walking every daughter back to a cradle. KEPT OPEN 2026-09-10 for seven owed items -- BL-849, BL-852, BL-853, BL-854, BL-855, BL-859, BL-861 -- ALL NOW DELIVERED (BL-859 cancelled and redirected to BL-888, also delivered). BL-861 (no conquest across the 4000-year span) resolved as a measured SIDE EFFECT of BL-849/852/855/888 together, not a direct fix to war logic -- history_sweep across 16 seeds now shows every seed fighting (median 61 battles, range 7-141; seed 0 specifically went from 0 to 61). Sprint 38's BL-868 is blocked on the same symptom and should be re-checked against this before further diagnosis. |
 | 40 | three trees, one grammar | CLOSED 2026-09-10, the same day it opened, as a DESIGN sprint: the three trees, the grammar, the lint and the Empire scorer are written and linted; the six build items BL-881..BL-886 go to the pool. Ben: "I'm reluctant to push further when Empire and Industry have not landed yet" - the build waits on sprints 38 and 39. |
-| 37 | how humanity spreads before it fights | REOPENED 2026-09-09 for a design addendum, having been closed the same day. The gap found: the migration builds a family tree of peoples (BL-856) and DISCARDS it, so kinship -- the natural substrate for culture similarity -- is unrecoverable by the empire phase. BL-865 (the addendum's whole reason to reopen) LANDED 2026-09-09 and is verified on main -- culture now carries `parent`/`origin_farm_class`, walking every daughter back to a cradle. KEPT OPEN ANYWAY (Ben, 2026-09-10): seven items from the original close's owed list are still untouched -- BL-849, BL-852, BL-853, BL-854, BL-855, BL-859, BL-861. BL-861 (no conquest across the 4000-year span) is the same symptom sprint 38's BL-868 is blocked on, diagnosed a sprint earlier and never resolved -- read the two together. |
 | 38 | how city states become empires | 8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). BL-868 (creeds raise armies) is the one holdout, blocked seven attempts running -- not a wiring defect, see notes. |
 
 **Next up.** SPRINT 38 IS OPEN (opened 2026-09-09, given its own entry 2026-09-10) - how city states become empires. 8 of 9 items are landed and verified on main; BL-868 (creeds raise armies) is the sole holdout after seven verification attempts, now understood to be a fixture problem entangled with BL-837/BL-872's reach and supply mechanics rather than a wiring defect. Next session's whole focus here is BL-868: redesign its test fixture for the post-BL-837/872 world, or give it a longer stop_year, before attempting an eighth pass. Sprint 37 remains open pending its reopened design addendum (Ben, 2026-09-09: 'we have more work to do for sprint 37').
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*55 sprints archived cold; 2 open/gated in the hot store.*
+*56 sprints archived cold; 1 open/gated in the hot store.*
