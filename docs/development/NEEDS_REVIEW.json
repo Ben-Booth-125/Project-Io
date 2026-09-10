@@ -421,6 +421,44 @@
   },
   {
    "id": "NR-823",
+   "title": "CALL: reach GATES conquest (2026-09-09) and the arc requires conquest to COMPOUND (2026-09-10) pull against each other",
+   "raised": "2026-09-10",
+   "kind": "question",
+   "status": "resolved",
+   "source": "Sprint 38 close. history_sim.hpp sec sustainable_campaign_floor_q already says in the source: \"80 IS WHERE THIS SHIPS, PENDING BEN'S CALL.\"",
+   "what": "Ben ruled 2026-09-09 that reach GATES a campaign rather than pricing it -- a wall, not a toll -- so a rich polity cannot buy past geography. Ben ruled 2026-09-10 that the world must show polities eliminated, empires forming, empires collapsing, and unequal survivors. A hard gate caps how far success can carry before it must stop, and the field's own comment records that it \"removes that long tail entirely\" in which a shrinking realm's last holdout finally falls. Both rulings are live and they conflict.",
+   "why_it_matters": "This is the crux of BL-889 (conquest must compound) and it decides what that item is allowed to change. Measured evidence that the gate is a hard veto: history_sim_harness fails R3a2/R3a3 on main with \"near: 6 battles / 1 conquests | far: 0 battles / 0 conquests\" in a case that deliberately sets neighbour_radius=40 and w_dist=0 so ONLY supply decay can stop the far target. A prior investigation already showed floors of 80 and 20 give identical elimination counts, so this is not a calibration question.",
+   "options": "A) Keep the gate absolute and find compounding elsewhere (roads/reach must GROW with success, so the wall moves outward as an empire wins -- BL-892 is relevant, reach works are currently inert). B) Soften the gate to a steep price above a floor, restoring the low-probability killing blow. C) Keep the gate but make reach propagate through centre chains, which is BL-887 and is already deferred pending tech progression.",
+   "recommendation": "A, on the evidence -- it satisfies both rulings rather than trading one off. A wall that MOVES when you win is still a wall, and BL-892 (reach works inert) suggests the intended mechanism for moving it already exists and is broken.",
+   "items": [
+    "BL-889",
+    "BL-892",
+    "BL-887",
+    "BL-868"
+   ],
+   "resolved": "2026-09-10",
+   "resolution": "BEN, 2026-09-10: option A -- keep the wall, make it move. The 2026-09-09 reach-GATES-not-prices ruling stands; the gate is not fixed, so winning extends reach outward and geography must be BUILT past rather than bought past. Written into CIVILISATION.md sec The arc the phase must produce. B (soften to a price) and C (centre chains, BL-887) both explicitly declined. Consequence: BL-892 raised to priority A -- it records the widening mechanism inert (W7b), which is the lever BL-889 now rests on. BL-889 may NOT be delivered by lowering sustainable_campaign_floor_q."
+  },
+  {
+   "id": "NR-824",
+   "title": "CALL: BL-861 (no conquest in the span) is met as literally written and unmet in intent -- close it or rewrite it?",
+   "raised": "2026-09-10",
+   "kind": "question",
+   "status": "resolved",
+   "source": "Sprint 38 close, measured against history_sweep at 16 seeds on main (c83a0d74).",
+   "what": "BL-861 was filed on \"0 battles, 0 conquests, 611 foundings\" on seed 0 and asked that the cause be measured. Measured: battles median 412, conquests median 386, zero worlds with zero conquest, B384a passes. Its stated DONE WHEN is satisfied. But the world it wanted -- one with a real arc in it -- is not there: 0 eliminations in 16/16, largest empire 3.3%, rise/peak/fall 0/16.",
+   "why_it_matters": "Leaving it open with a stale premise is how backlog prose rots into a false record; closing it as delivered risks reading as if the underlying design intent was met, which it was not. BL-889 now carries the surviving question.",
+   "options": "A) Close as delivered-by-sprint-38, with BL-889 named as the successor. B) Rewrite onto the surviving question and keep the id. C) Cancel as superseded.",
+   "recommendation": "A -- the item did its job (it forced the measurement that found the real defect), and BL-889 carries the intent forward with the evidence attached.",
+   "items": [
+    "BL-861",
+    "BL-889"
+   ],
+   "resolved": "2026-09-10",
+   "resolution": "BEN, 2026-09-10: CANCEL as superseded -- not the \"close as delivered\" that was recommended. BL-861 is marked cancelled rather than complete, which is the honest record: the item asked for a cause to be measured, the measurement happened, and it found a different defect than the one the item described. Its surviving question is carried by BL-889 (conquest must compound). A cancelled row is also what \"--status cancelled finds work that was closed unbuilt\" is for."
+  },
+  {
+   "id": "NR-825",
    "title": "BL-855's degree cap (10) reduces reach-rebuild growth but doesn't cleanly flatten it at 4,000+ regions",
    "raised": "2026-09-10",
    "kind": "question",

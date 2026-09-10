@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*18 entries — 15 open, 3 resolved.*
+*20 entries — 15 open, 5 resolved.*
 
 ---
 
@@ -237,7 +237,7 @@ Colonisation 3 rings / 3 milestones, Empire 4 / 4, Industry 4 / 4. The ring-1 mi
 
 *Files: `docs/generation/trees/TREES.md`, `tools/session/tree_lint.js`*
 
-### NR-823 — BL-855's degree cap (10) reduces reach-rebuild growth but doesn't cleanly flatten it at 4,000+ regions
+### NR-825 — BL-855's degree cap (10) reduces reach-rebuild growth but doesn't cleanly flatten it at 4,000+ regions
 *question · raised 2026-09-10 · from BL-855 (adjacency caps region count), delivered 2026-09-10 per your NR-809 call to pursue the fix now.*
 
 max_neighbour_degree=10 was measured (mean degree ~7-9 early game, climbing past 20 by 4,000yr uncapped) and chosen to sit at the top of the early-game band. history_span_cost post-fix shows ms/rebuild growth reduced (roughly region^1.5 instead of region^2) but not fully flat at the larger region counts this run reached (up to ~4,400) -- e.g. seed 0: 0.084/0.164/0.235/0.156 ms/rebuild at 1748/2931/3601/3718 regions, with a drop at the final checkpoint rather than a plateau. Reach-rebuild count is also driven by battle frequency independent of the fix, which confounds a clean read.
@@ -322,4 +322,26 @@ Two readings. (A) THE COAST, adopted: the Culture round still ends when every ha
 > **RESOLVED.** RESOLVED (Ben, 2026-09-09): reading A, the COAST, confirmed - and the boundary moved with it. The Culture round keeps its derived terminating condition, and the world holds what migration left it until the stated boundary, simulating nothing in between. THE BOUNDARY IS 400 BCE, NOT 0 CE, and pass 1 now covers 3,600 years rather than 4,000: Culture 2400 BCE -> 400 BCE (2,000 years), Empires 400 BCE -> 1200 CE (1,600 years). 1200 CE is unmoved, so the coast to 1560, pass 2 and the 1960 epoch are untouched. One claim written under the first cut is now FALSE and was removed: 0 CE was 'a year the engine already knows' because the sim's ancient arc ends there - 400 BCE is not, so the split is real work rather than free. Written into CIVILISATION.md sec The span is 400 BCE to 1200 CE, which owns the arithmetic; COLONISATION.md, STARTUP.md and GENERATION_STRATEGY.md take their figures from it. Carried by BL-871.
 
 *Files: `docs/generation/CIVILISATION.md`, `docs/generation/COLONISATION.md`, `docs/ui/STARTUP.md`*
+
+### NR-823 — CALL: reach GATES conquest (2026-09-09) and the arc requires conquest to COMPOUND (2026-09-10) pull against each other
+*question · raised 2026-09-10 · from Sprint 38 close. history_sim.hpp sec sustainable_campaign_floor_q already says in the source: "80 IS WHERE THIS SHIPS, PENDING BEN'S CALL."*
+
+Ben ruled 2026-09-09 that reach GATES a campaign rather than pricing it -- a wall, not a toll -- so a rich polity cannot buy past geography. Ben ruled 2026-09-10 that the world must show polities eliminated, empires forming, empires collapsing, and unequal survivors. A hard gate caps how far success can carry before it must stop, and the field's own comment records that it "removes that long tail entirely" in which a shrinking realm's last holdout finally falls. Both rulings are live and they conflict.
+
+**Why it matters.** This is the crux of BL-889 (conquest must compound) and it decides what that item is allowed to change. Measured evidence that the gate is a hard veto: history_sim_harness fails R3a2/R3a3 on main with "near: 6 battles / 1 conquests | far: 0 battles / 0 conquests" in a case that deliberately sets neighbour_radius=40 and w_dist=0 so ONLY supply decay can stop the far target. A prior investigation already showed floors of 80 and 20 give identical elimination counts, so this is not a calibration question.
+
+> **Recommendation:** A, on the evidence -- it satisfies both rulings rather than trading one off. A wall that MOVES when you win is still a wall, and BL-892 (reach works inert) suggests the intended mechanism for moving it already exists and is broken.
+
+> **RESOLVED.** BEN, 2026-09-10: option A -- keep the wall, make it move. The 2026-09-09 reach-GATES-not-prices ruling stands; the gate is not fixed, so winning extends reach outward and geography must be BUILT past rather than bought past. Written into CIVILISATION.md sec The arc the phase must produce. B (soften to a price) and C (centre chains, BL-887) both explicitly declined. Consequence: BL-892 raised to priority A -- it records the widening mechanism inert (W7b), which is the lever BL-889 now rests on. BL-889 may NOT be delivered by lowering sustainable_campaign_floor_q.
+
+### NR-824 — CALL: BL-861 (no conquest in the span) is met as literally written and unmet in intent -- close it or rewrite it?
+*question · raised 2026-09-10 · from Sprint 38 close, measured against history_sweep at 16 seeds on main (c83a0d74).*
+
+BL-861 was filed on "0 battles, 0 conquests, 611 foundings" on seed 0 and asked that the cause be measured. Measured: battles median 412, conquests median 386, zero worlds with zero conquest, B384a passes. Its stated DONE WHEN is satisfied. But the world it wanted -- one with a real arc in it -- is not there: 0 eliminations in 16/16, largest empire 3.3%, rise/peak/fall 0/16.
+
+**Why it matters.** Leaving it open with a stale premise is how backlog prose rots into a false record; closing it as delivered risks reading as if the underlying design intent was met, which it was not. BL-889 now carries the surviving question.
+
+> **Recommendation:** A -- the item did its job (it forced the measurement that found the real defect), and BL-889 carries the intent forward with the evidence attached.
+
+> **RESOLVED.** BEN, 2026-09-10: CANCEL as superseded -- not the "close as delivered" that was recommended. BL-861 is marked cancelled rather than complete, which is the honest record: the item asked for a cause to be measured, the measurement happened, and it found a different defect than the one the item described. Its surviving question is carried by BL-889 (conquest must compound). A cancelled row is also what "--status cancelled finds work that was closed unbuilt" is for.
 

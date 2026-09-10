@@ -45,6 +45,17 @@ settings hub (no Load/Save on the menu; `--load` is a command-line path). Conten
 
 - **Seed** — hex entry, a one-shot **Roll** (a `random_device` draw feeds *only*
   the seed value; generation stays a pure function of it), and **Copy seed**.
+  **The wizard OPENS on a rolled seed, not on a fixed one (Ben, 2026-09-10):**
+  *"Let's lose the framing of seeded worlds... it allows the player to have a higher degree of
+  chance when they do choose to reroll, and it gives the player the ability to see if their world
+  will contain these types of structures."* A default of `0` makes every new game the same
+  reference world unless the player thinks to press Roll, which turns rerolling into a thing you
+  must know to do rather than the ordinary way in.
+  **This does not touch the determinism rule.** The entropy stops here, exactly as the Roll
+  button's already does — `world/*` stays a pure function of the seed, so save, replay and the
+  multiplayer argument are untouched, and every harness and golden keeps passing its seed
+  explicitly. Seed `0` still names the reference world; it is simply no longer what you get by
+  accident.
 - **Resources** — abundance radio: Sparse / Lean / Standard (Standard is the
   Earth-like ceiling, GENERATION_STRATEGY.md § The resource ceiling).
 - **Bodies** — a disabled slider, fixed at 5; the count knob is phased to a
