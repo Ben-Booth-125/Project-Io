@@ -12,10 +12,11 @@
 //       every creed line carries its consequence (PLANETOLOGY.md §
 //       Presentation, non-negotiable).
 //
-//   C3  THE CREED DRIVES. A warlike synthetic culture welds its neighbour and
-//       fragmentation_q FALLS; a peaceable one leaves it untouched; and no
-//       amount of welding can push it below half its incoming value, so
-//       warlike creeds cannot manufacture a hegemon by themselves.
+//   C3  FRAGMENTATION FROM CONTACT (BL-852, resolving NR-808). Heavy contact
+//       (a high average region_mix_q) pulls fragmentation_q DOWN; zero
+//       contact leaves it untouched; and no amount of contact can push it
+//       below half the STRUCTURAL value it started from, so creeds alone
+//       still cannot manufacture a hegemon by themselves (BL-224).
 //
 //   C4  GLOBALISATION CLOSES THE STORY. Exactly one common-tongue line, dated
 //       1951 (nine years before the epoch), after every shrine and war line.
@@ -55,19 +56,6 @@ bool contains(const std::string& s, const char* needle)
     return s.find(needle) != std::string::npos;
 }
 
-/// A synthetic culture with a hand-set temperament. The pantheon layout
-/// matters: index 0 is the chief, index 1 the war god (creeds.cpp's contract).
-culture synthetic_culture(int cradle, const char* name, int zeal, int dominion, int aggression)
-{
-    culture c;
-    c.cradle = cradle;
-    c.name = name;
-    c.pantheon.push_back(culture_god{ "Chief", "the storm", "who splits the sky", 4, 5 });
-    c.pantheon.push_back(culture_god{ "Warlord", "war", "who counts the spears", zeal, dominion });
-    c.aggression_q = aggression;
-    return c;
-}
-
 history_ladder_state synthetic_ladder(int fragmentation_q, int conquest_q, int cradles)
 {
     history_ladder_state h;
@@ -84,44 +72,42 @@ int main()
 {
     std::printf("=== creeds (BL-235) ===\n\n");
 
-    // --- C3 the creed drives ------------------------------------------------
-    // Asserted on synthetic states first, so the claim holds for any creed,
-    // not just the one Kepler happens to roll.
+    // --- C3 fragmentation from contact ---------------------------------------
+    // Asserted on synthetic ladders first, so the claim holds for any settled
+    // map, not just the one Kepler happens to grow.
     {
-        // A maximal aggressor against a defenceless neighbour on open ground:
-        // attack = 10*60 + 1000/2 + r(120) >= 1100; defence < 240. Always won.
-        creed_state cs;
-        cs.cultures.push_back(synthetic_culture(0, "Marauders", 10, 10, 1000));
-        cs.cultures.push_back(synthetic_culture(1, "Farmers", 0, 0, 0));
+        // Heavy contact everywhere: every region's nearest neighbour is a
+        // different people (region_mix_q == 1000 throughout). The average is
+        // 1000, which would zero fragmentation outright if unbounded - the
+        // floor is the point of this case.
         history_ladder_state hl = synthetic_ladder(800, 0, 2);
-
-        record_tribal_conflict(cs, hl, 0xB235u);
+        record_cultural_contact(hl, std::vector<int>(6, 1000));
         check(hl.fragmentation_q < 800,
-              "C3 a won tribal war welds cradles - fragmentation falls");
-        check(hl.fragmentation_q >= 400,
-              "C3 welding is floored at half the incoming fragmentation");
-        check(!cs.history.empty() && contains(cs.history.back().event, "war-bands"),
-              "C3 the war writes its line");
+              "C3 heavy contact pulls fragmentation down");
+        check(hl.fragmentation_q == 400,
+              "C3 contact is floored at half the STRUCTURAL fragmentation (BL-224)");
 
-        // Peaceable creeds leave the ladder untouched.
-        creed_state calm;
-        calm.cultures.push_back(synthetic_culture(0, "Weavers", 2, 2, 100));
-        calm.cultures.push_back(synthetic_culture(1, "Potters", 2, 2, 100));
+        // Zero contact - every region's nearest neighbour is its own people -
+        // leaves the ladder exactly where Stage 3 (terrain + cradle count)
+        // set it. No roll, no war: this must be exact, not merely close.
         history_ladder_state hl2 = synthetic_ladder(800, 0, 2);
-        record_tribal_conflict(calm, hl2, 0xB235u);
-        check(hl2.fragmentation_q == 800 && calm.history.empty(),
-              "C3 peaceable creeds farm instead - no wars, no welding");
+        record_cultural_contact(hl2, std::vector<int>(6, 0));
+        check(hl2.fragmentation_q == 800,
+              "C3 zero contact leaves fragmentation untouched");
 
-        // Expensive ground defends: same marauders, conquest cost at maximum.
-        // defence >= 0 + 0 + 500 + 0; attack floor 1100 still clears it, so
-        // raise the defender too - the point is the cost REACHES the fight.
-        creed_state cs3;
-        cs3.cultures.push_back(synthetic_culture(0, "Marauders", 10, 4, 600));
-        cs3.cultures.push_back(synthetic_culture(1, "Highlanders", 8, 8, 400));
-        history_ladder_state hl3 = synthetic_ladder(800, 1000, 2);
-        record_tribal_conflict(cs3, hl3, 0xB235u);
-        check(hl3.fragmentation_q == 800,
-              "C3 conquest cost prices the march - the highland frontier holds");
+        // Partial contact lands between the two: average mix 300 over a
+        // structural 800 subtracts exactly 300, well clear of the floor.
+        history_ladder_state hl3 = synthetic_ladder(800, 0, 2);
+        record_cultural_contact(hl3, std::vector<int>{ 300, 300, 300, 300 });
+        check(hl3.fragmentation_q == 500,
+              "C3 partial contact subtracts its own average, not a fixed step");
+
+        // No settled regions at all - nothing to read contact off - is a
+        // no-op, not a divide-by-zero.
+        history_ladder_state hl4 = synthetic_ladder(800, 0, 2);
+        record_cultural_contact(hl4, {});
+        check(hl4.fragmentation_q == 800,
+              "C3 an unsettled map leaves fragmentation untouched");
     }
 
     // --- Generate the real world twice --------------------------------------

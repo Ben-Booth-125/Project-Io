@@ -45,7 +45,6 @@ struct rng
 // FRESH stage tags — none collides with the ladder's (0x5A11 / 0xC4A7 /
 // 0xF2A6), the continents' (0xC017) or the planetology chain's.
 constexpr uint32_t tag_pantheon = 0xD317u; // Pantheon + tongue generation.
-constexpr uint32_t tag_conflict = 0x1B47u; // The tribal-conflict stage.
 
 int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
@@ -226,70 +225,31 @@ creed_state run_creeds(const planetology_state& pl,
 }
 
 // ---------------------------------------------------------------------------
-// The tribal-conflict stage — the creeds reach the political map.
+// Fragmentation from contact (BL-852, retiring the tribal marches NR-808
+// resolved) — the creeds reach the political map without a war.
 // ---------------------------------------------------------------------------
 
-void record_tribal_conflict(creed_state& cs,
-                            history_ladder_state& hl,
-                            uint32_t seed)
+void record_cultural_contact(history_ladder_state& hl,
+                             const std::vector<int>& region_mix_q)
 {
-    if (cs.cultures.size() < 2 || hl.cradles.size() < 2)
+    if (region_mix_q.empty())
         return;
 
-    rng r(seed, tag_conflict);
-    const int floor_q = hl.fragmentation_q / 2; // Welding can never halve-and-more.
-    int welds = 0;
+    // THE NON-HEGEMONY FLOOR (BL-224), re-derived over the STRUCTURAL reading
+    // Stage 3 computed from terrain and cradle count alone, before any
+    // culture existed to meet another — the same base value and the same
+    // half-floor the retired welding enforced, so creeds alone still cannot
+    // manufacture a hegemon by themselves.
+    const int floor_q = hl.fragmentation_q / 2;
 
-    for (std::size_t i = 0; i < cs.cultures.size(); ++i)
-    {
-        const culture& a = cs.cultures[i];
-        if (a.aggression_q <= 550) continue; // Peaceable creeds farm instead.
+    // Average interpenetration across every settled region: how far a second
+    // people has mixed into ground a plurality culture still holds. No roll,
+    // no pairwise comparison, no war — a pure read of the settled shares.
+    int64_t total = 0;
+    for (const int m : region_mix_q) total += clampi(m, 0, 1000);
+    const int avg_mix_q = static_cast<int>(total / static_cast<int64_t>(region_mix_q.size()));
 
-        // Nearest other cradle by grid distance, columns wrapping; ties break
-        // on the LOWEST index, same rule as every other selection in the layer.
-        const agrarian_cradle& ac = hl.cradles[static_cast<std::size_t>(a.cradle)];
-        int best = -1, best_d = 1 << 30;
-        for (std::size_t j = 0; j < cs.cultures.size(); ++j)
-        {
-            if (j == i) continue;
-            const agrarian_cradle& bc = hl.cradles[static_cast<std::size_t>(cs.cultures[j].cradle)];
-            const int dc = std::abs(ac.col - bc.col);
-            const int dr = std::abs(ac.row - bc.row);
-            const int d  = std::min(dc, 180 - dc) + dr; // gw wrap priced coarsely.
-            if (d < best_d) { best_d = d; best = static_cast<int>(j); }
-        }
-        if (best < 0) continue;
-        const culture& b = cs.cultures[static_cast<std::size_t>(best)];
-
-        // Attack must clear the defence AND the ground: the ladder's conquest
-        // cost prices the march, exactly as Stage 2 priced it for armies.
-        const int attack  = a.pantheon[1].dominion * 60 + a.aggression_q / 2 + r.pick(120);
-        const int defence = b.pantheon[1].dominion * 60 + b.aggression_q / 4
-                          + hl.conquest_cost_q / 2 + r.pick(120);
-
-        const int jitter = r.pick(300);
-        const int64_t year = -(1500 - static_cast<int64_t>(i) * 60 + jitter);
-
-        if (attack > defence)
-        {
-            ++welds;
-            cs.history.push_back(history_event{
-                years_from_calendar_year(year), chain_stage::legacy,
-                "The " + a.name + " war-bands march under " + a.pantheon[1].name +
-                    "; the " + b.name + " cradle falls.",
-                "-> two peoples weld into one; fragmentation falls" });
-        }
-        else
-        {
-            cs.history.push_back(history_event{
-                years_from_calendar_year(year), chain_stage::legacy,
-                "The " + a.name + " war-bands break against the " + b.name + " ground.",
-                "-> conquest priced too high; the frontier holds" });
-        }
-    }
-
-    if (welds > 0)
-        hl.fragmentation_q = std::max(floor_q, hl.fragmentation_q - welds * 120);
+    hl.fragmentation_q = std::max(floor_q, hl.fragmentation_q - avg_mix_q);
 }
 
 // ---------------------------------------------------------------------------

@@ -12,11 +12,15 @@
 // god. ONE pantheon per culture (Ben, 2026-07-31): the tongue and the creed
 // are the same act of self-description.
 //
-// THE CREED DRIVES, IT DOES NOT NARRATE (the BL-221 rule, inherited): each
-// culture's temperament — zeal (relish for battle) and dominion (expectation
-// of prevailing) — prices the tribal-conflict stage, which welds cradles
-// together and LOWERS the ladder's fragmentation before nation_params_from_
-// ladder reads it. A world of warlike creeds grows fewer, larger polities.
+// THE CREED DRIVES, IT DOES NOT NARRATE (the BL-221 rule, inherited), but not
+// through war any more (BL-852, resolving NR-808;
+// docs/generation/COLONISATION.md § Fragmentation comes from contact). The
+// tribal marches retired: fragmentation is now read off how far two peoples'
+// settled shares interpenetrate (`record_cultural_contact`), and a world
+// whose cultures never met stays as fragmented as its terrain alone made it.
+// `aggression_q`, below, survives unchanged as the temperament reading the
+// Era -1 sim consumes as doctrine — it prices how a polity fights once it
+// exists, and stops setting the nation count.
 //
 // Globalisation closes the pass: at the end of generation a common trade
 // tongue spreads, rendered as the player's own language (English for now —
@@ -58,7 +62,9 @@ struct culture
     std::vector<culture_god> pantheon;
 
     /// 0-1000 — how readily this culture's war-bands march, derived from the
-    /// pantheon's zeal. Consumed by record_tribal_conflict.
+    /// pantheon's zeal. Survives BL-852 unchanged as the Era -1 sim's
+    /// DOCTRINE input (`history_sim.cpp` reads it per attacker/defender); it
+    /// no longer sets the nation count — `record_cultural_contact` does.
     int aggression_q = 0;
 
     // --- Descent (BL-865) --------------------------------------------------
@@ -120,19 +126,31 @@ creed_state run_creeds(const planetology_state& pl,
                        const std::vector<entity_id>& tile_ids,
                        int gw, int gh, uint32_t seed);
 
-/// The tribal-conflict stage — where the creeds start DRIVING.
+/// Fragmentation, re-derived from CONTACT rather than war (BL-852, resolving
+/// NR-808; docs/generation/COLONISATION.md § Fragmentation comes from
+/// contact). Retires the tribal marches: no aggression-vs-defence
+/// comparison, no roll, no pairwise war between cradles.
 ///
-/// Walks cradle pairs in index order; a culture whose aggression clears the
-/// conquest cost marches on its nearest neighbour, and a won war WELDS the
-/// two cradles: @p hl.fragmentation_q falls (bounded — it can never fall
-/// below half its incoming value, so warlike creeds cannot weld a fragmented
-/// world into a hegemon by themselves). Must run BEFORE
-/// nation_params_from_ladder so the welding reaches the political map.
+/// @p region_mix_q is one entry per SETTLED region — 1000 minus that
+/// region's plurality culture share (`region::culture.weight_q[0]`,
+/// `settlement.hpp`), i.e. how far a second people has interpenetrated that
+/// ground. The caller derives it there rather than this function taking a
+/// dependency neither `creeds.hpp` nor `history_ladder.hpp` can afford:
+/// `settlement.hpp` already includes both of them. Two cultures whose shares
+/// mix heavily across a broad frontier pull @p hl.fragmentation_q down; two
+/// that never met leave it exactly where Stage 3 (terrain + cradle count)
+/// set it.
 ///
-/// Appends its war lines to @p cs.history.
-void record_tribal_conflict(creed_state& cs,
-                            history_ladder_state& hl,
-                            uint32_t seed);
+/// THE NON-HEGEMONY FLOOR (BL-224), RE-DERIVED: contact can never pull
+/// fragmentation below half of the STRUCTURAL reading Stage 3 computed
+/// before any culture existed to meet another — the same floor the retired
+/// welding enforced, over the same base value, because creeds alone still
+/// must not be able to manufacture a hegemon by themselves.
+///
+/// Pure and seedless: a deterministic function of the settled map's own
+/// shares, with nothing left to roll.
+void record_cultural_contact(history_ladder_state& hl,
+                             const std::vector<int>& region_mix_q);
 
 /// The globalisation event that closes generation: a common trade tongue
 /// spreads through every realm. From this point the record is rendered in the
