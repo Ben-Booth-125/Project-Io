@@ -1,76 +1,73 @@
-# Next session — close BL-868, then close sprint 38
+# Next session — sprint 38, reframed onto the arc
 
-Written 2026-09-10 at the close of a batch-delivery session that landed 8 of sprint 38's 9
-items. **This note replaces the 2026-09-09 handover — that one's decomposition work is done.**
+Written 2026-09-10, replacing the earlier note of the same day. **That note's central diagnosis
+was wrong and this one says why**, because the mistake is worth not repeating.
 
-## Where things stand
+## What changed
 
-All of CIVILISATION.md's Empires design is built and verified on main except one item:
+The previous handover said sprint 38 had one holdout, BL-868 (creeds raise armies), blocked by a
+`two_polity_world` fixture that BL-837 and BL-872 had broken. Ben reframed the close around what
+he actually wants out of the phase — *volatility, conflict, and asymmetric polities* — and the
+sweep was run to see where each of those stands.
 
-| Item | Status |
+**`history_sweep`, 16 seeds, main at `c83a0d74`:**
+
+| | Median | Range | |
+|---|---|---|---|
+| Battles per world | 412 | 4 – 1000 | healthy |
+| Conquests per world | 386 | 4 – 740 | healthy |
+| Worlds with zero conquest | 0 / 16 | | healthy |
+| Largest polity's share | **3.3%** | 2.1% – 5.4% | flat |
+| Polities eliminated | **0** | 0 in every world | flat |
+| Rise / peak / fall worlds | **0 / 16** | | flat |
+
+With 31–61 powers per world an even split is 1.6–3.2%. **Conflict is fixed; asymmetry and
+volatility are not.** 386 conquests per world and the political map ends the shape it started.
+
+**BL-868's fixture was never broken.** It was reporting the truth — conquest is capped
+*everywhere*, not just there — and seven passes read a correct null result as a fixture bug. The
+lesson: check the world-level instrument before rebuilding a synthetic fixture around a null.
+
+## Ben's rulings, 2026-09-10
+
+- **The arc.** *"Really I want to see polities be eliminated and empires to form, before
+  collapsing back into those smaller polities - with some surviving as larger kingdoms."* Written
+  into `GENERATION_STRATEGY.md` § The asymmetry is POLITICAL as well as economic and
+  `CIVILISATION.md` § The arc the phase must produce.
+- **A peaceable world is legitimate.** The claim is distributional; a seed that refuses war is not
+  a failure case. This settles the BL-861 / BL-854 standoff — `B384a` passes and did not need
+  retiring.
+- **The wall moves when you win** (NR-823). Reach still GATES rather than prices, so geography
+  cannot be *bought* past — but the gate is not fixed, so winning extends reach outward and
+  geography must be *built* past. Softening the gate to a price was declined; centre chains
+  (BL-887) stay deferred.
+- **Random worlds, wizard only.** The wizard opens on a rolled seed. Entropy stops at the UI, so
+  `world/*` stays pure and the determinism rule is untouched — no grant needed.
+- **BL-861 cancelled** as superseded (NR-824).
+
+## The work now
+
+| Item | |
 |---|---|
-| BL-873 (culture coining year) | complete |
-| BL-871 (empire span 400 BCE–1200 CE) | complete |
-| BL-866 (settlements are sparse) | complete |
-| BL-837 (ancient roads / reach gate) | complete |
-| BL-867 (materials spent on action) | complete |
-| BL-870 (culture relations) | complete |
-| BL-869 (civilisations from mixing) | complete |
-| BL-872 (centres from supply/governance) | complete |
-| **BL-868 (creeds raise armies)** | **open — seven attempts, unresolved** |
+| `BL-889` (conquest must compound) | The sprint's real subject. **May NOT be delivered by lowering `sustainable_campaign_floor_q`** — that is the softening Ben declined, and floors of 80 and 20 already measured identical. |
+| `BL-892` (reach_mod inert on supply) | Priority A. `W7b` fails: a pre-built reach work does not change the supply path. This *is* the widening mechanism the ruling rests on. Start here. |
+| `BL-890` (wizard rolls seed) | Difficulty 1. `startup_screens.cpp:333` already has Roll; only the default is missing. |
+| `BL-891` (round 4 structure readout) | Check BL-817 / BL-830 coverage first — may be a read on those, not a new panel. |
+| `BL-868` (creeds raise armies) | Blocked on BL-889. Wiring is sound and sits rebased in `.claude/worktrees/agent-aec88315766979641` (`ea2b1111`). Verify distributionally on the sweep, never on a two-polity fixture. |
 
-Read `docs/generation/CIVILISATION.md` for the design; it hasn't changed. This note is only
-about the one holdout.
+## Evidence to start from
 
-## BL-868 — what's actually blocking it
-
-**This is not a wiring problem.** `w_aggr_q` (in `history_sim_params`) leans the Campaign score
-by the acting polity's `aggression_q` (carried from its founding culture), proportionally and
-symmetric around a neutral 500 — the same idiom as `w_cult`/`w_dist`. That part has looked
-correct since the first attempt.
-
-**It's a test-fixture problem, and now a coupled one.** Seven attempts, roughly:
-1–3. Vacuous or confounded metrics (`trace_battles` off; `campaign_chosen` counts that fall
-   when a symmetric arms race ends a war early rather than rise).
-4–5. Separation/calibration issues — polities placed outside `neighbour_radius`'s default reach.
-6. A genuinely sound design: hold the *defender's* culture at neutral aggression in both runs,
-   sweep 6 seeds, measure **time to first conquest** rather than an event count. This isolates
-   the real confound.
-7. Rebased pass 6 onto current main (post BL-837/BL-872) and reran it: **zero conquests in
-   either run**, 0/6 seeds, in 1000 years. `two_polity_world`'s fixture no longer fights at all
-   under the reach gate (BL-837) and supply floor (BL-872) — both landed *after* BL-868 was
-   first designed, and both are tuned against different fixtures.
-
-**BL-868, BL-837 and BL-872 are coupled.** The aggression lean can't be demonstrated until the
-fixture can actually produce a conquest under current reach/supply mechanics. Two ways in:
-- Rebuild the fixture for the post-BL-837/872 world — shorter reach requirement between the two
-  polities, or explicit road/supply seeding so a campaign is reachable at all.
-- Or give it a much longer `stop_year` so reach and supply have time to build up before judging
-  whether the lean ever gets to matter.
-
-Either way, **check first that a conquest happens at all in the new fixture with `w_aggr_q=0`**
-before reasoning about the lean — that was the mistake baked into pass 7.
-
-The pass-6/7 code sits uncommitted in `.claude/worktrees/agent-aec88315766979641`
-(commit `b6d04c6c`, rebased cleanly onto main at `ed229efb`). The test design (hold defender
-neutral, measure time-to-first-conquest) is worth keeping; only the fixture needs redoing.
-
-**Read this alongside BL-861 (sprint 37, still open, kept open 2026-09-10).** BL-861 found the
-same symptom a sprint earlier — seed 0's full 4000-year span fights zero battles — and was never
-resolved; its own notes name culture-by-route's contiguous kin blocks and large unclaimed
-buffers as the likely causes. Worth diagnosing BL-868's silent fixture and BL-861's silent world
-together rather than as two separate no-conquest mysteries.
-
-## Also worth knowing
-
-- **BL-887 (reach-as-centre-chains)** was filed out of this sprint, priority B, no sprint —
-  Ben's deliberate call to defer a reach-model rework (chains of population centres, Logistic
-  Points) until tech progression is wired into generation. Too few small polities survive
-  Round 4 as it stands; this is the eventual fix, not now.
-- **BL-861** (no-conquest measurement, sprint 37) and **BL-823** (anti-hegemon levers, no
-  sprint) both need a re-scoping pass before implementation — their prose predates how much
-  this sprint changed the underlying mechanics. Neither is sprint 38's.
-- **BL-867's backlog record was found unmarked** during this session's housekeeping, despite
-  its code having landed on main days earlier (`b25db602`) — the delivery commit happened, the
-  bookkeeping commit didn't. Fixed same session; worth a beat of caution that a batch delivery's
-  last step (mark it in `backlog.json`) is as easy to drop as any other.
+- `history_sim_harness` fails `R3a2` / `R3a3` on main: `near: 6 battles / 1 conquests | far: 0
+  battles / 0 conquests` — in a case that *deliberately* sets `neighbour_radius=40` and
+  `w_dist=0` so only supply decay can stop the far target. Zero far campaigns. That is the gate
+  vetoing distance before supply is priced.
+- `history_sim.hpp` § `sustainable_campaign_floor_q` carries the prior investigation: floors of 80
+  and 20 gave identical elimination counts, ruling out a calibration fix.
+- **A gate-off sweep was started this session and had not finished when it closed.** Re-run
+  `./build_gen/verify/history_sweep.exe 16 --set sustainable_campaign_floor_q=0` and compare
+  against the gate-on rows (saved in the BL-889 record). It answers whether the gate is the
+  *cause* of the flatness or only the leading suspect.
+- `history_sweep`'s `--set` table now carries the reach dials
+  (`sustainable_campaign_floor_q`, `sustainable_garrison_floor_q`, `terrain_reach_cost_q`,
+  `road_tier1_uses`, `road_tier2_uses`) — added this session, because the field's own comment
+  says to tune it with the sweep and the sweep could not reach it.

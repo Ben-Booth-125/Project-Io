@@ -414,6 +414,20 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     if (name == "w_work_reach")            { p.w_work_reach = v;            return true; }
     if (name == "w_work_defence")          { p.w_work_defence = v;          return true; }
     if (name == "w_work_industrial")       { p.w_work_industrial = v;       return true; }
+
+    // --- The BL-837 reach GATE, exposed to --set (2026-09-10) ------------
+    // `sustainable_campaign_floor_q`'s own comment instructs the reader to
+    // "Re-tune from here with `history_sweep`, not by re-guessing a round
+    // number" -- and until now this table did not carry it, so every
+    // investigation of the gate had to EDIT SOURCE to move it. That is the
+    // one dial the sweep is explicitly told to tune, and setting it to 0
+    // turns the wall back into a toll, which is the comparison the
+    // gate-versus-price question needs.
+    if (name == "sustainable_campaign_floor_q") { p.sustainable_campaign_floor_q = v; return true; }
+    if (name == "sustainable_garrison_floor_q") { p.sustainable_garrison_floor_q = v; return true; }
+    if (name == "terrain_reach_cost_q")    { p.terrain_reach_cost_q = v;    return true; }
+    if (name == "road_tier1_uses")         { p.road_tier1_uses = v;         return true; }
+    if (name == "road_tier2_uses")         { p.road_tier2_uses = v;         return true; }
     return false;
 }
 

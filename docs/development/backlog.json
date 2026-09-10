@@ -640,8 +640,8 @@
       "design": "BEN, 2026-09-09: we aim for most of the land to be habitable, and include human populations.\n\nMEASURED: the first build leaves roughly HALF the homeworld permanently grey, and it is visible on screen as unclaimed ground that never fills. The harness reads 51-61% of land farmable across three seeds, and one seed (2) reached only 34% farmable with 62% of land reached at all.\n\nEMPTINESS STAYS A REAL OUTCOME AND STOPS BEING THE DEFAULT ONE. COLONISATION.md's 'ground no package suits is not settled' is unchanged as a RULE. What changes is the calibration target it is measured against: a finished migration round should leave the map substantially peopled, with unsettled ground the exception marking genuinely hostile country.\n\nTHE FIX IS IN THE PACKAGE, NEVER IN A FLOOR THAT FILLS THE MAP REGARDLESS. The levers are what a package can farm (the affinity floor, currently 120 per-mille) and how it broadens -- both magnitudes, so this is history_sweep's to argue. A clamp that settles ground no package can farm would delete the frontier mechanism BL-847 exists to create, which is the failure mode this item must not produce.\n\nDONE WHEN: history_sweep reports the habitable/peopled share across a seed spread, most land is peopled on most seeds, and the frontier still stalls somewhere on every world.\n\n--- MEASURED 2026-09-09, AND IT OVERTURNS THIS ITEM'S PREMISE ---\nThe route work (BL-857) alone moved farmable share 50->56%, 46->52%, 34->43% across seeds 0/1/2. Rather than reach for the affinity floor to close the rest, a per-farm-class census of the UNFARMED remainder was added to colonisation_harness. It is decisive:\n\n  seed 0  boreal 2154/3842 unfarmed, montane 241/275   (boreal = 45% of all unfarmed land)\n  seed 1  boreal 2393/3400 unfarmed, montane 505/507   (boreal = 43%)\n  seed 2  boreal  974/2055 unfarmed, montane 221/270   (boreal = 35%)\n\nTHE SHORTFALL IS POLAR ICE AND MOUNTAINS, NOT A BROKEN PACKAGE GATE. Boreal is cold ground (snow cover or icy substrate) and it is 24-30% of the whole homeworld -- the polar caps of a 261x121 grid. Montane is near-totally unfarmed and small. Both are exactly the classes that SHOULD be sparsely peopled, and no cradle forms in either, so no package carries affinity for them.\n\nEXCLUDING BOREAL AND MONTANE, roughly 70% of reached temperate land is farmable on seed 0 -- which is 'most', as asked.\n\nSO THE LEVER THIS ITEM NAMED IS THE WRONG ONE. Lowering package_affinity_floor would have raised the headline number by making cradle packages farm glaciers, satisfying the metric while deleting the frontier mechanism BL-847 exists to create. That is the exact failure the item's own text forbids, and the census is what caught it.\n\nWHAT IS ACTUALLY OPEN, and it is Ben's rather than a constant to tune: (a) accept it -- polar ice is not meant to be farmed, and 'most land habitable' should be read as most TEMPERATE land; (b) reduce how much of the map is boreal, which is a PLANETOLOGY question about ice-cap extent, not a colonisation one; or (c) let some packages coin cold affinity, which needs a cradle to form on cold ground and is a real design change.\n\nThe census is committed and reports rather than asserts, so the sweep can argue it."
     },
     {
-      "status": "designed",
-      "glyph": "✓",
+      "status": "cancelled",
+      "glyph": "✗",
       "parked": false,
       "sprint": "37",
       "written": "2026-09-09",
@@ -651,7 +651,8 @@
       "priority": "A",
       "category": "Generation",
       "requires": [
-        "BL-860"
+        "BL-860",
+        "BL-889"
       ],
       "id": "BL-861",
       "short_name": "NO_CONQUEST_IN_THE_SPAN",
@@ -662,7 +663,10 @@
         "src/world/history_sim.cpp",
         "tools/verify/history_sweep.cpp"
       ],
-      "design": "FOUND BY DRIVING THE BUILT APP, 2026-09-09, and not by any harness.\n\nTHE READING: '0 battles, 0 conquests, 611 foundings in the full run' across four thousand years on seed 0, with five powers holding ground and none ever taking any from another. Ben's arc -- origin, communication, conquest or diplomatic union, a stable dark age -- has only its first act.\n\nTHE LIKELY CAUSE, and it needs confirming rather than assuming. Culture-by-route (BL-848) gives each stream a CONTIGUOUS block, so a region's neighbours are overwhelmingly kin; the objective scorer's w_cult discount for foreign ground therefore never fires. Large unclaimed buffers (BL-859) compound it by leaving polities without shared frontiers at all.\n\nTHE EVIDENCE IS AMBIGUOUS AND MUST NOT BE ARGUED FROM ONE ARC. At the 4000-year span battles fell 567 -> 70 after culture-by-route; on the 1960 two-span arc they ROSE 30 -> 141. Both are real measurements of different arcs. A tidy story about kinship suppressing war fits the first and not the second, so the cause is to be MEASURED across history_sweep before anything is changed.\n\nTHIS IS THE COUNTERWEIGHT TO BL-854. That item argues B384a (every world sees a region change hands by war) should be retired because a warless settlement span is correct behaviour. This item is the reason that argument cannot be taken on faith: a span with NO war in it at all is not a peaceful settlement process, it is a missing mechanism. Settle the two together.\n\nDONE WHEN: the cause is measured rather than reasoned, and the history round (BL-860) produces conquest without the migration round being made violent."
+      "design": "FOUND BY DRIVING THE BUILT APP, 2026-09-09, and not by any harness.\n\nTHE READING: '0 battles, 0 conquests, 611 foundings in the full run' across four thousand years on seed 0, with five powers holding ground and none ever taking any from another. Ben's arc -- origin, communication, conquest or diplomatic union, a stable dark age -- has only its first act.\n\nTHE LIKELY CAUSE, and it needs confirming rather than assuming. Culture-by-route (BL-848) gives each stream a CONTIGUOUS block, so a region's neighbours are overwhelmingly kin; the objective scorer's w_cult discount for foreign ground therefore never fires. Large unclaimed buffers (BL-859) compound it by leaving polities without shared frontiers at all.\n\nTHE EVIDENCE IS AMBIGUOUS AND MUST NOT BE ARGUED FROM ONE ARC. At the 4000-year span battles fell 567 -> 70 after culture-by-route; on the 1960 two-span arc they ROSE 30 -> 141. Both are real measurements of different arcs. A tidy story about kinship suppressing war fits the first and not the second, so the cause is to be MEASURED across history_sweep before anything is changed.\n\nTHIS IS THE COUNTERWEIGHT TO BL-854. That item argues B384a (every world sees a region change hands by war) should be retired because a warless settlement span is correct behaviour. This item is the reason that argument cannot be taken on faith: a span with NO war in it at all is not a peaceful settlement process, it is a missing mechanism. Settle the two together.\n\nDONE WHEN: the cause is measured rather than reasoned, and the history round (BL-860) produces conquest without the migration round being made violent.",
+      "resolution": "CANCELLED 2026-09-10 by Ben (ruling on NR-824), as SUPERSEDED.\n\nPREMISE MEASURED STALE 2026-09-10 (this session). This item was filed on \"0 battles, 0 conquests, 611 foundings in the full run\" on seed 0, and asked that the cause be measured rather than reasoned. It has now been measured, and the world it describes no longer exists.\n\nhistory_sweep, 16 seeds, main at c83a0d74: battles median 412 (range 4..1000), conquests median 386 (range 4..740), and ZERO worlds with zero conquest. history_sim_harness B384a (\"every world sees at least one region change hands by war\") PASSES on main. Sprint 38 -- BL-866, BL-837, BL-867, BL-870, BL-869, BL-872 -- closed the no-conquest gap this item was filed against.\n\nIT WAS REPLACED BY THE OPPOSITE DEFECT, NOT BY HEALTH. The same sweep shows 0 polities eliminated in 16/16 worlds, a largest empire of 3.3% against an even split of 1.6-3.2%, and the rise/peak/fall shape in 0/16 worlds. Conquest is now constant and changes nothing. BL-889 (conquest must compound) owns that, with the evidence.\n\nALSO SETTLED: its open question against BL-854. Ben, 2026-09-10: \"It is not a strict failure case if seeds refuse war.\" A warless seed is legitimate; the claim is distributional. That is the ruling this item said had to be settled alongside it, and it did not need B384a retired -- B384a passes.\n\nNEEDS BEN'S CALL: close as delivered-by-sprint-38, or rewrite onto the surviving question (which mechanism should make conquest compound). Its stated DONE WHEN is met as literally written; the design intent behind it is not, and BL-889 now carries that.",
+      "resolved": "2026-09-10",
+      "completed": null
     },
     {
       "status": "complete",
@@ -722,12 +726,15 @@
       "sprint": "38",
       "written": "2026-09-09",
       "author": "Ben (2026-09-09, the Empires design pass); Claude (itemisation)",
-      "blocked_on": null,
+      "blocked_on": [
+        "BL-889"
+      ],
       "version_goal": null,
       "priority": "A",
       "category": "Generation",
       "requires": [
-        "BL-865"
+        "BL-865",
+        "BL-889"
       ],
       "id": "BL-868",
       "short_name": "CREEDS_RAISE_ARMIES",
@@ -739,7 +746,7 @@
         "tools/verify/history_sweep.cpp"
       ],
       "design": "BEN, 2026-09-09: depending on their creed, some cultures grow armies and begin to conquer.\n\nTHE INPUT ALREADY EXISTS AND IS ALREADY EARNED. culture::aggression_q derives from the pantheon's war god, and COLONISATION.md sec Culture arrives by route made the distribution of pantheons a RECORD OF ROUTES. So which peoples turn warlike is downstream of where their ancestors walked -- which is exactly the ordering the colonisation design set out to establish: doctrine is downstream of how a people came to live where it lives.\n\nNOT EVERY PEOPLE CONQUERS, AND THAT IS THE POINT. A world where every culture musters is as flat as one where none does.\n\nNOT A NEW AI GRANT. A polity choosing to campaign is a decision, and this phase HAS actors where the migration span deliberately has none -- but it is the Era -1 sim's EXISTING scored-utility verb set, already covered by the dated register in AI_OPPONENT.md sec 11, bound by the same constraints: pure, seeded, deterministic, replayable, only legal verbs, never a planner. ANYTHING BEYOND THOSE FIVE VERBS IS A NEW WIDENING AND IS BEN'S TO GIVE -- raised, never assumed.\n\nDONE WHEN: the spread of who conquers correlates with route-derived aggression across a seed sweep, and a warlike people and a peaceable one are both normal outcomes.",
-      "resolution": "Seventh verification attempt (2026-09-10, worktree agent-aec88315766979641, uncommitted / not merged): rebased the sixth pass onto main after BL-866/837/867/870/869/872 landed. The sixth pass itself was sound — w_aggr_q wires polity.aggression_q (from culture.aggression_q) as a proportional lean on the Campaign score, symmetric around neutral 500, same idiom as w_cult/w_dist; the test isolates the prior confound by holding the DEFENDER culture at neutral aggression in both runs and measuring TIME TO FIRST CONQUEST over a 6-seed sweep rather than a raw event count. But on current main the two_polity_world(7) fixture now produces 0/6 conquests within 1000 years for BOTH the warlike and peaceable attacker (BL868a passes vacuously, BL868b fails because neither side ever wins). This is a fixture problem, not a wiring problem: BL-837's reach gate and BL-872's supply floor, both landed after this item was first designed, now suppress the two_polity_world fixture's conquest entirely at its default separation/params, so the test never gets the chance to show the aggression lean at all. Left unmerged in .claude/worktrees/agent-aec88315766979641 (commit b6d04c6c, rebased onto ed229efb). Per Ben's own \"try one more, then stop\" instruction, stopping here — needs either a fixture redesigned for the post-BL-837/872 world (shorter reach requirement, or explicit road/supply seeding so conquest is reachable at all) or a longer stop_year, before the next attempt."
+      "resolution": "DIAGNOSIS SUPERSEDED 2026-09-10 (this session). The seven failed verification attempts were not seven bad fixtures; they were one correct signal, misread each time.\n\nWHAT THE PRIOR NOTE SAID: two_polity_world stopped producing conquests once BL-837 (reach gate) and BL-872 (supply floor) landed, so the fixture needed rebuilding for the post-BL-837/872 world.\n\nWHAT THE SWEEP ACTUALLY SHOWS. history_sweep at 16 seeds on main: 386 conquests in the median world, 0 polities eliminated in 16 of 16 worlds, largest empire 3.3%, rise/peak/fall in 0/16 worlds. Conquest is not suppressed -- it is CONSTANT and CONSEQUENCE-FREE, everywhere, not just in this item's fixture. BL-889 (conquest must compound) owns that finding.\n\nWHY THAT MAKES THIS ITEM UNTESTABLE AS WRITTEN. w_aggr_q leans WHICH polity chooses to campaign. In a world where campaigning already happens 386 times and compounds into nothing, a lean on that choice produces no measurable difference in outcome -- there is no outcome for it to differ in. Every clean test design would still read as noise. That is why passes 1-7 could not find a signal: the signal is not there to find yet.\n\nTHE WIRING IS STILL SOUND AND IS STILL WORTH KEEPING. w_aggr_q as a proportional lean symmetric around neutral 500, same idiom as w_cult/w_dist, plus pass 6's test design (hold the DEFENDER at neutral aggression, measure time-to-first-conquest across a seed sweep). It sits rebased and unmerged in .claude/worktrees/agent-aec88315766979641 (commit b6d04c6c / ea2b1111 on ed229efb).\n\nNOW BLOCKED ON BL-889. Once conquest compounds, this item gets a route it never had: a warlike creed should produce a LARGER or FASTER empire, which is a difference the sweep can see. Verify it distributionally on history_sweep rather than on a two-polity fixture -- and per Ben (2026-09-10) a seed that refuses war is a legitimate outcome, so the claim is about the spread, never about every world."
     },
     {
       "status": "complete",
@@ -1043,6 +1050,94 @@
         "src/world/logistics.cpp"
       ],
       "design": "BEN, 2026-09-10, watching BL-837 (ancient logistics and roads) play out live in Round 4: \"Reach should be propagated by chains of population centres. This is a logistics question no? We can treat logistic points as a side effect of larger population centres too.\"\n\nTHE PROBLEM BL-837 SHOWED, live rather than on paper. Reach gating one Dijkstra from a single capital works as designed -- BL837a/b/c all pass, the mechanism is sound -- but it produces too few small polities surviving the round, and B384c (a death spiral must terminate somewhere in a sweep) fails: a shrinking polity's last holdout can end up permanently beyond its own contracting single-capital radius, in a way pure pricing never allowed. Floor recalibration (250 -> 80 -> 20) does not move this -- it is structural, not a tuning problem (see BL-837's resolution note and CIVILISATION.md sec Open questions).\n\nTHE PROPOSED FIX IS ARCHITECTURAL. Reach should propagate through a NETWORK of population centres -- hopping seat to seat, or centre to centre, along roads -- rather than radiating from one capital by Dijkstra. Ben's own framing ties this to the existing Logistic Points concept (../economy/LOGISTICS.md): larger population centres would generate Logistic Points as a side effect, and those points (or the network they imply) are what carries reach onward, rather than a single distance-from-capital number.\n\nWHY THIS ALSO MATTERS BEYOND B384c. Ben's stated goal is a \"new world\" for a later exploration/colonisation phase to still find -- meaning round 4 should not fully partition every last scrap of the map into a handful of surviving empires. A chain-based reach model, where a network can genuinely fail to extend into some ground, is one candidate mechanism for leaving real unclaimed territory behind, distinct from B384c's narrower death-spiral question but plausibly solved by the same rework.\n\nTIES DIRECTLY TO BL-872 (centres from supply/governance, not yet built) -- that item already asks what a population centre IS in this phase (derived by supply and governance), and this item asks what a centre DOES for reach. They may turn out to be the same piece of work, or BL-872 may need to land first to give this item real centres to chain through.\n\nDELIBERATELY NOT BUILT NOW. Ben: wants tech progression wired into these generation rounds first, so this is a later-sprint item, not an immediate follow-up to BL-837. B384c stays a known, accepted failure in the interim (see BL-837's resolution).\n\nDONE WHEN: reach is computed as propagation through a chain/network of population centres rather than a single capital-Dijkstra; B384c's death-spiral invariant holds again across a seed sweep; and round 4 measurably leaves some ground unclaimed rather than fully partitioning the map, in a way a later exploration phase could plausibly build on."
+    },
+    {
+      "id": "BL-889",
+      "short_name": "CONQUEST_MUST_COMPOUND",
+      "status": "designed",
+      "priority": "A",
+      "difficulty": 6,
+      "glyph": "✓",
+      "sprint": "38",
+      "written": "2026-09-10",
+      "author": "Ben (2026-09-10); Claude (itemisation)",
+      "requires": [
+        "BL-837",
+        "BL-872",
+        "BL-892"
+      ],
+      "parked": false,
+      "category": "Generation",
+      "title": "Conquest happens constantly and compounds into nothing, so no empire ever forms or falls",
+      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+      "files": [
+        "src/world/history_sim.cpp",
+        "tools/verify/history_sweep.cpp"
+      ],
+      "design": "BEN, 2026-09-10, on being shown the sweep: \"Really I want to see polities be eliminated and empires to form, before collapsing back into those smaller polities - with some surviving as larger kingdoms.\"\n\nMEASURED, NOT REASONED. history_sweep, 16 seeds, main at c83a0d74 (this session):\n  battles per world      median 412   range 4..1000\n  conquests per world    median 386   range 4..740\n  worlds with 0 conquest 0 / 16\n  LARGEST polity share   median 3.3%  range 2.1%..5.4%\n  polities ELIMINATED    0, in 16 of 16 worlds (powers_start == powers_end everywhere)\n  rise/peak/fall shape   0 / 16 worlds\n  hegemony               never (hegemony_year == -1 x16)\nWith 31-61 powers per world an EVEN split is 1.6-3.2%. The biggest empire anywhere reaches 3.3%.\n\nTHE DEFECT IS NOT VOLUME, IT IS COMPOUNDING. 386 conquests per world and the political map ends the shape it started. Each transfer leaves the winner no better placed to win the next, so success never runs away with itself. All four of Ben's moments -- elimination, empire, collapse, uneven survival -- are consequences of that single property, not four dials.\n\nTHIS SUPERSEDES THE BL-868 DIAGNOSIS. NEXT_SESSION.md and BL-868's own resolution blamed a broken two_polity_world fixture for seven failed verification attempts. The fixture was reporting the truth: conquest is capped everywhere, not just there. An aggression lean cannot be measured as a difference in who conquers while conquest changes nothing for anybody.\n\nTHE LEADING SUSPECT IS THE REACH GATE, AND IT IS EVIDENCED, NOT ASSUMED. history_sim_harness on main fails R3a2 and R3a3 with the trace \"near: 6 battles / 1 conquests | far: 0 battles / 0 conquests\" -- and that case DELIBERATELY sets neighbour_radius=40 and w_dist=0 so that ONLY supply decay can stop the far target. Zero campaigns reach it. Something vetoes distance outright before supply is ever priced, and sustainable_campaign_floor_q is the hard gate BL-837 added. Its own comment already records the prior investigation: floors of 80 and 20 -- two orders of magnitude apart -- produced IDENTICAL elimination counts, which rules out a calibration fix, and names the mechanism (\"a hard gate removes that long tail entirely\").\n\nTHE TENSION IS REAL AND IS BEN'S TO RESOLVE. Ben ruled 2026-09-09 that reach GATES a campaign rather than pricing it, precisely so a rich polity cannot buy past geography. That ruling and this one pull against each other: a wall stops compounding by construction. CIVILISATION.md sec The arc the phase must produce states the tension rather than resolving it, and history_sim.hpp already carries \"80 IS WHERE THIS SHIPS, PENDING BEN'S CALL\".\n\nDONE WHEN: across a history_sweep spread, worlds show the arc -- polities eliminated, a polity reaching a share materially above an even split, that polity then falling, and surviving fragments of visibly unequal size. Distributional, never per-world: a peaceable seed is a legitimate outcome (Ben, 2026-09-10) and must not be forced. NO TARGET NUMBER IS SET HERE -- the threshold comes off the measured spread, not ahead of it.\n\nRULED 2026-09-10 (Ben, on NR-823): THE WALL MOVES WHEN YOU WIN. The 2026-09-09 reach-GATES-not-prices ruling stands -- geography cannot be bought past. What resolves the tension with this item is that the gate is NOT FIXED: reach is a function of the road network a polity has built and walked, so winning extends the wall outward. Geography must be BUILT past, and building past it is what an empire is.\n\nREJECTED, so they are not re-litigated. Softening the gate into a steep price (would reverse the 2026-09-09 ruling and let a rich polity buy past geography). Centre-chain propagation (BL-887) -- the eventual reach model, deliberately still deferred until tech progression is wired into these rounds.\n\nWHAT THAT MAKES LOAD-BEARING. This item may NOT be delivered by lowering sustainable_campaign_floor_q -- that is the softening Ben declined, and it is separately ruled out by measurement (floors of 80 and 20 give identical elimination counts). The work is in the mechanism by which success WIDENS reach. BL-892 records that mechanism failing today: W7b shows a pre-built reach work does not change the supply path at all. A wall that cannot move IS the fixed wall this ruling declines, so BL-892 is a prerequisite in substance even where it is not one in code."
+    },
+    {
+      "id": "BL-890",
+      "short_name": "WIZARD_ROLLS_SEED",
+      "status": "designed",
+      "priority": "A",
+      "difficulty": 1,
+      "glyph": "✓",
+      "sprint": "38",
+      "written": "2026-09-10",
+      "author": "Ben (2026-09-10); Claude (itemisation)",
+      "requires": [],
+      "parked": false,
+      "category": "UI",
+      "title": "The wizard opens on seed 0, so every new game is the same reference world unless you press Roll",
+      "authority_doc": "docs/ui/STARTUP.md",
+      "files": [
+        "src/ui/startup_screens.cpp"
+      ],
+      "design": "BEN, 2026-09-10: \"Let's lose the framing of seeded worlds, and make world generation entirely random. This comes at the cost of having newer data to examine each test, but it allows the player to have a higher degree of chance when they do choose to reroll, and it gives the player the ability to see if their world will contain these types of structures.\"\n\nSCOPE, SETTLED BY BEN THE SAME DAY (elicitation, \"wizard-default-only\"). The wizard's OPENING seed is rolled. Harnesses, goldens and the sweep keep passing seeds explicitly and are untouched.\n\nWHAT IS ALREADY THERE. startup_screens.cpp:333 already has hex entry, a Roll button drawing from std::random_device, and Copy seed, with the comment \"no entropy ever enters world generation, which stays a pure function of this seed\". The gap is only that world_params::seed defaults to 0 -- hard_coded_world.hpp:41, \"0 reproduces the legacy world\" -- and nothing rolls it on entry, so m_pending_world_params is default-constructed and the player must know to press Roll.\n\nNOT A DETERMINISM WIDENING, AND THIS IS THE POINT. The entropy stops at the UI exactly as the existing Roll button's does. world/* stays a pure function of the seed, so save, replay and the multiplayer argument are untouched and no standing-rule grant is needed. Seed 0 still names the reference world; it is simply no longer what a player gets by accident.\n\nDONE WHEN: arriving at New World shows a freshly rolled seed, the player can still type or paste one, and a run at a given seed is identical to before."
+    },
+    {
+      "id": "BL-891",
+      "short_name": "ROUND4_STRUCTURE_READOUT",
+      "status": "designed",
+      "priority": "A",
+      "difficulty": 4,
+      "glyph": "✓",
+      "sprint": "38",
+      "written": "2026-09-10",
+      "author": "Ben (2026-09-10); Claude (itemisation)",
+      "requires": [
+        "BL-890"
+      ],
+      "parked": false,
+      "category": "UI",
+      "title": "A rolled world cannot be judged, because round 4 never shows whether the arc happened in it",
+      "authority_doc": "docs/ui/STARTUP.md",
+      "files": [
+        "src/ui/startup_screens.cpp"
+      ],
+      "design": "BEN, 2026-09-10, the second half of the randomise ruling: rolling should give \"the player the ability to see if their world will contain these types of structures\". Ben placed this IN sprint 38 (elicitation, \"in-sprint-38\").\n\nRANDOMNESS WITHOUT A READOUT IS NOT A CHOICE. BL-890 makes each arrival a fresh world; this item is what lets the player tell one from another. Without it a reroll is a blind redraw -- the player cannot see whether this world produced an empire, a collapse, or five polities that never fought, so \"reroll until it looks interesting\" is not actually available to them.\n\nTHE STRUCTURES ARE THE ONES GENERATION_STRATEGY.md sec The asymmetry is POLITICAL names: were polities eliminated, did an empire form, did it fall, are the survivors unequal. history_sweep already computes every one of these per world (eliminations, top/peak share, BL-767 rise/peak/fall) -- the quantities exist and are simply not surfaced.\n\nRELATED SURFACES ALREADY DESIGNED: BL-817 (history playback record) and BL-830 (top-sixteen scoreboard) are round 4's instrument. Check what they now cover before adding a surface -- this may be a read on those rather than a new panel. SCOPE THAT FIRST.\n\nDONE WHEN: after round 4 the player can see, without leaving the wizard, whether this world's history contains the arc -- and can reroll on that basis."
+    },
+    {
+      "id": "BL-892",
+      "short_name": "REACH_MOD_INERT_ON_SUPPLY",
+      "status": "designed",
+      "priority": "A",
+      "difficulty": 3,
+      "glyph": "✓",
+      "sprint": "38",
+      "written": "2026-09-10",
+      "author": "Ben (2026-09-10); Claude (itemisation)",
+      "requires": [],
+      "parked": false,
+      "category": "Generation",
+      "title": "W7b fails: pre-built reach works do not change the supply path, so reach_mod reads as inert",
+      "authority_doc": "docs/generation/CIVILISATION.md",
+      "files": [
+        "src/world/history_sim.cpp",
+        "tools/verify/history_sweep.cpp"
+      ],
+      "design": "FOUND BY RUNNING history_sweep ON MAIN, 2026-09-10 (this session), at c83a0d74. The sweep's only red:\n\n  FAIL  W7b  pre-built reach changes the supply path -- reach_mod is read, not inert\n\nwith the trace immediately above it reading \"reach seeded: 1 battles / 0 stalled | plain: 1 / 0\" -- identical with and without seeded reach works, which is exactly what the check is written to catch.\n\nWHY IT MATTERS MORE THAN A LONE RED. w_work_reach exists so a polity can BUILD its way to further reach, and CIVILISATION.md sec The road is the empire's skeleton makes reach the thing that gates conquest. If a reach work does not move the supply path, then the one lever a polity has for extending its own reach does nothing -- which bears directly on BL-889 (conquest must compound), where inability to extend reach is the leading explanation for why no empire ever forms. Diagnose the two together.\n\nFOLDED INTO SPRINT 38 ON BEN'S CALL (2026-09-10, elicitation, \"fold-into-38\") rather than filed as its own stream.\n\nDONE WHEN: W7b passes because a seeded reach work demonstrably changes the supply path, or the check is retired with a stated reason if the mechanism it asserts was superseded.\n\nRAISED TO PRIORITY A, 2026-09-10, by Ben's NR-823 ruling. The ruling makes the arc depend on reach WIDENING as a polity succeeds -- \"the wall moves when you win\". This item is the record of that widening mechanism being inert. It is no longer a lone harness red; it is the lever BL-889 (conquest must compound) rests on."
     }
   ]
 }

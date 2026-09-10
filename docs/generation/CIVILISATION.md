@@ -237,6 +237,49 @@ flat as one where none does. The asymmetry is the deliverable
 
 ---
 
+## The arc the phase must produce (Ben, 2026-09-10)
+
+> *"Really I want to see polities be eliminated and empires to form, before collapsing back
+> into those smaller polities - with some surviving as larger kingdoms."*
+
+This is the phase's **outcome shape**, and it is what every mechanism above is ultimately
+answerable to. `GENERATION_STRATEGY.md` § The asymmetry is POLITICAL as well as
+economic owns the full statement; what belongs here is what it demands of *this* phase.
+
+**Conquest must COMPOUND.** Territory changing hands is necessary and nowhere near sufficient. A
+transfer that leaves the winner no better placed to win the next one produces churn — a map that
+moves constantly and ends the shape it started. The arc needs holding ground to make the next
+campaign easier, so that success runs away with itself into an empire and failure runs away into
+a collapse. Every one of the four moments — elimination, empire, collapse, uneven survival — is a
+consequence of that one property, not a separate dial to be tuned.
+
+**THE WALL MOVES WHEN YOU WIN (Ben, 2026-09-10, ruling on NR-823).** § The road is the empire's
+skeleton makes reach GATE a campaign rather than price it, on Ben's 2026-09-09 ruling, so that a
+rich polity cannot buy past geography. Read naively that caps every polity at the neighbourhood
+it started in, which is the opposite of compounding — and the two rulings would contradict each
+other. They do not, because **the gate is not fixed**: what a polity can reach is a function of
+the road network it has built and walked, so **winning extends the wall outward** rather than
+dissolving it. Geography still cannot be BOUGHT past. It has to be BUILT past, and building past
+it is what an empire is.
+
+The two rejected readings, so they are not re-litigated. **Softening the gate into a steep price**
+was declined — it restores the low-probability killing blow by reversing the 2026-09-09 ruling
+outright, and a rich polity could buy past geography again. **Reaching for centre-chain
+propagation** (`BL-887`) was declined *for now* — it is the eventual reach model and remains
+deliberately deferred until tech progression is wired into these rounds.
+
+**WHAT THAT MAKES LOAD-BEARING.** If success must widen a polity's reach, then the mechanism by
+which reach widens is the mechanism the whole arc rests on — and `BL-892` records it failing
+today: `history_sweep`'s `W7b` shows a pre-built reach work does not change the supply path at
+all. A wall that cannot move is the fixed wall this ruling declines. Diagnose the two together;
+`BL-889` owns the arc, `BL-892` owns the lever.
+
+**A peaceable world is a legitimate outcome (Ben, 2026-09-10).** The claim is distributional: the
+arc must appear across a spread of worlds, never in every one of them. A seed that refuses war is
+not a failure case and must not be made into one.
+
+---
+
 ## A civilisation is what mixing makes, and it is not a creed
 
 **Ben, 2026-09-09: some civilisations form, whereby mixing cultures gives rise to philosophy and

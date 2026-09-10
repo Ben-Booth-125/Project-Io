@@ -180,6 +180,38 @@ player is one corporation among several in a world none of them chose, and the c
 terminal. A generator that made every start equivalent would be answering a multiplayer-ladder
 question this game does not ask.
 
+### The asymmetry is POLITICAL as well as economic (Ben, 2026-09-10)
+
+> *"Really I want to see polities be eliminated and empires to form, before collapsing back
+> into those smaller polities - with some surviving as larger kingdoms."*
+
+Everything above this line is about the **supply** asymmetry — what ground holds, and how
+unevenly. This ruling extends the same claim to the **political** map the Era −1 pass hands
+forward, and it is the same argument: a world of equal polities carries no information, so one
+trade route, one border and one rival is as good as any other.
+
+**The stated arc has four moments, and they are ONE claim, not four dials.**
+
+1. Polities are **eliminated** — a defeat can be terminal.
+2. **Empires form** — some polity grows materially beyond an even share.
+3. They **collapse back** — an empire is a phase, not an end state.
+4. Some fragments **survive as larger kingdoms** — the wreck is uneven, not a reset.
+
+**Conquest that does not COMPOUND satisfies none of them, however much of it happens.** That is
+the distinction this ruling turns on, and it is not a volume question: a world can run hundreds
+of conquests per era and still end the shape it started, because each transfer is independent of
+the last. What the arc requires is that holding ground makes the next conquest EASIER — so that
+success accumulates into an empire, and the loss of it accumulates into a collapse.
+
+**The measurables already exist and are reported by `history_sweep`** — eliminations, largest
+share, peak share, and BL-767's rise/peak/fall shape. As with chain completeness above,
+generation is answerable for the **distribution** across a spread of worlds and for nothing at
+all about any single world. **A peaceable world is a legitimate outcome** (Ben, 2026-09-10) —
+what is illegitimate is a spread in which the arc never appears anywhere.
+
+No target number is set here, deliberately. A threshold picked before the spread is measured is
+the fixture-fitting this section exists to prevent.
+
 ---
 
 ## The world descriptor — seed + generation parameters
