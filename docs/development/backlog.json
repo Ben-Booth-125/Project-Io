@@ -13,134 +13,10 @@
   ],
   "items": [
     {
-      "id": "BL-812",
-      "short_name": "PHASE6_SEES_ROADS",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 3,
-      "glyph": "✓",
-      "sprint": "36",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08, on the cleared board); Claude (itemisation)",
-      "requires": [],
-      "parked": false,
-      "category": "Generation",
-      "title": "The phase 6 objective gains a reach-quality term, so a road tier is something it can see",
-      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "files": [
-        "src/world/landscape_score.cpp",
-        "src/world/landscape_score.hpp",
-        "src/world/landscape_search.cpp",
-        "tools/verify/landscape_score_harness.cpp"
-      ],
-      "design": "BEN, 2026-09-08: \"Roads should be visible in phase 6 too.\" The ruling is written into GENERATION_STRATEGY.md as the objective's FIFTH TERM; this item is the work.\n\nTHE MEASUREMENT THAT FORCED IT (archived NR-793, confirmed on a live ten-market world, seed ABCDEF01, every term alive):\n  tier=1  IN_REACH=25658  raws=122  composite=0.010256174\n  tier=3  IN_REACH=26024  raws=122  composite=0.010256174\nThe reach frontier moves by 366 tiles. Every scored term is bit-identical.\n\nTHE CAUSE IS ONE NUMBER, and it is raws_in_reach: 122 either side. A road tier scales traversal COST, continuously. Terms 1 and 4 read reach through a PER-RESOURCE COVERAGE BOOLEAN - is there any reachable deposit of resource R in this catchment - and that boolean is SATURATED. With 122 resource-market pairs already covered across 25,658 tiles, 366 more tiles introduce no pair that was not already covered. So the axis moves a continuous quantity the objective only reads through a threshold, and the search spends a third of every round proposing a change it cannot score.\n\nTHE CONSTRAINT, and it is the whole difficulty. Cheaper traversal everywhere is trivially better, so a reach-quality term entered as a FLAT VIABILITY BONUS would reward a uniformly well-connected map - precisely the evenness term 3 and GENERATION_STRATEGY.md § Asymmetry is the deliverable exist to prevent. The term must be a PER-MARKET reading whose SPREAD is scored, exactly like terms 1 and 2, never a single global number added to the composite.\n\nSLICE 1 IS A MEASUREMENT, NOT A FEATURE, and it decides what the term reads. Two candidates: the mean traversal cost from a market to the tiles in its catchment, and the in-reach tile COUNT rather than the coverage boolean. Both are continuous and both move when a tier does. Score candidates that differ ONLY in road tier and ask whether the chosen reading DISCRIMINATES between them at all. A reading that does not is not worth keeping, and that is an afternoon's answer rather than a wasted build. This is § The first slice is the scorer applied to the new term.\n\nTWO THINGS TO CARRY, both from the archived phase 6 work. (1) The default-seed phase 6 fixture is a TWO-MARKET world on which balance and composite evaluate to zero for every candidate - it is not a sound basis for any phase 6 measurement, and NR-793's first reading was taken on it before being re-run on a live world. Use a 10-15 market world. (2) Adding a term changes every ranking and therefore the selected landscape, so this is a world-moving change and owes the digest discipline in DELIVERY.md § The digest re-bless is one act per WAVE.\n\nDONE WHEN: road tier 1, 2 and 3 produce DIFFERENT composites on a 10-15 market world; the difference is reported per market rather than as one global number; an even-reach landscape does not beat an uneven one at the same mean; and the determinism of the argmax is unchanged across thread counts."
-    },
-    {
       "status": "designed",
       "glyph": "✓",
       "parked": false,
-      "sprint": "36",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08, on the visibility form: extra wizard rounds, leans per pass); Claude (itemisation)",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-818",
-      "short_name": "HISTORY_LEANS",
-      "priority": "B",
-      "difficulty": 4,
-      "category": "Generation",
-      "title": "Leans per pass - named forces over the ancient and industrial spans, resolved against the seed",
-      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "requires": [
-        "BL-817"
-      ],
-      "files": [
-        "src/world/planetology.hpp",
-        "src/world/history_sim.cpp",
-        "src/ui/startup_screens.cpp"
-      ],
-      "design": "BEN'S CALL (2026-09-08): yes, leans per pass - the wizard's preferences model extended past planetology.\n\nTHE MODEL IS UNCHANGED AND MUST STAY UNCHANGED: a lean is a NAMED LEAN on an axis, resolved against the seed by a resolve_* function, and no raw generated value is editable. It names a FORCE, never an outcome - the tune-the-forces-never-the-outcome rule is not relaxed for being player-facing, and 'guarantee me an empire' is exactly the reading it forbids.\n\nWHAT THE AXES ARE IS THE DESIGN WORK OF THIS ITEM, and it is NOT settled. Each candidate axis must map onto a scalar the sim ALREADY reads, or it is a new mechanism wearing a lean's clothes. The obvious candidates to test: consolidation pressure (fractious vs consolidating) and sea legs (insular vs seafaring) for pass 1; industrialisation timing (late vs early) and tariff posture (open vs protective) for pass 2. A lean whose effect is not visible on the round's own globe is not worth offering.\n\nDONE WHEN: each shipped axis moves a measurable outcome across a SEED SWEEP - not one seed - and none of them clamps.",
-      "notes": "SUPERSEDED IN ITS AXES by BL-839 (2026-09-08): Ben named the axis he actually wants - HISTORICAL TURBULENCE, fewer or more countries at the epoch. The four axes guessed at here (consolidation, sea legs, industrialisation timing, tariff posture) were explicitly unsettled and are now second to that one. Keep this item for the round 5 / pass 2 leans; round 4 lean is BL-839."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "36",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08, on the visibility form: extra wizard rounds, leans per pass); Claude (itemisation)",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-819",
-      "short_name": "SUBSTRATE_ROUND",
-      "priority": "A",
-      "difficulty": 4,
-      "category": "UI",
-      "title": "Round 5 - metros, reach across water, firm markers and charters, and the market carve",
-      "authority_doc": "docs/ui/STARTUP.md",
-      "requires": [
-        "BL-816"
-      ],
-      "files": [
-        "src/ui/startup_screens.cpp",
-        "src/world/corporation_generation.cpp",
-        "src/world/market.cpp"
-      ],
-      "design": "FOUR OBJECTS, ALL FOUR CHOSEN BY BEN (2026-09-08), drawn in order on the epoch globe: metros growing out of the population centres the history grew and sacked; colonial reach across water; firm markers with their charters; the market carve and its price field.\n\nTHIS ROUND SHOWS THE SELECTED LANDSCAPE, NOT THE SEARCH. Phase 6 scores candidates statically in milliseconds; a ranking is not a spectacle. The player watches the winner being drawn.\n\nPLACEHOLDERS ARE EXPECTED AND ARE THE POINT. Phase 6's search is not built (BL-770 was cancelled with the board clear) and colonial ties do not cross the handoff yet. Each of the four draws from whatever is real today - centres, corporations and markets all are; reach across water is the one with nothing behind it - and is LABELLED as a placeholder where it is one. An unlabelled placeholder is a lie the next session will believe.\n\nTHIS PAYS THREE OF THE FOUR OWED VISIBILITY ITEMS: the region surface, the market-carving explanation, and background firms - the last of which stops being blocked by the worker-thread objection, because a wizard round is not the worker's loading screen.\n\nDONE WHEN: all four draw in the built app on a LIVE click-through, each placeholder is visibly marked as one, and the Visibility table's verdicts are updated to match what actually renders."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "36",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08, on the visibility form: extra wizard rounds, leans per pass); Claude (itemisation)",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-820",
-      "short_name": "PASS_RUNS_IN_THE_ROUND",
-      "priority": "A",
-      "difficulty": 4,
-      "category": "UI",
-      "title": "The wait becomes the round - run the real pass inside rounds 4 and 5, drawing as it computes",
-      "authority_doc": "docs/ui/STARTUP.md",
-      "requires": [
-        "BL-817"
-      ],
-      "files": [
-        "src/core/app.cpp",
-        "src/ui/startup_screens.cpp",
-        "src/world/hard_coded_world.cpp"
-      ],
-      "design": "THE STRUCTURAL PROBLEM THIS ITEM EXISTS FOR. The planetology rounds re-run their chain as a pure throwaway preview on EVERY control move. The history sim is the most expensive pass in the project and cannot be previewed that way at any budget - so rounds 4 and 5 invert the wizard's own mechanism, and that inversion needs stating rather than discovering.\n\nTHE SHAPE: the player sets the leans, presses Run, and the pass runs INSIDE the round with its output drawn as it computes. Accept moves on; reroll runs it again. The generation_progress sink already exists for the loading screen and is the natural feed; what changes is that generation stops being one call behind a bar and becomes calls the player initiates.\n\nBEN'S RULING THAT LICENSES IT (2026-09-08): 'a watched wait needs no budget' - which is why the whole startup-budget chain was dropped rather than deferred.\n\nAND THE OBLIGATION THAT REPLACES THE BUDGET IS SHARPER, NOT LOOSER. A watched wait must be WORTH WATCHING. A round that shows a still globe for ninety seconds is worse than the bar it replaced, because the bar at least admitted it was a wait. If the playback has dead stretches, the answer is to make them move - never to hide them behind a caption.\n\nSTART_NEW_GAME IS THE SEAM THAT MOVES. The one-and-only generation call splits, and the clock rebase at handoff must still hold: wall time spent watching must not land as elapsed in-game days.\n\nDONE WHEN: a live click-through from the menu to play, timed, with no stretch longer than a few seconds in which nothing on the globe changes."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "36",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08, describing round 4 against the live app); Claude (itemisation)",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-822",
-      "short_name": "RESEARCH_FROM_POPULATION",
-      "priority": "B",
-      "difficulty": 1,
-      "category": "Generation",
-      "title": "Research points accrue from population - the parked placeholder, stated as one",
-      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "requires": [],
-      "files": [
-        "src/world/history_sim.cpp"
-      ],
-      "design": "BEN PARKED THE DESIGN AND NAMED THE STUB (2026-09-08): \"We want to simulate research as well, however we will have to park that. Instead of designing it, allow research points to accumulate based on that culture's population.\"\n\nSO THIS ITEM IS DELIBERATELY TINY AND MUST STAY TINY. Points accrue in proportion to population. No tree, no rates, no unlocks, no per-culture modifier - every one of those is the design that was parked, and adding any of them here is how a placeholder quietly becomes the system nobody chose.\n\nIT MUST BE LABELLED AS A PLACEHOLDER wherever it surfaces - in the code and on BL-821's leaderboard. An unlabelled placeholder is a lie the next session will believe.\n\nDONE WHEN: research points exist, accrue from population, and every surface showing them says what they are."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": null,
+      "sprint": "38",
       "written": "2026-09-08",
       "author": "Ben (2026-09-08, describing round 4 against the live app); Claude (itemisation)",
       "blocked_on": null,
@@ -162,139 +38,10 @@
       "design": "RETURNED TO THE POOL 2026-09-09, unbuilt and unchanged. This was planned for sprint 36 and never started. Ben redirected that sprint mid-flight: the rules for initial colonisation and the peaceful spreading of societies are vastly different from those of war and empire, and this item is EMPIRE-PHASE - it only bites once there is something to fight over. Applying it to a span that is overwhelmingly settlement (839 foundings against 9 battles on seed 0, measured) is what would force the fixture-fitting the redirect exists to avoid. Re-scope it against whatever phase boundary sprint 37 settles on before building it.\n\nBEN ASKED FOR LEVERS THAT STOP A TOTAL HEGEMON and named two - cultures in region, and a simple logistics implementation - leaving the rest to judgement. They serve BL-224's non-hegemony invariant, and the constraint on every one of them is the standing rule: a lever is a FORCE WITH A VISIBLE CAUSE ON THE MAP, never a term inside an actor and never a penalty that scales with a polity's rank.\n\nTHE SIX, with what exists today. (1) CULTURES IN A REGION - foreign-culture ground costs cohesion to hold and assimilates slowly, so conquest buys unrest rather than strength. PARTLY BUILT: w_cult = 150 and a per-region culture index are already in history_sim.hpp, so this is calibration more than construction. (2) SIMPLE LOGISTICS - reach falls with distance from the seat along real terrain, so a campaign past reach cannot be sustained. This is the lever that makes a strait or a mountain stall a frontier WITHOUT special-casing either, which is why it is worth more than its cost. OWED. (3) COMMUNICATION - a polity cannot act on ground it cannot hear from until a communication rung is reached. OWED, and it is also the second rung of Ben's own arc, so it earns its place twice. (4) SUCCESSION - a large polity fractures on a leadership transition, weighted by cohesion; this is the dark-age rung. COLLAPSE.md already owns culmination. (5) STRAIN - already built, and its accumulators already cross the pass 1 -> pass 2 handoff. (6) BALANCING COALITIONS - neighbours' stance moves against the largest polity.\n\nLEVER 6 IS THE DANGEROUS ONE and is called out rather than dropped. It is one step from an agent handicap: a coefficient that reads a polity's rank and pushes back is exactly the shape the standing rule forbids. It is admissible ONLY as a STANCE the player can read on the map (RELATIONS.md), arrived at by an in-world cause. If it cannot be built that way, it is not built.\n\nDONE WHEN: across a SEED SWEEP - not one seed - a single polity holding the great majority of the world's land at 1200 CE is rare rather than typical, and each shipped lever demonstrably moves that distribution when varied. A world that does produce a near-hegemon stays a legitimate outcome; the levers tune the forces, they do not clamp the result.\n\nBEN'S ENDING SPEC, 2026-09-09 (elicitation notes): 'this phase will feed directly into our industrial era sim, where we see resources as capital, so it's important to keep in mind specifically how larger empires may persist, expand their reach, and then collapse into smaller nations ready for an industrial boom.'\n\nTHAT MAKES NON-HEGEMONY AN INPUT REQUIREMENT, not just a watchability one. Pass 2 is an economy pass over NATIONS, and nations are what an empire leaves behind when it can no longer hold itself. So a world ending pass 1 as one hegemon has failed the handoff however plausible its numbers -- and so has a world that never assembled anything larger than a city state. Both ends produce an industrial era with nothing to industrialise against.\n\nREACH-GATING IS NOW THE PRIMARY LEVER, and it changes this item's shape. BL-837 was settled on 2026-09-09 as a GATE rather than a price, so lever (2) is no longer 'simple logistics' among six -- an empire persists while its network holds and fragments when it does not, and the number of nations at 1200 CE is a consequence of what got built and stayed maintainable. Re-read the other five as SUPPORTING that mechanism rather than substituting for it, and drop any that only duplicate it.\n\nNEVER A TARGET COUNT AND NEVER A COLLAPSE EVENT FIRED AT A DATE."
     },
     {
-      "status": "partial",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "35",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08: get the sim right first - grudges, cultural mixes, provinces owned); Claude (itemisation, against the sim as it stands)",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-828",
-      "short_name": "PASS_ONE_HANDOFF",
-      "priority": "A",
-      "difficulty": 2,
-      "category": "Generation",
-      "title": "State what pass 1 hands on, as one structure, and assert nothing else crosses",
-      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "requires": [
-        "BL-826",
-        "BL-827"
-      ],
-      "files": [
-        "src/world/history_sim.hpp",
-        "src/world/hard_coded_world.cpp"
-      ],
-      "design": "\"THE IMPORTANT PART IS THAT WE TAKE BACK SOMETHING USEFUL\" (Ben, 2026-09-08). This item is that sentence made checkable.\n\nGENERATION_STRATEGY.md already names what crosses each handoff and adds 'and nothing else'. That clause is currently a promise in prose with nothing enforcing it. Pass 1 now produces three more things - grudges, cultural mixes, and the provinces each polity holds - and a fourth pass will want a fifth thing unless the boundary is written down as a TYPE.\n\nTHE WORK: one struct that is the whole of what pass 1 hands forward, with every consumer taking it rather than reaching into the sim state. Then the doc's list and the struct's fields are the same list, and a change to either shows up as a change to the other.\n\nWHY IT IS WORTH A SEPARATE ITEM rather than a tidy-up inside BL-826: a handoff that is a struct is the difference between 'the history informed the world' and 'the history IS the world's cause'. It is also what makes pass 1 re-runnable in a wizard round without dragging the entire sim state into the UI layer.\n\nDONE WHEN: one type carries the handoff, no consumer reaches past it, and the doc's list matches its fields.",
-      "resolved": "2026-09-09",
-      "resolution": "PARTIALLY DELIVERED and closed as partial rather than complete, on the author's own admission. pass_one_output, make_pass_one_output and pass_one_output_valid exist and are asserted by tools/verify/pass_one_handoff.cpp (C7a-C7h, 0 failures, re-run in the main session). What is NOT done is the item's actual point: settlement_seed_polities, generate_nations and hard_coded_world still reach into settlement_state and history_sim_state directly rather than taking the struct, so \"every consumer takes it, and nothing else crosses\" is still a promise in prose. The review barrier confirmed the remainder is INCOMPLETE rather than INCONSISTENT - no consumer reads a field whose meaning changed under it - so it is safe to leave, and it is the seam BL-843 also wants (the load path skips pass_one_output_valid, which already checks what the seam does not). Re-file the rewiring with the stage 4 work."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "36",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08: another focused pass on economy from 1560 to 1960); Claude (itemisation)",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-831",
-      "short_name": "PASS_TWO_ECONOMY_SPAN",
-      "priority": "A",
-      "difficulty": 4,
-      "category": "Generation",
-      "title": "Pass 2 as the economy pass - 1560 to 1960, on the calendar Ben stated",
-      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "requires": [
-        "BL-825",
-        "BL-828"
-      ],
-      "files": [
-        "src/world/history_sim.cpp",
-        "src/world/hard_coded_world.hpp",
-        "src/world/era_band.hpp"
-      ],
-      "design": "BEN, 2026-09-08: \"another focused pass on economy from 1560 to 1960\". With pass 1 ending at 1200 CE that fixes the whole calendar - and the calendar is now STATED rather than derived from a boundary-year default.\n\nTHE CONSEQUENCE THAT IS NOT A DETAIL: epoch_year = 1960 puts the campaign in the INDUSTRIAL era band. era_band_for_epoch flips at 1700, so every consumer keyed on the band - eras, the resource split, the unit roster - takes the industrial branch rather than the ancient one that epoch_year = 0 produced. That is a world-moving change and it owes the digest discipline in DELIVERY.md: one deliberate re-bless against a stated description of what changed.\n\nTHE 1200 -> 1560 GAP IS A COAST, NOT A HOLE. Pass 1's arc ends in a stable dark age, and a span defined by little changing is the one span not worth simulating. The world arrives at 1560 holding what 1200 left it. What this item must check is whether anything ACCUMULATING is silently lost across it - assimilation shares (BL-826) and grudge decay (BL-827) are the two that move on their own - and advance those cheaply across the gap rather than stepping it.\n\nSAME ENGINE, DIFFERENT QUESTION. Pass 1 asks who holds what ground. Pass 2 asks what that ground produces and trades. The works roster is cumulative and the unit roster is era-keyed, so this is the first span continued with more rows offered - not a second mechanism (§ Three passes of simulated history).\n\nDONE WHEN: a full run does 3,600 years to 1200 (2400 BCE -> 1200 CE, divided at 400 BCE -- BL-871, Ben 2026-09-09; the earlier figure here was 4000), coasts to 1560, runs 1560-1960, and arrives at an industrial-band epoch; the accumulators crossing the gap are named and handled; and the era-band flip is deliberately re-blessed rather than absorbed.\n\nPASS 1'S TOTAL CHANGED UNDER THIS ITEM, 2026-09-09: 3,600 years rather than 4,000, starting 2400 BCE. THE 1200 -> 1560 COAST AND THE 1960 EPOCH ARE UNAFFECTED -- only pass 1's start and its internal boundary moved. The accumulator question this item raises for the 1200 -> 1560 gap now applies a second time, at the 400 BCE boundary inside pass 1 (BL-871)."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "36",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08: another focused pass on economy from 1560 to 1960); Claude (itemisation)",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-832",
-      "short_name": "COLONIAL_TIES",
-      "priority": "A",
-      "difficulty": 4,
-      "category": "Generation",
-      "title": "Colonial ties - reach across water in pass 2, and the trade relationships it leaves behind",
-      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "requires": [
-        "BL-831"
-      ],
-      "files": [
-        "src/world/history_sim.cpp",
-        "src/world/market.cpp"
-      ],
-      "design": "WHAT PASS 2 ADDS OVER PASS 1 is reach across water - a campaign or settle target across a sea leg, staged from harbour works, because colonisation by a major is the Metropole strategy played overseas. It culminates as every major does (../lore/COLLAPSE.md), and the epoch still arrives multipolar: the non-hegemony invariant is NOT relaxed for the sea.\n\nWHAT IT LEAVES BEHIND is the part that matters to the campaign, and it is already named in GENERATION_STRATEGY.md as crossing the handoff: COLONIAL TIES seed the order book's preferred-seller relationships, so a colony's chains close through its metropole before they close anywhere else.\n\nTHAT IS ONE OF THE THREE IN-WORLD FORCES the design relies on to make market conditions uneven WITHOUT a term inside an agent - tariffs, distance, and ties. A player can read why on the map, which is the whole test.\n\nAND IT IS ALSO ROUND 5'S SECOND OBJECT: reach across water is the one of BL-819's four with nothing behind it today. This item is what turns that placeholder into a real drawing.\n\nDONE WHEN: colonisation happens across water on a seeded sweep without producing a hegemon; ties survive the handoff into the order book; and round 5 draws real reach rather than a labelled stub."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "36",
-      "written": "2026-09-08",
-      "author": "Ben (2026-09-08: another focused pass on economy from 1560 to 1960); Claude (itemisation)",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-833",
-      "short_name": "TARIFF_POSTURE_FROM_HISTORY",
-      "priority": "B",
-      "difficulty": 3,
-      "category": "Generation",
-      "title": "Tariff posture out of pass 2, enacted as an ordinary import_tariff law",
-      "authority_doc": "docs/politics/NATIONS.md",
-      "requires": [
-        "BL-831"
-      ],
-      "files": [
-        "src/world/history_sim.cpp",
-        "src/world/law.cpp"
-      ],
-      "design": "A NATION THAT INDUSTRIALISED LATE RELATIVE TO ITS NEIGHBOURS PROTECTS WHAT IT HAS. That is the cause; the posture is its consequence, and pass 2 already computes the input - polity::industrial_year, the year a polity crossed the rung, is in history_sim.hpp today.\n\nWHAT MATTERS IS HOW IT IS ENACTED: as an ORDINARY import_tariff law at world setup, not as a special generation-only field. The design says so explicitly, and the reason is the one that keeps the whole economy legible - a player can open the law panel and read the tariff, repeal it, and watch prices move. A hidden generation modifier would be invisible and unrepealable, which is the shape the standing rule against invisible forces exists to prevent.\n\nRELATIVE, NOT ABSOLUTE. 'Late' means late against its neighbours, so a world where everyone industrialised late produces no protectionists - which is correct, and is why the term must not be a threshold on the raw year.\n\nDONE WHEN: postures derive from relative industrialisation dates, land as real import_tariff laws visible in the law panel, and a world with uniform timing produces no tariffs."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "36",
-      "written": "2026-09-08",
-      "author": "Found by the BL-826 regression hunt (2026-09-08); Claude",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-836",
-      "short_name": "WINTER_LOSES_EVERY_TIE",
-      "priority": "B",
-      "difficulty": 2,
-      "category": "Generation",
-      "title": "Winter can never win a tie in the season argmax, and integer truncation makes ties common",
-      "authority_doc": "docs/generation/MILITARY_HISTORY.md",
-      "requires": [
-        "BL-835"
-      ],
-      "files": [
-        "src/world/history_sim.cpp"
-      ],
-      "design": "THE SEASON AXIS IS DECIDED BY A STRICT COMPARISON. Summer is evaluated first (w = 0) and winter guards on s > best_score - strictly greater - so an EXACT TIE always keeps summer.\n\nWINTER'S ONLY BENEFIT IN THE SCORE is that def_ready drops 1000 -> 750, shrinking the defence term (params.w_def * def_eff) / 2000. That is integer division, so on a weak defender the winter advantage TRUNCATES TO ZERO and the two seasons tie exactly - at which point the strict comparison silently discards winter. Measured: def_scaled must reach about 4 before the winter delta survives the divide at all.\n\nAgainst a zero-defence target both terms are 0, so winter is unreachable BY CONSTRUCTION, not by a hair. That is why R5 reports 0 winter campaigns out of 258 with the winter premium set to 0 to make winter freely competitive. The scoring itself is healthy where a defender exists - probed candidates show winter strictly ahead (s=70 vs 67, s=83 vs 81) - the argmax simply never reaches them while a dead region outranks everything.\n\nSO THIS IS THE SECOND-ORDER HALF AND IT IS SEQUENCED DELIBERATELY. Fixing BL-835 may make R5 pass on its own by removing the dominating candidate. Fix BL-835 first, RE-MEASURE, and only then decide whether the tie-break also wants changing - a tie-break altered while a bigger distortion is still in play is a change nobody can evaluate.\n\nAND THE TIE-BREAK IS A DESIGN CALL, not a defect to silently flip. Preferring summer on a tie may be exactly right. What is wrong is that it is UNSTATED and that truncation manufactures the ties.\n\nDONE WHEN: BL-835 is fixed and R5 re-measured; the tie-break is then either stated as deliberate in MILITARY_HISTORY.md or changed on Ben's ruling."
-    },
-    {
       "status": "complete",
       "glyph": "✓",
       "parked": false,
-      "sprint": null,
+      "sprint": "38",
       "written": "2026-09-08",
       "author": "Ben (2026-09-08, on the holistic scorer: diplomacy, logistics, turbulence); Claude",
       "blocked_on": null,
@@ -321,7 +68,7 @@
       "status": "designed",
       "glyph": "✓",
       "parked": false,
-      "sprint": null,
+      "sprint": "38",
       "written": "2026-09-08",
       "author": "Ben (2026-09-08, on the holistic scorer: diplomacy, logistics, turbulence); Claude",
       "blocked_on": null,
@@ -346,7 +93,7 @@
       "status": "designed",
       "glyph": "✓",
       "parked": false,
-      "sprint": null,
+      "sprint": "38",
       "written": "2026-09-08",
       "author": "Ben (2026-09-08, on the holistic scorer: diplomacy, logistics, turbulence); Claude",
       "blocked_on": null,
@@ -372,96 +119,7 @@
       "status": "designed",
       "glyph": "✓",
       "parked": false,
-      "sprint": "36",
-      "written": "2026-09-09",
-      "author": "The sprint 35 step 4a review barrier (2026-09-08); Claude",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-840",
-      "short_name": "REALM_ENDED_IS_DEAD_CODE",
-      "priority": "A",
-      "difficulty": 2,
-      "category": "Generation",
-      "title": "The realm-ended grudge can never fire - its predicate is unsatisfiable",
-      "authority_doc": "docs/politics/RELATIONS.md",
-      "requires": [],
-      "files": [
-        "src/world/history_sim.cpp"
-      ],
-      "design": "FOUND BY THE STEP 4a REVIEW BARRIER, and it is the exact defect a barrier exists to catch: a harness green on a feature that does not exist.\n\nextinguish_polity (history_sim.cpp:602) raises grudge_kind::realm_ended only from surviving polities that SHARE THE DEAD REALM'S CULTURE. But polities are seeded ONE PER DISTINCT CULTURE (lines 396-427, deduped with std::find) and polities.push_back occurs at line 427 and nowhere else in the file. So for any surviving kin, kin.culture != dead_culture is ALWAYS true and the loop body is never reached.\n\nCONSEQUENCES. params.grudge_realm_ended = 900 - the LARGEST magnitude in the whole table - is never applied. grudge_event_line's \"a realm ended\" string is unreachable. And the documented behaviour in history_sim.hpp - \"the dead leave a grudge in their kin, never in an heir\" - is unimplemented prose. The seed-0 fixture extinguishes several realms and produces zero realm_ended events.\n\ntools/verify/pass_one_handoff.cpp ASSERTS NOTHING ABOUT realm_ended, which is why it passed 0 failures over a dead branch. Whatever the fix, it owes an assertion that this kind actually fires.\n\nTHE FIX IS A DESIGN CALL, not a repair, because the original ruling was reasoned FROM the one-polity-per-culture fact: the dead leave a grudge in their kin rather than an heir, precisely because there are no heirs. If kin cannot exist either, the choice is between dropping the kind outright and giving it a different bearer - the dead realm's NEIGHBOURS, say, who watched it happen, which is also the natural feed for BL-838 (fear of being next).\n\nDONE WHEN: either the kind is removed with its magnitude and its string, or it fires on a real run and a harness asserts that it does."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "36",
-      "written": "2026-09-09",
-      "author": "The sprint 35 step 4a review barrier (2026-09-08); Claude",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-841",
-      "short_name": "ASSIMILATION_LOST_TO_THE_TAIL",
-      "priority": "A",
-      "difficulty": 3,
-      "category": "Generation",
-      "title": "A holder with no free culture slot loses its assimilation into the anonymous tail",
-      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "requires": [],
-      "files": [
-        "src/world/settlement.cpp"
-      ],
-      "design": "FOUND BY THE STEP 4a REVIEW BARRIER. It silently disables the anti-hegemony lever BL-826 exists to build, on exactly the ground where that lever matters most.\n\nTHE PATH. All three named slots hold A, B, C; a fourth culture D takes the region. shift_toward(D, ...) finds no slot for D (settlement.cpp:96), the displacement test taken > cw[smallest] fails while the smallest slot is bigger than one round's take, and line 112 puts the gain into other_q. share_of(D) reads the TAIL as 0, so the w_cult term (history_sim.cpp:1190) charges D the FULL foreign discount forever. The ground never digests.\n\nAND THE ACCUMULATED GAIN IS PERMANENTLY LOST. When D finally does claim a slot it restarts from one round's take; the reviewer measured roughly 240 per-mille of assimilation stranded in a tail that is foreign to every culture and never re-attributed. The tail is documented as \"peoples too small to name\"; this path makes it a one-way sink for the HOLDER'S OWN share.\n\nTHIS IS THE COMMON CASE, NOT A CORNER. A frontier region changing hands three times is ordinary - and on the current fixture one region changes hands 258 times (BL-835).\n\nSHAPE OF A FIX, not prescribed: the holder's share is the one share that must be nameable, since it is the one every downstream reader asks about. Either the holder always claims a slot on first gain, or the tail tracks the holder separately from the anonymous remainder. Whichever, the invariant to state and then assert is that a share the sim is actively accruing is never written somewhere share_of cannot read it back.\n\nDONE WHEN: a holder with three foreign slots digests its ground at the same rate as one with a free slot, and a harness asserts no accrued share is unreadable."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "36",
-      "written": "2026-09-09",
-      "author": "The sprint 35 step 4a review barrier (2026-09-08); Claude",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-842",
-      "short_name": "SMALL_GRUDGES_FREEZE",
-      "priority": "B",
-      "difficulty": 2,
-      "category": "Generation",
-      "title": "Integer truncation freezes small grudges forever, falsifying both decay and sparsity",
-      "authority_doc": "docs/politics/RELATIONS.md",
-      "requires": [],
-      "files": [
-        "src/world/history_sim.cpp"
-      ],
-      "design": "FOUND BY THE STEP 4a REVIEW BARRIER. Two of the grudge design's stated properties are false in the code, and both were argued for in prose rather than measured.\n\nTHE ARITHMETIC. g.score -= (g.score * shed) / 1000 (history_sim.cpp:770) truncates to a ZERO decrement once score < 1000/shed. shed = grudge_decay_per_year_q (3) x step_years, so in the -20..0 band (step 5) shed is 15 and any score below 67 decrements by exactly nothing, forever. At the 4000-year span the -400..-100 band (step 20, shed 60) freezes everything below 17; the -100..-20 band (step 10, shed 30) freezes everything below 34.\n\nSO A SINGLE border_raided (magnitude 60) raised late in a run is frozen at 60 for the rest of it. It never reaches grudge_floor (4), so it is never erased, and it crosses the handoff as a permanent row.\n\nBOTH DESIGN CLAIMS FALL. The comment's \"a half-life near 230 years, so a single old wrong is gone by the epoch\" is true only for LARGE scores. And the sparse table the design is built on is not sparse: every pair that ever skirmished keeps a permanent row. Sparsity was one of the three reasons the ledger was affordable at 4000 years.\n\nThe usual fix is a minimum decrement of one where score is above the floor, but that changes the half-life at the bottom of the range and should be measured rather than assumed.\n\nDONE WHEN: no score above grudge_floor is stationary across a round at any step_years in use, and a 4000-year run's grudge count is measured rather than asserted."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": "36",
-      "written": "2026-09-09",
-      "author": "The sprint 35 step 4a review barrier (2026-09-08); Claude",
-      "blocked_on": null,
-      "version_goal": null,
-      "id": "BL-843",
-      "short_name": "SEAM_SKIPS_ITS_OWN_VALIDATOR",
-      "priority": "B",
-      "difficulty": 2,
-      "category": "Generation",
-      "title": "The save seam checks the shares sum but not their structure, and a stricter checker already exists",
-      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
-      "requires": [],
-      "files": [
-        "src/core/save_game.cpp",
-        "src/world/history_sim.cpp"
-      ],
-      "design": "FOUND BY THE STEP 4a REVIEW BARRIER. r_region (save_game.cpp:351) enforces total_q() == 1000 and per-field ranges, but NOT the structural invariants every culture_shares accessor depends on: weight 0 exactly where id is -1, descending sort, no duplicate ids, ids in range.\n\nTHE FAILURE. A truncated or bit-flipped save carrying id = {-1, 5, -1}, weight_q = {1000, 0, 0}, other_q = 0 passes every current check and loads clean. The region then reports empty() == true and plurality() == -1 while carrying 1000 per-mille on an unnamed slot, and share_of(5) == 0 although slot 1 names culture 5. Every downstream reader - city_names.cpp:76, hard_coded_world.cpp:742, the polity seed at history_sim.cpp:399 - silently treats the region as uncultured.\n\nTHE PART THAT MAKES THIS CHEAP AND SLIGHTLY EMBARRASSING: pass_one_output_valid() ALREADY CHECKS ALL FOUR (history_sim.cpp:2337-2379). The stricter checker exists and the load path does not call it. Two callers sharing one implementation is the discipline that stops a check measuring something different from the code - the same argument BL-775 was filed on.\n\nNOTE THE SEVERITY HONESTLY: this is a corrupt-input hardening issue on a local single-player save, not a live exploit, and the save seam is not the untrusted wire boundary the standing rules govern. It is filed because the fix is small and the checker is already written.\n\nDONE WHEN: the load path enforces the same four structural invariants as pass_one_output_valid, through one shared implementation rather than a second copy."
-    },
-    {
-      "status": "designed",
-      "glyph": "✓",
-      "parked": false,
-      "sprint": null,
+      "sprint": "38",
       "written": "2026-09-09",
       "author": "BL-835 verification (2026-09-09); Ben's call to file it separately; Claude",
       "blocked_on": null,
@@ -878,163 +536,13 @@
       "resolution": "BUILT and merged (commit 6c67b445, integrated via merge). culture::coined_year (int64_t, sentinel INT64_MIN) added to creeds.hpp, threaded from colonisation_field::spawns through derive_daughter_culture; cradle cultures get colonisation_start_year, not a sentinel. colonisation_harness C14 extended with time-monotonicity, root-year and hop-vs-years checks: 36/0 PASS on seeds 0-2 (deepest chains 9/10/12 hops, 110/224/216 years apart -- confirming hops and years are genuinely different measures, the whole point of NR-816). Re-verified green after merge to main."
     },
     {
-      "id": "BL-881",
-      "short_name": "EMPIRE_TREE_IN_SIM",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 5,
-      "glyph": "·",
-      "sprint": null,
-      "written": "2026-09-10",
-      "author": "Ben (design pass 2026-09-10; items minted by Claude)",
-      "requires": [],
-      "parked": false,
-      "category": "Generation",
-      "title": "The Era -1 sim reads the Empire tree: a node mask per polity, Invest takes a node, milestones gate rings",
-      "authority_doc": "docs/generation/trees/TREES.md",
-      "files": [
-        "docs/generation/trees/EMPIRE_TREE.md",
-        "docs/generation/trees/empire_tree.json",
-        "src/world/history_sim.hpp",
-        "src/world/history_sim.cpp",
-        "src/world/works_roster.hpp",
-        "tools/session/tree_lint.js"
-      ],
-      "design": "THE SIM READS NODES, NOT BANDS (Ben, 2026-09-10). Today a polity's technology is seven ints, capacity[sim_domain], raised one band at a time by the Invest verb; the ladder's nodes are a picture beside it. This item makes the Empire tree (docs/generation/trees/EMPIRE_TREE.md, 52 nodes) the thing the sim runs.\n\nWHAT LANDS: (1) polity carries a 64-bit mask per tree plus one accumulated-progress int for the node in hand; (2) the Invest verb's target becomes a NODE chosen by the scorer in TREES.md § The scorer, with every node's pursued_when as the specification — the terms are readings of state the sim already has (free_holdings overrun, manpower against ceiling, population against K, seat stores, cohesion, neighbour power and grudge, drawdowns, the endowment windows, culture shares, port windows); (3) cost = base(kind) × ring, replacing capacity_band_cost × band; (4) a ring is locked until the milestone below it is held; travel is OR, gates and requires are AND, requires_fork either side, requires_any any N; (5) forks close the other side's window permanently; (6) minors diffuse free by contact at the Institutions-scaled rate, majors by class, milestones never; (7) the derived BAND reading — roster_band_for_capacity and the furnace crossing — is computed FROM the mask where a consumer still wants a scalar, so works.lua and the unit roster keep working unchanged on day one.\n\nHOW THE STORE REACHES A LUA-FREE SIM: the headless harnesses link without sol2, so the sim cannot load the JSON through the Lua state the way works.lua is loaded. Lean: a tools/session script transcribes the three stores into a generated Lua-free header (one constexpr table per tree), regenerated by the lint; determinism favours it and the ladder_lint precedent already couples doc, store and check. Raise the alternative (a Lua loader in one TU, as works_registry.cpp does) if the generated header grows past taste.\n\nWITHIN THE GRANT: choosing a node is an argument to the existing Invest verb (AI_OPPONENT.md § 11); no new verb, no planner. The empire span's default arc is 400 BCE -> 1200 CE (BL-871).\n\nDONE WHEN: history_sweep reports per polity the nodes held and the milestone reached; a polity's Invest choice is reproducible from its pursued_when terms in a harness assertion; no polity holds a ring-r+1 node without milestone r; a fork never has both sides held; and the sizing rule reads from the sweep — leader at the rim shortly before 1200, median near ring 2 — as a MEASUREMENT, not yet a pass/fail.\n\nIN THE POOL (Ben, 2026-09-10): sprint 40 closed as a design sprint; the build waits on the Empire (sprint 38) and Industry (sprint 39) phases landing. Re-scope against whatever those settle before starting."
-    },
-    {
-      "id": "BL-882",
-      "short_name": "COLONISATION_TREE_CARRIED",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 4,
-      "glyph": "·",
-      "sprint": null,
-      "written": "2026-09-10",
-      "author": "Ben (design pass 2026-09-10; items minted by Claude)",
-      "requires": [],
-      "parked": false,
-      "category": "Generation",
-      "title": "The migration carries the Colonisation tree: a mask per culture, acquired by time on ground, inherited at coining",
-      "authority_doc": "docs/generation/trees/TREES.md",
-      "files": [
-        "docs/generation/trees/COLONISATION_TREE.md",
-        "docs/generation/trees/colonisation_tree.json",
-        "src/world/colonisation.cpp",
-        "src/world/creeds.hpp"
-      ],
-      "design": "NO ACTOR, SO NO SCORER — and this must not grow one (COLONISATION.md is emphatic). A culture acquires a node by TIME ON GROUND that satisfies its gate (a people on arable ground after N years holds the flood-basin sowing node), or by contact for minors; a daughter copies its parent's mask at coining, in exactly the shape BL-865 used for parent and BL-873 for coined_year.\n\nTHE RIM MILESTONE IS THE SEAT CONDITION: a culture holding The Standing Seat at 400 BCE seeds a polity that starts the Empire tree at its root; one that does not starts late, once it climbs there inside the empire span. That is the handoff CIVILISATION.md § What the Culture phase must hand forward wants and the tree exists to give.\n\nMilestones use requires_any (any two of the four ground-family majors at the ring) because a people coined on one ground holds one branch — TREES.md § Milestones. The twelve farm classes the classifier yields fold into four ground families; which class goes where is NR-819, Ben's call, and woodland/boreal/arid/stone belong to no branch until he makes it.\n\nDONE WHEN: the colonisation harness reports the mask per culture at 400 BCE; a daughter's mask at coining equals its parent's; a culture never holds a node whose gate its ground never satisfied; and the sweep reports how many cultures reach each milestone by 400 BCE against the sizing rule.\n\nIN THE POOL (Ben, 2026-09-10): sprint 40 closed as a design sprint; the build waits on the Empire (sprint 38) and Industry (sprint 39) phases landing. Re-scope against whatever those settle before starting."
-    },
-    {
-      "id": "BL-883",
-      "short_name": "INDUSTRY_TREE_IN_PASS2",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 5,
-      "glyph": "·",
-      "sprint": null,
-      "written": "2026-09-10",
-      "author": "Ben (design pass 2026-09-10; items minted by Claude)",
-      "requires": [
-        "BL-881"
-      ],
-      "parked": false,
-      "category": "Generation",
-      "title": "Pass 2 invests the Industry tree: the fuel gate binds, four forks decide the 1960 nation, the rim hands the capacity vector",
-      "authority_doc": "docs/generation/trees/TREES.md",
-      "files": [
-        "docs/generation/trees/INDUSTRY_TREE.md",
-        "docs/generation/trees/industry_tree.json",
-        "src/world/history_sim.cpp",
-        "src/world/nation_generation.cpp",
-        "docs/generation/CORPORATION_GENERATION.md"
-      ],
-      "design": "THE SAME VERB AND THE SAME MACHINERY AS BL-881, on the second span (1560 -> 1960), with the differences the phase owns: capacity gates BIND here (ore_q + fuel on the spire is the Great-Divergence mechanism), the industrial rung is the milestone that lights the furnace rather than a band comparison, and the four doctrine forks — Fuel, Labour, Sovereign, Works — are the axes the 1960 spread runs along.\n\nENTRY TIMING IS THE FIRST INPUT: a polity holding The Enforceable Promise at 1200 enters at the root when pass 2 opens; one that does not enters once it does. That, not a per-domain band, is how a nation ends 1960 three bands behind.\n\nTHE 1960 HANDOFF: the held mask becomes the nation's capacity vector (the unlocked building/recipe set, BL-156 shape), Works Doctrine × General Incorporation becomes the charter gate CORPORATION_GENERATION.md reads (BL-311), Labour Doctrine feeds demography, and the sea majors are what colonisation across water staged from.\n\nDONE WHEN: history_sweep at --epoch 1960 reports per polity the Industry nodes held and forks taken; the furnace year is derived from the milestone and agrees with the old derivation on the goldens where both exist; and at least one seed in eight produces a State-Arsenal nation and one a Private-Works nation, so the charter gate has something to read.\n\nIN THE POOL (Ben, 2026-09-10): sprint 40 closed as a design sprint; the build waits on the Empire (sprint 38) and Industry (sprint 39) phases landing. Re-scope against whatever those settle before starting."
-    },
-    {
-      "id": "BL-884",
-      "short_name": "RESEARCH_FLOW_FROM_LABOUR_SPLIT",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 3,
-      "glyph": "·",
-      "sprint": null,
-      "written": "2026-09-10",
-      "author": "Ben (design pass 2026-09-10; items minted by Claude)",
-      "requires": [
-        "BL-867"
-      ],
-      "parked": false,
-      "category": "Generation",
-      "title": "Research is a flow: a fraction of the industry slice, scaled by spire ring and contact, never a resource",
-      "authority_doc": "docs/generation/trees/TREES.md",
-      "files": [
-        "docs/generation/trees/TREES.md",
-        "docs/generation/CIVILISATION.md",
-        "src/world/history_sim.cpp"
-      ],
-      "design": "TREES.md § State, and where research comes from. Before universities a research point is anachronistic, so in generation research is a DERIVED FLOW: a fraction of the region's industry slice (CIVILISATION.md § Materials are spent divides labour into subsistence, industry, muster — BL-867), summed to the seat, scaled by the spire ring the polity holds and by its contact degree.\n\nIT COSTS LABOUR, which is the point: a polity that musters hard researches slowly, a comfortable one researches fastest, and a starved one is behind, never broken — the shortfall shape every goods draw in the campaign takes. Not a fourth claimant on the split; a reading of the second.\n\nThe fraction per spire ring is a sweep dial set against the sizing rule (TREES.md § Sizes), not picked. Round 4's leaderboard already promises a research-speed metric (STARTUP.md § Rounds); this is the quantity it reads.\n\nDONE WHEN: the flow is computed per polity per round from the split, the leaderboard reads it, and a harness shows a polity at full muster researching measurably slower than the same polity consolidating.\n\nIN THE POOL (Ben, 2026-09-10): sprint 40 closed as a design sprint; the build waits on the Empire (sprint 38) and Industry (sprint 39) phases landing. Re-scope against whatever those settle before starting."
-    },
-    {
-      "id": "BL-885",
-      "short_name": "TREE_VIEWER_READS_STORES",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 3,
-      "glyph": "·",
-      "sprint": null,
-      "written": "2026-09-10",
-      "author": "Ben (design pass 2026-09-10; items minted by Claude)",
-      "requires": [
-        "BL-881"
-      ],
-      "parked": false,
-      "category": "Generation",
-      "title": "The tech viewer and the wizard read the three tree stores; the ANT- transcription in tech_tree.lua retires",
-      "authority_doc": "docs/generation/trees/TREES.md",
-      "files": [
-        "scripts/tech_tree.lua",
-        "src/world/tech_tree.hpp",
-        "src/world/tech_tree.cpp",
-        "src/ui/tech_tree_panel.cpp",
-        "docs/ui/STARTUP.md"
-      ],
-      "design": "scripts/tech_tree.lua's Era -1 Antiquity section is a mechanical transcription of docs/research/ancient_tech_ladder.json (BL-310), and that store is superseded by docs/generation/trees/*.json. The F9 viewer's radial layout (one wedge per quest, rings by band) is already the spire-and-wedges shape; it should draw a tree store directly — spire as the centre column, one wedge per branch, ring = ring — and the Era 0/1 campaign section of tech_tree.lua stays as it is.\n\nThe wizard's round 4 (Empires) and round 5 (Industrialisation) leaderboards read research speed and, per polity, the milestone reached; the fog rule (a node renders only within reach of a held node) is what the god view breaks on purpose.\n\nDONE WHEN: the ANT- quests and T*- nodes are gone from tech_tree.lua; the viewer draws all three trees from their stores with a live click (not a capture); and tree_lint's doc/store cross-check is the only place node identity is asserted.\n\nIN THE POOL (Ben, 2026-09-10): sprint 40 closed as a design sprint; the build waits on the Empire (sprint 38) and Industry (sprint 39) phases landing. Re-scope against whatever those settle before starting."
-    },
-    {
-      "id": "BL-886",
-      "short_name": "TREE_SIZING_SWEEP",
-      "status": "designed",
-      "priority": "A",
-      "difficulty": 3,
-      "glyph": "·",
-      "sprint": null,
-      "written": "2026-09-10",
-      "author": "Ben (design pass 2026-09-10; items minted by Claude)",
-      "requires": [
-        "BL-881",
-        "BL-882",
-        "BL-883"
-      ],
-      "parked": false,
-      "category": "Generation",
-      "title": "history_sweep asserts the sizing rule and re-prices the placeholder magnitudes",
-      "authority_doc": "docs/generation/trees/TREES.md",
-      "files": [
-        "tools/verify/history_sweep.cpp",
-        "docs/generation/trees/TREES.md",
-        "docs/generation/trees/empire_tree.json"
-      ],
-      "design": "TREES.md § Sizes: a tree is sized to the rounds its phase gives a LEADING polity — the best in a world finishes just before the phase ends, the median reaches halfway. That is an assertion the sweep makes, not a number anyone picks, and every per_mille in the three stores is a placeholder by judgement until this item prices it (the works magnitudes are the precedent, HISTORY.md § Magnitudes).\n\nAlso owned here: the thresholds at which each scorer term counts as BINDING (EMPIRE_TREE.md § The terms), the awareness discount (the known term), and the research fraction per spire ring — all measurements over the sweep's polities, none a judgement.\n\nDONE WHEN: the sweep prints per tree the leader's and median's ring at phase end across the seed spread, the assertion is in the harness with its bar stated, and the magnitudes that moved are recorded in the store's _note with the sweep line that moved them.\n\nIN THE POOL (Ben, 2026-09-10): sprint 40 closed as a design sprint; the build waits on the Empire (sprint 38) and Industry (sprint 39) phases landing. Re-scope against whatever those settle before starting."
-    },
-    {
       "id": "BL-887",
       "short_name": "REACH_AS_CENTRE_CHAINS",
       "status": "designed",
       "priority": "B",
       "difficulty": 5,
       "glyph": "✓",
-      "sprint": null,
+      "sprint": "38",
       "written": "2026-09-10",
       "author": "Ben (2026-09-10, watching Round 4 live); Claude (itemisation)",
       "requires": [
