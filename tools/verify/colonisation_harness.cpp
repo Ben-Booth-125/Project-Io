@@ -495,6 +495,7 @@ void case_real_worlds(int seed_count)
         const std::vector<terrain_substrate>& sub = fx.terrain.substrate;
         const std::vector<terrain_cover>&     cov = fx.terrain.cover;
         const std::vector<terrain_landform>&  lf  = fx.terrain.landform;
+        const std::vector<std::uint8_t>&      riv = fx.terrain.river;
 
         // COIN A PACKAGE AT EVERY SETTLED REGION'S ANCHOR. Real ground, real
         // windows — the spread below is the spread the game would actually get.
@@ -515,6 +516,7 @@ void case_real_worlds(int seed_count)
         in.substrate     = &sub;
         in.cover         = &cov;
         in.landform      = &lf;
+        in.river         = &riv;
         in.gw            = fx.gw;
         in.gh            = fx.gh;
         in.boundary_year = 0;
@@ -538,6 +540,18 @@ void case_real_worlds(int seed_count)
             ++land;
             if (f.arrival_year[i] != colonisation_never_reached) ++reached;
             if (f.farmable[i]) ++farmable;
+        }
+
+        // RIVER SHARE OF ARRIVAL (BL-853). COLONISATION.md names river courses
+        // as the cheapest ground of all -- this reports how much of the walk
+        // actually used one, now that the sim's terrain view can see them.
+        int reached_river = 0, land_river = 0;
+        for (std::size_t i = 0; i < f.arrival_year.size(); ++i)
+        {
+            if (i < sub.size() && is_water(sub[i])) continue;
+            if (i >= riv.size() || riv[i] == 0) continue;
+            ++land_river;
+            if (f.arrival_year[i] != colonisation_never_reached) ++reached_river;
         }
 
         // WHICH GROUND NOBODY CAN FARM (BL-859). The habitable share is a single
@@ -578,10 +592,13 @@ void case_real_worlds(int seed_count)
         if (bytes > bytes_max) bytes_max = bytes;
 
         std::printf("seed %u  regions %d  breadth min/mean/max %d/%d/%d  "
-                    "land %d  reached %d (%d%%)  farmable %d (%d%%)  field %lld KB\n",
+                    "land %d  reached %d (%d%%)  farmable %d (%d%%)  "
+                    "river tiles %d, reached %d (%d%%)  field %lld KB\n",
                     wp.seed, bn, bmin, bmean, bmax, land,
                     reached, land ? (reached * 100) / land : 0,
                     farmable, land ? (farmable * 100) / land : 0,
+                    land_river, reached_river,
+                    land_river ? (reached_river * 100) / land_river : 0,
                     static_cast<long long>(bytes / 1024));
 
         // BL-851's DELIVERABLE, and the reason it is printed rather than

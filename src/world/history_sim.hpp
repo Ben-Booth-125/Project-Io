@@ -83,6 +83,13 @@ struct sim_terrain_view
     const std::vector<terrain_cover>*     cover     = nullptr;
     const std::vector<std::uint8_t>*      density   = nullptr;
     const std::vector<terrain_landform>*  landform  = nullptr;
+
+    /// Non-zero where `tile_component::river_edges` is non-zero (BL-853). A
+    /// river is an EDGE on the tile, not a tile property of its own, so this
+    /// is a one-byte-per-tile derived flag rather than a fifth terrain axis.
+    /// May be null independently of the rest, in which case a caller (e.g.
+    /// `run_colonisation`) treats every tile as riverless.
+    const std::vector<std::uint8_t>*      river     = nullptr;
 };
 
 // ---------------------------------------------------------------------------
