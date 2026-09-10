@@ -26,29 +26,6 @@ void app::open_new_world_wizard()
 {
     // Nothing is generated yet — the wizard runs on a throwaway preview and only
     // commits when the player reaches its last round and presses "Begin".
-    // THE WIZARD OPENS ON A ROLLED SEED (BL-890; Ben, 2026-09-10). A default of
-    // 0 made every new game the same reference world unless the player thought
-    // to press Roll, which turns rerolling into a thing you must know to do
-    // rather than the ordinary way in. `STARTUP.md` carries the ruling.
-    //
-    // THE ENTROPY STOPS HERE, exactly as the Roll button's already does. This
-    // draw feeds ONLY the seed value; `world/*` stays a pure function of that
-    // seed, so save, replay, multiplayer and the determinism standing rule are
-    // all untouched. Seed 0 still names the reference world — it is simply no
-    // longer what a player gets by accident.
-    //
-    // NOT UNDER --verify, AND THAT IS LOAD-BEARING. Every scripted capture and
-    // every golden reaches the wizard through this function; rolling here would
-    // make each run a different world and turn the whole visual suite
-    // non-deterministic. `m_golden_dir` non-empty is this file's own test for
-    // "a harness is driving", used the same way by the history-lapse adopt path
-    // below. A script that wants a specific seed still sets one.
-    if (m_golden_dir.empty())
-    {
-        std::random_device rd;
-        m_pending_world_params.seed = static_cast<uint32_t>(rd());
-    }
-
     m_wiz_round = 0;
     m_wiz_dirty = true;
     m_screen    = app_screen::generating;
@@ -352,6 +329,39 @@ void app::draw_main_menu()
         //     centred buttons below. ---
         world_params& wp = m_pending_world_params;
         ImGui::SeparatorText("New World");
+
+        // THE MENU OPENS ON A ROLLED SEED (BL-890; Ben, 2026-09-10). The
+        // default of 0 made every new game the same reference world unless the
+        // player thought to press Roll, which turns rerolling into a thing you
+        // must know to do rather than the ordinary way in. STARTUP.md carries
+        // the ruling.
+        //
+        // ROLLED HERE, AND ONCE, FOR TWO REASONS THE LIVE CHECK FOUND. Rolling
+        // per frame would make the field impossible to type into. Rolling when
+        // the WIZARD opens -- the first place this was tried -- silently threw
+        // away a seed the player had just typed or pasted into this very field,
+        // because New Game runs that path on the way out of this screen. The
+        // latch keeps the draw idempotent: the number is fresh on arrival and
+        // is then the player's.
+        //
+        // THE ENTROPY STOPS HERE, exactly as the Roll button's below already
+        // does. world/* stays a pure function of the seed, so save, replay and
+        // the multiplayer argument are untouched; seed 0 still names the
+        // reference world, it is simply no longer what you get by accident.
+        //
+        // NOT UNDER --verify. Every scripted capture reaches this menu, and a
+        // rolled seed would make each run a different world and turn the visual
+        // suite non-deterministic. `m_golden_dir` non-empty is this file's own
+        // test for "a harness is driving".
+        if (!m_seed_rolled)
+        {
+            m_seed_rolled = true;
+            if (m_golden_dir.empty())
+            {
+                std::random_device rd_seed;
+                wp.seed = static_cast<uint32_t>(rd_seed());
+            }
+        }
 
         // Seed — hex entry + a one-shot randomise. The random_device draw feeds ONLY
         // the seed value; no entropy ever enters world generation, which stays a pure

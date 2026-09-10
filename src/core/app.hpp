@@ -488,6 +488,13 @@ private:
     sim_loop        m_sim_loop;
     lua_state       m_lua;
     world           m_world;
+    /// One-shot latch for BL-890's rolled seed. The menu draw rolls
+    /// `m_pending_world_params.seed` the FIRST time it runs and never again, so
+    /// the field the player sees is already a fresh world and anything they
+    /// then type, paste or Roll into it survives. Rolling per-frame would make
+    /// the field impossible to edit; rolling when the wizard opens would throw
+    /// away a seed they had just entered on this very screen.
+    bool            m_seed_rolled = false;
     world_params    m_pending_world_params; ///< Edited by the New World menu and then by the wizard; consumed by start_new_game (BL-114/167).
     world_params    m_active_world_params;  ///< The descriptor the live world was built from; shown as the "seed used".
 

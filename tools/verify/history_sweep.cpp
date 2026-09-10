@@ -715,11 +715,26 @@ int main(int argc, char** argv)
                 if (c.year <= params.start_year + span / 10) ++early; // First tenth of the run.
             }
             {
-                std::vector<int> flips;
+                // CONQUESTS ONLY -- and this correction matters, because the
+                // first cut of this block did NOT make it and was vacuous.
+                // `owner_changes` records EVERY ownership transition including
+                // a FOUNDING (a region gaining its first owner). Measured on
+                // this sweep: ~4,827 owner_changes per world against a median
+                // of 35 conquests and 2,682 foundings. So a histogram over raw
+                // owner_changes reports how SETTLEMENT is distributed and says
+                // nothing whatever about conquest -- it read "99% taken once
+                // and kept", which is a true statement about founding new
+                // ground and a meaningless one about taking someone else's.
+                //
+                // A region's FIRST change is its founding; every later change
+                // is a transfer between owners. Counting only those makes this
+                // block answer the question it is named for.
+                std::vector<int> seen, flips;
                 for (const owner_change& c2 : sim.owner_changes)
                 {
                     const std::size_t r2 = static_cast<std::size_t>(c2.region);
-                    if (r2 >= flips.size()) flips.resize(r2 + 1, 0);
+                    if (r2 >= seen.size()) { seen.resize(r2 + 1, 0); flips.resize(r2 + 1, 0); }
+                    if (seen[r2] == 0) { seen[r2] = 1; continue; } // the founding
                     ++flips[r2];
                 }
                 int64_t total = 0;
@@ -1266,7 +1281,7 @@ int main(int argc, char** argv)
             }
             const int64_t pr = median_of(per_reg);
             std::printf("\n--- BL-889  DOES CONQUEST ACCUMULATE, OR DOES THE MAP CHURN? ---\n");
-            std::printf("  regions ever taken     median %lld per world\n", static_cast<long long>(median_of(touched)));
+            std::printf("  regions ever CONQUERED median %lld per world (foundings excluded)\n", static_cast<long long>(median_of(touched)));
             std::printf("  TAKEN ONCE AND KEPT    median %lld%% of them\n", static_cast<long long>(median_of(once_pct)));
             std::printf("  TAKEN 3+ TIMES         median %lld%% of them\n", static_cast<long long>(median_of(thrice_pct)));
             std::printf("  changes per region     median %lld.%02lld\n",
