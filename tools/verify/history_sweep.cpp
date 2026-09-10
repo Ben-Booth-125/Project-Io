@@ -190,6 +190,8 @@ struct sweep_row
     int64_t campaign_scored   = 0; ///< Candidates reaching the score comparison.
     int64_t campaign_cleared  = 0; ///< Candidates clearing campaign_threshold_q.
     int64_t campaign_chosen   = 0; ///< Rounds where Campaign won the verb choice.
+    int64_t cleared_rounds    = 0; ///< ROUND-grain: rounds where Campaign was in the running.
+    int64_t cleared_lost      = 0; ///< ...of those, rounds it lost the argmax.
     int64_t naval_battles     = 0; ///< Battles with a naval entry on either side.
     int64_t sea_leg_battles   = 0; ///< Battles REACHED over water — the real reading.
     /// Works raised over the run (BL-321), and how many regions ended the run
@@ -789,6 +791,8 @@ int main(int argc, char** argv)
         row.campaign_scored   = sim.campaign_scored;
         row.campaign_cleared  = sim.campaign_cleared;
         row.campaign_chosen   = sim.campaign_chosen;
+        row.cleared_rounds    = sim.campaign_cleared_rounds;
+        row.cleared_lost      = sim.campaign_cleared_lost;
         row.naval_battles     = sim.naval_battles;
         row.sea_leg_battles   = sim.sea_leg_battles;
         row.foundings     = sim.foundings;
@@ -1312,6 +1316,12 @@ int main(int argc, char** argv)
             std::printf("  reached scoring        median %lld\n", static_cast<long long>(median_of(sco)));
             std::printf("  cleared the threshold  median %lld\n", static_cast<long long>(median_of(cle)));
             std::printf("  Campaign won the verb  median %lld rounds\n", static_cast<long long>(median_of(cho)));
+            std::vector<int64_t> crd, cls;
+            for (const sweep_row& r : rows) { crd.push_back(r.cleared_rounds); cls.push_back(r.cleared_lost); }
+            std::printf("  --- ROUND grain (the two above are CANDIDATE grain; do not ratio them) ---\n");
+            std::printf("  Campaign in the running median %lld rounds\n", static_cast<long long>(median_of(crd)));
+    std::printf("    ...WON the argmax     median %lld\n", static_cast<long long>(median_of(cho)));
+            std::printf("    ...LOST the argmax    median %lld\n", static_cast<long long>(median_of(cls)));
             std::printf("  (Read top down. Candidates dying at TRAVERSAL or REACH are a\n"
                         "   geography/adjacency problem; dying between SCORED and CLEARED is a\n"
                         "   threshold problem; cleared-but-never-chosen is verb competition.\n"
