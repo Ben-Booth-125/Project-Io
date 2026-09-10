@@ -189,11 +189,20 @@ Divide the grid rows into named temperature bands. Band boundaries are shifted b
 
 | Band | Temperate row % | Scorching row % | Cold row % |
 |---|---|---|---|
-| Polar | 0–10, 90–100 | — | 0–15, 85–100 |
-| Subpolar | 10–22, 78–90 | — | 15–35, 65–85 |
-| Temperate | 22–42, 58–78 | 0–20, 80–100 | 35–65 |
+| Polar | 0–6, 94–100 | — | 0–15, 85–100 |
+| Subpolar | 6–14, 86–94 | — | 15–35, 65–85 |
+| Temperate | 14–42, 58–86 | 0–20, 80–100 | 35–65 |
 | Subtropical | 42–47, 53–58 | 20–40, 60–80 | — |
 | Tropical | 47–53 | 40–60 | — |
+
+The Temperate column's polar/subpolar boundaries were narrowed 2026-09-10
+(BL-888, redirected from BL-859): polar from the outer 20% of rows to the
+outer 12%, subpolar from the next 24% to the next 16% — the combined cold
+band drops from 44% to 28% of rows. `colonisation_harness`'s per-farm-class
+census found boreal (icy substrate / snow cover) at 24-30% of all land and
+the largest single class of unfarmed ground; this is the ice-cap-extent lever
+Ben's ruling asked for, not a colonisation-side fix. The subtropical/tropical
+boundaries are unchanged.
 
 The cold column's polar band is the outer 30% of rows, not the outer 50%: a
 `polar_frozen` body with half its rows polar reads half-icy (see the comment in

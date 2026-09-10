@@ -346,8 +346,18 @@ lat_band band_for_distance(double d, temperature_class temp)
 
         case temperature_class::temperate:
         default:
-            if (d >= 0.80) return lat_band::polar;
-            if (d >= 0.56) return lat_band::subpolar;
+            // Tuned 2026-09-10 (BL-888): polar boundary widened from d >= 0.80
+            // to d >= 0.88 and subpolar from d >= 0.56 to d >= 0.72, shrinking
+            // the combined cold band (where refine_cover can place snow, and
+            // where substrate can generate icy) from the outer 44% of rows to
+            // the outer 28%. colonisation_harness's per-farm-class census had
+            // boreal at 24-30% of all land and 35-45% of all UNFARMED land —
+            // the polar caps of the homeworld grid — per Ben's redirect of
+            // BL-859 (docs/generation/PLANETOLOGY.md is silent on the exact
+            // row-percent table; TILE_GENERATION.md Pass 3 owns it). The
+            // subtropical/tropical boundaries (0.16, 0.06) are untouched.
+            if (d >= 0.88) return lat_band::polar;
+            if (d >= 0.72) return lat_band::subpolar;
             if (d >= 0.16) return lat_band::temperate;
             if (d >= 0.06) return lat_band::subtropical;
             return lat_band::tropical;
