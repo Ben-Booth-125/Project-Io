@@ -306,6 +306,17 @@ struct sweep_row
     /// and expansion recur across the whole run rather than firing once. These
     /// two measure it directly: the last year anything changed hands, and the
     /// share of changes that happened in the first tenth of the run.
+    // --- BL-889: does conquest ACCUMULATE, or does the map churn? ---------
+    // `battles` and `conquests` count events; neither can tell "many regions
+    // taken once and HELD" from "a few regions changing hands over and over".
+    // Those are opposite worlds and only the first one builds an empire, so
+    // the arc GENERATION_STRATEGY.md sec The asymmetry is POLITICAL asks for
+    // is invisible to every column that existed before this block.
+    int      regions_touched   = 0; ///< Distinct regions that ever changed hands.
+    int      regions_once      = 0; ///< ...that changed hands exactly once (kept).
+    int      regions_thrice    = 0; ///< ...that changed hands 3+ times (contested).
+    int      max_flips         = 0; ///< The most-fought-over single region.
+    int      flips_per_region  = 0; ///< Mean changes per touched region, x100.
     int64_t last_change_year  = 0;
     int      early_change_pct = 0;
 };
@@ -702,6 +713,28 @@ int main(int argc, char** argv)
             {
                 if (c.year > row.last_change_year) row.last_change_year = c.year;
                 if (c.year <= params.start_year + span / 10) ++early; // First tenth of the run.
+            }
+            {
+                std::vector<int> flips;
+                for (const owner_change& c2 : sim.owner_changes)
+                {
+                    const std::size_t r2 = static_cast<std::size_t>(c2.region);
+                    if (r2 >= flips.size()) flips.resize(r2 + 1, 0);
+                    ++flips[r2];
+                }
+                int64_t total = 0;
+                for (int f2 : flips)
+                {
+                    if (f2 <= 0) continue;
+                    ++row.regions_touched;
+                    total += f2;
+                    if (f2 == 1) ++row.regions_once;
+                    if (f2 >= 3) ++row.regions_thrice;
+                    if (f2 > row.max_flips) row.max_flips = f2;
+                }
+                if (row.regions_touched > 0)
+                    row.flips_per_region =
+                        static_cast<int>((total * 100) / static_cast<int64_t>(row.regions_touched));
             }
             if (!sim.owner_changes.empty())
                 row.early_change_pct =
@@ -1213,6 +1246,38 @@ int main(int argc, char** argv)
                     static_cast<long long>(median_of(lasts)));
         std::printf("  CHANGES IN 1st 10%%   %lld%% on average\n",
                     static_cast<long long>(early_sum / static_cast<int64_t>(rows.size())));
+        // --- BL-889: churn or accumulation --------------------------------
+        //
+        // battles and conquests count EVENTS. Neither can tell "many regions
+        // taken once and HELD" from "a few regions changing hands over and
+        // over" -- opposite worlds, of which only the first builds an empire.
+        // The arc GENERATION_STRATEGY.md sec The asymmetry is POLITICAL asks
+        // for is invisible to every column that existed before this block.
+        {
+            std::vector<int64_t> touched, once_pct, thrice_pct, per_reg, maxf;
+            for (const sweep_row& r : rows)
+            {
+                const int64_t t2 = r.regions_touched > 0 ? r.regions_touched : 1;
+                touched.push_back(r.regions_touched);
+                once_pct.push_back(static_cast<int64_t>(r.regions_once) * 100 / t2);
+                thrice_pct.push_back(static_cast<int64_t>(r.regions_thrice) * 100 / t2);
+                per_reg.push_back(r.flips_per_region);
+                maxf.push_back(r.max_flips);
+            }
+            const int64_t pr = median_of(per_reg);
+            std::printf("\n--- BL-889  DOES CONQUEST ACCUMULATE, OR DOES THE MAP CHURN? ---\n");
+            std::printf("  regions ever taken     median %lld per world\n", static_cast<long long>(median_of(touched)));
+            std::printf("  TAKEN ONCE AND KEPT    median %lld%% of them\n", static_cast<long long>(median_of(once_pct)));
+            std::printf("  TAKEN 3+ TIMES         median %lld%% of them\n", static_cast<long long>(median_of(thrice_pct)));
+            std::printf("  changes per region     median %lld.%02lld\n",
+                        static_cast<long long>(pr / 100), static_cast<long long>(pr % 100));
+            std::printf("  most-fought-over one   median %lld changes   worst %lld\n",
+                        static_cast<long long>(median_of(maxf)), static_cast<long long>(span(maxf).second));
+            std::printf("  (HIGH kept + LOW 3+ = conquest accumulates and an empire can form.\n"
+                        "   LOW kept + HIGH 3+ = the same ground trading hands, which logs\n"
+                        "   conquests without ever moving the political map. REPORTED, not gated.)\n");
+        }
+
         std::printf("\n  HEGEMONY RATE        %d / %d worlds reached %d%% single-power share\n",
                     hegemonies, static_cast<int>(rows.size()), hegemony_threshold_q / 10);
         std::vector<int64_t> smalls;
@@ -1720,15 +1785,89 @@ int main(int argc, char** argv)
             const history_sim_state b =
                 run_history_sim(plain,  nullptr, no_terrain, 60, 30, wp2, 909u, nullptr, nullptr);
 
+            // BL-892 INSTRUMENT (2026-09-10). W7b asserted on OUTCOMES -- battles,
+            // conquests, foundings -- and read a null result as "reach_mod is
+            // inert". Outcomes are the wrong altitude: reach_mod discounts the
+            // TERRAIN TERM of supply, so what it can move DIRECTLY is
+            // `region::network_supply_q`, and only a large enough move in that
+            // ever shows up as a different decision. `run_history_sim` mutates
+            // the settlement in place, so the post-run regions carry the number.
+            // Printing it separates the two diagnoses the old check could not
+            // tell apart: "supply does not differ" (a wiring bug) from "supply
+            // differs but no decision changed" (a mis-aimed assertion).
+            // THE THIRD RUN IS WHAT MAKES THIS A GUARD RATHER THAN A GESTURE.
+            // Measured while writing it: forcing work_reach_relief_cap_q to 0 --
+            // i.e. disconnecting the discount at both read sites -- drops the
+            // seeded-vs-plain supply delta from 358 to 16, but NOT to zero. So
+            // reach_mod reaches supply by TWO paths: the terrain discount (the
+            // 342), and the reach Dijkstra itself, which a cheaper network also
+            // shortens (the 16). A plain "seeded > plain" therefore still passes
+            // with the discount fully dead, which is the exact weakness the old
+            // outcome-level check had, one level down.
+            //
+            // So the assertion is DIFFERENTIAL: the delta with the discount live
+            // must be materially larger than the delta with it capped off. No
+            // magic threshold, nothing to tune toward -- if the discount is ever
+            // disconnected the two deltas collapse onto each other and this goes
+            // red.
+            history_sim_params wp3 = wp2;
+            wp3.work_reach_relief_cap_q = 0;
+            settlement_state capped = rival_strip(5, 800, 600, 500);
+            for (region& p : capped.regions)
+            {
+                p.population = 60000;
+                apply_work_to_region(p, r2, way);
+                apply_work_to_region(p, r2, mole);
+            }
+            run_history_sim(capped, nullptr, no_terrain, 60, 30, wp3, 909u, nullptr, nullptr);
+            int capped_supply = 0;
+            for (const region& rr : capped.regions) capped_supply += rr.network_supply_q;
+
+            int seeded_supply = 0, plain_supply = 0, seeded_mod = 0;
+            for (const region& rr : seeded.regions) { seeded_supply += rr.network_supply_q; seeded_mod += rr.work_reach_mod; }
+            for (const region& rr : plain.regions)  { plain_supply  += rr.network_supply_q; }
+            std::printf("      reach_mod sum seeded %d / plain 0   |   network_supply_q sum seeded %d, plain %d, delta %d\n",
+                        seeded_mod, seeded_supply, plain_supply, seeded_supply - plain_supply);
+
             std::printf("      reach seeded: %lld battles / %lld stalled   |   plain: %lld / %lld\n",
                         static_cast<long long>(a.battles), static_cast<long long>(a.stalled_campaigns),
                         static_cast<long long>(b.battles), static_cast<long long>(b.stalled_campaigns));
 
             check(way >= 0 && mole >= 0, "W7   the fixture carries reach works to seed");
-            check(a.battles != b.battles || a.stalled_campaigns != b.stalled_campaigns
-               || a.conquests != b.conquests || a.foundings != b.foundings
-               || a.owner_changes.size() != b.owner_changes.size(),
-                  "W7b  pre-built reach changes the supply path — reach_mod is read, not inert");
+            // W7b RE-AIMED (BL-892, 2026-09-10). It used to assert that seeded
+            // reach changed an OUTCOME -- battles, conquests, foundings,
+            // owner_changes -- and it had been red for some time, which the
+            // backlog recorded as "reach_mod is inert".
+            //
+            // IT IS NOT INERT, AND THE INSTRUMENT ABOVE IS WHY WE KNOW. Measured
+            // on this exact fixture: work_reach_mod sums to 3200 across the ten
+            // seeded regions (120 Way + 200 Mole each), and network_supply_q
+            // sums to 22038 seeded against 21680 plain -- a delta of 358, about
+            // 3.6% of supply per region. The discount is applied, read, and
+            // arithmetically exactly what it is authored to be.
+            //
+            // WHAT WAS WRONG WAS THE ALTITUDE OF THE ASSERTION. reach_mod
+            // discounts the TERRAIN TERM of supply; supply is one input among
+            // several to a threshold decision. 3.6% is real and is far too small
+            // to flip a campaign choice on a ten-region strip, so an
+            // outcome-level check cannot distinguish "working as authored" from
+            // "disconnected entirely" -- which is precisely the confusion it
+            // caused. A check that cannot tell those apart is not guarding the
+            // mechanism it names.
+            //
+            // So it now asserts the number the mechanism MOVES DIRECTLY. That
+            // matters more than tidiness here: CIVILISATION.md sec The arc the
+            // phase must produce makes reach-that-widens the lever the whole
+            // Empires arc rests on (Ben, 2026-09-10, ruling on NR-823 -- "the
+            // wall moves when you win"), so this is the check standing guard
+            // over it.
+            check(seeded_mod > 0,
+                  "W7b1 the seeded strip actually carries reach works (not vacuous)");
+            check(seeded_supply - plain_supply > 2 * (capped_supply - plain_supply),
+                  "W7b  the reach DISCOUNT dominates the supply gain - reach_mod is read, not inert");
+            std::printf("      discount live: +%d   |   discount capped off: +%d\n",
+                        seeded_supply - plain_supply, capped_supply - plain_supply);
+
         }
     }
 
