@@ -241,6 +241,22 @@ struct world
     /// Written by generate_nations() alongside the nation_component.tiles list.
     std::unordered_map<entity_id, entity_id>           tile_to_nation;
 
+    /// Land tiles the colonisation span's diffusion actually reached AND could
+    /// farm (BL-849, colonisation seeds the partition). Mirrors `tile_to_nation`'s
+    /// shape and rule: absent means "not settled" — an unreached tile, a body
+    /// the migration never ran on, or water (colonisation covers land only).
+    ///
+    /// WRITTEN BEFORE `build_province_partition` RUNS, from
+    /// `settlement_state::settled_cells` (`run_settlement`'s colonisation field,
+    /// `colonisation_field::farmable` — see `hard_coded_world.cpp`). Nothing
+    /// downstream of the partition writes it, and it is NOT SERIALISED: like the
+    /// reverse index `tile_to_nation` is, it is a generation-time index with no
+    /// committed record to rebuild it from — the colonisation field itself is
+    /// discarded once the partition has read it.
+    ///
+    /// A `std::set` so a deterministic walk over it needs no sort of its own.
+    std::set<entity_id>                                 tile_settled;
+
     /// Corporation entities keyed by their entity ID. Populated by
     /// generate_corporations() after nation generation; empty until that call
     /// is made. Exactly one entry will have corporation_component::is_player == true,

@@ -801,6 +801,13 @@ settlement_state run_settlement(const planetology_state& pl,
     // answers that exactly: the last landing is the end of the migration.
     out.migration_end_year = col_field.last_arrival_year;
 
+    // THE SETTLED CELLS (BL-849) — a straight copy of `farmable`, carried past
+    // this function's return because the province partition needs it as a hard
+    // input and `col_field` does not survive this call. See the field's own
+    // comment (settlement.hpp) for why it lives on the record rather than being
+    // read out of `col_field` directly by some second caller.
+    out.settled_cells = col_field.farmable;
+
     // MATERIALISE THE CULTURES THE MIGRATION COINED (BL-856). The walk allocates
     // ids and records parentage; it has no vocabulary for a pantheon or a tongue
     // and should not grow one. This turns each spawn into a real `culture`

@@ -210,6 +210,44 @@ int main()
                     prov_by_kind[1], by_kind[2], prov_by_kind[2]);
     }
 
+    // P2d — BL-849: THE SETTLEMENT LOCK. Every land province's tiles agree on
+    // `w.tile_settled`'s verdict, the same claim P2b/P2c make about domain and
+    // body — a province that mixed settled and unsettled ground would mean the
+    // colonisation span was read as a suggestion rather than the hard input the
+    // ruling names. Also the instrument for "province shapes visibly follow
+    // settlement history": it reports how much of the land is settled at all,
+    // and how many land provinces are wholly settled vs wholly wild — numbers
+    // that mean nothing if the partition never read the field.
+    {
+        std::size_t settled_tiles = 0, unsettled_tiles = 0;
+        std::size_t settled_provinces = 0, unsettled_provinces = 0, mixed_provinces = 0;
+        for (const province& p : part.provinces)
+        {
+            if (province_kind_of(w, p) != province_kind::land)
+                continue;
+            std::size_t s = 0, u = 0;
+            for (const entity_id t : p.tiles)
+            {
+                const bool on = w.tile_settled.find(t) != w.tile_settled.end();
+                if (on) { ++s; ++settled_tiles; } else { ++u; ++unsettled_tiles; }
+            }
+            if (s > 0 && u > 0) ++mixed_provinces;
+            else if (s > 0)     ++settled_provinces;
+            else                ++unsettled_provinces;
+        }
+        check(mixed_provinces == 0,
+              "P2d every land province is wholly settled or wholly unsettled"
+              " (the colonisation span's settled cells are a hard input, BL-849)");
+        const std::size_t land_tiles = settled_tiles + unsettled_tiles;
+        std::printf("        settlement: %zu/%zu land tiles settled (%.1f%%) across"
+                    " %zu settled + %zu unsettled land provinces (%zu mixed)\n",
+                    settled_tiles, land_tiles,
+                    land_tiles > 0 ? 100.0 * static_cast<double>(settled_tiles)
+                                       / static_cast<double>(land_tiles)
+                                   : 0.0,
+                    settled_provinces, unsettled_provinces, mixed_provinces);
+    }
+
     // P3 — tile_province agrees with the province membership, both ways.
     {
         bool ok = part.tile_province.size() > 0;
@@ -485,6 +523,9 @@ int main()
                 const auto own_nat = w.tile_to_nation.find(p.tiles.front());
                 const entity_id own_nation =
                     (own_nat == w.tile_to_nation.end()) ? null_entity : own_nat->second;
+                // BL-849: the settlement lock's key for this singleton.
+                const bool own_settled = w.tile_settled.find(p.tiles.front())
+                                        != w.tile_settled.end();
                 for (int s = 0; s < 6; ++s)
                 {
                     const auto c =
@@ -514,6 +555,13 @@ int main()
                             (nn == w.tile_to_nation.end()) ? null_entity : nn->second;
                         if (n_nation != own_nation)
                             continue;
+                        // BL-849: and the same settled/unsettled verdict — a
+                        // neighbour on the other side of the colonisation
+                        // frontier was never available either, the same
+                        // reasoning as the nation check just above.
+                        const bool n_settled = w.tile_settled.find(n) != w.tile_settled.end();
+                        if (n_settled != own_settled)
+                            continue;
                     }
                     ++not_islands;
                     break;
@@ -523,7 +571,7 @@ int main()
                         singles, not_islands == 0 ? "yes" : "NO");
             check(not_islands == 0,
                   "P5d every surviving one-tile province had NOWHERE TO GO (no same-domain,"
-                  " and on land same-nation, neighbour)");
+                  " on-land same-nation, and on-land same-settlement, neighbour)");
         }
     }
 
