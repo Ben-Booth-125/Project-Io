@@ -678,6 +678,28 @@ struct settlement_state
     /// keeps it off the save seam: `generation_report` copies the settlement
     /// AFTER the sim, so there is no half-founded state to serialise.
     std::vector<region> pending_foundings;
+
+    /// THE COLONISATION SPAN'S SETTLED CELLS (BL-849) — raster-order (row * gw +
+    /// col, the same order `colonisation_field` and the caller's `tile_ids` use),
+    /// one byte per tile: 1 where the migration's flood both reached the ground
+    /// AND could farm it (`colonisation_field::farmable`), 0 otherwise. Water and
+    /// never-reached ground both read 0 — this is not a "was this tile visited"
+    /// record, it is "did anybody's stream actually live here".
+    ///
+    /// WHY IT IS CARRIED HERE RATHER THAN LEFT INSIDE `run_settlement`: the
+    /// province partition (`docs/generation/PROVINCES.md` § The settled cells
+    /// are a binding input) needs it as a HARD INPUT, the way it already takes
+    /// the national assignment, and the partition runs long after this call has
+    /// returned and `col_field` has gone out of scope. The caller
+    /// (`hard_coded_world.cpp`) turns this into `world::tile_settled` before
+    /// `build_province_partition` runs.
+    ///
+    /// EMPTY for a caller that never asked for a schedule (`sim_start_year`
+    /// still at its `INT64_MAX` default runs the walk exactly as before and
+    /// still fills this — it is a straight copy of `colonisation_field::
+    /// farmable`, so it costs one vector move and reproduces byte-identically
+    /// whether or not anything reads it).
+    std::vector<uint8_t> settled_cells;
 };
 
 /// Settle the body: place regions, inherit each one's cradle culture, survey

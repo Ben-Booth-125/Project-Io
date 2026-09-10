@@ -415,13 +415,23 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///
 /// Pure in everything but its inputs: the result is a function of (@p seed, each
 /// body's grid dimensions, its land mask, its tiles' height / river edges, its
-/// nation assignment, and its non-anchor population centres) alone — the
-/// PRE-ROAD world (BL-623, provinces before roads: road_level is deliberately
-/// not an input, so a recompute on a world whose roads have since been stamped
-/// reproduces the partition exactly). NO RNG STREAM IS CONSUMED — every
-/// draw is a stateless fold from @p seed, the campaign_battle identity idiom, so
-/// the partition can never perturb another generation pass's draws no matter
-/// where it is called.
+/// nation assignment, its non-anchor population centres, and `w.tile_settled`)
+/// alone — the PRE-ROAD world (BL-623, provinces before roads: road_level is
+/// deliberately not an input, so a recompute on a world whose roads have since
+/// been stamped reproduces the partition exactly). NO RNG STREAM IS CONSUMED —
+/// every draw is a stateless fold from @p seed, the campaign_battle identity
+/// idiom, so the partition can never perturb another generation pass's draws no
+/// matter where it is called.
+///
+/// THE SETTLED CELLS ARE A HARD INPUT TOO (BL-849; docs/generation/PROVINCES.md
+/// § The settled cells are a binding input), the same way the nation assignment
+/// already is: on LAND, a region is locked to `w.tile_settled`'s verdict on its
+/// seed tile exactly as it is locked to the seed's nation — a province anchored
+/// on settled ground claims only settled ground, and ground the colonisation
+/// span never reached partitions into its own hinterland, never blending into a
+/// settled neighbour's shape. Colonisation still only SEEDS the partition; this
+/// pass still DRAWS it — the lock changes which tiles a region MAY claim, not
+/// who claims first or how the cost model prices an edge.
 ///
 /// Two passes (BL-515's settled algorithm):
 ///

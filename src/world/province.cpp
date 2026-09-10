@@ -83,21 +83,26 @@ struct domain_spec
     std::size_t   hard_min    = k_province_hard_min_tiles; ///< Taken whatever it costs.
     int           spacing     = k_province_seed_spacing;   ///< Minimum seed separation.
     bool          settled     = true;                      ///< Population centres seed it (land only).
+    /// BL-849: does this domain lock growth to the seed's SETTLED verdict, the
+    /// way land already locks to the seed's nation? Land only — water carries
+    /// no colonisation record (`w.tile_settled` is a land-only set), so the
+    /// lock would be a no-op there and is not worth asking the question of.
+    bool          settlement_lock = false;
 };
 
 /// The domains IN THE ORDER THEY ARE PARTITIONED, land first. The order is not
 /// load-bearing — the sets are disjoint, so no domain can take a tile another
 /// wanted — but it is fixed anyway so a reader never has to prove that.
 const domain_spec k_domains[3] = {
-    // Land: the pre-BL-516 band and rules, unchanged.
+    // Land: the pre-BL-516 band and rules, unchanged, plus the settlement lock.
     { province_kind::land, k_province_min_tiles, k_province_max_tiles,
-      k_province_hard_min_tiles, k_province_seed_spacing, true },
+      k_province_hard_min_tiles, k_province_seed_spacing, true, true },
     // Coastal water: Ben named the land band for it, and nothing settles it.
     { province_kind::coastal_water, k_province_min_tiles, k_province_max_tiles,
-      k_province_hard_min_tiles, k_province_seed_spacing, false },
+      k_province_hard_min_tiles, k_province_seed_spacing, false, false },
     // Open ocean: much larger, growth capped at 80.
     { province_kind::open_ocean, k_sea_province_soft_target, k_sea_province_max_tiles,
-      k_province_hard_min_tiles, k_sea_province_seed_spacing, false },
+      k_province_hard_min_tiles, k_sea_province_seed_spacing, false, false },
 };
 
 /// Per-body, per-domain working state for the fill. Everything is keyed by tile
@@ -130,6 +135,15 @@ struct region
     /// construction and its anchor centre's nation IS its tile-derived
     /// nation. Water is never locked — nations own no water.
     entity_id nation = null_entity;
+
+    /// The seed tile's colonisation verdict (BL-849): true if `w.tile_settled`
+    /// holds it. On LAND the fill is SETTLEMENT-LOCKED exactly as it is
+    /// nation-locked: growth, leftover seeding and singleton absorption all
+    /// keep a region's tiles on one side of the settled/unsettled line, so
+    /// ground the colonisation span never reached forms its own hinterland
+    /// rather than blending into a settled neighbour's shape. Meaningless off
+    /// land (water carries no colonisation record) and always false there.
+    bool settled = false;
 
     /// Sum of the edge costs of the steps that claimed `tiles`, and how many
     /// there were (the seed itself was not stepped to). Their mean is what the
@@ -200,6 +214,17 @@ entity_id nation_of_tile(const world& w, entity_id tile)
 {
     const auto it = w.tile_to_nation.find(tile);
     return (it == w.tile_to_nation.end()) ? null_entity : it->second;
+}
+
+/// Did the colonisation span settle @p tile (BL-849)? One lookup, shared by
+/// seeding, growth and absorption for the same reason `nation_of_tile` is —
+/// the lock cannot disagree with itself. `w.tile_settled` holds land tiles
+/// only, so this is unconditionally false for water and for any body the
+/// migration never ran on, which is the correct "no colonisation record"
+/// answer rather than a special case.
+bool settled_of_tile(const world& w, entity_id tile)
+{
+    return w.tile_settled.find(tile) != w.tile_settled.end();
 }
 
 /// Grow every region named in @p active SIMULTANEOUSLY as one cost-weighted
@@ -291,6 +316,14 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, const domain_spe
             // against ground of ANOTHER nation — on an unsettled body every
             // tile's nation is null and the lock never bites.
             if (dom.kind == province_kind::land && nation_of_tile(w, n) != r.nation)
+                continue;
+            // BL-849: the settlement lock, the same shape as the nation lock
+            // above — a region stays on its seed's side of the settled /
+            // unsettled line. On a body the colonisation span never ran on
+            // every tile reads unsettled, so `r.settled` is false for every
+            // seed there and the lock never bites, exactly as the nation lock
+            // does not bite on an unsettled body.
+            if (dom.settlement_lock && settled_of_tile(w, n) != r.settled)
                 continue;
 
             frontier_entry e;
@@ -549,6 +582,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 region    r;
                 r.seed   = tile_id;
                 r.nation = nation_of_tile(w, tile_id); // BL-611: the lock's key
+                r.settled = settled_of_tile(w, tile_id); // BL-849: the settlement lock's key
                 r.target = k_province_min_tiles
                            + static_cast<std::size_t>((clamped - 1))
                                  * (k_province_max_tiles - k_province_min_tiles) / 4u;
@@ -678,9 +712,10 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                     if (seed_blocked.find(t) != seed_blocked.end())
                         continue;
                     region r;
-                    r.seed   = t;
-                    r.nation = nation_of_tile(w, t);
-                    r.target = dom.soft_target;
+                    r.seed    = t;
+                    r.nation  = nation_of_tile(w, t);
+                    r.settled = settled_of_tile(w, t); // BL-849
+                    r.target  = dom.soft_target;
                     active.push_back(regions.size());
                     regions.push_back(std::move(r));
                     block_around(t);
@@ -706,9 +741,10 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 if (bw.owner.find(t) != bw.owner.end())
                     continue;
                 region r;
-                r.seed   = t;
-                r.nation = nation_of_tile(w, t);
-                r.target = dom.soft_target;
+                r.seed    = t;
+                r.nation  = nation_of_tile(w, t);
+                r.settled = settled_of_tile(w, t); // BL-849
+                r.target  = dom.soft_target;
                 const std::size_t ri = regions.size();
                 regions.push_back(std::move(r));
                 grow_regions(bw, w, seed, dom, regions, { ri });
@@ -806,6 +842,13 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                         // exactly the border tiles it exists to draw.
                         if (dom.kind == province_kind::land
                             && regions[nri].nation != regions[ri].nation)
+                            continue;
+                        // BL-849: and the settlement lock, the same reasoning —
+                        // a singleton on one side of the settled/unsettled line
+                        // joins only a province on the same side, or the lock
+                        // grow_regions enforced would dissolve at absorption.
+                        if (dom.settlement_lock
+                            && regions[nri].settled != regions[ri].settled)
                             continue;
 
                         const int       cost = edge_cost_impl(seed, t, tc, n, nit->second, s);
