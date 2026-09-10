@@ -181,6 +181,15 @@ struct sweep_row
     /// combat is the design (docs/generation/MILITARY_HISTORY.md § Naval).
     int64_t illegal_campaigns = 0; ///< Refused on traversal legality (BL-778).
     int64_t starved_campaigns = 0; ///< Fought at zero supply, could not forage.
+    // --- BL-889: WHY a campaign did not happen, by reason ------------------
+    // The sim already counts every one of these; the sweep reported two of
+    // them. 812,424 refusals across 16 worlds with a single named reason is
+    // not a diagnosis, so the whole funnel is surfaced.
+    int64_t reach_denied      = 0; ///< Refused by the BL-837 reach gate.
+    int64_t campaign_contacts = 0; ///< (own region, foreign neighbour) pairs examined.
+    int64_t campaign_scored   = 0; ///< Candidates reaching the score comparison.
+    int64_t campaign_cleared  = 0; ///< Candidates clearing campaign_threshold_q.
+    int64_t campaign_chosen   = 0; ///< Rounds where Campaign won the verb choice.
     int64_t naval_battles     = 0; ///< Battles with a naval entry on either side.
     int64_t sea_leg_battles   = 0; ///< Battles REACHED over water — the real reading.
     /// Works raised over the run (BL-321), and how many regions ended the run
@@ -761,6 +770,11 @@ int main(int argc, char** argv)
         row.conquests     = sim.conquests;
         row.illegal_campaigns = sim.illegal_campaigns;
         row.starved_campaigns = sim.starved_campaigns;
+        row.reach_denied      = sim.reach_denied_campaigns;
+        row.campaign_contacts = sim.campaign_contacts;
+        row.campaign_scored   = sim.campaign_scored;
+        row.campaign_cleared  = sim.campaign_cleared;
+        row.campaign_chosen   = sim.campaign_chosen;
         row.naval_battles     = sim.naval_battles;
         row.sea_leg_battles   = sim.sea_leg_battles;
         row.foundings     = sim.foundings;
@@ -1261,6 +1275,35 @@ int main(int argc, char** argv)
                     static_cast<long long>(median_of(lasts)));
         std::printf("  CHANGES IN 1st 10%%   %lld%% on average\n",
                     static_cast<long long>(early_sum / static_cast<int64_t>(rows.size())));
+        // --- BL-889: WHY A CAMPAIGN DID NOT HAPPEN, BY REASON --------------
+        //
+        // The sweep used to report ONE refusal reason (traversal legality) and
+        // it dominates: ~50,000 per world against ~61 battles fought. A single
+        // named reason at that scale is not a diagnosis -- it cannot say
+        // whether the others are also firing, nor where in the funnel the
+        // candidates actually die. Every counter below already existed on
+        // history_sim_state; only the reporting was missing.
+        {
+            std::vector<int64_t> con, sco, cle, cho, ill, rch;
+            for (const sweep_row& r : rows)
+            {
+                con.push_back(r.campaign_contacts); sco.push_back(r.campaign_scored);
+                cle.push_back(r.campaign_cleared);  cho.push_back(r.campaign_chosen);
+                ill.push_back(r.illegal_campaigns); rch.push_back(r.reach_denied);
+            }
+            std::printf("\n--- BL-889  WHY A CAMPAIGN DID NOT HAPPEN, BY REASON ---\n");
+            std::printf("  contacts examined      median %lld per world\n", static_cast<long long>(median_of(con)));
+            std::printf("    REFUSED traversal    median %lld   (BL-778 water gate)\n", static_cast<long long>(median_of(ill)));
+            std::printf("    REFUSED reach gate   median %lld   (BL-837)\n", static_cast<long long>(median_of(rch)));
+            std::printf("  reached scoring        median %lld\n", static_cast<long long>(median_of(sco)));
+            std::printf("  cleared the threshold  median %lld\n", static_cast<long long>(median_of(cle)));
+            std::printf("  Campaign won the verb  median %lld rounds\n", static_cast<long long>(median_of(cho)));
+            std::printf("  (Read top down. Candidates dying at TRAVERSAL or REACH are a\n"
+                        "   geography/adjacency problem; dying between SCORED and CLEARED is a\n"
+                        "   threshold problem; cleared-but-never-chosen is verb competition.\n"
+                        "   REPORTED, not gated.)\n");
+        }
+
         // --- BL-889: churn or accumulation --------------------------------
         //
         // battles and conquests count EVENTS. Neither can tell "many regions
