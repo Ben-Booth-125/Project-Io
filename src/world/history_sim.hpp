@@ -495,8 +495,36 @@ struct history_sim_params
     int transfer_decisiveness_q = 300;
 
     /// Adjacency radius in tiles — two regions closer than this are
-    /// neighbours, and only neighbours are campaign candidates.
+    /// CANDIDATE neighbours; `max_neighbour_degree` below decides which of
+    /// them actually link.
     int neighbour_radius = 9;
+
+    /// BL-855: THE HARD CAP THAT MAKES THE NEIGHBOUR GRAPH O(N) AGAIN. A radius
+    /// alone is not a bound on degree — the map does not grow, but the regions
+    /// filling it do, so a fixed-radius disc holds more and more of them as a
+    /// run goes on. BL-844 gave `rebuild_reach` a heap (O(E log V) instead of
+    /// O(N^2)), but E itself was densifying: measured at 0.017 -> 0.079 ms per
+    /// rebuild from 533 to 1,174 regions (seed 0), fitted exponent ~2 across
+    /// seeds — the heap fix could not reach a problem that lives in E, only the
+    /// one that lived in the scan.
+    ///
+    /// A region links to at most this many of its nearest (by
+    /// `region_distance`, ties broken on the lower region index — the same
+    /// determinism discipline `rebuild_reach`'s heap comparator already uses)
+    /// same-radius candidates, and only among candidates that themselves still
+    /// have a free slot. THE VALUE IS MEASURED ON THIS BUILD TREE, not guessed:
+    /// with degree left uncapped, mean degree at `neighbour_radius = 9` runs
+    /// ~7-9 through the early game and climbs past 20 by 4,000 years as the map
+    /// fills in (history_span_cost). 10 sits at the top of the early-game band,
+    /// so the cap costs the sim almost nothing while the map is sparse — where
+    /// most of a run's battles land — and only prunes the DENSIFYING interior
+    /// that the old radius rule let through unbounded.
+    ///
+    /// A DETERMINISM-DIGEST CHANGE, NOT A REFACTOR (BL-855): capping degree
+    /// changes which regions the sim considers adjacent, which changes which
+    /// campaigns are even candidates. `world_determinism`'s digests move and
+    /// must be re-blessed deliberately, not by reflex.
+    int max_neighbour_degree = 10;
 
     // --- Logistics (BL-314) -----------------------------------------------
     //

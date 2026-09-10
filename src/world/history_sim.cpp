@@ -741,7 +741,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         }
     };
 
-    // --- Neighbour index --------------------------------------------------
+    // --- Neighbour index (BL-855: degree-capped) ---------------------------
     //
     // Campaign candidates are NEIGHBOURS ONLY, so the neighbourhood is built
     // once rather than rediscovered by scanning every region from every held
@@ -749,25 +749,48 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // the Settle verb growing the map past 400 regions, it dominated the
     // whole run (2.5s of a 2.5s run). Built once here, extended when a
     // region is founded, it is a lookup.
+    //
+    // BL-855: `neighbour_radius` alone is not a bound on degree. The map does
+    // not grow but the regions filling it do, so a fixed-radius disc holds
+    // more and more of them as a run goes on — the graph densifies and
+    // BL-844's heap could not fix an O(E log V) that was growing because E
+    // was. `max_neighbour_degree` caps it: each region links only to its
+    // nearest candidates (by `region_distance`, ties on the lower index — no
+    // container-order dependency), and only while both ends still have a
+    // free slot.
+    //
+    // WHY THIS IS DETERMINISTIC EVEN THOUGH IT IS ORDER-SENSITIVE. Capping
+    // degree while filling slots on a first-come basis means a region's final
+    // neighbour set can depend on which of its candidates were linked
+    // FIRST — but "first" here is region-INDEX order, walked 0..N-1 below and
+    // by founding order thereafter (`link_region` is only ever called for the
+    // newest region against the ones that already exist). Region index is
+    // itself a deterministic function of the seed and the simulation trace,
+    // so the result is reproducible byte-for-byte; it is simply no longer a
+    // pure function of the region SET alone, the way the uncapped radius was.
     std::vector<std::vector<int>> neighbours(ss.regions.size());
+    std::vector<int> degree(ss.regions.size(), 0);
     const auto link_region = [&](std::size_t i) {
-        for (std::size_t j = 0; j < ss.regions.size(); ++j)
+        std::vector<std::pair<int, int>> candidates; // (distance, region index)
+        for (std::size_t j = 0; j < i; ++j)
         {
-            if (i == j) continue;
-            if (region_distance(ss.regions[i], ss.regions[j], gw) <= params.neighbour_radius)
-            {
-                neighbours[i].push_back(static_cast<int>(j));
-                neighbours[j].push_back(static_cast<int>(i));
-            }
+            if (degree[j] >= params.max_neighbour_degree) continue; // No free slot.
+            const int d = region_distance(ss.regions[i], ss.regions[j], gw);
+            if (d <= params.neighbour_radius)
+                candidates.emplace_back(d, static_cast<int>(j));
+        }
+        std::sort(candidates.begin(), candidates.end()); // Nearest first, index tie-break.
+        for (const std::pair<int, int>& c : candidates)
+        {
+            if (degree[i] >= params.max_neighbour_degree) break;
+            const std::size_t j = static_cast<std::size_t>(c.second);
+            neighbours[i].push_back(static_cast<int>(j));
+            neighbours[j].push_back(static_cast<int>(i));
+            ++degree[i];
+            ++degree[j];
         }
     };
-    for (std::size_t i = 0; i < ss.regions.size(); ++i)
-        for (std::size_t j = i + 1; j < ss.regions.size(); ++j)
-            if (region_distance(ss.regions[i], ss.regions[j], gw) <= params.neighbour_radius)
-            {
-                neighbours[i].push_back(static_cast<int>(j));
-                neighbours[j].push_back(static_cast<int>(i));
-            }
+    for (std::size_t i = 0; i < ss.regions.size(); ++i) link_region(i);
 
     // --- Terrain-weighted reach (BL-314 S2) -------------------------------
     //
@@ -1148,6 +1171,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             ss.regions.push_back(std::move(np));
             owner.push_back(np_owner);
             neighbours.emplace_back();
+            degree.push_back(0);
             link_region(ss.regions.size() - 1); // Keep the index complete.
 
             if (np_owner >= 0)
@@ -2917,6 +2941,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 ss.regions.push_back(np);
                 owner.push_back(q.id);
                 neighbours.emplace_back();
+                degree.push_back(0);
                 link_region(ss.regions.size() - 1); // Keep the index complete.
 
                 // BL-768 — the road a founding party walked. The daughter is
