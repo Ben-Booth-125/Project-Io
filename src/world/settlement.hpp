@@ -349,6 +349,30 @@ struct region
     /// locally.
     int64_t material_stock = 0;
 
+    // --- Civilisations (BL-869) ---------------------------------------------
+    // CIVILISATION.md § A civilisation is what mixing makes, and it is not a
+    // creed. "A region carrying two peoples in quantity, for a long time" is
+    // the trigger; these two fields are the ground's own memory of how long,
+    // and what it grew. No existing timer covered this — `assimilation_per_
+    // year_q` moves `culture` itself but nothing recorded how long a mix had
+    // already sat there, so this is new rather than a repurposed field.
+
+    /// Consecutive decision rounds' worth of years (advanced by the sim's own
+    /// `step_years`, exactly like the assimilation shift) this region's
+    /// SECOND-largest culture share has sat at or above
+    /// `civilisation_mix_threshold_q`, UNBROKEN. Reset to 0 the instant the
+    /// mix falls below the threshold or the region has no second culture —
+    /// "for a long time" means unbroken, not cumulative, so a mix that
+    /// digests away and later returns starts the clock over.
+    int64_t mix_years = 0;
+
+    /// Index into the sim's civilisation list (`history_sim_state::
+    /// civilisations`), or -1. Set once by `run_civilisation_formation`
+    /// (history_sim.cpp) and NEVER cleared afterward — a fact about the
+    /// ground, mirroring `founding_culture`, which is what lets a
+    /// civilisation OUTLIVE the polity that formed it.
+    int civilisation = -1;
+
     // --- Demography (BL-273) ----------------------------------------------
     // The region is the unit of population as well as of settlement — see
     // demography.md's section header below for the model. Left at zero here;

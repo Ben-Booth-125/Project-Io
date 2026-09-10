@@ -179,3 +179,77 @@ int64_t culture_kinship_years(const std::vector<culture>& cultures, int a, int b
 /// — never a second scorer term of its own. Returns 0 for the same culture or
 /// an out-of-range index.
 int culture_opposition_q(const std::vector<culture>& cultures, int a, int b);
+
+// ---------------------------------------------------------------------------
+// Civilisations (BL-869; CIVILISATION.md § A civilisation is what mixing
+// makes, and it is not a creed)
+// ---------------------------------------------------------------------------
+
+/// The ethic a civilisation settles on — the field that makes it not-a-creed
+/// (CIVILISATION.md: "a creed answers which gods there are, an ethic answers
+/// how one ought to live"). Represented on the SAME two axes `culture_god`
+/// carries (zeal/dominion, 0-10) rather than a fresh axis invented for the
+/// occasion: those are exactly what `culture_opposition_q`'s temperament axis
+/// reads, i.e. what CIVILISATION.md says the member cultures "disagreed about
+/// and settled". Deliberately NOT a `culture_god` itself — no name, no
+/// domain, no epithet — because an ethic has no god behind it; it is the
+/// settled answer, not a new belief.
+struct civilisation_ethic
+{
+    int zeal     = 0; ///< 0-10 — the settled relish for the martial life.
+    int dominion = 0; ///< 0-10 — the settled expectation of prevailing.
+};
+
+/// A NAMED RECORD (Ben, 2026-09-09, elicitation): "with member cultures and
+/// an ETHIC. Not a set of axes over the composing cultures, and not a lens on
+/// the existing shares." `run_civilisation_formation` (history_sim.cpp) is
+/// the only writer — it never runs at a cradle, only where two peoples have
+/// shared ground in quantity for a long time (`region::mix_years`).
+///
+/// OUTLIVES THE POLITIES THAT FORMED IT by construction, not by a special
+/// case: `region::civilisation` is a fact about the ground, set once and
+/// never cleared, exactly the pattern `region::founding_culture` already
+/// uses. A polity that fragments leaves every fragment still pointing at the
+/// same record.
+struct civilisation
+{
+    std::string name;             ///< Coined from the tongues that mixed.
+    std::vector<int> members;     ///< Culture indices, ascending, no duplicates.
+    civilisation_ethic ethic;
+
+    /// 0-1000 — the opposition INHERITED at formation, not resolved away
+    /// (NR-817: "inherits what is left as strain"). Never revised after
+    /// formation: a civilisation does not settle further with age, it simply
+    /// carries what it was founded on.
+    int strain_q = 0;
+
+    int64_t formed_year = INT64_MIN;
+};
+
+/// Bar above which no civilisation can form at all (NR-817: "a civilisation
+/// CANNOT form across an opposition above a bar" — fracture is the formation
+/// rule). Same 0-1000 scale as `culture_opposition_q`.
+///
+/// A MEASUREMENT, NOT A JUDGEMENT (CIVILISATION.md § Open questions: "it
+/// should be set from a sweep that produces both alliance-shaped and
+/// enmity-shaped worlds, never from a number picked to make one seed look
+/// right"). This is a FIRST CUT pending that sweep, chosen as a middle value
+/// on the same reasoning `kinship_full_weight_years` (creeds.cpp) documents
+/// for its own placeholder: it should let a genuinely near-kin pair (low
+/// temperament difference, same farm class) through comfortably while
+/// stopping a pair that disagrees on both axes at once.
+inline constexpr int civilisation_opposition_bar_q = 600;
+
+/// Per-mille the SECOND-largest culture share must clear for a region to
+/// count as carrying "two peoples in quantity" at all (CIVILISATION.md § A
+/// civilisation is what mixing makes). Below this, a stray minority is not a
+/// mix worth growing anything from.
+inline constexpr int civilisation_mix_threshold_q = 200;
+
+/// Years the mix above must hold CONTINUOUSLY before it counts as "for a long
+/// time". A FIRST CUT alongside the opposition bar, sized as roughly a fifth
+/// of the Empires phase's own 1,600-year span (CIVILISATION.md § The span is
+/// 400 BCE to 1200 CE) — long enough that a civilisation cannot form in the
+/// first handful of decision rounds after a border moves, short enough that
+/// one can still form well before the phase ends.
+inline constexpr int64_t civilisation_mix_years_bar = 300;
