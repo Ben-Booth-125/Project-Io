@@ -10,6 +10,63 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-10 (sprint 38) — City states become empires, eight of nine
+
+**Mode:** Full, batch delivery.
+**Runtime:** one extended session, largely parallel sub-agents in separate worktrees; the main
+session merged, built, verified, and reconciled backlog state at the end.
+
+### What started it
+
+Ben: mint backlog items for the Empires round out of the CIVILISATION.md design (closed
+2026-09-09), mirroring how the colonisation wizard stage presents, and batch-deliver the whole
+chain — "if there are problems that come up, or if you have any questions, just ask."
+
+### What landed
+
+Eight of sprint 38's nine items, all verified on main: BL-873 (culture coining year), BL-871
+(empire span split, 400 BCE→1200 CE, so Culture and Empires stop running the same simulation),
+BL-866 (sparse settlements — seats and hinterland pointers, conquest carries a whole hinterland
+at once), BL-837 (ancient roads — a heavily-walked edge gets cheaper, campaigns beyond
+sustainable reach are denied outright), BL-867 (materials spent on action — labour splits
+subsistence/industry/muster, a captured seat carries its material stock rather than resetting),
+BL-870 (culture relations — opposition PERMITS conquest rather than forbidding it, corrected
+from an initially backwards formula), BL-869 (civilisations from mixing — named records with an
+ethic, gated by an opposition bar so estranged cultures never coin one), and BL-872 (centres
+from supply/governance — a population centre grows only where the road network can still feed
+and rule it; cut-off ground freezes rather than razes).
+
+Several caught real defects before shipping: an integer-truncation bug that zeroed campaign
+material cost under 250 raised heads; two directional inversions relative to CIVILISATION.md's
+stated design (opposition's discount ran backwards; a test fixture skipped `draw_region_urban`
+and compared against the wrong baseline); a test seed that happened to land on a peaceful world.
+
+### What didn't
+
+BL-868 (creeds raise armies — a culture's `aggression_q` should lean the Campaign score) failed
+verification seven times running. The wiring has looked correct since the first attempt; every
+failure has been in the TEST — vacuous metrics, calibration outside default ranges, a genuine
+confound (a symmetric arms race between two aggressive cultures can end a war EARLY, logging
+FEWER campaign events for the more warlike world, not more), and finally, once that confound was
+fixed, a fixture that no longer fights at all under BL-837/BL-872's reach gate and supply floor —
+both landed after BL-868 was first designed. Left open; see NEXT_SESSION.md.
+
+### What was found late
+
+BL-867's backlog record was still unmarked days after its code landed on main (`b25db602`) — the
+delivery commit happened, the bookkeeping commit didn't. Caught and fixed during this session's
+close-out; a reminder that the last step of a batch delivery is as easy to drop as any other.
+
+### What is open
+
+BL-868 (above). BL-887 (reach-as-centre-chains) was filed and deliberately deferred — Ben's own
+call: too few small polities survive Round 4, and a "new world" should remain for a future
+exploration/colonisation phase, but the fix (chains of population centres, Logistic Points)
+waits on tech progression being wired into generation first. BL-861 and BL-823 both need a
+re-scoping pass before implementation; their prose predates this sprint's mechanics changes.
+
+---
+
 ## 2026-09-10 (sprint 40 opens) — Three trees, one grammar
 
 **Mode:** Design, out of order — sprint 40 opened ahead of 38 and 39 on Ben's call.

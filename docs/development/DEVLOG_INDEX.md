@@ -3,7 +3,7 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 203 entries across 2 volume(s).
+One line per session, newest first — 204 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
@@ -197,6 +197,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-06-13 | [Layer 2: Primary canvases](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 1: ECS data model](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 0: Engine scaffolding](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
+| ? | [2026-09-10 (sprint 38) — City states become empires, eight of nine](DEVLOG.md) | BL-823 BL-837 BL-861 BL-866 BL-867 BL-868 BL-869 BL-870 BL-871 BL-872 BL-873 BL-887 | DEVLOG.md |
 | ? | [2026-09-10 (sprint 40 opens) — Three trees, one grammar](DEVLOG.md) | BL-881 BL-886 | DEVLOG.md |
 | ? | [2026-09-09 (sprint 37) — The world stops opening already full](DEVLOG.md) | BL-844 BL-855 BL-862 | DEVLOG.md |
 | ? | [2026-09-08/09 (sprint 35) — Generation gets two more rounds, and the measurements refute nearly everything](DEVLOG.md) | BL-816 BL-824 BL-825 BL-826 BL-827 BL-828 BL-834 BL-835 BL-840 | DEVLOG.md |

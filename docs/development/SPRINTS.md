@@ -94,6 +94,34 @@ THE FOUR EMPIRE-PHASE ITEMS ARE IN THE POOL, unbuilt and untouched: BL-837 (anci
 
 DESIGN PASS CLOSED 2026-09-09. docs/generation/COLONISATION.md is new and is the authority for the span - sibling to MILITARY_HISTORY.md, one doc per concern. Ben's five design calls: DIFFUSION with no actor (so no AI-behaviour grant is needed, and it must not become precedent for one); a STATED boundary year, not a derived one; a DOMESTICATION PACKAGE that spreads and gates settlement; philosophy is the EXISTING pantheon with no new axis; and colonisation SEEDS the province partition rather than drawing it. Two later rulings: predation caps a penned people's pressure and decays LOGARITHMICALLY IN POPULATION, and fragmentation is re-derived FROM CONTACT with the creeds' tribal marches retired (NR-808). Seven items minted, BL-846..BL-852. Four questions stay open in the doc and none is a design call - three magnitudes for the sweep and one derivation inside BL-852.
 
+### Sprint 38 — how city states become empires
+*Open · opened 2026-09-09*
+
+**Goal.** Decompose CIVILISATION.md's Empires design (settled 2026-09-09) into delivery and build it: sparse settlements with seats and hinterlands, roads that gate reach, materials spent on action, culture relations as the engine of conquest, civilisations formed by mixing, and centres that grow only where the road network can supply and govern them.
+
+**Planned.**
+- BL-873 (culture coining year) - retains when a culture split off; feeds kinship.
+- BL-871 (empire span 400 BCE to 1200 CE) - splits Culture and Empires into genuinely separate wizard rounds.
+- BL-866 (settlements are sparse) - seats and hinterland pointers; conquest carries a whole hinterland at once.
+- BL-837 (ancient roads / reach gate) - a heavily-walked edge gets cheaper; campaigns beyond sustainable reach are denied outright.
+- BL-867 (materials spent on action) - labour splits subsistence/industry/muster; campaigns cost materials; a captured seat carries its stock.
+- BL-870 (culture relations) - kinship and opposition drive conquest likelihood; opposition PERMITS conquest, it does not forbid it.
+- BL-869 (civilisations from mixing) - named records with an ethic, gated by opposition, outliving the polities that formed them.
+- BL-872 (centres from supply/governance) - a population centre grows only on ground the road network can still feed and rule.
+- BL-868 (creeds raise armies) - a culture's aggression_q leans the Campaign score; NOT YET DEMONSTRATED, see notes.
+
+**Done when.** BL-868's harness cases (BL868a/BL868b) pass on main against a fixture that actually produces conquests under current BL-837/BL-872 mechanics, with no confound between aggression and how fast a war happens to resolve.
+
+**Risk.** BL-868's wiring (w_aggr_q, a proportional lean around neutral 500, same idiom as w_cult/w_dist) has looked structurally sound across all seven attempts. What has never once landed is a TEST that cleanly shows the effect without a confound: first a vacuous trace_battles-off metric, then separation calibration putting polities outside default neighbour_radius, then a real-but-inverted 6-seed sweep with a symmetric-arms-race confound (both sides escalating together lets a war end EARLY, which logs FEWER campaign_chosen events for the MORE warlike world). The sixth pass fixed that by holding the defender at neutral aggression and measuring time-to-first-conquest -- sound design, but on current main (post BL-837/BL-872) the two_polity_world fixture now produces ZERO conquests within 1000 years for either attacker, so the lean never gets exercised at all. BL-837's reach gate and BL-872's supply floor are both tuned against a different fixture and have made the old BL-868 fixture too hard to fight over. The three items are coupled: BL-868 cannot be verified without either a fixture rebuilt for the post-BL-837/872 world (shorter reach requirement, explicit road/supply seeding) or a longer stop_year giving reach and supply time to build up first.
+
+OPENED implicitly 2026-09-09 alongside sprint 37's design pass (CIVILISATION.md), given its own sprints.json entry 2026-09-10 during sprint-close housekeeping -- the items had been carrying sprint:38 in backlog.json and NEXT_SESSION.md's ordering since the design closed, but no sprint object existed until now.
+
+BL-867's backlog record was found unmarked during this housekeeping pass despite its code having landed on main in b25db602 (2026-09-10 02:14) -- the delivery commit happened, the bookkeeping commit did not. Fixed same session.
+
+BL-887 (reach-as-centre-chains) was filed out of this sprint's work, priority B, no sprint -- Ben's own call to defer the reach model rework (chains of population centres, Logistic Points) to a later sprint once tech progression is wired into generation. Too few small polities survive Round 4 as-is; BL-887 is the eventual fix, deliberately not now.
+
+BL-861 (no-conquest measurement, sprint 37) and BL-823 (anti-hegemon levers, no sprint) both came up when checking what else might belong to this close. Neither is sprint 38's, and both need a re-scoping pass before implementation -- their backlog prose predates how much this sprint changed the mechanics underneath them.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -154,9 +182,10 @@ DESIGN PASS CLOSED 2026-09-09. docs/generation/COLONISATION.md is new and is the
 | 36 | a revised look at ancient history | CLOSED 2026-09-09, REDIRECTED RATHER THAN FINISHED. Three of six items landed and are verified: the ancient pass is 5.4x/2.9x faster over 4,000 years and the dead-region ping-pong is gone at its cause. The four unbuilt items were empire-phase and went back to the pool when Ben observed that colonisation and empire want different rules. Sprint 37 takes that up. |
 | 40 | three trees, one grammar | CLOSED 2026-09-10, the same day it opened, as a DESIGN sprint: the three trees, the grammar, the lint and the Empire scorer are written and linted; the six build items BL-881..BL-886 go to the pool. Ben: "I'm reluctant to push further when Empire and Industry have not landed yet" - the build waits on sprints 38 and 39. |
 | 37 | how humanity spreads before it fights | REOPENED 2026-09-09 for a design addendum, having been closed the same day. Ben: 'we have more work to do for sprint 37 ... we need to be sure we retrieve all necessary data to facilitate this.' The Empires phase needs city states growing into empires, ancient logistics expanding, and natural resources abstracted for conquest -- and the Culture phase must HAND THAT FORWARD. docs/generation/CIVILISATION.md is the new authority. The gap found: the migration builds a family tree of peoples (BL-856) and DISCARDS it, so kinship -- the natural substrate for culture similarity -- is unrecoverable by the empire phase. BL-865 closes it and is sprint 37's; BL-866..BL-870 are sprint 38's. |
+| 38 | how city states become empires | 8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). BL-868 (creeds raise armies) is the one holdout, blocked seven attempts running -- not a wiring defect, see notes. |
 
-**Next up.** SPRINT 37 IS OPEN (2026-09-09) - how humanity spreads before it fights. It is NOT YET SCOPED, and that is deliberate: the first work is a design pass, not implementation. The subject is initial colonisation and the spreading of humanity - where populations grow, how agriculture takes hold in ground that suits it, how cultures grow from that, and what philosophies emerge as the precursor to military doctrine. The open design question is where the boundary between this phase and the empire phase sits, and nothing should be built until that is answered. Sprint 36 closed with its three landed items verified; its four unbuilt empire-phase items are in the pool awaiting that same boundary.
+**Next up.** SPRINT 38 IS OPEN (opened 2026-09-09, given its own entry 2026-09-10) - how city states become empires. 8 of 9 items are landed and verified on main; BL-868 (creeds raise armies) is the sole holdout after seven verification attempts, now understood to be a fixture problem entangled with BL-837/BL-872's reach and supply mechanics rather than a wiring defect. Next session's whole focus here is BL-868: redesign its test fixture for the post-BL-837/872 world, or give it a longer stop_year, before attempting an eighth pass. Sprint 37 remains open pending its reopened design addendum (Ben, 2026-09-09: 'we have more work to do for sprint 37').
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*55 sprints archived cold; 1 open/gated in the hot store.*
+*55 sprints archived cold; 2 open/gated in the hot store.*
