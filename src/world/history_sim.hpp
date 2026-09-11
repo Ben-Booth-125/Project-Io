@@ -644,6 +644,83 @@ struct history_sim_params
     /// this item's answer to its own open question.
     int sustainable_settlement_floor_q = 40;
 
+    // --- REACH PROPAGATES THROUGH A NETWORK OF CENTRES (BL-887) -----------
+    //
+    // Ben, 2026-09-10, watching a run: *"Reach should be propagated by chains
+    // of population centres. This is a logistics question no? We can treat
+    // logistic points as a side effect of larger population centres too."*
+    //
+    // WHAT IS STRUCTURALLY WRONG WITH ONE DIJKSTRA FROM ONE CAPITAL. Reach
+    // today radiates from a single seat, so a shrinking polity's last holdout
+    // can sit permanently outside its own CONTRACTING radius -- it is too far
+    // to reach, so it starves, so the realm contracts further, so it is
+    // further outside still. `sustainable_campaign_floor_q`'s own comment
+    // records that tension, and records that recalibrating the floor
+    // (250 -> 80 -> 20) did not move it -- because it is not a tuning
+    // problem: a radius has ONE origin, and the map has many towns on it.
+    //
+    // WHAT THIS REPLACES IT WITH: A RELAY, WHICH IS WHAT A CHAIN IS. A region
+    // carrying `centres >= centre_reach_min_centres` refunds part of the cost
+    // that reached it before relaxing its neighbours, so reach hops town to
+    // town along the roads `rebuild_reach` already discounts rather than
+    // decaying monotonically from the seat. A distant province with a real
+    // town on it stays reachable in a way a bare frontier march does not --
+    // which is CIVILISATION.md § Centres are derived by supply and governance
+    // read in the other direction, and it is the ../economy/LOGISTICS.md
+    // § Logistic Points shape: *"cities generate it"*, a node-generated rate
+    // rather than a per-actor haul allowance, with a bigger node generating
+    // more. LOGISTICS.md's rule 2 ("adopt the node half; refuse the link
+    // half") is why this is a NODE discount and never a second distance
+    // budget laid over `road_traversal_multiplier`.
+    //
+    // THE FEEDBACK LOOP IS THE HAZARD, AND IT IS DAMPED BY CONSTRUCTION.
+    // Centres are grown BY supply (`sustainable_settlement_floor_q`, BL-872)
+    // and would now also GENERATE it, which is a loop that could run away or
+    // oscillate. Four things stop it, and none of them is a magic number:
+    //
+    //   1. THE REBATE IS A FRACTION OF COST ALREADY ACCRUED, never a credit.
+    //      A centre nothing has reached has accrued nothing and refunds
+    //      nothing, so a centre CANNOT BOOTSTRAP ITS OWN REACH FROM NOTHING.
+    //      The capital itself stands at cost 0, so its own rebate is 0.
+    //   2. THE FRACTION IS CAPPED STRICTLY BELOW 1 (`..._rebate_cap_q` < 1000).
+    //      Cost along a chain of k centres therefore decays geometrically and
+    //      is bounded below by zero rather than turning negative, so no edge
+    //      is ever traversed for free and no cycle can pump cost downward.
+    //      This is also what makes the relaxation below TERMINATE.
+    //   3. THE READING IS ONE DECISION ROUND STALE. Centres are promoted in
+    //      the demography loop off LAST round's `network_supply_q`; a rebuild
+    //      reads the centre map as it already stands and never re-enters it.
+    //      There is no recursion inside a rebuild.
+    //   4. THE OUTPUT IS CLAMPED. `network_supply_q` is clamped to [0, 1000],
+    //      so the loop's gain saturates: past full supply, more centres buy a
+    //      region nothing at all and the two floors stop moving.
+    //
+    // DEFAULTS OFF. The single-capital path stays live and stays the default
+    // so no existing fixture changes meaning; `era_minus_one.cpp` switches it
+    // on for generation's own round, and `history_sweep`'s `--set` carries
+    // every field below so the two models can be A/B'd on one build.
+    bool centre_chain_reach = false;
+
+    /// Per-mille of accrued cost a SINGLE centre refunds. The LP analogy's
+    /// "bigger node, more throughput": the fraction scales with how many
+    /// centres stand in the region, up to `centre_reach_rebate_cap_q`.
+    /// A placeholder magnitude on the same footing as the w_* weights --
+    /// the SHAPE is the design, `history_sweep` tunes the number.
+    int centre_reach_rebate_q = 150;
+
+    /// Hard ceiling on the combined rebate, per mille. MUST STAY BELOW 1000,
+    /// and is what makes damping point 2 above true rather than hoped for: at
+    /// 1000 a large enough town would carry reach onward for free and the
+    /// network would extend without bound.
+    int centre_reach_rebate_cap_q = 500;
+
+    /// Centres a region must carry before it relays at all. At 1, every
+    /// region with any town on it is a node of the network, which is the
+    /// reading CIVILISATION.md § The road is the empire's skeleton uses (a
+    /// network "whose nodes are seats and whose edges are roads"). Raise it
+    /// to make the network sparser -- only real cities relay.
+    int centre_reach_min_centres = 1;
+
     /// Per-mille of `army_stock` lost per YEAR to a garrison standing beyond
     /// `sustainable_garrison_floor_q`. An army beyond sustainable reach cannot
     /// be maintained — this is what makes that literally true rather than a

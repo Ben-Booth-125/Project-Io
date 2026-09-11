@@ -613,6 +613,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // would revive the per-round-rebuild cost BL-834 just eliminated.
     int roads_version = 0;
 
+    // BL-887 — THE SAME TRICK FOR THE CENTRE MAP. With `centre_chain_reach`
+    // on, a region's `centres` is an input to `rebuild_reach`, and towns turn
+    // over constantly (promoted in the demography loop, razed by a sack). This
+    // counter moves only when a count ACTUALLY CHANGES, so a quiet century
+    // costs no rebuilds at all and the BL-834 cache survives. With the model
+    // off nothing ever bumps it and the cache behaves exactly as it did.
+    int centres_version = 0;
+
     const auto edge_key = [](int a, int b) -> uint64_t {
         const uint32_t lo = static_cast<uint32_t>(a < b ? a : b);
         const uint32_t hi = static_cast<uint32_t>(a < b ? b : a);
@@ -867,6 +875,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
         /// or growing the region count, so it is a THIRD invalidation input
         /// alongside the two the header comment above names.
         int              roads_version = -1;
+        /// BL-887: `centres_version` this cost vector was built against. With
+        /// `centre_chain_reach` on, a town standing up or being sacked changes
+        /// a relay without moving the capital, growing the region count or
+        /// crossing a road tier -- so it is a FOURTH invalidation input, and
+        /// the header comment above is exhaustive only with it listed.
+        int              centres_version = -1;
     };
     std::vector<reach_cache> reach_by_polity;
 
@@ -917,19 +931,74 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // `if (best < 0) break`. A region enters the queue only when something
         // relaxes it below its 1 << 28 sentinel, so the queue empties exactly
         // when the scan would have found nothing left under the sentinel.
+        //
+        // BL-887 — THE CENTRE RELAY, AND WHY `done` GOES AWAY WHEN IT IS ON.
+        // A relaying region refunds part of the cost that reached it before it
+        // relaxes onward, which is a NODE DISCOUNT, and a node discount breaks
+        // the one property plain Dijkstra rests on: that a settled region can
+        // never be improved later. A path arriving at a town by a longer route
+        // can leave it cheaper than a shorter route left a bare region, so a
+        // region already settled genuinely may need relaxing again.
+        //
+        // The fix is to stop asserting the property rather than to trust it:
+        // with the relay on, a popped entry is skipped only when it is STALE
+        // (`best_c > reach[best]`), and an improved region is simply pushed
+        // again. That is the same lazy-deletion queue run to a FIXPOINT
+        // instead of to a single settle per region.
+        //
+        // IT TERMINATES, and the reason is damping point 2 on the param: every
+        // edge step is clamped to at least 1 and the rebate is capped strictly
+        // below the whole accrued cost, so a relaxation strictly LOWERS an
+        // integer that is bounded below by zero. There is no negative cycle to
+        // ride down, because there is no negative edge.
+        //
+        // IT IS STILL DETERMINISTIC, and for a stronger reason than the
+        // comparator's tie-break: the result is the unique least-cost fixpoint
+        // of a fixed graph, so the ORDER entries come off the heap cannot
+        // change the answer at all -- only how many pops it takes to get
+        // there. The comparator's (cost, index) pair is kept anyway so the pop
+        // order itself stays reproducible for profiling.
         using node = std::pair<int, int>; // (cost, region index) — never equal.
         std::priority_queue<node, std::vector<node>, std::greater<node>> frontier;
         std::vector<bool> done(ss.regions.size(), false);
+        const bool relay = params.centre_chain_reach;
+        const int  relay_min = std::max(1, params.centre_reach_min_centres);
+        const int  relay_per = clampi(params.centre_reach_rebate_q, 0, 999);
+        const int  relay_cap = clampi(params.centre_reach_rebate_cap_q, 0, 999);
         frontier.push({0, capital});
         while (!frontier.empty())
         {
             const node top = frontier.top();
             frontier.pop();
             const int best_c = top.first, best = top.second;
-            if (done[static_cast<std::size_t>(best)]) continue; // A stale entry.
-            done[static_cast<std::size_t>(best)] = true;
+            if (relay)
+            {
+                // Stale-entry test, replacing the settle test. `reach[best]`
+                // is the best cost known for this region right now; anything
+                // worse is a superseded push.
+                if (best_c > reach[static_cast<std::size_t>(best)]) continue;
+            }
+            else
+            {
+                if (done[static_cast<std::size_t>(best)]) continue; // A stale entry.
+                done[static_cast<std::size_t>(best)] = true;
+            }
 
             const region& bp = ss.regions[static_cast<std::size_t>(best)];
+            // THE REBATE. A fraction of what it COST to get here, never a
+            // credit against nothing -- the capital sits at `best_c == 0` and
+            // refunds zero, which is what stops a centre bootstrapping its own
+            // reach. The fraction rises with the town count (LOGISTICS.md's
+            // "cities generate it", a bigger node moving more) and is capped
+            // strictly below the whole cost.
+            int out_c = best_c;
+            if (relay && best != capital && bp.centres >= relay_min)
+            {
+                const int64_t frac = std::min<int64_t>(
+                    static_cast<int64_t>(bp.centres) * relay_per, relay_cap);
+                out_c = best_c - static_cast<int>((static_cast<int64_t>(best_c) * frac) / 1000);
+                if (out_c < 0) out_c = 0; // Unreachable given frac < 1000; belt and braces.
+            }
             for (int nb : neighbours[static_cast<std::size_t>(best)])
             {
                 const region& np2 = ss.regions[static_cast<std::size_t>(nb)];
@@ -948,7 +1017,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int step = raw_step > 0
                                 ? std::max(1, static_cast<int>(raw_step * discount + 0.5f))
                                 : 1;
-                const int cand = best_c + step;
+                const int cand = out_c + step; // BL-887: `out_c == best_c` with the relay off.
                 if (cand < reach[static_cast<std::size_t>(nb)])
                 {
                     reach[static_cast<std::size_t>(nb)] = cand;
@@ -956,8 +1025,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
         }
-        rc.capital       = capital;
-        rc.roads_version = roads_version;
+        rc.capital         = capital;
+        rc.roads_version   = roads_version;
+        rc.centres_version = centres_version;
     };
 
     // --- Time-lapse change list -------------------------------------------
@@ -1256,8 +1326,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // every other per-round aggregate in this file already carries.
             // On year one, before any decision round has run at all, the
             // field's own default (1000, full supply) is what is read.
+            // BL-887: a town standing up here is a new relay for
+            // `rebuild_reach`, so the centre count is watched across the call
+            // and `centres_version` bumped only when it actually moved. Most
+            // years it does not, which is what keeps the BL-834 cache alive.
+            const int centres_before = ss.regions[i].centres;
             advance_region_urban(ss.regions[i],
                 ss.regions[i].network_supply_q > params.sustainable_settlement_floor_q);
+            if (ss.regions[i].centres != centres_before) ++centres_version;
             // BL-835 — ONE YEAR OF THE MUSTER, for every region whether or not
             // anyone is fighting over it. This is what makes an undefended
             // region a TEMPORARY state: a region stripped by a march away, or
@@ -1591,7 +1667,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             reach_cache& rc = reach_by_polity[static_cast<std::size_t>(q.id)];
 
             if (rc.capital != q.capital || rc.cost.size() != ss.regions.size()
-             || rc.roads_version != roads_version) // BL-837: a road crossed a tier
+             || rc.roads_version != roads_version // BL-837: a road crossed a tier
+             || (params.centre_chain_reach
+              && rc.centres_version != centres_version)) // BL-887: a relay moved
                 rebuild_reach(rc, q.capital);
             const std::vector<int>& reach = rc.cost;
 
@@ -2807,7 +2885,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // one place history DESTROYS a centre rather than thinning
                     // it, so a sacked city reads as a smaller or absent centre
                     // on the epoch map.
+                    // BL-887: a razed city is a relay REMOVED from the
+                    // network, the mirror of the demography loop's bump.
+                    const int sacked_centres_before = tgt.centres;
                     sack_region_urban(tgt, params.sack_population_loss_q);
+                    if (tgt.centres != sacked_centres_before) ++centres_version;
 
                     // BL-835 — THE ARMY THAT TOOK IT IS THE ARMY THAT HOLDS IT,
                     // and this is the line that breaks the ping-pong.
