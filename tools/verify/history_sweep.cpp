@@ -472,6 +472,13 @@ struct sweep_row
     int64_t foundings_settled   = 0;
     int64_t civilisations       = 0;
 
+    /// BL-920 -- regions the ORGANISE verb actually took, regions a
+    /// crossing threshold promoted to a new city state in its own right, and
+    /// (already carried above) `conquests` -- so a world's growth over
+    /// unorganised culture ground can be read as organised-vs-conquered.
+    int64_t organised          = 0;
+    int64_t city_states_risen  = 0;
+
     /// Polities holding EXACTLY ONE region, at each of the 40-step samples the
     /// rise/peak/fall walk already takes (index 0 = start year).
     std::vector<int> city_states_series;
@@ -1588,6 +1595,9 @@ int main(int argc, char** argv)
             row.foundings_scheduled = sim.foundings_scheduled;
             row.foundings_settled   = sim.foundings_settled;
             row.civilisations       = sim.civilisations_formed;
+            row.organised           = sim.organised;          // BL-920
+            row.city_states_risen   = sim.city_states_risen;  // BL-920
+            row.conquests           = sim.conquests;          // BL-920: read beside `organised`.
 
             // The supply histogram, over HELD ground at the stop year, against
             // the floors the run actually used.
@@ -2889,6 +2899,37 @@ int main(int argc, char** argv)
                         static_cast<long long>(median_of(civ)));
             std::printf("  (city states = polities holding EXACTLY ONE region, sampled every %lld years.)\n",
                         static_cast<long long>(rows.front().city_states_step));
+        }
+
+        // BL-920 -- ground taken by ORGANISE beside ground taken by
+        // CONQUEST, and the count of city states that ROSE (crossed
+        // `city_state_population_threshold` on unorganised ground) rather
+        // than opened the run already above it. Read before and after, no
+        // target set -- CIVILISATION.md sec "A city state spawns where a
+        // region's population is above a threshold".
+        std::printf("\n--- BL-920  ORGANISED vs CONQUERED, and CITY STATES THAT ROSE ---\n");
+        std::printf("  seed   organised   conquests   organised share   city states risen\n");
+        {
+            std::vector<int64_t> org_share, risen;
+            for (const sweep_row& r : rows)
+            {
+                const int64_t total = r.organised + r.conquests;
+                const int64_t share_pm = total > 0 ? (r.organised * 1000) / total : 0;
+                std::printf("  %4u   %9lld   %9lld   %14lld.%1lld%%   %17lld\n",
+                            r.seed,
+                            static_cast<long long>(r.organised),
+                            static_cast<long long>(r.conquests),
+                            static_cast<long long>(share_pm / 10),
+                            static_cast<long long>(share_pm % 10),
+                            static_cast<long long>(r.city_states_risen));
+                org_share.push_back(share_pm);
+                risen.push_back(r.city_states_risen);
+            }
+            std::printf("  ORGANISED SHARE of (organised + conquests)   median %lld.%1lld%%\n",
+                        static_cast<long long>(median_of(org_share) / 10),
+                        static_cast<long long>(median_of(org_share) % 10));
+            std::printf("  CITY STATES RISEN (crossed the threshold mid-span)   median %lld per world\n",
+                        static_cast<long long>(median_of(risen)));
         }
     }
 
