@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*23 entries — 23 open, 0 resolved.*
+*28 entries — 23 open, 5 resolved.*
 
 ---
 
@@ -369,4 +369,89 @@ Implemented the settled rule literally: a region is communication-reachable iff 
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-835 — CALL: how does the Empires phase OPEN -- one city state per culture, or every opening region a city state?
+*question · raised 2026-09-11 · from BL-920 (city states on culture ground), filed from Ben's 2026-09-11 reframe: "a dull version of the culture map, with city-states rising and gaining control of provinces".*
+
+Today one polity per plurality culture opens holding EVERY region of that culture (24-60 blobs of ~4.5 regions). The reframe opens on unorganised culture ground with city states at seats and an Organise verb that brings ground under control. The open call is the starting count. (A) One city state per culture at its best region, and new city states RISE through the span where a centre grows on unorganised ground. (B) Every region present at 400 BCE is its own city state (83-279 per world), so the opening is a field of specks that gather. (C) Keep the culture-blob opening and add the Organise verb only for foundings that arrive later.
+
+**Why it matters.** It decides what the first frame of round 4 looks like and how much of the growth is organising versus conquest. (A) matches "city states rising" literally and keeps the opening legible; (B) gives the most drama early but starts every seed at the same shape; (C) changes the least and gives powerhouses the least room.
+
+- A - one per culture, more rise as centres grow (recommended)
+- B - every opening region a city state
+- C - keep the blob opening, organise only later foundings
+
+> **Recommendation:** A. It is the reading closest to Ben's words, and it leaves the migration's culture map as the dull base the round is supposed to show.
+
+> **RESOLVED.** BEN, 2026-09-11 (form, Other): "City states spawn in provinces above a threshold population. Choose a sensible number - your judgement will be good here." So the opening is neither one-per-culture nor every-region: a region whose population is above a threshold is a city state, at the opening and whenever it crosses the line later; the rest is unorganised culture ground. The number is the builder's call, read against the opening distribution (BL-926) and recorded; BL-920 carries the provisional value and the intent it must satisfy (a minority of regions at 400 BCE, more over the span). Written into CIVILISATION.md sec The unit is the city state.
+
+*Files: `docs/generation/CIVILISATION.md`, `src/world/history_sim.cpp`*
+
+### NR-836 — CALL: force follows the network -- pooled garrisons along the supplied network, a standing field army bought from stock, or both?
+*question · raised 2026-09-11 · from BL-921 (force follows the network). The holistic read found that an attack is the staging hub's garrison plus at most as much again from half of adjacent held garrisons, each converging to 2% of its own region's population, so a 150-region realm and a 3-region polity fight the same-sized battle.*
+
+(A) POOLED LEVY: a campaign gathers a share of every held region's garrison the staging hub can reach along the supplied network, weighted by network_supply_q and road hops; roads and reach are then literally what brings force to a border. (B) STANDING FIELD ARMY: each realm keeps one field force bought and paid from seat stock (BL-895's upkeep and sinks already exist), sized by what the stock can carry, marched to the staging hub. (C) Both: the field army as the core, the network levy as the reinforcement.
+
+**Why it matters.** This is the structural cause of no compounding; whichever is chosen is the mechanism the whole rise-and-fall arc rests on. (A) is the most systemic and legible (a visible cause on the map: the roads and the ground behind them) and needs no new object; (B) makes materials matter and gives "war is paid for" bite (NR-827) but adds a new pool with its own upkeep and placement questions; (C) is the richest and the most to build in one sprint.
+
+- A - pooled levy along the supplied network (recommended)
+- B - a standing field army from seat stock
+- C - both
+
+> **Recommendation:** A now; B is the natural follow-on once trade income scales (NR-827).
+
+> **RESOLVED.** BEN, 2026-09-11 (form): A -- a pooled levy along the supplied network. BL-921 builds it; MILITARY_HISTORY.md sec Armies are distinct from population amended. A standing field army from stock stays a follow-on, not filed.
+
+*Files: `docs/generation/MILITARY_HISTORY.md`, `src/world/history_sim.cpp`*
+
+### NR-837 — CALL: a breakdown produces CITY STATES (reversing NR-826 call 2) or blocks of two or more regions?
+*question · raised 2026-09-11 · from BL-923 (breakdown to city states). Ben, 2026-09-11: "polities which have spread too far also breaking back down into city states." NR-826 call 2 (BL-896, taken at build) set the secession unit to a contiguous block of at least two regions so a realm SPLITS rather than SHATTERS into specks.*
+
+Ben's words point at the shatter the earlier call was set against. (A) Each cut-off seat with the hinterland pointing at it becomes its own city state; a cut-off region with no seat joins the nearest cut-off seat or stands alone. (B) Keep blocks of two or more, so a breakdown produces a few successor realms. (C) Seats become city states and seatless ground stays with the parent until a seat rises on it.
+
+**Why it matters.** It decides whether the dark age hands the next phase many small nations or a few medium ones, and CIVILISATION.md sec What the dark age must leave asks for nations of UNEQUAL strength -- (A) produces the most inequality between the surviving core and its pieces; (B) produces fewer, larger pieces. Under BL-920 seats are far more numerous than today (one per city state that rose), so (A) no longer means single-region specks everywhere.
+
+- A - city states, one per cut-off seat (recommended)
+- B - blocks of two or more, as built
+- C - seats only; seatless ground waits for a seat
+
+> **Recommendation:** A. It is what Ben asked to see, and with BL-920's seat density the pieces are real polities, not specks.
+
+> **RESOLVED.** BEN, 2026-09-11 (form): A -- city states, one per cut-off seat. This REVERSES NR-826 call 2 (blocks of two or more); NR-826 call 3 (the successor takes its seat's plurality culture) stands. CIVILISATION.md sec How an empire actually falls rewritten; BL-923 builds it.
+
+*Files: `docs/generation/CIVILISATION.md`, `src/world/history_sim.cpp`*
+
+### NR-838 — CALL: the reach basis -- supply priced from the seat over HELD ground, over all ground, or from the staging hub?
+*question · raised 2026-09-11 · from BL-922 (reach has a gradient), answering BL-905's owed call. Reach today is an ownership-blind Dijkstra from the capital; supply loses 0.1 per plains tile against floors of 40/60/80, so no connected region can ever cross a floor and the campaign gate refuses 0 or 94% with nothing between.*
+
+(A) From the seat over HELD ground only, at a per-tile cost rescaled so distance matters; foreign ground is impassable, so a war that takes the ground between a seat and its far block cuts the block off -- the cause CIVILISATION.md already names. Roads discount the cost (the wall moves when you win). (B) From the seat over all ground as today, only rescaled -- distance bites, severance does not. (C) From the staging hub for campaigns and the seat for holding, two bases as today, both rescaled.
+
+**Why it matters.** This is the currency every floor reads (settlement growth, garrison attrition, secession/breakdown, the campaign gate, the creed). (A) makes "a war that emptied the ground between" a real mechanism and makes roads matter twice; it also changes the decision digest, so world_determinism re-blesses once. (B) is the smallest change and leaves severance impossible. (C) keeps the step-function shape BL-905 found.
+
+- A - seat over held ground, rescaled (recommended)
+- B - seat over all ground, rescaled
+- C - two bases as today, rescaled
+
+> **Recommendation:** A.
+
+> **RESOLVED.** BEN, 2026-09-11 (form, Other): "Price in that polity's capital. In the Empire phase, each polity sees itself as the strategic headquarters where any supply, or material gain is stockpiled." So the basis is the CAPITAL for every reading -- holding, campaigning and the stockpile alike -- rescaled so distance costs; the staging-hub pricing that made the campaign gate a step function goes. The traversal domain (held ground only, so a war that takes the ground between cuts a block off) was not named in the verdict and follows the recommendation; recorded here as a decision taken on his behalf, overturnable. Ben added, same message: a polity spends its stockpile on upgrading SUPPLY SITES -- BL-929 filed. CIVILISATION.md sec How an empire actually falls carries the capital-as-headquarters ruling; BL-922 builds it.
+
+*Files: `docs/generation/CIVILISATION.md`, `src/world/history_sim.cpp`*
+
+### NR-839 — CALL: the ISOLATION split -- a cut-off part of a culture diverging into a daughter -- runs in the Culture round only, or in both rounds?
+*question · raised 2026-09-11 · from BL-918 (culture diversity over-tuned). Ben, 2026-09-11: "single cultures in a range breaking down into insular groups... not outcomes for the end, but part of the time-lapse."*
+
+Today a culture splits only while a stream WALKS (distance, biome). The isolation trigger coins a daughter on a settled component of a culture that has been cut off from its origin component (by mountains, water or distance) for longer than a divergence span. (A) Round 3 only: the migration ends with the families it made, and the Empires phase merges and mixes them. (B) Both rounds: an empire that holds a range can watch it come apart culturally before it comes apart politically, and a breakdown (BL-923) can follow a cultural rift. (C) Walk triggers only, over-tuned; no isolation trigger.
+
+**Why it matters.** (B) is the most dramatic and ties culture to breakdown; it also means the Empires phase can create cultures, which CIVILISATION.md today reserves for mixing (civilisations). (A) keeps the phases' subjects clean. (C) is the least mechanism and may already give the diversity Ben wants -- seeds 0 and 1 carry 676 and 929 cultures today.
+
+- A - Culture round only (recommended)
+- B - both rounds
+- C - no isolation trigger, over-tune the walk splits only
+
+> **Recommendation:** A for this sprint; extend to round 4 once BL-923 shows breakdowns on connected ground and there is something for a rift to precede.
+
+> **RESOLVED.** BEN, 2026-09-11 (form): A -- the isolation split runs in the Culture round only. BL-918 builds it there; the Empires phase keeps merging and mixing as its way of making peoples. COLONISATION.md sec Diversity is the deliverable amended.
+
+*Files: `docs/generation/COLONISATION.md`, `src/world/colonisation.cpp`*
 

@@ -112,6 +112,23 @@ grouped by the routes their ancestors took, is a map of a *migration* — and it
 history round needs if its contests are to be between neighbours who are recognisably kin or
 recognisably not.
 
+**Diversity is the deliverable, and the splits are tuned TOWARD it (Ben, 2026-09-11).** Many
+cultures that are recognisably similar are worth more than one culture over a lot of ground, so
+where a magnitude is in doubt the split is set to fire *more* readily, not less — *"if you need to
+over-tune splits, I encourage that."* Three things divide a people, and each is a consequence of
+the ground and the walk, never a roll: **distance** (a stream that has travelled far enough
+diverges), **biome** (a people that settles ground of a different farm class than the one it was
+coined on becomes a daughter — a barrier landform, a marsh, a forest, a desert is a cultural rift
+as much as a farming one), and **isolation** (a single culture spread across a range whose parts
+are cut off from one another — by mountains, by water, by sheer distance — breaks down into
+insular groups over time). All three are **visible inside the round's own time-lapse**: a lobe
+changing hue as it crosses a barrier, a range coming apart into kin, are what the player watches,
+not a count read off at the end. Daughters stay kin — the pantheon and the tongue are inherited
+and diverge, so the map reads as families of peoples rather than as noise. The isolation split
+belongs to this span alone (Ben, 2026-09-11): the migration ends with the families it made, and the
+Empires phase makes peoples only by mixing them (`CIVILISATION.md` § A civilisation is what mixing
+makes).
+
 ---
 
 ## Coastal and overseas routes are the ones that need emphasis

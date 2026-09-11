@@ -106,6 +106,18 @@ is how an empire's edge becomes ragged without any rule drawing a ragged edge.
 urban places stand on a region; the seat flag is which region a city state is governed from. A
 seat with no centre is a poor capital, and that is a legitimate world.
 
+**A CITY STATE SPAWNS WHERE A REGION'S POPULATION IS ABOVE A THRESHOLD (Ben, 2026-09-11).** The
+phase opens on the culture map the migration left: the ground is peopled and belongs to a culture,
+and it is **unorganised** until a city state organises it. A region whose population stands above
+the city-state threshold is a city state — at the opening, and at whatever later year it crosses
+the line — so city states keep *rising* through the span as later-founded ground grows toward its
+ceiling. The threshold is a stated magnitude chosen to select a minority of the regions standing
+at 400 BCE (about the best-farmed third) and read against the opening distribution, never a quota
+per world. A city state grows by **organising** the unorganised ground its capital can supply,
+priced by kinship — its own people cheapest, kin dearer, an opposed people not at all, for they
+can only be conquered — and by conquest of what other city states hold. Ground that a founding
+adds to the map arrives unorganised; nobody grows for free.
+
 ---
 
 ## Materials are spent when something happens
@@ -313,6 +325,24 @@ all. A wall that cannot move is the fixed wall this ruling declines. Diagnose th
 **A peaceable world is a legitimate outcome (Ben, 2026-09-10).** The claim is distributional: the
 arc must appear across a spread of worlds, never in every one of them. A seed that refuses war is
 not a failure case and must not be made into one.
+
+**THE ARC IS WATCHED, NOT READ OFF AT THE END (Ben, 2026-09-11).** The Empires phase *lives on
+top of the culture map*. The round opens on a dull rendering of the peoples the migration left —
+the ground is peopled and belongs to a culture, and a **city state** is a seat that has organised
+some of it. What the player then watches, inside the time-lapse and not as a closing summary, is:
+city states rising and taking control of the regions around them; neighbours who are kin setting
+up trade; roads walked into being and bridges thrown across rivers; wars that take *whole
+cultures* rather than one border region, and the cultural merge that follows; and polities that
+have spread too far **breaking back down into city states**. A run in which the same few powers
+consolidate and trade border regions back and forth for sixteen centuries has produced none of
+these moments, however many conquests it logs.
+
+**GROWTH FIRST.** The mechanism that lets a select few powerhouses clearly grow — room in the
+culture map for kin to be gathered, force that follows the network so success compounds, ground
+that can be lost to over-reach — comes before any deepening of how a battle resolves. Defence
+over rivers and mountains is real and wanted (`MILITARY_HISTORY.md` § The resolver), and it waits
+until strong growth is visible on the map, because a richer battle inside a stable map is a
+richer way of changing nothing.
 
 ---
 
@@ -577,6 +607,13 @@ never grow with a realm the way industry does, which is a shape problem rather t
 one; raising the constant until the share looked right would be fitting a figure to a target.
 `NR-827` carries the open call.
 
+**SUPPLY SITES ARE BOUGHT FROM THE STOCKPILE (Ben, 2026-09-11).** A realm does not only wait for
+a road to be walked into being; it can spend the materials stockpiled at its capital — *"gained
+through trade or conquest"* — on upgrading a **supply site**: a reach work on a held region, or
+the tier of a corridor, chosen where the network is weakest. This is the deliberate half of *the
+wall moves when you win*: a realm that trades and wins can afford to reach further, and a realm
+that cannot pay watches its far ground break away.
+
 ### How an empire actually falls (Ben, 2026-09-11)
 
 § What the dark age must leave settles the CAUSE as network failure. These are the two calls that
@@ -605,12 +642,25 @@ because a specific region's supply fell under a floor, for reasons a player coul
 polity needs an id and a seat allocated in an order that depends only on the sim's own state, never
 on iteration order over a container whose order is undefined.
 
-**A CONTIGUOUS BLOCK LEAVES TOGETHER, NEVER ONE REGION ALONE.** This is the dial between a
-*shattered* realm and a *split* one, and only the second produces what the dark age is asked to
-hand forward. A province leaving on its own reduces an empire to specks — many polities, all of
-them too small to colonise anyone — while a cut-off block leaving as one produces a successor with
-real ground and a real disparity against its parent. The block is grown by a breadth-first walk
-from its lowest-indexed region, which is also what makes the allocation order a property of the map.
+**GROUND THAT BREAKS AWAY BREAKS INTO CITY STATES, ONE PER CUT-OFF SEAT (Ben, 2026-09-11).**
+Each seat the capital can no longer supply becomes its own polity, taking the hinterland that
+points at it. A cut-off region with no seat joins the nearest cut-off seat, and where there is
+none it stands alone as a city state of its own — it is never handed to a neighbour, and it is
+never released to nobody (§ What the dark age must leave holds: collapse does not re-wild).
+This supersedes the earlier build-time call that a breakdown leaves as a contiguous block of two
+or more regions: the dark age is asked to hand forward nations of *unequal* strength, and the
+inequality that matters is between the surviving core and the many small realms it could no
+longer hold. With seats as numerous as city states that have risen, the pieces are real polities,
+not specks. The cut is grown by a breadth-first walk from the lowest-indexed region, which is what
+makes the allocation order a property of the map.
+
+**THE CAPITAL IS THE STRATEGIC HEADQUARTERS (Ben, 2026-09-11).** Every reading of supply is priced
+from the polity's capital — holding, growth, breakdown, the campaign gate, the battle and the levy
+alike — over the ground the realm holds, so that a war which takes the ground between a capital
+and its far block cuts that block off. *"Each polity sees itself as the strategic headquarters
+where any supply, or material gain is stockpiled"*: the material stock lives at the capital, a
+captured seat's stock is carried home, and it is from that stockpile that a realm pays to extend
+its reach (§ What materials are FOR).
 
 **THE SUCCESSOR IS ITS OWN PEOPLE'S REALM, NOT A COPY OF ITS PARENT.** Its culture is the **new
 seat's plurality**, not the parent's — a province that walks away is the realm of whoever actually

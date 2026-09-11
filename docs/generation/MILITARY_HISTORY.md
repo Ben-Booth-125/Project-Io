@@ -198,9 +198,10 @@ depends on.
 
 **What it asks of the scorer.** Question A sharpens from *can I take this* to **can I keep an
 army there** — which is what makes logistics and roads load-bearing rather than decorative. A
-campaign concentrates the staging hub's garrison plus what the holdings around it can spare,
-bounded at double the hub's own; those holdings are genuinely uncovered while the campaign runs,
-and the survivors have to be somewhere. An offensive is a bet made with a finite object that can
+campaign gathers a pooled levy from every held region the capital can supply (§ Force follows
+the network below), so a realm brings as much of itself to a border as its network can carry;
+those regions are genuinely uncovered while the campaign runs, and the survivors have to be
+somewhere. An offensive is a bet made with a finite object that can
 be in only one place.
 
 **The collapse path survives, in the shape that was always the legible one.** A sack still falls
@@ -218,6 +219,16 @@ and visible as such — never as a coefficient hidden inside a battle. A battle 
 farmers is exactly the accounting this section replaced.
 
 ---
+
+**FORCE FOLLOWS THE NETWORK (Ben, 2026-09-11).** A campaign's stack is not the staging hub's own
+garrison plus what its immediate neighbours can spare. It is a **pooled levy**: every held region
+the capital can supply contributes a share of its garrison, in proportion to its supply as read
+from the capital and discounted by the roads between, so a realm with a network brings more of
+itself to a border than one without, and a realm of many regions fights a larger battle than a
+realm of three. The defender's emergency levy stays local. The regions that contributed are
+genuinely uncovered while the campaign runs, and a bigger stack eats more upkeep, so the pooled
+levy is a decision with a cost rather than a free accumulation. This is what lets success
+compound into an empire and, when the network fails, lets failure compound into a collapse.
 
 ## The band ladder — how a polity's roster advances
 

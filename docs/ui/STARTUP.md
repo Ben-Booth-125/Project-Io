@@ -216,6 +216,23 @@ seconds is worse than a bar, not better.
 **Rounds stay causal.** Rerolling a pass round invalidates the rounds below it, as
 rerolling a planetology round already re-draws the ones below it.
 
+**The render starts with the calculation and lags it at a constant rate (Ben, 2026-09-11).**
+A pass round does not compute its record and then play it back; the map begins drawing the
+moment the pass begins, and it advances in **fixed ticks** at one constant rate for the whole
+span, always **behind** the year the pass has reached and never ahead of it. The rate is set so
+the whole span plays in about **thirty seconds**; if the pass is slower than that the playhead
+waits at the computed frontier, so a longer round is acceptable and a playhead that overtakes
+the calculation is not. The sim publishes its growing record through a **write-only tap** — the
+same contract the market carve uses to fill the loading screen — so a watched run and an
+unwatched run are byte-identical, and the standing determinism rule is untouched. Once the pass
+has landed, the record stays: the round can be paused and scrubbed at the player's own pace. There is no Restart button on either pass round (Ben, 2026-09-11): a scrubber makes it redundant, and its row belongs to the ranking board.
+
+**The pass rounds draw the ground, not only the fill (Ben, 2026-09-11).** Rivers and the
+landform relief — mountains, highlands, the barriers the walk and the campaign both price — are
+drawn beneath the culture or polity fill on rounds 3 and 4, and the fill is a tint over that
+ground rather than a flat colour that hides it. A frontier, a road and a bridge are legible only
+against the terrain they cross.
+
 ## Handoff — `start_new_game`
 
 The wizard's "Begin", and the one and only generation call:
