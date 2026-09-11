@@ -1774,6 +1774,44 @@ struct grudge
     grudge_event events[grudge_events_kept]{};
 };
 
+// ---------------------------------------------------------------------------
+// Contact (BL-908)
+// ---------------------------------------------------------------------------
+
+/// WHAT caused the meeting. Only causes this sim actually resolves — the same
+/// discipline `grudge_kind` holds itself to.
+enum class contact_kind : uint8_t
+{
+    campaign  = 0, ///< A campaign crossed onto the other's ground (won or not).
+    inherited = 1, ///< Carried forward from a conquered polity's own contacts.
+};
+inline constexpr int contact_kind_count = 2;
+
+/// The event that FIRST joined the pair. Unlike a grudge, contact does not
+/// decay and does not accumulate a score — meeting is a fact, not a magnitude
+/// — so one event is the whole of what there is to keep.
+struct contact_event
+{
+    int32_t      year   = 0;
+    uint16_t     region = 0xFFFFu; ///< `owner_none` where the event has no place.
+    contact_kind kind   = contact_kind::campaign;
+};
+
+/// A directed pair, IN THE GRUDGE TABLE'S SHAPE (BL-908): "who has met whom"
+/// reads as `pass_one_output::grudges` does, a named pair carrying the event
+/// that joined it, rather than a second convention for the same kind of fact.
+///
+/// Contact is recorded in BOTH directions when it is first established —
+/// meeting is mutual even though the record is a directed pair, the same as
+/// the table it borrows its shape from stores two independent rows for a
+/// mutual fact rather than inventing an undirected edge type.
+struct contact
+{
+    uint16_t      from = 0;
+    uint16_t      to   = 0;
+    contact_event first;         ///< The event that established the pair.
+};
+
 struct history_sim_state
 {
     std::vector<polity> polities;
@@ -1895,6 +1933,18 @@ struct history_sim_state
     /// surviving polity that shares the dead realm's culture toward its killer.
     /// The dead leave a grudge in their kin, never in an heir.
     std::vector<grudge> grudges;
+
+    /// THE SPARSE, DIRECTED CONTACT TABLE (BL-908) — who has met whom, and
+    /// what joined them. Sorted ascending by (from, to) and searched by
+    /// binary search, same discipline as `grudges` above.
+    ///
+    /// UNLIKE A GRUDGE, CONTACT SURVIVES A DEATH — see `extinguish_polity`:
+    /// a conqueror INHERITS what its victim knew, because the knowledge was
+    /// in the seat rather than in the dead ruler. This is the opposite call
+    /// from the grudge table's on the same event, and it is deliberate: a
+    /// grudge is a feeling a person or lineage holds, which the seat does not
+    /// carry forward; contact is a fact about the map, which the seat does.
+    std::vector<contact> contacts;
 
     int      region_stride = 0; ///< Final region count (slice width for replay).
     int64_t  years           = 0; ///< Years simulated.
@@ -2296,6 +2346,15 @@ int fear_of_next_q(const history_sim_state& s, const history_sim_params& p,
 std::string grudge_event_line(const grudge_event& e, const settlement_state& ss);
 
 // ---------------------------------------------------------------------------
+// Contact reads (BL-908)
+// ---------------------------------------------------------------------------
+
+/// True where @p from has met @p to, i.e. an entry exists in the sparse
+/// contact table. Binary search over the sorted table, same shape as
+/// `grudge_between`.
+bool has_contact(const history_sim_state& s, int from, int to);
+
+// ---------------------------------------------------------------------------
 // The turbulence lean, resolved (BL-839)
 // ---------------------------------------------------------------------------
 //
@@ -2357,6 +2416,7 @@ struct polity_holdings
 ///                                  `work_*_mod` fields, plus `works_by_span_band`
 ///   - the strain accumulators   -> `region::contest_q` and `polity::cohesion_q`
 ///   - grudges (BL-827)          -> `grudges`
+///   - contact (BL-908)          -> `contacts`
 ///   - the provinces each polity holds -> `holdings`
 struct pass_one_output
 {
@@ -2379,6 +2439,12 @@ struct pass_one_output
     /// setup, never a quantity of its own.
     std::vector<grudge> grudges;
 
+    /// The directed contact table (BL-908) — who has met whom, and what
+    /// event joined the pair. Landmass identity is DERIVED from this by a
+    /// consumer that walks it against `region::domain`; it is not stored
+    /// here as a second table.
+    std::vector<contact> contacts;
+
     /// Which provinces each polity holds, one entry per LIVING polity, sorted
     /// ascending by polity id. The political map as a set rather than as a
     /// field to be re-derived.
@@ -2400,5 +2466,6 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
 /// actually claims: every region's shares sum to exactly 1000 and name only
 /// cultures in range; every holding names a living polity and an existing
 /// region, with no region held twice; every grudge names polities in range and
-/// carries at least one event. Writes the first failure into @p why.
+/// carries at least one event; every contact names polities in range and
+/// carries the event that joined it. Writes the first failure into @p why.
 bool pass_one_output_valid(const pass_one_output& o, std::string* why);
