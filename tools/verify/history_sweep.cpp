@@ -490,6 +490,13 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     if (name == "w_aggr_q")                   { p.w_aggr_q = v;                        return true; }
     if (name == "w_fear_q")                   { p.w_fear_q = v;                        return true; }
     if (name == "fear_reference")             { p.fear_reference = v;                  return true; }
+    // BL-887: the centre-chain reach model, whole. `centre_chain_reach=0` is
+    // the OLD single-capital Dijkstra, so one build A/Bs the two models rather
+    // than two builds being compared and hoped identical elsewhere.
+    if (name == "centre_chain_reach")         { p.centre_chain_reach = v != 0;         return true; }
+    if (name == "centre_reach_rebate_q")      { p.centre_reach_rebate_q = v;           return true; }
+    if (name == "centre_reach_rebate_cap_q")  { p.centre_reach_rebate_cap_q = v;       return true; }
+    if (name == "centre_reach_min_centres")   { p.centre_reach_min_centres = v;        return true; }
     return false;
 }
 

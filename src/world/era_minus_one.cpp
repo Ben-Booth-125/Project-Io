@@ -145,6 +145,46 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     hp.universal_creed_hold_years        = 200;
     hp.universal_creed_convert_supply_q  = 400;
     hp.universal_creed_alien_penalty_q   = 200;
+    // BL-887: reach propagates through a chain of population centres, not out
+    // of one capital (Ben, 2026-09-10). ON for generation's own round, which
+    // is the round that has a real centre map to chain through -- BL-872
+    // computes `network_supply_q` for every held region every decision round
+    // and grows `region::centres` off it. The struct default stays OFF so no
+    // synthetic fixture changes meaning; the field comments on
+    // `history_sim_params::centre_chain_reach` carry the design and the four
+    // ways its feedback loop is damped. Placeholder magnitudes, like the w_*
+    // beside them -- the SHAPE is the ruling, history_sweep tunes the numbers.
+    // OFF, AND THAT IS A MEASUREMENT RATHER THAN CAUTION. Built, wired and
+    // swept both ways across 16 seeds at --epoch 0, the relay moves NOTHING
+    // the round is judged on: secessions stay at a median 2 with 14 regions
+    // walking, largest share stays at a median 10% (6-18%), hegemony stays
+    // 0/16, and 15/16 worlds still show the arc. Raising the rebate more than
+    // threefold (400 per centre, cap 900) reproduced the OLD figures exactly
+    // -- so this is not a magnitude that wants tuning, it is a mechanism with
+    // nothing to bite on here, for two diagnosable reasons:
+    //
+    //   THE REACH GATE ALREADY REFUSES NOTHING. BL-889's census reads
+    //   "REFUSED reach gate median 0" on this round. Cheaper reach can only
+    //   unlock ground a price was keeping shut, and no ground is shut.
+    //
+    //   THE GROUND THAT NEEDS A RELAY IS DENIED ONE. BL-872 FREEZES
+    //   `region::centres` at or below `sustainable_settlement_floor_q`, so a
+    //   province stranded under the secession floor is exactly a province with
+    //   no town to relay through. A chain model helps where there is a chain;
+    //   the pathological holdout is by construction the case with nothing
+    //   behind it. `history_sim_harness`'s R3a2/R3a3 are the same shape and
+    //   are unmoved, as they must be: `two_polity_world(34)` has no
+    //   intervening ground at all.
+    //
+    // Left wired, left off, and one line from live. `history_sweep --set
+    // centre_chain_reach=1` runs it without a rebuild, which is what the two
+    // reasons above should be re-measured against once either one moves --
+    // when the reach gate starts refusing campaigns, or when the freeze rule
+    // stops denying a frontier province its town.
+    hp.centre_chain_reach        = false;
+    hp.centre_reach_rebate_q     = 150;
+    hp.centre_reach_rebate_cap_q = 500;
+    hp.centre_reach_min_centres  = 1;
 
     // BL-868: creeds raise armies. A placeholder magnitude, like the w_* it
     // sits beside -- the SHAPE is the ruling, history_sweep tunes the number.
