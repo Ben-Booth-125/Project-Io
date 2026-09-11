@@ -67,6 +67,39 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // number is for history_sweep to tune.
     hp.trade_income_per_link = 40;
 
+    // BL-895's TWO SINKS (Ben, 2026-09-11). Without them the income above
+    // could not gate anything: campaigns were the ONLY thing materials were
+    // ever spent on, hundreds against hundreds of millions produced. A
+    // standing army is now a permanent claim on production, and a road is
+    // something a realm BUYS rather than a free side effect of walking.
+    // Placeholder magnitudes on the same footing as the w_* weights -- the
+    // SHAPE is the ruling, history_sweep tunes the numbers.
+    // 20, NOT A GUESS: measured across 16 seeds at --epoch 0 against a stated
+    // target -- the sinks should claim a VISIBLE MINORITY of production, so
+    // stock is a constraint a realm manages, while road-building stays a
+    // CHOICE rather than something poverty forbids. At 200 the sinks claimed
+    // 63% of production and 324 corridor promotions per world were refused
+    // for want of materials, which is poverty governing the network. At 20
+    // they claim 8% with 43 refusals, and 2,732,809 heads a world are still
+    // sent home unpaid -- the strangling channel bites without swallowing the
+    // economy.
+    hp.army_upkeep_per_1000_heads = 20;
+    hp.unpaid_army_disband_q      = 250;
+    hp.road_build_material_cost   = 2000;
+
+    // BL-896: collapse is NETWORK FAILURE (Ben, 2026-09-11). Ground whose
+    // reach from its own seat has fallen this low secedes rather than falling
+    // to a neighbour -- a successor realm, which is what the dark age has to
+    // hand forward. Sited just above `sustainable_settlement_floor_q` (40, the
+    // struct default this round takes): ground too far out for its towns to
+    // grow is the same ground too far out to be ruled, which is one reach
+    // reading doing both jobs rather than two floors disagreeing. NOT ordered
+    // against `sustainable_garrison_floor_q`, which is ZERO on this round --
+    // garrison attrition is effectively off here, so there is no ordering to
+    // claim. Placeholder magnitudes; history_sweep tunes them.
+    hp.secession_supply_floor_q = 60;
+    hp.secession_min_regions    = 2;
+
     // BL-868: creeds raise armies. A placeholder magnitude, like the w_* it
     // sits beside -- the SHAPE is the ruling, history_sweep tunes the number.
     hp.w_aggr_q = 300;

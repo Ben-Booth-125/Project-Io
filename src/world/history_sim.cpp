@@ -647,7 +647,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
         return 0;
     };
 
-    const auto note_corridor = [&](int a, int b) {
+    // BL-895 sink 2 -- A ROAD COSTS MATERIALS TO BUILD. `payer_seat` is the
+    // acting polity's capital, or -1 for a walk nobody is paying for (which is
+    // also the disabled path: `road_build_material_cost == 0`). The WALK is
+    // always recorded -- `corridor_uses` is the pure-observation record
+    // `road_generation.cpp` stamps onto the finished world, and a party that
+    // walked a line walked it whether or not anyone widened it. What money buys
+    // is the TIER, which is the thing that does something to reach.
+    //
+    // A REFUSED PROMOTION HOLDS THE COUNT ONE SHORT rather than discarding the
+    // walk, so the corridor is promoted the next time it is walked with the
+    // materials standing. Poverty DELAYS a road; it does not forbid one.
+    const auto note_corridor = [&](int a, int b, int payer_seat) {
         if (a < 0 || b < 0 || a == b) return;
         if (a >= static_cast<int>(owner_index_limit)
          || b >= static_cast<int>(owner_index_limit)) return;
@@ -659,7 +670,24 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const int before = road_tier_for_uses(uses);
         ++uses;
         const int after = road_tier_for_uses(uses);
-        if (after != before) ++roads_version;
+        if (after == before) return;
+
+        if (params.road_build_material_cost > 0)
+        {
+            region* seat = (payer_seat >= 0
+                         && static_cast<std::size_t>(payer_seat) < ss.regions.size())
+                         ? &ss.regions[static_cast<std::size_t>(payer_seat)] : nullptr;
+            const int64_t cost = params.road_build_material_cost;
+            if (seat == nullptr || seat->material_stock < cost)
+            {
+                --uses;                       // held one short, not thrown away
+                ++out.road_builds_refused;
+                return;
+            }
+            seat->material_stock -= cost;
+            out.materials_spent_on_roads += cost;
+        }
+        ++roads_version;
     };
 
     // --- GRUDGES (BL-827) -------------------------------------------------
@@ -1306,6 +1334,60 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ss.regions[static_cast<std::size_t>(seat_idx)].material_stock += produced;
                     out.materials_produced += produced;
                 }
+            }
+        }
+
+        // ---- BL-895 sink 1: THE STANDING ARMY EATS, EVERY YEAR -----------
+        //
+        // A SECOND PASS, deliberately. The loop above credits industry and
+        // trade to seats as it walks the regions in index order, so a charge
+        // levied inside it would read a seat's stock half-accumulated and the
+        // answer would depend on where the paying region sat relative to its
+        // own capital in the index. Charging afterwards asks every garrison
+        // the same question about a settled year, which is the determinism
+        // requirement stated plainly rather than a tidiness preference.
+        //
+        // UNPAID TROOPS GO HOME, they do not serve for free and they do not
+        // put the seat into deficit. The heads return to `manpower_stock`
+        // exactly as `muster_garrison`'s over-target disband sends them --
+        // a discharged soldier was never subtracted from `population`, so
+        // returning him to the recruitable pool is the only consistent
+        // destination. This is the strangling channel BL-896 needs: a realm
+        // cut off from its income loses its army without losing a battle.
+        if (params.army_upkeep_per_1000_heads > 0)
+        {
+            for (std::size_t i = 0; i < ss.regions.size(); ++i)
+            {
+                region& p = ss.regions[i];
+                if (p.army_stock <= 0) continue;
+                const int64_t due =
+                    (p.army_stock * params.army_upkeep_per_1000_heads) / 1000;
+                if (due <= 0) continue;
+
+                const int st = p.seat_region;
+                int64_t paid = 0;
+                if (st >= 0 && static_cast<std::size_t>(st) < ss.regions.size())
+                {
+                    region& seat = ss.regions[static_cast<std::size_t>(st)];
+                    paid = std::min(due, seat.material_stock);
+                    seat.material_stock -= paid;
+                    out.materials_spent_on_upkeep += paid;
+                }
+
+                if (paid >= due || params.unpaid_army_disband_q <= 0) continue;
+
+                // The unpaid SHARE of the garrison, then the per-mille of that
+                // share which walks off this year. Both bounded by the pool
+                // itself, so a region can never disband more than it holds.
+                const int64_t unpaid_heads =
+                    (p.army_stock * (due - paid)) / due;
+                const int64_t gone = std::min(
+                    p.army_stock,
+                    (unpaid_heads * params.unpaid_army_disband_q) / 1000);
+                if (gone <= 0) continue;
+                p.army_stock    -= gone;
+                p.manpower_stock += gone;
+                out.army_heads_unpaid_disbanded += gone;
             }
         }
         } // BL-825 demography timer
@@ -2496,7 +2578,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // whether or not the battle was won, and a network that only
                 // remembered the winners would be a map of conquests rather
                 // than a map of routes.
-                note_corridor(src, static_cast<int>(ti));
+                note_corridor(src, static_cast<int>(ti), q.capital);
 
                 // The stall, counted where it actually happens (BL-312). The
                 // first cut incremented this AFTER resolve_battle and only at
@@ -3043,7 +3125,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // the commoner of the two corridor sources: a polity settles far
                 // more often than it campaigns, which is what gives a peaceful
                 // history a road network at all.
-                note_corridor(best_target, static_cast<int>(ss.regions.size()) - 1);
+                note_corridor(best_target, static_cast<int>(ss.regions.size()) - 1, q.capital);
                 out.owner_changes.push_back(owner_change{
                     static_cast<int32_t>(y),
                     static_cast<uint16_t>(ss.regions.size() - 1),
@@ -3201,6 +3283,156 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         p.industrial_year = y;
                         ++out.regions_industrialised;
                     }
+                }
+            }
+        }
+
+        // ---- BL-896 - GROUND THE REALM CANNOT REACH SECEDES ---------------
+        //
+        // Ben's ruling, 2026-09-11: collapse is NETWORK FAILURE. Succession,
+        // exhaustion and external shock were all offered as causes and none was
+        // chosen, so this is the settled cause rather than the likely one, and
+        // CIVILISATION.md's incumbent reading ("reach-gating is what makes the
+        // collapse mechanical rather than scripted... never a collapse event
+        // fired at a date") is promoted from a likelihood to a rule.
+        //
+        // THE NETWORK IS REACH, NOT THE ROAD GRAPH (ruling 1, same session).
+        // `region::network_supply_q` was computed above for every held region
+        // this round, off the same terrain-and-road Dijkstra `rebuild_reach`
+        // already discounts by the corridors this history has actually walked.
+        // So the instrument is dense (every held region, every round) where the
+        // road graph is sparse (about fifty promoted edges per world), and no
+        // road-density fix is needed first.
+        //
+        // AFTER THE DECISION LOOP, NEVER INSIDE IT. A successor is a
+        // `push_back` onto `out.polities`, which invalidates the `polity&` that
+        // loop holds. Everything below therefore indexes rather than
+        // references.
+        //
+        // DETERMINISM IS THE REAL CONSTRAINT HERE and every choice below is
+        // made for it: polities are walked in id order, regions in index order,
+        // blocks grow by a breadth-first walk seeded from the lowest index in
+        // the block, and successors are allocated in the order those blocks are
+        // found. Nothing below reads a container whose order is undefined.
+        if (params.secession_supply_floor_q > 0)
+        {
+            // Snapshot the count: a successor born this round does not itself
+            // secede in its own birth round. It has had no round to be measured
+            // and the reading on its ground is still its parent's.
+            const std::size_t pol_count = out.polities.size();
+            for (std::size_t pi = 0; pi < pol_count; ++pi)
+            {
+                if (!out.polities[pi].alive) continue;
+                const int qid  = out.polities[pi].id;
+                const int qcap = out.polities[pi].capital;
+
+                // The cut-off set, in region-index order. The capital is never
+                // in it: a seat is by construction at zero distance from itself
+                // and cannot secede from the realm it IS.
+                std::vector<int> cut;
+                for (std::size_t i = 0; i < owner.size(); ++i)
+                {
+                    if (owner[i] != qid) continue;
+                    if (static_cast<int>(i) == qcap) continue;
+                    if (ss.regions[i].network_supply_q
+                        <= params.secession_supply_floor_q)
+                        cut.push_back(static_cast<int>(i));
+                }
+                if (static_cast<int>(cut.size()) < params.secession_min_regions) continue;
+
+                std::vector<char> taken(cut.size(), 0);
+                for (std::size_t ci = 0; ci < cut.size(); ++ci)
+                {
+                    if (taken[ci]) continue;
+
+                    // A CONTIGUOUS BLOCK LEAVES TOGETHER. One region leaving
+                    // alone shatters a realm into specks; a cut-off block
+                    // leaving as one SPLITS it, and a split is what produces
+                    // the nations of unequal strength the dark age is asked to
+                    // hand forward.
+                    std::vector<int> block;
+                    std::vector<int> queue{cut[ci]};
+                    taken[ci] = 1;
+                    for (std::size_t qi = 0; qi < queue.size(); ++qi)
+                    {
+                        const int r = queue[qi];
+                        block.push_back(r);
+                        for (int nb : neighbours[static_cast<std::size_t>(r)])
+                            for (std::size_t cj = 0; cj < cut.size(); ++cj)
+                                if (!taken[cj] && cut[cj] == nb)
+                                { taken[cj] = 1; queue.push_back(nb); }
+                    }
+                    if (static_cast<int>(block.size()) < params.secession_min_regions)
+                        continue;
+                    std::sort(block.begin(), block.end());
+
+                    // The successor's seat is the block's lowest index -
+                    // placement order, which is best-ground first: the same
+                    // rule the capital-fell branch above already uses.
+                    const int seat = block.front();
+                    if (out.polities.size() >= owner_index_limit) break;
+
+                    polity np;
+                    np.id = static_cast<int>(out.polities.size());
+                    // THE GROUND'S OWN PEOPLE, not the parent's. A province
+                    // that walks away is its own plurality's realm, which is
+                    // what makes secession carry culture forward rather than
+                    // clone the empire that lost it.
+                    np.culture  = ss.regions[static_cast<std::size_t>(seat)].culture.plurality();
+                    np.capital  = seat;
+                    np.aggression_q =
+                        (cs && np.culture >= 0
+                         && np.culture < static_cast<int>(cs->cultures.size()))
+                            ? cs->cultures[static_cast<std::size_t>(np.culture)].aggression_q
+                            : 500;
+                    // INSTITUTIONS ARE INHERITED, not reset. A province of an
+                    // empire knows what the empire knew, and that is the whole
+                    // reason a dark age leaves unequal nations rather than a
+                    // blank map. Cohesion is inherited for the same reason and
+                    // so that no new dial is invented for this event.
+                    for (int d = 0; d < sim_domain_count; ++d)
+                    {
+                        np.capacity[d]   = out.polities[pi].capacity[d];
+                        np.progress_q[d] = out.polities[pi].progress_q[d];
+                    }
+                    np.cohesion_q      = out.polities[pi].cohesion_q;
+                    np.industrial_year = out.polities[pi].industrial_year;
+                    out.polities.push_back(np);
+
+                    for (int r : block)
+                    {
+                        const std::size_t ri = static_cast<std::size_t>(r);
+                        owner[ri]                  = np.id;
+                        ss.regions[ri].nation      = np.id;
+                        ss.regions[ri].seat_region = seat;
+                        ss.regions[ri].is_seat     = (r == seat);
+                        out.owner_changes.push_back(owner_change{
+                            static_cast<int32_t>(y),
+                            static_cast<uint16_t>(r),
+                            static_cast<uint16_t>(np.id)});
+                    }
+
+                    // A SECESSION IS A DEFEAT FOR THE PARENT, through the same
+                    // cohesion channel every other loss uses - never a term
+                    // invented for this event.
+                    out.polities[pi].cohesion_q = clampi(
+                        out.polities[pi].cohesion_q - params.cohesion_loss_on_defeat_q,
+                        params.cohesion_floor_q, 1000);
+
+                    // AND IT LEAVES A GRUDGE, carried today and inert today
+                    // (BL-898 owns making it bite). `ground_taken` rather than
+                    // a fifth kind: ground did change hands, and that is the
+                    // honest cause to tell a player.
+                    raise_grudge(qid, np.id, grudge_kind::ground_taken,
+                                 seat, y, params.grudge_ground_taken);
+
+                    ++out.secessions;
+                    out.regions_seceded += static_cast<int64_t>(block.size());
+                    out.history.push_back(history_event{
+                        years_from_calendar_year(y), chain_stage::legacy,
+                        ss.regions[static_cast<std::size_t>(seat)].name
+                            + " breaks away, beyond its seat's reach",
+                        std::string{}});
                 }
             }
         }

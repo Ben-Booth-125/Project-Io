@@ -478,6 +478,46 @@
     "tools/verify/history_span_cost.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-826",
+   "title": "BL-896: three of the four open secession calls were taken at build time",
+   "raised": "2026-09-11",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-896 (collapse is network failure). The item named four calls as OPEN FOR THE BUILD; three had to be settled to write the code, and the fourth answered itself.",
+   "what": "(1) WHICH FLOOR: a new `secession_supply_floor_q` rather than reusing `sustainable_garrison_floor_q`. That floor is ZERO on generation's round, so reusing it would have made secession dead code; the new floor is sited at 60, just above `sustainable_settlement_floor_q` (40), so ground too far out for its towns to grow is the same ground too far out to be ruled. (2) THE UNIT IS A CONTIGUOUS BLOCK, min 2 regions: one region leaving alone shatters a realm into specks, a cut-off block leaving together splits it, and a split is what produces nations of unequal strength. (3) WHAT THE SUCCESSOR INHERITS: the ground's OWN culture (the new seat's plurality, not the parent's), the parent's capacity and progress ladders and its cohesion, and nothing of the parent's seat stock -- that stock sits in a capital it no longer holds. A grudge is raised parent->successor as `ground_taken`, rather than adding a fifth `grudge_kind`. (4) HINTERLAND: answered by (2) -- the block IS the hinterland, since seat_region is rewritten across the whole block.",
+   "why_it_matters": "Each is a design call the item explicitly left to Ben, and each shapes what the dark age hands forward. The block-size floor in particular is the dial between a shattered map and a split one, and the culture choice decides whether a successor is a fragment of the empire or a people reasserting itself.",
+   "options": [],
+   "recommendation": "Keep all four. The culture call is the one worth a second look: taking the seat's plurality means a successor can be culturally alien to its parent, which is what makes secession carry the pantheon record forward rather than clone the empire.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "src/world/era_minus_one.cpp",
+    "docs/generation/CIVILISATION.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-827",
+   "title": "BL-895: trade income is still 0.25% of production after both sinks land, and upkeep claims 63%",
+   "raised": "2026-09-11",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-895's remaining half -- build both sinks, then re-measure whether trade becomes a material share. Measured across 16 seeds at --epoch 0.",
+   "what": "With a standing-army upkeep of 200 per 1000 heads per year and a road build cost of 2000: production fell 241,000,000 -> 113,922,140 per world, the three sinks together claimed 63% of it, and 16,026,384 heads were sent home unpaid. The sinks are unambiguously live. But TRADE is 281,280 of that 113,922,140 -- 0.25% -- so what makes war affordable is still INDUSTRY, not the network. The item's own 'done when' asks that a polity connected to unlike ground sustains campaigns a disconnected one cannot, and that is not yet what the numbers say.",
+   "why_it_matters": "Raising `trade_income_per_link` until trade is a visible share would be fitting a figure to a target, which is the thing this project refuses. The honest readings are either (a) trade should be paid on something that scales -- the number of unlike PAIRS a realm touches is bounded by its adjacency, so a per-link constant can never grow with a realm the way industry does; or (b) trade is correctly a minor income in this phase and the 'rich pay for war' story belongs to pass 2, where resources become capital.",
+   "options": [
+    "Accept trade as a minor income here; say so in CIVILISATION.md and stop tuning it.",
+    "Re-base trade on something that scales with a realm (e.g. distinct trade classes reachable, not roaded pairs), then re-measure.",
+    "Cut industry's yield instead, so the same trade figure becomes a larger share."
+   ],
+   "recommendation": "Option 2 is the only one that changes the mechanism rather than the arithmetic, and it keeps the no-market constraint intact -- 'how many unlike things can this realm reach' is still a property of the network and still reads only DIFFERENCE.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/CIVILISATION.md"
+   ],
+   "resolution": null
   }
  ]
 }

@@ -550,6 +550,32 @@ is.
 realm's stock is limited by what it chooses to keep paying for; a cap or a decay would be a second
 mechanism doing a job the sinks already do, and would need a magnitude nobody has a reason to pick.
 
+**UNPAID TROOPS GO HOME, which is what makes upkeep a strangling channel rather than a drain.** A
+seat that cannot pay does not run a deficit: the unpaid share of the garrison walks off, and the
+heads return to the recruitable pool rather than to the civilian count, exactly as an over-target
+disband already sends them. So a realm cut off from its income **loses its army without losing a
+battle** — which is the second job § How an empire actually falls needs from this mechanism.
+
+**A REFUSED ROAD IS DELAYED, NEVER FORBIDDEN.** A corridor whose promotion the seat cannot afford
+holds its use count one short of the threshold instead of discarding the walk, so it is promoted
+the next time it is walked with the materials standing. The walk itself is always recorded — a
+party that walked a line walked it whether or not anyone widened it. What money buys is the *tier*,
+which is the half that does something to reach.
+
+**THE MAGNITUDES ARE MEASURED AGAINST A STATED TARGET, not felt.** The target: the sinks should
+claim a **visible minority** of production, so stock is a constraint a realm manages, while road
+building stays a *choice* rather than something poverty forbids. At an upkeep of 200 per 1,000
+heads the sinks claimed **63%** of production and **324** corridor promotions a world were refused
+for want of materials — that is poverty governing the network, not a realm choosing. At **20** they
+claim **8%** with 43 refusals, and 2.7 million heads a world are still sent home unpaid.
+
+**TRADE IS STILL NOT WHAT PAYS FOR WAR, and this section does not pretend otherwise.** With both
+sinks live, network income is **281,280 of 113,922,140** produced — a quarter of one per cent. What
+makes war affordable is industry. A per-link constant is bounded by a realm's adjacency and so can
+never grow with a realm the way industry does, which is a shape problem rather than a magnitude
+one; raising the constant until the share looked right would be fitting a figure to a target.
+`NR-827` carries the open call.
+
 ### How an empire actually falls (Ben, 2026-09-11)
 
 § What the dark age must leave settles the CAUSE as network failure. These are the two calls that
@@ -577,6 +603,30 @@ because a specific region's supply fell under a floor, for reasons a player coul
 **SECESSION MUST BE DETERMINISTIC**, which is a real constraint rather than a note: a seceding
 polity needs an id and a seat allocated in an order that depends only on the sim's own state, never
 on iteration order over a container whose order is undefined.
+
+**A CONTIGUOUS BLOCK LEAVES TOGETHER, NEVER ONE REGION ALONE.** This is the dial between a
+*shattered* realm and a *split* one, and only the second produces what the dark age is asked to
+hand forward. A province leaving on its own reduces an empire to specks — many polities, all of
+them too small to colonise anyone — while a cut-off block leaving as one produces a successor with
+real ground and a real disparity against its parent. The block is grown by a breadth-first walk
+from its lowest-indexed region, which is also what makes the allocation order a property of the map.
+
+**THE SUCCESSOR IS ITS OWN PEOPLE'S REALM, NOT A COPY OF ITS PARENT.** Its culture is the **new
+seat's plurality**, not the parent's — a province that walks away is the realm of whoever actually
+lives on it, and that is what carries the pantheon record (`../generation/COLONISATION.md` § Culture
+arrives by route) forward through the fragmentation instead of cloning the empire that lost it.
+
+**WHAT IT INHERITS, AND WHAT IT DOES NOT.** It inherits the parent's **capacity and progress
+ladders** and its **cohesion**: a province of an empire knows what the empire knew, and that is the
+whole reason a dark age leaves *unequal* nations rather than a blank map. It inherits **nothing of
+the parent's stock**, because that stock stands in a capital it no longer holds. The parent takes a
+cohesion loss through the same channel every other defeat uses, and a grudge is raised parent →
+successor as *ground taken* — ground did change hands, and that is the honest cause to tell a
+player.
+
+**MEASURED, 16 seeds at the 0 CE epoch:** a median of **2 secessions and 14 regions walking away**
+per world, with the arc intact — 15 of 16 worlds still show a polity rise, peak and fall, largest
+share at a median 10%, and hegemony reached in 0 of 16.
 
 ---
 

@@ -773,6 +773,84 @@ struct history_sim_params
     /// both carry trade, they differ in what they do to REACH.
     int trade_income_per_link = 0;
 
+    /// THE STANDING ARMY EATS, EVERY YEAR (BL-895 sink 1; Ben, 2026-09-11).
+    /// Materials charged per YEAR per 1000 heads standing in `army_stock`,
+    /// drawn from the region's seat. Zero disables it.
+    ///
+    /// WHY IT HAD TO EXIST. Before it, campaigns were the ONLY thing materials
+    /// were ever spent on -- one site in the whole sim, spending in the
+    /// HUNDREDS against hundreds of millions produced. An income nothing
+    /// competes for cannot make war affordable to the rich and unaffordable to
+    /// the poor however large it is, so the trade income of BL-895's first half
+    /// could not gate anything. A standing army is now a PERMANENT claim on
+    /// production rather than a free accumulation, which makes a large one a
+    /// decision.
+    ///
+    /// IT IS ALSO THE STRANGLING CHANNEL. A realm whose seat cannot pay does
+    /// not simply run a deficit -- the unpaid share of its garrison goes home
+    /// (`unpaid_army_disband_q`), so a realm cut off from its income loses its
+    /// army without losing a battle. That is the second job BL-896 needs.
+    int army_upkeep_per_1000_heads = 0;
+
+    /// Per-mille of the UNPAID share of a garrison that goes home this year.
+    /// The heads return to `manpower_stock`, exactly as `muster_garrison`'s
+    /// over-target disband does and for the same reason: a discharged soldier
+    /// was never subtracted from `population`. Zero means an unpaid army
+    /// stands anyway, which makes `army_upkeep_per_1000_heads` a pure drain.
+    int unpaid_army_disband_q = 0;
+
+    /// ROADS COST MATERIALS TO BUILD (BL-895 sink 2; Ben, 2026-09-11).
+    /// Charged to the acting polity's seat each time a walked corridor would
+    /// cross a TIER boundary (0 -> Track, Track -> Road). Zero disables it,
+    /// which is the historical behaviour: a road was a free side effect of
+    /// walking a corridor often enough.
+    ///
+    /// IT CLOSES A LOOP. Trade pays for the network and the network carries
+    /// trade, which turns "the wall moves when you win" from a geographic
+    /// statement into an economic one: a realm that cannot afford roads cannot
+    /// extend its reach however much ground it takes.
+    ///
+    /// A REFUSED PROMOTION IS NOT A LOST WALK. The use count is held one short
+    /// of the threshold rather than discarded, so the corridor is promoted the
+    /// next time it is walked WITH the materials standing. The road is delayed
+    /// by poverty, never forbidden by it.
+    int road_build_material_cost = 0;
+
+    /// GROUND THE REALM CANNOT REACH SECEDES (BL-896; Ben, 2026-09-11, ruling
+    /// from four candidates -- succession, exhaustion and external shock were
+    /// all offered and none was chosen). A held region whose
+    /// `region::network_supply_q` has fallen to or below this floor is ground
+    /// the seat can no longer rule. Zero disables it.
+    ///
+    /// IT DOES NOT FALL TO WHOEVER CAN REACH IT, and that choice is the arc's
+    /// rather than a detail: ground lost to a neighbour CONCENTRATES the map
+    /// and works against everything this phase is for, while ground that
+    /// secedes becomes a SUCCESSOR -- a new polity holding real ground,
+    /// carrying its own people's culture. That is what `../generation/
+    /// CIVILISATION.md` sec What the dark age must leave asks the phase to hand
+    /// forward: nations of unequal strength, some able to colonise and some
+    /// only to be colonised.
+    ///
+    /// MECHANICAL, NEVER SCHEDULED. No collapse fires on a date or a counter.
+    /// A realm fragments because a specific region's supply fell under a floor,
+    /// for reasons a player could read off the map -- distance, terrain, a road
+    /// never built, a war that emptied the ground between.
+    ///
+    /// A SEPARATE FLOOR FROM THE OTHER TWO, and deliberately so. It is the
+    /// same 0-1000 reach currency `sustainable_garrison_floor_q` (an army on
+    /// this ground starts to waste) and `sustainable_settlement_floor_q` (its
+    /// towns stop growing) are read in, but it answers a third question: can
+    /// the SEAT still rule here. Callers site it where the arc they want puts
+    /// it; nothing in this file orders the three.
+    int secession_supply_floor_q = 0;
+
+    /// Smallest contiguous cut-off block that may secede. The BLOCK is the unit
+    /// (Ben left this open; resolved at build time): one region leaving alone
+    /// SHATTERS a realm into specks, while a cut-off block leaving together
+    /// SPLITS it -- and a split is what produces nations of unequal strength.
+    /// Raising this makes fragmentation rarer and the pieces larger.
+    int secession_min_regions = 2;
+
     /// A CREED'S APPETITE FOR WAR, LEANING THE CAMPAIGN SCORE (BL-868;
     /// CIVILISATION.md sec Armies come from creeds, and only some peoples raise
     /// them). Per-mille pull, applied proportionally and SYMMETRICALLY around a
@@ -1539,6 +1617,27 @@ struct history_sim_state
     int64_t materials_produced           = 0;
     int64_t materials_spent_on_campaigns = 0;
     int64_t materials_from_trade = 0; ///< BL-895: of `materials_produced`, the share the network yielded.
+
+    /// BL-895's TWO SINKS, as run totals on the same footing as
+    /// `materials_spent_on_campaigns`. Before they existed a campaign was the
+    /// only thing materials were ever spent on, so an income could not gate
+    /// anything; these two are what a realm's stock now competes for.
+    int64_t materials_spent_on_upkeep = 0; ///< Standing-army upkeep, all regions, all years.
+    int64_t materials_spent_on_roads  = 0; ///< Corridor promotions actually paid for.
+
+    /// Heads sent home because the seat could not pay them, and corridor
+    /// promotions REFUSED for the same reason. Both are the observable that
+    /// separates "the sinks are live" from "the sinks are biting".
+    int64_t army_heads_unpaid_disbanded = 0;
+    int64_t road_builds_refused         = 0;
+
+    /// BL-896 -- how many successor realms the dark age produced, and how much
+    /// ground walked away with them. The pair is the item's "done when": an
+    /// empire that forms and then fragments shows both non-zero, and a world
+    /// whose networks always held shows both zero without anything being
+    /// broken.
+    int64_t secessions      = 0;
+    int64_t regions_seceded = 0;
 
     /// BL-869 — every civilisation mixing actually grew, in formation order.
     /// A NAMED RECORD each (creeds.hpp), never a creed: `region::civilisation`

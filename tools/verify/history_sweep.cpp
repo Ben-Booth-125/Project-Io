@@ -187,6 +187,13 @@ struct sweep_row
     // not a diagnosis, so the whole funnel is surfaced.
     int64_t mat_trade         = 0; ///< BL-895: materials the network yielded.
     int64_t mat_total         = 0; ///< ...of this much produced in total.
+    int64_t mat_upkeep        = 0; ///< BL-895 sink 1: spent standing an army.
+    int64_t mat_roads         = 0; ///< BL-895 sink 2: spent widening corridors.
+    int64_t mat_campaigns     = 0; ///< BL-867: spent launching campaigns.
+    int64_t heads_unpaid      = 0; ///< Heads sent home unpaid.
+    int64_t roads_refused     = 0; ///< Corridor promotions refused for want of materials.
+    int64_t secessions        = 0; ///< BL-896: successor realms the dark age produced.
+    int64_t regions_seceded   = 0; ///< ...and the ground that walked away with them.
     int64_t reach_denied      = 0; ///< Refused by the BL-837 reach gate.
     int64_t campaign_contacts = 0; ///< (own region, foreign neighbour) pairs examined.
     int64_t campaign_scored   = 0; ///< Candidates reaching the score comparison.
@@ -457,6 +464,11 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     if (name == "settle_requires_razed_ground") { p.settle_requires_razed_ground = v != 0; return true; }
     if (name == "amphibious_weight_crossing")   { p.amphibious_weight_crossing = v != 0;   return true; }
     if (name == "trade_income_per_link")       { p.trade_income_per_link = v;            return true; }
+    if (name == "army_upkeep_per_1000_heads")  { p.army_upkeep_per_1000_heads = v;       return true; }
+    if (name == "unpaid_army_disband_q")       { p.unpaid_army_disband_q = v;            return true; }
+    if (name == "road_build_material_cost")    { p.road_build_material_cost = v;         return true; }
+    if (name == "secession_supply_floor_q")    { p.secession_supply_floor_q = v;         return true; }
+    if (name == "secession_min_regions")       { p.secession_min_regions = v;            return true; }
     if (name == "w_aggr_q")                   { p.w_aggr_q = v;                        return true; }
     return false;
 }
@@ -860,6 +872,13 @@ int main(int argc, char** argv)
         row.reach_denied      = sim.reach_denied_campaigns;
         row.mat_trade         = sim.materials_from_trade;
         row.mat_total         = sim.materials_produced;
+        row.mat_upkeep        = sim.materials_spent_on_upkeep;
+        row.mat_roads         = sim.materials_spent_on_roads;
+        row.mat_campaigns     = sim.materials_spent_on_campaigns;
+        row.heads_unpaid      = sim.army_heads_unpaid_disbanded;
+        row.roads_refused     = sim.road_builds_refused;
+        row.secessions        = sim.secessions;
+        row.regions_seceded   = sim.regions_seceded;
         row.campaign_contacts = sim.campaign_contacts;
         row.campaign_scored   = sim.campaign_scored;
         row.campaign_cleared  = sim.campaign_cleared;
@@ -1383,13 +1402,56 @@ int main(int argc, char** argv)
                 ill.push_back(r.illegal_campaigns); rch.push_back(r.reach_denied);
             }
             {
-            std::vector<int64_t> mt, mp;
-            for (const sweep_row& r : rows) { mt.push_back(r.mat_trade); mp.push_back(r.mat_total); }
+            std::vector<int64_t> mt, mp, mu, mr, mc, hu, rr;
+            for (const sweep_row& r : rows) {
+                mt.push_back(r.mat_trade);   mp.push_back(r.mat_total);
+                mu.push_back(r.mat_upkeep);  mr.push_back(r.mat_roads);
+                mc.push_back(r.mat_campaigns);
+                hu.push_back(r.heads_unpaid); rr.push_back(r.roads_refused);
+            }
             std::printf("\n--- BL-895  DID THE NETWORK ACTUALLY PAY? ---\n");
             std::printf("  materials from TRADE   median %lld per world\n", static_cast<long long>(median_of(mt)));
             std::printf("  materials produced     median %lld\n", static_cast<long long>(median_of(mp)));
             std::printf("  (A trade figure of ZERO means the mechanism never fired -- a wiring\n"
                         "   question, not a balance one. REPORTED, not gated.)\n");
+
+            // THE SINKS (BL-895, Ben's ruling 2026-09-11). The income half of
+            // this item could not gate anything while campaigns were the only
+            // thing materials were ever spent on, so what matters here is the
+            // SHARE of production the three sinks between them claim -- never
+            // any one of them read on its own.
+            {
+                const int64_t up = median_of(mu), rd = median_of(mr), cp = median_of(mc);
+                const int64_t prod = median_of(mp);
+                std::printf("\n--- BL-895  WHAT DID THE MATERIALS GO ON? ---\n");
+                std::printf("  spent on UPKEEP        median %lld per world\n", static_cast<long long>(up));
+                std::printf("  spent on ROADS         median %lld\n", static_cast<long long>(rd));
+                std::printf("  spent on CAMPAIGNS     median %lld\n", static_cast<long long>(cp));
+                std::printf("  all sinks / produced   %lld%% of %lld\n",
+                            static_cast<long long>(prod > 0 ? ((up + rd + cp) * 100) / prod : 0),
+                            static_cast<long long>(prod));
+                std::printf("  heads sent home UNPAID median %lld   (the strangling channel)\n",
+                            static_cast<long long>(median_of(hu)));
+                std::printf("  road builds REFUSED    median %lld   (poverty delays a road)\n",
+                            static_cast<long long>(median_of(rr)));
+            }
+
+            // BL-896 -- DID EMPIRES FRAGMENT, AND DID THE PIECES DIFFER?
+            // Ben's ruling: collapse is NETWORK FAILURE. Both numbers zero is
+            // a world whose networks always held -- a legitimate outcome and
+            // not a broken mechanism -- so this REPORTS and does not gate.
+            {
+                std::vector<int64_t> sc, rs;
+                for (const sweep_row& r : rows)
+                { sc.push_back(r.secessions); rs.push_back(r.regions_seceded); }
+                std::printf("\n--- BL-896  DID THE NETWORK FAILURE FRAGMENT ANYONE? ---\n");
+                std::printf("  SECESSIONS             median %lld per world\n",
+                            static_cast<long long>(median_of(sc)));
+                std::printf("  regions that walked    median %lld\n",
+                            static_cast<long long>(median_of(rs)));
+                std::printf("  (ZERO of both is a world whose realms never outran their\n"
+                            "   own reach. REPORTED, not gated.)\n");
+            }
         }
 
         std::printf("\n--- BL-889  WHY A CAMPAIGN DID NOT HAPPEN, BY REASON ---\n");
