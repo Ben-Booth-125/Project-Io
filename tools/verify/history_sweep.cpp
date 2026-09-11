@@ -202,6 +202,10 @@ struct sweep_row
     int64_t heads_unpaid      = 0; ///< Heads sent home unpaid.
     int64_t roads_refused     = 0; ///< Corridor promotions refused for want of materials.
     int64_t secessions        = 0; ///< BL-896: successor realms the dark age produced.
+    int64_t supply_sites_upgraded           = 0; ///< BL-929: supply sites bought outright.
+    int64_t supply_sites_upgraded_regions   = 0; ///< ...of which a region's own relief.
+    int64_t supply_sites_upgraded_corridors = 0; ///< ...of which a corridor's tier.
+    int64_t mat_supply_sites                = 0; ///< BL-929: materials spent buying them.
     int64_t events            = 0; ///< BL-916: typed events the record carries.
     int64_t events_ended      = 0; ///< ...of which realm_ended (the wizard's "destroyed").
     int64_t events_broke      = 0; ///< ...of which broke_away.
@@ -613,6 +617,10 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     if (name == "army_upkeep_per_1000_heads")  { p.army_upkeep_per_1000_heads = v;       return true; }
     if (name == "unpaid_army_disband_q")       { p.unpaid_army_disband_q = v;            return true; }
     if (name == "road_build_material_cost")    { p.road_build_material_cost = v;         return true; }
+    // BL-929: supply sites bought outright from the stockpile.
+    if (name == "supply_upgrade_material_cost") { p.supply_upgrade_material_cost = v;    return true; }
+    if (name == "supply_upgrade_reach_gain_q")  { p.supply_upgrade_reach_gain_q = v;     return true; }
+    if (name == "supply_upgrade_threshold_q")   { p.supply_upgrade_threshold_q = v;      return true; }
     if (name == "secession_supply_floor_q")    { p.secession_supply_floor_q = v;         return true; }
     if (name == "secession_min_regions")       { p.secession_min_regions = v;            return true; }
     // BL-897 -- a creed that spans cultures. The first is the master switch.
@@ -1104,6 +1112,10 @@ int main(int argc, char** argv)
         row.heads_unpaid      = sim.army_heads_unpaid_disbanded;
         row.roads_refused     = sim.road_builds_refused;
         row.secessions        = sim.secessions;
+        row.supply_sites_upgraded           = sim.supply_sites_upgraded;
+        row.supply_sites_upgraded_regions   = sim.supply_sites_upgraded_regions;
+        row.supply_sites_upgraded_corridors = sim.supply_sites_upgraded_corridors;
+        row.mat_supply_sites                = sim.materials_spent_on_supply_sites;
         // BL-916 — the event layer, counted per kind. `realm_ended` is the
         // wizard's "destroyed" figure, so it is the one worth printing beside
         // the sweep's own death count.
@@ -2235,6 +2247,61 @@ int main(int argc, char** argv)
                             static_cast<long long>(median_of(hu)));
                 std::printf("  road builds REFUSED    median %lld   (poverty delays a road)\n",
                             static_cast<long long>(median_of(rr)));
+            }
+
+            // BL-929 -- DID A REALM SPEND THE STOCKPILE ON REACH ITSELF?
+            // The verb's own "done when": upgrades and materials spent on
+            // them, reported beside the three sinks above (upkeep, roads,
+            // campaigns) so this is read as a FOURTH claim on production
+            // rather than in isolation. REPORTS, never gates -- zero here is
+            // a legitimate reading (no held region ever fell to the floor)
+            // and not by itself a defect.
+            {
+                std::vector<int64_t> su, sur, suc, ms;
+                for (const sweep_row& r : rows)
+                {
+                    su.push_back(r.supply_sites_upgraded);
+                    sur.push_back(r.supply_sites_upgraded_regions);
+                    suc.push_back(r.supply_sites_upgraded_corridors);
+                    ms.push_back(r.mat_supply_sites);
+                }
+                const int64_t prod = median_of(mp);
+                std::printf("\n--- BL-929  DID A REALM BUY REACH FROM THE STOCKPILE? ---\n");
+                std::printf("  supply sites UPGRADED  median %lld per world  (region %lld / corridor %lld)\n",
+                            static_cast<long long>(median_of(su)),
+                            static_cast<long long>(median_of(sur)),
+                            static_cast<long long>(median_of(suc)));
+                std::printf("  materials spent on them median %lld\n", static_cast<long long>(median_of(ms)));
+                std::printf("  as a share of produced  %lld%% of %lld\n",
+                            static_cast<long long>(prod > 0 ? (median_of(ms) * 100) / prod : 0),
+                            static_cast<long long>(prod));
+
+                // TRADE INCOME vs UPGRADE COUNT, ACROSS WORLDS -- the closest
+                // this sweep can come to the item's "realms with higher trade
+                // income upgrade more sites" before BL-925 lands trade across
+                // borders and a PER-POLITY figure exists to correlate against
+                // its OWN upgrade count. This correlates one WORLD's total
+                // trade yield against that same world's total upgrade count,
+                // which is a coarser claim -- a world is not a realm -- and is
+                // reported as such rather than dressed up as the per-realm
+                // reading the design actually asks for.
+                if (rows.size() >= 4)
+                {
+                    std::vector<std::pair<int64_t, int64_t>> by_trade; // (mat_trade, upgrades)
+                    for (const sweep_row& r : rows)
+                        by_trade.push_back({r.mat_trade, r.supply_sites_upgraded});
+                    std::sort(by_trade.begin(), by_trade.end());
+                    const std::size_t half = by_trade.size() / 2;
+                    std::vector<int64_t> lo, hi;
+                    for (std::size_t i = 0; i < by_trade.size(); ++i)
+                        (i < half ? lo : hi).push_back(by_trade[i].second);
+                    std::printf("  upgrades, LOW-trade half of worlds   median %lld\n",
+                                static_cast<long long>(median_of(lo)));
+                    std::printf("  upgrades, HIGH-trade half of worlds  median %lld\n",
+                                static_cast<long long>(median_of(hi)));
+                    std::printf("  (WORLD-level correlation only -- a world is not a realm; the true\n"
+                                "   per-realm reading wants BL-925's trade-across-borders figure.)\n");
+                }
             }
 
             // BL-899 -- DID SEA LEGS FEED ANY CROSSING AT ALL?

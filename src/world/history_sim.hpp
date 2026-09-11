@@ -1378,6 +1378,42 @@ struct history_sim_params
     /// over a run without paying for a full scan every round.
     int work_candidate_regions = 2;
 
+    // --- BL-929: SUPPLY SITES BOUGHT FROM THE STOCKPILE ---------------------
+    //
+    // CIVILISATION.md § What materials are FOR; Ben, 2026-09-11: "a polity
+    // should be able to upgrade supply sites spending our stockpiled
+    // 'industry points'". `build_work` already lets a region's reach relief
+    // rise as the incidental yield of `work_score_q`'s argmax, and a
+    // corridor already promotes a tier as the incidental yield of enough
+    // campaigns having walked it — BL-757 measured the first winning ZERO
+    // times across sixteen real generated worlds, and the second is
+    // triggered by USE, never by CHOICE. This verb is the deliberate
+    // spend neither of those is: a region's own relief or one incoming
+    // corridor's tier, bought outright from the capital's `material_stock`,
+    // offered wherever a held region's `network_supply_q` sits at or below
+    // `sustainable_settlement_floor_q` -- the SAME floor growth and
+    // secession already read, so "low" here means exactly what "too far
+    // out to grow" and "too far out to rule" already mean elsewhere in this
+    // file.
+    //
+    // Zero cost disables the WHOLE verb -- no candidate is ever offered --
+    // which keeps every existing fixture and golden unmoved, exactly as
+    // `road_build_material_cost == 0` disables road promotion's own cost.
+
+    /// Materials the capital spends on ONE supply-site upgrade, region or
+    /// corridor. The same price for both kinds: the choice between them is
+    /// which one buys more `network_supply_q`, not which one is cheaper.
+    int64_t supply_upgrade_material_cost = 0;
+
+    /// How far ONE region purchase raises `region::work_reach_mod`, still
+    /// clamped at `work_reach_relief_cap_q` by the same read every other
+    /// caller of that field already clamps against -- a region already at
+    /// the ceiling has nothing left to buy, so the scorer skips it.
+    int supply_upgrade_reach_gain_q = 0;
+
+    /// Minimum in the shared currency, like the other four verb thresholds.
+    int supply_upgrade_threshold_q = 0;
+
     // --- Materials and labour (BL-867) --------------------------------------
     // CIVILISATION.md § Materials are spent when something happens. Industry
     // accumulates at every seat for free (`region_industry_output`, no dial
@@ -1727,6 +1763,7 @@ enum class sim_verb : uint8_t
     invest,
     consolidate,
     build_work, ///< Raise an Era -1 work on a held region (BL-321).
+    upgrade_supply, ///< Buy reach directly at a region or a corridor (BL-929).
 };
 
 // ---------------------------------------------------------------------------
@@ -2243,6 +2280,18 @@ struct history_sim_state
     /// separates "the sinks are live" from "the sinks are biting".
     int64_t army_heads_unpaid_disbanded = 0;
     int64_t road_builds_refused         = 0;
+
+    /// BL-929 -- how many supply sites a realm bought outright, of which
+    /// kind, and what it cost. `_regions` is a region's own reach relief
+    /// bought directly; `_corridors` is one incoming edge's tier bought
+    /// outright rather than walked into existence. The split is the
+    /// observable that tells "the mechanism never wins the region case" from
+    /// "the mechanism never wins the corridor case", the same split
+    /// `works_by_span_band` exists to make for `build_work`.
+    int64_t supply_sites_upgraded           = 0;
+    int64_t supply_sites_upgraded_regions   = 0;
+    int64_t supply_sites_upgraded_corridors = 0;
+    int64_t materials_spent_on_supply_sites = 0;
 
     /// BL-896 -- how many successor realms the dark age produced, and how much
     /// ground walked away with them. The pair is the item's "done when": an
