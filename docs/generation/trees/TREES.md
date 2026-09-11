@@ -16,7 +16,7 @@
 
 **Four trees, one grammar.** Generation runs four simulated spans, and each has a technology
 tree of its own: **Colonisation** for the migration, **Empire** for the city states,
-**Globalisation** for the exploration age, **Industry** for digitisation. They are four trees and
+**Exploration** for the exploration age, **Industry** for digitisation. They are four trees and
 not four regions of one web (Ben, 2026-09-10,
 overturning the one-web reading of `../../research/ANCIENT_TECH_LADDER.md` § Geometry — the
 constellation, for the pre-game layer). What they share is everything in this document; what differs is in each tree's
@@ -31,7 +31,7 @@ unit roster's band boundary, the furnace crossing. Nothing new keys off a band.
 |---|---|---|---|---|
 | **Colonisation** | The migration, 2400 → 400 BCE (`../COLONISATION.md`) | None, by construction | **Carried** — a people acquires a node by time on ground that satisfies its gate, and a daughter inherits its parent's set at coining | `COLONISATION_TREE.md` · `colonisation_tree.json` |
 | **Empire** | The city states, 400 BCE → 1200 CE (`../CIVILISATION.md`) | Yes — the five scored verbs | **Invested** — the Invest verb takes one node a round, chosen by the tree's scorer | `EMPIRE_TREE.md` · `empire_tree.json` |
-| **Globalisation** | The exploration age, 1200 → 1660 CE (`../GLOBALISATION.md`) | Yes | **Invested**, the same verb; the first tree with a treasury to pay for a node | `GLOBALISATION_TREE.md` · `globalisation_tree.json` |
+| **Exploration** | The exploration age, 1200 → 1660 CE (`../EXPLORATION.md`) | Yes | **Invested**, the same verb; the first tree with a treasury to pay for a node | `EXPLORATION_TREE.md` · `exploration_tree.json` |
 | **Industry** | Digitisation, 1660 → 1960 (`../DIGITISATION.md`) | Yes | **Invested**, the same verb; capacity gates bind here as nowhere else | `INDUSTRY_TREE.md` · `industry_tree.json` |
 
 The Colonisation tree has no scorer because the migration has no actor and must never grow one.
@@ -116,10 +116,10 @@ needs — a people coined on one ground family holds one branch, and a milestone
 named branches would be unreachable for every people not coined on both; "any two of four" keeps
 rule 4's breadth without naming which breadth.
 
-**The last milestone unlocks the next tree.** The chain is Colonisation → Empire → Globalisation
-→ Industry (Ben, 2026-09-11: *"Globalisation and industry use different trees"*). A polity
-holding Empire's rim milestone at 1200 CE enters the **Globalisation** tree at its root the
-moment that phase opens; a polity holding Globalisation's rim at 1660 enters the Industry tree;
+**The last milestone unlocks the next tree.** The chain is Colonisation → Empire → Exploration
+→ Industry (Ben, 2026-09-11: *"Exploration and industry use different trees"*). A polity
+holding Empire's rim milestone at 1200 CE enters the **Exploration** tree at its root the
+moment that phase opens; a polity holding Exploration's rim at 1660 enters the Industry tree;
 a culture holding Colonisation's rim milestone at 400 BCE seeds a polity that starts the Empire
 tree at its root. A polity that never
 reached the rim starts the next tree **late**, at the root, once it holds the prior milestone —
@@ -253,7 +253,7 @@ is an assertion the sweep makes, not a number anyone picks.
 |---|---|---|---|---|---|
 | Colonisation | 3 | 4, one per origin farm class | 3 | ~28 | 64 |
 | Empire | 4 | 4 | 4 | ~48 | 64 |
-| Globalisation | 3 | 4 | 3 | ~34 | 64 |
+| Exploration | 3 | 4 | 3 | 31 | 64 |
 | Industry | 4 | 5 | 4 | ~60 | 64 |
 
 One milestone per ring follows from the spire's shape (one major and one milestone per ring); the
@@ -261,10 +261,16 @@ node targets follow from the branch × ring × (one major + one-and-a-half minor
 the spire. Where a tree comes in under target, that is a sparse branch doing what the ladder's
 sparse-sector rule was adopted for.
 
-**The Industry tree was sized to a 400-year span and now has 300** (`../DIGITISATION.md`).
-The row above states what it IS, not what the rule wants: by the sizing rule a 300-year phase
-asks for a shallower tree, and reconciling the two is a measurement against the sweep rather
-than a row anyone rewrites. The Globalisation row is a target, its tree being unauthored.
+**The Industry tree is oversized, and the cause is not arithmetic (2026-09-11).** Its span fell
+from 400 years to 300, but the real finding is that **its ring 1 is the exploration age** —
+*Full-Rigged Ship*, *Celestial Navigation*, *Chronometer*, *Joint-Stock & Public Credit*,
+*Chartered Capital*. Those subjects now have a tree of their own, and two of them duplicate
+`EXPLORATION_TREE.md` nodes outright.
+
+**So the shrink is a MIGRATION, not a trim, and it must not touch ring 4** — which carries
+electrification, oil, flight, broadcast and antibiotics, the things that make 1960 look like
+1960. Ring 1 moves out, every ring shifts down one, and Industry becomes 3 rings of ~44 nodes.
+`BL-938` owns it; the row above states what the tree IS until then.
 
 ---
 

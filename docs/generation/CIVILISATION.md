@@ -729,8 +729,8 @@ what **crosses**, in what form, and how the next phase **judges** it. Together t
 contract, and the contract is what makes a mechanism inside this phase judgeable at all: a force
 that moves no reading below is a force nobody asked for.
 
-**THE PHASE THAT FOLLOWS IS GLOBALISATION, AND THE COAST IS GONE (Ben, 2026-09-11).** That phase
-is `GLOBALISATION.md`'s, and the phase after it `DIGITISATION.md`'s. Pass 2 was
+**THE PHASE THAT FOLLOWS IS EXPLORATION, AND THE COAST IS GONE (Ben, 2026-09-11).** That phase
+is `EXPLORATION.md`'s, and the phase after it `DIGITISATION.md`'s. Pass 2 was
 one economy span, 1560 → 1960, with 1200 → 1560 left unsimulated. Splitting exploration from
 digitisation replaces both:
 
@@ -738,7 +738,7 @@ digitisation replaces both:
 |---|---|---|---|
 | **Culture** — the migration | 2400 BCE | 400 BCE | 2,000 |
 | **Empires** — this phase | 400 BCE | 1200 CE | 1,600 |
-| **Globalisation** | 1200 CE | 1660 CE | 460 |
+| **Exploration** | 1200 CE | 1660 CE | 460 |
 | **Digitisation** | 1660 CE | 1960 CE | 300 |
 
 **1960 is unmoved and 1200 is unmoved**, so this phase's own span (§ The span is 400 BCE to

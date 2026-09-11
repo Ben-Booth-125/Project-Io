@@ -69,8 +69,8 @@
     { "id": "EM-SP-4m", "name": "The Enforceable Promise", "kind": "milestone", "ring": 4, "branch": "SP",
       "links": [ "EM-SP-4a" ], "gate": null, "excludes": null,
       "requires": [ "EM-PE-4a", "EM-RD-4b" ],
-      "effects": [ { "kind": "open", "target": "globalisation tree" } ],
-      "pursued_when": { "term": "spire", "situation": "An entity that outlives its members can own, sue and be sued, and the realm is mapped. The rim: the Globalisation tree opens at 1200 CE." },
+      "effects": [ { "kind": "open", "target": "exploration tree" } ],
+      "pursued_when": { "term": "spire", "situation": "An entity that outlives its members can own, sue and be sued, and the realm is mapped. The rim: the Exploration tree opens at 1200 CE." },
       "earth_ref": "contract law reaches capital — the Charter Age apex" },
 
     { "id": "EM-RD-1a", "name": "Engineered Road Network", "kind": "major", "ring": 1, "branch": "RD",

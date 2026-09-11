@@ -188,16 +188,39 @@ SUPERSEDES the sprint-39 id sprint 38's own handoff previously reserved for 'the
 
 THE FIVE CALLS, TAKEN 2026-09-11 (Ben, form): city states spawn in regions above a threshold population, the number left to the builder's judgement (NR-835); force is a POOLED LEVY along the supplied network (NR-836); a breakdown produces CITY STATES, one per cut-off seat, reversing NR-826 call 2 (NR-837); supply is priced in the polity's CAPITAL, which is the strategic headquarters where every material gain is stockpiled (NR-838); the isolation split runs in the Culture round only (NR-839). Further detail the same message: a polity upgrades supply sites by spending its stockpile -- BL-929 filed. Traversal domain of supply (held ground only) taken on Ben's behalf and recorded on NR-838.
 
-### Sprint 40 — the new world
-*Open · opened 2026-09-10 · Claude (2026-09-10 sprint-assignment sweep)*
+### Sprint 40 — exploration
+*Open · opened 2026-09-11 · Ben (2026-09-11, Exploration design session); Claude (decomposed from EXPLORATION.md)*
 
-**Goal.** The exploration and colonisation phase that comes AFTER the Era -1 history: the unclaimed ground round 4 should leave behind, and what a player does with it. Ben, 2026-09-10, defining the live sprint map as 37 culture, 38 empire, 39 the new world.
+**Goal.** THE EXPLORATION AGE, 1200 -> 1660 CE: the simulated phase between the Empire closure and digitisation. Ben, 2026-09-11, naming its two jobs: "to stimulate international demand for goods, and strengthen the economic power of colonial actors." Its one structural claim is that conflict MOVES -- neighbour-war rate falls RELATIVE TO frontier-skirmish rate, with a fall in both counting as a failure. docs/generation/EXPLORATION.md is the authority.
 
-DEFINED 2026-09-10 (Ben). This sprint id was briefly used for the technology trees during a sprint-assignment sweep the same day; Ben redefined it as the new world and the six tree items (BL-881..886) were deleted outright rather than re-homed -- "we will look back at wiring tech later".
+**Planned.**
+- BL-930
+- BL-931
+- BL-932
+- BL-933
+- BL-934
+- BL-935
+- BL-936
+- BL-937
+- BL-938
 
-THE DEPENDENCY IS REAL AND RUNS THROUGH SPRINT 38. Whether there is a new world to find at all is decided by how much ground round 4 leaves unclaimed, which is exactly what BL-889 (conquest must compound) changes. Do not decompose this sprint before that lands.
+**Done when.** The span runs 1200 -> 1660 on the shared engine; the ten readings in EXPLORATION.md sec What the phase is judged on are instrumented and taken over a seed spread; the displacement ratio moves in the right direction with total conflict still well above zero; and both a consolidator and an expansionist appear among the strongest realms in a sweep, each traceable to its creed.
 
-RENUMBERED FROM 39 TO 40 (Ben, 2026-09-11): sprint 39 was reassigned to a lever-tuning sprint after sprint 38's Empire phase landed 'lively, perhaps too lively' -- battle/conquest/contact volumes read as high once the full 1,600-year span and the closure contract (BL-906/907/908/909/910/911/912) were all live in one sweep. This sprint's content (the new world / exploration phase) is unchanged, only its number moved.
+**Risk.** THE FROZEN MAP. Every mechanism in this phase damps conflict near home -- treaties, deterrence, the arms race -- and the obvious failure is to damp it everywhere and hand digitisation a world that stopped moving. CIVILISATION.md's handoff requires FRAGMENTATION, not peace. BL-937 exists to make that visible before any dial is touched, and it should land EARLY rather than last.
+
+SECOND RISK: the phase rewarding one strategy. EXPLORATION.md sec Two ways to be strong is the answer, and it rests on an untested claim -- that a creed's zeal, dominion and sea_legs_q actually separate consolidators from expansionists. If a sweep says they do not, the fix is upstream in the Empire phase, never a flag in this one.
+
+PREMISE CORRECTED 2026-09-11. This sprint was defined on 2026-09-10 as "the unclaimed ground round 4 should leave behind, and what a player does with it." THERE IS NO UNCLAIMED GROUND: CIVILISATION.md sec Contact is polity to polity settles that the migration fills every habitable landmass, so a far continent at 1200 CE is SETTLED AND UNMET. The new world is a world of strangers, not of vacancies, and what is discovered is PEOPLE. The dependency on BL-889 (conquest must compound) therefore does not gate this sprint the way the original note claimed.
+
+RENAMED FROM GLOBALISATION (Ben, 2026-09-11): "we will have to rename GLOBALISATION to EXPLORATION. It just fits better." It also removes a collision -- record_globalisation in src/world/creeds.cpp is the common-tongue event that closes generation, a different thing entirely, and CREEDS.md keeps that meaning untouched.
+
+FOUR RULINGS TAKEN THIS SESSION, all written into EXPLORATION.md. The treasury sits at the CAPITAL SEAT and is capturable, consolidated from the seats as the phase's visible opening act. The phase carries a SCARCITY SIGNAL per good per market, never a price; digitisation resolves prices. Goods move as ONE NUMBER PER CORRIDOR with no cargo object ever existing, and the fleet/caravan visual is a threshold filter on that number. Depletion is RETROFITTED as a stated formula at the end of digitisation, seeding the campaign's existing resource_remaining reserve.
+
+THE INDUSTRY TREE FINDING (BL-938) came out of authoring the Exploration tree and is the session's most consequential discovery: Industry's ring 1 is the exploration age and duplicates the new tree outright, while its ring 4 is the twentieth century and must survive. The shrink Ben asked for is a migration, not a trim.
+
+DEFINED 2026-09-10 (Ben). This sprint id was briefly used for the technology trees during a sprint-assignment sweep the same day; Ben redefined it as the new world and the six tree items (BL-881..886) were deleted outright rather than re-homed -- "we will look back at wiring tech later". That later is now: BL-930 authors the fourth tree.
+
+RENUMBERED FROM 39 TO 40 (Ben, 2026-09-11): sprint 39 was reassigned to a lever-tuning sprint after sprint 38's Empire work.
 
 ## Where things stand
 
@@ -261,7 +284,7 @@ RENUMBERED FROM 39 TO 40 (Ben, 2026-09-11): sprint 39 was reassigned to a lever-
 | 40 | three trees, one grammar | CLOSED 2026-09-10, the same day it opened, as a DESIGN sprint: the three trees, the grammar, the lint and the Empire scorer are written and linted; the six build items BL-881..BL-886 go to the pool. Ben: "I'm reluctant to push further when Empire and Industry have not landed yet" - the build waits on sprints 38 and 39. |
 | 38 | empire — the whole phase | 8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). REFRAMED 2026-09-10 on Ben's call (option B): the sprint no longer closes on BL-868's harness, but on a DISTRIBUTIONAL reading of history_sweep. The sweep was run and the reading is in: conflict is fixed, asymmetry and volatility are not. BL-889, BL-890, BL-891 and BL-892 were added to the sprint on that basis; BL-868 is now blocked on BL-889. |
 | 39 | the drama of the time-lapse | OPEN. Redefined 2026-09-11 (Ben) from "tighten the levers" to the DRAMA of generation: the political map is highly stable and empires never fragment back into city states, and the rounds render a computed record after the fact. Sixteen items filed off a holistic read of the generation layer (seven parallel readers, 67 stability claims adversarially checked); five design calls resolved on the form 2026-09-11 (NR-835..NR-839). Batch-delivered in one go. |
-| 40 | the new world | OPEN AND EMPTY BY DESIGN. The phase is named and reserved; no items are decomposed for it yet. Its first input is whatever round 4 leaves unpartitioned once sprint 38 settles how far empires actually spread. |
+| 40 | exploration | DESIGNED AND DECOMPOSED 2026-09-11. Nine items, BL-930..BL-938. The phase doc, the placeholder for digitisation, and a linting mock-up of the fourth technology tree all exist; nothing is built. BL-930 (exploration tree) and BL-931 (the span runs) gate the rest. |
 
 **Next up.** SPRINT 39 IS OPEN (redefined 2026-09-11) - the drama of the time-lapse. Sixteen items filed (BL-914..BL-929, BL-928 sprintless); the five calls (NR-835..NR-839) are resolved. Batch-deliver in one go: BL-926 first, then the independent wave, then the dependents, BL-923 last. Sprint 38 is closed for real (2026-09-11); sprint 40 (the new world) waits on what this sprint leaves unorganised.
 

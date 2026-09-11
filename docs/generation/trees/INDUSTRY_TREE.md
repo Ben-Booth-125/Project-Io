@@ -15,8 +15,8 @@
 
 The Industry tree is the last of the four trees `TREES.md` defines, and it runs inside
 **digitisation, 1660 → 1960** (`../DIGITISATION.md`) — not the whole economy pass. The pass split
-in two on 2026-09-11 and the exploration half took its own tree (`GLOBALISATION_TREE.md`), so
-this tree's root is gated behind **Globalisation's rim milestone**, never Empire's. It is
+in two on 2026-09-11 and the exploration half took its own tree (`EXPLORATION_TREE.md`), so
+this tree's root is gated behind **Exploration's rim milestone**, never Empire's. It is
 **invested**: the Era −1 sim's polities are the actors, and the Invest verb takes one node a
 round, chosen by the scorer.
 

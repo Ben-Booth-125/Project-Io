@@ -1,16 +1,16 @@
 # Project Io — Digitisation
 
-> **Settles:** what the fourth simulated span is for and where its boundary with Globalisation
+> **Settles:** what the fourth simulated span is for and where its boundary with Exploration
 > falls · which subjects belong to it and which were deliberately kept out.
-> **Not here:** the phase before it and everything it hands forward (GLOBALISATION) · the nodes of
+> **Not here:** the phase before it and everything it hands forward (EXPLORATION) · the nodes of
 > its technology tree (trees/INDUSTRY_TREE) · how a market clears and how a price resolves
 > (../economy/MARKETS) · how a corporation is placed, focused and financed at the epoch
 > (CORPORATION_GENERATION) · the pass map and the calendar (GENERATION_STRATEGY § Pass 2).
-> **Confused with:** GLOBALISATION.md, CORPORATION_GENERATION.md, ../economy/MARKETS.md.
+> **Confused with:** EXPLORATION.md, CORPORATION_GENERATION.md, ../economy/MARKETS.md.
 
 **THIS IS A PLACEHOLDER (Ben, 2026-09-11).** *"Add a placeholder for Digitisation, and we will
-work on the current Globalisation round."* What this document settles is the **boundary** — which
-subjects are Digitisation's rather than Globalisation's — so that the phase before it can be
+work on the current Exploration round."* What this document settles is the **boundary** — which
+subjects are Digitisation's rather than Exploration's — so that the phase before it can be
 designed without leaking into it. The mechanism is not designed and no section below claims to
 settle one.
 
@@ -24,25 +24,25 @@ the campaign opens on.
 ## The boundary
 
 **Ben, 2026-09-11, drawing it in one line:** *"Digitisation is exactly the round which generates
-companies as we know them in live play. Globalisation gives us cultural preference to goods,
+companies as we know them in live play. Exploration gives us cultural preference to goods,
 markets that trade named goods in a simplified form."*
 
-| Belongs to Globalisation | Belongs to Digitisation |
+| Belongs to Exploration | Belongs to Digitisation |
 |---|---|
 | Capital as a per-polity treasury | Capital as firm balance sheets |
 | Named goods, traded in simplified form | The price field, the order book, the market carve |
 | Cultural preference for a good | Demand resolved from population and preference |
 | Ports, navies, standing armies and their upkeep | Industrialisation and the furnace crossing |
 | Treaties, subjects, trade provinces | **Corporations as live-play actors** |
-| The Globalisation tree | The **Industry** tree, gated behind Globalisation's rim |
+| The Exploration tree | The **Industry** tree, gated behind Exploration's rim |
 | — | Tariff posture by 1960; national political character hardened |
 
 **The company is the reason the split exists.** A corporation is the object the campaign is played
 with (`../CONCEPT.md`), and generating one needs a chartering institution, a treasury behind it,
-and a market it can price against. Globalisation produces all three and charters none of them;
+and a market it can price against. Exploration produces all three and charters none of them;
 this phase is where the actor appears.
 
-**This phase inherits `GLOBALISATION.md` § What this phase hands digitisation and nothing else.**
+**This phase inherits `EXPLORATION.md` § What this phase hands digitisation and nothing else.**
 That list is the contract, in the same sense `CIVILISATION.md` § The closure of the Empire era is
 the contract before it: a struct, not a promise.
 

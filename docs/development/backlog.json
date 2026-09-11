@@ -37,61 +37,61 @@
   },
   {
    "glyph": "✓",
-   "sprint": null,
+   "sprint": 40,
    "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
    "blocked_on": null,
    "parked": false,
    "category": "Generation",
    "status": "designed",
    "id": "BL-930",
-   "short_name": "GLOBALISATION_TREE",
+   "short_name": "EXPLORATION_TREE",
    "priority": "A",
    "difficulty": 5,
-   "title": "The fourth tree: Globalisation, and the chain re-pointed off Industry",
-   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "title": "The fourth tree: Exploration, and the chain re-pointed off Industry",
+   "authority_doc": "docs/generation/EXPLORATION.md",
    "files": [
-    "docs/generation/trees/GLOBALISATION_TREE.md",
-    "docs/generation/trees/globalisation_tree.json",
+    "docs/generation/trees/EXPLORATION_TREE.md",
+    "docs/generation/trees/exploration_tree.json",
     "docs/generation/trees/TREES.md",
     "tools/session/tree_lint.js",
     "tools/session/gen_empire_tree_table.js",
     "src/world/history_sim.cpp"
    ],
-   "design": "BEN, 2026-09-11: \"Globalisation and industry use different trees.\" The chain becomes Colonisation -> Empire -> GLOBALISATION -> Industry.\n\nDONE IN THE DESIGN SESSION (prose and store strings only): EMPIRE_TREE.md and empire_tree.json now say the rim milestone The Enforceable Promise opens the GLOBALISATION tree; INDUSTRY_TREE.md says its root is gated behind Globalisation's rim and that it runs in digitisation 1660-1960; TREES.md carries four trees, the four-row phase table and the four-row size table. tree_lint.js passes on empire and industry unchanged.\n\nTHE WORK. Author GLOBALISATION_TREE.md and globalisation_tree.json to the TREES.md grammar - three rings, four branches, three milestones, ~34 nodes of the 64 cap (TREES.md sec Sizes, sized to 460 years). Branch concerns per GLOBALISATION.md sec The tree: hulls and crossings; the charter and the treasury; the port and the garrison; what a people does with a good it did not grow. At least one FORK, because GLOBALISATION.md sec The shape of the age depends on two rich polities ending the phase incapable of the same things. Teach tree_lint.js the new tree, and add the generator for its table if the empire generator does not generalise.\n\nPREREQUISITE FOR every other Globalisation item that reads a held node.",
+   "design": "BEN, 2026-09-11: \"Exploration and industry use different trees.\" The chain becomes Colonisation -> Empire -> EXPLORATION -> Industry.\n\nDONE IN THE DESIGN SESSION (prose and store strings only): EMPIRE_TREE.md and empire_tree.json now say the rim milestone The Enforceable Promise opens the EXPLORATION tree; INDUSTRY_TREE.md says its root is gated behind Exploration's rim and that it runs in digitisation 1660-1960; TREES.md carries four trees, the four-row phase table and the four-row size table. tree_lint.js passes on empire and industry unchanged.\n\nTHE WORK. Author EXPLORATION_TREE.md and exploration_tree.json to the TREES.md grammar - three rings, four branches, three milestones, ~34 nodes of the 64 cap (TREES.md sec Sizes, sized to 460 years). Branch concerns per EXPLORATION.md sec The tree: hulls and crossings; the charter and the treasury; the port and the garrison; what a people does with a good it did not grow. At least one FORK, because EXPLORATION.md sec The shape of the age depends on two rich polities ending the phase incapable of the same things. Teach tree_lint.js the new tree, and add the generator for its table if the empire generator does not generalise.\n\nPREREQUISITE FOR every other Exploration item that reads a held node.",
    "requires": []
   },
   {
    "glyph": "✓",
-   "sprint": null,
+   "sprint": 40,
    "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
    "blocked_on": null,
    "parked": false,
    "category": "Generation",
    "status": "designed",
    "id": "BL-931",
-   "short_name": "GLOBALISATION_PHASE_RUNS",
+   "short_name": "EXPLORATION_PHASE_RUNS",
    "priority": "A",
    "difficulty": 5,
-   "title": "The Globalisation span runs: 1200 to 1660, on the shared engine, with an upkeep step",
-   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "title": "The Exploration span runs: 1200 to 1660, on the shared engine, with an upkeep step",
+   "authority_doc": "docs/generation/EXPLORATION.md",
    "files": [
     "src/world/history_sim.cpp",
     "src/world/history_sim.hpp",
     "src/world/hard_coded_world.cpp",
     "docs/generation/GENERATION_STRATEGY.md"
    ],
-   "design": "BEN, 2026-09-11: \"Let's use the same engine - if needs be we can revise this later.\"\n\nTHE SPAN. 1200 -> 1660 CE, 460 years, opening the instant the Empire pass closes. The 1200 -> 1560 coast is RETIRED (GENERATION_STRATEGY.md sec Pass 2 now records the supersession). Pass 1's 3600 years and the 1960 epoch are both unmoved.\n\nTHE ENGINE. history_sim over the same region and polity tables, taking pass_one_output as its input and nothing else. Two honest additions, both named in GLOBALISATION.md sec The engine is shared: a ROUND-LEVEL UPKEEP STEP (earn, pay stocks, invest) because every other item depends on a recurring bill, and OBJECTS WITH A TERM, because treaties expire and nothing in the Empire phase does.\n\nTHE VERBS. Settle, Invest, Consolidate and Campaign carry over unchanged; what the phase adds is what a treasury makes purchasable, scored on the one shape (TREES.md sec The scorer).\n\nNOT IN SCOPE: a second simulator, and any change to the Empire span's rules.",
+   "design": "BEN, 2026-09-11: \"Let's use the same engine - if needs be we can revise this later.\"\n\nTHE SPAN. 1200 -> 1660 CE, 460 years, opening the instant the Empire pass closes. The 1200 -> 1560 coast is RETIRED (GENERATION_STRATEGY.md sec Pass 2 now records the supersession). Pass 1's 3600 years and the 1960 epoch are both unmoved.\n\nTHE ENGINE. history_sim over the same region and polity tables, taking pass_one_output as its input and nothing else. Two honest additions, both named in EXPLORATION.md sec The engine is shared: a ROUND-LEVEL UPKEEP STEP (earn, pay stocks, invest) because every other item depends on a recurring bill, and OBJECTS WITH A TERM, because treaties expire and nothing in the Empire phase does.\n\nTHE VERBS. Settle, Invest, Consolidate and Campaign carry over unchanged; what the phase adds is what a treasury makes purchasable, scored on the one shape (TREES.md sec The scorer).\n\nNOT IN SCOPE: a second simulator, and any change to the Empire span's rules.",
    "requires": [
     "BL-930"
    ]
   },
   {
    "glyph": "✓",
-   "sprint": null,
+   "sprint": 40,
    "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
    "blocked_on": null,
    "parked": false,
    "category": "Generation",
@@ -101,21 +101,21 @@
    "priority": "A",
    "difficulty": 4,
    "title": "Capital arrives as one treasury scalar per polity, earned and spent",
-   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "authority_doc": "docs/generation/EXPLORATION.md",
    "files": [
     "src/world/history_sim.hpp",
     "src/world/history_sim.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-11, elicitation): capital in this phase is a PER-POLITY TREASURY SCALAR - not valued regional stores, not a per-good ledger.\n\nThis is where CIVILISATION.md's deferral lands: that doc says resources become capital in pass 2 and not in the Empire phase, and Globalisation is pass 2's first half. The Empire span stays priceless.\n\nFED BY what the polity already holds and reaches - endowment on held ground, the inherited surviving_corridors network, the markets standing on its seats (has_market), and colony tribute. Nothing tops it up: a polity that inherited little is poor, which is the asymmetry the 1200 CE handoff exists to produce.\n\nNO MARKET CLEARS. Price discovery, order books and the price field are Digitisation's. What this phase has is a quantity of capital and a set of things to buy.\n\nOPEN, AND A MEASUREMENT NOT A GUESS: the arithmetic of the four income terms. Set it from a sweep that produces both rich and poor survivors, never from a number picked to make one seed solvent (GLOBALISATION.md sec Open questions).",
+   "design": "SETTLED (Ben, 2026-09-11, elicitation): capital in this phase is a PER-POLITY TREASURY SCALAR - not valued regional stores, not a per-good ledger.\n\nThis is where CIVILISATION.md's deferral lands: that doc says resources become capital in pass 2 and not in the Empire phase, and Exploration is pass 2's first half. The Empire span stays priceless.\n\nFED BY what the polity already holds and reaches - endowment on held ground, the inherited surviving_corridors network, the markets standing on its seats (has_market), and colony tribute. Nothing tops it up: a polity that inherited little is poor, which is the asymmetry the 1200 CE handoff exists to produce.\n\nNO MARKET CLEARS. Price discovery, order books and the price field are Digitisation's. What this phase has is a quantity of capital and a set of things to buy.\n\nOPEN, AND A MEASUREMENT NOT A GUESS: the arithmetic of the four income terms. Set it from a sweep that produces both rich and poor survivors, never from a number picked to make one seed solvent (EXPLORATION.md sec Open questions).",
    "requires": [
     "BL-931"
    ]
   },
   {
    "glyph": "✓",
-   "sprint": null,
+   "sprint": 40,
    "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
    "blocked_on": null,
    "parked": false,
    "category": "Generation",
@@ -125,12 +125,12 @@
    "priority": "A",
    "difficulty": 6,
    "title": "Treaties: a bound pair with an end date, and five clause kinds",
-   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "authority_doc": "docs/generation/EXPLORATION.md",
    "files": [
     "src/world/history_sim.hpp",
     "src/world/history_sim.cpp"
    ],
-   "design": "BEN, 2026-09-11: \"We should move away from the rapid claim and grudge system. We should be creating lengthy treaties and pushing slowly towards gaining territory.\"\n\nTHIS OVERTURNS CIVILISATION.md's THIRD EXCLUSION, FORWARD ONLY. That doc's sec Fear of being next declines treaties, negotiation and alliance objects - correctly, for Empires, and nothing here relaxes it backwards. Globalisation has real treaty objects; Empires still does not.\n\nTHE SHAPE. Same family as grudge and contact - a named pair plus what joined them - with two additions: it EXPIRES (a term of years) and it BINDS rather than records.\n\nFIVE CLAUSE KINDS, all five settled by Ben 2026-09-11: non-aggression for a term; trade access to a market; a sphere of claim over unclaimed ground; tribute from subject to overlord; mutual defence.\n\nNOBODY NEGOTIATES. A treaty forms when both parties independently score the binding as worth more than the freedom it costs, against the same seeded state - which keeps determinism and keeps a bargaining layer out.\n\nBREAKING ONE IS LEGAL AND COSTLY. Defection writes into the EXISTING grudge table, and the cost lands on every other party's willingness to bind with the defector. Nothing reads the defector's own ledger to pick a target - that is revenge and stays declined.\n\nOPEN: where the formation threshold sits. Too low and the map freezes; too high and the conflict displacement never happens. Same discipline as the opposition bar.",
+   "design": "BEN, 2026-09-11: \"We should move away from the rapid claim and grudge system. We should be creating lengthy treaties and pushing slowly towards gaining territory.\"\n\nTHIS OVERTURNS CIVILISATION.md's THIRD EXCLUSION, FORWARD ONLY. That doc's sec Fear of being next declines treaties, negotiation and alliance objects - correctly, for Empires, and nothing here relaxes it backwards. Exploration has real treaty objects; Empires still does not.\n\nTHE SHAPE. Same family as grudge and contact - a named pair plus what joined them - with two additions: it EXPIRES (a term of years) and it BINDS rather than records.\n\nFIVE CLAUSE KINDS, all five settled by Ben 2026-09-11: non-aggression for a term; trade access to a market; a sphere of claim over unclaimed ground; tribute from subject to overlord; mutual defence.\n\nNOBODY NEGOTIATES. A treaty forms when both parties independently score the binding as worth more than the freedom it costs, against the same seeded state - which keeps determinism and keeps a bargaining layer out.\n\nBREAKING ONE IS LEGAL AND COSTLY. Defection writes into the EXISTING grudge table, and the cost lands on every other party's willingness to bind with the defector. Nothing reads the defector's own ledger to pick a target - that is revenge and stays declined.\n\nOPEN: where the formation threshold sits. Too low and the map freezes; too high and the conflict displacement never happens. Same discipline as the opposition bar.",
    "requires": [
     "BL-931",
     "BL-932"
@@ -138,9 +138,9 @@
   },
   {
    "glyph": "✓",
-   "sprint": null,
+   "sprint": 40,
    "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
    "blocked_on": null,
    "parked": false,
    "category": "Generation",
@@ -150,7 +150,7 @@
    "priority": "A",
    "difficulty": 6,
    "title": "A colony is a live polity with an overlord link, and it wants things of its own",
-   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "authority_doc": "docs/generation/EXPLORATION.md",
    "files": [
     "src/world/history_sim.hpp",
     "src/world/history_sim.cpp"
@@ -163,9 +163,9 @@
   },
   {
    "glyph": "✓",
-   "sprint": null,
+   "sprint": 40,
    "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
    "blocked_on": null,
    "parked": false,
    "category": "Generation",
@@ -175,7 +175,7 @@
    "priority": "A",
    "difficulty": 5,
    "title": "Ports, navies and standing armies: built from capital, and they decay",
-   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "authority_doc": "docs/generation/EXPLORATION.md",
    "files": [
     "src/world/history_sim.hpp",
     "src/world/history_sim.cpp",
@@ -189,9 +189,9 @@
   },
   {
    "glyph": "✓",
-   "sprint": null,
+   "sprint": 40,
    "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
    "blocked_on": null,
    "parked": false,
    "category": "Generation",
@@ -201,39 +201,66 @@
    "priority": "B",
    "difficulty": 4,
    "title": "A good is wanted differently by different peoples, and the difference is traceable to route",
-   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "authority_doc": "docs/generation/EXPLORATION.md",
    "files": [
     "src/world/history_sim.hpp",
     "src/world/history_sim.cpp"
    ],
-   "design": "BEN, 2026-09-11: Globalisation \"gives us cultural preference to goods, markets that trade named goods in a simplified form.\"\n\nPREFERENCE ATTACHES TO A CULTURE, NOT A POLITY. Cultures already cross borders as shares on every region, so a preference carried by culture spreads with people and survives conquest - which makes a market's demand a fact about who LIVES there rather than who RULES there.\n\nDERIVED, NEVER ROLLED (the standing rule: consequences, not dice). It follows from what the culture's ground never held and what its route exposed it to - the same two inputs derive_wants already uses, read at culture grain instead of polity grain. A people that walked past a good and never held it pays most for it.\n\nIT WEIGHTS A WANT, IT DOES NOT SET A PRICE. The want table is directed and unpriced; preference makes some directed wants stronger, which is enough to rank where a fleet goes first. Turning a weight into a price is Digitisation's.\n\nOPEN: how preference interacts with assimilation - whether an absorbed culture's preferences blend, persist or lapse is unowned.",
+   "design": "BEN, 2026-09-11: Exploration \"gives us cultural preference to goods, markets that trade named goods in a simplified form.\"\n\nPREFERENCE ATTACHES TO A CULTURE, NOT A POLITY. Cultures already cross borders as shares on every region, so a preference carried by culture spreads with people and survives conquest - which makes a market's demand a fact about who LIVES there rather than who RULES there.\n\nDERIVED, NEVER ROLLED (the standing rule: consequences, not dice). It follows from what the culture's ground never held and what its route exposed it to - the same two inputs derive_wants already uses, read at culture grain instead of polity grain. A people that walked past a good and never held it pays most for it.\n\nIT WEIGHTS A WANT, IT DOES NOT SET A PRICE. The want table is directed and unpriced; preference makes some directed wants stronger, which is enough to rank where a fleet goes first. Turning a weight into a price is Digitisation's.\n\nOPEN: how preference interacts with assimilation - whether an absorbed culture's preferences blend, persist or lapse is unowned.",
    "requires": [
     "BL-931"
    ]
   },
   {
    "glyph": "✓",
-   "sprint": null,
+   "sprint": 40,
    "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
    "blocked_on": null,
    "parked": false,
    "category": "Generation",
    "status": "designed",
    "id": "BL-937",
-   "short_name": "GLOBALISATION_SWEEP_READINGS",
+   "short_name": "EXPLORATION_SWEEP_READINGS",
    "priority": "A",
    "difficulty": 4,
-   "title": "Instrument the seven Globalisation readings, taken at 1660 over a seed spread",
-   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "title": "Instrument the seven Exploration readings, taken at 1660 over a seed spread",
+   "authority_doc": "docs/generation/EXPLORATION.md",
    "files": [
     "tools/verify/history_sweep.cpp",
     "src/world/history_sim.cpp"
    ],
-   "design": "GLOBALISATION.md sec What the phase is judged on names seven readings, all taken at 1660 CE and all over a SEED SPREAD, never per world. Without them no mechanism in this phase is judgeable, exactly as the 1200 CE contract made the Empire phase judgeable.\n\nTHE SEVEN. Displacement: neighbour-war rate FALLS across the span while frontier-skirmish rate RISES - the phase's one structural claim, and the reading that can falsify it. Treaty depth: treaties standing at 1660 with years still to run, not a churn of one-round bindings. Colonial asymmetry: some polities hold subjects, most hold none, at least one subject under a distant overlord. Subject friction: at least one subject's wants point where its overlord's do not. Fleets: navies exist unevenly, and at least one built one and let it decay. Treasury spread: wide, and correlated with the inherited corridor network rather than with size alone. Preference: goods wanted differently by different cultures, traceable to route.\n\nA READING IS A REQUIREMENT, NOT A TARGET. A seed that refuses one is a legitimate world; a SPREAD that refuses one is a phase that did not do its job. No number is set ahead of the measured spread.\n\nBUILD THIS EARLY. BL-905/BL-906 showed the Empire span's instrumentation was what turned a guessed constant into a measured one; the same applies here before any Globalisation dial moves.",
+   "design": "EXPLORATION.md sec What the phase is judged on names seven readings, all taken at 1660 CE and all over a SEED SPREAD, never per world. Without them no mechanism in this phase is judgeable, exactly as the 1200 CE contract made the Empire phase judgeable.\n\nTHE SEVEN. Displacement: neighbour-war rate FALLS across the span while frontier-skirmish rate RISES - the phase's one structural claim, and the reading that can falsify it. Treaty depth: treaties standing at 1660 with years still to run, not a churn of one-round bindings. Colonial asymmetry: some polities hold subjects, most hold none, at least one subject under a distant overlord. Subject friction: at least one subject's wants point where its overlord's do not. Fleets: navies exist unevenly, and at least one built one and let it decay. Treasury spread: wide, and correlated with the inherited corridor network rather than with size alone. Preference: goods wanted differently by different cultures, traceable to route.\n\nA READING IS A REQUIREMENT, NOT A TARGET. A seed that refuses one is a legitimate world; a SPREAD that refuses one is a phase that did not do its job. No number is set ahead of the measured spread.\n\nBUILD THIS EARLY. BL-905/BL-906 showed the Empire span's instrumentation was what turned a guessed constant into a measured one; the same applies here before any Exploration dial moves.",
    "requires": [
     "BL-931"
    ]
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 40,
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, \"we should shrink the industry tree\"); Claude (found the cause while building the Exploration tree)",
+   "requires": [
+    "BL-930"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-938",
+   "short_name": "INDUSTRY_TREE_RING_ONE_MIGRATES",
+   "priority": "A",
+   "difficulty": 5,
+   "title": "Industry's ring 1 is the exploration age: migrate it out and shift every ring down",
+   "authority_doc": "docs/generation/trees/INDUSTRY_TREE.md",
+   "files": [
+    "docs/generation/trees/INDUSTRY_TREE.md",
+    "docs/generation/trees/industry_tree.json",
+    "docs/generation/trees/EXPLORATION_TREE.md",
+    "docs/generation/trees/exploration_tree.json",
+    "docs/generation/trees/TREES.md"
+   ],
+   "design": "BEN, 2026-09-11: \"we should shrink the industry tree\" (resolving NR-844, which reported it oversized after the span fell 400 -> 300 years).\n\nTHE NAIVE SHRINK IS WRONG AND MUST NOT BE DONE. Dropping the outer ring is the obvious cut and it removes RING 4: Electrification, Internal Combustion & Oil, Flight, Automotive Transport, Broadcast, Antibiotics & Mass Vaccination, Synthetic Chemistry, Fixed-Nitrogen Synthesis, Tractor & Fertiliser. That is the twentieth century, and the campaign epoch is 1960. Ring 4 stays.\n\nTHE REAL FINDING: RING 1 IS THE EXPLORATION AGE. Measured 2026-09-11 while authoring EXPLORATION_TREE.md. Ring 1 holds Full-Rigged Ship, Celestial Navigation, Chronometer, Joint-Stock & Public Credit, Chartered Capital, Movable-Type Press, Crop-Package Exchange. Those are 1200-1660 subjects, and they sat in the Industry tree only because no Exploration tree existed to hold them. TWO ARE OUTRIGHT DUPLICATES of nodes now authored: IN-MV-1b Full-Rigged Ship and IN-MV-1c Celestial Navigation against EX-HL-2a Ocean Carrack and EX-HL-3a Oceanic Navigation; IN-CH-1b/IN-CH-1d against EX-SP-2a The Chartered Company.\n\nTHE WORK. Ring 1 (18 nodes) migrates out: some subjects are already covered by the Exploration tree and are simply dropped, others may earn a place in it. Rings 2/3/4 shift down to 1/2/3. Industry becomes 3 rings, 5 branches, 3 milestones, ~44 nodes -- which is also the proportional target (62 x 300/400 = 46), reached by MEANING rather than by arithmetic, which is why it is believable.\n\nEVERY NODE ID CHANGES, because an id carries its ring. That is the bulk of the work and it is mechanical: renumber, rewrite links/requires/excludes, rewrite the doc's tables, re-run tree_lint.js industry. THE RIM MILESTONE'S MEANING IS UNCHANGED -- it still opens nothing and ends the chain; only its id moves.\n\nWATCH FOR: rule 4 breakage. Each milestone requires majors at ITS OWN ring from two branches; after a shift the old ring-2 milestone's requires are still ring-2 ids that are now ring 1, so they travel together, but any milestone whose requires named a ring-1 major that got DROPPED needs a new requirement. The lint catches this; do not hand-wave it.\n\nDONE WHEN: tree_lint.js passes on both industry and exploration, no subject appears in both trees, ring 4's contents survive as ring 3, and TREES.md's size row states the new shape."
   }
  ]
 }

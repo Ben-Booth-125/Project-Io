@@ -1,35 +1,37 @@
-# Project Io — Globalisation
+# Project Io — Exploration
 
-> **Settles:** what the exploration age is for and which question it answers · what capital is
-> in a phase that has one for the first time · what a treaty is as data and what it binds · what
-> a colony is and why it wants things of its own · how ports, navies and standing armies are
-> paid for and how they decay · how a good acquires a cultural preference · why conflict moves
-> away from the home coast and out to the frontier · what the phase hands digitisation.
+> **Settles:** what the exploration age is for and which question it answers · where the treasury
+> sits and what it buys · why this phase carries a scarcity signal and never a price · how goods
+> move without a cargo ever existing · what a treaty is as data and what it binds · what a colony
+> is and why it wants things of its own · how ports, navies and standing armies are paid for and
+> how they decay · how an arms race buys quiet at home and opportunity abroad · the two ways to
+> be strong and how a creed decides which · how a good acquires a cultural preference · what the
+> phase hands digitisation.
 > **Not here:** what crosses into it from the Empire phase (CIVILISATION § The closure of the
 > Empire era) · the nodes of its technology tree and the grammar every tree obeys
-> (trees/GLOBALISATION_TREE, trees/TREES) · the phase after it (DIGITISATION) · how a market
+> (trees/EXPLORATION_TREE, trees/TREES) · the phase after it (DIGITISATION) · how a market
 > clears once there is a price (../economy/MARKETS) · the campaign-era money loop
 > (../economy/FINANCE) · the pass map and the calendar (GENERATION_STRATEGY § Pass 2).
 > **Confused with:** CIVILISATION.md, COLONISATION.md, DIGITISATION.md,
 > ../economy/MARKETS.md.
 
-**Globalisation is the third simulated span and the first with a price on anything.** It runs
+**Exploration is the third simulated span and the first with a price on anything.** It runs
 **1200 → 1660 CE, 460 years**, opening the instant the Empire phase closes — the 1200 → 1560
 coast is retired (`GENERATION_STRATEGY.md` § Pass 2). Where Empires asks *who holds this ground*,
-Globalisation asks *who wants what someone else holds, and what they will do about it*.
+Exploration asks *who wants what someone else holds, and what they will do about it*.
 
 **Ben, 2026-09-11, naming the phase's two jobs:** *"to stimulate international demand for goods,
 and strengthen the economic power of colonial actors."* Every mechanism below exists to move one
 of those two, and a mechanism that moves neither has no business here.
 
-**The name is Globalisation** (Ben, 2026-09-11). *Exploration* describes what the age looks like
+**The name is Exploration** (Ben, 2026-09-11). *Exploration* describes what the age looks like
 and is not a term; the phase, its tree and its store all carry the one name.
 
 ---
 
 ## The shape of the age, and why it is not Empires again
 
-**Empires is a phase of fear and adjacency; Globalisation is a phase of appetite and distance.**
+**Empires is a phase of fear and adjacency; Exploration is a phase of appetite and distance.**
 The Empire phase's engine is a neighbour who might come for you, and its verbs resolve against
 ground you can walk to. That engine produced the world this one starts on, and running it again
 for another 460 years would produce more of the same world.
@@ -51,32 +53,79 @@ is what creates them. The actor's scorer is untouched; the world around it chang
 
 ---
 
-## Capital arrives, as one number per polity
+## Capital arrives, and it sits in the capital
 
-**SETTLED (Ben, 2026-09-11): capital is a per-polity TREASURY SCALAR.** Not valued regional
-stores, not a per-good ledger. One integer per polity, in the sim's usual 0–1000-style quantised
-currency, earned and spent.
+**SETTLED (Ben, 2026-09-11): the treasury sits AT THE CAPITAL SEAT, one per polity.** Not a heap
+on every region, and not a free-floating per-polity number with no place on the map.
 
-**This is where `CIVILISATION.md`'s deferral lands.** That phase abstracts natural resources into
-what conquest consumes and says explicitly that *resources become capital in pass 2, not here*.
-Globalisation is pass 2's first half, so the promise is kept exactly here and the Empire phase
-stays priceless.
+**This keeps the one property the Empire phase's stores were built for.**
+`CIVILISATION.md` § Materials are spent when something happens puts stores at the seat precisely
+so that *"a conqueror who takes the seat takes the stores standing in it"*. A treasury with no
+location would discard that in the phase that needs it most — a fleet that sacks a capital must
+take something real, or a distant war is a gesture.
 
-**Why one scalar rather than a valued map.** A treasury is the smallest object that can express
-the three things this phase needs to price — a port that must be built, a fleet that must be kept,
-and a treaty that must be worth more than a war. A regional-stores model would price all three
-*and* re-open who-may-spend-what, which is a logistics question this phase does not ask. When
-Digitisation needs balance sheets it will build them on firms, not by retrofitting this.
+**Consolidating the seats into the capital is the phase's OPENING ACT, and it is visible.**
+Ben, 2026-09-11: *"We can just consolidate all stores of material into the polity level as the
+initial part of Exploration... it doesn't bother me if we introduce major centralisation as an
+initial step."* At 1200 CE every seat's stores flow to the capital, once. That centralisation is
+a thing the time-lapse can show, and it is the moment a realm stops being a set of provisioned
+cities and starts being a state with a purse.
+
+**Why one number rather than a valued map.** A treasury is the smallest object that can price the
+three things this phase buys — a port, a fleet, and a binding worth more than a war. A regional
+model would price all three *and* re-open who-may-spend-what, which is a logistics question this
+phase does not ask.
 
 **The treasury is a consequence, never an allowance.** It is fed by what the polity already holds
-and already reaches — endowment on held ground, the surviving corridor network it inherited, the
-markets standing on its seats, and what its colonies remit. Nothing tops it up; a polity that
+and already reaches — endowment on held ground, the inherited `surviving_corridors` network, the
+markets standing on its seats, and what its subjects remit. Nothing tops it up: a polity that
 inherited little is poor, which is the asymmetry the handoff exists to produce.
 
-**No market clears in this phase, and the treasury does not need one.** Goods are named and their
-preference is legible (§ A good acquires a cultural preference); price discovery, order books and
-the price field are Digitisation's (`../economy/MARKETS.md`). What this phase has is a quantity
-of capital and a set of things it can buy.
+---
+
+## There is no price here, only a scarcity signal
+
+**SETTLED (Ben, 2026-09-11): this phase carries a SCARCITY SIGNAL, not a price.** One integer per
+good per market — how badly this market wants this good — with no clearing, no order book and no
+firm. Digitisation resolves signals into prices; this phase only says what is wanted and how much.
+
+**This is what keeps `CIVILISATION.md`'s boundary from drifting.** That doc's markets at the close
+are *a place and a visible condition, not an order book*, and a price in this phase would quietly
+build the economy layer two phases early. The signal is the smallest thing that carries the
+information forward without becoming a market.
+
+**The signal is the DEMAND half, and it is not sufficient on its own** — § Goods move as
+throughput, never as cargo owns the other half.
+
+---
+
+## Goods move as throughput, never as cargo
+
+**SETTLED (Ben, 2026-09-11): no per-good routing.** Nothing paths a cargo, nothing owns a cargo,
+and no convoy is an object. `GENERATION_STRATEGY.md` records that the Empire pass already pays a
+full Dijkstra per polity per round against a region count that grows *inside* the run; routing
+goods on top of that multiplies the known hot spot across another 460 years.
+
+**What moves instead is ONE NUMBER PER CORRIDOR.** The sim already derives
+`region::network_supply_q` — 0–1000, terrain-weighted reach from the capital over held ground,
+discounted by a road and relayed by a town. That is throughput in everything but name, and the
+flow this phase needs is that quantity read along the `surviving_corridors` graph it already
+walks.
+
+**Scarcity says what is wanted; throughput says how much arrives.** Neither alone is enough. A
+want with no throughput is an appetite that never resolves, and throughput with no want is traffic
+with no reason. The pair is what makes a trade route a consequence rather than a drawing.
+
+**The road ladder gets its third rung here.** The Empire sim promotes a corridor by use — a Track
+at four uses, a Road above it, and no tier beyond. A phase about throughput is where the next rung
+belongs, bought with capital rather than earned by traffic, which is Ben's *"upgrade of roads"*.
+
+**THE VISUAL IS A FILTER ON THAT NUMBER, NOT A SECOND SIMULATION (Ben, 2026-09-11).** *"We also
+want to visualise fleets and caravans moving, this can be heavily abstracted since the pace of our
+time-lapse is too fast, so we will just render examples when a threshold supply is reached."* A
+corridor whose throughput crosses a threshold draws an exemplar — one caravan, one sail — and the
+exemplar stands for the flow rather than depicting it. Because the flow is already a corridor
+number, this costs a comparison.
 
 ---
 
@@ -89,7 +138,7 @@ layer, and nothing here relaxes it backwards.
 
 **Ben, 2026-09-11, overturning it FORWARD:** *"we should move away from the rapid claim and grudge
 system. We should be creating lengthy treaties and pushing slowly towards gaining territory."* So
-Globalisation has real treaty objects, and Empires still does not. The two phases sharing an
+Exploration has real treaty objects, and Empires still does not. The two phases sharing an
 engine (§ The engine is shared) does not make them share a diplomatic model.
 
 ### What a treaty is
@@ -206,7 +255,7 @@ conflict, expressed in the only currency the phase has.
 
 ## A good acquires a cultural preference
 
-**Ben, 2026-09-11: Globalisation "gives us cultural preference to goods."** A good is not equally
+**Ben, 2026-09-11: Exploration "gives us cultural preference to goods."** A good is not equally
 wanted everywhere, and which people wants which good is the difference between a trade map and a
 distance map.
 
@@ -227,10 +276,72 @@ into a price is Digitisation's job.
 
 ---
 
+## The arms race reinforces peace near home and conflict far from it
+
+**Ben, 2026-09-11:** *"military arms races which serve to reinforce peace near to home, and
+conflict far from home."*
+
+**This is deterrence, and the project already has its shape.** `../economy/ERAS.md` § The two
+scalars carries a per-nation **Ceiling** (restraint) against a per-nation **Alarm** (how
+threatened this nation feels by others' *visible* capability), with the explicit discipline that
+neither is a new world object. The same pair, at polity grain, is what makes a standing army a
+deterrent rather than merely an expense.
+
+**Visible capability is the whole mechanism.** A fleet and a standing army are read by neighbours,
+and a neighbour that reads them binds a treaty rather than tests them. The same fleet, pointed at
+ground whose holder has none, meets no deterrent at all — so one purchase buys quiet at home and
+opportunity abroad, which is exactly the displacement the phase claims.
+
+**AND IT MUST NOT PRODUCE CALM (Ben, 2026-09-11, agreeing the reading is a RATIO).** The Empire
+phase runs continuous conflict to 1200, and the obvious failure of this phase is to damp it
+everywhere and hand Digitisation a frozen map. `CIVILISATION.md`'s handoff requires
+**fragmentation**, not peace. So the reading is neighbour-war rate *against* frontier-skirmish
+rate, and a fall in both is a failure, not a success (§ What the phase is judged on).
+
+---
+
+## Two ways to be strong, and the creed decides which
+
+**THE PROBLEM, NAMED BY ITS AUTHOR (Ben, 2026-09-11):** *"so much of this is my euro-centric view
+as an author, I want to consider how we can also strengthen larger empires which do not have an
+interest in colonization / spreading faith."*
+
+**A phase that only rewards crossing water has built an author's bias into its scoreboard.** The
+seven readings would measure colonies and fleets, a continental realm would have no way to succeed
+at the phase, and the world would converge on one strategy — which is the flat map
+`GENERATION_STRATEGY.md` § Asymmetry is the deliverable exists to prevent.
+
+**So there are TWO strategies, and both must pay.**
+
+| | **Expansion** | **Consolidation** |
+|---|---|---|
+| What it buys | Ports, hulls, subjects, trade provinces | The road ladder, dense internal throughput, its own ground worked harder |
+| What it wants | Goods it lacks, from strangers | Reach and yield it already owns |
+| How it grows | Outward, across water, toward people | Inward, absorbing neighbours and their peoples |
+| How it fails | Outruns its network, subjects refuse renewal | Stagnates; nothing new enters, and the frontier passes it by |
+
+**NEITHER IS A FLAG, AND NEITHER IS CHOSEN (Ben, 2026-09-11):** *"Ideally we can let candidates
+work on either consolidation or expansion depending on their historical creed."* The disposition
+is **derived from what already happened to these people**, which is the standing requirement for
+any force in this project.
+
+**The material is already recorded, and nothing new needs inventing.** A pantheon's gods carry
+`zeal` — how much a god relishes battle — and `dominion` — how surely it expects to prevail
+(`../lore/CREEDS.md`). And `sea_legs_q` is earned from three deeds: a coastal cradle, a crossing
+in the migration, and a sea or storm god. **High dominion with no sea legs is the continental
+consolidator**, already derivable; deep sea legs with a universalising creed is the coloniser.
+
+**If the mapping turns out not to separate them, the fix is upstream, not here** (Ben, 2026-09-11:
+*"if we have to force this outcome, then we should be looking back at the Empire phase to ensure
+creeds map well to our phase"*). Forcing a disposition the creeds do not support would be a term
+inside an actor, and that stays declined.
+
+---
+
 ## The engine is shared
 
 **SETTLED (Ben, 2026-09-11): "let's use the same engine — if needs be we can revise this later."**
-Globalisation runs on `history_sim`, over the same region table, the same polity table and the
+Exploration runs on `history_sim`, over the same region table, the same polity table and the
 same round loop. It is not a second simulator.
 
 **Two things the shared engine does not already have, and both are honest additions rather than
@@ -251,12 +362,12 @@ open; forking it pre-emptively is not.
 
 ## The tree
 
-**The Globalisation tree is the third of four** (`trees/TREES.md`), and its existence is Ben's
-ruling of 2026-09-11: *"Globalisation and industry use different trees."* The chain is
-Colonisation → Empire → **Globalisation** → Industry.
+**The Exploration tree is the third of four** (`trees/TREES.md`), and its existence is Ben's
+ruling of 2026-09-11: *"Exploration and industry use different trees."* The chain is
+Colonisation → Empire → **Exploration** → Industry.
 
 **The Empire tree's rim milestone — *The Enforceable Promise* — opens THIS tree**, not the
-Industry tree, and the Industry tree's root is gated behind Globalisation's own rim. That is the
+Industry tree, and the Industry tree's root is gated behind Exploration's own rim. That is the
 whole structural consequence of the ruling, and it is why a 1960 spread is now manufactured across
 two intervening trees rather than one.
 
@@ -265,7 +376,7 @@ correspondingly shallower — three rings, four branches, three milestones (`tre
 § Sizes). Its concerns are the phase's: hulls and crossings, the charter and the treasury,
 the port and the garrison, and what a people does with a good it did not grow.
 
-Its nodes, its forks and its scorer terms are `trees/GLOBALISATION_TREE.md`'s.
+Its nodes, its forks and its scorer terms are `trees/EXPLORATION_TREE.md`'s.
 
 ---
 
@@ -277,13 +388,20 @@ Empire handoff.
 
 | Reading | What it must show |
 |---|---|
-| **Displacement** | Neighbour-war rate falls across the span; frontier-skirmish rate rises |
+| **Displacement — A RATIO** | Neighbour-war rate falls *relative to* frontier-skirmish rate. **A fall in BOTH is a failure**, not a success |
+| **Conflict persists** | Total conflict at 1660 is lower than Empires' but not near zero; a frozen map fails the handoff as surely as a hegemon does |
+| **Both strategies pay** | Consolidators and expansionists both present among the strongest realms, and each traceable to its creed |
 | **Treaty depth** | Treaties standing at 1660 with years still to run, not a churn of one-round bindings |
 | **Colonial asymmetry** | Some polities hold subjects, most hold none, and at least one subject sits under a distant overlord |
 | **Subject friction** | At least one subject's wants point somewhere its overlord's do not |
 | **Fleets** | Navies exist, unevenly, and at least one polity that built one let it decay |
 | **Treasury spread** | Wide, and correlated with the inherited corridor network rather than with size alone |
+| **Throughput** | Corridors carrying materially different volumes, with the road ladder visible in the difference |
 | **Preference** | Goods wanted differently by different cultures, with the difference traceable to route |
+
+**THE FIRST TWO ARE ONE TEST AND MUST BE READ TOGETHER.** Displacement alone can be satisfied by a
+world that simply stopped fighting, which is the failure mode Ben named on 2026-09-11 and the
+reason the ratio replaced the original one-way reading.
 
 **A reading is a requirement, not a target.** A seed that refuses one is a legitimate world; a
 *spread* that refuses one is a phase that did not do its job.
@@ -294,13 +412,39 @@ Empire handoff.
 
 `DIGITISATION.md` owns what happens next; this is the list, and nothing else crosses.
 
-- **Treasuries**, per polity — the capital that firms will be chartered against.
+**Ben, 2026-09-11, on what that phase needs it for:** *"the aim of digitisation is to spawn our
+saturated web of companies and corporations... the main levers we pass are going to be about how
+much of easily accessible resource has been actually spent, and what prices different goods have,
+and what preference different cultures develop for these goods."*
+
+- **Treasuries**, one per polity at its capital — the capital a firm will be chartered against.
+- **Scarcity signals**, per good per market — what Digitisation resolves into prices. Not prices.
+- **Corridor throughput** — which lines carry volume, and at which rung of the road ladder.
+- **Cultural good preference** — the demand shape a price field resolves against.
 - **The overlord graph** — who holds whom, and on what tribute terms.
 - **Standing treaties and their remaining terms** — the diplomatic position 1660 opens on.
 - **Ports, navies and standing armies**, at whatever level upkeep left them.
-- **Cultural good preference** — the demand shape a price field will resolve against.
 - **The contact and want tables**, grown: a world that has met itself, mostly.
-- **Globalisation tree masks** — who enters the Industry tree early and who enters late.
+- **Exploration tree masks** — who enters the Industry tree early and who enters late.
+
+### Spend is estimated at the end, not accumulated throughout
+
+**SETTLED (Ben, 2026-09-11): depletion is RETROFITTED.** *"I would prefer if we retrofit this, and
+come to a sensible estimate at the very end of digitisation. For generation you are right in that
+keeping items abstract is best policy."*
+
+**Where it lands is already built.** The campaign's `tile_component::resource_remaining` is a
+finite reserve, drawn down by extraction and tapering output as it empties, **seeded at
+generation** to richness × a factor. So spend does not need a new accumulator anywhere in the
+history sim — the two economy phases set that seed instead of a constant, and ground worked for
+centuries hands the campaign a thinner reserve.
+
+**THE PRICE OF RETROFITTING, STATED.** An estimate computed once at 1960 can never be *checked*
+against what actually happened, because nothing recorded it. That makes it a **stated formula**
+rather than a measurement, and the formula must be written down as one — named inputs, named
+arithmetic — or it becomes a fudge factor nobody can audit. Its inputs are the abstract ones the
+sim already holds: how long ground was held and worked, its dominant class, and the throughput
+that ran off it.
 
 ---
 
@@ -318,5 +462,13 @@ Empire handoff.
   preferences somewhere; whether they blend, persist or lapse is unowned.
 - **Whether the 460-year span is enough rounds** for a tree, a treasury and a fleet to all turn
   over believably. A measurement owed before any constant is tuned.
-- **Whether Globalisation should also raise the Digitisation-era world war** (Ben, 2026-09-11:
+- **The depletion formula itself** — which abstract inputs, and what arithmetic. It is a stated
+  formula by construction (§ Spend is estimated at the end), so writing it down IS the work; an
+  unwritten estimate is the failure mode.
+- **Where the deterrence pair's thresholds sit.** The arms race borrows ERAS.md's Ceiling/Alarm
+  shape at polity grain; what makes a neighbour bind rather than test is unmeasured.
+- **Whether the creed axes actually separate consolidators from expansionists.** § Two ways to be
+  strong argues they should, from `zeal`, `dominion` and `sea_legs_q`. If a sweep shows they do
+  not, the fix is upstream in the Empire phase, never a flag here.
+- **Whether Exploration should also raise the Digitisation-era world war** (Ben, 2026-09-11:
   on the fence, deferred). If it does, its cause is built here and fires there.
