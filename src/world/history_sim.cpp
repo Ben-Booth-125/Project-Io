@@ -1764,6 +1764,47 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             0, 1000);
             };
 
+            // ---- BL-899: sea legs — the ration a crossing lands on ---------
+            //
+            // A REDUCED RATION, SCALED BY HOW SEAFARING THE STAGING REGION'S
+            // PEOPLE ARE (docs/lore/CREEDS.md § Sea legs). Returns per-mille of
+            // the ordinary foraged supply, or 0 where the crossing starves as
+            // it does today. Read at the SUPPLY calculation by BOTH the scorer
+            // and execute — the file's own thesis is that the estimate and the
+            // outcome must ask the identical question.
+            //
+            // SHARE-WEIGHTED OVER THE REGION'S PEOPLE, not read off the
+            // plurality: the ground is mixed and the tradition is carried by
+            // whoever actually lives there, so a region half-settled by a
+            // seafaring people lands on half the ration. The slots are a
+            // fixed-order array, so the sum is order-independent by
+            // construction.
+            //
+            // THREE CONDITIONS, ALL INDEPENDENT: the people carry sea legs
+            // above the floor, the staging ground touches water, and the realm
+            // can field a naval row at its band. The last is NOT merged into
+            // the others — sea legs feed a force that has landed; they never
+            // put it on the water.
+            const auto sea_legs_ration = [&](int hub) -> int {
+                if (params.sea_legs_ration_q <= 0 || hub < 0 || cs == nullptr)
+                    return 0;
+                const region& h = ss.regions[static_cast<std::size_t>(hub)];
+                if (h.port_q < params.sea_legs_port_q) return 0;
+                if (!can_field_naval(h, mil_band)) return 0;
+                int weighted = 0;
+                for (int si = 0; si < culture_share_slots; ++si)
+                {
+                    const int cid = static_cast<int>(h.culture.id[si]);
+                    if (cid < 0 || cid >= static_cast<int>(cs->cultures.size())) continue;
+                    weighted += static_cast<int>(h.culture.weight_q[si])
+                              * clampi(cs->cultures[static_cast<std::size_t>(cid)].sea_legs_q,
+                                       0, 1000);
+                }
+                const int legs = clampi(weighted / 1000, 0, 1000);
+                if (legs < params.sea_legs_floor_q) return 0;
+                return clampi((params.sea_legs_ration_q * legs) / 1000, 0, 1000);
+            };
+
             // ---- BL-778 / BL-779: the water gate on a campaign edge -------
             //
             // TWO QUESTIONS, ASKED OF ONE EDGE, and they are deliberately
@@ -2031,8 +2072,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // own — zero supply takes the full attrition hit, which is
                     // the pressure the rule is for (MILITARY_HISTORY.md
                     // § Forage). No new constant: it is the same 0..1000.
+                    // BL-899 — and a crossing that cannot forage may still land
+                    // on the reduced ration its people's creed earned. Same
+                    // `campaign_supply`, scaled; never a bonus added on top.
+                    const int sl_ration = forages ? 0 : sea_legs_ration(hi);
                     const int supply_here =
-                        forages ? campaign_supply(hub_dist, ti, hi) : 0;
+                        forages ? campaign_supply(hub_dist, ti, hi)
+                                : (sl_ration > 0
+                                       ? (campaign_supply(hub_dist, ti, hi) * sl_ration) / 1000
+                                       : 0);
 
                     // BL-837 — REACH GATES A CAMPAIGN; IT DOES NOT MERELY
                     // PRICE IT (Ben, 2026-09-09 elicitation). Everything
@@ -2565,9 +2613,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // outcome ask the identical question.
                 const bool exec_dry     = dry_contact(src, ti);
                 const bool exec_forages = exec_dry || tgt_shore;
-                const int atk_supply = exec_forages ? campaign_supply(src_d, ti, src) : 0;
+                // BL-899 — SEA LEGS, asked of the staging holding execute
+                // actually chose, by the identical lambda the scorer used.
+                const int exec_ration = exec_forages ? 0 : sea_legs_ration(src);
+                const int atk_supply =
+                    exec_forages ? campaign_supply(src_d, ti, src)
+                                 : (exec_ration > 0
+                                        ? (campaign_supply(src_d, ti, src) * exec_ration) / 1000
+                                        : 0);
                 const int def_supply = 1000;
-                if (!exec_forages) ++out.starved_campaigns;
+                if (!exec_forages)
+                {
+                    // One or the other, never both: a crossing is fed on the
+                    // reduced ration or it starves as it did before.
+                    if (exec_ration > 0) ++out.sea_legs_fed_campaigns;
+                    else                 ++out.starved_campaigns;
+                }
 
                 // BL-768 — THE SUPPLY CORRIDOR, recorded where it is priced.
                 // `src` is the staging holding the army victualled from and

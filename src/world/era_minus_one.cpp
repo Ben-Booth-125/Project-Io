@@ -61,6 +61,23 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // the round the rule was designed for.
     hp.amphibious_weight_crossing = true;
 
+    // BL-899: SEA LEGS -- the reduced ration a crossing lands on
+    // (docs/lore/CREEDS.md, Sea legs). BL-893 above opened LEGALITY and changed
+    // no outcome, because a wet crossing forages on nothing and so loses every
+    // verb contest on supply. These three switch on the ration that makes some
+    // crossings survivable without making any of them free.
+    //
+    // 900: a creed at FULL sea legs lands at nine tenths of what it would have
+    // foraged -- nearly fed, never better fed than it would be on dry ground.
+    // 300: the floor a people's creed must clear before it is fed at all, so a
+    // landlocked people with a token storm god still starves. 300: the port_q a
+    // staging region must reach, which is a real port rather than a puddle.
+    // Placeholder magnitudes on the same footing as the w_* weights -- the
+    // SHAPE is Ben's ruling, the numbers are history_sweep's to argue.
+    hp.sea_legs_ration_q = 900;
+    hp.sea_legs_floor_q  = 300;
+    hp.sea_legs_port_q   = 300;
+
     // BL-895: the network pays for war. Materials per year per roaded link
     // between held regions that hold unlike ground. A placeholder magnitude on
     // the same footing as the w_* weights -- the SHAPE is the ruling, the

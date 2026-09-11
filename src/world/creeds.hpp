@@ -67,6 +67,39 @@ struct culture
     /// no longer sets the nation count — `record_cultural_contact` does.
     int aggression_q = 0;
 
+    /// 0-1000 — how readily this people can FEED a force it has put across
+    /// water (BL-899; docs/lore/CREEDS.md § Sea legs). Read at the Era -1 sim's
+    /// SUPPLY calculation, never added to a campaign score: it is a property of
+    /// the people standing on the staging ground, not a term inside an actor.
+    ///
+    /// EARNED FROM FACTS, NEVER ROLLED, and derived in exactly the place and
+    /// exactly the manner `aggression_q` is — one line off the finished
+    /// pantheon, in `build_creeds`, with no RNG of its own. Two of the three
+    /// upstream facts CREEDS.md names are reachable here:
+    ///
+    ///   - A COASTAL CRADLE — `agrarian_cradle::coastal`, the same fact that
+    ///     decides whether this pantheon raises a sea god at all. It is the
+    ///     larger share, because beginning on the water is what puts boats in a
+    ///     people's hands before anybody asks them to fight from one.
+    ///   - A SEA OR STORM GOD — read through `culture_god::domain`, the same
+    ///     channel `aggression_q` reads the war god through. Zeal weighs twice
+    ///     dominion, as it does there: how hard a people throws itself at the
+    ///     water matters more than how sure it is of winning.
+    ///
+    /// THE THIRD FACT — a crossing in the people's own migration — DID NOT
+    /// SURVIVE THE HANDOFF. `colonisation.cpp`'s crude overseas hop knows it
+    /// coined a daughter on the far side of water, but `culture_spawn` records
+    /// only (culture, parent, tile, class, year), so nothing that reaches this
+    /// struct can distinguish a daughter that hopped from one that walked.
+    /// Rather than invent a third fact, this derives on the two that survived;
+    /// adding a `crossed_water` flag to `culture_spawn` is the repair, and it
+    /// belongs to whoever is next in `colonisation.cpp`.
+    ///
+    /// A daughter inherits its parent's pantheon and cradle whole
+    /// (`derive_daughter_culture`), so it inherits this unchanged — which is
+    /// right: it is the same people, later and further away.
+    int sea_legs_q = 0;
+
     // --- Descent (BL-865) --------------------------------------------------
     //
     // WHAT THIS IS FOR, and it is the empire phase rather than this one.

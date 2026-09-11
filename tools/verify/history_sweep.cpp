@@ -181,6 +181,7 @@ struct sweep_row
     /// combat is the design (docs/generation/MILITARY_HISTORY.md § Naval).
     int64_t illegal_campaigns = 0; ///< Refused on traversal legality (BL-778).
     int64_t starved_campaigns = 0; ///< Fought at zero supply, could not forage.
+    int64_t sea_legs_fed      = 0; ///< BL-899: crossings fed on the reduced ration.
     // --- BL-889: WHY a campaign did not happen, by reason ------------------
     // The sim already counts every one of these; the sweep reported two of
     // them. 812,424 refusals across 16 worlds with a single named reason is
@@ -463,6 +464,10 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     // migration-era one without deriving generation's whole param set.
     if (name == "settle_requires_razed_ground") { p.settle_requires_razed_ground = v != 0; return true; }
     if (name == "amphibious_weight_crossing")   { p.amphibious_weight_crossing = v != 0;   return true; }
+    // BL-899: sea legs. The ration, the creed floor, and the port gate.
+    if (name == "sea_legs_ration_q")           { p.sea_legs_ration_q = v;                return true; }
+    if (name == "sea_legs_floor_q")            { p.sea_legs_floor_q = v;                 return true; }
+    if (name == "sea_legs_port_q")             { p.sea_legs_port_q = v;                  return true; }
     if (name == "trade_income_per_link")       { p.trade_income_per_link = v;            return true; }
     if (name == "army_upkeep_per_1000_heads")  { p.army_upkeep_per_1000_heads = v;       return true; }
     if (name == "unpaid_army_disband_q")       { p.unpaid_army_disband_q = v;            return true; }
@@ -869,6 +874,7 @@ int main(int argc, char** argv)
         row.conquests     = sim.conquests;
         row.illegal_campaigns = sim.illegal_campaigns;
         row.starved_campaigns = sim.starved_campaigns;
+        row.sea_legs_fed      = sim.sea_legs_fed_campaigns;
         row.reach_denied      = sim.reach_denied_campaigns;
         row.mat_trade         = sim.materials_from_trade;
         row.mat_total         = sim.materials_produced;
@@ -1434,6 +1440,34 @@ int main(int argc, char** argv)
                             static_cast<long long>(median_of(hu)));
                 std::printf("  road builds REFUSED    median %lld   (poverty delays a road)\n",
                             static_cast<long long>(median_of(rr)));
+            }
+
+            // BL-899 -- DID SEA LEGS FEED ANY CROSSING AT ALL?
+            // The question BL-893 could not answer about itself: it opened
+            // LEGALITY and changed no outcome. FED at zero with STARVED above
+            // zero means the mechanism is wired but nobody clears the creed
+            // floor or holds the port; both at zero means no crossing was ever
+            // launched, which is a geography answer and not a balance one.
+            // REPORTS, never gates.
+            {
+                std::vector<int64_t> sl, st;
+                for (const sweep_row& r : rows)
+                { sl.push_back(r.sea_legs_fed); st.push_back(r.starved_campaigns); }
+                int64_t sl_tot = 0, st_tot = 0;
+                for (const sweep_row& r : rows)
+                { sl_tot += r.sea_legs_fed; st_tot += r.starved_campaigns; }
+                std::printf("\n--- BL-899  DID SEA LEGS FEED ANY CROSSING? ---\n");
+                std::printf("  crossings FED on ration median %lld per world  (total %lld)\n",
+                            static_cast<long long>(median_of(sl)),
+                            static_cast<long long>(sl_tot));
+                std::printf("  crossings that STARVED   median %lld            (total %lld)\n",
+                            static_cast<long long>(median_of(st)),
+                            static_cast<long long>(st_tot));
+                std::printf("  fed share of crossings   %lld%%\n",
+                            static_cast<long long>((sl_tot + st_tot) > 0
+                                                   ? (sl_tot * 100) / (sl_tot + st_tot) : 0));
+                std::printf("  (SOME peoples cross fed and MOST do not is the design. A 100%%\n"
+                            "   share means the floor is too low. REPORTED, not gated.)\n");
             }
 
             // BL-896 -- DID EMPIRES FRAGMENT, AND DID THE PIECES DIFFER?

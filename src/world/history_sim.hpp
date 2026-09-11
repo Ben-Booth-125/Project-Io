@@ -746,6 +746,58 @@ struct history_sim_params
     /// fixture changes meaning.
     bool amphibious_weight_crossing = false;
 
+    /// SEA LEGS: THE REDUCED RATION A CROSSING LANDS ON (BL-899; Ben,
+    /// 2026-09-11 — docs/lore/CREEDS.md § Sea legs). Per-mille of the supply an
+    /// ordinary foraging force would have drawn, awarded at FULL sea legs; the
+    /// ration actually paid is this scaled by the staging region's own
+    /// `sea_legs_q`, so a creed with deep sea legs lands nearly fed and one
+    /// with shallow sea legs lands hungry but alive.
+    ///
+    /// WHY A SCALED RATION AND NOT FORAGE. BL-893 opened the water gate on
+    /// weight and changed no outcome, because `forages` is `dry || shore` and a
+    /// weight crossing is neither -- so every crossing fought at zero supply and
+    /// lost the verb contest. Restoring full forage is the wrong repair: it
+    /// makes coastal ground CHEAPER to take than inland ground, inverting the
+    /// intent (see `amphibious_weight_crossing` above, which says the same). A
+    /// flat allowance is wrong for a different reason -- it is a switch where
+    /// the design asks for a spectrum a player can read.
+    ///
+    /// NOT A TERM INSIDE AN ACTOR. This is read at the SUPPLY calculation, by
+    /// both the scorer and execute, off the ground and the people standing on
+    /// it. Nothing is added to a campaign's score.
+    ///
+    /// Zero by default -- the whole mechanism is off, and no existing fixture
+    /// changes meaning. Generation's Empires round sets it
+    /// (`era_minus_one.cpp`).
+    int sea_legs_ration_q = 0;
+
+    /// The sea legs a staging region's people must carry before the ration is
+    /// paid at all, 0-1000 (BL-899).
+    ///
+    /// "NONE STILL STARVES" is the design's third rung and this is what makes
+    /// it true rather than asymptotic. Without a floor, a landlocked people
+    /// with a token storm god would land on a thin-but-nonzero ration, and the
+    /// ordinary case -- a creed with no tradition of the water trying a
+    /// crossing -- would stop being refused-or-beaten exactly as it is today.
+    int sea_legs_floor_q = 0;
+
+    /// The `region::port_q` a staging region must reach for its people to use
+    /// the sea legs they earned, 0-1000 (BL-899).
+    ///
+    /// THE POLITY HOLDS IT, BUT ONLY FROM A PORT (CREEDS.md § Sea legs). A
+    /// realm that inherits a seafaring people and holds no water cannot use
+    /// what it inherited, and that is the second of the two conditions the
+    /// design requires at the crossing -- the first being that the people on
+    /// the staging ground carry the tradition in the first place.
+    ///
+    /// This is NOT the naval test and does not replace it: a crossing still
+    /// requires `can_field_naval` at the polity's military band, because the
+    /// two answer different questions (can this realm put hulls on the water /
+    /// can these people feed a force once it lands). Keeping them independent
+    /// is what stops an ancient people out-raiding a realm that has actually
+    /// reached the naval rung.
+    int sea_legs_port_q = 0;
+
     /// TRADE INCOME FROM THE NETWORK (BL-895; Ben, 2026-09-11: "we also need a
     /// simple cost for war, and this cost can be sourced by rich trade").
     /// Materials yielded per YEAR by each roaded link between two held regions
@@ -1523,6 +1575,17 @@ struct history_sim_state
     /// (MILITARY_HISTORY.md § Forage) — it reached ground adjacent to neither
     /// land nor water its own polity holds. A subset of `stalled_campaigns`.
     int64_t starved_campaigns = 0;
+
+    /// Campaigns that could NOT forage and were fed anyway, on the reduced
+    /// ration their staging region's creed earned (BL-899; CREEDS.md § Sea
+    /// legs). Disjoint from `starved_campaigns`: a crossing is one or the
+    /// other, and the pair together is every launched crossing.
+    ///
+    /// REPORT, NEVER A GATE. Its whole job is to answer "did the mechanism fire
+    /// at all", which is the question BL-893 could not answer about itself --
+    /// it opened legality, changed no outcome, and nothing counted the
+    /// difference.
+    int64_t sea_legs_fed_campaigns = 0;
 
     // --- BL-837: ancient roads and the reach GATE ---------------------------
 

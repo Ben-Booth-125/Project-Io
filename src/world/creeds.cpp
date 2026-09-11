@@ -205,6 +205,28 @@ creed_state run_creeds(const planetology_state& pl,
         const culture_god& war_g = cu.pantheon[1];
         cu.aggression_q = clampi(war_g.zeal * 70 + chief.zeal * 20 + war_g.dominion * 10, 0, 1000);
 
+        // SEA LEGS (BL-899; docs/lore/CREEDS.md § Sea legs) — derived HERE, off
+        // the finished pantheon, for the same reason `aggression_q` is: it is a
+        // consequence of what happened to these people, never a roll. Two facts
+        // (the third did not survive the migration handoff — see creeds.hpp):
+        // the cradle stood on the water, and the pantheon seats a god of it.
+        // The strongest sea/storm seat is taken rather than the first, so a
+        // people with both a sea chief and a storm god reads off whichever they
+        // actually feared most; the scan is over a fixed-order vector, so it is
+        // deterministic. Zeal weighs twice dominion, as above.
+        int sea_zeal = 0, sea_dom = 0;
+        for (const culture_god& g : cu.pantheon)
+        {
+            if (g.domain != std::string("the sea") && g.domain != std::string("the storm"))
+                continue;
+            if (g.zeal * 10 + g.dominion > sea_zeal * 10 + sea_dom)
+            {
+                sea_zeal = g.zeal;
+                sea_dom  = g.dominion;
+            }
+        }
+        cu.sea_legs_q = clampi((c.coastal ? 400 : 0) + sea_zeal * 40 + sea_dom * 20, 0, 1000);
+
         // The shrine line. Dated AFTER the granary line by construction: the
         // granary year is -(3000 + 6*arable + jitter), this is
         // -(2500 + 5*arable + jitter<=400), and 500 + arable always clears it.
