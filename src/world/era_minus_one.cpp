@@ -67,6 +67,10 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // number is for history_sweep to tune.
     hp.trade_income_per_link = 40;
 
+    // BL-868: creeds raise armies. A placeholder magnitude, like the w_* it
+    // sits beside -- the SHAPE is the ruling, history_sweep tunes the number.
+    hp.w_aggr_q = 300;
+
     if (two_span)
     {
         // 1160 -> 1560 -> 1960 at the defaults. The ancient span is

@@ -138,6 +138,38 @@ void draw_lapse_scoreboard(const history_lapse& h,
                            const std::vector<uint16_t>& slice,
                            const std::vector<uint16_t>& lagged);
 
+/// BL-891 -- WHAT HAPPENED IN THIS WORLD, read off the record the round already
+/// holds. The scoreboard shows a SNAPSHOT that re-ranks as the centuries pass;
+/// this answers the different question a player rolling a world actually asks --
+/// *did anything happen here* - without them having to watch the whole replay.
+///
+/// The four quantities are `GENERATION_STRATEGY.md` sec The asymmetry is
+/// POLITICAL as well as economic, in the order it states them: polities
+/// ELIMINATED, an empire FORMED (the largest share anyone ever reached), empires
+/// that then FELL, and how UNEQUAL the survivors are. Definitions are the sweep's
+/// own, so the panel and `history_sweep` cannot drift: ROSE means a peak at least
+/// double the start and at least three regions more; FELL means ending at or
+/// under 60% of that peak.
+///
+/// DERIVED, NOT STORED. Every number comes from `era_timelapse::samples`, which
+/// generation already emits for the replay -- BL-891 adds no field to the record
+/// and nothing to the save seam.
+struct lapse_arc
+{
+    int polities        = 0; ///< Distinct polities ever seen holding ground.
+    int eliminated      = 0; ///< ...that ended holding none.
+    int peak_share_q    = 0; ///< Largest share any one polity ever held, per-mille.
+    int rose_and_fell   = 0; ///< ...that doubled and then fell back under 60% of peak.
+    int biggest_end_q   = 0; ///< Largest share still held at the end, per-mille.
+    int smallest_end    = 0; ///< Regions held by the smallest surviving polity.
+};
+
+/// Walks the replay record once. Cheap: linear in `samples`.
+lapse_arc summarise_lapse_arc(const history_lapse& h);
+
+/// Renders the summary as prose a player can read at a glance.
+void draw_lapse_arc(const history_lapse& h);
+
 /// A signed calendar year as this surface prints it ("400 BCE", "1200 CE").
 std::string lapse_year_label(int year);
 

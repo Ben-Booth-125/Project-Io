@@ -964,6 +964,9 @@ void app::draw_generation_screen()
                 ImGui::Separator();
 
                 ui::draw_lapse_scoreboard(rec, hist_slice, hist_lagged);
+                // BL-891: the arc, so a rolled world can be judged without
+                //         watching the whole replay.
+                ui::draw_lapse_arc(rec);
 
                 ImGui::Spacing();
                 // WHAT THIS ROUND IS AND IS NOT YET (BL-871), said in as many

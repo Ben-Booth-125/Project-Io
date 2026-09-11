@@ -404,4 +404,100 @@ void draw_lapse_scoreboard(const history_lapse& h,
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// BL-891 -- the arc, read off the record
+// ---------------------------------------------------------------------------
+//
+// A ROLLED WORLD CANNOT BE JUDGED BY A SNAPSHOT. BL-890 makes every arrival at
+// the wizard a fresh world; without a readout a reroll is a blind redraw,
+// because the scoreboard beside this shows who leads RIGHT NOW and says nothing
+// about whether an empire ever formed or fell. Ben, 2026-09-10: rolling should
+// give "the player the ability to see if their world will contain these types
+// of structures".
+//
+// EVERY DEFINITION HERE IS history_sweep's, deliberately, so the panel and the
+// harness cannot drift into disagreeing about the same world.
+
+lapse_arc summarise_lapse_arc(const history_lapse& h)
+{
+    lapse_arc out;
+    const int stride = h.lapse.region_stride > 0 ? h.lapse.region_stride : 1;
+
+    // Per polity: first holding, peak holding, last holding. `polity` ids are
+    // sparse, so a map keyed by id would iterate in an order the record does not
+    // define — a vector indexed by id keeps this deterministic.
+    std::vector<int> first_r, peak_r, last_r;
+    for (const polity_sample& s : h.lapse.samples)
+    {
+        const std::size_t id = s.polity;
+        if (id >= first_r.size())
+        {
+            first_r.resize(id + 1, -1);
+            peak_r.resize(id + 1, 0);
+            last_r.resize(id + 1, 0);
+        }
+        const int r = static_cast<int>(s.regions);
+        if (first_r[id] < 0) first_r[id] = r;
+        if (r > peak_r[id])  peak_r[id]  = r;
+        last_r[id] = r;
+    }
+
+    int biggest_end = 0, smallest_end = 0;
+    for (std::size_t id = 0; id < first_r.size(); ++id)
+    {
+        if (first_r[id] < 0) continue;       // never seen
+        if (peak_r[id] <= 0) continue;       // never held ground
+        ++out.polities;
+
+        const int pq = (peak_r[id] * 1000) / stride;
+        if (pq > out.peak_share_q) out.peak_share_q = pq;
+
+        if (last_r[id] <= 0) { ++out.eliminated; continue; }
+
+        // THE SWEEP'S OWN SHAPE TEST: doubled AND gained at least three
+        // regions, then ended at or under 60% of the peak.
+        const bool rose = peak_r[id] >= first_r[id] * 2 && peak_r[id] >= first_r[id] + 3;
+        const bool fell = last_r[id] * 100 <= peak_r[id] * 60;
+        if (rose && fell) ++out.rose_and_fell;
+
+        if (last_r[id] > biggest_end) biggest_end = last_r[id];
+        if (smallest_end == 0 || last_r[id] < smallest_end) smallest_end = last_r[id];
+    }
+    out.biggest_end_q = (biggest_end * 1000) / stride;
+    out.smallest_end  = smallest_end;
+    return out;
+}
+
+void draw_lapse_arc(const history_lapse& h)
+{
+    const lapse_arc a = summarise_lapse_arc(h);
+    if (a.polities <= 0) return;
+
+    const ImU32 col_dim = IM_COL32(150, 158, 175, 255);
+    ImGui::SeparatorText("What happened here");
+
+    // STATED AS PROSE, NOT A TABLE. The player is deciding whether to keep this
+    // world, which is a judgement about SHAPE; a table of six numbers makes them
+    // do the reading. The numbers are still all present.
+    if (a.eliminated == 0 && a.rose_and_fell == 0 && a.peak_share_q < 100)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+        ImGui::TextWrapped("A quiet age. %d peoples held ground and none of them "
+                           "grew large or was destroyed.", a.polities);
+        ImGui::PopStyleColor();
+    }
+    else
+    {
+        ImGui::Text("%d polities, %d destroyed.", a.polities, a.eliminated);
+        ImGui::Text("The largest empire held %d%% of the world; %d rose and fell back.",
+                    a.peak_share_q / 10, a.rose_and_fell);
+        ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+        ImGui::TextWrapped("At the end the greatest holds %d%%, the least %d region%s.",
+                           a.biggest_end_q / 10, a.smallest_end,
+                           a.smallest_end == 1 ? "" : "s");
+        ImGui::PopStyleColor();
+    }
+}
+
 } // namespace ui

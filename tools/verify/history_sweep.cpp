@@ -457,6 +457,7 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     if (name == "settle_requires_razed_ground") { p.settle_requires_razed_ground = v != 0; return true; }
     if (name == "amphibious_weight_crossing")   { p.amphibious_weight_crossing = v != 0;   return true; }
     if (name == "trade_income_per_link")       { p.trade_income_per_link = v;            return true; }
+    if (name == "w_aggr_q")                   { p.w_aggr_q = v;                        return true; }
     return false;
 }
 

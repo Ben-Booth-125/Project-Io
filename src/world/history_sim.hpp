@@ -773,6 +773,30 @@ struct history_sim_params
     /// both carry trade, they differ in what they do to REACH.
     int trade_income_per_link = 0;
 
+    /// A CREED'S APPETITE FOR WAR, LEANING THE CAMPAIGN SCORE (BL-868;
+    /// CIVILISATION.md sec Armies come from creeds, and only some peoples raise
+    /// them). Per-mille pull, applied proportionally and SYMMETRICALLY around a
+    /// neutral 500: a polity whose founding culture's `aggression_q` is 1000
+    /// scores a campaign `w_aggr_q` per-mille higher, one at 0 scores it that
+    /// much lower, and one at 500 is unmoved. Zero disables it.
+    ///
+    /// THE INPUT IS ALREADY EARNED, WHICH IS WHAT MAKES THIS ADMISSIBLE.
+    /// `culture::aggression_q` derives from the pantheon's war god
+    /// (`../lore/CREEDS.md`), and COLONISATION.md sec Culture arrives by route
+    /// made the distribution of pantheons a RECORD OF ROUTES. So which peoples
+    /// turn warlike is downstream of where their ancestors walked. This is not
+    /// a dial on an actor; it is a consequence of that actor's history, read at
+    /// the one place the decision is made.
+    ///
+    /// SAME IDIOM AS `w_cult` AND `w_dist`: a proportional lean on a value that
+    /// already exists, never a new term added beside the score.
+    ///
+    /// NOT A NEW AI GRANT. A polity choosing to campaign is the Era -1 sim's
+    /// existing scored-utility verb set, covered by the dated register in
+    /// `../ai/AI_OPPONENT.md` sec 11 and bound by the same constraints: pure,
+    /// seeded, deterministic, replayable, only legal verbs, never a planner.
+    int w_aggr_q = 0;
+
     /// Severity of the sack a conquered region suffers, per-mille.
     ///
     /// BL-835 — THIS IS NOW AN URBAN QUANTITY ONLY. It used to be subtracted
