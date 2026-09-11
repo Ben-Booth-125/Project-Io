@@ -333,6 +333,27 @@ struct region
     /// seat, is re-pointed at its new owner's seat instead of left dangling.
     int seat_region = -1;
 
+    // --- BL-910: capitals and markets stand at the close --------------------
+    // CIVILISATION.md sec Capitals exist at the close. SETTLED (Ben,
+    // 2026-09-11): near the Empire pass's 1200 CE close, every surviving
+    // polity that still holds a governable seat gets a market centred on
+    // it. THE CAPITAL IS ALREADY THE SEAT (`is_seat`/`polity::capital`
+    // above) -- this is not a second placement pass, and this flag is a
+    // PROMOTION of that existing fact, never a new id space.
+
+    /// TRUE ONLY ON A REGION THAT IS BOTH A SEAT AND STILL GOVERNED AT THE
+    /// CLOSE. Set once, in `run_history_sim`'s closing block, for every
+    /// living polity's `capital` region; never set anywhere else and never
+    /// cleared once set (a market that stood is not un-stood by a later
+    /// conquest -- the same ground keeps carrying it, mirroring `is_seat`).
+    /// NO QUOTA: a polity with no governable seat at the close leaves every
+    /// one of its former regions at `false`, on purpose.
+    ///
+    /// A PLACE AND A VISIBLE CONDITION, NOT AN ORDER BOOK. No firms, no
+    /// clearing tick, no price band, no inventory ride on this flag -- the
+    /// economy pass materialises those, from this fact, downstream.
+    bool has_market = false;
+
     // --- Materials and labour (BL-867) --------------------------------------
     // CIVILISATION.md § Materials are spent when something happens. SETTLED
     // (Ben, 2026-09-09): "the stores sit AT THE SEAT, and fall with it." No
