@@ -183,6 +183,8 @@ enum class lapse_event_kind : uint8_t
     creed_preached      = 7, ///< A universal creed arose; `other` = the creed index.
     culture_split       = 8, ///< The migration coined a daughter people; `polity` = the daughter culture, `other` = its parent culture.
     supply_site_upgraded = 9, ///< BL-929: a region bought its own reach relief outright; `polity` = the buyer.
+    trade_link_opened   = 10, ///< BL-925: a cross-border corridor turned amicable; `region`/`other` = its ends.
+    trade_link_closed   = 11, ///< BL-925: a grudge shut a cross-border corridor; `region`/`other` = its ends.
     count
 };
 

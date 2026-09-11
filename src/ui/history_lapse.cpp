@@ -58,6 +58,12 @@ constexpr ImU32 col_road_track = IM_COL32(150, 130,  90, 130);
 constexpr ImU32 col_road       = IM_COL32(215, 190, 130, 235);
 constexpr ImU32 col_bridge     = IM_COL32(240, 240, 235, 255);
 
+/// AMICABLE CROSS-BORDER TRADE (BL-925). A distinct hue from the road network
+/// on purpose — this stroke crosses a FRONTIER, which a road corridor (always
+/// inside one realm) never does, and the two facts should not read as one
+/// idiom repainted. A cool green against the road's warm ochre.
+constexpr ImU32 col_trade_link = IM_COL32(110, 205, 150, 220);
+
 /// The fill's opacity over the base. High enough that a colour reads as a
 /// colour on the board's swatch too; low enough that a mountain range and a
 /// river still show through it, which is the whole point of the base.
@@ -438,6 +444,56 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
         }
     }
 
+    // --- Amicable cross-border trade corridors (BL-925), baked once --------
+    //
+    // Built from `trade_link_opened` / `trade_link_closed` events, the same
+    // "one segment per distinct (a, b) pair" idiom as the road bake just
+    // above, ADDED BESIDE IT rather than folded in: a trade link is not a
+    // road (it can close and reopen, so it carries a list of spans rather
+    // than a single promotion year) and the two are unrelated facts about a
+    // corridor. The Culture round's record carries no such events, so this
+    // loop leaves `trade_segs` empty there without a round flag to check.
+    h.trade_segs.clear();
+    for (const lapse_event& e : h.lapse.events)
+    {
+        const bool opened = e.kind == static_cast<uint8_t>(lapse_event_kind::trade_link_opened);
+        const bool closed = e.kind == static_cast<uint8_t>(lapse_event_kind::trade_link_closed);
+        if (!opened && !closed) continue;
+        if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
+        const uint16_t a = e.region, b = e.other; // note_event: region/other = the corridor's ends
+        if (static_cast<std::size_t>(a) >= h.region_col.size()
+         || static_cast<std::size_t>(b) >= h.region_col.size()) continue;
+
+        auto it = std::find_if(h.trade_segs.begin(), h.trade_segs.end(),
+                               [&](const lapse_trade_seg& s) { return s.region_a == a && s.region_b == b; });
+        if (it == h.trade_segs.end())
+        {
+            lapse_trade_seg seg;
+            seg.region_a = a;
+            seg.region_b = b;
+            seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
+            seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
+            seg.c1 = static_cast<float>(h.region_col[b]) + 0.5f;
+            seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
+            h.trade_segs.push_back(std::move(seg));
+            it = std::prev(h.trade_segs.end());
+        }
+        if (opened)
+        {
+            // A well-formed record never opens twice without a close between
+            // (the sim's own "note only on change" idiom), but a fixture or a
+            // future caller doing something odd is handled by simply not
+            // opening a second span on top of one already open.
+            if (it->spans.empty() || it->spans.back().year_close != 0x7FFFFFFF)
+                it->spans.push_back({e.year, 0x7FFFFFFF});
+        }
+        else // closed
+        {
+            if (!it->spans.empty() && it->spans.back().year_close == 0x7FFFFFFF)
+                it->spans.back().year_close = e.year;
+        }
+    }
+
     // The Culture round's record carries a lineage palette (BL-919); its hue
     // families seed the slot walk so kin start near one another on the wheel.
     assign_polity_colours(h, h.culture_family.empty() ? nullptr : &h.culture_family);
@@ -775,6 +831,25 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         }
     }
 
+    // ── 3c. AMICABLE CROSS-BORDER TRADE (BL-925), beside the road network
+    //    rather than folded into its loop above: a trade link is OPEN or
+    //    CLOSED at the playhead year, read off whichever span (if any)
+    //    brackets it, where a road corridor only ever ratchets forward. A
+    //    grudge closing a border stops drawing the stroke; it does not erase
+    //    the corridor, which can reopen once the grudge decays. ──
+    for (const lapse_trade_seg& s : h.trade_segs)
+    {
+        bool open_here = false;
+        for (const lapse_trade_span& sp : s.spans)
+        {
+            if (year >= sp.year_open && year < sp.year_close) { open_here = true; break; }
+        }
+        if (!open_here) continue;
+        const float w = std::max(1.25f, scale * 0.22f);
+        dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, col_trade_link, w);
+        ++prims;
+    }
+
     // ── 4. SEATS: one dot per polity HOLDING GROUND in this slice, at the
     //    region it first held. Seats only, not every region — the in-game Ages
     //    view draws a dot per region, and at blob granularity that is a rash;
@@ -801,9 +876,9 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     {
         h.prim_report_done = true;
         std::fprintf(stderr, "history_lapse: %zu base runs, %zu relief rims, %zu river segments, "
-                             "%zu road corridors, %d primitives this frame\n",
+                             "%zu road corridors, %zu trade corridors, %d primitives this frame\n",
                      h.base_runs.size(), h.relief_segs.size(), h.river_segs.size(),
-                     h.road_segs.size(), prims);
+                     h.road_segs.size(), h.trade_segs.size(), prims);
     }
 
     // The year, over the map's own corner. It is the one thing a watcher needs
@@ -1310,6 +1385,14 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         break;
     case lapse_event_kind::supply_site_upgraded:
         std::snprintf(buf, sizeof buf, "%s buys a waystation, widening its own reach.", R);
+        break;
+    case lapse_event_kind::trade_link_opened:
+        std::snprintf(buf, sizeof buf, "%s opens trade across the border with %s.",
+                      R, region_name_of(h, e.other));
+        break;
+    case lapse_event_kind::trade_link_closed:
+        std::snprintf(buf, sizeof buf, "A grudge closes the trade route between %s and %s.",
+                      R, region_name_of(h, e.other));
         break;
     default:
         std::snprintf(buf, sizeof buf, "Something happens at %s.", R);
