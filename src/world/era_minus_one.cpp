@@ -39,10 +39,17 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
 {
     history_sim_params hp;
 
-    // The stop year is the epoch on BOTH shapes; only the start and the
-    // interior differ.
+    // THE STOP YEAR SPLITS ON SHAPE (BL-906). A two-span epoch's industrial
+    // arc still closes AT the epoch — that half is unchanged and untouched by
+    // this item. A single-span (ancient-only) epoch used to close at the epoch
+    // too, which coupled the Empires round's own end to a field that names the
+    // CAMPAIGN's calendar start, not this round's close: the campaign opens at
+    // `epoch_year == 0`, so the round ran 400 BCE -> 0 CE (400 years) against
+    // the 400 BCE -> 1200 CE (1,600 years) `docs/generation/CIVILISATION.md`
+    // § "The closure of the Empire era" specifies. `empires_stop_year`
+    // (default 1200) is now that round's own close, set below in the branch
+    // that actually applies.
     const bool two_span = era_minus_one_has_industrial_span(params);
-    hp.stop_year = params.epoch_year;
 
     // SETTLE IS RE-SETTLEMENT IN GENERATION'S OWN ROUND (BL-894; Ben,
     // 2026-09-11). This is the Empires round -- the land is already settled
@@ -240,6 +247,9 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
         // unrestricted. Both bands tick at 4 years, as the single-span run
         // always has — the clock is not what changes between the spans, the
         // roster ceiling is.
+        // The two-span industrial arc's own stop is `epoch_year`, unchanged by
+        // BL-906 — see the header comment on `world_params::empires_stop_year`.
+        hp.stop_year          = params.epoch_year;
         hp.boundary_year      = params.epoch_year - params.industrial_years;
         hp.start_year         = hp.boundary_year - params.prehistory_years;
         hp.span1_band_ceiling = roster_band::medieval;
@@ -249,17 +259,17 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     }
     else
     {
-        // EXACTLY what this function did before BL-747, byte for byte, and
-        // that is the point: `boundary_year` and `span1_band_ceiling` are left
-        // at their struct defaults (INT64_MIN and `industrial`), so the
-        // ceiling is inert twice over — no year is before the boundary, AND
-        // the clamp is the identity. An ancient epoch therefore executes the
-        // same values through the same code as it did, which is what keeps the
-        // 0 CE arc's `state_hash` byte-identical across this change. Adding a
-        // candidate to the scorer would move the argmax even where it never
-        // wins; adding an inert clamp cannot.
+        // BL-906: the single-span (ancient-only) run closes at its OWN stop
+        // year, `empires_stop_year` (default 1200 CE), rather than at
+        // `epoch_year` (the campaign's calendar start, 0 CE). `boundary_year`
+        // and `span1_band_ceiling` stay at their struct defaults (INT64_MIN
+        // and `industrial`), exactly as before this item: the ceiling is
+        // inert twice over — no year is before the boundary, AND the clamp is
+        // the identity — so nothing about the SHAPE of this branch changed,
+        // only the year it now runs to.
+        hp.stop_year       = params.empires_stop_year;
         hp.start_year      = params.epoch_year - params.prehistory_years;
-        hp.tick_bands[0]   = {params.epoch_year, 4};
+        hp.tick_bands[0]   = {hp.stop_year, 4};
         hp.tick_band_count = 1;
     }
 

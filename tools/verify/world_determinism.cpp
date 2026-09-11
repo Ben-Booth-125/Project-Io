@@ -409,7 +409,8 @@ int main()
                 static_cast<long long>(rep_a1.prehistory_foundings));
     // Seed B's counters are printed alongside because the era pass's WALL CLOCK
     // is strongly seed-dependent (measured 2026-08-18: 23-34 s at seed A against
-    // 75 s at seed B, same Debug build, same 400-year span), and the counters
+    // 75 s at seed B, same Debug build, same span — 400 years at the time of
+    // that measurement, 1600 since BL-906), and the counters
     // are what makes that legible rather than mysterious. Note which counter
     // tracks it: seed B is 3x the cost with FEWER battles (193 vs 365) and more
     // FOUNDINGS (994 vs 765), so the era sim's cost scales with the region
@@ -420,8 +421,11 @@ int main()
                 static_cast<long long>(rep_b.prehistory_battles),
                 static_cast<long long>(rep_b.prehistory_conquests),
                 static_cast<long long>(rep_b.prehistory_foundings));
-    check(rep_a1.prehistory_years == 400,
-          "R3.4 the era pass ran the full 400-year span (report agrees with the params)");
+    // BL-906: the Empires round's own span is 400 BCE -> 1200 CE (1,600
+    // years), not the epoch-coupled 400 this assertion pinned before the fix
+    // (`docs/generation/CIVILISATION.md` § "The closure of the Empire era").
+    check(rep_a1.prehistory_years == 1600,
+          "R3.4 the era pass ran the full 1600-year span (report agrees with the params)");
     check(rep_a1.prehistory_battles + rep_a1.prehistory_conquests
               + rep_a1.prehistory_foundings > 0,
           "R3.4 the era pass DID something (battles/conquests/foundings not all zero)");

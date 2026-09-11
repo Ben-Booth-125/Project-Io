@@ -98,6 +98,31 @@ struct world_params
     /// so a 1960 arc at the defaults runs 1160 -> 1560 -> 1960. Zero means no
     /// industrial span and the run is single-span, as an ancient epoch is.
     int             industrial_years = 400;
+
+    /// THE EMPIRES ROUND'S OWN STOP YEAR (BL-906), for a SINGLE-span run only
+    /// (`era_minus_one_has_industrial_span(params) == false`) — independent of
+    /// `epoch_year`.
+    ///
+    /// THE BUG THIS CLOSES. `era_minus_one_sim_params` used to set
+    /// `hp.stop_year = params.epoch_year` unconditionally, so an ancient-epoch
+    /// world (the campaign's `epoch_year == 0`) ran the Empires round 400 BCE
+    /// -> 0 CE — 400 years — where `docs/generation/CIVILISATION.md` § "The
+    /// closure of the Empire era" specifies 400 BCE -> 1200 CE, 1,600 years.
+    /// The stop year was coupled to a field that means something else
+    /// entirely: the CAMPAIGN's calendar start, not this round's own close.
+    ///
+    /// 1200 is Ben's ruling (2026-09-11) and the doc's own "1200 is unmoved" —
+    /// it is a fixed year the Empires round closes ON, not a span length, so it
+    /// does not move if `prehistory_years` (the START side of the span) is
+    /// ever retuned.
+    ///
+    /// TWO-SPAN EPOCHS (>= 1700) DO NOT READ THIS FIELD. There the industrial
+    /// arc's own stop is `epoch_year` (the 1960 arc, untouched) and the ancient
+    /// half beneath it stops at `boundary_year`, both unaffected by BL-906.
+    ///
+    /// Default 1200 matches the doc for every existing single-span caller —
+    /// nothing opts in, the shipped world simply runs its documented span.
+    int64_t         empires_stop_year = 1200;
     int             body_count = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a
     // *consequence* of its habitable land area and the minimum-viable-territory floor
