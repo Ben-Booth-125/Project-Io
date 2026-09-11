@@ -149,17 +149,25 @@ verify.capture("press_06_round6_substrate")
 -- A8 -- BACK WALKS THE LADDER DOWN ONE RUNG AT A TIME, and a finished record is
 -- NOT discarded and re-run on the way past. That guard is the reason the
 -- auto-start is conditioned on the arriving round being empty.
+-- These two checks were off by one round (BL-904): BL-863 dropped
+-- planetology_rounds from 3 to 2, so the wizard shrank from six rounds to
+-- five and INDUSTRIALISATION became the LAST round (0-based 4), not a "round
+-- 6" past it. Back from round 4 lands on round 3, and Back from round 3 lands
+-- on round 2 -- the navigation was always correct; only these two expected
+-- values were stale.
 verify.click(BACKP_X, BACKP_Y)
 verify.frames(4)
 round = select(1, verify.wizard_round())
-verify.expect(round == 4, "Back from round 6 lands on round 5 (0-based " .. round .. ")")
+verify.expect(round == 3, "Back from round 4 lands on round 3, EMPIRES (0-based "
+                          .. round .. ")")
 verify.expect(verify.history_powers() > 0,
-              "round 5's record survived the trip to round 6 and back")
+              "round 3's record survived the trip to round 4 and back")
 
 verify.click(BACKP_X, BACKP_Y)
 verify.frames(4)
 round = select(1, verify.wizard_round())
-verify.expect(round == 3, "Back from round 5 lands on round 4 (0-based " .. round .. ")")
+verify.expect(round == 2, "Back from round 3 lands on round 2, CULTURE (0-based "
+                          .. round .. ")")
 verify.expect(verify.history_powers() > 0,
-              "round 4's record survived the walk up to round 6 and back")
+              "round 2's record survived the walk up to round 4 and back")
 verify.capture("press_07_back_on_round4")

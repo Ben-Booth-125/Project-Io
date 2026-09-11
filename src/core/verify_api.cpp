@@ -689,6 +689,18 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     // Resize the live window mid-script, so a perf run can measure at the real
     // interactive resolution instead of the fixed verify capture size.
+    //
+    // COORDINATE SPACE (BL-904). `click(x, y)` feeds x/y straight into
+    // io.AddMousePosEvent, which ImGui reads against io.DisplaySize -- and
+    // DisplaySize tracks the SDL window's LOGICAL size every frame
+    // (ImGui_ImplSDL3_NewFrame calls SDL_GetWindowSize, not the pixel size), the
+    // same logical size `capture_frame` reads pixels back at. So a click
+    // coordinate and a coordinate read off a capture ARE the same space, once
+    // this call has actually taken effect -- SDL_SyncWindow above blocks until
+    // it has. The one place they can appear to differ is the STARTUP log line
+    // ("Display: window WxH...", app.cpp), which fires once at app construction
+    // BEFORE any verify script's window() call runs; it is not a second
+    // coordinate space, only an earlier size.
     v.set_function("window", [this](int w, int h) {
         SDL_SetWindowSize(m_window, w, h);
         SDL_SyncWindow(m_window);
@@ -1393,6 +1405,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // by a third route.
         else if (name == "market_trades")        target = "##trades_scroll";
         else if (name == "convoys")              target = "Convoys";
+        // BL-904: the pre-game wizard's left column has NO named ledger window
+        // to aim at -- it is a plain `BeginChild("##wiz_left", ...)` -- so a
+        // script had no way to test whether a human could reach a control the
+        // column had scrolled below the fold. `foldout_scroll_child` matches on
+        // the id string alone, so naming the child here is enough.
+        else if (name == "wizard")               target = "##wiz_left";
         else if (name.empty())                   target = ""; // the documented "clear" call
 
         if (target == nullptr)
@@ -1401,7 +1419,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             SDL_Log("verify.scroll_panel FAIL: unknown panel '%s' - the request "
                     "reached no scroller. Known: tile, history, market, balance, "
                     "corporation, construction, acquisitions, "
-                    "generation_ledger, convoys.", name.c_str());
+                    "generation_ledger, convoys, wizard.", name.c_str());
             ui::foldout_request_scroll("", 0.0f);
             return;
         }
