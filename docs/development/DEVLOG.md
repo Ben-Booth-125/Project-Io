@@ -89,6 +89,25 @@ has **no scroll verb for the wizard column**, so no script can test the path a h
 come out 1920×1080 — if those are different spaces, every wizard coordinate ever read off a capture
 was read in the wrong one.
 
+### How the session actually ended, which matters more than what it built
+
+Ben closed it by naming the thing none of the ten items addressed: *"we are still yet to work on the
+output data, and what our age of exploration expects to find after the age of empires."*
+
+That reframes every null result above. `BL-887` moved nothing, `BL-839`'s forces are inert,
+`BL-838` didn't shift the figure it was written against, and `BL-905` found the primary lever
+refusing zero campaigns — four shrugs in one session. The common cause is not any of the
+mechanisms: it is that **nothing downstream asks pass 1 for anything specific**, so no mechanism can
+be judged, and a lever that stopped firing was noticed by nobody because no consumer would have
+missed it.
+
+The next block is therefore a design session on the **pass 1 → pass 2 contract**, not more
+mechanism. Items stay open deliberately; the handoff says do not open by tuning.
+
+One good report from the build: the round-4 time-lapse — `BL-817`'s record, `BL-830`'s scoreboard
+and `BL-891`'s arc readout together — **looks great**. That is the surface this whole phase is read
+through, and it is working.
+
 ---
 
 ## 2026-09-10 (sprint 37 closes) — The seven owed items, and a delegation bug caught mid-flight

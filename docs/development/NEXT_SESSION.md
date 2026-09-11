@@ -1,8 +1,52 @@
-# Next session — sprint 38 closed; the phase's primary lever is inert
+# Next session — write the pass 1 → pass 2 contract, before any more mechanism
 
-Written 2026-09-11 at the close of a batch delivery. **Sprint 38 was the PHASE, not a fixed item
-list** (Ben, 2026-09-11) — and the phase now produces what `CIVILISATION.md` asks of it. The nine
-items that opened this session are all closed or superseded.
+Written 2026-09-11 at the close of a batch delivery. Sprint 38's nine items are closed or
+superseded; six items are open and **all of them stay open deliberately** (Ben, 2026-09-11).
+
+## The redirect, and it is the whole point of this handoff
+
+**Ben, 2026-09-11, closing the session:** *"It might be that we are needlessly overcomplicating
+things — we are still yet to work on the output data, and what our age of exploration expects to
+find after the age of empires."*
+
+**He is right, and the session's own numbers are the evidence.** Every item delivered today added a
+*mechanism inside the Era −1 sim*. Not one was chosen by asking what the next phase needs. So:
+
+- `BL-887` built a correct, cheap centre-relay reach model that **moved nothing**.
+- `BL-839` built a turbulence lean whose forces are **inert** — two of three never fire.
+- `BL-838` cleared every scope check and **did not move the number it was written against**.
+- `BL-905` found the phase's stated primary lever **refuses zero campaigns** — a lever nobody
+  noticed wasn't firing, because no consumer would have noticed either.
+
+Each was measured honestly. None could be **judged**, because nothing downstream asks for anything
+specific. `CIVILISATION.md` § What the dark age must leave is the entire specification — three
+bullets of prose (nations of unequal strength, roads that outlive their builders, grudges that still
+bite), with no schema, no magnitudes and no consumer.
+
+**So the next block is a DESIGN session on the pass 1 → pass 2 contract, not more mechanism.**
+`pass_one_output` already exists as the enforced list of *what crosses*; it carries no expectation
+about *shape*. What the age of exploration expects to find: how many nations, in what strength
+distribution, holding what, wanting what from each other.
+
+Once that exists, most of the open queue answers itself or stops mattering — `NR-827`'s trade share,
+`NR-829`'s grudge decay, `NR-830`'s hegemony bar, `BL-839`'s magnitudes are every one of them
+currently judged against taste, for want of a requirement to judge them against. It would also
+settle whether the **400-of-1,600-years** gap is actually a problem, which has been attached as a
+caveat to every number all day without anyone deciding it is one.
+
+**Do not open this by tuning anything.** The instruction is to write the contract first.
+
+## What Ben saw in the build
+
+`build_rel\ProjectIo.exe` was rebuilt at the close (Release / Ninja) and opened. His verdict:
+**"the time-lapse looks great."** That is the round-4 lapse surface — `BL-817`'s playback record,
+`BL-830`'s scoreboard and `BL-891`'s arc readout together.
+
+**It does NOT settle `BL-904`.** Round 3 carries a lapse too, so viewing one does not prove round 4
+was reached by pressing Next. The reachability question is still open and still unanswerable by any
+script.
+
+---
 
 ## Read this first: the reach gate refuses nothing
 
