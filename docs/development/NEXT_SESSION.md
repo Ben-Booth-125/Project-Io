@@ -20,6 +20,8 @@ Wave 1 items **merged into main, built (`build_app.bat` BUILD_OK) and captured c
 
 **BL-922 (reach has a gradient) IS MERGED (5e08b708).** Capital-based Dijkstra over HELD ground; supply walks its own uncapped neighbour index (the degree-capped campaign index left founded regions with no edge to their parent and secessions exploded to 117/world -- a Ben call whether the campaign index should be uncapped too, file it); `terrain_reach_cost_q` 10 -> 4000 (measured: at 4000 the reach gate refuses 1.5% of contacts, at 3000 0.17%, at 5000 8.7% -- Ben may prefer 3000); staging-hub pricing gone; a latent int overflow that made cut-off ground read fully supplied and a missing owner_change on seat-hinterland capture both fixed. Digests moved (seedA/on BFF4F830... -> 5A641C67838E8B54, seedB/on -> B16BF946D3CE19D6, two-span -> E5513B203E2DA268). Era -1 ms per seed roughly halved. 4-seed at 4000: battles 1800, conquests 829, secessions 6, largest share 18%, rose+fell 3/4. history_sim_harness 79 PASS / 2 FAIL (R3a2/R3a3 fail on main too); B384c now passes; stepped_clock_harness variants are now identical (supply_decay_per_tile_q retired) -- fix that harness.
 
+**INTEGRATED 2-SEED READING (main 74f9a5e6, all seven items together):** largest share median 30% (was 11%), battles 844 (was 3114), reach gate refusing 28,921 contacts (the agent measured 1.5% alone; combined with BL-918 it is far more), secessions 0 on both seeds. The combination moves much further than either item alone -- run the 16-seed sweep FIRST and put the spread in front of Ben before touching any dial; `terrain_reach_cost_q` 3000 is the one number to shift if the gate is now refusing too much.
+
 ## Wave-1 close-out still owed (do before wave 2)
 
 1. (done) BL-922 merged; app builds.
