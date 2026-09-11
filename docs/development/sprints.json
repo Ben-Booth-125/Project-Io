@@ -139,6 +139,25 @@
   },
   {
    "id": "39",
+   "theme": "tighten the levers",
+   "state": "open",
+   "status_line": "OPEN. Defined 2026-09-11 after Ben reviewed sprint 38's Empire phase live in build_rel: \"really lively, and perhaps too much so.\" The phase's SUBSTANCE is delivered and the closure contract is fully wired (sprint 38); this sprint is the tuning pass that follows it -- refining the feel of the time-lapses (battle/conquest/contact/want volumes, the reach gate's step-function behaviour, tariff/turbulence bands) rather than adding new mechanism.",
+   "opened_date": "2026-09-11",
+   "closed_date": null,
+   "author": "Ben (2026-09-11, live build_rel review)",
+   "goal": "Sprint 38 built the Empire phase's full mechanism and made it measurable (the seven-reading closure contract). Ben's read of it running live: the phase feels TOO lively -- too much fighting, too much churn -- as a precursor to the next phase of generation rather than as the finished feel. This sprint tunes what sprint 38 measured rather than building anything new: read the sweep's own numbers (history_sweep's BL-907 scoreboard, the reach-gate finding in NR-833/BL-905, the tariff/turbulence bands) and bring the phase's pace and volume down to where it reads as history rather than noise, without re-opening the mechanism itself.",
+   "planned": [
+    "Open: no items decomposed yet. Candidates already surfaced this session -- BL-905's reach-gate finding (the gate is a step function, refuses ~0 or ~everything, no gradient) and NR-833 (BL-903's dead-end, likely sharing a cause with BL-905) are the two most load-bearing places to start, since both post-water gates may be inert for the same reason."
+   ],
+   "risk": "Tuning without re-measuring is exactly the failure mode sprint 38 itself was built to avoid (forced outcomes, tuning toward a number rather than measuring one). Every change here needs a before/after read off history_sweep, same discipline as sprint 38.",
+   "done_when": null,
+   "notes": [
+    "Ben, 2026-09-11, live build_rel review of sprint 38's Empire phase: \"This looks really lively, and perhaps too much so. I think this would work as a precursor to the next phase of generation, but I want to tighten some levers.\"",
+    "SUPERSEDES the sprint-39 id sprint 38's own handoff previously reserved for 'the new world' -- that content moved to sprint 40, unchanged, so this tuning pass could take the 39 slot immediately after 38 rather than queue behind an unrelated phase."
+   ]
+  },
+  {
+   "id": "40",
    "theme": "the new world",
    "state": "open",
    "status_line": "OPEN AND EMPTY BY DESIGN. The phase is named and reserved; no items are decomposed for it yet. Its first input is whatever round 4 leaves unpartitioned once sprint 38 settles how far empires actually spread.",
@@ -151,7 +170,8 @@
    "done_when": null,
    "notes": [
     "DEFINED 2026-09-10 (Ben). This sprint id was briefly used for the technology trees during a sprint-assignment sweep the same day; Ben redefined it as the new world and the six tree items (BL-881..886) were deleted outright rather than re-homed -- \"we will look back at wiring tech later\".",
-    "THE DEPENDENCY IS REAL AND RUNS THROUGH SPRINT 38. Whether there is a new world to find at all is decided by how much ground round 4 leaves unclaimed, which is exactly what BL-889 (conquest must compound) changes. Do not decompose this sprint before that lands."
+    "THE DEPENDENCY IS REAL AND RUNS THROUGH SPRINT 38. Whether there is a new world to find at all is decided by how much ground round 4 leaves unclaimed, which is exactly what BL-889 (conquest must compound) changes. Do not decompose this sprint before that lands.",
+    "RENUMBERED FROM 39 TO 40 (Ben, 2026-09-11): sprint 39 was reassigned to a lever-tuning sprint after sprint 38's Empire phase landed 'lively, perhaps too lively' -- battle/conquest/contact volumes read as high once the full 1,600-year span and the closure contract (BL-906/907/908/909/910/911/912) were all live in one sweep. This sprint's content (the new world / exploration phase) is unchanged, only its number moved."
    ]
   }
  ],

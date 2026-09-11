@@ -4401,6 +4401,134 @@
         "docs/generation/MILITARY_HISTORY.md"
       ],
       "resolution": "RULED by Ben, 2026-09-08, and the ruling went past all three options offered. First: a region emptied by war is immediately resettled by the attacker. Then, decisively: POPULATION IS CIVILIAN, ARMIES ARE DISTINCT FROM IT, AND STAGE 4 DOES NOT SIMULATE TOTAL WARFARE - so war stops producing empty regions at all, and the pathology has no cause rather than a block. That also dissolves the assimilation-bypass worry I raised against the first answer: with no war route to emptiness there is no massacre-and-resettle fast path. Written into GENERATION_STRATEGY.md § Population is civilian, and armies are distinct from it. Work is BL-835, re-authored around the split."
+    },
+    "NR-808": {
+      "id": "NR-808",
+      "title": "The creeds' tribal marches are wars, sitting inside a span whose premise is that war is not yet the process",
+      "raised": "2026-09-09",
+      "kind": "question",
+      "status": "resolved",
+      "source": "The colonisation design session, 2026-09-09. Recorded as an open question in COLONISATION.md and raised here because it is a call, not work.",
+      "what": "CREEDS.md's tribal marches resolve single-round pairwise wars at cradle grain and WELD two cradles into one, lowering fragmentation_q before nation_params_from_ladder reads it. Under the new colonisation span (COLONISATION.md) they run inside a span whose stated premise is that spreading, not fighting, is the interesting process.",
+      "why_it_matters": "They are the only wars in the peaceful span, so leaving them where they are makes the span's premise partly false on its own terms. But moving them is not free: welding drives fragmentation_q, fragmentation_q drives the SEED BUDGET, and the seed budget drives the nation count. Moving the marches past the boundary changes how many nations a world has. That is a measured change, not a design one, which is why nothing was moved by this session.",
+      "options": [
+        "Leave them where they are - a peaceful span is a comparative claim, not an absolute one, and cradle-grain welding is coarse enough not to contradict it.",
+        "Move them to the boundary, so the colonisation span is warless by construction and the marches become the first act of the empire phase.",
+        "Fold them into the span as a NON-violent mechanism - two cradles that meet merge by contact rather than by conquest, keeping the fragmentation effect and dropping the war."
+      ],
+      "recommendation": "Do not decide it dry. Whoever builds BL-846 (colonisation span) should measure the nation-count distribution across a seed spread with the marches in each position, and bring you the three numbers. The third option is the most interesting design and the least measured.",
+      "files": [
+        "docs/lore/CREEDS.md",
+        "docs/generation/COLONISATION.md",
+        "src/world/creeds.cpp"
+      ],
+      "resolution": "BEN, 2026-09-09: option 3, re-derive fragmentation from contact. The tribal marches RETIRE; fragmentation_q is read off how far two peoples' streams interpenetrate, which the colonisation span already produces in culture_shares.\n\nTHE FINDING THAT REFRAMED THE QUESTION: the marches' TIMING was the lesser problem and their GRAIN the greater one. They compare cradle to cradle - a scalar against a scalar between two discrete points - but under diffusion a cradle is a SOURCE, not a point, and what meets at a frontier is two streams already mixing. Moving them past the boundary would have fixed when they ran and left that untouched.\n\nWHAT IT SEPARATES: aggression_q drove both how consolidated the political map is and how a polity fights once it exists. It now drives only the second; package breadth drives the first. One cause each.\n\nWritten into COLONISATION.md (new section: Fragmentation comes from contact), CREEDS.md (the creed drives, rewritten) and HISTORY.md (the ladder pass + the pipeline diagram). Work is BL-852. TWO THINGS CARRIED FORWARD, both open in COLONISATION.md: the non-hegemony floor must be re-derived for the new mechanism (the old welding carried an explicit half-fragmentation floor for BL-224's sake), and the nation-count distribution must be MEASURED across a seed spread before the change lands."
+    },
+    "NR-814": {
+      "id": "NR-814",
+      "title": "Culture relations: four calls that decide whether the empire phase has an engine",
+      "raised": "2026-09-09",
+      "kind": "question",
+      "status": "resolved",
+      "source": "The Empires design pass, 2026-09-09. Ben asked for a quick design aside on point 5 (culture relations); CIVILISATION.md sec Culture relations carries it and these are the calls it deliberately did not answer.",
+      "what": "Cultures are to be alike or opposed, and that opposition is meant to be the engine of conquest. The SIMILARITY half has an answer already: the migration builds a family tree of peoples, so kinship is a similarity measure EARNED by history rather than assigned (BL-865 retains it). The OPPOSITION half does not, and kinship alone will not supply it -- kinship gives DISTANT, not OPPOSED, and two peoples on opposite sides of a continent who never met are distant with no quarrel.",
+      "why_it_matters": "It decides whether the empire phase is a map of armies bumping into each other or a map of peoples who want different things. It also decides how much new machinery sprint 38 needs: three of the candidate axes are quantities that ALREADY exist and are already earned, so a good answer here may cost almost nothing, and a bad one invents a whole relations system beside the ones already running.",
+      "options": [
+        "IS OPPOSITION SYMMETRIC? `grudge` is a DIRECTED table, so the sim already has a precedent for asymmetry -- but a disagreement about how one ought to live may be mutual. Directed makes relations a matrix; symmetric makes it a set of pairs, and halves the storage.",
+        "DOES KINSHIP DECAY, or is the tree enough? Two peoples five generations apart may be as foreign as two unrelated ones, or kinship may hold indefinitely and make whole branches of the tree natural allies.",
+        "DOES OPPOSITION CAUSE CONQUEST, OR MERELY PERMIT IT? The sim already scores campaigns with w_cult discounting foreign ground. Feeding relations into that weight is the SMALLER change and keeps one scorer; giving relations a score of their own is what would make them the engine Ben describes. This is the one that most changes sprint 38's size.",
+        "HOW DOES A CIVILISATION RELATE TO OPPOSED CULTURES INSIDE IT? If two opposed peoples end up in one civilisation, does it resolve the opposition, inherit it, or fracture?"
+      ],
+      "recommendation": "Answer (3) first, because the other three are cheap once it is settled and expensive to revisit after. My lean is PERMIT rather than CAUSE for the first cut: it keeps a single scorer, it is measurable against the existing sweep, and it can be raised to CAUSE later if the histories come out flat -- whereas a second scorer is hard to remove once other things read it. On (1) I lean symmetric for similarity and directed for grievance, which is how the two already behave: kinship is a fact about a shared past, a grudge is something one party holds.",
+      "files": [
+        "docs/generation/CIVILISATION.md",
+        "src/world/creeds.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "resolution": "PARTLY RESOLVED 2026-09-09. Ben, on call (3): 'Go with permit rather than cause for now. This is really work for sprint 38.'\n\nSO OPPOSITION PERMITS CONQUEST RATHER THAN CAUSING IT: relations feed the existing w_cult weight rather than raising a score of their own. One scorer, measurable against the sweep already in place, and raisable to CAUSE later if the histories come out flat -- whereas a second scorer would be hard to remove once other things read it.\n\nCALLS (1), (2) and (4) REMAIN OPEN and are sprint 38's, along with the build itself (BL-870). They were deliberately not answered here: (3) was the one that decides the size of the others, and answering it first is what makes them cheap.\n\nWHAT LANDED IN SPRINT 37 INSTEAD is the substrate the whole question rests on: BL-865 retains the migration's family tree, and it turns out to have real depth -- deepest descent 9 and 10 on seeds 0 and 1, across 676 and 929 cultures, every one of which walks back to a cradle. Kinship distance therefore carries actual signal rather than being flat, which is what a similarity measure needs to be worth reading."
+    },
+    "NR-818": {
+      "id": "NR-818",
+      "title": "Does the Culture round COAST to the boundary, or does its terminating condition become it?",
+      "raised": "2026-09-09",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Your elicitation answer on the span boundary: 'Run this from 0 CE to 1200 CE'. It names the Empires start and does not say what happens to the migration's own ending.",
+      "what": "Two readings. (A) THE COAST, adopted: the Culture round still ends when every habitable landmass carries some culture - a derived year - and the world then holds what migration left it until 0 CE, simulating nothing in between. (B) THE CLAMP: the Culture round's terminating condition simply becomes 0 CE.",
+      "why_it_matters": "COLONISATION.md settled the derived terminating condition on 2026-09-09, overturning a stated-year ruling made earlier the same day. Reading B would overturn it a second time within the day; reading A keeps both your rulings true at once. It also changes a written line in two authority docs, which is why it is raised rather than assumed.",
+      "options": [
+        "A - coast to 0 CE, derived ending preserved (ADOPTED)",
+        "B - the migration's terminating condition becomes 0 CE",
+        "C - derived ending, and the Empires start floats with it"
+      ],
+      "recommendation": "A, on the grounds that it is the only reading under which neither of your two rulings has to be discarded, and because the design already uses exactly this device across 1200 -> 1560. The consequence to accept is that a world filling early sits still for a while - which is what a dark age looks like, and it is cheap. Overturn to B if you want the migration span itself bounded.",
+      "files": [
+        "docs/generation/CIVILISATION.md",
+        "docs/generation/COLONISATION.md",
+        "docs/ui/STARTUP.md"
+      ],
+      "resolution": "RESOLVED (Ben, 2026-09-09): reading A, the COAST, confirmed - and the boundary moved with it. The Culture round keeps its derived terminating condition, and the world holds what migration left it until the stated boundary, simulating nothing in between. THE BOUNDARY IS 400 BCE, NOT 0 CE, and pass 1 now covers 3,600 years rather than 4,000: Culture 2400 BCE -> 400 BCE (2,000 years), Empires 400 BCE -> 1200 CE (1,600 years). 1200 CE is unmoved, so the coast to 1560, pass 2 and the 1960 epoch are untouched. One claim written under the first cut is now FALSE and was removed: 0 CE was 'a year the engine already knows' because the sim's ancient arc ends there - 400 BCE is not, so the split is real work rather than free. Written into CIVILISATION.md sec The span is 400 BCE to 1200 CE, which owns the arithmetic; COLONISATION.md, STARTUP.md and GENERATION_STRATEGY.md take their figures from it. Carried by BL-871."
+    },
+    "NR-823": {
+      "id": "NR-823",
+      "title": "CALL: reach GATES conquest (2026-09-09) and the arc requires conquest to COMPOUND (2026-09-10) pull against each other",
+      "raised": "2026-09-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 38 close. history_sim.hpp sec sustainable_campaign_floor_q already says in the source: \"80 IS WHERE THIS SHIPS, PENDING BEN'S CALL.\"",
+      "what": "Ben ruled 2026-09-09 that reach GATES a campaign rather than pricing it -- a wall, not a toll -- so a rich polity cannot buy past geography. Ben ruled 2026-09-10 that the world must show polities eliminated, empires forming, empires collapsing, and unequal survivors. A hard gate caps how far success can carry before it must stop, and the field's own comment records that it \"removes that long tail entirely\" in which a shrinking realm's last holdout finally falls. Both rulings are live and they conflict.",
+      "why_it_matters": "This is the crux of BL-889 (conquest must compound) and it decides what that item is allowed to change. Measured evidence that the gate is a hard veto: history_sim_harness fails R3a2/R3a3 on main with \"near: 6 battles / 1 conquests | far: 0 battles / 0 conquests\" in a case that deliberately sets neighbour_radius=40 and w_dist=0 so ONLY supply decay can stop the far target. A prior investigation already showed floors of 80 and 20 give identical elimination counts, so this is not a calibration question.",
+      "options": "A) Keep the gate absolute and find compounding elsewhere (roads/reach must GROW with success, so the wall moves outward as an empire wins -- BL-892 is relevant, reach works are currently inert). B) Soften the gate to a steep price above a floor, restoring the low-probability killing blow. C) Keep the gate but make reach propagate through centre chains, which is BL-887 and is already deferred pending tech progression.",
+      "recommendation": "A, on the evidence -- it satisfies both rulings rather than trading one off. A wall that MOVES when you win is still a wall, and BL-892 (reach works inert) suggests the intended mechanism for moving it already exists and is broken.",
+      "items": [
+        "BL-889",
+        "BL-892",
+        "BL-887",
+        "BL-868"
+      ],
+      "resolved": "2026-09-10",
+      "resolution": "BEN, 2026-09-10: option A -- keep the wall, make it move. The 2026-09-09 reach-GATES-not-prices ruling stands; the gate is not fixed, so winning extends reach outward and geography must be BUILT past rather than bought past. Written into CIVILISATION.md sec The arc the phase must produce. B (soften to a price) and C (centre chains, BL-887) both explicitly declined. Consequence: BL-892 raised to priority A -- it records the widening mechanism inert (W7b), which is the lever BL-889 now rests on. BL-889 may NOT be delivered by lowering sustainable_campaign_floor_q."
+    },
+    "NR-824": {
+      "id": "NR-824",
+      "title": "CALL: BL-861 (no conquest in the span) is met as literally written and unmet in intent -- close it or rewrite it?",
+      "raised": "2026-09-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 38 close, measured against history_sweep at 16 seeds on main (c83a0d74).",
+      "what": "BL-861 was filed on \"0 battles, 0 conquests, 611 foundings\" on seed 0 and asked that the cause be measured. Measured: battles median 412, conquests median 386, zero worlds with zero conquest, B384a passes. Its stated DONE WHEN is satisfied. But the world it wanted -- one with a real arc in it -- is not there: 0 eliminations in 16/16, largest empire 3.3%, rise/peak/fall 0/16.",
+      "why_it_matters": "Leaving it open with a stale premise is how backlog prose rots into a false record; closing it as delivered risks reading as if the underlying design intent was met, which it was not. BL-889 now carries the surviving question.",
+      "options": "A) Close as delivered-by-sprint-38, with BL-889 named as the successor. B) Rewrite onto the surviving question and keep the id. C) Cancel as superseded.",
+      "recommendation": "A -- the item did its job (it forced the measurement that found the real defect), and BL-889 carries the intent forward with the evidence attached.",
+      "items": [
+        "BL-861",
+        "BL-889"
+      ],
+      "resolved": "2026-09-10",
+      "resolution": "BEN, 2026-09-10: CANCEL as superseded -- not the \"close as delivered\" that was recommended. BL-861 is marked cancelled rather than complete, which is the honest record: the item asked for a cause to be measured, the measurement happened, and it found a different defect than the one the item described. Its surviving question is carried by BL-889 (conquest must compound). A cancelled row is also what \"--status cancelled finds work that was closed unbuilt\" is for."
+    },
+    "NR-834": {
+      "id": "NR-834",
+      "title": "BL-909 (directed want table): an intermittent history_sweep crash was fixed empirically by switching to bounds-checked lookups, without pinning the actual mechanism",
+      "raised": "2026-09-11",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "BL-909 (DIRECTED_WANT_TABLE), delivered this session.",
+      "what": "The implementing agent's first cut of derive_wants (and its pass_one_output_valid checks) used operator[] on per-polity/per-good lookup vectors and produced an intermittent, unreproducible-by-inspection crash across full 16-seed history_sweep runs. Switching those same lookups to bounds-checked .at() made four consecutive full sweeps pass cleanly (EXIT=0), and pass_one_handoff plus world_determinism (bit-identical digests) both stayed green with the change. The agent could not find an out-of-bounds access by static reading of the code and reported the fix as empirical, not diagnosed.",
+      "why_it_matters": "An .at() swap that silently fixes a crash without a known cause is a real risk in a deterministic sim: if the underlying issue is an actual out-of-bounds read (rather than something environmental to the harness's process spawning, which the BL-907 agent separately reported issues with in this same session), .at() only turns a crash into a caught exception at a different spot, or masks a logic error whose consequence is merely invisible until the vector sizes shift again. Landed as-is because the fix is real and cheap and the harnesses are genuinely green, but nobody has confirmed it is not silently working around something worse.",
+      "options": [
+        "Accept the .at() fix as sufficient (defensive bounds-checking is reasonable regardless of cause) and close this without further investigation.",
+        "Spend a session instrumenting derive_wants (address sanitizer / a debug build with bounds logging) to find the actual OOB access before trusting the currently-green harnesses fully.",
+        "Ask the BL-907 agent's separately-reported 'duplicate process' sandboxing artifact to be ruled out first -- if history_sweep was genuinely being invoked twice concurrently against shared output state in this environment, that could produce exactly this kind of intermittent, non-reproducible-by-inspection failure with no real OOB in the code at all."
+      ],
+      "recommendation": "Option 3 first -- cheap to check (rerun the pre-.at() code once, serially, with no other harness running concurrently) and would fully explain the symptom without implicating derive_wants's logic at all. If it reproduces even in isolation, escalate to option 2.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/history_sim.hpp",
+        "tools/verify/history_sweep.cpp",
+        "tools/verify/pass_one_handoff.cpp"
+      ],
+      "resolution": "INVESTIGATED 2026-09-11 (Ben: \"Do investigate NR-834 here\"). Took the recommended option 3 first. STATIC READ: every holds/shows_market index in the delivered code is either loop-bound-guaranteed (a, b range over 0..polities.size()-1 by construction) or explicitly range-checked before use (r.nation >= polities.size(), w.from/w.to >= o.polities.size() both guard ahead of any lookup) -- the .at() calls cannot actually throw in this final code as written, which is itself evidence the crash was not a logic OOB in the shipped version. EMPIRICAL TEST: reverted all seven .at() call sites in derive_wants and its pass_one_output_valid checks back to plain operator[], built the harness, and ran a single ISOLATED 32-seed history_sweep (no other harness running concurrently) -- ALL PASS, 0 failures, no crash. Restored .at() afterward (kept as cheap, reasonable defensive bounds-checking regardless of cause -- harmless, not costly). CONCLUSION: the intermittent crash the building agent saw during development was very likely the environmental artifact option 3 named (this session's sandbox spawning duplicate/concurrent harness processes against shared output state -- independently reported by the BL-907 agent the same session), not a real out-of-bounds read in derive_wants. Closing without further instrumentation (option 2 not needed -- nothing reproduced in isolation to instrument)."
     }
   }
 }

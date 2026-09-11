@@ -11,27 +11,5 @@
   "  design-owed (glyph ~) - design still owed; must be settled before promotion.",
   "PRIORITY (ascending): F C B A S SSS."
  ],
- "items": [
-  {
-   "id": "BL-903",
-   "short_name": "COMMUNICATION_RUNG",
-   "status": "designed",
-   "priority": "B",
-   "difficulty": 3,
-   "glyph": "✓",
-   "sprint": null,
-   "written": "2026-09-11",
-   "author": "Ben (2026-09-08, as lever 3 of BL-823); Claude (split out on closing that umbrella)",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "title": "A polity can act on ground it cannot hear from, because there is no communication rung",
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-   "files": [
-    "src/world/history_sim.cpp"
-   ],
-   "design": "SPLIT OUT OF BL-823 (anti-hegemon levers) ON 2026-09-11, when that umbrella closed. It is the LAST of its six levers still unbuilt; the other five shipped under their own ids.\n\nBEN, 2026-09-08, naming it: before a communication rung is reached, a polity cannot act on ground it cannot HEAR from -- which bounds early growth by GEOGRAPHY rather than by a cap.\n\nIT EARNS ITS PLACE TWICE, which is why it survived the umbrella's closure. It is an anti-hegemon lever, and it is also THE SECOND RUNG OF BEN'S OWN ARC (GENERATION_STRATEGY.md: origin -> COMMUNICATION -> conquest or diplomatic union -> a stable dark age). The arc names four rungs and this is the only one with no mechanism behind it.\n\nIT IS NOT A DUPLICATE OF REACH, AND THAT DISTINCTION IS THE WHOLE ITEM. BL-837's reach asks CAN I SUPPLY THIS -- a question about materials moving over terrain. Communication asks CAN I KNOW ABOUT THIS AT ALL -- a question about information, which travels differently, degrades differently, and binds EARLY history where reach binds late. If the build cannot articulate a difference that shows up in the numbers, it is duplicating reach and should be dropped rather than shipped: BL-823's own instruction was to re-read the remaining levers as SUPPORTING reach-gating and to drop any that only duplicate it. That test applies to this item first.\n\nTHE CONSTRAINT, unchanged from the umbrella: a lever is a FORCE WITH A VISIBLE CAUSE ON THE MAP, never a term inside an actor and never a penalty that scales with a polity's rank.\n\nDESIGN IS OWED BEFORE BUILD. Open: what the rung IS (a capacity band? a work? a property of the network?); whether it gates the scorer's candidate list or the verb's execution; and how it differs measurably from reach rather than only in prose.\n\nDONE WHEN: a polity demonstrably cannot act on ground it has no communication to; the bound shows up in EARLY history where reach binds late; and the difference from reach is visible in the sweep rather than argued for in a comment.\n\nDESIGN SETTLED (Ben, 2026-09-11, elicitation): the rung is DERIVED, not a stored capacity band or a work of its own -- it comes from either (A) immediate borders, or (B) good relations with a neighbour who shares border detail. It gates the SCORER'S CANDIDATE LIST, not verb execution -- ground beyond the rung never becomes a candidate the scorer considers, rather than being considered and then refused at execution. Design is now settled; this item may be promoted to REFINED.md."
-  }
- ]
+ "items": []
 }

@@ -145,7 +145,21 @@ THE PHASE MAP CHANGED (Ben, 2026-09-11), as a consequence of splitting explorati
 
 AN ASPECT WAS CONCEDED AND IS WORTH RECORDING. The first assessment argued that population demand belongs to the economy pass and should be descoped from this phase. Ben overturned it: a good you know exists, that you do not have, is an incentive without any price attached. That is why BL-909 is a want table rather than nothing, and it did not need the no-market ruling relaxed.
 
-### Sprint 39 — the new world
+### Sprint 39 — tighten the levers
+*Open · opened 2026-09-11 · Ben (2026-09-11, live build_rel review)*
+
+**Goal.** Sprint 38 built the Empire phase's full mechanism and made it measurable (the seven-reading closure contract). Ben's read of it running live: the phase feels TOO lively -- too much fighting, too much churn -- as a precursor to the next phase of generation rather than as the finished feel. This sprint tunes what sprint 38 measured rather than building anything new: read the sweep's own numbers (history_sweep's BL-907 scoreboard, the reach-gate finding in NR-833/BL-905, the tariff/turbulence bands) and bring the phase's pace and volume down to where it reads as history rather than noise, without re-opening the mechanism itself.
+
+**Planned.**
+- Open: no items decomposed yet. Candidates already surfaced this session -- BL-905's reach-gate finding (the gate is a step function, refuses ~0 or ~everything, no gradient) and NR-833 (BL-903's dead-end, likely sharing a cause with BL-905) are the two most load-bearing places to start, since both post-water gates may be inert for the same reason.
+
+**Risk.** Tuning without re-measuring is exactly the failure mode sprint 38 itself was built to avoid (forced outcomes, tuning toward a number rather than measuring one). Every change here needs a before/after read off history_sweep, same discipline as sprint 38.
+
+Ben, 2026-09-11, live build_rel review of sprint 38's Empire phase: "This looks really lively, and perhaps too much so. I think this would work as a precursor to the next phase of generation, but I want to tighten some levers."
+
+SUPERSEDES the sprint-39 id sprint 38's own handoff previously reserved for 'the new world' -- that content moved to sprint 40, unchanged, so this tuning pass could take the 39 slot immediately after 38 rather than queue behind an unrelated phase.
+
+### Sprint 40 — the new world
 *Open · opened 2026-09-10 · Claude (2026-09-10 sprint-assignment sweep)*
 
 **Goal.** The exploration and colonisation phase that comes AFTER the Era -1 history: the unclaimed ground round 4 should leave behind, and what a player does with it. Ben, 2026-09-10, defining the live sprint map as 37 culture, 38 empire, 39 the new world.
@@ -153,6 +167,8 @@ AN ASPECT WAS CONCEDED AND IS WORTH RECORDING. The first assessment argued that 
 DEFINED 2026-09-10 (Ben). This sprint id was briefly used for the technology trees during a sprint-assignment sweep the same day; Ben redefined it as the new world and the six tree items (BL-881..886) were deleted outright rather than re-homed -- "we will look back at wiring tech later".
 
 THE DEPENDENCY IS REAL AND RUNS THROUGH SPRINT 38. Whether there is a new world to find at all is decided by how much ground round 4 leaves unclaimed, which is exactly what BL-889 (conquest must compound) changes. Do not decompose this sprint before that lands.
+
+RENUMBERED FROM 39 TO 40 (Ben, 2026-09-11): sprint 39 was reassigned to a lever-tuning sprint after sprint 38's Empire phase landed 'lively, perhaps too lively' -- battle/conquest/contact volumes read as high once the full 1,600-year span and the closure contract (BL-906/907/908/909/910/911/912) were all live in one sweep. This sprint's content (the new world / exploration phase) is unchanged, only its number moved.
 
 ## Where things stand
 
@@ -215,10 +231,11 @@ THE DEPENDENCY IS REAL AND RUNS THROUGH SPRINT 38. Whether there is a new world 
 | 37 | how humanity spreads before it fights | CLOSED 2026-09-10. REOPENED 2026-09-09 for a design addendum, having been closed the same day. The gap found: the migration builds a family tree of peoples (BL-856) and DISCARDS it, so kinship -- the natural substrate for culture similarity -- is unrecoverable by the empire phase. BL-865 (the addendum's whole reason to reopen) LANDED 2026-09-09 and is verified on main -- culture now carries `parent`/`origin_farm_class`, walking every daughter back to a cradle. KEPT OPEN 2026-09-10 for seven owed items -- BL-849, BL-852, BL-853, BL-854, BL-855, BL-859, BL-861 -- ALL NOW DELIVERED (BL-859 cancelled and redirected to BL-888, also delivered). BL-861 (no conquest across the 4000-year span) resolved as a measured SIDE EFFECT of BL-849/852/855/888 together, not a direct fix to war logic -- history_sweep across 16 seeds now shows every seed fighting (median 61 battles, range 7-141; seed 0 specifically went from 0 to 61). Sprint 38's BL-868 is blocked on the same symptom and should be re-checked against this before further diagnosis. |
 | 40 | three trees, one grammar | CLOSED 2026-09-10, the same day it opened, as a DESIGN sprint: the three trees, the grammar, the lint and the Empire scorer are written and linted; the six build items BL-881..BL-886 go to the pool. Ben: "I'm reluctant to push further when Empire and Industry have not landed yet" - the build waits on sprints 38 and 39. |
 | 38 | empire — the whole phase | 8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). REFRAMED 2026-09-10 on Ben's call (option B): the sprint no longer closes on BL-868's harness, but on a DISTRIBUTIONAL reading of history_sweep. The sweep was run and the reading is in: conflict is fixed, asymmetry and volatility are not. BL-889, BL-890, BL-891 and BL-892 were added to the sprint on that basis; BL-868 is now blocked on BL-889. |
-| 39 | the new world | OPEN AND EMPTY BY DESIGN. The phase is named and reserved; no items are decomposed for it yet. Its first input is whatever round 4 leaves unpartitioned once sprint 38 settles how far empires actually spread. |
+| 39 | tighten the levers | OPEN. Defined 2026-09-11 after Ben reviewed sprint 38's Empire phase live in build_rel: "really lively, and perhaps too much so." The phase's SUBSTANCE is delivered and the closure contract is fully wired (sprint 38); this sprint is the tuning pass that follows it -- refining the feel of the time-lapses (battle/conquest/contact/want volumes, the reach gate's step-function behaviour, tariff/turbulence bands) rather than adding new mechanism. |
+| 40 | the new world | OPEN AND EMPTY BY DESIGN. The phase is named and reserved; no items are decomposed for it yet. Its first input is whatever round 4 leaves unpartitioned once sprint 38 settles how far empires actually spread. |
 
 **Next up.** SPRINT 38 IS OPEN (opened 2026-09-09, given its own entry 2026-09-10) - how city states become empires. 8 of 9 items are landed and verified on main; BL-868 (creeds raise armies) is the sole holdout after seven verification attempts, now understood to be a fixture problem entangled with BL-837/BL-872's reach and supply mechanics rather than a wiring defect. Next session's whole focus here is BL-868: redesign its test fixture for the post-BL-837/872 world, or give it a longer stop_year, before attempting an eighth pass. Sprint 37 remains open pending its reopened design addendum (Ben, 2026-09-09: 'we have more work to do for sprint 37').
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*56 sprints archived cold; 2 open/gated in the hot store.*
+*56 sprints archived cold; 3 open/gated in the hot store.*
