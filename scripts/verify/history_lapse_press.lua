@@ -37,7 +37,15 @@ verify.window(1920, 1080)
 -- Both were read off captures rather than derived, and a pass round's footer is
 -- the same on every one of them because the decision block is empty on all three.
 local NEXT3_X,  NEXT3_Y  = 603, 975   -- the last planetology round's Next
-local RESTART_X, RESTART_Y = 483, 150 -- a lapse round's Restart slot
+-- BL-914 (2026-09-11): Restart is retired on both lapse rounds -- a scrubber
+-- makes it redundant and its row went to the ranking board. The SAME slot is
+-- now the Pause/Play toggle; a landed round is parked (paused) under --verify
+-- (m_golden_dir set), so this button reads "Play", and pressing it both
+-- starts playing AND -- because the playhead sits at the record's last year
+-- here -- re-parks it at the first year, exactly the observable behaviour A3
+-- below has always asserted. The scrubber beside it takes no --verify hook
+-- yet and is not exercised by this script; a live click is owed for it.
+local TRANSPORT_X, TRANSPORT_Y = 483, 150
 local REROLL_X, REROLL_Y = 483, 957   -- a pass round's Reroll
 local BACKP_X,  BACKP_Y  = 363, 995   -- a pass round's Back
 local NEXTP_X,  NEXTP_Y  = 603, 995   -- a pass round's Next
@@ -87,11 +95,15 @@ verify.expect(at_first > 0 and at_last > 0,
               "both ends of the span hold ground ("
               .. at_first .. " -> " .. at_last .. " powers)")
 
--- A3 -- RESTART IS A REACHABLE PRESS. It re-parks the playhead at the record's
--- own first year, so the year after the press is the span's start.
+-- A3 -- THE TRANSPORT'S PLAY PRESS IS REACHABLE, and pressing it FROM THE END
+-- re-parks the playhead at the record's own first year (BL-914's stand-in for
+-- the retired Restart: resuming from the very end restarts, since a Play
+-- button that visibly does nothing would be worse than the button it
+-- replaced). Frozen under --verify regardless of the resulting `playing`
+-- state, so the year holds at the start for the capture.
 verify.history_year(last)
 verify.frames(2)
-verify.click(RESTART_X, RESTART_Y)
+verify.click(TRANSPORT_X, TRANSPORT_Y)
 verify.frames(3)
 verify.capture("press_02_after_restart")
 

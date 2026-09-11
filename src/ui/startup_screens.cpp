@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <random>
 #include <string>
@@ -236,7 +237,24 @@ void app::launch_wizard_history_run(int lapse_index)
 
     m_wiz_history[lapse_index]         = ui::history_lapse{};
     m_wiz_history_playing[lapse_index] = false;
+    m_wiz_history_paused[lapse_index]  = false;
     m_wiz_history_carry[lapse_index]   = 0.0f;
+    // Sentinel, not 0: a signed calendar year of 0 is a real year (0 CE), so
+    // it cannot double as "never parked yet". `poll_wizard_history_tap`'s
+    // first live update and `poll_wizard_history`'s landing both snap this to
+    // the record's own start_year on sight of it (BL-914) — the same "parks
+    // at its first year" this member's own comment always promised, just no
+    // longer forced to happen ONLY at landing.
+    m_wiz_history_year[lapse_index]    = INT32_MIN;
+
+    // BL-914: the tap for a fresh run. Reset FIRST, before anything can
+    // publish into it, then pointed at from `prog` — a worker started below
+    // reads `prog.lapse_tap` once, at its own leisure, and by then it is
+    // already this round's tap and already empty.
+    era_lapse_tap& tap = m_wiz_history_tap[lapse_index];
+    tap.reset();
+    m_wiz_history_tap_seen[lapse_index]       = tap.epoch_now();
+    m_wiz_history_tap_redraw_at[lapse_index]  = 0.0;
 
     // The wait's own content. Cleared FIRST so no frame can read the previous
     // run's pass split as this one's — the same ordering begin_new_game keeps.
@@ -246,6 +264,7 @@ void app::launch_wizard_history_run(int lapse_index)
     prog.stage_count.store(generation_stage_label_count, std::memory_order_relaxed);
     prog.sub_progress.store(0, std::memory_order_relaxed);
     prog.sub_total.store(0, std::memory_order_relaxed);
+    prog.lapse_tap = &tap; // BL-914: null-safe in run_history_sim/make_hard_coded_world.
 
     // UNDER --verify, ADOPT THE WORLD THE HARNESS ALREADY BUILT. run_verify opens
     // in_game on a generated world, so `m_generation_report` already holds this
@@ -332,14 +351,91 @@ void app::poll_wizard_history()
             m_wiz_history_playing[i] = false;
             continue;
         }
-        m_wiz_history[i]      = std::move(landed);
-        m_wiz_history_year[i] = m_wiz_history[i].lapse.start_year;
-        // It plays the moment it lands: the run was the wait, and the playback is
+        m_wiz_history[i] = std::move(landed);
+
+        // BL-914: LANDING NO LONGER RE-PARKS THE PLAYHEAD AT THE START. Under
+        // the old design the future carried the whole record and this was the
+        // first moment any of it was visible, so parking at the start was the
+        // only sensible year. Now the live phase has usually already been
+        // playing this very round for most of its 30 seconds — snapping back
+        // to year one the instant the future resolves would look like the
+        // transport lurching backwards at exactly the moment it should read as
+        // seamless. So: clamp what is already there into the landed record's
+        // range, and only fall back to its start_year for a round that was
+        // never live-drawn at all (the `--verify`/adopted paths, whose year is
+        // still the launch-time sentinel).
+        const int lstart = m_wiz_history[i].lapse.start_year;
+        const int lend   = lstart + m_wiz_history[i].lapse.years;
+        if (m_wiz_history_year[i] < lstart) m_wiz_history_year[i] = lstart;
+        if (m_wiz_history_year[i] > lend)   m_wiz_history_year[i] = lend;
+
+        // It plays the moment it lands (or keeps playing, if the live phase
+        // already had it going): the run was the wait, and the playback is
         // what arriving on the round asked for. Frozen under --verify, where the
         // year is set by the script instead (verify.history_year).
         m_wiz_history_playing[i] = m_golden_dir.empty();
-        m_wiz_history_carry[i]   = 0.0f;
+        m_wiz_history_paused[i]  = false;
     }
+}
+
+void app::poll_wizard_history_tap(int lapse_index)
+{
+    // Only a round whose worker is still running publishes anything new; once
+    // landed, `poll_wizard_history` above owns the record wholesale, and a
+    // round nobody has started yet has no tap worth reading either.
+    if (lapse_index < 0 || lapse_index >= wizard_lapse_round_count) return;
+    if (!m_wiz_history_future[lapse_index].valid()) return;
+    // FROZEN UNDER --verify, same reason every other wizard animation is: a
+    // capture must never race a live redraw, and a `--verify` run resolves its
+    // (deferred) future synchronously before the first frame draws anyway, so
+    // this branch would have nothing to do even without the guard.
+    if (!m_golden_dir.empty()) return;
+
+    era_lapse_tap& tap   = m_wiz_history_tap[lapse_index];
+    const uint32_t epoch = tap.epoch_now();
+    if (epoch == m_wiz_history_tap_seen[lapse_index]) return; // nothing new published
+
+    // THROTTLED INDEPENDENTLY OF THE PUBLISH RATE. A founding or a recorded
+    // step can publish a few thousand times across a run; re-deriving the
+    // drawable map (`finish_history_lapse`'s BFS + terrain bake + polity
+    // colouring) that often would cost far more than the animation it is for.
+    // Redraws every ~0.2 s regardless of how many publishes landed in between
+    // — always the LATEST snapshot, never a queued backlog of frames.
+    const double now = ImGui::GetTime();
+    if (now < m_wiz_history_tap_redraw_at[lapse_index]) return;
+    m_wiz_history_tap_redraw_at[lapse_index] = now + 0.2;
+
+    ui::history_lapse& rec = m_wiz_history[lapse_index];
+    int32_t start_year = 0, year_reached = 0;
+    m_wiz_history_tap_seen[lapse_index] = tap.snapshot(
+        rec.lapse.changes, rec.lapse.culture_changes, rec.lapse.events,
+        rec.region_col, rec.region_row, rec.region_name,
+        start_year, year_reached);
+
+    if (rec.region_col.empty())
+        return; // Geometry has not been published yet — nothing drawable this poll.
+
+    const bool first_populate = (rec.grid_w == 0);
+
+    rec.lapse.start_year    = start_year;
+    rec.lapse.years         = std::max<int32_t>(0, year_reached - start_year);
+    rec.lapse.region_stride = static_cast<int32_t>(rec.region_col.size());
+    rec.grid_w = home_grid_width;
+    rec.grid_h = home_grid_height;
+
+    // Force `finish_history_lapse` to re-run: new regions and/or new ownership
+    // widen the tile assignment and can move the polity adjacency graph, so
+    // the whole one-shot derivation (tile_region, the terrain bake, the
+    // palette) is invalidated rather than patched. See history_lapse.hpp;
+    // `derived()` reads `tile_region` alone, so clearing it is sufficient.
+    rec.tile_region.clear();
+
+    // The playhead parks at the record's own first year the moment there is
+    // anything to show at all — "arriving on the round IS the instruction to
+    // run it" (STARTUP.md), now true of the FIRST live frame rather than only
+    // of the moment the future eventually lands.
+    if (first_populate)
+        m_wiz_history_year[lapse_index] = start_year;
 }
 
 void app::poll_wizard_surface()
@@ -819,6 +915,10 @@ void app::draw_generation_screen()
     const bool lapse_round =
         (!planetology_round && pass_index < wizard_lapse_round_count);
     const int  lapse_index = lapse_round ? pass_index : 0;
+    // BL-914: pull whatever the round's own worker has published so far,
+    // BEFORE the empty() check below — this is what turns "empty until the
+    // future lands" into "has a growing record from the first publish on".
+    if (lapse_round) poll_wizard_history_tap(lapse_index);
     std::vector<uint16_t> hist_slice, hist_lagged;
     if (lapse_round && !m_wiz_history[lapse_index].empty())
     {
@@ -834,17 +934,37 @@ void app::draw_generation_screen()
                                  m_wiz_terrain.size());
 
         const int first = rec.lapse.start_year;
-        const int last  = first + rec.lapse.years;
+        const int last  = first + rec.lapse.years; // BL-914: the YEAR REACHED SO FAR
+                                                    // while live — see poll_wizard_history_tap
+                                                    // — and the true final year once landed.
+        const bool live = m_wiz_history_future[lapse_index].valid();
 
         // FROZEN UNDER --verify, for the reason the globe's rotation is: a capture
         // must never race an animation. The year is then whatever the script set.
-        if (m_wiz_history_playing[lapse_index] && m_golden_dir.empty())
+        //
+        // BL-914: a LIVE round is always advancing — there is nothing to pause
+        // yet, only a frontier the playhead can be waiting at (`year == last`,
+        // handled by the clamp below rather than by stopping here). Once
+        // landed, `m_wiz_history_playing` is what the new Pause control drives.
+        if ((live || m_wiz_history_playing[lapse_index]) && m_golden_dir.empty())
         {
-            // The rate follows the SPAN rather than being a constant, the same
-            // derivation the History ledger's Ages view makes: the recorded era is
-            // 400 years today and the round is written against 4000, and a fixed
-            // years-per-second would empty the transport in a blink on one of them.
-            const float span = static_cast<float>(last - first);
+            // THE RATE IS AGAINST THE ROUND'S FULL SPAN, NOT AGAINST HOW FAR IT
+            // HAS GOT (Ben, 2026-09-11: "played at a constant (slower) rate
+            // than calculation"). `last - first` is the wrong divisor while
+            // live — it grows every publish, and dividing by a growing number
+            // would make the transport visibly slow down as history runs.
+            // Round 4's full span is known before a single owner_change
+            // exists (`sub_total`, set in `hard_coded_world.cpp` right before
+            // `run_history_sim` starts); round 3's migration record has no
+            // such upfront figure, but it is not built incrementally either
+            // (settlement.cpp is untouched by this item) — its very first
+            // publish already carries the WHOLE finished record, so
+            // `last - first` is already the true total the first time this
+            // branch ever runs for it, and never grows again afterward.
+            const int sub_total =
+                m_wiz_history_progress[lapse_index].sub_total.load(std::memory_order_relaxed);
+            const float span = sub_total > 0 ? static_cast<float>(sub_total)
+                                             : static_cast<float>(last - first);
             constexpr float run_secs = 30.0f;
             const float rate = span > 0.0f ? span / run_secs : 1.0f;
             m_wiz_history_carry[lapse_index] += ImGui::GetIO().DeltaTime * rate;
@@ -854,7 +974,10 @@ void app::draw_generation_screen()
                 m_wiz_history_carry[lapse_index] -= static_cast<float>(whole);
                 m_wiz_history_year[lapse_index]  += whole;
             }
-            if (m_wiz_history_year[lapse_index] >= last)
+            // Stop-at-the-end applies only once landed: hitting the current
+            // frontier of a still-running pass is a WAIT (the clamp below
+            // holds the playhead there), never the end of the transport.
+            if (!live && m_wiz_history_year[lapse_index] >= last)
             {
                 m_wiz_history_year[lapse_index]    = last;
                 m_wiz_history_playing[lapse_index] = false;
@@ -862,6 +985,10 @@ void app::draw_generation_screen()
         }
         int& year = m_wiz_history_year[lapse_index];
         if (year < first) year = first;
+        // NEVER READS A YEAR THE PASS HAS NOT REACHED (the determinism-
+        // adjacent half of this item's DONE WHEN): `last` is `year_reached`
+        // while live, so this is the fixed-rate/published-year clamp the
+        // design asks for, expressed as the one clamp the code already had.
         if (year > last)  year = last;
 
         hist_slice = owner_slice_at(rec.lapse, year);
@@ -1090,14 +1217,48 @@ void app::draw_generation_screen()
             }
             else
             {
-                // Restart is the whole transport. It is not a toggle — it has no
-                // active state to undo; it re-parks the playhead and plays.
-                if (ImGui::Button("Restart##wizhistrestart",
+                // NO RESTART BUTTON (Ben, 2026-09-11): with a scrubber below it
+                // is redundant — anywhere the run ever reached is a drag away —
+                // and its row goes to the ranking board this round's whole
+                // point is to show. BL-914's transport is Pause/Play plus the
+                // scrubber, both live only now that the record is complete
+                // (NR-813's deferral premise — no real arc to sit through — is
+                // gone since BL-906 lengthened round 4's own span).
+                //
+                // A TOGGLE (io-standing-rules.md § Toggle rule): the label IS
+                // the visible active state, so the same press that started
+                // playing undoes it.
+                const int  first_y = rec.lapse.start_year;
+                const int  last_y  = first_y + rec.lapse.years;
+                const bool playing = m_wiz_history_playing[lapse_index];
+                if (ImGui::Button(playing ? "Pause##wizhisttransport"
+                                          : "Play##wizhisttransport",
                                   {ImGui::GetContentRegionAvail().x, 30.0f}))
                 {
-                    m_wiz_history_year[lapse_index]    = rec.lapse.start_year;
+                    m_wiz_history_playing[lapse_index] = !playing;
+                    m_wiz_history_paused[lapse_index]  =  playing; // now paused iff it just stopped
+                    // Resuming from the very end restarts rather than sitting on
+                    // a Play button that visibly does nothing — the one case
+                    // Restart used to cover that a plain toggle would not.
+                    if (!playing && m_wiz_history_year[lapse_index] >= last_y)
+                    {
+                        m_wiz_history_year[lapse_index]  = first_y;
+                        m_wiz_history_carry[lapse_index] = 0.0f;
+                    }
+                }
+                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+                int scrub_year = m_wiz_history_year[lapse_index];
+                if (ImGui::SliderInt("##wizhistscrub", &scrub_year, first_y, last_y,
+                                     ui::lapse_year_label(scrub_year).c_str()))
+                {
+                    // Dragging is itself an implicit pause — a scrubber that
+                    // fought the playhead for the same year would be
+                    // unreadable, and BL-914 only ever asks for Pause AND a
+                    // scrubber together, never scrubbing while still playing.
+                    m_wiz_history_year[lapse_index]    = scrub_year;
                     m_wiz_history_carry[lapse_index]   = 0.0f;
-                    m_wiz_history_playing[lapse_index] = m_golden_dir.empty();
+                    m_wiz_history_playing[lapse_index] = false;
+                    m_wiz_history_paused[lapse_index]  = true;
                 }
                 ImGui::Spacing();
 
@@ -1339,14 +1500,18 @@ void app::draw_generation_screen()
             {
                 ImGui::Dummy({0.0f, ImGui::GetContentRegionAvail().y * 0.45f});
                 ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+                // BL-914: the map now draws WHILE the pass runs, so this text
+                // is only ever seen for the first moment or two of a run —
+                // before its worker has published a first region and a first
+                // owner for it — rather than for the whole wait as before.
                 const bool running = m_wiz_history_future[lapse_index].valid();
                 if (lapse_index == 0)
                     ImGui::TextWrapped(running
-                        ? "  The migration is running. The map fills in when it lands."
+                        ? "  The migration is starting."
                         : "  The migration has not been run for this world yet.");
                 else
                     ImGui::TextWrapped(running
-                        ? "  The history is running. The map fills in when it lands."
+                        ? "  The history is starting."
                         : "  The history has not been run for this world yet.");
                 ImGui::PopStyleColor();
             }

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <mutex>
+#include <string>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -251,6 +254,173 @@ struct era_timelapse
 /// the walk stops at the first one past it. A region that has not appeared yet
 /// reads `owner_none`.
 std::vector<uint16_t> owner_slice_at(const era_timelapse& t, int64_t year);
+
+// ---------------------------------------------------------------------------
+// The live tap (BL-914) — render while it computes, not after
+// ---------------------------------------------------------------------------
+//
+// UNTIL NOW A PASS ROUND WAS COMPUTED SILENTLY and only handed to the renderer
+// once `std::async` landed the whole `era_timelapse` in one piece — "it plays
+// the moment it lands: the run was the wait" (STARTUP.md's old wording). Ben,
+// 2026-09-11: the wizard should draw the map moving from the first frame, at a
+// fixed pace, always behind the year the pass has actually reached.
+//
+// THE SAME CONTRACT THE MARKET CARVE USES (hard_coded_world.hpp's
+// `generation_progress`): a pure, WRITE-ONLY tap. The worker thread appends to
+// it exactly as it appends to its own real record and nothing here is ever
+// read back by the sim — no field feeds a decision, a branch or a random draw
+// — so a watched run and an unwatched run take identical paths and are
+// byte-identical. Every producer takes `era_lapse_tap*` defaulted to null and
+// treats null as "publish nothing"; the harness and every headless caller pass
+// nothing and pay not even the cost of a lock.
+//
+// A MUTEX RATHER THAN THE CARVE'S BARE ATOMICS, and that is a frequency
+// argument, not a style one: the carve republishes a single grid cell tens of
+// thousands of times a run, so a lock per publish would be the bottleneck. A
+// time-lapse publishes on recorded steps and discrete events — at most a few
+// thousand times across a 4000-year run — so a short critical section around a
+// `vector::push_back` costs nothing measurable and is far easier to reason
+// about correctly than a lock-free double buffer of growing vectors would be.
+// `<mutex>`/`<atomic>` are standard-library, not a project header, so this
+// keeps era_timelapse.hpp's real promise — no history_sim.hpp, no
+// hard_coded_world.hpp — while paying for the lock only where one is used.
+//
+// APPEND-ONLY ON BOTH SIDES, exactly like the vectors it mirrors: the worker
+// never rewrites or truncates what it already published, so the reader can
+// track "how much of each list have I already copied" by size alone and copy
+// only the new tail on every snapshot.
+//
+// REGION GEOMETRY RIDES ALONG TOO, and this is a considered widening past the
+// three lists BL-914's own design names, not an oversight. A political map
+// cannot be drawn from ownership alone: `finish_history_lapse` (history_lapse.
+// hpp) needs every region's tile position and name before it can assign a
+// single tile, and those positions do not exist anywhere the renderer can
+// already see them — `settlement_state` is worker-local and never crosses the
+// thread boundary until the whole future lands. Without republishing it here,
+// "the map moving in the first second" is not implementable at all, only
+// "the year counter moving in the first second" is. Regions are append-only
+// for the life of a run (Settle only ever adds one — see history_sim.cpp), so
+// this is the same tail-copy contract as the three lists above, at columns/
+// rows/names instead of changes.
+struct era_lapse_tap
+{
+    mutable std::mutex mutex;
+
+    std::vector<owner_change>   changes;         ///< Mirrors `history_sim_state::owner_changes`.
+    std::vector<culture_change> culture_changes;  ///< Mirrors `history_sim_state::culture_changes`.
+    std::vector<lapse_event>    events;           ///< Mirrors `history_sim_state::events`.
+
+    // Region geometry — see the widening note above. Parallel arrays, indexed
+    // exactly as `settlement_state::regions` is; `region_col`/`region_row` are
+    // `region::col`/`::row`, `region_name` is `region::name`.
+    std::vector<int32_t>     region_col;
+    std::vector<int32_t>     region_row;
+    std::vector<std::string> region_name;
+
+    int32_t start_year   = 0;  ///< Year of the first publish this run.
+    int32_t year_reached = 0;  ///< The highest year folded into the three lists above.
+    bool    started      = false;
+
+    /// Bumped after every publish, under the lock. The renderer polls this
+    /// WITHOUT the lock (`epoch_now`) and only pays for the copy in `snapshot`
+    /// when the count has moved since its last read — a still frame (no
+    /// publish since last poll) costs one relaxed atomic load.
+    std::atomic<uint32_t> epoch{0};
+
+    /// Worker side (called from `world/*` only). `all_*` are the sim's own
+    /// growing vectors; only the tail past what this tap already holds is
+    /// copied in, so a publish costs O(new entries) rather than O(everything
+    /// so far). `year` is the highest year folded into this publish — it must
+    /// never regress across calls, mirroring the sim's own forward-only clock.
+    void publish(const std::vector<owner_change>&   all_changes,
+                 const std::vector<culture_change>&  all_culture_changes,
+                 const std::vector<lapse_event>&     all_events,
+                 int32_t                             year)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (!started) { start_year = year; started = true; }
+        for (std::size_t i = changes.size(); i < all_changes.size(); ++i)
+            changes.push_back(all_changes[i]);
+        for (std::size_t i = culture_changes.size(); i < all_culture_changes.size(); ++i)
+            culture_changes.push_back(all_culture_changes[i]);
+        for (std::size_t i = events.size(); i < all_events.size(); ++i)
+            events.push_back(all_events[i]);
+        if (year > year_reached || !started) year_reached = year;
+        epoch.fetch_add(1, std::memory_order_release);
+    }
+
+    /// Worker side, region geometry. Called wherever a region is founded
+    /// (settlement's own founding, and the per-year founding schedule inside
+    /// `run_history_sim` — see history_sim.cpp). `all_col`/`all_row`/`all_name`
+    /// are the caller's own flattened, append-only mirror of its region list;
+    /// only the new tail is copied in, same contract as `publish`. Takes its
+    /// own lock rather than folding into `publish`: geometry and ownership
+    /// grow on different schedules (a founding happens far less often than a
+    /// year advances), so a caller publishing one has no reason to pay for
+    /// re-copying the other.
+    void publish_regions(const std::vector<int32_t>&     all_col,
+                          const std::vector<int32_t>&     all_row,
+                          const std::vector<std::string>& all_name)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        for (std::size_t i = region_col.size(); i < all_col.size(); ++i)
+            region_col.push_back(all_col[i]);
+        for (std::size_t i = region_row.size(); i < all_row.size(); ++i)
+            region_row.push_back(all_row[i]);
+        for (std::size_t i = region_name.size(); i < all_name.size(); ++i)
+            region_name.push_back(all_name[i]);
+        epoch.fetch_add(1, std::memory_order_release);
+    }
+
+    /// Renderer side. Lock-free peek: has anything published since `last_seen`
+    /// (a value this same function returned before)? Callers skip `snapshot`
+    /// entirely when this comes back equal.
+    uint32_t epoch_now() const { return epoch.load(std::memory_order_acquire); }
+
+    /// Renderer side. Copies the whole record out under the lock, so a reader
+    /// never observes a half-appended publish, and returns the epoch the copy
+    /// was taken at (compare against a later `epoch_now()` to know it moved
+    /// again). Deliberately a full copy, not a delta: the renderer's own
+    /// playhead needs the whole prefix to redraw from, and a lapse tops out at
+    /// a few thousand entries, so this is cheap next to one frame's render.
+    uint32_t snapshot(std::vector<owner_change>&   out_changes,
+                       std::vector<culture_change>& out_culture_changes,
+                       std::vector<lapse_event>&    out_events,
+                       std::vector<int32_t>&        out_region_col,
+                       std::vector<int32_t>&        out_region_row,
+                       std::vector<std::string>&    out_region_name,
+                       int32_t& out_start_year, int32_t& out_year_reached) const
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        out_changes         = changes;
+        out_culture_changes = culture_changes;
+        out_events          = events;
+        out_region_col      = region_col;
+        out_region_row      = region_row;
+        out_region_name     = region_name;
+        out_start_year      = start_year;
+        out_year_reached    = year_reached;
+        return epoch.load(std::memory_order_relaxed);
+    }
+
+    /// Owner side, between runs (a fresh round, or a reroll). Never called from
+    /// `world/*` — only the app resets a tap it owns, before handing a fresh
+    /// pointer to the next worker.
+    void reset()
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        changes.clear();
+        culture_changes.clear();
+        events.clear();
+        region_col.clear();
+        region_row.clear();
+        region_name.clear();
+        start_year   = 0;
+        year_reached = 0;
+        started      = false;
+        epoch.store(0, std::memory_order_relaxed);
+    }
+};
 
 // ---------------------------------------------------------------------------
 // The ancient road record (BL-768)

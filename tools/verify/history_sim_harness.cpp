@@ -1310,6 +1310,74 @@ int main()
         }
     }
 
+    // --- B914  THE LIVE TAP DOES NOT PERTURB THE RUN ------------------------
+    //
+    // BL-914's determinism claim, asserted the same way BL-817's is above (and
+    // for the same reason: a recorder that can be READ is not the risk here —
+    // nothing in `world/*` ever reads a tap field back — the risk is a
+    // recorder that changes what it watches by the act of watching it). A
+    // tapped run and an untapped run must agree on EVERY field the harness
+    // already checks, not just the ownership list: `same_except_record` covers
+    // the counters, the road corridors, the grudge table, the polity ladder,
+    // the narration and the mutated settlement state, and `same_record` covers
+    // the playback series — between them that is everything `history_sim_state`
+    // carries except the event layer, checked separately below.
+    {
+        era_lapse_tap        tap;
+        settlement_state     s_tapped   = k1->settlement;
+        settlement_state     s_untapped = k1->settlement;
+        const history_sim_state tapped =
+            run_history_sim(s_tapped, nullptr, no_terrain, kgw, kgh, params, 4242u,
+                            nullptr, nullptr, &tap);
+        const history_sim_state untapped =
+            run_history_sim(s_untapped, nullptr, no_terrain, kgw, kgh, params, 4242u);
+
+        check(same_except_record(tapped, untapped, s_tapped, s_untapped)
+              && same_record(tapped, untapped),
+              "B914a a tapped run and an untapped run agree on every output field "
+              "already checked above (ownership, counters, corridors, grudges, "
+              "polities, narration, the settlement mutation, and the playback record)");
+
+        bool events_match = tapped.events.size() == untapped.events.size();
+        for (std::size_t i = 0; events_match && i < tapped.events.size(); ++i)
+        {
+            const lapse_event& x = tapped.events[i];
+            const lapse_event& y = untapped.events[i];
+            if (x.year != y.year || x.kind != y.kind || x.region != y.region
+             || x.polity != y.polity || x.other != y.other)
+                events_match = false;
+        }
+        check(events_match,
+              "B914b the event layer is identical between a tapped and an untapped run");
+
+        // A REAL ASSERTION ABOUT A RUN THAT WAS ACTUALLY WATCHED, not a
+        // vacuous pass over a tap nothing ever published into.
+        check(tap.epoch_now() > 0 && !tap.changes.empty() && !tap.region_col.empty(),
+              "B914c the tap actually published region geometry and ownership over the watched run");
+
+        // AND WHAT IT PUBLISHED AGREES WITH WHAT THE RUN ITSELF PRODUCED. The
+        // per-year publish lags the sim by one year (era_lapse_tap::publish,
+        // era_timelapse.hpp) precisely so it never reports a year that might
+        // still be mid-append; the final flush right before `run_history_sim`
+        // returns is what closes that one-year gap, so by here the tap must
+        // hold the complete record, not a lagging prefix of it.
+        check(tap.changes.size() == tapped.owner_changes.size()
+              && tap.culture_changes.size() == tapped.culture_changes.size()
+              && tap.events.size() == tapped.events.size(),
+              "B914d the tap's final flush holds the complete record, not a lagging prefix of it");
+
+        // THE GEOMETRY MIRROR AGREES TOO — every published region is the same
+        // region the run itself ended up with, in the same order.
+        bool geometry_match = tap.region_col.size() == s_tapped.regions.size();
+        for (std::size_t i = 0; geometry_match && i < tap.region_col.size(); ++i)
+            if (tap.region_col[i] != s_tapped.regions[i].col
+             || tap.region_row[i] != s_tapped.regions[i].row
+             || tap.region_name[i] != s_tapped.regions[i].name)
+                geometry_match = false;
+        check(geometry_match,
+              "B914e the tap's region geometry mirror matches the run's own regions, in order");
+    }
+
     // --- R9  culture relations: opposition permits conquest (BL-870) -------
     //
     // THE SAME IDIOM AS R3/S1/S2/S3/B318 ABOVE: one world, one variable

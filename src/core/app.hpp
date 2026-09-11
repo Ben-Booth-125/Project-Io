@@ -285,9 +285,19 @@ private:
         for (int i = 0; i < wizard_lapse_round_count; ++i)
         {
             if (wizard_planetology_round_count + i <= round) continue;
-            if (m_wiz_history_future[i].valid()) m_wiz_history_stale[i] = true;
-            else                                 m_wiz_history[i] = ui::history_lapse{};
+            if (m_wiz_history_future[i].valid())
+            {
+                m_wiz_history_stale[i] = true;
+                // BL-914: a live round already has a partial record drawn from
+                // its tap — that ground is gone the instant the planetology
+                // moved, exactly as much as a landed one would be, so it stops
+                // being SHOWN here even though the worker cannot be recalled
+                // and keeps publishing into a tap nothing reads any more.
+                m_wiz_history[i] = ui::history_lapse{};
+            }
+            else m_wiz_history[i] = ui::history_lapse{};
             m_wiz_history_playing[i] = false;
+            m_wiz_history_paused[i]  = false;
         }
     }
 
@@ -624,8 +634,33 @@ private:
     /// wrong bar when the true budget is 1 MB / (number of `app a;` scopes).
     std::unique_ptr<generation_progress[]> m_wiz_history_progress =
         std::make_unique<generation_progress[]>(wizard_lapse_round_count);
+
+    /// BL-914: the live tap each lapse round's worker publishes into while it
+    /// runs. Heap-allocated for the exact reason `m_wiz_history_progress` is
+    /// (see its own comment) — one more array member here is one more array
+    /// member charged six times to the main thread's stack in Debug. Reset by
+    /// `launch_wizard_history_run` before the pointer is handed to a fresh
+    /// worker; `m_wiz_history_progress[i].lapse_tap` is pointed at
+    /// `&m_wiz_history_tap[i]` at the same site.
+    std::unique_ptr<era_lapse_tap[]> m_wiz_history_tap =
+        std::make_unique<era_lapse_tap[]>(wizard_lapse_round_count);
+    /// The tap epoch this round's live poll last copied out. Compared against
+    /// `era_lapse_tap::epoch_now()` so a still frame (nothing published since
+    /// the last poll) costs one relaxed load and no copy.
+    uint32_t m_wiz_history_tap_seen[wizard_lapse_round_count] = {};
+    /// Wall time (`ImGui::GetTime()`) of the last live re-derive
+    /// (`finish_history_lapse` re-run). Throttled independently of the tap's
+    /// own publish rate — see `poll_wizard_history_tap` — because a BFS over
+    /// the whole homeworld raster on every one of a few thousand publishes
+    /// would cost far more than the animation it draws.
+    double m_wiz_history_tap_redraw_at[wizard_lapse_round_count] = {};
+
     int   m_wiz_history_year[wizard_lapse_round_count]    = {}; ///< Where playback stands, in calendar years.
     bool  m_wiz_history_playing[wizard_lapse_round_count] = {}; ///< Advancing on wall time.
+    /// Set once a landed record has been manually paused (the transport BL-914
+    /// adds once the future lands). Never true while a round is still live —
+    /// there is nothing to pause yet, only a frontier to wait at.
+    bool  m_wiz_history_paused[wizard_lapse_round_count]  = {};
     /// The planetology moved while a run was in flight, so what it returns is a
     /// history of a world that is gone. Discarded on arrival rather than shown.
     bool  m_wiz_history_stale[wizard_lapse_round_count]   = {};
@@ -636,6 +671,10 @@ private:
     void launch_wizard_history_run(int lapse_index);
     /// Per-frame: adopt any finished run and park its playback at its first year.
     void poll_wizard_history();
+    /// Per-frame, BL-914: while a lapse round's run is still in flight, pull
+    /// whatever its tap has published so far into `m_wiz_history[lapse_index]`
+    /// and re-derive the drawable map from it, throttled — see the .cpp.
+    void poll_wizard_history_tap(int lapse_index);
 
     // --- The seat (BL-630, 2026-08-26) --------------------------------------
     //

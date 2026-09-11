@@ -163,6 +163,18 @@ struct generation_progress
     std::atomic<int> sub_progress{0};
     std::atomic<int> sub_total{0};
 
+    // --- The live lapse tap (BL-914) ----------------------------------------
+    //
+    // A pass round's own record, published while it computes rather than
+    // handed over whole once the future lands. The pointer is set by the
+    // caller BEFORE `std::async` starts the worker and never reassigned while
+    // the worker runs, so no lock is needed on the pointer itself; the object
+    // it points at (`era_lapse_tap`) carries its own mutex around the growing
+    // vectors, for the reason its own header argues. Null for every generation
+    // call that has no wizard watching — `start_new_game`, every harness — so
+    // the sim pays nothing beyond one pointer compare when nobody is drawing.
+    era_lapse_tap* lapse_tap = nullptr;
+
     // --- The generation budget, published to the loading screen (BL-754) ----
     //
     // WHY HERE AND NOWHERE ELSE. The same numbers already reach a harness on
