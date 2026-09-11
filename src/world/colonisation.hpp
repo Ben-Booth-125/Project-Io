@@ -390,7 +390,113 @@ inline constexpr int32_t colonisation_hop_centiyears = 2600;
 /// different people whether it walked far or walked hard.
 ///
 /// A PLACEHOLDER awaiting `history_sweep`, like every magnitude here.
-inline constexpr int64_t colonisation_split_centiyears = 60000; // 600 years
+///
+/// 200 YEARS, DOWN FROM 600 (BL-918). Diversity is the deliverable and the
+/// splits are tuned TOWARD it (COLONISATION.md § Diversity is the
+/// deliverable; Ben, 2026-09-11: "if you need to over-tune splits, I
+/// encourage that"). A third of the interval triples how often a lineage may
+/// diverge by DISTANCE over the same walk; it stays a per-lineage rate limit,
+/// so it cannot reproduce the 1,739-culture runaway, which came from counting
+/// tiles rather than streams (see `run_colonisation`). Seven generations is
+/// about the shortest span over which two halves of a people stop
+/// understanding each other, which is the thing this number is standing for.
+inline constexpr int64_t colonisation_split_centiyears = 20000; // 200 years
+
+/// Centi-years a stream must have carried ITS OWN country before crossing
+/// into new country coins a daughter — the BIOME trigger's rate limit
+/// (BL-918). Fifty years on the stream, twenty-five on the lineage (below).
+///
+/// THE BIOME TRIGGER NOW FIRES ON EVERY FARM-CLASS TRANSITION, not once per
+/// class per lineage as BL-864's first cut bounded it. That bound was chosen
+/// against the runaway rather than against the design: it meant a people that
+/// came down from the highlands onto a floodplain, and then a second group of
+/// the same people that came down two centuries later by another pass, were
+/// one daughter rather than two — and the second is precisely the kin-but-
+/// distinct people the round is supposed to produce.
+///
+/// WHAT BOUNDS IT INSTEAD is time in the country, on two clocks:
+///   - a STREAM must have been a people of its class for this long before a
+///     transition can split it (`front_entry::since_split_cy`), so a daughter
+///     coined at a class boundary cannot coin a grand-daughter on the very
+///     next tile when the boundary is jagged — the chain that would rebuild
+///     the runaway one tile at a time;
+///   - a LINEAGE coins at most one biome daughter per
+///     `colonisation_biome_lineage_centiyears` (`last_biome_split_cy`, keyed
+///     by parent), so a broad lobe crossing a boundary along its whole width
+///     in the same decade produces ONE daughter rather than one per tile —
+///     the grain fix, applied here as it already was to the distance trigger.
+///
+/// MEASURED, NOT GUESSED. A first cut set both clocks to a century and
+/// `colonisation_harness` C15 read 171/220/137 cultures at a tree depth of 2
+/// against the 806/794/603 at depth 16/13/11 the once-per-class bound had
+/// produced — the loosening had tightened, because the old trigger carried
+/// no time gate at all and its chains were doing the work. Fifty years on
+/// the stream is the shortest gate that still stops the jagged-boundary
+/// chain (a stream re-coined every tile), and twenty-five on the lineage is
+/// enough that one lobe crossing at once is one daughter, not thirty. Both
+/// are shorter than the distance interval, deliberately: a new country is a
+/// stronger reason to differ than a long walk over the same ground, so where
+/// both apply the country is the explanation. The recorded 1,739 runaway is
+/// the ceiling to stay well under, not the target; C15 prints the count.
+inline constexpr int64_t colonisation_biome_split_centiyears   = 5000; // 50 years, per stream
+inline constexpr int64_t colonisation_biome_lineage_centiyears = 2500; // 25 years, per lineage
+
+// ---------------------------------------------------------------------------
+// Isolation (BL-918): a range breaks into insular groups
+// ---------------------------------------------------------------------------
+
+/// How far apart two settled regions may sit and still be one people
+/// (BL-918). The same nine the Era -1 sim uses for its region graph
+/// (`history_sim_params::neighbour_radius`), restated here rather than
+/// included because this header has no business depending on the sim's: a
+/// number the two must agree on is stated in both places with a pointer, as
+/// `culture::origin_farm_class` does for `farm_class`.
+inline constexpr int colonisation_isolation_radius = 9;
+
+/// Years a group must be cut off from its people's origin before it IS a
+/// people of its own — the divergence span (BL-918).
+///
+/// THE ISOLATION TRIGGER is the one split that happens AFTER settlement. The
+/// walk's three triggers all fire on a stream in motion, so a culture that
+/// had finished spreading across a range could never come apart however
+/// badly the range divided it. This is that split: at each record step of
+/// the migration, a culture's settled regions are partitioned into components
+/// over cheap-traversal adjacency (two anchors within
+/// `colonisation_isolation_radius` with no mountain, canyon, rift or water
+/// on the line between them), and a component that has been cut off from the
+/// component holding the culture's first settlement for longer than this
+/// span coins a daughter on itself.
+///
+/// A CONSEQUENCE OF TERRAIN AND TIME, never a roll: which regions are cut off
+/// is a fact about the ground, and how long is a fact about the calendar.
+/// 200 years, matching the distance interval, and erring toward more splits
+/// as the design asks — a range that has been divided for seven generations
+/// has divided its people. Only the CULTURE round runs it (Ben, 2026-09-11,
+/// ruling on NR-839): the Empires phase makes peoples by mixing, never by
+/// isolation.
+inline constexpr int64_t colonisation_isolation_span_years = 200;
+
+/// Years between the migration's record steps — how often the partition is
+/// re-read (BL-918). Fifty: fine enough that a group cut off for the span
+/// is coined within a generation of it, coarse enough that a 2,000-year
+/// migration is forty partitions rather than two thousand.
+inline constexpr int64_t colonisation_isolation_step_years = 50;
+
+/// WHICH OF THE FOUR WAYS a people became two (BL-918) — the axis the split
+/// census is printed over. Append-only; the census array is indexed by it.
+enum class split_trigger : uint8_t
+{
+    distance  = 0, ///< Walked long enough (BL-856; `colonisation_split_centiyears`).
+    biome     = 1, ///< Settled country of another farm class (BL-864, loosened by BL-918).
+    size      = 2, ///< Held more ground than one people holds (BL-864).
+    isolation = 3, ///< Cut off from its origin after settlement (BL-918).
+
+    count     = 4
+};
+
+inline constexpr int split_trigger_count = static_cast<int>(split_trigger::count);
+
+const char* split_trigger_name(split_trigger t);
 
 /// Tiles one culture may hold before it divides on its next founding (BL-864).
 ///
@@ -431,6 +537,8 @@ struct culture_spawn
     /// fact of the three `sea_legs_q` terms that is a DEED rather than a
     /// circumstance — set only at the hop's spawn site in `colonisation.cpp`.
     bool crossed_water = false;
+    /// Which trigger coined it (BL-918) — the axis of the split census.
+    split_trigger trigger = split_trigger::distance;
 };
 
 /// Radius of the window a cradle coins its package from.
@@ -541,6 +649,12 @@ struct colonisation_field
     /// them. Empty when no stream walked far enough to diverge.
     std::vector<culture_spawn> spawns;
 
+    /// HOW MANY OF `spawns` EACH TRIGGER COINED (BL-918), indexed by
+    /// `split_trigger`. The walk fills the first three; `run_isolation_splits`
+    /// has its own field. Redundant with a count over `spawns`, kept so a
+    /// reader that only holds the census need not hold the list.
+    std::array<int32_t, split_trigger_count> split_census{};
+
     bool empty() const { return arrival_year.empty(); }
 };
 
@@ -589,6 +703,85 @@ colonisation_field run_colonisation(const colonisation_input& in,
 /// Bytes the field occupies — the quantity a requirement bounds, stated the way
 /// `owner_ring_bytes` states the time-lapse's.
 int64_t colonisation_field_bytes(const colonisation_field& f);
+
+// ---------------------------------------------------------------------------
+// Isolation (BL-918): the split that happens AFTER settlement
+// ---------------------------------------------------------------------------
+
+/// One settled region as the isolation pass sees it — an anchor, the people
+/// on it, and when they got there. The caller's `region` is far wider than
+/// this and lives in a header this one must not include; the pass reads
+/// three fields and writes one.
+struct isolation_region
+{
+    int32_t tile         = -1; ///< Raster index of the anchor.
+    int32_t culture      = -1; ///< The people holding it; REWRITTEN on a split.
+    int64_t founded_year = 0;  ///< Calendar year settled; not present before it.
+};
+
+/// One region changing people at a record step (BL-918) — the migration
+/// time-lapse's hook: a lobe changing hue as it diverges is one of these per
+/// region in the component, at the year the daughter was coined.
+struct region_reculture
+{
+    int32_t region  = -1; ///< Index into the caller's region list.
+    int32_t culture = -1; ///< The daughter it now belongs to.
+    int32_t parent  = -1; ///< The people it belonged to until then.
+    int64_t year    = 0;  ///< The record step it happened at.
+};
+
+/// What the isolation pass produced.
+struct isolation_result
+{
+    /// The daughters coined, in allocation order (ascending year, then the
+    /// parent's id, then the component's seat), each with
+    /// `trigger == split_trigger::isolation`.
+    std::vector<culture_spawn> spawns;
+    /// Every region that changed people, in the same order.
+    std::vector<region_reculture> recultured;
+    /// How many record steps the pass read.
+    int32_t steps = 0;
+};
+
+/// Is this ground a BARRIER to cheap traversal for the purpose of the
+/// isolation partition (BL-918)? Water, or a mountain, canyon or rift
+/// landform. Pure. Stated as a function so the harness and the pass agree.
+bool isolation_barrier(terrain_substrate s, terrain_landform lf);
+
+/// Are two anchors CHEAPLY ADJACENT — within `colonisation_isolation_radius`
+/// (Chebyshev over the wrapped grid, as the sim's region graph measures) with
+/// no barrier tile on the straight line between them? Pure; integer only.
+/// @p barrier is one byte per tile in raster order.
+bool isolation_adjacent(const std::vector<uint8_t>& barrier, int gw, int gh,
+                        int32_t tile_a, int32_t tile_b);
+
+/// Run the isolation split over a settled map (BL-918).
+///
+/// At each record step from @p start_year to @p end_year (every
+/// `colonisation_isolation_step_years`, and the end year itself), every
+/// culture's regions founded by that year are partitioned into components
+/// over `isolation_adjacent`. The ORIGIN component is the one holding the
+/// culture's earliest-founded region (ties on the lower index). A region in
+/// any other component is cut off; a component whose oldest cut-off member
+/// has been cut off for `colonisation_isolation_span_years` or more coins a
+/// daughter (id from @p next_culture, which is advanced) on its seat — its
+/// earliest-founded region — and every region in it is rewritten to the
+/// daughter in @p regions.
+///
+/// DETERMINISM: regions are walked in index order, components are keyed by
+/// their lowest region index, and every tie is broken on an index. No float,
+/// no roll, no container whose iteration order is a hash's.
+///
+/// Reads @p f only for `ground` (the daughter's origin class) and @p in for
+/// the barrier rasters. Complexity: one adjacency build over the regions
+/// (bucketed by radius, so linear in regions times a local neighbourhood),
+/// then per step a union-find over the adjacency edges.
+isolation_result run_isolation_splits(const colonisation_input&      in,
+                                      const colonisation_field&      f,
+                                      std::vector<isolation_region>& regions,
+                                      int32_t&                       next_culture,
+                                      int64_t                        start_year,
+                                      int64_t                        end_year);
 
 // ---------------------------------------------------------------------------
 // Why a cradle stopped (BL-851)

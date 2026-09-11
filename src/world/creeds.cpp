@@ -339,7 +339,16 @@ int64_t culture_kinship_years(const std::vector<culture>& cultures, int a, int b
             const culture& anc = cultures[static_cast<std::size_t>(at)];
             const culture& ca  = cultures[static_cast<std::size_t>(a)];
             const culture& cb  = cultures[static_cast<std::size_t>(b)];
-            if (anc.coined_year < 0 || ca.coined_year < 0 || cb.coined_year < 0)
+            // THE SENTINEL IS INT64_MIN, NOT "NEGATIVE" (BL-918). Every
+            // culture in the migration is coined BCE — the cradles at
+            // `colonisation_start_year` (-2400), the daughters between it and
+            // the epoch — so a `< 0` test here read every dated tree as
+            // undated and this returned -1 for every pair on every world:
+            // kinship was unmeasurable, and `culture_opposition_q` weighed
+            // every neighbour as a stranger. Caught by the split census's
+            // "adjacent pairs 0" line, which is what a face is for.
+            if (anc.coined_year == INT64_MIN || ca.coined_year == INT64_MIN
+                || cb.coined_year == INT64_MIN)
                 return -1; // Ancestry known, dates are not — unmeasurable.
             return std::max(ca.coined_year, cb.coined_year) - anc.coined_year;
         }

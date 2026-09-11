@@ -47,6 +47,7 @@
 // BL-217 named this pass as its intended second client.
 // ---------------------------------------------------------------------------
 
+#include "colonisation.hpp" // BL-918: split_trigger, region_reculture
 #include "creeds.hpp"
 #include "history_ladder.hpp"
 #include "planetology.hpp"
@@ -765,6 +766,42 @@ struct settlement_state
     /// farmable`, so it costs one vector move and reproduces byte-identically
     /// whether or not anything reads it).
     std::vector<uint8_t> settled_cells;
+
+    /// THE SHAPE OF THE MIGRATION'S CULTURE TREE (BL-918) — the numbers
+    /// "over-tune the splits" is only honest against. Read at the end of the
+    /// Culture round over every region the walk placed, BEFORE the antiquity
+    /// stop trims the list to the epoch, so it is a fact about the migration
+    /// and not about where the campaign happens to start.
+    ///
+    /// THE SWEEP'S HOOK: `history_sweep` carries `era_minus_one_fixture::
+    /// settlement`, so this rides on it with no further plumbing; the sibling
+    /// item that prints it on the sweep's JSON row reads it from here.
+    struct culture_census
+    {
+        int32_t cultures = 0;      ///< Every people at the round's end, cradles included.
+        int32_t cradles  = 0;      ///< Of which coined by a cradle rather than the walk.
+        int32_t holding_ground = 0; ///< Peoples that are the plurality on at least one region.
+        int32_t tree_depth = 0;    ///< Deepest descent, in generations from a cradle.
+        /// Distinct pairs of DIFFERENT peoples whose regions are cheaply adjacent
+        /// (`isolation_adjacent`), and the mean of `culture_kinship_years` over
+        /// them; -1 when there are no such pairs. How kin the neighbours are.
+        int64_t adjacent_pairs = 0;
+        int64_t mean_adjacent_kinship_years = -1;
+        /// Splits by trigger, indexed by `split_trigger`.
+        int32_t splits[split_trigger_count] = {};
+        /// Regions the isolation pass moved to a daughter, and the record steps
+        /// it read.
+        int32_t recultured_regions = 0;
+        int32_t isolation_steps    = 0;
+    };
+    culture_census census;
+
+    /// EVERY REGION THE ISOLATION PASS MOVED TO A DAUGHTER (BL-918), with the
+    /// year: the migration time-lapse's hook for showing a range coming apart.
+    /// `region` indexes `regions` as it stood when the pass ran — before the
+    /// antiquity stop and the founding schedule partitioned the list — so a
+    /// reader that wants a live index must map through `anchor`.
+    std::vector<region_reculture> culture_recultured;
 };
 
 /// Settle the body: place regions, inherit each one's cradle culture, survey
