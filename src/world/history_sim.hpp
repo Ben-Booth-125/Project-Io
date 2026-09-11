@@ -999,6 +999,29 @@ struct history_sim_params
     /// both carry trade, they differ in what they do to REACH.
     int trade_income_per_link = 0;
 
+    /// TRADE CROSSES A BORDER, BETWEEN AMICABLE NEIGHBOURS (BL-925; Ben,
+    /// 2026-09-11: "amicable neighbours trading"). Before this a realm's own
+    /// borders were the whole world trade could see -- BL-895's income never
+    /// crossed a border, so "amicable neighbours trading" had no meaning in
+    /// the sim (NR-827: trade at 0.25% of production).
+    ///
+    /// TWO POLITIES ARE AMICABLE when their cultures are KIN -- opposition
+    /// below `organise_opposition_bar_q`, the SAME bar Organise already
+    /// refuses at -- AND NEITHER HOLDS A BITING GRUDGE against the other.
+    /// A walked corridor joining UNLIKE ground across an amicable border
+    /// pays BOTH seats, at `trade_income_per_link` -- the identical constant,
+    /// so this is the same income extended across a new kind of edge, not a
+    /// second economy. No market, no price: the no-market ruling
+    /// (`trade_income_per_link`'s own comment) stands unchanged.
+    ///
+    /// A grudge raised on EITHER side closes the link until it decays below
+    /// this bar again -- read both directions of `grudge_between`, since a
+    /// one-sided wrong is enough to sour a border. Zero disables the grudge
+    /// gate entirely (kinship alone decides). PLACEHOLDER, same footing as
+    /// the `w_*` weights: half of `grudge_ground_taken` (300), so one ground
+    /// exchange bites but the noise floor near `grudge_floor` (4) never does.
+    int trade_grudge_bar_q = 150;
+
     /// THE STANDING ARMY EATS, EVERY YEAR (BL-895 sink 1; Ben, 2026-09-11).
     /// Materials charged per YEAR per 1000 heads standing in `army_stock`,
     /// drawn from the region's seat. Zero disables it.

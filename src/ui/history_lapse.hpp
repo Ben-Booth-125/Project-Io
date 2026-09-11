@@ -160,6 +160,31 @@ struct lapse_road_seg
     std::vector<lapse_bridge> bridges;
 };
 
+/// ONE OPEN SPAN, on a cross-border trade corridor between amicable seats
+/// (BL-925). Unlike a road, which only ever ratchets UP a tier, this link can
+/// close (a grudge) and reopen (it decays), so a corridor is baked as a list
+/// of [open, close) year spans rather than a single promotion year.
+struct lapse_trade_span
+{
+    int32_t year_open  = 0;
+    int32_t year_close = 0x7FFFFFFF; ///< Unset — still open at the record's end.
+};
+
+/// ONE CROSS-BORDER TRADE CORRIDOR (BL-925), baked once when the record
+/// lands — the same anchor-to-anchor geometry `lapse_road_seg` uses, built
+/// from `lapse_event_kind::trade_link_opened` / `trade_link_closed` instead
+/// of `road_promoted`. A pair that never traded amicably gets no segment
+/// here, same "never walked, never drawn" idiom as the road network.
+struct lapse_trade_seg
+{
+    uint16_t region_a = 0;
+    uint16_t region_b = 0;
+    float c0 = 0.0f, r0 = 0.0f; ///< Region A's anchor tile centre.
+    float c1 = 0.0f, r1 = 0.0f; ///< Region B's anchor tile centre.
+
+    std::vector<lapse_trade_span> spans; ///< Ascending by `year_open`.
+};
+
 /// The recorded era, plus the derived fields the map and the board need.
 ///
 /// Lifted whole out of `generation_report` on the worker that produced it (see
@@ -254,6 +279,12 @@ struct history_lapse
     /// record time — see `lapse_road_seg`. Empty on the Culture round, whose
     /// record carries no `road_promoted` events.
     std::vector<lapse_road_seg> road_segs;
+
+    /// Amicable cross-border trade corridors (BL-925), baked from
+    /// `lapse.events` once at record time — see `lapse_trade_seg`. Empty on
+    /// the Culture round, whose record carries no `trade_link_opened` /
+    /// `trade_link_closed` events.
+    std::vector<lapse_trade_seg> trade_segs;
 
     /// The map prints its primitive count to stderr ONCE per record, so the
     /// draw-index bound is a measured number in every capture log. Mutable

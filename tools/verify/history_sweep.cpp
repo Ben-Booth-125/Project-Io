@@ -33,6 +33,7 @@
 #include <cstdlib>
 #include <string>
 #include <type_traits>
+#include <unordered_set>
 #include <vector>
 
 namespace
@@ -201,6 +202,7 @@ struct sweep_row
     int64_t mat_campaigns     = 0; ///< BL-867: spent launching campaigns.
     int64_t heads_unpaid      = 0; ///< Heads sent home unpaid.
     int64_t roads_refused     = 0; ///< Corridor promotions refused for want of materials.
+    int64_t cross_border_links_open = 0; ///< BL-925: amicable trade links open at run's end.
     int64_t secessions        = 0; ///< BL-896: successor realms the dark age produced.
     int64_t supply_sites_upgraded           = 0; ///< BL-929: supply sites bought outright.
     int64_t supply_sites_upgraded_regions   = 0; ///< ...of which a region's own relief.
@@ -1118,6 +1120,27 @@ int main(int argc, char** argv)
         row.mat_campaigns     = sim.materials_spent_on_campaigns;
         row.heads_unpaid      = sim.army_heads_unpaid_disbanded;
         row.roads_refused     = sim.road_builds_refused;
+
+        // BL-925 -- HOW MANY CROSS-BORDER LINKS ARE OPEN AT THE END. Net of
+        // opens and closes over the whole run, from the event layer alone
+        // (`out.events`), the same source `history_lapse.cpp` bakes its
+        // corridor draw from -- a fresh open/closed set here, not a read of
+        // anything internal to `history_sim.cpp`.
+        {
+            std::unordered_set<uint64_t> open_links;
+            for (const lapse_event& e : sim.events)
+            {
+                if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
+                const uint32_t lo = std::min<uint32_t>(e.region, e.other);
+                const uint32_t hi = std::max<uint32_t>(e.region, e.other);
+                const uint64_t key = (static_cast<uint64_t>(lo) << 32) | hi;
+                if (e.kind == static_cast<uint8_t>(lapse_event_kind::trade_link_opened))
+                    open_links.insert(key);
+                else if (e.kind == static_cast<uint8_t>(lapse_event_kind::trade_link_closed))
+                    open_links.erase(key);
+            }
+            row.cross_border_links_open = static_cast<int64_t>(open_links.size());
+        }
         row.secessions        = sim.secessions;
         row.supply_sites_upgraded           = sim.supply_sites_upgraded;
         row.supply_sites_upgraded_regions   = sim.supply_sites_upgraded_regions;
@@ -2235,8 +2258,27 @@ int main(int argc, char** argv)
             std::printf("\n--- BL-895  DID THE NETWORK ACTUALLY PAY? ---\n");
             std::printf("  materials from TRADE   median %lld per world\n", static_cast<long long>(median_of(mt)));
             std::printf("  materials produced     median %lld\n", static_cast<long long>(median_of(mp)));
+            {
+                const int64_t mmt = median_of(mt), mmp = median_of(mp);
+                std::printf("  trade's share of production  %lld.%02lld%%\n",
+                            static_cast<long long>(mmp > 0 ? (mmt * 100) / mmp : 0),
+                            static_cast<long long>(mmp > 0 ? ((mmt * 10000) / mmp) % 100 : 0));
+            }
             std::printf("  (A trade figure of ZERO means the mechanism never fired -- a wiring\n"
                         "   question, not a balance one. REPORTED, not gated.)\n");
+
+            // BL-925 -- AMICABLE CROSS-BORDER LINKS, PER WORLD. Read only: no
+            // target is set here, the design's DONE WHEN asks the number be
+            // visible, not that it clear a bar.
+            {
+                std::vector<int64_t> cbl;
+                for (const sweep_row& r : rows) cbl.push_back(r.cross_border_links_open);
+                std::printf("\n--- BL-925  AMICABLE CROSS-BORDER TRADE ---\n");
+                std::printf("  cross-border links open at run's end, median %lld, per world:",
+                            static_cast<long long>(median_of(cbl)));
+                for (int64_t v : cbl) std::printf(" %lld", static_cast<long long>(v));
+                std::printf("\n");
+            }
 
             // THE SINKS (BL-895, Ben's ruling 2026-09-11). The income half of
             // this item could not gate anything while campaigns were the only

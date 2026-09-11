@@ -760,6 +760,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // because nothing iterates it — every read is a point lookup on a key
     // computed from region indices, never a walk in map order.
     std::unordered_map<uint64_t, int> road_uses_live;
+
+    // BL-925 -- which cross-border corridors are CURRENTLY open to amicable
+    // trade, keyed the same way as `road_uses_live` above. Point lookups and
+    // point writes only, so the plain `unordered_map` note above applies here
+    // unchanged. Holds `true` only while the pair is presently open; an
+    // absent key and a `false` value both read as closed, but the sim keeps
+    // the entry once opened so a re-open never re-notes the same corridor as
+    // new (the event layer wants ONE transition per state change, not one per
+    // year the state holds).
+    std::unordered_map<uint64_t, bool> trade_link_open_live;
+
     // Bumped every time an edge's tier (0/1/2, from `road_tier_for_uses`)
     // actually changes, so `reach_cache` can invalidate on "a road changed"
     // without invalidating on every single use — most uses do not cross a
@@ -831,6 +842,35 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (p.port_q >= p.farm_q && p.port_q >= p.ore_q) return 2;
         if (p.ore_q  >= p.farm_q)                        return 1;
         return 0;
+    };
+
+    // BL-925 -- WHEN TWO NEIGHBOURING POLITIES ARE AMICABLE. Kin cultures
+    // (opposition below `organise_opposition_bar_q`, the SAME bar Organise
+    // already reads -- CIVILISATION.md's kinship ladder is one bar, not two)
+    // AND neither holds a biting grudge against the other, read BOTH
+    // directions of `grudge_between` because a one-sided wrong is enough to
+    // sour a border. `cs == nullptr` (a fixture isolating a different
+    // mechanism, same convention as every other `cs` read in this file)
+    // refuses rather than defaults open -- no culture data means no kinship
+    // claim can be made.
+    const auto polities_amicable = [&](int qa, int qb) -> bool {
+        if (qa < 0 || qb < 0 || qa == qb) return false;
+        if (static_cast<std::size_t>(qa) >= out.polities.size()
+         || static_cast<std::size_t>(qb) >= out.polities.size()) return false;
+        if (cs == nullptr) return false;
+        const int ca = out.polities[static_cast<std::size_t>(qa)].culture;
+        const int cb = out.polities[static_cast<std::size_t>(qb)].culture;
+        if (ca < 0 || cb < 0) return false;
+        if (ca >= static_cast<int>(cs->cultures.size())
+         || cb >= static_cast<int>(cs->cultures.size())) return false;
+        if (culture_opposition_q(cs->cultures, ca, cb) >= params.organise_opposition_bar_q)
+            return false;
+        if (params.trade_grudge_bar_q > 0)
+        {
+            if (grudge_between(out, qa, qb) >= params.trade_grudge_bar_q) return false;
+            if (grudge_between(out, qb, qa) >= params.trade_grudge_bar_q) return false;
+        }
+        return true;
     };
 
     // --- THE EVENT LAYER (BL-916) -----------------------------------------
@@ -1855,7 +1895,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     for (int nb : neighbours[i])
                     {
                         if (nb <= static_cast<int>(i)) continue;          // pay the pair once
-                        if (owner[static_cast<std::size_t>(nb)] != owner[i]) continue;
+                        const int oj = owner[static_cast<std::size_t>(nb)] == owner_none
+                                       ? -1 : static_cast<int>(owner[static_cast<std::size_t>(nb)]);
+                        // BL-925 -- ACROSS A BORDER, ONLY WHEN AMICABLE. Same
+                        // owner is the BL-895 case unchanged below; a different
+                        // owner is this item's case, and an unowned neighbour
+                        // (`oj < 0`) pays neither.
+                        const bool same_owner = (oj == oi);
+                        if (!same_owner && (oj < 0 || !polities_amicable(oi, oj))) continue;
                         // ANY WALKED CORRIDOR CARRIES TRADE, not only a promoted
                         // Track. Measured 2026-09-11: of 1,607 distinct corridors,
                         // 1,347 are walked ONCE and only 155 reach the 4 uses
@@ -1866,10 +1913,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         // a trade route whether or not it has been widened; the
                         // TIER is about what a line does to REACH, which is
                         // BL-837's subject, not this one's.
-                        if (road_uses_live.find(edge_key(static_cast<int>(i), nb))
-                            == road_uses_live.end()) continue;
+                        const uint64_t ekey = edge_key(static_cast<int>(i), nb);
+                        if (road_uses_live.find(ekey) == road_uses_live.end()) continue;
                         if (region_trade_class(ss.regions[i])
                          == region_trade_class(ss.regions[static_cast<std::size_t>(nb)])) continue;
+
+                        if (!same_owner)
+                        {
+                            // BL-925 -- THE LAPSE DRAWS THE LINK. One transition
+                            // event per state change, not one per year the link
+                            // holds open -- `trade_link_open_live` is the same
+                            // "note only on change" idiom `try_upgrade_corridor`
+                            // uses for `roads_version` just above.
+                            bool& open_now = trade_link_open_live[ekey];
+                            if (!open_now)
+                            {
+                                open_now = true;
+                                note_event(lapse_event_kind::trade_link_opened,
+                                           static_cast<int>(i), -1, nb);
+                            }
+                        }
+
                         const int seat_t = ss.regions[i].seat_region;
                         if (seat_t >= 0 && static_cast<std::size_t>(seat_t) < ss.regions.size())
                         {
@@ -1877,6 +1941,48 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                 params.trade_income_per_link;
                             out.materials_produced  += params.trade_income_per_link;
                             out.materials_from_trade += params.trade_income_per_link;
+                        }
+                        // BL-925 -- BOTH SEATS ARE PAID ACROSS AN AMICABLE
+                        // BORDER, at the SAME constant: this is one income
+                        // extended across a new kind of edge, not a second one.
+                        // The internal case pays once because the pair share a
+                        // seat; a cross-border pair does not, so paying only `i`'s
+                        // seat would make the far side's amicability free to it.
+                        if (!same_owner)
+                        {
+                            const int seat_o = ss.regions[static_cast<std::size_t>(nb)].seat_region;
+                            if (seat_o >= 0 && static_cast<std::size_t>(seat_o) < ss.regions.size())
+                            {
+                                ss.regions[static_cast<std::size_t>(seat_o)].material_stock +=
+                                    params.trade_income_per_link;
+                                out.materials_produced  += params.trade_income_per_link;
+                                out.materials_from_trade += params.trade_income_per_link;
+                            }
+                        }
+                    }
+
+                    // BL-925 -- A GRUDGE CLOSES THE LINK, OR CONQUEST DOES.
+                    // Swept as its own pass rather than inline above: the loop
+                    // above only visits a pair while it is STILL PAYING, so a
+                    // pair that stopped clearing amicability needs its own
+                    // check or the "open" entry would stay stale and the lapse
+                    // would draw it forever.
+                    if (!trade_link_open_live.empty())
+                    {
+                        for (int nb : neighbours[i])
+                        {
+                            if (nb <= static_cast<int>(i)) continue;
+                            const uint64_t ekey = edge_key(static_cast<int>(i), nb);
+                            auto it = trade_link_open_live.find(ekey);
+                            if (it == trade_link_open_live.end() || !it->second) continue;
+                            const int oj = owner[static_cast<std::size_t>(nb)] == owner_none
+                                           ? -1 : static_cast<int>(owner[static_cast<std::size_t>(nb)]);
+                            const bool still_amicable = oj >= 0 && oj != oi
+                                                       && polities_amicable(oi, oj);
+                            if (still_amicable) continue;
+                            it->second = false;
+                            note_event(lapse_event_kind::trade_link_closed,
+                                       static_cast<int>(i), -1, nb);
                         }
                     }
                 }
