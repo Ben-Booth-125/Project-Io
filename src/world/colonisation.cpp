@@ -505,29 +505,43 @@ colonisation_field run_colonisation(const colonisation_input& in,
     //  * `culture_tiles` -- how much ground this people holds, counted as tiles
     //    are claimed. Reset on a split, so the SIZE trigger is bounded by
     //    (land tiles / colonisation_culture_max_tiles).
-    //  * `class_seen` -- a 12-bit mask of the farm classes this culture has
-    //    already spawned a daughter for, so the BIOME trigger fires at most ONCE
-    //    per (culture, class) pair. Bounded by construction rather than by a
-    //    threshold tuned until it looked right: BL-856's first cut had no such
-    //    bound and coined 1,739 peoples on one world.
-    std::vector<int32_t>  culture_tiles;
-    std::vector<uint16_t> class_seen;
+    //  * `last_biome_split_cy` -- when this lineage last coined a daughter by
+    //    BIOME (BL-918). The trigger now fires on EVERY farm-class transition
+    //    rather than once per (culture, class) pair as BL-864 bounded it; what
+    //    bounds it instead is time in the country on two clocks -- see
+    //    `colonisation_biome_split_centiyears` for both and for why the old
+    //    bound was against the runaway rather than against the design.
+    std::vector<int32_t> culture_tiles;
+    std::vector<int64_t> last_biome_split_cy;
     const auto grow_culture_state = [&](std::size_t k) {
         if (k >= culture_tiles.size())
         {
             culture_tiles.resize(k + 1, 0);
-            class_seen.resize(k + 1, 0u);
+            last_biome_split_cy.resize(k + 1, INT64_MIN);
         }
     };
-    const auto may_split = [&](int32_t parent, int64_t at) {
+    // ONE RATE LIMITER, TWO CLOCKS: the distance trigger's and the biome
+    // trigger's are kept apart so a lineage that just diverged by walking may
+    // still diverge by crossing into new country, and vice versa -- the two
+    // are different reasons and the design wants both counted.
+    const auto rate_limited = [](std::vector<int64_t>& last, int32_t parent, int64_t at,
+                                 int64_t interval) {
         if (parent < 0) return false;
         const std::size_t k = static_cast<std::size_t>(parent);
-        if (k >= last_split_cy.size()) last_split_cy.resize(k + 1, INT64_MIN);
-        if (last_split_cy[k] != INT64_MIN
-            && at - last_split_cy[k] < colonisation_split_centiyears)
-            return false;
-        last_split_cy[k] = at;
+        if (k >= last.size()) last.resize(k + 1, INT64_MIN);
+        if (last[k] != INT64_MIN && at - last[k] < interval) return false;
+        last[k] = at;
         return true;
+    };
+    const auto may_split = [&](int32_t parent, int64_t at) {
+        return rate_limited(last_split_cy, parent, at, colonisation_split_centiyears);
+    };
+    const auto may_split_biome = [&](int32_t parent, int64_t at) {
+        return rate_limited(last_biome_split_cy, parent, at,
+                            colonisation_biome_lineage_centiyears);
+    };
+    const auto tally = [&](split_trigger t) {
+        ++f.split_census[static_cast<std::size_t>(t)];
     };
 
     // --- Walk ---------------------------------------------------------------
@@ -617,24 +631,33 @@ colonisation_field run_colonisation(const colonisation_input& in,
             {
                 const std::size_t k = static_cast<std::size_t>(e.culture);
                 grow_culture_state(k);
-                const uint16_t bit = static_cast<uint16_t>(1u << static_cast<int>(g));
 
-                bool split = false;
-                if (g != e.origin_class && (class_seen[k] & bit) == 0)
+                bool          split = false;
+                split_trigger why   = split_trigger::distance;
+                // COUNTRY, ON EVERY TRANSITION (BL-918), gated by time in the
+                // country on both clocks -- the stream's own and its
+                // lineage's. A stream that has just been coined cannot be
+                // re-coined on the next tile of a jagged boundary, and a
+                // lineage's whole lobe crossing at once coins one daughter.
+                if (g != e.origin_class
+                    && child_since >= colonisation_biome_split_centiyears
+                    && may_split_biome(e.culture, at))
                 {
-                    class_seen[k] = static_cast<uint16_t>(class_seen[k] | bit);
-                    child_origin  = g;
-                    split         = true;
+                    child_origin = g;
+                    split        = true;
+                    why          = split_trigger::biome;
                 }
                 else if (culture_tiles[k] >= colonisation_culture_max_tiles)
                 {
                     culture_tiles[k] = 0;
                     split            = true;
+                    why              = split_trigger::size;
                 }
                 else if (child_since >= colonisation_split_centiyears
                          && may_split(e.culture, at))
                 {
                     split = true;
+                    why   = split_trigger::distance;
                 }
 
                 if (split)
@@ -643,7 +666,9 @@ colonisation_field run_colonisation(const colonisation_input& in,
                     child_since   = 0;
                     f.spawns.push_back(culture_spawn{child_culture, e.culture,
                                                      static_cast<int32_t>(ni),
-                                                     child_origin, at / 100});
+                                                     child_origin, at / 100,
+                                                     /*crossed_water=*/false, why});
+                    tally(why);
                 }
             }
             front.push(front_entry{at, static_cast<int32_t>(ni), e.source,
@@ -718,7 +743,9 @@ colonisation_field run_colonisation(const colonisation_input& in,
                                 f.spawns.push_back(culture_spawn{hop_culture, e.culture,
                                                                  static_cast<int32_t>(ni),
                                                                  e.origin_class, at / 100,
-                                                                 /*crossed_water=*/true});
+                                                                 /*crossed_water=*/true,
+                                                                 split_trigger::distance});
+                                tally(split_trigger::distance);
                             }
                             front.push(front_entry{at, static_cast<int32_t>(ni), e.source,
                                                    hop_culture, hop_since, e.origin_class});
@@ -929,4 +956,307 @@ int64_t colonisation_field_bytes(const colonisation_field& f)
                                     + sizeof(int32_t)    // culture
                                     + sizeof(farm_class) // ground
                                     + sizeof(uint8_t));  // farmable
+}
+
+const char* split_trigger_name(split_trigger t)
+{
+    switch (t)
+    {
+        case split_trigger::distance:  return "distance";
+        case split_trigger::biome:     return "biome";
+        case split_trigger::size:      return "size";
+        case split_trigger::isolation: return "isolation";
+        case split_trigger::count:     break;
+    }
+    return "?";
+}
+
+// ---------------------------------------------------------------------------
+// Isolation (BL-918): a range breaks into insular groups
+// ---------------------------------------------------------------------------
+
+bool isolation_barrier(terrain_substrate s, terrain_landform lf)
+{
+    if (is_water(s)) return true;
+    switch (lf)
+    {
+        case terrain_landform::mountain:
+        case terrain_landform::canyon:
+        case terrain_landform::rift:     return true;
+        case terrain_landform::plains:
+        case terrain_landform::highland:
+        case terrain_landform::valley:
+        case terrain_landform::crater:   break;
+    }
+    return false;
+}
+
+namespace
+{
+
+/// Signed column difference the SHORT way round the cylinder.
+int wrapped_dc(int from, int to, int gw)
+{
+    int dc = to - from;
+    if (dc >  gw / 2) dc -= gw;
+    if (dc < -gw / 2) dc += gw;
+    return dc;
+}
+
+/// floor(a / b) for b > 0, exact for negative a — `/` truncates toward zero.
+int floor_div(int a, int b)
+{
+    const int q = a / b;
+    return (a % b != 0 && a < 0) ? q - 1 : q;
+}
+
+/// round(a / b) to nearest, halves up, for b > 0. Integer throughout.
+int round_div(int a, int b) { return floor_div(2 * a + b, 2 * b); }
+
+} // namespace
+
+bool isolation_adjacent(const std::vector<uint8_t>& barrier, int gw, int gh,
+                        int32_t tile_a, int32_t tile_b)
+{
+    if (gw <= 0 || gh <= 0 || tile_a < 0 || tile_b < 0) return false;
+    const std::size_t n = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+    if (static_cast<std::size_t>(tile_a) >= n || static_cast<std::size_t>(tile_b) >= n)
+        return false;
+    if (tile_a == tile_b) return true;
+
+    const int ca = tile_a % gw, ra = tile_a / gw;
+    const int cb = tile_b % gw, rb = tile_b / gw;
+    const int dc = wrapped_dc(ca, cb, gw);
+    const int dr = rb - ra;
+    const int adc = dc < 0 ? -dc : dc;
+    const int adr = dr < 0 ? -dr : dr;
+    // CHEBYSHEV OVER THE WRAPPED GRID, as `settlement.cpp`'s `grid_dist` and
+    // the sim's region graph both measure -- the same yardstick, so "cut off
+    // by sheer distance" here means what "not a neighbour" means there.
+    const int dist = adc > adr ? adc : adr;
+    if (dist > colonisation_isolation_radius) return false;
+
+    // THE LINE BETWEEN THEM, sampled once per step of the longer axis, both
+    // ends excluded (the anchors themselves are settled ground, whatever they
+    // sit on). Integer rounding, so the same pair samples the same tiles on
+    // every machine; symmetric in (a, b) because round-half-up of t/N and of
+    // (N-t)/N land on the same cells when N is walked from both ends -- and
+    // where they would not, the pass only ever asks in one order (lower
+    // region index first), so the answer is stable regardless.
+    for (int t = 1; t < dist; ++t)
+    {
+        int col = ca + round_div(dc * t, dist);
+        col %= gw;
+        if (col < 0) col += gw;
+        const int row = ra + round_div(dr * t, dist);
+        if (row < 0 || row >= gh) return false; // Off the open edge: no route.
+        const std::size_t i = static_cast<std::size_t>(row) * static_cast<std::size_t>(gw)
+                            + static_cast<std::size_t>(col);
+        if (barrier[i] != 0u) return false;
+    }
+    return true;
+}
+
+isolation_result run_isolation_splits(const colonisation_input&      in,
+                                      const colonisation_field&      f,
+                                      std::vector<isolation_region>& regions,
+                                      int32_t&                       next_culture,
+                                      int64_t                        start_year,
+                                      int64_t                        end_year)
+{
+    isolation_result out;
+    if (in.substrate == nullptr || in.gw <= 0 || in.gh <= 0 || next_culture < 0) return out;
+    if (regions.empty() || end_year <= start_year) return out;
+
+    const int gw = in.gw, gh = in.gh;
+    const std::size_t n = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+    if (in.substrate->size() < n) return out;
+    const std::size_t R = regions.size();
+
+    // --- The barrier raster, once ---------------------------------------
+    std::vector<uint8_t> barrier(n, 0u);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        const terrain_landform lf = (in.landform && i < in.landform->size())
+                                        ? (*in.landform)[i] : terrain_landform::plains;
+        barrier[i] = isolation_barrier((*in.substrate)[i], lf) ? 1u : 0u;
+    }
+
+    // --- The adjacency, once ----------------------------------------------
+    //
+    // TERRAIN DOES NOT MOVE, so which pairs of anchors are cheaply adjacent is
+    // a fact of the map and is read once; what changes step to step is only
+    // which regions exist and whose they are. Bucketed by a cell the size of
+    // the radius so each region looks at its 3x3 neighbourhood of cells
+    // rather than at every other region: linear in regions times a local
+    // count, and the 2,500-region worlds NR-809 is about stay cheap.
+    //
+    // EDGES ARE (lower index, higher index), gathered in ascending order of
+    // the lower index and then of the higher, so the list is the same on
+    // every machine whatever the bucket layout.
+    const int cell   = colonisation_isolation_radius;
+    const int cells_w = (gw + cell - 1) / cell;
+    const int cells_h = (gh + cell - 1) / cell;
+    std::vector<std::vector<int32_t>> bucket(
+        static_cast<std::size_t>(cells_w) * static_cast<std::size_t>(cells_h));
+    for (std::size_t r = 0; r < R; ++r)
+    {
+        const int32_t t = regions[r].tile;
+        if (t < 0 || static_cast<std::size_t>(t) >= n) continue;
+        const int cx = (t % gw) / cell, cy = (t / gw) / cell;
+        bucket[static_cast<std::size_t>(cy) * static_cast<std::size_t>(cells_w)
+               + static_cast<std::size_t>(cx)].push_back(static_cast<int32_t>(r));
+    }
+    std::vector<std::pair<int32_t, int32_t>> edges;
+    for (std::size_t r = 0; r < R; ++r)
+    {
+        const int32_t t = regions[r].tile;
+        if (t < 0 || static_cast<std::size_t>(t) >= n) continue;
+        const int cx = (t % gw) / cell, cy = (t / gw) / cell;
+        std::vector<int32_t> cand;
+        for (int dy = -1; dy <= 1; ++dy)
+        {
+            const int y = cy + dy;
+            if (y < 0 || y >= cells_h) continue;
+            for (int dx = -1; dx <= 1; ++dx)
+            {
+                int x = (cx + dx) % cells_w;
+                if (x < 0) x += cells_w;
+                for (const int32_t o : bucket[static_cast<std::size_t>(y)
+                                              * static_cast<std::size_t>(cells_w)
+                                              + static_cast<std::size_t>(x)])
+                    if (o > static_cast<int32_t>(r)) cand.push_back(o);
+            }
+        }
+        // A wrapped grid with fewer than three cells across can list a
+        // neighbour twice; sort and dedupe so the edge list is canonical.
+        std::sort(cand.begin(), cand.end());
+        cand.erase(std::unique(cand.begin(), cand.end()), cand.end());
+        for (const int32_t o : cand)
+            if (isolation_adjacent(barrier, gw, gh, t, regions[static_cast<std::size_t>(o)].tile))
+                edges.emplace_back(static_cast<int32_t>(r), o);
+    }
+
+    // --- The record steps ---------------------------------------------------
+    //
+    // `isolated_since[r]` is the year region r was first found outside its
+    // people's origin component, or NONE while it is inside one. A component's
+    // age is its OLDEST member's -- a group that has been cut off for the span
+    // has diverged whether or not a new settlement joined it last decade, and
+    // reading the youngest member instead would let a growing lobe postpone
+    // its own divergence forever. Erring toward more splits is the design's
+    // instruction.
+    constexpr int64_t NONE = INT64_MIN;
+    std::vector<int64_t> isolated_since(R, NONE);
+    std::vector<int32_t> parent_of(R);   // Union-find, rebuilt per step.
+    std::vector<int32_t> comp_key(R);    // Lowest region index in each component.
+    std::vector<int32_t> comp_seat(R);   // Earliest-founded region, ties on index.
+    std::vector<int64_t> comp_oldest(R); // min isolated_since over the component.
+
+    const auto find = [&](int32_t x) {
+        while (parent_of[static_cast<std::size_t>(x)] != x)
+        {
+            parent_of[static_cast<std::size_t>(x)] =
+                parent_of[static_cast<std::size_t>(parent_of[static_cast<std::size_t>(x)])];
+            x = parent_of[static_cast<std::size_t>(x)];
+        }
+        return x;
+    };
+    const auto unite = [&](int32_t a, int32_t b) {
+        a = find(a);
+        b = find(b);
+        if (a == b) return;
+        // THE LOWER INDEX IS THE ROOT, always: the representative is then a
+        // property of the set, not of the order the edges arrived in.
+        if (a < b) parent_of[static_cast<std::size_t>(b)] = a;
+        else       parent_of[static_cast<std::size_t>(a)] = b;
+    };
+    const auto earlier = [&](int32_t a, int32_t b) { // Is region a the earlier seat?
+        const isolation_region& ra = regions[static_cast<std::size_t>(a)];
+        const isolation_region& rb = regions[static_cast<std::size_t>(b)];
+        return ra.founded_year != rb.founded_year ? ra.founded_year < rb.founded_year : a < b;
+    };
+
+    for (int64_t y = start_year + colonisation_isolation_step_years;; y += colonisation_isolation_step_years)
+    {
+        if (y > end_year) y = end_year;
+        ++out.steps;
+
+        // Partition: a region is present once founded; an edge joins two
+        // present regions of the same people.
+        for (std::size_t r = 0; r < R; ++r) parent_of[r] = static_cast<int32_t>(r);
+        const auto present = [&](int32_t r) {
+            const isolation_region& x = regions[static_cast<std::size_t>(r)];
+            return x.culture >= 0 && x.founded_year <= y;
+        };
+        for (const auto& [a, b] : edges)
+            if (present(a) && present(b)
+                && regions[static_cast<std::size_t>(a)].culture
+                       == regions[static_cast<std::size_t>(b)].culture)
+                unite(a, b);
+
+        // Per culture, the ORIGIN component is the one holding the earliest
+        // settlement. One pass in region order finds each culture's seat and
+        // each component's seat; cultures are keyed by id in a dense table.
+        int32_t max_culture = -1;
+        for (std::size_t r = 0; r < R; ++r)
+            if (regions[r].culture > max_culture) max_culture = regions[r].culture;
+        std::vector<int32_t> culture_seat(static_cast<std::size_t>(max_culture + 1), -1);
+        for (std::size_t r = 0; r < R; ++r)
+        {
+            const int32_t ri = static_cast<int32_t>(r);
+            if (!present(ri)) continue;
+            int32_t& seat = culture_seat[static_cast<std::size_t>(regions[r].culture)];
+            if (seat < 0 || earlier(ri, seat)) seat = ri;
+            const int32_t root = find(ri);
+            if (root == ri) { comp_seat[r] = ri; comp_oldest[r] = NONE; }
+            else if (earlier(ri, comp_seat[static_cast<std::size_t>(root)]))
+                comp_seat[static_cast<std::size_t>(root)] = ri;
+        }
+        // A region's isolation clock: started when first found outside the
+        // origin component, cleared when it is back inside one.
+        for (std::size_t r = 0; r < R; ++r)
+        {
+            const int32_t ri = static_cast<int32_t>(r);
+            if (!present(ri)) { isolated_since[r] = NONE; continue; }
+            const int32_t root   = find(ri);
+            const int32_t origin = find(culture_seat[static_cast<std::size_t>(regions[r].culture)]);
+            if (root == origin) { isolated_since[r] = NONE; continue; }
+            if (isolated_since[r] == NONE) isolated_since[r] = y;
+            int64_t& oldest = comp_oldest[static_cast<std::size_t>(root)];
+            if (oldest == NONE || isolated_since[r] < oldest) oldest = isolated_since[r];
+        }
+        // Coin. Roots are visited in ascending index, so daughters are
+        // allocated in a fixed order within the step; each coining rewrites
+        // its component and no other, so the order cannot change the outcome.
+        for (std::size_t r = 0; r < R; ++r)
+        {
+            const int32_t ri = static_cast<int32_t>(r);
+            if (!present(ri) || find(ri) != ri) continue;           // Not a root.
+            if (comp_oldest[r] == NONE) continue;                   // In the origin.
+            if (y - comp_oldest[r] < colonisation_isolation_span_years) continue;
+
+            const int32_t parent = regions[r].culture;
+            const int32_t seat   = comp_seat[r];
+            const int32_t id     = next_culture++;
+            const int32_t seat_tile = regions[static_cast<std::size_t>(seat)].tile;
+            const farm_class origin_class =
+                (seat_tile >= 0 && static_cast<std::size_t>(seat_tile) < f.ground.size())
+                    ? f.ground[static_cast<std::size_t>(seat_tile)] : farm_class::steppe;
+            out.spawns.push_back(culture_spawn{id, parent, seat_tile, origin_class, y,
+                                               /*crossed_water=*/false,
+                                               split_trigger::isolation});
+            for (std::size_t o = r; o < R; ++o)
+            {
+                const int32_t oi = static_cast<int32_t>(o);
+                if (!present(oi) || find(oi) != ri) continue;
+                regions[o].culture = id;
+                isolated_since[o]  = NONE; // Its own people now; the clock is theirs.
+                out.recultured.push_back(region_reculture{oi, id, parent, y});
+            }
+        }
+
+        if (y >= end_year) break;
+    }
+    return out;
 }

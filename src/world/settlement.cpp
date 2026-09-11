@@ -980,6 +980,122 @@ settlement_state run_settlement(const planetology_state& pl,
         }
     }
 
+    // --- Isolation: a range breaks into insular groups (BL-918) ---------------
+    //
+    // THE ONE SPLIT THAT HAPPENS AFTER SETTLEMENT. The walk's triggers fire on
+    // a stream in motion; once a people had finished spreading across a range
+    // nothing could ever divide it, however badly the range did. This re-reads
+    // the settled map at each record step of the migration and coins a
+    // daughter on any group cut off from its people's origin for the
+    // divergence span. CULTURE ROUND ONLY (Ben, 2026-09-11, NR-839): it runs
+    // here, over the map as the walk left it, and the Empires sim never calls
+    // it. Terrain and the calendar decide; nothing rolls.
+    {
+        std::vector<isolation_region> iso;
+        iso.reserve(out.regions.size());
+        for (const region& p : out.regions)
+            iso.push_back(isolation_region{p.anchor, p.founding_culture, p.founded_year});
+        int32_t next_culture = static_cast<int32_t>(cs.cultures.size())
+                             + static_cast<int32_t>(col_field.spawns.size());
+        const isolation_result ir = run_isolation_splits(
+            col_in, col_field, iso, next_culture, colonisation_start_year,
+            col_field.last_arrival_year);
+
+        // Materialise the isolation daughters exactly as the walk's were, in
+        // allocation order, appended after them so ids stay contiguous.
+        const std::size_t walk_spawns = col_field.spawns.size();
+        for (std::size_t si = 0; si < ir.spawns.size(); ++si)
+        {
+            const culture_spawn& sp = ir.spawns[si];
+            const ::culture* par = culture_at(sp.parent);
+            if (par == nullptr) { out.spawned_cultures.push_back(culture{}); continue; }
+            culture daughter = derive_daughter_culture(
+                *par, sp.parent, static_cast<int8_t>(sp.origin_class), seed ^ 0xC0DAu,
+                static_cast<int>(walk_spawns + si), sp.coined_year, sp.crossed_water);
+            out.spawned_cultures.push_back(std::move(daughter));
+        }
+        // The regions that changed people take the daughter's shares and her
+        // name — a straight rewrite of what the placement loop wrote above.
+        for (const region_reculture& rc : ir.recultured)
+        {
+            if (rc.region < 0 || static_cast<std::size_t>(rc.region) >= out.regions.size())
+                continue;
+            region& p = out.regions[static_cast<std::size_t>(rc.region)];
+            p.culture          = culture_shares::pure(rc.culture);
+            p.founding_culture = rc.culture;
+            const ::culture* named = culture_at(rc.culture);
+            const std::string people = named ? named->name : std::string("nameless");
+            p.name = people + " " + quarter_word(lexicon_for(rc.culture), p.col, p.row, gw, gh);
+        }
+        out.culture_recultured = ir.recultured;
+
+        // --- The census: the numbers over-tuning is honest against ----------
+        settlement_state::culture_census& cc = out.census;
+        cc.cradles  = static_cast<int32_t>(cs.cultures.size());
+        cc.cultures = cc.cradles + static_cast<int32_t>(out.spawned_cultures.size());
+        for (int t = 0; t < split_trigger_count; ++t)
+            cc.splits[t] = col_field.split_census[static_cast<std::size_t>(t)];
+        cc.splits[static_cast<int>(split_trigger::isolation)] =
+            static_cast<int32_t>(ir.spawns.size());
+        cc.recultured_regions = static_cast<int32_t>(ir.recultured.size());
+        cc.isolation_steps    = ir.steps;
+
+        std::vector<culture> all = cs.cultures;
+        all.insert(all.end(), out.spawned_cultures.begin(), out.spawned_cultures.end());
+        // Cradle years are copied back by the caller; for kinship they are
+        // needed now, so they are set on the local copy only.
+        for (const auto& [cid, year] : out.cradle_coined_year)
+            if (cid >= 0 && cid < static_cast<int>(all.size()))
+                all[static_cast<std::size_t>(cid)].coined_year = year;
+        for (std::size_t i = 0; i < all.size(); ++i)
+        {
+            int depth = 0;
+            for (int at = static_cast<int>(i), guard = 0;
+                 at >= 0 && all[static_cast<std::size_t>(at)].parent >= 0
+                 && guard <= static_cast<int>(all.size()); ++guard)
+            { at = all[static_cast<std::size_t>(at)].parent; ++depth; }
+            if (depth > cc.tree_depth) cc.tree_depth = depth;
+        }
+        std::vector<uint8_t> holds(all.size(), 0u);
+        for (const region& p : out.regions)
+            if (p.founding_culture >= 0 && static_cast<std::size_t>(p.founding_culture) < holds.size())
+                holds[static_cast<std::size_t>(p.founding_culture)] = 1u;
+        for (const uint8_t h : holds) cc.holding_ground += h;
+
+        // Adjacent different peoples: pairs of regions cheaply adjacent whose
+        // peoples differ, each culture pair counted once, in index order.
+        std::vector<uint8_t> barrier(static_cast<std::size_t>(total), 0u);
+        for (int idx = 0; idx < total; ++idx)
+            barrier[static_cast<std::size_t>(idx)] =
+                isolation_barrier(col_sub[static_cast<std::size_t>(idx)],
+                                  col_lf[static_cast<std::size_t>(idx)]) ? 1u : 0u;
+        std::vector<std::pair<int, int>> pairs;
+        for (std::size_t a = 0; a < out.regions.size(); ++a)
+            for (std::size_t b = a + 1; b < out.regions.size(); ++b)
+            {
+                const int ca = out.regions[a].founding_culture, cb = out.regions[b].founding_culture;
+                if (ca < 0 || cb < 0 || ca == cb) continue;
+                if (grid_dist(out.regions[a].col, out.regions[a].row,
+                              out.regions[b].col, out.regions[b].row, gw)
+                    > colonisation_isolation_radius) continue;
+                if (!isolation_adjacent(barrier, gw, gh, out.regions[a].anchor,
+                                        out.regions[b].anchor)) continue;
+                pairs.emplace_back(std::min(ca, cb), std::max(ca, cb));
+            }
+        std::sort(pairs.begin(), pairs.end());
+        pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+        int64_t sum = 0, counted = 0;
+        for (const auto& [a, b] : pairs)
+        {
+            const int64_t yrs = culture_kinship_years(all, a, b);
+            if (yrs < 0) continue;
+            sum += yrs;
+            ++counted;
+        }
+        cc.adjacent_pairs = static_cast<int64_t>(pairs.size());
+        cc.mean_adjacent_kinship_years = counted > 0 ? sum / counted : -1;
+    }
+
     // --- Antiquity stop (BL-271) ----------------------------------------------
     // Below the industrial era the pass generates the world AT `stop_year`:
     // regions founded later do not exist yet (the year-tick sim founds them),

@@ -1233,6 +1233,59 @@ void case_settlement_seats(int seed_count)
 
 } // namespace
 
+// ---------------------------------------------------------------------------
+// C15 — THE SPLIT CENSUS (BL-918)
+// ---------------------------------------------------------------------------
+//
+// "Over-tune the splits" is only honest against a number. Prints, per world:
+// cultures, tree depth, mean kinship years between cheaply-adjacent different
+// peoples, and the splits by trigger. Asserts only the structure the item
+// names as DONE-WHEN: no world reaches the recorded 1,739-culture runaway, and
+// the isolation trigger — a split that happens AFTER settlement — actually
+// fires somewhere across the sweep.
+void case_split_census(int seed_count, int span_years)
+{
+    std::printf("\n--- C15: the split census (BL-918) -----------------------------\n");
+
+    int worlds = 0, under_ceiling = 0;
+    long long isolation_total = 0;
+
+    for (int s = 0; s < seed_count; ++s)
+    {
+        world_params wp;
+        wp.seed = static_cast<uint32_t>(s);
+        wp.prehistory_years = span_years;
+
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{}, nullptr, nullptr, &fx);
+        (void)w;
+        if (!fx.ran) continue;
+        ++worlds;
+
+        const settlement_state::culture_census& cc = fx.settlement.census;
+        std::printf("seed %u  cultures %d (cradles %d, holding ground %d)  depth %d  "
+                    "adjacent pairs %lld  mean adjacent kinship %lld yr  splits:",
+                    wp.seed, cc.cultures, cc.cradles, cc.holding_ground, cc.tree_depth,
+                    static_cast<long long>(cc.adjacent_pairs),
+                    static_cast<long long>(cc.mean_adjacent_kinship_years));
+        for (int t = 0; t < split_trigger_count; ++t)
+            std::printf(" %s %d", split_trigger_name(static_cast<split_trigger>(t)), cc.splits[t]);
+        std::printf("  (isolation moved %d regions over %d steps)\n",
+                    cc.recultured_regions, cc.isolation_steps);
+
+        if (cc.cultures < 1739) ++under_ceiling;
+        isolation_total += cc.splits[static_cast<int>(split_trigger::isolation)];
+    }
+
+    if (worlds == 0) { check(false, "C15 no world ran - the case is vacuous"); return; }
+    check(under_ceiling == worlds,
+          "C15a no world reaches the recorded 1,739-culture runaway");
+    check(isolation_total > 0,
+          "C15b THE ISOLATION TRIGGER FIRES somewhere across the sweep - a range that "
+          "settled as one people comes apart after settlement");
+}
+
 int main(int argc, char** argv)
 {
     const int seed_count = argc > 1 ? std::atoi(argv[1]) : 3;
@@ -1260,6 +1313,7 @@ int main(int argc, char** argv)
     case_sea_legs_crossing(seed_count);
     case_family_tree(seed_count, span_years);
     case_settlement_seats(seed_count);
+    case_split_census(seed_count, span_years);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;
