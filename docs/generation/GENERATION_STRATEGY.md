@@ -793,8 +793,9 @@ the epoch and the sim stops where it stops today.
 **SUPERSEDED AND REPLACED (Ben, 2026-09-11): pass 2 SPLITS into Globalisation and Digitisation,
 and the 1200 → 1560 coast is gone.** Exploration and digitisation are different subjects with
 different terminating conditions, so they are two phases rather than one 400-year economy span.
-`CIVILISATION.md` § The closure of the Empire era owns the arithmetic; the rest of this section
-predates the split and is read against that table.
+`CIVILISATION.md` § The closure of the Empire era owns the arithmetic; **`GLOBALISATION.md` and
+`DIGITISATION.md` own the two phases themselves**; the rest of this section predates the split and
+is read against that table.
 
 | Phase | from | to | years |
 |---|---|---|---|
@@ -814,7 +815,11 @@ divided at **400 BCE** into the migration and empire rounds (Ben, 2026-09-09;
 pass 2 runs **1560 → 1960**; the epoch is **1960**. That makes the campaign an **industrial-band**
 world (`era_band_for_epoch` flips at 1700), not the ancient one the 0 CE default produced.
 
-**The 1200 → 1560 gap is deliberate and is the dark age.** Pass 1's arc ends in *a stable dark age*
+**SUPERSEDED — THE GAP IS GONE (Ben, 2026-09-11).** Globalisation opens at 1200 CE, so there is no
+coast to advance accumulators across; `GLOBALISATION.md` owns the span. The paragraph below
+records the reasoning that held while the coast existed.
+
+**The 1200 → 1560 gap was deliberate and was the dark age.** Pass 1's arc ends in *a stable dark age*
 (§ Round 4's arc), and a span whose defining property is that little changes is the one span not
 worth simulating. It is a **coast**, not an omission: the world arrives at 1560 holding what 1200
 left it. If that turns out to lose something — a slow assimilation, a decaying grudge — the honest

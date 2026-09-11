@@ -729,7 +729,8 @@ what **crosses**, in what form, and how the next phase **judges** it. Together t
 contract, and the contract is what makes a mechanism inside this phase judgeable at all: a force
 that moves no reading below is a force nobody asked for.
 
-**THE PHASE THAT FOLLOWS IS GLOBALISATION, AND THE COAST IS GONE (Ben, 2026-09-11).** Pass 2 was
+**THE PHASE THAT FOLLOWS IS GLOBALISATION, AND THE COAST IS GONE (Ben, 2026-09-11).** That phase
+is `GLOBALISATION.md`'s, and the phase after it `DIGITISATION.md`'s. Pass 2 was
 one economy span, 1560 → 1960, with 1200 → 1560 left unsimulated. Splitting exploration from
 digitisation replaces both:
 

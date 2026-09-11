@@ -34,6 +34,206 @@
     "src/world/history_sim.hpp"
    ],
    "design": "BEN, 2026-09-11: \"I would argue we also need a deeper combat system, so that we take into account defence over rivers and mountains, but before this we must ensure we can see strong growth.\" DEFERRED BY THAT RULING: no sprint until sprint 39's growth items have landed and been read.\n\nWHAT EXISTS. resolve_battle carries a landform defence multiplier on the defender only (mountain strongest, then rift, canyon, crater, highland, valley) and a doctrine mountain_penalty. The campaign scorer never sees the terrain term (battle_trace's own comment: \"the term the scorer never sees\"), so attackers do not avoid mountains, they lose there. Rivers are absent from the resolver and from the Empires sim entirely; only the migration walk reads them.\n\nDESIGN OWED. Whether a river is a defence term on the region behind it or a crossing cost on the corridor; whether the scorer reads terrain so a campaign routes around a range or over a bridge (BL-917 draws bridges; this is what would make them matter); how it composes with works defence. Written against MILITARY_HISTORY.md sec The resolver when taken up."
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "id": "BL-930",
+   "short_name": "GLOBALISATION_TREE",
+   "priority": "A",
+   "difficulty": 5,
+   "title": "The fourth tree: Globalisation, and the chain re-pointed off Industry",
+   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "files": [
+    "docs/generation/trees/GLOBALISATION_TREE.md",
+    "docs/generation/trees/globalisation_tree.json",
+    "docs/generation/trees/TREES.md",
+    "tools/session/tree_lint.js",
+    "tools/session/gen_empire_tree_table.js",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "BEN, 2026-09-11: \"Globalisation and industry use different trees.\" The chain becomes Colonisation -> Empire -> GLOBALISATION -> Industry.\n\nDONE IN THE DESIGN SESSION (prose and store strings only): EMPIRE_TREE.md and empire_tree.json now say the rim milestone The Enforceable Promise opens the GLOBALISATION tree; INDUSTRY_TREE.md says its root is gated behind Globalisation's rim and that it runs in digitisation 1660-1960; TREES.md carries four trees, the four-row phase table and the four-row size table. tree_lint.js passes on empire and industry unchanged.\n\nTHE WORK. Author GLOBALISATION_TREE.md and globalisation_tree.json to the TREES.md grammar - three rings, four branches, three milestones, ~34 nodes of the 64 cap (TREES.md sec Sizes, sized to 460 years). Branch concerns per GLOBALISATION.md sec The tree: hulls and crossings; the charter and the treasury; the port and the garrison; what a people does with a good it did not grow. At least one FORK, because GLOBALISATION.md sec The shape of the age depends on two rich polities ending the phase incapable of the same things. Teach tree_lint.js the new tree, and add the generator for its table if the empire generator does not generalise.\n\nPREREQUISITE FOR every other Globalisation item that reads a held node.",
+   "requires": []
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "id": "BL-931",
+   "short_name": "GLOBALISATION_PHASE_RUNS",
+   "priority": "A",
+   "difficulty": 5,
+   "title": "The Globalisation span runs: 1200 to 1660, on the shared engine, with an upkeep step",
+   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "src/world/hard_coded_world.cpp",
+    "docs/generation/GENERATION_STRATEGY.md"
+   ],
+   "design": "BEN, 2026-09-11: \"Let's use the same engine - if needs be we can revise this later.\"\n\nTHE SPAN. 1200 -> 1660 CE, 460 years, opening the instant the Empire pass closes. The 1200 -> 1560 coast is RETIRED (GENERATION_STRATEGY.md sec Pass 2 now records the supersession). Pass 1's 3600 years and the 1960 epoch are both unmoved.\n\nTHE ENGINE. history_sim over the same region and polity tables, taking pass_one_output as its input and nothing else. Two honest additions, both named in GLOBALISATION.md sec The engine is shared: a ROUND-LEVEL UPKEEP STEP (earn, pay stocks, invest) because every other item depends on a recurring bill, and OBJECTS WITH A TERM, because treaties expire and nothing in the Empire phase does.\n\nTHE VERBS. Settle, Invest, Consolidate and Campaign carry over unchanged; what the phase adds is what a treasury makes purchasable, scored on the one shape (TREES.md sec The scorer).\n\nNOT IN SCOPE: a second simulator, and any change to the Empire span's rules.",
+   "requires": [
+    "BL-930"
+   ]
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "id": "BL-932",
+   "short_name": "POLITY_TREASURY",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "Capital arrives as one treasury scalar per polity, earned and spent",
+   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-11, elicitation): capital in this phase is a PER-POLITY TREASURY SCALAR - not valued regional stores, not a per-good ledger.\n\nThis is where CIVILISATION.md's deferral lands: that doc says resources become capital in pass 2 and not in the Empire phase, and Globalisation is pass 2's first half. The Empire span stays priceless.\n\nFED BY what the polity already holds and reaches - endowment on held ground, the inherited surviving_corridors network, the markets standing on its seats (has_market), and colony tribute. Nothing tops it up: a polity that inherited little is poor, which is the asymmetry the 1200 CE handoff exists to produce.\n\nNO MARKET CLEARS. Price discovery, order books and the price field are Digitisation's. What this phase has is a quantity of capital and a set of things to buy.\n\nOPEN, AND A MEASUREMENT NOT A GUESS: the arithmetic of the four income terms. Set it from a sweep that produces both rich and poor survivors, never from a number picked to make one seed solvent (GLOBALISATION.md sec Open questions).",
+   "requires": [
+    "BL-931"
+   ]
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "id": "BL-933",
+   "short_name": "TREATIES_WITH_A_TERM",
+   "priority": "A",
+   "difficulty": 6,
+   "title": "Treaties: a bound pair with an end date, and five clause kinds",
+   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "BEN, 2026-09-11: \"We should move away from the rapid claim and grudge system. We should be creating lengthy treaties and pushing slowly towards gaining territory.\"\n\nTHIS OVERTURNS CIVILISATION.md's THIRD EXCLUSION, FORWARD ONLY. That doc's sec Fear of being next declines treaties, negotiation and alliance objects - correctly, for Empires, and nothing here relaxes it backwards. Globalisation has real treaty objects; Empires still does not.\n\nTHE SHAPE. Same family as grudge and contact - a named pair plus what joined them - with two additions: it EXPIRES (a term of years) and it BINDS rather than records.\n\nFIVE CLAUSE KINDS, all five settled by Ben 2026-09-11: non-aggression for a term; trade access to a market; a sphere of claim over unclaimed ground; tribute from subject to overlord; mutual defence.\n\nNOBODY NEGOTIATES. A treaty forms when both parties independently score the binding as worth more than the freedom it costs, against the same seeded state - which keeps determinism and keeps a bargaining layer out.\n\nBREAKING ONE IS LEGAL AND COSTLY. Defection writes into the EXISTING grudge table, and the cost lands on every other party's willingness to bind with the defector. Nothing reads the defector's own ledger to pick a target - that is revenge and stays declined.\n\nOPEN: where the formation threshold sits. Too low and the map freezes; too high and the conflict displacement never happens. Same discipline as the opposition bar.",
+   "requires": [
+    "BL-931",
+    "BL-932"
+   ]
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "id": "BL-934",
+   "short_name": "COLONIES_ARE_SUBJECTS",
+   "priority": "A",
+   "difficulty": 6,
+   "title": "A colony is a live polity with an overlord link, and it wants things of its own",
+   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-11, elicitation): a colony is a LIVE POLITY WITH AN OVERLORD LINK - not a region annotation, not a new actor class. And (Ben, same day) colonies are \"subject with their own desires.\"\n\npolity::parent IS NOT THAT FIELD. parent records lineage - who this polity broke away from. Subjection is a LIVE relation that begins, ends and transfers; overloading lineage onto it makes a colony indistinguishable from a secession the moment either changes. The overlord link is its own field.\n\nOWN DESIRES IS THE LOAD-BEARING HALF. A colony keeps its own rows in the want table, pointed at what ITS ground lacks and its neighbours hold. Two consequences, both wanted: a colony can want what its overlord does not, and a colony's wants can point at a rival's colony across a frontier the metropoles have treatied over.\n\nWHERE SUBJECTS COME FROM. There is NO TERRA NULLIUS: CIVILISATION.md sec Contact is polity to polity fixes that a far continent at 1200 CE is settled and unmet. So either a TRADE PROVINCE (a seat with a market and an overlord on a native polity's coast, the native polity surviving beside it) or a SUBJECTED POLITY (the native polity itself, brought under the link, whole). Ben, 2026-09-11: \"the most technologically dominant nations are able to lay claim to polities they have no direct control over - beginning to sprout trade provinces, and steal land from natives.\"\n\nTHE ASYMMETRY IS A NODE, NEVER A RANK. Nothing reads size; what decides who can arrive is what the arriving polity holds.\n\nREFUSAL IS SECESSION. Tribute is a treaty clause and a clause comes up for renewal; a subject refusing renewal should read the same quantities the Empire phase's secession reads, so a colonial empire outrunning its network fails the same way a land empire does.\n\nOPEN: whether a colony may itself hold a colony - the link permits a chain, and the answer decides whether a subject is an actor or a leaf.",
+   "requires": [
+    "BL-931",
+    "BL-933"
+   ]
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "id": "BL-935",
+   "short_name": "PORTS_NAVIES_AND_UPKEEP",
+   "priority": "A",
+   "difficulty": 5,
+   "title": "Ports, navies and standing armies: built from capital, and they decay",
+   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/combat.cpp"
+   ],
+   "design": "BEN, 2026-09-11: \"Spending capital on ports within the Exploration round enables cheaper overseas skirmishes. So building a navy and standing army that persists is important - these degrade over time if insufficient capital is provided.\"\n\nCARRY RULE, settled by Ben 2026-09-11 (elicitation): army_stock CARRIES across the 1200 handoff; the NAVY IS NEW AND STARTS AT ZERO everywhere. So the first ocean-capable power in a world built its fleet inside this phase, and the sweep can see when.\n\nTHREE STOCKS, each maintained by the treasury. PORT: built on a region with a port window, lowers the cost of every crossing staged from it, silts toward nothing when underfunded. NAVY: staged from a port, gives crossing capacity and contest of a crossing, decays - a fleet is a running cost, not a purchase. STANDING ARMY: on top of inherited army_stock, force already raised when a skirmish opens; falls back toward what muster alone provides.\n\nport_q IS ENDOWMENT, NOT A PORT. The region field says the ground could take a harbour. Building one is an act of this phase and is paid for; conflating the two gives every coastal polity the thing the phase is about acquiring.\n\nWHY IT MATTERS TO THE PHASE'S CLAIM. A neighbour war is fought where treaties bind and no port discount applies; a frontier skirmish is staged from a port the polity paid for. That price gap IS the displacement of conflict, and it is a cost in the world rather than a handicap in the scorer.",
+   "requires": [
+    "BL-931",
+    "BL-932"
+   ]
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "id": "BL-936",
+   "short_name": "CULTURAL_GOOD_PREFERENCE",
+   "priority": "B",
+   "difficulty": 4,
+   "title": "A good is wanted differently by different peoples, and the difference is traceable to route",
+   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "BEN, 2026-09-11: Globalisation \"gives us cultural preference to goods, markets that trade named goods in a simplified form.\"\n\nPREFERENCE ATTACHES TO A CULTURE, NOT A POLITY. Cultures already cross borders as shares on every region, so a preference carried by culture spreads with people and survives conquest - which makes a market's demand a fact about who LIVES there rather than who RULES there.\n\nDERIVED, NEVER ROLLED (the standing rule: consequences, not dice). It follows from what the culture's ground never held and what its route exposed it to - the same two inputs derive_wants already uses, read at culture grain instead of polity grain. A people that walked past a good and never held it pays most for it.\n\nIT WEIGHTS A WANT, IT DOES NOT SET A PRICE. The want table is directed and unpriced; preference makes some directed wants stronger, which is enough to rank where a fleet goes first. Turning a weight into a price is Digitisation's.\n\nOPEN: how preference interacts with assimilation - whether an absorbed culture's preferences blend, persist or lapse is unowned.",
+   "requires": [
+    "BL-931"
+   ]
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, Globalisation design session); Claude (written into GLOBALISATION.md)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "id": "BL-937",
+   "short_name": "GLOBALISATION_SWEEP_READINGS",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "Instrument the seven Globalisation readings, taken at 1660 over a seed spread",
+   "authority_doc": "docs/generation/GLOBALISATION.md",
+   "files": [
+    "tools/verify/history_sweep.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "GLOBALISATION.md sec What the phase is judged on names seven readings, all taken at 1660 CE and all over a SEED SPREAD, never per world. Without them no mechanism in this phase is judgeable, exactly as the 1200 CE contract made the Empire phase judgeable.\n\nTHE SEVEN. Displacement: neighbour-war rate FALLS across the span while frontier-skirmish rate RISES - the phase's one structural claim, and the reading that can falsify it. Treaty depth: treaties standing at 1660 with years still to run, not a churn of one-round bindings. Colonial asymmetry: some polities hold subjects, most hold none, at least one subject under a distant overlord. Subject friction: at least one subject's wants point where its overlord's do not. Fleets: navies exist unevenly, and at least one built one and let it decay. Treasury spread: wide, and correlated with the inherited corridor network rather than with size alone. Preference: goods wanted differently by different cultures, traceable to route.\n\nA READING IS A REQUIREMENT, NOT A TARGET. A seed that refuses one is a legitimate world; a SPREAD that refuses one is a phase that did not do its job. No number is set ahead of the measured spread.\n\nBUILD THIS EARLY. BL-905/BL-906 showed the Empire span's instrumentation was what turned a guessed constant into a measured one; the same applies here before any Globalisation dial moves.",
+   "requires": [
+    "BL-931"
+   ]
   }
  ]
 }
