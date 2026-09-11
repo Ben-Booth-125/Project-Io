@@ -9,6 +9,7 @@
 #include <imgui.h>
 
 #include "ui/detail_level.hpp"
+#include "ui/foldout_column.hpp"     // foldout_scroll_child — BL-904's wizard-column scroll verb
 #include "ui/generation_charts.hpp"
 #include "ui/generation_preview.hpp"
 #include "ui/history_lapse.hpp"      // BL-829/BL-830: round 4's map and its board
@@ -480,18 +481,38 @@ constexpr int planetology_rounds = 2;  // System, Life (BL-863)
 constexpr int pass_rounds        = 3;  // Culture, Empires, Industrialisation
 constexpr int lapse_rounds       = 2;
 
-/// The pass rounds take no preference rows yet — their leans arrive with the passes
-/// themselves (BL-829 the lapse rounds, BL-819 the substrate) — so they reserve
-/// nothing but the placeholder caption.
+/// Empires' historical-turbulence caption, shared between the layout-height
+/// estimate below and the actual draw call in the round switch, so the two
+/// can never drift apart the way the fixed-line-count guess did (BL-904).
+constexpr const char* kTurbulenceCaption =
+    "Calm: peoples differ less, neighbours let a riser rise, and "
+    "distance is cheap to hold. Turbulent: the warlike are more so, "
+    "a riser draws a coalition, and an over-reached empire cannot "
+    "feed what it took. It leans the forces - it sets no number of "
+    "realms, and either setting can surprise you.";
+
+/// Culture (round 2) and Empires (round 3) are PASS rounds, not planetology
+/// rounds, but each still carries exactly one lean row of its own -- Drawdown
+/// (moved here by BL-863) and the historical-turbulence lean (BL-839). The old
+/// `r >= planetology_rounds` guard zeroed both out, under-reserving the layout
+/// by one row and pushing each round's preference block and Next/Back footer
+/// below the visible fold at 1080p (BL-904, found via history_lapse_press.lua
+/// and round4_arc_reach.lua going red).
 int round_pref_count(int r)
 {
-    if (r >= planetology_rounds) return 0;
-    return (r == 0) ? 4 : (r == 1) ? 3 : 1;
+    if (r == 0) return 4;
+    if (r == 1) return 3;
+    if (r == 2 || r == 3) return 1;
+    return 0;
 }
 int round_note_lines(int r)
 {
-    if (r >= planetology_rounds) return 0;
-    return (r == 1) ? 3 : 1; ///< B carries the iron/coal caption.
+    if (r == 1) return 3; ///< B carries the iron/coal caption.
+    if (r == 0) return 1;
+    // Culture's Drawdown carries no caption. Empires' turbulence caption is
+    // far longer than a fixed line count can safely predict, so its height is
+    // measured directly against kTurbulenceCaption where decide_h is built.
+    return 0;
 }
 
 /// A round's header text. The planetology rounds take theirs from the shared chain
@@ -847,6 +868,11 @@ void app::draw_generation_screen()
                              - style.ItemSpacing.x) / 3.0f;
         ImGui::BeginChild("##wiz_left", {col_w, 0.0f}, false,
                           ImGuiWindowFlags_NoBackground);
+        // BL-904: gives verify.scroll_panel("wizard", ...) a real scroller to
+        // aim at. The column is a plain BeginChild, not a foldout ledger, but
+        // `foldout_scroll_child` only matches on the id string it is handed,
+        // so it works here unchanged.
+        ui::foldout_scroll_child("##wiz_left");
 
         // ── (a) Header: the round name large, what it settles beneath, progress right ──
         {
@@ -891,11 +917,23 @@ void app::draw_generation_screen()
         const float frame_h  = ImGui::GetFrameHeight();
         const float line_h   = ImGui::GetTextLineHeightWithSpacing();
         // Each lean row is now a label line plus a 2x2 radio grid (three lines).
-        const float decide_h = static_cast<float>(round_pref_count(m_wiz_round))
-                                   * (line_h + 2.0f * (frame_h + style.ItemSpacing.y))
-                             + line_h * static_cast<float>(round_note_lines(m_wiz_round)
-                                                           + (m_wiz_resolved.gave_up ? 2 : 0))
-                             + style.ItemSpacing.y * 3.0f;
+        float decide_h = static_cast<float>(round_pref_count(m_wiz_round))
+                             * (line_h + 2.0f * (frame_h + style.ItemSpacing.y))
+                       + line_h * static_cast<float>(round_note_lines(m_wiz_round)
+                                                     + (m_wiz_resolved.gave_up ? 2 : 0))
+                       + style.ItemSpacing.y * 3.0f;
+        // Empires' turbulence lean is `turbulence_row`, not `lean_row` — ONE row
+        // of three radios (Calm/Ordinary/Turbulent), not the 2x2 grid
+        // round_pref_count's generic multiplier assumes for every other lean.
+        // Correct that one row back out, then add the caption's real height,
+        // measured rather than guessed (BL-904): it runs to five sentences,
+        // well past what a fixed line count could safely predict at every
+        // column width the wizard can be shown at.
+        if (m_wiz_round == 3)
+            decide_h += ImGui::CalcTextSize(kTurbulenceCaption, nullptr, false,
+                                             ImGui::GetContentRegionAvail().x).y
+                      + style.ItemSpacing.y
+                      - (frame_h + style.ItemSpacing.y);
         // Two button rows now: Reroll full-width above, Back / Continue below.
         const float footer_h = 34.0f * 2.0f + style.ItemSpacing.y * 3.0f;
         ImGui::BeginChild("##wiz_charts", {0.0f, -(decide_h + footer_h)}, false,
@@ -1100,11 +1138,7 @@ void app::draw_generation_screen()
                     // than the reroll button needs it.
                     invalidate_wizard_rounds_below(m_wiz_round - 1);
                 }
-                dim_text("Calm: peoples differ less, neighbours let a riser rise, and "
-                         "distance is cheap to hold. Turbulent: the warlike are more so, "
-                         "a riser draws a coalition, and an over-reached empire cannot "
-                         "feed what it took. It leans the forces - it sets no number of "
-                         "realms, and either setting can surprise you.");
+                dim_text(kTurbulenceCaption);
                 break;
 
             default:
