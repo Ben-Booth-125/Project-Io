@@ -132,7 +132,7 @@ bool same_except_record(const history_sim_state& a, const history_sim_state& b,
         const polity& p = a.polities[i];
         const polity& q = b.polities[i];
         if (p.capital != q.capital || p.cohesion_q != q.cohesion_q
-         || p.industrial_year != q.industrial_year)
+         || p.industrial_year != q.industrial_year || p.parent != q.parent)
             return false;
         for (int d = 0; d < sim_domain_count; ++d)
             if (p.capacity[d] != q.capacity[d] || p.progress_q[d] != q.progress_q[d])
@@ -1219,6 +1219,64 @@ int main()
               "B817h a recorded run and a suppressed run agree on EVERY other output");
         check(same_record(a, a2) && same_except_record(a, a2, s1, s2),
               "B817i the same seed records identically twice");
+
+        // --- B916  THE EVENT LAYER -------------------------------------------
+        //
+        // The same three claims B817 makes of the playback record, made of the
+        // event list: bounded and STATED; suppressed together with the record
+        // so a recorded and a suppressed run agree on everything else (B817h
+        // above already covers this, because `same_except_record` ignores
+        // `events` and `n` was run with `record_playback` off); and internally
+        // consistent with the counters the sim keeps for the same moments —
+        // which is the check that catches an emit site that was missed.
+        {
+            int kinds[static_cast<int>(lapse_event_kind::count)] = {0};
+            bool ascending = true, in_range = true;
+            for (std::size_t i = 0; i < a.events.size(); ++i)
+            {
+                const lapse_event& e = a.events[i];
+                if (e.kind < static_cast<uint8_t>(lapse_event_kind::count)) ++kinds[e.kind];
+                else in_range = false;
+                if (i > 0 && e.year < a.events[i - 1].year) ascending = false;
+                if (e.region != lapse_event_none && e.region >= a.region_stride) in_range = false;
+            }
+            const long long ev_bytes = static_cast<long long>(event_record_bytes(a));
+            std::printf("      event layer: %lld events = %lld bytes  "
+                        "(founded %d, seat captured %d, realm ended %d, broke away %d, "
+                        "capital moved %d, road promoted %d, civilisation %d, creed %d)\n",
+                        static_cast<long long>(a.events.size()), ev_bytes,
+                        kinds[0], kinds[1], kinds[2], kinds[3], kinds[4], kinds[5], kinds[6], kinds[7]);
+
+            check(!a.events.empty() && ev_bytes < 1024 * 1024,
+                  "B916a the event layer is emitted and stays under 1 MB over the whole span");
+            check(ascending && in_range,
+                  "B916b events ascend by year, carry a known kind, and index inside the stride");
+            check(n.events.empty(),
+                  "B916c record_playback=false suppresses the event layer with the rest of the record");
+
+            // EVERY DEATH IS AN EVENT, and only deaths are: the polity table's
+            // `alive` flags are the sim's own ledger of who ended.
+            int dead = 0, seceded = 0;
+            for (const polity& p : a.polities)
+            {
+                if (!p.alive)     ++dead;
+                if (p.parent >= 0) ++seceded;
+            }
+            check(kinds[static_cast<int>(lapse_event_kind::realm_ended)] == dead,
+                  "B916d realm_ended events equal the polities the run left dead");
+            check(kinds[static_cast<int>(lapse_event_kind::broke_away)]
+                      == static_cast<int>(a.secessions)
+                  && seceded == static_cast<int>(a.secessions),
+                  "B916e broke_away events and `polity::parent` both equal the secession counter");
+            check(kinds[static_cast<int>(lapse_event_kind::founded)]
+                      == static_cast<int>(a.polities.size()) - static_cast<int>(a.secessions),
+                  "B916f every polity that was not a successor was founded");
+            check(kinds[static_cast<int>(lapse_event_kind::civilisation_formed)]
+                      == static_cast<int>(a.civilisations_formed)
+                  && kinds[static_cast<int>(lapse_event_kind::creed_preached)]
+                      == static_cast<int>(a.universal_creeds_arisen),
+                  "B916g civilisation and creed events equal their counters");
+        }
     }
 
     // --- R9  culture relations: opposition permits conquest (BL-870) -------

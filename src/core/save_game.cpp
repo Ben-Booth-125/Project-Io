@@ -443,6 +443,17 @@ void w_timelapse(std::ostream& o, const era_timelapse& t)
         for (int k = 0; k < timelapse_culture_slots; ++k) w_i32(s, v.weight_q[k]);
         w_i32(s, v.other_q);
     });
+    // save_game_version 13 (BL-916, the event layer) -- keep r_timelapse in
+    // step. One flat array appended after the culture list; the kind goes out
+    // as its wire byte and is range-checked against `lapse_event_kind::count`
+    // on the way back in.
+    w_vec(o, t.events, [](std::ostream& s, const lapse_event& v) {
+        w_i32(s, v.year);
+        w_u8(s, v.kind);
+        w_u16(s, v.region);
+        w_u16(s, v.polity);
+        w_u16(s, v.other);
+    });
 }
 
 bool r_timelapse(std::istream& i, era_timelapse& t)
@@ -511,6 +522,24 @@ bool r_timelapse(std::istream& i, era_timelapse& t)
     }
     for (const culture_change& c : t.culture_changes)
         if (c.region >= static_cast<uint16_t>(t.region_stride) && t.region_stride > 0)
+            return false;
+
+    // save_game_version 13 (BL-916) -- keep w_timelapse in step. A kind past
+    // the enum is corrupt, not a future kind: the enum is append-only, so a
+    // newer writer would have bumped the version and been refused whole.
+    if (!r_vec(i, t.events, [](std::istream& s, lapse_event& v) {
+            uint8_t kind = 0;
+            if (!(r_i32(s, v.year) && r_u8(s, kind) && r_u16(s, v.region)
+                  && r_u16(s, v.polity) && r_u16(s, v.other)))
+                return false;
+            if (kind >= static_cast<uint8_t>(lapse_event_kind::count)) return false;
+            v.kind = kind;
+            return true;
+        }))
+        return false;
+    for (const lapse_event& e : t.events)
+        if (e.region != lapse_event_none && t.region_stride > 0
+         && e.region >= static_cast<uint16_t>(t.region_stride))
             return false;
     return true;
 }

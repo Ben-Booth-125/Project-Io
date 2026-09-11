@@ -1614,6 +1614,14 @@ struct polity
 
     bool alive = true; ///< False once the polity holds no regions.
 
+    /// BL-916 — THE REALM THIS ONE BROKE FROM, or -1 for a polity that was
+    /// founded rather than seceded. Set once, at the secession that created it
+    /// (BL-896), and never changed: it is lineage, not allegiance, and it is
+    /// what lets a successor be named "X, broken from Y" on the read side
+    /// rather than reconstructed from a `ground_taken` grudge that decays.
+    /// Read by nothing in the sim.
+    int16_t parent = -1;
+
     // -----------------------------------------------------------------------
     // BL-912 — THE EMPIRE TREE, held as real per-polity state.
     // -----------------------------------------------------------------------
@@ -1972,6 +1980,13 @@ struct history_sim_state
     std::vector<timelapse_step>  steps;
     std::vector<polity_sample>   samples;
     std::vector<culture_change>  culture_changes;
+
+    /// THE EVENT LAYER (BL-916) — the named moments, typed, appended at the
+    /// sites that already push a prose line into `history`. Ascending by year.
+    /// Same discipline as the three above: written by the sim, read by nothing
+    /// in it, empty when `params.record_playback` is false. See
+    /// era_timelapse.hpp § The event layer for the kinds.
+    std::vector<lapse_event>     events;
 
     /// THE ANCIENT ROAD RECORD (BL-768) — every region-to-region corridor the
     /// history actually moved along, deduplicated and counted.
@@ -2360,6 +2375,12 @@ inline int64_t playback_record_bytes(const history_sim_state& s)
          + static_cast<int64_t>(s.culture_changes.size()) * static_cast<int64_t>(sizeof(culture_change));
 }
 
+/// Bytes the EVENT LAYER occupies (BL-916). Disjoint from the two above.
+inline int64_t event_record_bytes(const history_sim_state& s)
+{
+    return static_cast<int64_t>(s.events.size()) * static_cast<int64_t>(sizeof(lapse_event));
+}
+
 /// Materialise the ownership map as it stood at the END of @p year — the
 /// time-lapse read. Returns `region_stride` entries, `owner_none` where the
 /// region did not exist yet or was unowned.
@@ -2378,6 +2399,7 @@ inline era_timelapse as_timelapse(const history_sim_state& s)
     t.steps           = s.steps;
     t.samples         = s.samples;
     t.culture_changes = s.culture_changes;
+    t.events          = s.events;
     t.region_stride = s.region_stride;
     t.start_year    = static_cast<int32_t>(s.start_year);
     t.years         = static_cast<int32_t>(s.years);

@@ -661,6 +661,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
         return 0;
     };
 
+    // --- THE EVENT LAYER (BL-916) -----------------------------------------
+    //
+    // A pure record, appended at the sites that already push a prose line into
+    // `out.history`, and read by nothing below. `event_year` is the sim's
+    // current year as the recorder sees it: assigned at the top of every year
+    // of the loop and read ONLY here, so a closure defined before the loop
+    // (`note_corridor`) can date what it records without a clock of its own.
+    // Gated on `record_playback` with the rest of the record, so the harness
+    // holds a recorded and a suppressed run bit-identical on everything else.
+    int64_t event_year = params.start_year;
+    const auto note_event = [&](lapse_event_kind kind, int region_idx, int polity_id,
+                                int other_id) {
+        if (!params.record_playback) return;
+        const auto slot = [](int v) {
+            return (v < 0 || v >= static_cast<int>(lapse_event_none))
+                       ? lapse_event_none : static_cast<uint16_t>(v);
+        };
+        lapse_event e;
+        e.year   = static_cast<int32_t>(event_year);
+        e.kind   = static_cast<uint8_t>(kind);
+        e.region = slot(region_idx);
+        e.polity = slot(polity_id);
+        e.other  = slot(other_id);
+        out.events.push_back(e);
+    };
+
     // BL-895 sink 2 -- A ROAD COSTS MATERIALS TO BUILD. `payer_seat` is the
     // acting polity's capital, or -1 for a walk nobody is paying for (which is
     // also the disabled path: `road_build_material_cost == 0`). The WALK is
@@ -702,6 +728,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.materials_spent_on_roads += cost;
         }
         ++roads_version;
+        // BL-916: the promotion is the event, not the walk — a walk is the
+        // corridor record's business, and a tier crossing is what a watcher
+        // can see on the map.
+        note_event(lapse_event_kind::road_promoted, lo, after, hi);
     };
 
     // --- GRUDGES (BL-827) -------------------------------------------------
@@ -831,6 +861,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
     const auto extinguish_polity = [&](int dead, int killer, int region_idx, int64_t year) {
         const int dead_culture = (dead >= 0 && dead < static_cast<int>(out.polities.size()))
                                ? out.polities[static_cast<std::size_t>(dead)].culture : -1;
+        // BL-916: THE DEATH IS RECORDED HERE, at the one site that knows the
+        // killer. The step record samples living polities only, so a realm's
+        // end used to be an absence a reader had to infer — and inferred wrong.
+        note_event(lapse_event_kind::realm_ended, region_idx, dead, killer);
         out.grudges.erase(
             std::remove_if(out.grudges.begin(), out.grudges.end(),
                            [&](const grudge& g) {
@@ -1126,6 +1160,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 static_cast<uint16_t>(i),
                 static_cast<uint16_t>(owner[i])});
 
+    // BL-916: every opening polity is FOUNDED at the start year, at its seat.
+    // Ascending id, which is the order the seed above allocated them in.
+    for (const polity& q : out.polities)
+        note_event(lapse_event_kind::founded, q.capital, q.id, -1);
+
 
     // --- THE PLAYBACK RECORD (BL-817) -------------------------------------
     //
@@ -1261,6 +1300,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
+        event_year = y; // BL-916: the recorder's clock, read by `note_event` alone.
+
         // Loading-screen sink only — never read back, so the sim stays pure.
         if (year_progress != nullptr)
             year_progress->store(static_cast<int>(y - params.start_year + 1),
@@ -1346,6 +1387,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 q.capital = static_cast<int>(ss.regions.size());
                 np_owner  = q.id;
                 out.polities.push_back(q);
+                // BL-916: a people that founds its first seat mid-run is a
+                // polity founded, dated to the founding.
+                note_event(lapse_event_kind::founded, q.capital, q.id, -1);
             }
             np.nation = np_owner;
 
@@ -1609,7 +1653,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             for (std::size_t i = 0; i < owner.size(); ++i)
                 if (owner[i] == q.id) held.push_back(static_cast<int>(i));
 
-            if (held.empty()) { q.alive = false; continue; }
+            if (held.empty())
+            {
+                // BL-916: the fallback death, with no killer knowable here.
+                // The conquest path records its own at `extinguish_polity`
+                // and marks `alive` false first, so this cannot double-count.
+                note_event(lapse_event_kind::realm_ended, q.capital, q.id, -1);
+                q.alive = false;
+                continue;
+            }
             if (q.capital < 0 || owner[static_cast<std::size_t>(q.capital)] != q.id)
             {
                 // Capital fell. The successor is the polity's lowest-indexed
@@ -1618,6 +1670,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // holding" the first cut's comment claimed (BL-312).
                 const int old_capital = q.capital;
                 q.capital = held.front();
+                note_event(lapse_event_kind::capital_moved, q.capital, q.id, old_capital); // BL-916
 
                 // BL-866 — THE SURVIVING HINTERLAND FOLLOWS ITS REALM'S NEW
                 // SEAT. The old capital is no longer this polity's seat (it
@@ -1734,6 +1787,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         idx = static_cast<int>(out.civilisations.size());
                         out.civilisations.push_back(std::move(cv));
                         ++out.civilisations_formed;
+                        note_event(lapse_event_kind::civilisation_formed, hi, q.id, idx); // BL-916
                         out.history.push_back(history_event{
                             years_from_calendar_year(y), chain_stage::legacy,
                             out.civilisations.back().name
@@ -3229,6 +3283,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     out.history.push_back(history_event{
                         years_from_calendar_year(y), chain_stage::legacy,
                         tgt.name + " changes hands", std::string{}});
+                    // BL-916: a SEAT falling is the named moment; a march
+                    // changing hands stays an ownership change on the map.
+                    if (was_seat)
+                        note_event(lapse_event_kind::seat_captured,
+                                   static_cast<int>(ti), q.id, loser_id);
 
                     // BL-827 — DID THAT END A REALM? Detected here, at the
                     // conquest, rather than at the top of the next round where
@@ -3847,7 +3906,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     }
                     np.cohesion_q      = out.polities[pi].cohesion_q;
                     np.industrial_year = out.polities[pi].industrial_year;
+                    np.parent          = static_cast<int16_t>(qid); // BL-916: lineage, set once.
                     out.polities.push_back(np);
+                    note_event(lapse_event_kind::broke_away, seat, np.id, qid); // BL-916
 
                     for (int r : block)
                     {
@@ -3985,6 +4046,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 out.polities[pi].universal_creed    = ci;
                 out.polities[pi].creed_adopted_year = y;
                 ++out.polities_adopted_creed;
+                note_event(lapse_event_kind::creed_preached,
+                           out.polities[pi].capital, out.polities[pi].id, ci); // BL-916
 
                 out.history.push_back(history_event{
                     years_from_calendar_year(y), chain_stage::legacy,

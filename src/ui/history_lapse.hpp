@@ -29,13 +29,21 @@
 // WHAT IT DELIBERATELY DOES NOT DRAW.
 //   * CULTURE MIXES (BL-826). They exist and they are not drawn: two overlapping
 //     colour meanings on one map is how a legible surface becomes a plaid.
-//   * POPULATION and MILITARY columns. They need BL-817's per-polity sample
-//     series, which the record does not carry yet — the seam for them is marked
-//     in `draw_lapse_scoreboard`.
 //   * RESEARCH, at all, and this one is a correctness rule rather than a
 //     scheduling one. Research points accrue from population under BL-822, so a
 //     research column would show a correlation it never measured — on the very
 //     board Ben is using to judge whether the research levers work.
+//
+// WHAT IT DRAWS FROM THE EVENT LAYER (BL-916). The record carries the named
+// moments — foundings, seats falling, realms ending, secessions, re-seatings,
+// roads, civilisations, creeds, and in round 3 the migration's culture splits —
+// and this surface shows them THREE ways: a ticker of the last few at or before
+// the playhead, phrased as prose with the region's generated name; a marker
+// pulsing at the event's region on the map for about one screen-second of
+// playback; and the arc readout, which counts realms ended off the events
+// rather than inferring a death from a polity missing in the next sample. The
+// board's Population and Might columns come from the sample series the record
+// already carried (BL-817).
 //
 // DRAW COST. ImGui carries 16-bit draw indices, which is why the wizard's globe
 // is 48 meridian slices rather than ~7,500 projected hexes. The map is drawn at
@@ -134,9 +142,29 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
 /// @param lagged  The same slice taken a few centuries earlier. It is what makes
 ///                an ENTRY or an EXIT visible: a row that was not on the board
 ///                then is marked, and the rank delta is drawn against it.
+/// @param year    The playhead year, for the Population and Might columns: they
+///                read the recorded step AT OR BEFORE it (BL-916 on BL-817's
+///                series), so the board and the map show the same instant.
 void draw_lapse_scoreboard(const history_lapse& h,
                            const std::vector<uint16_t>& slice,
-                           const std::vector<uint16_t>& lagged);
+                           const std::vector<uint16_t>& lagged,
+                           int year);
+
+/// BL-916 -- one event as a line of prose, with its region's generated name and
+/// the year. Never an Earth name: every noun here comes off the region table.
+std::string lapse_event_prose(const history_lapse& h, const lapse_event& e);
+
+/// BL-916 -- the ticker: the last `max_rows` narrated events at or before
+/// @p year, oldest first, the newest bright. Road promotions are ringed on the
+/// map but not narrated (see the .cpp for the measurement). Six rows, so the
+/// arc readout under it stays above the column's fold at 1080p.
+void draw_lapse_ticker(const history_lapse& h, int year, int max_rows = 6);
+
+/// BL-916 -- how many years an event stays marked on the map after it happens:
+/// about one screen-second of playback, derived from the span exactly as the
+/// transport's rate is (span / 30 s), so the marker is a property of the record
+/// and not of the frame clock. Never below one year.
+int lapse_marker_window_years(const history_lapse& h);
 
 /// BL-891 -- WHAT HAPPENED IN THIS WORLD, read off the record the round already
 /// holds. The scoreboard shows a SNAPSHOT that re-ranks as the centuries pass;
@@ -151,14 +179,22 @@ void draw_lapse_scoreboard(const history_lapse& h,
 /// double the start and at least three regions more; FELL means ending at or
 /// under 60% of that peak.
 ///
-/// DERIVED, NOT STORED. Every number comes from `era_timelapse::samples`, which
-/// generation already emits for the replay -- BL-891 adds no field to the record
-/// and nothing to the save seam.
+/// DERIVED, NOT STORED. Every number comes from `era_timelapse::samples` and
+/// `era_timelapse::events`, which generation already emits for the replay.
+///
+/// TWO READINGS WERE WRONG UNDER SAMPLES ALONE (BL-916). The step record samples
+/// LIVING polities only, so "ended holding none" was structurally zero on every
+/// world — a dead realm is absent from the next step, not present with zeros —
+/// and the capture read "0 destroyed" on a world where a dozen powers fell. And
+/// peak share divided by the FINAL region stride while the region count grows
+/// four to six times inside the run, so an early empire read a quarter of its
+/// true share. `eliminated` now counts `realm_ended` events, and the peak share
+/// is taken against the regions that EXISTED at the peak's own step.
 struct lapse_arc
 {
     int polities        = 0; ///< Distinct polities ever seen holding ground.
-    int eliminated      = 0; ///< ...that ended holding none.
-    int peak_share_q    = 0; ///< Largest share any one polity ever held, per-mille.
+    int eliminated      = 0; ///< Realms ended -- the `realm_ended` event count.
+    int peak_share_q    = 0; ///< Largest share any one polity ever held, per-mille of the regions live at that step.
     int rose_and_fell   = 0; ///< ...that doubled and then fell back under 60% of peak.
     int biggest_end_q   = 0; ///< Largest share still held at the end, per-mille.
     int smallest_end    = 0; ///< Regions held by the smallest surviving polity.

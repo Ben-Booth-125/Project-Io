@@ -81,13 +81,18 @@ float deposit_scalar_for(abundance_level a, const world_gen_config& cfg)
 // PURE AND READ-ONLY: folds `settlement_state` as it stood the instant
 // `run_settlement` returned, before the empire sim (or anything else) has
 // touched it. No randomness, no clock, no write-back.
-era_timelapse build_migration_timelapse(const settlement_state& ss, int64_t start_year,
-                                        int64_t end_year)
+era_timelapse build_migration_timelapse(const settlement_state& ss, const creed_state& cs,
+                                        int64_t start_year, int64_t end_year)
 {
     era_timelapse t;
     t.start_year    = static_cast<int32_t>(start_year);
     t.years         = static_cast<int32_t>(std::max<int64_t>(0, end_year - start_year));
     t.region_stride = static_cast<int32_t>(ss.regions.size());
+
+    // BL-916: the first region each people is the plurality of, by founding
+    // year then index — where a daughter culture first shows on the map, and
+    // the ground its `culture_split` event is pinned to.
+    std::vector<int32_t> first_region(cs.cultures.size(), -1);
 
     t.changes.reserve(ss.regions.size());
     for (std::size_t i = 0; i < ss.regions.size(); ++i)
@@ -99,12 +104,42 @@ era_timelapse build_migration_timelapse(const settlement_state& ss, int64_t star
             static_cast<int32_t>(r.founded_year),
             static_cast<uint16_t>(i),
             static_cast<uint16_t>(plurality)});
+        if (static_cast<std::size_t>(plurality) < first_region.size())
+        {
+            int32_t& fr = first_region[static_cast<std::size_t>(plurality)];
+            if (fr < 0 || r.founded_year < ss.regions[static_cast<std::size_t>(fr)].founded_year)
+                fr = static_cast<int32_t>(i);
+        }
     }
     // ASCENDING BY YEAR, matching every other producer of this format
     // (`era_timelapse.hpp`'s "the replay substrate" contract) — `owner_slice_at`
     // walks it in order and stops at the first change past the query year.
     std::stable_sort(t.changes.begin(), t.changes.end(),
                      [](const owner_change& a, const owner_change& b) {
+                         return a.year < b.year;
+                     });
+
+    // THE MIGRATION'S ONE EVENT KIND (BL-916): a people splitting from its
+    // parent. `culture::parent` and `coined_year` are what `run_settlement`
+    // materialised from the walk's spawn list, so this is the same fact the
+    // creeds roster already carries, dated and placed. Cradles have no parent
+    // and emit nothing. Ascending by coined year, ties by culture id — the
+    // allocation order, so the list is stable across machines.
+    for (std::size_t c = 0; c < cs.cultures.size(); ++c)
+    {
+        const culture& cu = cs.cultures[c];
+        if (cu.parent < 0 || cu.coined_year == INT64_MIN) continue;
+        lapse_event e;
+        e.year   = static_cast<int32_t>(cu.coined_year);
+        e.kind   = static_cast<uint8_t>(lapse_event_kind::culture_split);
+        e.region = first_region[c] >= 0 ? static_cast<uint16_t>(first_region[c])
+                                        : lapse_event_none;
+        e.polity = static_cast<uint16_t>(c);
+        e.other  = static_cast<uint16_t>(cu.parent);
+        t.events.push_back(e);
+    }
+    std::stable_sort(t.events.begin(), t.events.end(),
+                     [](const lapse_event& a, const lapse_event& b) {
                          return a.year < b.year;
                      });
     return t;
@@ -781,7 +816,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
         if (gen_cfg.stop_after_migration)
         {
             const era_timelapse migration_lapse =
-                build_migration_timelapse(kepler_settlement, colonisation_start_year,
+                build_migration_timelapse(kepler_settlement, kepler_creeds,
+                                          colonisation_start_year,
                                           kepler_settlement.migration_end_year);
             if (report)
             {

@@ -128,6 +128,41 @@ verify.expect(r5 > 0,
               "round 4 runs its OWN pass on arrival (" .. r5 .. " powers)")
 verify.capture("press_04_round5_history")
 
+-- ── BL-916: THE EVENT LAYER IS ON THE ROUND ────────────────────────────────
+--
+-- A9 -- at the END of the span the ticker has lines to show and the arc's
+-- "destroyed" figure came off recorded realm_ended events rather than off an
+-- absence in the closing sample (which was structurally zero on every world).
+-- Parked at the last year so the capture carries the fullest ticker; the
+-- marker window is derived from the span, so whatever happened inside the
+-- last ~1/30th of it is ringed on the map in the same frame.
+local ev_first, ev_last = verify.history_span()
+verify.history_year(ev_last)
+verify.frames(2)
+local ev_total, ev_ended, ev_broke = verify.history_events()
+verify.expect(ev_total > 0,
+              "round 4's record carries typed events (" .. ev_total .. " at "
+              .. ev_last .. ")")
+verify.expect(ev_ended > 0 or ev_broke > 0,
+              "the record names at least one realm ending or breaking away ("
+              .. ev_ended .. " ended, " .. ev_broke .. " broke away) -- a quiet "
+              .. "world here means the emit sites are not wired, not a quiet world")
+verify.capture("press_04b_round4_ticker_at_end")
+
+-- A10 -- PARKED ON THE MOMENT A REALM BROKE AWAY (kind 3 = broke_away, kind 2
+-- = realm_ended, era_timelapse.hpp). The ticker's newest line is that event,
+-- bright, and its region is ringed on the map in the same frame -- the
+-- "breaks away" capture BL-916's DONE WHEN names. A world with no secession
+-- falls back to the last realm ending, which every world so far has.
+local park = verify.history_event_year(3)
+if park < ev_first then park = verify.history_event_year(2) end
+verify.expect(park >= ev_first,
+              "the record carries a break-away or a realm ending to park on ("
+              .. park .. ")")
+verify.history_year(park)
+verify.frames(2)
+verify.capture("press_04c_round4_break_away")
+
 -- A6 -- ROUND 5's REROLL IS ITS OWN. Same slot, different round: it must leave a
 -- record on round 5 rather than clearing it or acting on round 4's.
 verify.click(REROLL_X, REROLL_Y)

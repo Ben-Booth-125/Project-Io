@@ -1123,6 +1123,40 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return static_cast<int>(seen.size());
     });
 
+    // BL-916: how many recorded events sit at or before the playhead on the
+    // CURRENT lapse round, and how many of them are realms ending — the two
+    // numbers the ticker and the arc readout draw from. What it lets a script
+    // claim is that the ticker it captured had lines to show and that the
+    // "destroyed" count came off the record rather than off an absence. Counts
+    // only; the prose is the surface's and a capture is how it is judged.
+    v.set_function("history_events", [this]() {
+        const int i = wizard_lapse_index();
+        int total = 0, ended = 0, broke = 0;
+        if (!m_wiz_history[i].empty())
+            for (const lapse_event& e : m_wiz_history[i].lapse.events)
+            {
+                if (e.year > m_wiz_history_year[i]) break;
+                ++total;
+                if (e.kind == static_cast<uint8_t>(lapse_event_kind::realm_ended)) ++ended;
+                if (e.kind == static_cast<uint8_t>(lapse_event_kind::broke_away))  ++broke;
+            }
+        return std::make_tuple(total, ended, broke);
+    });
+
+    // BL-916: the year of the LAST recorded event of one kind (the wire byte
+    // of `lapse_event_kind`) on the current lapse round, or a year before the
+    // span when there is none. It lets a script PARK on the moment a realm
+    // broke away and capture the ticker line with its marker lit, rather than
+    // hoping the closing year happens to sit inside that event's window.
+    v.set_function("history_event_year", [this](int kind) -> int {
+        const int i = wizard_lapse_index();
+        int year = m_wiz_history[i].lapse.start_year - 1;
+        if (!m_wiz_history[i].empty())
+            for (const lapse_event& e : m_wiz_history[i].lapse.events)
+                if (e.kind == static_cast<uint8_t>(kind)) year = e.year;
+        return year;
+    });
+
     // The current lapse round's own span, so a script walks the years the run
     // actually produced rather than the years a doc says it should have.
     v.set_function("history_span", [this]() {

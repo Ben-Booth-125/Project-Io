@@ -755,11 +755,12 @@
     "wizard_round_history": {
       "surface": "New World wizard - round 5, The History",
       "answers": "Who claimed this ground, and who lost it, in the age before the epoch?",
-      "because": "Origin belongs to round 4; this round is the rest of the arc - communication, then conquest or diplomatic union, then a stable dark age - over the 4000 years ending at 1200 CE. It earns a page of its own rather than a section of round 4's because it has its own span, its own rules and its own reroll: a history you cannot reject is a history you were assigned, and rejecting it must not re-draw the migration above it (world_params::era_seed exists for exactly that). Its chart surface is the leaderboard, which moves with the map. WHAT IT DOES NOT YET CLAIM: generation still emits ONE recorded age, so this round replays the same record round 4 does, and it says so on screen rather than implying a separation the code has not made - the generation-side split is BL-858/BL-861.",
+      "because": "Origin belongs to round 4; this round is the rest of the arc - communication, then conquest or diplomatic union, then a stable dark age - over the 4000 years ending at 1200 CE. It earns a page of its own rather than a section of round 4's because it has its own span, its own rules and its own reroll: a history you cannot reject is a history you were assigned, and rejecting it must not re-draw the migration above it (world_params::era_seed exists for exactly that). Its chart surface is the leaderboard, which moves with the map. THE MOMENTS ARE PART OF THE TIME-LAPSE, not outcomes read off at the end (Ben, 2026-09-11): the record carries typed events - foundings, seats falling, realms ending, secessions, re-seatings, roads, civilisations, creeds - and the round shows them as a ticker of the last few at or before the playhead, phrased with the region's generated name, with a marker pulsing at the event's region on the map for about a screen-second of playback. The arc readout under the board counts destroyed realms off those events (a dead realm is ABSENT from the next sample, so counting zeros read 0 on every world) and takes peak share against the regions live at the peak's own step, not the final stride.",
       "backlog_item": [
         "BL-816",
         "BL-829",
-        "BL-860"
+        "BL-860",
+        "BL-916"
       ],
       "files": [
         "src/ui/startup_screens.cpp",
@@ -786,10 +787,11 @@
     "wizard_round_history_board": {
       "surface": "New World wizard - the lapse rounds' top-sixteen board",
       "answers": "Which powers are rising and which are falling as the centuries pass?",
-      "because": "Ordered and capped is the design, not a display convenience: sixteen rows re-ranking is the surface that shows RISE AND FALL, and an uncapped list of everything would show none of it. It orders by SHARE OF LAND - the honest default for rounds about ground, and the one metric the ownership record alone can answer. Rows are POLITIES, not settlements, because a settlement cannot rise and fall against a rival. Drawn on BOTH lapse rounds (4 and 5) from that round's own record, rather than once on a fused round. Population and military columns are owed on BL-817's sample series; a RESEARCH column is refused outright, because research points accrue from population under BL-822 and the column would show a correlation it never measured - on the board Ben is judging the research levers with.",
+      "because": "Ordered and capped is the design, not a display convenience: sixteen rows re-ranking is the surface that shows RISE AND FALL, and an uncapped list of everything would show none of it. It orders by SHARE OF LAND - the honest default for rounds about ground, and the one metric the ownership record alone can answer. Rows are POLITIES, not settlements, because a settlement cannot rise and fall against a rival. Drawn on BOTH lapse rounds (4 and 5) from that round's own record, rather than once on a fused round. Population and Might (the military capacity band, 1-6) are drawn from BL-817's per-polity sample series at the recorded step at or before the playhead, so the board and the map show one instant; the order stays share of land, the two columns qualify a row rather than rank it. A RESEARCH column is refused outright, because research points accrue from population under BL-822 and the column would show a correlation it never measured - on the board Ben is judging the research levers with.",
       "backlog_item": [
         "BL-830",
-        "BL-860"
+        "BL-860",
+        "BL-916"
       ],
       "files": [
         "src/ui/history_lapse.cpp"
