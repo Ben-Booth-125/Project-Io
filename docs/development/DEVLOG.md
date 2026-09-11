@@ -10,6 +10,92 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-11 — Sprint 39 closes in full: waves 2 and 3 land, eight items, one cross-item bug caught and fixed
+
+**Runtime:** long session (continuation of the same session that closed wave 1 below), Full /
+Batch Delivery, seven parallel worktree agents across two waves plus main-session merge/build/
+verify/live-click. **Items:** BL-914 BL-917 BL-920 BL-921 BL-924 BL-925 BL-929 BL-923. Sprint 39
+("the drama of the time-lapse") is now fully closed — fifteen items across three waves.
+
+### Wave 2, six independent items dispatched in parallel
+
+BL-914 (the tap mechanism: rounds render live instead of only after the pass finishes, Restart
+retired for Pause+scrubber), BL-917 (promoted roads and river bridges drawn on the Empires map,
+pure render, zero sim impact), BL-920 (the Empires opening reframed onto culture ground: city
+states seed above a 300,000-head population threshold, a new ORGANISE verb grows them onto
+reachable unorganised ground), BL-921 (a campaign's stack pools every held region's garrison
+weighted by capital-read `network_supply_q`, so a 30-region polity now fields ~2.9x a 3-region
+polity's stack at the same frontier — the structural fix for "no compounding"), BL-924 (region
+value reads what stands on it, not just endowment, so a seat is worth attacking), BL-929
+(a polity can spend its capital stockpile to deliberately upgrade a supply site). All six merged
+clean or with small, expected conflicts (two new `sim_verb` enum cases, two new dispatch `case`
+blocks) — every merge built and re-verified individually before the next.
+
+### The one real bug this wave: BL-924 broke the shared scoring currency
+
+BL-924's first cut folded its "what stands here" term directly into `region_value_q` — the
+function `history_sim.cpp` documents explicitly as "THE COMMON CURRENCY... every verb scores in
+ONE unit... 0-1000." Summing endowment and the new built/seat terms let it run to 3000, silently
+rescaling the currency every OTHER verb (Settle, Consolidate, `build_work`'s reach gain, a
+polity's own holdings-value sum) also reads. Cost `history_sim_harness` six checks — B318c,
+BL384a, R5, B384c, BL837b1, M2b — nearly all "Campaign never fires" symptoms of a threshold read
+against an inflated scale. Caught only because the wave-1 close-out had already established a
+clean 2-failure baseline to compare against; the merging agent's own brief hadn't asked it to run
+`history_sim_harness`, only `history_sweep` and `world_determinism` — an omission in this
+session's own briefing, not the agent's error, now worth remembering for the next batch. Root-
+caused by bisection (disabling the seat premium, then the built term, then scaling it) down to
+the fact that Campaign's own target valuation never went through `region_value_q` in the first
+place — it reads `w_farm`/`w_ore`/`w_port` against the target directly. Fixed by reverting
+`region_value_q` to its original pure-endowment form and adding the prize term
+(`campaign_prize_q`, a new `w_prize` weight) only at Campaign's own scoring site. Back to the two
+pre-existing tracked failures (R3a2/R3a3) after the fix; the churn reading BL-924 was built to
+move (seats' share of conquest, TAKEN 3+ TIMES) is unchanged in shape.
+
+### Wave 3: BL-923, and a second, narrower cross-item interaction
+
+BL-923 replaces BL-896's contiguous-block secession with city states, one per cut-off seat
+(Ben's ruling on NR-837, reversing NR-826 call 2; call 3 stands). Building it exposed a second,
+much narrower defect: BL-920's new "unorganised ground points at its geometrically-nearest seat"
+pointer interacts with BL-896's old secession code, which demotes a seat's `is_seat` flag with no
+knowledge of that new pointer type — `colonisation_harness`'s D1/D3 check (BL-866, "every
+hinterland region shares its seat's nation") caught it as one dangling pointer on one of three
+seeds. Fixed in two steps: first, a genuine, narrower regression from BL-920 itself (unorganised
+ground correctly has NO nation to match, so the check's nation-mismatch test needed to exempt it
+— this alone took `colonisation_harness` from a larger mismatch count to 1 remaining dangling
+case); second, BL-923's own rewrite of the secession block closed the dangling case as a natural
+consequence of replacing the code that caused it. `colonisation_harness`: 0 failures once both
+landed. 16-seed sweep: breakdowns median 119/world (was 2), pieces overwhelmingly city-state
+sized, and — the qualitative point BL-922 exists to make possible — most breakdowns now occur on
+ground the reach model calls connected, not only graph-disconnected islands.
+
+### Live-clicked the fully integrated tree
+
+Opened a fresh build in the wizard and played rounds 3 and 4 to completion (1200 CE). Confirmed
+live, not just in harness output: the map draws and animates from the moment each round arrives
+(BL-914) with no Restart button; kin cultures cluster by hue (BL-919, wave 1); the ticker
+narrated a broke-away line (BL-923) and two cross-border trade openings (BL-925) by name and
+year; the board carries Land/Rgn/Pop/Mt; the map shows terrain relief, rivers, and the promoted
+road network (BL-915/917, several sessions' worth of rendering work all present at once).
+
+### Bookkeeping
+
+All eight items' `req/requirements.json` rows flipped complete (BL-929's render row marked
+`partial` — the mechanism and its event/ticker feedback are live, but a bespoke waystation glyph
+and a road-stroke distinct from BL-917's own were cut for scope, left as a follow-on) and
+archived; all eight backlog rows flipped complete with resolution prose and evicted; `REFINED.md`
+emptied — sprint 39 carries no more active work. `backlog_lint.js` 0 fail(s).
+
+### What's next
+
+Sprint 39 is closed. The 16-seed reading recorded in the wave-1 entry below — largest share
+roughly doubled, rise-and-fall shape now appearing in fewer worlds rather than more — was taken
+before waves 2/3 landed; a fresh 16-seed sweep on the fully-integrated tree (all fifteen items
+together) would be the honest next reading before any tuning conversation, per
+`GENERATION_STRATEGY.md`'s "measured, not argued" rule. No sprint 40 planning happened this
+session.
+
+---
+
 ## 2026-09-11 — Sprint 39 wave 1 closes out: seven items verified, re-blessed, and a 16-seed reading for Ben
 
 **Runtime:** long session, Full / Batch Delivery close-out (no new build this session — wave 1's

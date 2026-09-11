@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 208 entries across 2 volume(s).
+One line per session, newest first — 209 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-09-11 | [Sprint 39 closes in full: waves 2 and 3 land, eight items, one cross-item bug caught and fixed](DEVLOG.md) | BL-866 BL-896 BL-914 BL-915 BL-917 BL-919 BL-920 BL-921 BL-922 BL-923 BL-924 BL-925 BL-929 | DEVLOG.md |
 | 2026-09-11 | [Sprint 39 wave 1 closes out: seven items verified, re-blessed, and a 16-seed reading for Ben](DEVLOG.md) | BL-870 BL-914 BL-915 BL-916 BL-917 BL-918 BL-919 BL-920 BL-921 BL-922 BL-923 BL-924 BL-925 BL-926 BL-927 BL-929 | DEVLOG.md |
 | 2026-09-11 | [Sprint 38 closes for real: the whole closure contract wired, twelve items, and the phase pronounced too lively](DEVLOG.md) | BL-480 BL-891 BL-901 BL-902 BL-903 BL-904 BL-905 BL-906 BL-907 BL-908 BL-909 BL-910 BL-911 BL-912 | DEVLOG.md |
 | 2026-09-11 | [Sprint 38 closes the phase: seven items, five agents, and a lever that refuses nothing](DEVLOG.md) | BL-817 BL-823 BL-827 BL-830 BL-838 BL-839 BL-887 BL-891 BL-893 BL-895 BL-896 BL-897 BL-898 BL-899 BL-904 BL-905 | DEVLOG.md |

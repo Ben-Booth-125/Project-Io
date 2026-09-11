@@ -494,6 +494,33 @@
   "body-market-index": {
    "resolution": "world.hpp gains mutable body_market_index + count/max-id stamp (markets are created, never destroyed — verified); markets_by_body returns the cached ref; market_for_tile/clear_markets allocation-free on the hot path, signature unchanged."
   },
+  "breakdown-to-city-states": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: world_determinism"
+     ],
+     "requirement": "Each seat the capital can no longer supply becomes its own polity with its hinterland; seatless cut-off regions join the nearest cut-off seat or stand alone; parent id and a broke-away event recorded; successors may re-fragment after their birth round; nothing released to nobody or handed to a neighbour.",
+     "result_metric": "history_sim_harness and world_determinism both ALL PASS (2 pre-existing tracked failures only). Replacing BL-896's block also surfaced and (via a follow-up fix in colonisation_harness.cpp, landed the same session) resolved a dangling seat-pointer edge case the old code left for BL-920's new unorganised-ground pointer type to trip over -- colonisation_harness went from 1 failure to 0 once this item landed on top of the fix.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep 16 --epoch 0",
+      "visual: round-4 capture"
+     ],
+     "requirement": "Breakdowns occur on connected ground across the sweep; pieces and sizes print; a round-4 capture shows a realm coming apart with ticker lines.",
+     "result_metric": "history_sweep (16 seeds): breakdowns median 119/world, pieces median 144/world (up from the old median 2 secessions / 14 regions -- expected, since a single cut-off seat now fragments on its own); piece sizes overwhelmingly 1 region (city-state sized), long tail to 57. Median 112 of ~144 secessions per world had a friendly, supplied neighbour within radius -- confirming breakdowns now occur on ground the reach model calls connected, not only graph-disconnected islands. Confirmed live: round-4 ticker narrated two breakaway lines (\"Shisirmeim Shuarua breaks away from Reste Tete\", \"Reste Tete breaks away from Reste Tete Reach\") during this session's click-through.",
+     "notes": ""
+    }
+   ],
+   "resolution": "BL-896's secession block (contiguous blocks of 2+ regions, one successor) is replaced per Ben's ruling on NR-837: every cut-off SEAT becomes its own successor polity with its whole hinterland; a cut-off, seatless region joins the nearest cut-off seat, or (if none) stands alone as its own city state. Each successor still records its parent, emits a broke-away event, takes its seat's plurality culture, and raises the existing ground_taken grudge on the parent; a fresh successor is exempt from fragmenting again only in its own birth round."
+  },
   "build-door-wide-roster": {
    "rows": [
     {
@@ -1054,6 +1081,33 @@
     }
    ],
    "resolution": "All 6 rows met. planetology_harness 121/121 pass (19 new R13); planetology_sweep unchanged; full CTest 37/37."
+  },
+  "city-states-on-culture-ground": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: world_determinism"
+     ],
+     "requirement": "The opening marks a region a city state when its population is above the threshold (provisional 300,000) and leaves the rest unorganised; an Organise verb, reach-gated from the capital and kinship-priced, brings unorganised ground under control; scheduled foundings arrive unorganised; hinterland points at the nearest seat; a centre crossing the threshold on unorganised ground becomes a new city state.",
+     "result_metric": "history_sim_harness and world_determinism both ALL PASS (2 pre-existing tracked failures only); code review confirmed the ORGANISE verb is additive (one new candidate block, one new dispatch case) and gated correctly by the flag.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep 4 --epoch 0",
+      "visual: round-4 captures"
+     ],
+     "requirement": "The sweep prints city-state count over time and the share of ground organised vs conquered; the round-4 capture at 400 BCE shows a dull culture map with bright seats and colour spread by mid-span.",
+     "result_metric": "history_sweep (4 seeds) prints organised-vs-conquered share (median 5.1%) and city-states-risen; confirmed live: round 4 at its opening shows unorganised ground in the dull culture tint with bright organised seats, spreading to a mostly-organised map by 1200 CE (per the live click and the sweep's own city-state-count-over-time series). The specific pixel-level distinction between the dull CULTURE tint and plain bare terrain on unorganised ground was not separately re-verified this session -- the underlying BL-915/919 tint machinery already exists and unorganised ground simply carries no polity colour, which the render already handles with no new code per the building agent's own report.",
+     "notes": ""
+    }
+   ],
+   "resolution": "The Empires phase opening now seeds a city state on any region already above the 300,000-head threshold (Ben's ruling on NR-835) and leaves the rest unorganised, gated by a new city_states_by_population_threshold flag (true only on generation's own round, so every history_sim_harness fixture isolating another mechanism is unaffected). A new ORGANISE verb grows a polity onto reachable unorganised ground it can supply (BL-922's capital reach), priced by kinship, refused outright against opposed cultures (conquest only); scheduled foundings arrive unorganised; a centre crossing the threshold on its own promotes to a new city state at any point in the run."
   },
   "coastal-territory": {
    "rows": [
@@ -2578,6 +2632,22 @@
    ],
    "resolution": "Complete. font_glyph_harness proves the atlas carries all 7 codepoints; the same probe against the pre-fix fonts.cpp fails 9 of 11 with the two Latin-1 controls still passing, so the check is not vacuous. Scope was WIDER than the item stated — see R2."
   },
+  "force-follows-the-network": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: history_sweep 4 --epoch 0"
+     ],
+     "requirement": "A campaign stack gathers a share of every held region the capital can supply, weighted by network_supply_q and road hops; the defender levy stays local; a fixture with a 3-region and a 30-region polity at one border shows the larger stack; upkeep prices the larger stack.",
+     "result_metric": "A direct fixture (BL-921.2 in history_sweep.cpp) reproduces gather_army's own formula at a 3-region vs. 30-region frontier: 23,307 vs. 67,004 (~2.9x), confirming the larger polity fields a materially larger stack. history_sim_harness: only the two pre-existing, tracked failures (confirmed by the agent stashing its own diff and re-running unmodified code -- identical 2 failures either way). world_determinism ALL PASS, digests moved as expected for a force-gathering change.",
+     "notes": ""
+    }
+   ],
+   "resolution": "gather_army now pools a share of every HELD region's garrison (not just the staging hub plus half of its neighbours), each weighted by that region's network_supply_q read from the capital (BL-922) -- so roads and reach are now a real lever on force size. The defender's emergency levy stays local, unchanged."
+  },
   "frame-budget-hud": {
    "rows": [
     {
@@ -3397,6 +3467,23 @@
     }
    ],
    "resolution": "build_lineage_palette derives hue by root cradle with a fixed per-daughter step and a lightness step by depth, rebuilt from the culture tree at record time. Round 3 draws culture ground in these hues; round 4 tints its base with them."
+  },
+  "live-lapse-render": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness tapped==untapped",
+      "headless: world_determinism",
+      "manual: live click on rounds 3 and 4"
+     ],
+     "requirement": "A write-only tap publishes the growing record from the worker; the playhead runs at span/30 s clamped to the published year; Pause and a scrubber after landing; no Restart button; tapped and untapped runs are bit-identical.",
+     "result_metric": "history_sim_harness B914a-e all PASS (tapped run agrees with untapped on every field, including events and the geometry mirror); world_determinism ALL PASS, digests unchanged by this item alone; live click on both rounds confirmed no Restart button, a working Play/Pause + scrubber, and the map rendering immediately on arrival rather than only after the pass finished.",
+     "notes": ""
+    }
+   ],
+   "resolution": "BL-914 built: a write-only era_lapse_tap publishes the growing record (owner changes, culture changes, events, region geometry) behind a mutex/epoch counter, null-safe for headless callers; the wizard playhead starts the moment a round arrives and advances at span/30s clamped to the published year; Pause/Play plus a year scrubber replace Restart on both lapse rounds. Confirmed live: round 3 opened mid-migration with the map already drawn, a Play/scrubber control in place of Restart, and round 4 animated visibly from its opening to 1200 CE."
   },
   "live-spectate-route": {
    "rows": [
@@ -4560,6 +4647,21 @@
     }
    ]
   },
+  "prize-reads-the-city": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep 4 --epoch 0"
+     ],
+     "requirement": "region value reads centres and seat status; the sweep share of conquests that are seats and TAKEN 3+ TIMES are re-read against the baseline.",
+     "result_metric": "history_sweep (4 seeds): seats' share of conquest rose (38.8% -> 46.7%); TAKEN 3+ TIMES and changes-per-region ticked up slightly rather than down in this small sample (reported, not gated, per the item's own \"no target set\"); most-fought-over-region worst case fell (79 -> 48 after the region_value_q fix). history_sim_harness back to the two pre-existing tracked failures after the fix; world_determinism ALL PASS.",
+     "notes": ""
+    }
+   ],
+   "resolution": "A new campaign_prize_q (centres, urban population, accumulated work effects, a seat premium) is read at Campaign's own target-scoring site, behind a new w_prize weight -- not folded into the shared region_value_q every OTHER verb reads (an early cut did fold it in and cost history_sim_harness six checks; reverted and re-scoped to Campaign only, see the main-session commit \"Fix BL-924: keep region_value_q a 0-1000 currency\"). Region endowment alone no longer values every region alike; a city and especially a seat are worth more to attack."
+  },
   "processing-chain-roster": {
    "rows": [
     {
@@ -5226,6 +5328,21 @@
      "notes": "Q1-Q4: floor world 3106 Track / 0 Road / 0 Highway vs qualified 2899/207/0, byte-identical floor regens. NR-641 raises the all-Track default consequence."
     }
    ]
+  },
+  "roads-and-bridges-on-lapse": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "visual: late- and early-span captures of round 4"
+     ],
+     "requirement": "The promoted network draws as it forms from road_promoted events, heavier at Road; a corridor crossing a river edge draws a bridge glyph; walked-once corridors are not drawn.",
+     "result_metric": "Agent-run ad-hoc --verify capture: 400 BCE shows no roads, 1150 CE shows 66 baked road corridors with visible strokes and a bridge glyph at a river crossing. Confirmed again in this session's live click of the final integrated tree (network strokes visible on the round-4 map at 1200 CE).",
+     "notes": ""
+    }
+   ],
+   "resolution": "The Empires map now bakes a stroke per promoted corridor from BL-916's road_promoted events (faint at Track, heavier at Road) and a bridge glyph where a drawn segment crosses a river edge; walked-once corridors are not drawn. Pure render change, zero sim impact (world_determinism digests unchanged by this item alone)."
   },
   "roster-breadth-guard": {
    "rows": [
@@ -5989,6 +6106,32 @@
    ],
    "resolution": "Complete. rank_extraction_sites() (src/world/corp_ai.cpp) hoists the O(tiles) survey/richness/affinity scan out of the per-corp loop in run_corp_strategic_step, computed once per tick and read by every due corp; only the per-corp can_place_in_world filter (tech gate, logistics reach) and scoring still run per corp, over the already-truncated top-M list. Verified behaviour-preserving by stash-and-diff against unmodified main: ai_skill_harness's 5-seed/300-tick benchmark produces numerically identical net_worth curves and action-verb counts on both sides, including its pre-existing golden-band failures (seeds 1-4 'net-worth final' fail identically on both sides - tracked by NR-140, not caused or worsened by this item; not re-blessed here since it is out of this item's scope). econ_stability's BL-250 scaling sweep is the direct measurement: exponent 1.28 -> 1.18, worst 2x-size-step growth 3.17x -> 3.01x, all six harnesses/build targets green. BL-365 (background industry, ~80 corps) is now unblocked."
   },
+  "supply-sites-from-the-stockpile": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: history_sweep 4 --epoch 0"
+     ],
+     "requirement": "The scorer offers a supply-site upgrade (reach work or corridor tier) where held ground reads low supply from the capital, paid from the capital stockpile, preferring the site that lifts the most ground; deterministic integer scorer.",
+     "result_metric": "history_sweep (16 seeds): supply-site upgrades fire (non-zero in the high-trade half of worlds, zero in the low-trade half -- a world-level trade correlation; a true per-realm reading is only possible once BL-925's cross-border trade gives a real per-realm income signal, which landed the same wave). history_sim_harness and world_determinism both clean (2 pre-existing tracked failures only; digests moved as expected).",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "partial",
+     "verification": [
+      "visual: round-4 capture"
+     ],
+     "requirement": "Upgraded sites draw on the lapse.",
+     "result_metric": "PARTIAL. Both upgrade kinds emit a lapse_event and so already draw the map's existing generic pulse-ring marker and a ticker line (\"X buys a waystation...\" / the existing road-laid line for corridors) -- confirmed live in this session's click-through. A bespoke waystation glyph and a heavier road stroke specific to an upgraded corridor (as opposed to a freshly-promoted one) were not built; the building agent judged new drawing infrastructure out of this item's scope budget and flagged the cut plainly. Left open as a follow-on polish item rather than reopening the batch for it.",
+     "notes": ""
+    }
+   ],
+   "resolution": "A new upgrade_supply verb lets a polity spend its capital's material_stock to buy a region's reach relief or a corridor straight to its next tier, offered wherever held ground reads at/below the settlement floor, scored against the same cached reach[] vector every other candidate this round reads (no extra Dijkstra). Deterministic integer scorer."
+  },
   "sweep-sees-the-arc": {
    "rows": [
     {
@@ -6475,6 +6618,31 @@
     }
    ],
    "resolution": "Complete. Partially delivered 2026-08-01, reopened the same day by an independent review that found three parts undelivered (R3 estimator location, R6 the ledger closing itself, R7 per-recipe rows) and two rows marked complete on evidence that could not have been produced. All three were then delivered and evidenced: the estimator moved to src/world/ with a 26-assertion headless harness cross-checking it against economy_system's own arithmetic, processing expanded to one row per recipe with the recipe surviving to construction, and the ledger now survives the build it initiated."
+  },
+  "trade-across-kin-borders": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep 4 --epoch 0"
+     ],
+     "requirement": "Kin neighbours with no biting grudge either way trade along a walked corridor joining unlike ground, both capitals paid at the BL-895 constant, a grudge closing the link; the sweep prints open cross-border links and trade share.",
+     "result_metric": "history_sweep (16 seeds): cross-border links open at run's end, median 3/world (range 0-8 across seeds); trade's share of production read ~0.12-0.14% before/after (small, consistent with NR-827's existing reading that trade income is a minor channel). history_sim_harness back to the two pre-existing tracked failures; world_determinism ALL PASS, digests moved as expected.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "visual: round-4 capture"
+     ],
+     "requirement": "The lapse draws an open link between the two seats.",
+     "result_metric": "Confirmed live: the round-4 ticker narrated \"Hogai Haimgo opens trade across the border with Si...\" and \"Sihamzi Saha opens trade across the border with Zit...\" during this session's click-through of the fully integrated tree.",
+     "notes": ""
+    }
+   ],
+   "resolution": "A neighbouring pair is amicable when their cultures are kin (below the organise_opposition_bar_q, the same bar ORGANISE reads) and neither holds a biting grudge (new trade_grudge_bar_q); a walked, unlike-ground corridor across an amicable border now pays BOTH seats at the existing BL-895 constant, and a raised grudge closes the link (typed trade_link_opened/closed events on the lapse record). The lapse draws an open cross-border link as a stroke between the two seats, beside BL-917's own road-stroke drawing."
   },
   "ui-frame-recompute-caches": {
    "resolution": "Complete 2026-08-10. update_body_vision, the three marker maps, the industry lens pre-pass, the lens-key chrome, the selection-panel tile metrics and the tech-tree constellation geometry all stopped recomputing per frame; intra_body_path returns a const ref instead of copying the tile vector on every A* cache hit (all 8 call sites audited for lifetime - std::map references survive insertion, and no site holds one across a clear). Hover dwell converted from frame counts to wall-clock seconds. THE REVIEW BARRIER CAUGHT TWO REAL FAULTS HERE, both fixed before close: a float-accumulation off-by-one that moved the stick threshold from frame 150 to 151, and a tech-tree cache stamp (registry address + entry counts) that verify.new_world defeats while dangling every retained node pointer."
