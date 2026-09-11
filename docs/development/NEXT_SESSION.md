@@ -1,143 +1,140 @@
-# Next session — write the pass 1 → pass 2 contract, before any more mechanism
+# Next session — build BL-906, and nothing else until it is green
 
-Written 2026-09-11 at the close of a batch delivery. Sprint 38's nine items are closed or
-superseded; six items are open and **all of them stay open deliberately** (Ben, 2026-09-11).
+Written 2026-09-11. The design work is **done and committed** (`fc688d44`). This session is a
+**build** session. Delivery — Full mode.
 
-## The redirect, and it is the whole point of this handoff
+## Your job
 
-**Ben, 2026-09-11, closing the session:** *"It might be that we are needlessly overcomplicating
-things — we are still yet to work on the output data, and what our age of exploration expects to
-find after the age of empires."*
+Build **`BL-906 (empire span runs to 1200)`**. One item. Do not start a second item until it is
+merged and verified.
 
-**He is right, and the session's own numbers are the evidence.** Every item delivered today added a
-*mechanism inside the Era −1 sim*. Not one was chosen by asking what the next phase needs. So:
+Read the item first:
 
-- `BL-887` built a correct, cheap centre-relay reach model that **moved nothing**.
-- `BL-839` built a turbulence lean whose forces are **inert** — two of three never fire.
-- `BL-838` cleared every scope check and **did not move the number it was written against**.
-- `BL-905` found the phase's stated primary lever **refuses zero campaigns** — a lever nobody
-  noticed wasn't firing, because no consumer would have noticed either.
-
-Each was measured honestly. None could be **judged**, because nothing downstream asks for anything
-specific. `CIVILISATION.md` § What the dark age must leave is the entire specification — three
-bullets of prose (nations of unequal strength, roads that outlive their builders, grudges that still
-bite), with no schema, no magnitudes and no consumer.
-
-**So the next block is a DESIGN session on the pass 1 → pass 2 contract, not more mechanism.**
-`pass_one_output` already exists as the enforced list of *what crosses*; it carries no expectation
-about *shape*. What the age of exploration expects to find: how many nations, in what strength
-distribution, holding what, wanting what from each other.
-
-Once that exists, most of the open queue answers itself or stops mattering — `NR-827`'s trade share,
-`NR-829`'s grudge decay, `NR-830`'s hegemony bar, `BL-839`'s magnitudes are every one of them
-currently judged against taste, for want of a requirement to judge them against. It would also
-settle whether the **400-of-1,600-years** gap is actually a problem, which has been attached as a
-caveat to every number all day without anyone deciding it is one.
-
-**Do not open this by tuning anything.** The instruction is to write the contract first.
-
-## What Ben saw in the build
-
-`build_rel\ProjectIo.exe` was rebuilt at the close (Release / Ninja) and opened. His verdict:
-**"the time-lapse looks great."** That is the round-4 lapse surface — `BL-817`'s playback record,
-`BL-830`'s scoreboard and `BL-891`'s arc readout together.
-
-**It does NOT settle `BL-904`.** Round 3 carries a lapse too, so viewing one does not prove round 4
-was reached by pressing Next. The reachability question is still open and still unanswerable by any
-script.
-
----
-
-## Read this first: the reach gate refuses nothing
-
-Three agents, working different items with no contact between them, independently measured the same
-line on `history_sweep --epoch 0`:
-
-```
-REFUSED reach gate   median 0   (BL-837)
+```bash
+node tools/session/backlog_query.js --grep BL-906 --full
 ```
 
-`BL-823`'s own resolution note promoted reach-gating from one lever among six to **the primary
-lever**, and `CIVILISATION.md` § The road is the empire's skeleton is built on that claim. It
-refuses zero campaigns. Whatever is holding these worlds multipolar at 0/16 hegemony, it is not
-this.
+## What BL-906 is, in four sentences
 
-**It already cost two items their result:**
+The Empires phase is designed to run **400 BCE → 1200 CE** (1,600 years). It actually runs
+**400 BCE → 0 CE** (400 years). The cause is one coupling: pass 1 stops at the **epoch**, and the
+game's epoch is 0 CE. Give pass 1 its own stop year, defaulting to **1200**, so it no longer takes
+that value from the epoch.
 
-- `BL-887`'s centre-chain relay is correct, cheap and moves nothing — cheaper reach can only unlock
-  ground a price was keeping shut. Tripling the rebate reproduced the default figures **exactly**,
-  which is what turns this from a tuning question into a finding.
-- `BL-839`'s turbulence lean pulls three forces and **two are inert**: its reach-cost term is a toll
-  on a road nobody is stopped on, and `w_fear_q = 400` leans a median of zero candidates.
+`stop_after_ancient_era` already exists as the halt point (it shipped with `BL-871 (empire span)`).
+What it halts **at** is the thing to change.
 
-`BL-905` owns it, at priority A, with three candidate causes to measure and an explicit instruction:
-**do not raise a floor until the cause is known.** Three wrong diagnoses have been published against
-this file and every one was caught by one number contradicting another on the same page.
+Files: `src/world/history_sim.cpp`, `src/world/hard_coded_world.cpp`, `src/world/era_minus_one.hpp`,
+`tools/verify/history_sweep.cpp`.
 
-## Where the phase stands, measured
+## Hard rules — read these before you write code
 
-16 seeds, `--epoch 0`, zero harness failures, 21 gating checks green:
+1. **Do NOT reach 1200 by moving the epoch to 1960.** That pulls in two phases that do not exist
+   (Globalisation, Digitisation — `BL-913`). The epoch stays at 0 CE.
+2. **Do NOT tune any constant to keep an old number stable.** Running 1,600 years instead of 400
+   will move nearly every figure in sprint 38's scoreboard. **That is expected and is the point.**
+   A figure measured over 400 years was never a measurement of this phase.
+3. **Do NOT treat a moved number as a regression.** Record the new value beside the old one and
+   move on.
+4. **Do NOT touch `src/world/corp_ai.cpp`** or add any AI behaviour. Read
+   `.claude/rules/io-standing-rules.md` if you are unsure.
+5. **Determinism is not negotiable.** No floats in the sim's decision path. `world_determinism`
+   must stay green.
 
-| | |
+## Commands
+
+Build the app:
+
+```bash
+./build_app.bat
+```
+
+Build and run the sweep harness:
+
+```bash
+node tools/verify/build_harness.js history_sweep
+```
+
+```bash
+./build_gen/verify/history_sweep.exe 16 --epoch 0
+```
+
+Determinism check (this one is Lua-linked, so it uses the **other** builder):
+
+```bash
+cmd //c "tools\verify\build_lua_harness.bat world_determinism"
+```
+
+```bash
+./build_gen/verify/world_determinism.exe
+```
+
+## Done when
+
+- The Empires round runs **400 BCE → 1200 CE** with the epoch still at 0 CE.
+- `history_sweep` prints the span it actually ran, on the face of the report.
+- `world_determinism` is unchanged (0 failures).
+- The sprint-38 figures are **re-read at full span** and written into the item's `resolution`
+  beside the old ones. The old ones, for comparison:
+
+| | 400-year value |
 |---|---|
-| hegemony rate | **0 / 16** worlds at a 50% share |
-| largest share | median **12%**, range 6–19% |
-| worlds showing rise → peak → fall | **15 / 16** |
-| secessions | median **2**/world, 14 regions walking away |
-| materials sinks | **8%** of production |
-| universalising creeds | **2 of 16** worlds |
-| fear-of-next leans | **6 of 16** worlds |
+| hegemony rate | 0 / 16 worlds at a 50% share |
+| largest share | median 12%, range 6–19% |
+| rise → peak → fall | 15 / 16 worlds |
+| secessions | median 2 per world |
+| materials sinks | 8% of production |
 
-**The caveat that must travel with every one of these numbers:** the phase runs **400 of its
-designed 1,600 years**. Round 5 / pass 2 are not built, so this is a quarter of the span.
+- **Measure the wall clock before and after.** This quadruples the empire round and pass 1 is
+  already the most expensive pass. If it lands badly, a shorter **step** is the admissible lever —
+  never a shorter span. Report the number either way.
 
-## The six open items
+## Commit
 
-**Blocked on the machine, not on thinking:**
+One commit for the item, via the `scoped-commit` skill — the working tree carries unrelated
+modified `perf_*.csv` and `history_sweep.json` that must **not** be swept in.
 
-- **`BL-891`** (round 4 arc readout) — *partial*. The readout renders and reads well on a headless
-  capture. The scripted walk **cannot reach round 4**: every Next after round 3 misses.
-- **`BL-904`** (wizard footer reachability) — priority A, and the downside case is a release
-  blocker. Either the footer has been pushed below the fold at 1080p and the wizard is *blocked at
-  round 3*, or a human can scroll to it and this is a scripted-walk problem. **No script can tell
-  you which**: `verify.scroll_panel` resolves only named ledger windows and knows nothing about the
-  wizard column. Also flags that the verify window reports **1720×1080 while captures come out
-  1920×1080** — if those are different spaces, every wizard coordinate ever read off a capture was
-  read in the wrong one, and the ones that pass do so by luck.
+```
+BL-906: the Empires phase runs its full 1,600 years
 
-**Real work, unblocked:**
+Tasks: <N completed>, <N cancelled>
+Requirements: <N completed>, <N pending>, <N failed>
+```
 
-- **`BL-905`** (reach gate refuses nothing) — read the section above. This is the one that matters.
-- **`BL-903`** (communication rung) — split out of `BL-823` on closing it; the last of its six
-  levers. Earns its place twice: an anti-hegemon lever *and* the second rung of Ben's own arc.
-  **Design is owed before build**, and the first test it must pass is articulating a difference from
-  reach that shows up in the numbers rather than in a comment.
-- **`BL-901`** (culture crossed water) — `colonisation.cpp` knows it coined a daughter across water,
-  but `culture_spawn` drops the fact one struct short of its consumer, so `BL-899` shipped sea legs
-  on two of the three facts Ben named. Small repair; arguably the best of the three, being the only
-  one that is a deed rather than a circumstance.
-- **`BL-902`** (pass_one_handoff fixture red) — seven rows red, pre-existing. The fixture stopped
-  producing a war as the sim was reshaped, so the assertions are right and the world under them is
-  wrong. **Do not tune the fixture until a war appears** — that is fitting a fixture to its
-  assertions. `BL-898`'s harness re-pointed at the real generated era instead; generalise that.
+## If BL-906 lands and you still have time
 
-## Awaiting Ben's judgement
+Take **`BL-907 (closure contract scoreboard)`** next — it is the reason BL-906 matters. Nothing
+else. The other items in sprint 38 have dependencies that BL-906 and BL-907 unblock.
 
-`NR-827` (trade is still 0.25% of production — a shape problem, not a magnitude one) ·
-`NR-828` (no launched crossing starves; the sea-legs floor is redundant with the port gate) ·
-`NR-829` (an inherited grudge decays away in ~3 campaign years) ·
-`NR-830` (`BL-838`'s hegemony criterion asks for a fall from a floor) ·
-`NR-831` (`w_aggr_q`'s lean sits **inside** the season loop and compounds — if unintended,
-`BL-868`'s hard-won magnitude includes a doubling nobody wrote down) ·
-`NR-832` (save format 11 → 12; `lean::any` representable but meaningless).
+Do **not** start `BL-912 (empire tree wired to sim)` in a low-effort session. It is difficulty 6.
 
-## Two operational notes
+## Where the design lives
 
-- **The saved agent definitions were broken, and are now fixed.** `generation-dev`, `ui-dev` and
-  `economy-dev` carried `tools: "All tools except Agent"` — prose where a list belongs — so every
-  spawn came up with `Agent` as its only tool. That is the "subagents were unusable" note from the
-  last handoff: a config fault, not a brief problem. Replaced with real lists; definitions are
-  cached at session start, so this session's five slices ran as `general-purpose` instead.
-- **Computer-use resolves `ProjectIo` to a stale worktree exe.** On 2026-09-11 it pointed at a
-  **two-day-old** binary while the real build sat in `build/`. Nothing looks broken — a live check
-  taken without comparing that path's mtime would verify the wrong exe and look fine doing it.
+`docs/generation/CIVILISATION.md` § **The closure of the Empire era** — what crosses at 1200 CE and
+the seven readings the contract is judged on. Written 2026-09-11, settled on two elicitation forms.
+Do not re-open those calls; build against them.
+
+The other seven items filed with it: `BL-907` scoreboard · `BL-908` contact record · `BL-909`
+directed want · `BL-910` capitals and markets · `BL-911` network crosses · `BL-912` empire tree ·
+`BL-913` Globalisation/Digitisation phases (design-owed, no sprint).
+
+## Traps that have cost time here before
+
+- **`build/` holds stale harness exes and `ctest` does not rebuild them.** Always build the target
+  before running it. A failure straight after a merge is a stale binary until a fresh build
+  reproduces it.
+- **A harness failing on `sol/sol.hpp` is the wrong builder, not broken code.** Use
+  `build_lua_harness.bat` for that one.
+- **Check `git status` before committing.** This checkout is shared with other sessions.
+- **Patch scripts must preserve CRLF.** Read and write binary, or a 10-line edit becomes a
+  1000-line diff.
+
+## Still open, not yours this session
+
+`BL-891` (round 4 arc readout, partial) · `BL-904` (wizard footer reachability — **needs a human at
+the keyboard**, no script can answer it) · `BL-905` (reach gate refuses nothing) · `BL-901`
+(culture crossed water) · `BL-902` (pass_one_handoff fixture red) · `BL-903` (communication rung,
+design owed).
+
+Awaiting Ben's judgement, do not resolve these yourself: `NR-827` · `NR-828` · `NR-829` · `NR-830`
+· `NR-831` · `NR-832`.
