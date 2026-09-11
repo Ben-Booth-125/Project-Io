@@ -4883,34 +4883,11 @@
    "difficulty": 3,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-11",
    "promoted_from": "backlog.json BL-926 - Sprint 39, the drama of the time-lapse",
    "batch": "sprint-39-drama",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: history_sweep 16 --epoch 0",
-      "code: history_sweep.json new fields"
-     ],
-     "requirement": "The sweep face and the JSON row carry per-polity gross deaths, lifespans (born/peak/peak year/died/killer-or-parent for the top N), breakdown pieces and sizes, the network_supply_q histogram with the share under each floor, cultures per world with tree depth, foundings by source, city-state count over time, civilisations formed, and the arc mode.",
-     "result_metric": "",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "manual: baseline file in the session scratchpad"
-     ],
-     "requirement": "A 16-seed run on main before any other sprint-39 item is saved as the baseline.",
-     "result_metric": "",
-     "notes": ""
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "aggression-lean-once",
@@ -4918,24 +4895,11 @@
    "difficulty": 1,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-11",
    "promoted_from": "backlog.json BL-927 - Sprint 39, the drama of the time-lapse",
    "batch": "sprint-39-drama",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: history_sweep 4 --epoch 0",
-      "code: lean outside the season loop"
-     ],
-     "requirement": "w_aggr_q leans a campaign candidate exactly once, outside the season loop, matching the fear lean; battle and conquest medians re-read before and after.",
-     "result_metric": "",
-     "notes": ""
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "culture-diversity-overtuned",
@@ -4943,45 +4907,11 @@
    "difficulty": 4,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-11",
    "promoted_from": "backlog.json BL-918 - Sprint 39, the drama of the time-lapse",
    "batch": "sprint-39-drama",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: colonisation_harness",
-      "headless: world_determinism"
-     ],
-     "requirement": "The walk splits fire more readily (shorter interval, biome trigger on every class transition) and an isolation trigger coins a daughter on a settled component cut off from its origin, in the Culture round only; deterministic, region-index order.",
-     "result_metric": "",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: colonisation_harness",
-      "headless: history_sweep 4 --epoch 0"
-     ],
-     "requirement": "Cultures per world, tree depth, adjacent kinship and the split census by trigger print on the harness face and on the sweep JSON row; no seed reaches the 1,739 runaway.",
-     "result_metric": "",
-     "notes": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "visual: history_lapse capture (after BL-919)"
-     ],
-     "requirement": "A round-3 capture at three years shows a range coming apart into kin hues.",
-     "result_metric": "",
-     "notes": ""
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "lineage-palette",
@@ -4989,24 +4919,11 @@
    "difficulty": 2,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-11",
    "promoted_from": "backlog.json BL-919 - Sprint 39, the drama of the time-lapse",
    "batch": "sprint-39-drama",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "visual: round-3 capture",
-      "code: palette derived from the tree"
-     ],
-     "requirement": "Culture colour derives from the culture tree at record time: hue by root cradle, a fixed step per daughter and a lightness step by depth; round 3 draws culture ground in these hues and round 4 tints the base with them.",
-     "result_metric": "",
-     "notes": ""
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "terrain-underlay-on-lapse",
@@ -5014,24 +4931,11 @@
    "difficulty": 3,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-11",
    "promoted_from": "backlog.json BL-915 - Sprint 39, the drama of the time-lapse",
    "batch": "sprint-39-drama",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "visual: round-4 capture at three years",
-      "manual: live click confirms frame rate"
-     ],
-     "requirement": "Rounds 3 and 4 draw a dull terrain base (relief for mountain/highland/canyon/rift, a river stroke on river edges) with the fill as a translucent tint, frontiers on both axes, seats as dots, and adjacent polities coloured distinctly.",
-     "result_metric": "",
-     "notes": ""
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "lapse-event-layer",
@@ -5039,36 +4943,11 @@
    "difficulty": 5,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-11",
    "promoted_from": "backlog.json BL-916 - Sprint 39, the drama of the time-lapse",
    "batch": "sprint-39-drama",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: history_sim_harness",
-      "headless: save_roundtrip",
-      "headless: world_determinism"
-     ],
-     "requirement": "era_timelapse carries a typed event list {year, kind, region, polity, other} emitted by the sim at founding, seat capture, realm ended, broke away, capital moved, road promoted, civilisation formed, creed preached and culture split; polity carries a parent id; save format 13 round-trips; recorded and suppressed runs are bit-identical.",
-     "result_metric": "",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "visual: round-4 capture",
-      "manual: live click"
-     ],
-     "requirement": "The wizard shows an event ticker and map markers, the arc readout counts deaths off the events with a live-stride denominator, and the board draws Population and Might.",
-     "result_metric": "",
-     "notes": ""
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "reach-has-a-gradient",
@@ -5076,35 +4955,11 @@
    "difficulty": 5,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-11",
    "promoted_from": "backlog.json BL-922 - Sprint 39, the drama of the time-lapse",
    "batch": "sprint-39-drama",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: history_sim_harness",
-      "code: one supply basis"
-     ],
-     "requirement": "network_supply_q and campaign_supply share one basis: a Dijkstra from the capital over held ground only, roads discounting, per-tile cost rescaled so a connected region 30+ tiles from its capital reads materially below one beside it; the staging-hub pricing is gone.",
-     "result_metric": "",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: history_sweep 4 --epoch 0",
-      "headless: world_determinism"
-     ],
-     "requirement": "The sweep prints the supply distribution before and after; REFUSED reach gate is neither 0 nor nearly everything; breakdown candidates exist on connected ground; world_determinism green after one authorised re-bless by the main session.",
-     "result_metric": "",
-     "notes": ""
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "live-lapse-render",

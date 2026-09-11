@@ -10,6 +10,100 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-11 — Sprint 39 wave 1 closes out: seven items verified, re-blessed, and a 16-seed reading for Ben
+
+**Runtime:** long session, Full / Batch Delivery close-out (no new build this session — wave 1's
+seven items, BL-926 BL-927 BL-918 BL-919 BL-915 BL-916 BL-922, were already merged to main by the
+prior session; this one runs the close-out checklist `NEXT_SESSION.md` left owed). **Items:** BL-926
+BL-927 BL-918 BL-919 BL-915 BL-916 BL-922.
+
+### Close-out checklist, run in full
+
+`build_app.bat` BUILD_OK. Re-built and ran every harness the handoff named: `world_determinism`
+(ALL PASS, digests moved as expected on BL-918/BL-922 — recorded below), `save_roundtrip` and
+`save_envelope_roundtrip` (both green, save format 13), `history_sim_harness` (down to the two
+pre-existing, tracked failures R3a2/R3a3 — both about far-objective under-supply, which is exactly
+the mechanism BL-922 changed, so their persistence is expected, not a regression), and
+`colonisation_harness` (0 failures). A `verifier-review` static pass and a separate cold
+`code-reviewer` adversarial pass (author ≠ reviewer, correctness-focused: overflow, sentinel bugs,
+serialisation symmetry) both came back clean — no blocking findings, two non-blocking hygiene
+suggestions noted for later. Live-clicked the wizard's rounds 3 and 4 in a fresh `build/ProjectIo.exe`
+(this worktree's own Debug build, not the stale `build_rel` the handoff named — equivalent evidence):
+confirmed rivers, terrain relief, seat markers and frontier lines on both maps, kin cultures sharing
+hue families on round 3, and the event ticker plus Population/Might board columns on round 4,
+animating live from 44 BCE to the 1200 CE epoch.
+
+**One authorised `world_determinism` re-bless for the whole wave**, per the handoff's instruction
+(never per item): seedA/on `DA6F5E1E50BC9A68`, seedB/on `A78B4BB975568091`, seedA/off
+`F9BF05466A631FF9`, 1960/two-span `1785663397FA92CD` — all reproduce bit-identical across two runs;
+ALL PASS, 0 failures. (The wave's earlier BL-922-only re-bless recorded in `NEXT_SESSION.md`,
+seedA/on `5A641C67838E8B54` etc., is superseded — BL-918 moved the digest again on top of it.)
+
+### The 16-seed reading Ben asked to see before any dial moves
+
+Per `GENERATION_STRATEGY.md` § The asymmetry is political, this is reported, not acted on.
+`history_sweep 16 --epoch 0` on the wave-1 tree, against the pre-wave main baseline
+(`6995b41e`: powers 42, largest share 11%, battles 3114, conquests 1812, secessions 2, reach
+refusals 0, rose-and-fell 2/world in 15/16):
+
+| metric | baseline (main) | wave 1 (16 seeds) |
+|---|---|---|
+| powers at epoch | median 42 | median 42, range 20–72 |
+| largest single share | median 11% | median 21%, range 12–32% |
+| battles per world | 3114 | median 689, range 57–2023 |
+| conquests per world | 1812 | median 311 |
+| taken 3+ times | 31% | 25% |
+| secessions per world | 2 | median 2 |
+| REFUSED reach gate | 0 | median 10,471 of ~207,935 contacts examined |
+| worlds showing rise-and-fall | 15/16 | **7/16** |
+| rose-and-fell, median | 2/world | **0/world** |
+
+The two-seed integrated reading the prior session took (largest share 30%, battles 844, reach
+refusals 28,921 combined) sits at the aggressive end of a much wider 16-seed spread, not the
+centre of it — battles alone range 57 to 2023 across seeds, a 35× spread. The headline tension:
+**largest share roughly doubled while the rise-and-fall shape Ben asked sprint 39 to deliver
+("drama") appears in fewer worlds, not more** (15/16 → 7/16). `terrain_reach_cost_q` (currently
+4000; 3000 refuses far fewer contacts per the BL-922 agent's own measurement) is the one number
+`NEXT_SESSION.md` names as the candidate to shift, but no dial was touched this session — the
+finding is filed for Ben's read, not resolved.
+
+### Novelty and decisions taken, filed
+
+- **NR-840 (novel-work):** `culture_kinship_years` tested `year < 0` for "undated," but every
+  culture in the migration is coined BCE, so the function returned −1 for every pair on every
+  world since BL-870 — the kin-opposition discount has never fired in a real run. Fixed in the
+  BL-918 commit (sentinel is now `INT64_MIN`) because the split census could not proceed without
+  it; recorded separately because BL-918 didn't ask for it.
+- **NR-841 (decision taken):** the wizard's Culture/Empires preview surface never ran the river
+  pass; BL-915 needed it to, so `generate_home_surface_preview` now runs `generate_rivers` with the
+  campaign's own seed formula. A generation-layer change made inside a UI item's scope.
+- **NR-842 (decision taken):** round 3 under `--verify` used to silently replay the Empires sim's
+  polities instead of the migration; BL-919 needed the real migration record for the lineage tree,
+  so the adopt path now calls `build_migration_timelapse` for round 3 specifically.
+- **NR-831 resolved:** BL-927 moved the `w_aggr_q` lean outside the season loop, confirming the
+  compounding this entry flagged was real and unintended; battle/conquest medians unchanged by
+  this item alone.
+
+### Bookkeeping
+
+All seven items' `req/requirements.json` rows flipped complete with result metrics and archived to
+`archive/requirements-2026-Q3.json`; all seven backlog rows flipped complete with resolution prose
+and evicted to `archive/backlog-design-2026-Q3.json` via `archive_landed.js` (verified byte-exact
+round trip); `REFINED.md`'s wave-1 task blocks are stale now that the rows are archived (left in
+place — wave 2/3 blocks below them are still live); `backlog_lint.js` 0 fail(s). A `mirror_check.js`
+run separately found `docs/ai/ACTIONS.md`/`ACTIONS_INDEX.json` stale against a change from an
+earlier, unrelated commit — reverted out of this batch and spawned as its own follow-up rather than
+bundled here.
+
+### What's next
+
+Wave 2 (BL-914, BL-917, BL-920, BL-921, BL-924, BL-925, BL-929) and wave 3 (BL-923) are briefed in
+`NEXT_SESSION.md` (now stale on the close-out section, live on the wave-2/3 briefs) and
+`REFINED.md`. The 16-seed table above is Ben's to read before any of `terrain_reach_cost_q`,
+the reach-gate constants, or the aggression/fear lean magnitudes move again.
+
+---
+
 ## 2026-09-11 — Sprint 38 closes for real: the whole closure contract wired, twelve items, and the phase pronounced too lively
 
 **Runtime:** very long session (survived one crash and a full resume), Full / batch delivery,

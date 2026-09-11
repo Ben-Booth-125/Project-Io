@@ -234,6 +234,22 @@
    ],
    "resolution": "Complete 2026-08-26. chain_depth 47 PASS / 1 FAIL at the integrated tree, and THE ONE FAILURE IS THE REQUIREMENT BEING MET: R2 asks the row to fail when an exemption names no findable injector, and it names eleven goods with the claim each could not substantiate. Eleven, not the ten expected - spacecraft_components was the surprise, because BL-350 procurement is a resource-agnostic TRANSFER and admitting it would substantiate the whole roster at once. R4 is the row that makes this durable: four of five probes read the Lua vectors the running passes multiply by, so a channel landing in economy.lua flips a good green with NO harness edit, and zeroing an upkeep rate demonstrably UNSUBSTANTIATES it again. The fifth probe could not read Lua, so the pass was made to declare its own draw rather than have the constant re-typed into the harness (NR-673). R3 verified: 8 check lines added, zero removed."
   },
+  "aggression-lean-once": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep 4 --epoch 0",
+      "code: lean outside the season loop"
+     ],
+     "requirement": "w_aggr_q leans a campaign candidate exactly once, outside the season loop, matching the fear lean; battle and conquest medians re-read before and after.",
+     "result_metric": "Confirmed by code review: exactly one w_aggr_q block, sited before the season loop, not duplicated inside it. history_sweep 4 --epoch 0 battle/conquest medians unchanged by this item in isolation (3114 median, matching pre-change).",
+     "notes": ""
+    }
+   ],
+   "resolution": "w_aggr_q relocated outside the per-season loop in history_sim.cpp so it leans a candidate once, matching the fear lean's siting. Resolves NR-831. Before/after on the wave-1 4-seed reading: battles 3114 -> 3114 median (unchanged); seeds 0 and 3 moved slightly in the full 4-seed digest set once combined with the other six items."
+  },
   "ancient-chain-does-not-convert": {
    "rows": [
     {
@@ -1696,6 +1712,43 @@
     }
    ],
    "resolution": "Delivered. enable_testing() + a foreach over tools/verify/*.cpp builds every harness not already declared (linking the world superset minus recipe_registry.cpp, mirroring the CI loop) and registers add_test for all; the 7 hand-listed targets keep their minimal link sets. check.bat wraps cmake --build + ctest. Confirmed: the previously-unbuildable econ_stability + world_audit now build and PASS."
+  },
+  "culture-diversity-overtuned": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: colonisation_harness",
+      "headless: world_determinism"
+     ],
+     "requirement": "The walk splits fire more readily (shorter interval, biome trigger on every class transition) and an isolation trigger coins a daughter on a settled component cut off from its origin, in the Culture round only; deterministic, region-index order.",
+     "result_metric": "colonisation_harness C13/C14/C15/D all PASS (0 failures); world_determinism R3/R4 PASS (digests move as expected, reproducibility intact).",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: colonisation_harness",
+      "headless: history_sweep 4 --epoch 0"
+     ],
+     "requirement": "Cultures per world, tree depth, adjacent kinship and the split census by trigger print on the harness face and on the sweep JSON row; no seed reaches the 1,739 runaway.",
+     "result_metric": "C15 split census prints cultures/cradles/depth/adjacent-pairs/mean-kinship/splits-by-trigger on the harness face; history_sweep.json carries the same fields per seed (median 362 cultures/world across the 16-seed wave-1 sweep, tree depth median 2). C15a: no world reaches the 1,739-culture runaway.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "visual: history_lapse capture (after BL-919)"
+     ],
+     "requirement": "A round-3 capture at three years shows a range coming apart into kin hues.",
+     "result_metric": "Confirmed live: round-3 click-through (seed 84287FD8) shows adjacent regions in distinct kin-hue clusters (purples, greens, pinks each grouped) consistent with a range coming apart into kin hues; no separate saved capture file taken (manual live-click substituted, per the close-out's live-click requirement for this batch).",
+     "notes": ""
+    }
+   ],
+   "resolution": "Split interval shortened 600->200y, biome trigger fires on every class transition, and the ISOLATION pass runs in run_settlement for the Culture round only (NR-839: Ben, A). colonisation_harness C15 census: seeds 0-2 show 380/395/265 cultures (was ~800/world median pre-item, per the handoff's \"cultures per world ~800->~380\" reading), 12 cradles, splits by distance/biome/size/isolation all firing, isolation moving 26-75 regions per world; no seed approaches the 1,739-culture runaway (C15a PASS). Same pass caught and fixed the culture_kinship_years BCE-sentinel defect (filed separately as NR-840, novel-work)."
   },
   "data-creep-convoy-scenario": {
    "rows": [
@@ -3276,6 +3329,34 @@
     }
    ]
   },
+  "lapse-event-layer": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: save_roundtrip",
+      "headless: world_determinism"
+     ],
+     "requirement": "era_timelapse carries a typed event list {year, kind, region, polity, other} emitted by the sim at founding, seat capture, realm ended, broke away, capital moved, road promoted, civilisation formed, creed preached and culture split; polity carries a parent id; save format 13 round-trips; recorded and suppressed runs are bit-identical.",
+     "result_metric": "history_sim_harness B916a-g all PASS (event layer emitted, stays under 1MB, ascends by year, realm_ended/broke_away counters agree with polity::parent, non-successors all founded); save_envelope_roundtrip S3 \"the event layer survives whole, field for field, sentinel included (BL-916)\" PASS; world_determinism unaffected by this row directly.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "visual: round-4 capture",
+      "manual: live click"
+     ],
+     "requirement": "The wizard shows an event ticker and map markers, the arc readout counts deaths off the events with a live-stride denominator, and the board draws Population and Might.",
+     "result_metric": "Confirmed live: round-4 click-through shows an \"As it happened\" ticker narrating seat captures and realm endings by name and year, and a Land/Rgn/Pop/Mt board column set. Map markers (ringed circles) visible at contested/capital sites. Road-promotion narration not separately observed this run (BL-917, wave 2, is what actually grows roads over the span).",
+     "notes": ""
+    }
+   ],
+   "resolution": "era_timelapse carries the typed event list (year/kind/region/polity/other) covering all nine kinds; polity::parent added; save format bumped to 13 with symmetric read/write and a range-checked kind byte. 4-seed reading: 1,039 events, 73 realms ended, 5 broke away; verify world arc line moved from \"0 polities destroyed\" to \"37 polities, 12 destroyed\"."
+  },
   "lens-driven-selection": {
    "rows": [
     {
@@ -3300,6 +3381,22 @@
     }
    ],
    "resolution": "Closed in the 2026-07-04 backlog reconciliation (retro-verified). Lens-driven selection resolution is live in selection_panel.cpp's lens-contextual branches; rows R1-R2 retro-verified. Pure bookkeeping."
+  },
+  "lineage-palette": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "visual: round-3 capture",
+      "code: palette derived from the tree"
+     ],
+     "requirement": "Culture colour derives from the culture tree at record time: hue by root cradle, a fixed step per daughter and a lightness step by depth; round 3 draws culture ground in these hues and round 4 tints the base with them.",
+     "result_metric": "Confirmed live in the round-3/round-4 click-through: culture territories cluster by hue family (kin cultures visibly share a hue, e.g. adjacent purple shades vs. a separate green cluster) rather than random per-polity colour. Code path (build_lineage_palette, parent-indexed) reviewed and confirmed complete by the code-reviewer pass.",
+     "notes": ""
+    }
+   ],
+   "resolution": "build_lineage_palette derives hue by root cradle with a fixed per-daughter step and a lightness step by depth, rebuilt from the culture tree at record time. Round 3 draws culture ground in these hues; round 4 tints its base with them."
   },
   "live-spectate-route": {
    "rows": [
@@ -4796,6 +4893,33 @@
     }
    ]
   },
+  "reach-has-a-gradient": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness",
+      "code: one supply basis"
+     ],
+     "requirement": "network_supply_q and campaign_supply share one basis: a Dijkstra from the capital over held ground only, roads discounting, per-tile cost rescaled so a connected region 30+ tiles from its capital reads materially below one beside it; the staging-hub pricing is gone.",
+     "result_metric": "history_sim_harness BL837a1-3 (reach gate fires and refuses, road discount live), BL837b1-2 (roaded edge denied less), BL837c1-3 (garrison attrition beyond reach), BL872a0-6 (cut-off ground freezes centre growth but not population) all PASS. Code review confirmed one shared basis (edge_step/Dijkstra) feeding both consumers, no second unfixed overflow.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep 4 --epoch 0",
+      "headless: world_determinism"
+     ],
+     "requirement": "The sweep prints the supply distribution before and after; REFUSED reach gate is neither 0 nor nearly everything; breakdown candidates exist on connected ground; world_determinism green after one authorised re-bless by the main session.",
+     "result_metric": "Wave-1 16-seed sweep (this close-out): REFUSED reach gate median 10,471 of ~207,935 contacts examined per world (neither 0 nor nearly-everything); secessions median 2/world, 6 regions walked; 8 of 12 seed-0-style cut zero-supply cases had a fed same-realm region within neighbour_radius (the uncapped-index residual the handoff flagged as a Ben call). world_determinism re-blessed once for the whole wave (see DEVLOG): seedA/on DA6F5E1E50BC9A68, seedB/on A78B4BB975568091, seedA/off F9BF05466A631FF9, 1960/two-span 1785663397FA92CD -- ALL PASS, 0 failures.",
+     "notes": ""
+    }
+   ],
+   "resolution": "Capital-based Dijkstra over HELD ground for both network_supply_q and campaign_supply (NR-838: Ben, capital basis); staging-hub pricing removed; roads discount cost; terrain_reach_cost_q raised 10->4000. A latent int overflow (cut-off ground reading as fully supplied) and a missing owner_change on seat-hinterland capture were both fixed. Re-verified in this close-out: world_determinism ALL PASS after the wave, digests recorded below; history_sim_harness down to the two pre-existing failures (R3a2/R3a3, both about far-objective under-supply, exactly what BL-922 changes the mechanism of -- tracked, not new)."
+  },
   "reach-rule-hardening": {
    "rows": [
     {
@@ -5865,6 +5989,32 @@
    ],
    "resolution": "Complete. rank_extraction_sites() (src/world/corp_ai.cpp) hoists the O(tiles) survey/richness/affinity scan out of the per-corp loop in run_corp_strategic_step, computed once per tick and read by every due corp; only the per-corp can_place_in_world filter (tech gate, logistics reach) and scoring still run per corp, over the already-truncated top-M list. Verified behaviour-preserving by stash-and-diff against unmodified main: ai_skill_harness's 5-seed/300-tick benchmark produces numerically identical net_worth curves and action-verb counts on both sides, including its pre-existing golden-band failures (seeds 1-4 'net-worth final' fail identically on both sides - tracked by NR-140, not caused or worsened by this item; not re-blessed here since it is out of this item's scope). econ_stability's BL-250 scaling sweep is the direct measurement: exponent 1.28 -> 1.18, worst 2x-size-step growth 3.17x -> 3.01x, all six harnesses/build targets green. BL-365 (background industry, ~80 corps) is now unblocked."
   },
+  "sweep-sees-the-arc": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep 16 --epoch 0",
+      "code: history_sweep.json new fields"
+     ],
+     "requirement": "The sweep face and the JSON row carry per-polity gross deaths, lifespans (born/peak/peak year/died/killer-or-parent for the top N), breakdown pieces and sizes, the network_supply_q histogram with the share under each floor, cultures per world with tree depth, foundings by source, city-state count over time, civilisations formed, and the arc mode.",
+     "result_metric": "history_sweep 16 --epoch 0 (wave-1 tree) prints every named field; history_sweep.json wrote 16 rows with the new keys populated on every seed.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "manual: baseline file in the session scratchpad"
+     ],
+     "requirement": "A 16-seed run on main before any other sprint-39 item is saved as the baseline.",
+     "result_metric": "Baseline captured on main 6995b41e before BL-927/918/919/915/916/922 landed: powers 42, largest share 11%, peak 20%, battles 3114, conquests 1812, taken-3+ 31%, secessions 2, reach refusals 0, rose-and-fell 2/world in 15/16 -- filed at the scratchpad path above.",
+     "notes": ""
+    }
+   ],
+   "resolution": "BL-926 built as designed: per-polity gross deaths/lifespans, breakdown pieces, the network_supply_q histogram, culture census, foundings by source, city-state series and civilisations formed all print on history_sweep.json (70-key row) and the harness face. The main-tree 16-seed baseline was captured BEFORE any other sprint-39 item, per R2, and is on file at C:\\Users\\benbo\\AppData\\Local\\Temp\\claude\\gen_sweep\\baseline\\sweep16.txt."
+  },
   "tariff-posture-and-consequence": {
    "rows": [
     {
@@ -6118,6 +6268,22 @@
     }
    ],
    "resolution": "Complete. is_barrier deleted; barrier_q is now graded land resistance + a separately-weighted ocean term (weight 750, chosen by sweep, Ben's call). Kepler's political map holds at 30 nations; Pallas's flat-zero barrier field is fixed. history_ladder_harness and world_audit green."
+  },
+  "terrain-underlay-on-lapse": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "visual: round-4 capture at three years",
+      "manual: live click confirms frame rate"
+     ],
+     "requirement": "Rounds 3 and 4 draw a dull terrain base (relief for mountain/highland/canyon/rift, a river stroke on river edges) with the fill as a translucent tint, frontiers on both axes, seats as dots, and adjacent polities coloured distinctly.",
+     "result_metric": "Confirmed live: round-3 and round-4 click-through both show river strokes, terrain relief texture, seat markers (ringed dots) and frontier lines between adjacent polities of visibly distinct colours. Frame rate was not numerically measured but the wizard remained responsive through both rounds' full animation (44 BCE -> 1200 CE on round 4 observed advancing live).",
+     "notes": ""
+    }
+   ],
+   "resolution": "Rounds 3 and 4 now draw a baked terrain base (relief, rivers, seats, frontiers on both axes) under the translucent political fill. generate_home_surface_preview gained the river pass (previously terrain-only), seeded identically to the campaign (params.seed ^ 0x52490001u) -- recorded as a decision taken on Ben's behalf, NR-841."
   },
   "text-wrap-render-audit": {
    "rows": [

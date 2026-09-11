@@ -7,44 +7,12 @@ their branch; the main session merges, builds, sweeps and live-clicks.
 
 ## Waves
 
-- **Wave 1 (baseline + independent):** BL-926, BL-927, BL-918, BL-919, BL-915, BL-916, BL-922.
+- **Wave 1 (baseline + independent): DONE 2026-09-11.** BL-926, BL-927, BL-918, BL-919, BL-915,
+  BL-916, BL-922 — built, verified, re-blessed and archived; see the DEVLOG entry "Sprint 39 wave 1
+  closes out" and `docs/development/archive/backlog-design-2026-Q3.json` / `archive/requirements-
+  2026-Q3.json` for the closed rows.
 - **Wave 2 (dependents):** BL-914, BL-917, BL-920, BL-921, BL-924, BL-925, BL-929.
 - **Wave 3:** BL-923.
-
-## BL-926 - the instrument reports the arc
-
-- **Task 1 — build the item as designed** (`node tools/session/backlog_query.js --grep BL-926 --full`). Files: the item's declared list. Satisfies: R1, R2. Status: pending.
-- **Task 2 — verify and measure**: run the rows' verification classes; sim items read history_sweep before and after against the wave-1 baseline. Status: pending.
-
-## BL-927 - the creed-aggression lean applied once
-
-- **Task 1 — build the item as designed** (`node tools/session/backlog_query.js --grep BL-927 --full`). Files: the item's declared list. Satisfies: R1. Status: pending.
-- **Task 2 — verify and measure**: run the rows' verification classes; sim items read history_sweep before and after against the wave-1 baseline. Status: pending.
-
-## BL-918 - many kin cultures, ranges break into insular groups
-
-- **Task 1 — build the item as designed** (`node tools/session/backlog_query.js --grep BL-918 --full`). Files: the item's declared list. Satisfies: R1, R2, R3. Status: pending.
-- **Task 2 — verify and measure**: run the rows' verification classes; sim items read history_sweep before and after against the wave-1 baseline. Status: pending.
-
-## BL-919 - kin cultures share a hue family
-
-- **Task 1 — build the item as designed** (`node tools/session/backlog_query.js --grep BL-919 --full`). Files: the item's declared list. Satisfies: R1. Status: pending.
-- **Task 2 — verify and measure**: run the rows' verification classes; sim items read history_sweep before and after against the wave-1 baseline. Status: pending.
-
-## BL-915 - rivers, mountains, seats and whole frontiers on the lapse
-
-- **Task 1 — build the item as designed** (`node tools/session/backlog_query.js --grep BL-915 --full`). Files: the item's declared list. Satisfies: R1. Status: pending.
-- **Task 2 — verify and measure**: run the rows' verification classes; sim items read history_sweep before and after against the wave-1 baseline. Status: pending.
-
-## BL-916 - typed events on the record, shown as they happen
-
-- **Task 1 — build the item as designed** (`node tools/session/backlog_query.js --grep BL-916 --full`). Files: the item's declared list. Satisfies: R1, R2. Status: pending.
-- **Task 2 — verify and measure**: run the rows' verification classes; sim items read history_sweep before and after against the wave-1 baseline. Status: pending.
-
-## BL-922 - supply priced from the capital over held ground at a cost that bites
-
-- **Task 1 — build the item as designed** (`node tools/session/backlog_query.js --grep BL-922 --full`). Files: the item's declared list. Satisfies: R1, R2. Status: pending.
-- **Task 2 — verify and measure**: run the rows' verification classes; sim items read history_sweep before and after against the wave-1 baseline. Status: pending.
 
 ## BL-914 - the pass rounds render while they compute
 
