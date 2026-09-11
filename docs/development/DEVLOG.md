@@ -10,6 +10,87 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-11 — Sprint 38 closes the phase: seven items, five agents, and a lever that refuses nothing
+
+**Runtime:** long session, Full / batch delivery. **Items:** BL-823 BL-838 BL-839 BL-887 BL-893
+BL-895 BL-896 BL-897 BL-898 BL-899.
+
+### What landed
+
+**The economy of war closed (`BL-895`).** Materials had no sink but campaigns — hundreds against
+hundreds of millions produced — so the trade income shipped the session before could not gate
+anything however large it was. Two sinks now compete for a realm's stock: a standing army eats
+every year, with the unpaid share of a garrison walking home; and a corridor promotion costs the
+acting seat, a refused one held one short rather than discarded. The magnitude was chosen against a
+**stated target** rather than by feel — at 200 per 1,000 heads the sinks claimed 63% of production
+and refused 324 road builds a world, which is poverty governing the network; at 20 they claim 8%
+with 43 refusals.
+
+**Collapse became mechanical (`BL-896`).** Ground whose reach from its own seat falls under a floor
+**secedes** as a contiguous block rather than falling to a neighbour — a successor with real ground,
+carrying its new seat's own culture and its parent's ladders. Median 2 secessions and 14 regions a
+world, arc intact.
+
+**The two creeds (`BL-897`, `BL-899`).** Ben settled eight design calls in one form. A universalising
+creed is coined new and belongs to nobody, arises from humiliation *and* density together, and
+splits the institution from the people so the two can disagree — 2 of 16 worlds, which is the spread
+the item demanded. Sea legs are a reduced ration scaled by how seafaring a people is, earned from
+facts already recorded; 405 crossings now land fed where none did, which finally moved `BL-893` from
+"changes no outcome" to a real one.
+
+**Grudges became consequential without becoming an agent term (`BL-898`).** The item's original
+design said a grudge must change who a polity campaigns against — precisely what `BL-827` ruled out.
+The corrected route seeds nation-to-nation sentiment at the handoff instead, and `history_sim.cpp`
+is **unchanged by the diff**, which is how the claim was verified rather than asserted.
+
+**And the dangerous lever, built in the admissible form (`BL-838`).** A realm is attacked for what
+it did to peoples like the decider's own, never for its size. It needed a dated widening of the
+AI-behaviour prohibition, raised rather than assumed — the rule it moves is written at the field
+itself. The scope is asserted on a built ledger where **the peaceful polity is the larger one**;
+clearing the ledger with nothing else changed drops both to zero, which a rank term could not do.
+
+### The finding that outranks all of it
+
+Three agents, working different items with no contact, independently hit the same line:
+
+> `REFUSED reach gate   median 0`
+
+`BL-823`'s own resolution promoted reach-gating from one lever among six to **the** primary lever,
+and `CIVILISATION.md` is built on that claim. It refuses nothing. That explains two null results at
+once: `BL-887`'s centre-chain relay measured no movement because cheaper reach can only unlock
+ground a price was keeping shut — tripling the rebate reproduced the figures *exactly*, which is
+what turned it from a tuning question into a finding — and `BL-839`'s turbulence lean pulls three
+forces of which two are inert. `BL-905` carries it, with the explicit instruction not to raise a
+floor until the cause is measured.
+
+### What this session got right, and what it got wrong
+
+Right: **every null result was reported as one.** Reassertion fired zero times in `BL-897` and was
+not tuned into firing; no launched crossing starves in `BL-899` and the floor turned out redundant
+with the port gate; calm and turbulent worlds are indistinguishable in `BL-839`. Each is recorded
+with its cause rather than smoothed.
+
+Wrong, and worth remembering: the saved implementer agent definitions carried **prose where a tool
+list belongs** (`tools: "All tools except Agent"`), so every spawn came up with `Agent` as its only
+tool. That is the "subagents were unusable" note from the previous handoff — a config fault, not a
+brief problem, and it cost two wasted spawns before it was diagnosed. Fixed, but definitions are
+cached at session start, so the five slices ran as `general-purpose` instead.
+
+Also wrong, and mine: a merge resolution in the sweep report left one brace too many. The compiler
+caught it immediately and it never went anywhere, but it was the integrating session's error rather
+than any agent's.
+
+### Left open
+
+`BL-891` is the only item blocked on something a session cannot do alone: the arc readout renders
+and reads well on a headless capture, but the scripted walk cannot reach round 4, and the verify API
+has **no scroll verb for the wizard column**, so no script can test the path a human would take.
+`BL-904` owns that, including the discovery that the verify window reports 1720×1080 while captures
+come out 1920×1080 — if those are different spaces, every wizard coordinate ever read off a capture
+was read in the wrong one.
+
+---
+
 ## 2026-09-10 (sprint 37 closes) — The seven owed items, and a delegation bug caught mid-flight
 
 **Mode:** Full, batch delivery, closing a reopened sprint.

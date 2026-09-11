@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*26 entries — 21 open, 5 resolved.*
+*27 entries — 22 open, 5 resolved.*
 
 ---
 
@@ -333,6 +333,20 @@ BL-868's creed-aggression lean (`w_aggr_q`) is applied inside the per-season loo
 > **Recommendation:** Worth ten minutes to read and then either fix or comment. It is cheap to settle now and expensive to discover during a future calibration -- this file has already published three wrong diagnoses that were caught only by one number contradicting another.
 
 *Files: `src/world/history_sim.cpp`*
+
+### NR-832 — BL-839 bumped the save format 11 -> 12, and reused `lean::any` for an axis where it has no meaning
+*decision taken on your behalf · raised 2026-09-11 · from BL-839 (turbulence lean), delivered 2026-09-11. Both calls taken by the building agent so the work could finish.*
+
+(1) SAVE FORMAT 11 -> 12. Unavoidable: the lean has to reach `make_hard_coded_world`, the same call the wizard's round-4 worker makes. The roundtrip check is pinned to a LITERAL rather than to the original value, so a writer and reader that both omitted the field cannot round-trip clean and call it a pass. (2) `lean::any` READS AS ORDINARY. The existing `lean` enum was reused rather than minting a new one, to avoid a second serialiser and bound. The cost is that `any` is representable on this axis but meaningless; the field defaults to `mid`, the departure is documented at both sites, and the wizard row offers only three options so `any` is never reachable from the UI.
+
+**Why it matters.** A save-format bump is the kind of change that should be seen rather than discovered, and this one landed inside a batch. The `lean::any` reuse is the smaller call but the more likely to bite later: a value that is representable and meaningless is exactly what a future reader mishandles, and it is only unreachable because one UI row happens not to offer it.
+
+- Accept both. The bump was forced and the enum reuse is documented and UI-unreachable.
+- Keep the bump, but mint a proper three-value type for this axis so `any` cannot be represented at all.
+
+> **Recommendation:** Option 2 when something next touches that serialiser. Not worth a bump of its own, but worth not leaving a meaningless-but-representable value in a saved enum indefinitely.
+
+*Files: `src/world/planetology.hpp`, `src/world/era_minus_one.cpp`, `src/world/world_save.cpp`*
 
 ---
 

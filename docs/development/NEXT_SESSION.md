@@ -1,87 +1,99 @@
-# Next session — sprint 38, the Empire phase
+# Next session — sprint 38 closed; the phase's primary lever is inert
 
-Written 2026-09-11 at the close of a long batch-delivery session. **Sprint 38 is the PHASE, not a
-fixed item list** (Ben, 2026-09-11) — it closes when the phase produces what `CIVILISATION.md` says
-it must, not when a count is exhausted.
+Written 2026-09-11 at the close of a batch delivery. **Sprint 38 was the PHASE, not a fixed item
+list** (Ben, 2026-09-11) — and the phase now produces what `CIVILISATION.md` asks of it. The nine
+items that opened this session are all closed or superseded.
 
-## The headline: the arc lands
+## Read this first: the reach gate refuses nothing
 
-`BL-894` (Settle is re-settlement) was the keystone. Measured `--epoch 0`, 8 seeds, single
-variable:
+Three agents, working different items with no contact between them, independently measured the same
+line on `history_sweep --epoch 0`:
 
-| | rule ON | rule OFF |
-|---|---|---|
-| battles / world | **810** | 7 |
-| conquests / world | **396** | 3 |
-| largest polity share | **10%**, peaking at 22% | 3% |
-| polities eliminated | **8 / 8 worlds** | 0 / 8 |
-| **rise → peak → fall** | **8 / 8 worlds** | 1 / 8 |
+```
+REFUSED reach gate   median 0   (BL-837)
+```
 
-Every seed now shows the arc `GENERATION_STRATEGY.md` § The asymmetry is POLITICAL asks for.
-Closing the frontier was the fix — and it was admissible where a weight change was not, because it
-changed what Settle *means*, not what the scorer *prefers*.
+`BL-823`'s own resolution note promoted reach-gating from one lever among six to **the primary
+lever**, and `CIVILISATION.md` § The road is the empire's skeleton is built on that claim. It
+refuses zero campaigns. Whatever is holding these worlds multipolar at 0/16 hegemony, it is not
+this.
 
-**Caveat that must travel with those numbers:** the phase runs **400 of its designed 1,600 years**.
-The wizard's epoch is 0 CE and round 5 / pass 2 are not built, so this is the arc over a quarter of
-the span.
+**It already cost two items their result:**
 
-## Delivered this session
+- `BL-887`'s centre-chain relay is correct, cheap and moves nothing — cheaper reach can only unlock
+  ground a price was keeping shut. Tripling the rebate reproduced the default figures **exactly**,
+  which is what turns this from a tuning question into a finding.
+- `BL-839`'s turbulence lean pulls three forces and **two are inert**: its reach-cost term is a toll
+  on a road nobody is stopped on, and `w_fear_q = 400` leans a median of zero candidates.
 
-| Item | |
+`BL-905` owns it, at priority A, with three candidate causes to measure and an explicit instruction:
+**do not raise a floor until the cause is known.** Three wrong diagnoses have been published against
+this file and every one was caught by one number contradicting another on the same page.
+
+## Where the phase stands, measured
+
+16 seeds, `--epoch 0`, zero harness failures, 21 gating checks green:
+
+| | |
 |---|---|
-| `BL-894` | Settle is re-settlement. The keystone. |
-| `BL-890` | Wizard opens on a rolled seed. Live-checked; the check caught a real regression. |
-| `BL-892` | `W7b` re-aimed onto supply; `reach_mod` was never inert. |
-| `BL-900` | The sweep's default is now the run the game performs. |
-| `BL-889` | Closed as delivered by `BL-894`. |
-| `BL-845` | Closed: the 1:1 ratio is absent on the real span (0 of 8). |
-| `BL-868` | Delivered after seven failed attempts. Conquests +26%. |
-| `BL-893` | **partial** — opens 45% of water refusals, changes no outcome. |
-| `BL-891` | **partial** — arc readout wired; live click owed. |
+| hegemony rate | **0 / 16** worlds at a 50% share |
+| largest share | median **12%**, range 6–19% |
+| worlds showing rise → peak → fall | **15 / 16** |
+| secessions | median **2**/world, 14 regions walking away |
+| materials sinks | **8%** of production |
+| universalising creeds | **2 of 16** worlds |
+| fear-of-next leans | **6 of 16** worlds |
 
-## Read this before measuring anything
+**The caveat that must travel with every one of these numbers:** the phase runs **400 of its
+designed 1,600 years**. Round 5 / pass 2 are not built, so this is a quarter of the span.
 
-Three wrong diagnoses were published this session and each was caught only by one number
-contradicting another on the same page. **The instrument was right every time; the reasoning ahead
-of it was not.**
+## The six open items
 
-- **Check the `TUNED:` banner** before believing any `--set` comparison.
-- **Check a counter is not trace-gated** before reading a zero as a finding (`campaign_contacts`,
-  `scored`, `cleared`, `chosen` are all gated on `trace_battles`).
-- **`--epoch` takes a YEAR.** `8 --epoch` used to run the struct defaults silently; both that and
-  `--epoch --set …` now fail loudly (`18c2299d`), and generation's span is the default (`657b0d8e`).
+**Blocked on the machine, not on thinking:**
 
-## The 9 open items
+- **`BL-891`** (round 4 arc readout) — *partial*. The readout renders and reads well on a headless
+  capture. The scripted walk **cannot reach round 4**: every Next after round 3 misses.
+- **`BL-904`** (wizard footer reachability) — priority A, and the downside case is a release
+  blocker. Either the footer has been pushed below the fold at 1080p and the wizard is *blocked at
+  round 3*, or a human can scroll to it and this is a scripted-walk problem. **No script can tell
+  you which**: `verify.scroll_panel` resolves only named ledger windows and knows nothing about the
+  wizard column. Also flags that the verify window reports **1720×1080 while captures come out
+  1920×1080** — if those are different spaces, every wizard coordinate ever read off a capture was
+  read in the wrong one, and the ones that pass do so by luck.
 
-**Designed and ready to build (Ben ruled 2026-09-11, `CIVILISATION.md` carries both):**
+**Real work, unblocked:**
 
-- **`BL-895`** — materials have **no sink**: campaigns are the only spender, hundreds against
-  241,000,000 produced. Two sinks chosen: a standing army eats materials *every year*, and roads
-  and works *cost* to build. Stock stays unbounded. Build the sinks, then re-measure whether trade
-  is a material share before tuning its magnitude.
-- **`BL-896`** — the network is **reach**, not the road graph (which is ~50 edges/world). Ground the
-  realm cannot reach **secedes** rather than falling to a neighbour, so the dark age hands forward
-  successors. Determinism is a real constraint: a seceding polity's id/seat/culture must be
-  allocated from sim state only.
+- **`BL-905`** (reach gate refuses nothing) — read the section above. This is the one that matters.
+- **`BL-903`** (communication rung) — split out of `BL-823` on closing it; the last of its six
+  levers. Earns its place twice: an anti-hegemon lever *and* the second rung of Ben's own arc.
+  **Design is owed before build**, and the first test it must pass is articulating a difference from
+  reach that shows up in the numbers rather than in a comment.
+- **`BL-901`** (culture crossed water) — `colonisation.cpp` knows it coined a daughter across water,
+  but `culture_spawn` drops the fact one struct short of its consumer, so `BL-899` shipped sea legs
+  on two of the three facts Ben named. Small repair; arguably the best of the three, being the only
+  one that is a deed rather than a circumstance.
+- **`BL-902`** (pass_one_handoff fixture red) — seven rows red, pre-existing. The fixture stopped
+  producing a war as the sim was reshaped, so the assertions are right and the world under them is
+  wrong. **Do not tune the fixture until a war appears** — that is fitting a fixture to its
+  assertions. `BL-898`'s harness re-pointed at the real generated era instead; generalise that.
 
-**Design-owed — do not build:**
+## Awaiting Ben's judgement
 
-- **`BL-897`** (universalising creed) — four unsettled questions in the item.
-- **`BL-899`** (seafaring creed crosses fed) — four unsettled questions. Pairs with `BL-897`.
+`NR-827` (trade is still 0.25% of production — a shape problem, not a magnitude one) ·
+`NR-828` (no launched crossing starves; the sea-legs floor is redundant with the port gate) ·
+`NR-829` (an inherited grudge decays away in ~3 campaign years) ·
+`NR-830` (`BL-838`'s hegemony criterion asks for a fall from a floor) ·
+`NR-831` (`w_aggr_q`'s lean sits **inside** the season loop and compounds — if unintended,
+`BL-868`'s hard-won magnitude includes a doubling nobody wrote down) ·
+`NR-832` (save format 11 → 12; `lean::any` representable but meaningless).
 
-**Premise now live for the first time:**
+## Two operational notes
 
-- **`BL-823`**, **`BL-838`** — brakes on a riser. There is a riser now (22%). Read them against the
-  new baseline before building; 22% is well short of hegemony.
-
-**Other:** `BL-839` (needs `BL-868` + `BL-838`), `BL-887` (reach as centre chains), `BL-898`
-(grudges seed nation sentiment — **corrected before coding**: making the Era −1 scorer read grudges
-is forbidden by `BL-827`; the real consumer is `RELATIONS.md`'s seeded sentiment).
-
-## Two things that are not items yet
-
-- **`history_sim_harness` R3a2/R3a3 still fail** on main. The reach gate refuses far targets in that
-  synthetic fixture. It denies **nothing** in a generated world, so this is a fixture-only red.
-- **Subagents were unusable this session** — two `generation-dev` agents returned with `Bash`,
-  `Read`, `Edit`, `Write` all disabled before reading a file. A session-level config fault, not a
-  brief problem. All work here was done serially.
+- **The saved agent definitions were broken, and are now fixed.** `generation-dev`, `ui-dev` and
+  `economy-dev` carried `tools: "All tools except Agent"` — prose where a list belongs — so every
+  spawn came up with `Agent` as its only tool. That is the "subagents were unusable" note from the
+  last handoff: a config fault, not a brief problem. Replaced with real lists; definitions are
+  cached at session start, so this session's five slices ran as `general-purpose` instead.
+- **Computer-use resolves `ProjectIo` to a stale worktree exe.** On 2026-09-11 it pointed at a
+  **two-day-old** binary while the real build sat in `build/`. Nothing looks broken — a live check
+  taken without comparing that path's mtime would verify the wrong exe and look fine doing it.
