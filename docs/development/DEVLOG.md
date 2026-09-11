@@ -10,6 +10,111 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-11 — Sprint 38 closes for real: the whole closure contract wired, twelve items, and the phase pronounced too lively
+
+**Runtime:** very long session (survived one crash and a full resume), Full / batch delivery,
+heavy parallel sub-agent fan-out. **Items:** BL-891 BL-901 BL-902 BL-903 BL-904 BL-905 BL-906
+BL-907 BL-908 BL-909 BL-910 BL-911 BL-912.
+
+### What landed
+
+**BL-906 first, alone, because everything else depended on it.** Pass 1's stop year decoupled
+from the epoch (`world_params::empires_stop_year`, default 1200) — the Empires phase now runs its
+full 400 BCE → 1200 CE, not the 400-year slice it had been silently running. Every sprint-38 figure
+re-read at full span: hegemony 0/16 unchanged, largest share barely moved (median 11% vs 12%),
+wall clock roughly quadrupled as warned.
+
+**Then the closure contract, in two waves of parallel agents.** `CIVILISATION.md`'s seven readings
+— explorer set, strength spread, contact, directed wants, markets, inherited network, grudges —
+are now ALL live in `history_sweep`'s report, each measured over the 16-seed spread with no target
+numbers set. `BL-908` (contact, the grudge table's shape reused for a different cause) and `BL-910`
+(capitals/markets, a pure read of existing seat state, no new placement pass) landed wave one, in
+parallel with `BL-901` (a culture that crossed water now carries that fact into sea legs), `BL-902`
+(harness fixture repointed at real generation instead of a strip that stopped producing war),
+`BL-904`/`BL-891` (the wizard's footer was never actually unreachable — a scripted-walk limitation
+plus a genuine smaller layout undercount), and `BL-905` (below). Wave two closed the loop: `BL-909`
+(directed wants, gated on contact, no price) and `BL-912` (the empire tree wired into the sim —
+real per-polity state, a deterministic scorer, a fork that closes for real, the rim milestone
+crossing the handoff) both required wave-one's output and both landed clean. `BL-907`'s scoreboard
+was built partway through and two of its seven readings were re-wired from stale MISSING
+placeholders as their sources landed on top of it in the same wave — the same bug class as a stale
+UI string caught live in the wizard the same session (see below).
+
+**BL-912 found a real bug in itself.** The empire tree's root node was permanently unlockable
+under the first cut's symmetric neighbour-mask construction — every child that named the root as a
+prerequisite fed a "needs a neighbour held" requirement back onto the root itself. Caught by the
+sweep showing 0 nodes bought at any span before the fix, 8–51 after.
+
+**Twelve of thirteen items shipped; the thirteenth taught the most.** `BL-903` (a communication
+rung, gating a polity's ability to act on ground it cannot hear from) was built exactly to its
+settled spec and measured `REFUSED comms gate median 0` on every seed — not a tuning miss but a
+structural one: Campaign's own candidate-generation loop already only ever enumerates directly-held
+border ground, so the gate's first condition is true by construction for every candidate it ever
+sees. Reverted rather than shipped as a no-op (`NR-833`), and retired outright once Ben read the
+finding — the candidate-generation widening that would make it real is a bigger, separate item.
+
+### The finding that outranks the rest
+
+`BL-905`, independently converging with `BL-903`'s dead end: the reach gate — `CIVILISATION.md`'s
+named PRIMARY LEVER — refuses campaigns via a **step function, not a gradient**. Probed the
+`sustainable_campaign_floor_q` directly: 250 refuses 0, 700 refuses 0.1%, 999 refuses 94% and
+collapses battles 815→34/world. No value threads the needle, because `campaign_supply` prices from
+the staging hub rather than the capital, so an ordinary neighbour-adjacent march's distance term
+barely decays the currency. `CIVILISATION.md` was corrected to name what's actually filtering
+campaigns today (score threshold and verb competition, not reach) rather than have a constant
+re-guessed against it. This is a real design decision, not yet taken.
+
+### Ben's verdict, live
+
+Ben reviewed the phase running in `build_rel` and called it: **"really lively, and perhaps too much
+so… I think this would work as a precursor to the next phase of generation, but I want to tighten
+some levers."** Sprint 39 was renamed from its previous placeholder ("the new world," moved intact
+to sprint 40) to **"tighten the levers"** — the tuning pass that follows sprint 38's now-fully-wired
+mechanism, starting from `BL-905`'s reach-gate finding and `NR-833`.
+
+### Investigated and closed: NR-834
+
+`BL-909`'s build hit an intermittent, unreproducible-by-inspection crash in `history_sweep`, fixed
+empirically by switching two lookups to bounds-checked `.at()` without the actual mechanism ever
+being pinned. Static read: every index BL-909 touches is either loop-bound-guaranteed or explicitly
+range-checked before use, so the `.at()` calls cannot actually throw as written — itself evidence
+against a real logic bug. Reverted to plain `operator[]` and ran a single ISOLATED 32-seed sweep
+(no concurrent harness) — ALL PASS, no crash. Most likely cause: this session's sandbox spawning
+duplicate/concurrent harness processes against shared output state, independently reported by the
+`BL-907` agent the same session — not a real out-of-bounds read. `.at()` restored anyway as cheap,
+reasonable defensive bounds-checking, and `NR-834` closed.
+
+### What went wrong, worth remembering
+
+**A worktree agent's stale base cost real integration risk.** `BL-912` (the empire tree, difficulty
+6) branched from a commit 9 behind main despite being explicitly briefed to fetch and fast-forward
+first — it built the whole feature against a base with none of `BL-908`/`910`/`911`'s new fields.
+Auto-merged clean by luck (the additions landed in different regions of the same files), but this
+is the `BL-480` shape and it will not always be luck. The main session's independent re-verification
+after every merge — never trusting an agent's self-reported PASS — is what caught it in time to
+matter here rather than after.
+
+**The session itself crashed mid-batch**, losing three just-launched agents (`BL-907`, `BL-909`,
+`BL-912`) before they had made a single commit. Checked their worktrees for partial work first
+(none — clean bases, zero commits) before relaunching fresh rather than trying to resume an unknown
+crashed state.
+
+**Two stale-copy bugs, both caught only by looking, not by a green harness.** A wizard disclaimer
+insisting the Empires round was "not yet the full 1,600 years" kept asserting that after `BL-906`
+made it true — caught live-clicking the wizard, not by any script. `BL-907`'s scoreboard carried
+two hardcoded MISSING readings that went quietly false the moment their sibling items landed in the
+same wave — caught by rereading the report after the merge rather than trusting the build-time
+snapshot. Both are the same lesson `io-same-day-ruling-orphans-siblings` already names: a fact
+asserted at one moment does not update itself when the ground under it moves.
+
+### Where the backlog stands
+
+Zero open items. `docs/development/sprints.json` now carries sprint 38 (open — the phase's
+mechanism is complete but Ben has not called it closed), sprint 39 (open, "tighten the levers,"
+empty — the tuning items are not yet decomposed), and sprint 40 (open, "the new world," unchanged).
+
+---
+
 ## 2026-09-11 — Sprint 38 closes the phase: seven items, five agents, and a lever that refuses nothing
 
 **Runtime:** long session, Full / batch delivery. **Items:** BL-823 BL-838 BL-839 BL-887 BL-893

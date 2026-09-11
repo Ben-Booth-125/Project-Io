@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 206 entries across 2 volume(s).
+One line per session, newest first — 207 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-09-11 | [Sprint 38 closes for real: the whole closure contract wired, twelve items, and the phase pronounced too lively](DEVLOG.md) | BL-480 BL-891 BL-901 BL-902 BL-903 BL-904 BL-905 BL-906 BL-907 BL-908 BL-909 BL-910 BL-911 BL-912 | DEVLOG.md |
 | 2026-09-11 | [Sprint 38 closes the phase: seven items, five agents, and a lever that refuses nothing](DEVLOG.md) | BL-817 BL-823 BL-827 BL-830 BL-838 BL-839 BL-887 BL-891 BL-893 BL-895 BL-896 BL-897 BL-898 BL-899 BL-904 BL-905 | DEVLOG.md |
 | 2026-09-01 | [Sprint 27 block 2: two scale-blind selections, and two instruments that were lying](DEVLOG.md) | BL-417 BL-434 BL-440 BL-642 BL-709 BL-710 BL-711 BL-712 | DEVLOG.md |
 | 2026-08-29 | [Sprint 24a: every ledger rebuilt, and three deletions that took a ruling with them](DEVLOG.md) | BL-176 BL-591 BL-683 BL-693 | DEVLOG.md |
