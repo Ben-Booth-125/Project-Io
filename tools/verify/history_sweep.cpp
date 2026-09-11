@@ -26,6 +26,7 @@
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -217,6 +218,11 @@ struct sweep_row
     int64_t cleared_lost      = 0; ///< ...of those, rounds it lost the argmax.
     int64_t naval_battles     = 0; ///< Battles with a naval entry on either side.
     int64_t sea_leg_battles   = 0; ///< Battles REACHED over water — the real reading.
+    // --- BL-912: the empire tree, as real per-polity state ------------------
+    int  empire_polities_alive = 0; ///< Living polities at the run's stop year.
+    int  empire_polities_rim   = 0; ///< ...of those, holding EM-SP-4m (the rim).
+    int  empire_nodes_mean_q   = 0; ///< Mean nodes held per living polity, x1000.
+    int  empire_nodes_max      = 0; ///< The best-climbed polity's node count.
     /// Works raised over the run (BL-321), and how many regions ended the run
     /// with at least one. Reported rather than gated, like every other metric
     /// here — but a column of zeroes would mean the roster never fired at all,
@@ -900,6 +906,26 @@ int main(int argc, char** argv)
             }
         }
 
+        // BL-912 — THE EMPIRE TREE, MEASURED. `sim.polities` already carries
+        // the mask and it crosses into `pass_one_output` untouched (it is
+        // copied whole); reading it here rather than there is cheaper and
+        // says the same thing at this epoch.
+        {
+            int64_t node_sum = 0;
+            for (const polity& q : sim.polities)
+            {
+                if (!q.alive) continue;
+                ++row.empire_polities_alive;
+                const int held_nodes = static_cast<int>(std::popcount(q.empire_mask));
+                node_sum += held_nodes;
+                if (held_nodes > row.empire_nodes_max) row.empire_nodes_max = held_nodes;
+                if (polity_holds_empire_rim(q)) ++row.empire_polities_rim;
+            }
+            if (row.empire_polities_alive > 0)
+                row.empire_nodes_mean_q = static_cast<int>(
+                    (node_sum * 1000) / row.empire_polities_alive);
+        }
+
         {
             int64_t early = 0;
             for (const owner_change& c : sim.owner_changes)
@@ -1466,6 +1492,50 @@ int main(int argc, char** argv)
         else
             std::printf("  [SKIP] B1   single-span arc: sim_band_ceiling is unrestricted here,\n"
                         "              so there is no ceiling to assert. Run with --epoch 1960.\n");
+    }
+
+    // --- BL-912: THE EMPIRE TREE, ACROSS THE SWEEP --------------------------
+    //
+    // The measured claim the item asks for: SOME surviving realms hold the
+    // rim (EM-SP-4m) and NOT ALL. Either extreme — 0 seeds or every seed at
+    // 100% — is a finding that the mechanism is not discriminating, reported
+    // rather than papered over.
+    if (!rows.empty())
+    {
+        int worlds_with_rim = 0, worlds_all_rim = 0;
+        int64_t total_alive = 0, total_rim = 0;
+        std::printf("\n--- BL-912  THE EMPIRE TREE (all seeds) ---\n");
+        std::printf("  seed  alive  rim  mean nodes  best nodes\n");
+        for (const sweep_row& r : rows)
+        {
+            std::printf("  %4u  %5d  %3d  %9d.%1d  %10d\n",
+                        r.seed, r.empire_polities_alive, r.empire_polities_rim,
+                        r.empire_nodes_mean_q / 1000, (r.empire_nodes_mean_q / 100) % 10,
+                        r.empire_nodes_max);
+            if (r.empire_polities_rim > 0) ++worlds_with_rim;
+            if (r.empire_polities_alive > 0 && r.empire_polities_rim == r.empire_polities_alive)
+                ++worlds_all_rim;
+            total_alive += r.empire_polities_alive;
+            total_rim   += r.empire_polities_rim;
+        }
+        std::printf("  worlds with >=1 realm holding the rim: %d/%d\n",
+                    worlds_with_rim, static_cast<int>(rows.size()));
+        std::printf("  worlds where EVERY living realm holds it: %d/%d\n",
+                    worlds_all_rim, static_cast<int>(rows.size()));
+        std::printf("  rim share across all living polities: %lld/%lld\n",
+                    static_cast<long long>(total_rim), static_cast<long long>(total_alive));
+        // REPORTED, not gated on "at least one realm reaches it" -- the
+        // default `--epoch 0` fixture runs generation's own SHORT ancient
+        // span (400 BCE -> 0 CE, 100 rounds; era_minus_one.hpp), not the
+        // 1200 CE / 1,600-year Empire span BL-906 names. Climbing all four
+        // rings of a ~48-node tree in 400 years is a real reach; a world
+        // that falls short here is a span-length finding (BL-906's own,
+        // still pending in this base), not a defect in the scorer or the
+        // mask. `total_rim < total_alive` is asserted where it CAN discriminate.
+        if (total_alive > 0)
+            check(total_rim < total_alive,
+                  "BL912b  the rim DISCRIMINATES -- not every living polity holds it "
+                  "(when any do; see the share line above for whether any did)");
     }
 
     // --- The distributions -------------------------------------------------

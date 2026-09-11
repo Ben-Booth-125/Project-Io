@@ -54,6 +54,7 @@
 #include "creeds.hpp"
 #include "settlement.hpp"
 #include "works_roster.hpp"
+#include "empire_tree_data.hpp" // BL-912 — the empire tree's generated node table
 
 #include <array>
 #include <atomic>
@@ -398,6 +399,18 @@ struct history_sim_params
     /// quantity in the tech ladder the one thing in this file that could not be
     /// tuned as data. The value is unchanged; only its address is.
     int capacity_band_cost = 4000;
+
+    /// BL-912 — THE EMPIRE TREE'S RESEARCH FRACTION. Research is a FLOW
+    /// derived from the industry slice, never a stockpile (TREES.md sec
+    /// State): this per-mille share of a polity's summed
+    /// `region_industry_output` over its held ground is what the Invest
+    /// verb spends on the tree's currently-targeted node, each round,
+    /// scaled further by the spire ring held and by contact degree. A
+    /// sweep dial per TREES.md sec Open questions ("the research
+    /// fraction... to be set against the sizing rule rather than picked");
+    /// 60 (6%) is a first guess sized so the Empire tree's ~48 nodes are
+    /// reachable, not exhausted, by a leading polity over 400 BCE-1200 CE.
+    int empire_research_fraction_q = 60;
 
     /// WHERE A POLITY'S INVESTMENT GOES (BL-767). The Invest verb raises ONE
     /// domain a round, and these two weights decide which.
@@ -1600,7 +1613,72 @@ struct polity
     int64_t creed_adopted_year = 0;
 
     bool alive = true; ///< False once the polity holds no regions.
+
+    // -----------------------------------------------------------------------
+    // BL-912 — THE EMPIRE TREE, held as real per-polity state.
+    // -----------------------------------------------------------------------
+    //
+    // trees/TREES.md sec State: "one 64-bit mask per tree plus one accumulated
+    // progress integer for the node being invested in." This is that state,
+    // added alongside the capacity ladder above rather than in place of it —
+    // TREES.md sec "The sim reads nodes, not bands" demotes the band to a
+    // DERIVED reading kept where a consumer still wants a scalar (the works
+    // gate, the unit roster boundary); nothing here retires `capacity`.
+    //
+    // `empire_mask` bit i is set iff this polity holds `empire_tree::nodes[i]`
+    // (docs/generation/trees/empire_tree.json, via the generated
+    // `empire_tree_data.hpp` — see `tools/session/gen_empire_tree_table.js`).
+    // A closed fork side (`node::excludes`) never sets its bit once the other
+    // side is held; see `empire_node_available` in history_sim.cpp.
+    uint64_t empire_mask = 0;
+
+    /// Index into `empire_tree::nodes`, or -1 when nothing is targeted. The
+    /// Invest verb (BL-912) picks this via the scorer and keeps investing in
+    /// it, round over round, until it is bought or goes unavailable (a rival
+    /// branch closed under it, e.g. after a fork).
+    int16_t empire_investing = -1;
+
+    /// Progress accumulated toward `empire_investing`'s cost. Reset to 0 when
+    /// the node is bought or abandoned. Same accumulated-progress currency the
+    /// domain ladder's `progress_q` uses; the unit is `capacity_band_cost`-
+    /// scaled, per node kind and ring (TREES.md sec Nodes: "cost is base x ring").
+    int32_t empire_progress_q = 0;
 };
+
+// ---------------------------------------------------------------------------
+// The empire tree (BL-912) — availability, the scorer, and the rim read
+// ---------------------------------------------------------------------------
+
+/// True iff `node_idx` is a legal Invest target for a polity holding `mask`:
+/// not already held, its fork partner (if any) not held, its ring unlocked
+/// (the milestone one ring down is held, or it sits at ring 1), and rule 2's
+/// OR-availability satisfied (a linked neighbour is held, or it has none —
+/// the spire roots). A milestone additionally needs its `requires` AND set
+/// and, if present, one side of its `requires_fork` pair.
+bool empire_node_available(uint64_t mask, int node_idx);
+
+/// The scorer (TREES.md sec The scorer): a seeded, deterministic argmax over
+/// every available node, integer throughout, tie-broken on the lower node
+/// index (the tree's own fixed authored order). Returns -1 when nothing is
+/// available (tree exhausted, or every open branch closed under a fork).
+///
+/// Terms read the polity's own state and its held ground — never a rank,
+/// never anything that grows with the polity's size alone (TREES.md sec
+/// "every term is an in-world quantity with a visible cause"). Argument to
+/// the Invest verb the AI grant register already covers
+/// (docs/ai/AI_OPPONENT.md sec 11); this chooses a node, not a new verb.
+int choose_empire_node(uint64_t mask, int cohesion_q, int stores_low_q,
+                        int reach_bound_q, int manpower_bound_q, int food_bound_q,
+                        int ground_ore_q, int ground_farm_q, int ground_fuel_q,
+                        int ground_port_q, int surplus_q);
+
+/// THE RIM (BL-912/BL-907): has this polity crossed EM-SP-4m, "The
+/// Enforceable Promise"? A per-polity BOOLEAN, read straight off the mask —
+/// the closure contract's "explorer set" reading, per the item's own naming.
+inline bool polity_holds_empire_rim(const polity& q)
+{
+    return (q.empire_mask & (1ULL << io::empire_tree::rim_node_index)) != 0;
+}
 
 /// What the scorer chose for one polity in one year — kept for the harness and
 /// for the History Log, so a run can be read back as decisions rather than as
