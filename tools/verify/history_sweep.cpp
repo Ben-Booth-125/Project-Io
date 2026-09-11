@@ -450,6 +450,10 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     if (name == "terrain_reach_cost_q")    { p.terrain_reach_cost_q = v;    return true; }
     if (name == "road_tier1_uses")         { p.road_tier1_uses = v;         return true; }
     if (name == "road_tier2_uses")         { p.road_tier2_uses = v;         return true; }
+    // BL-894: 0/1, so a sweep can measure the Empires-round rule against the
+    // migration-era one without deriving generation's whole param set.
+    if (name == "settle_requires_razed_ground") { p.settle_requires_razed_ground = v != 0; return true; }
+    if (name == "amphibious_weight_crossing")   { p.amphibious_weight_crossing = v != 0;   return true; }
     return false;
 }
 
@@ -498,9 +502,38 @@ int main(int argc, char** argv)
         // keeps meaning what it meant.
         if (arg == "--epoch" && a + 1 < argc)
         {
-            epoch_year = std::atoll(argv[++a]);
+            const std::string ey = argv[++a];
+            if (ey.rfind("--", 0) == 0)
+            {
+                std::printf("FAIL  --epoch wants a YEAR, got the flag \"%s\".\n", ey.c_str());
+                return 2;
+            }
+            epoch_year = std::atoll(ey.c_str());
             derive_from_generation = true;
             continue;
+        }
+        // AN UNRECOGNISED FLAG IS AN ERROR, NOT A SHRUG (2026-09-11).
+        //
+        // `--epoch` and `--set` both guard on `a + 1 < argc`, so a malformed
+        // invocation used to fall through to the seed-count branch, fail
+        // `atoi`, and run the DEFAULT sweep while looking like it had done what
+        // was asked. Two ways that bit, both in one session:
+        //   `8 --epoch`                       -- flag last, silently ignored,
+        //                                        struct defaults measured.
+        //   `8 --epoch --set field=0`         -- `--set` swallowed as the epoch
+        //                                        YEAR, override never applied.
+        // The second produced a two-variable comparison read as a one-variable
+        // one, and the conclusion drawn from it was backwards. This harness
+        // already refuses an unknown `--set` field for exactly this reason
+        // ("a silently ignored `--set` would produce a table labelled as a
+        // trial of a force that was never changed"); the same argument applies
+        // to the flags themselves.
+        if (arg.rfind("--", 0) == 0)
+        {
+            std::printf("FAIL  unknown or malformed flag \"%s\".\n"
+                        "      --epoch <year>   (the year is REQUIRED)\n"
+                        "      --set <field>=<value>\n", arg.c_str());
+            return 2;
         }
         const int n = std::atoi(argv[a]);
         if (n > 0) seed_count = n;
@@ -1640,9 +1673,25 @@ int main(int argc, char** argv)
         // The re-run must carry the SAME works registry for the same reason it
         // must carry the same terrain: a re-run that differs in an input is not
         // a determinism check, it is a guaranteed false FAIL.
+        // THE RE-RUN MUST CARRY THE OVERRIDES TOO (2026-09-11). The seed loop
+        // runs the deriving path on a COPY of `fx.params` with `--set` applied
+        // (see "THE OVERRIDES REACH THE FIXTURE'S PARAMS TOO" above), while the
+        // fixture itself is deliberately left untouched so the acceptance test
+        // still knows what generation actually ran. This re-run read the
+        // UNTOUCHED fixture, so under any `--set` it compared an overridden row
+        // against an un-overridden re-run and failed every time. Confirmed with
+        // an unrelated tunable: `--epoch 0 --set holdings_burden_q=40` fails S2
+        // exactly the same way.
+        //
+        // That is the failure mode the comment below already names, and it was
+        // dangerous rather than merely noisy: a check that ALWAYS goes red under
+        // `--set` cannot report a real determinism break on that path, because
+        // nobody would believe it.
+        history_sim_params re_fp = fx.params;
+        for (const param_override& o : g_overrides) apply_override(re_fp, o.name, o.value);
         const history_sim_state again = (derive_from_generation && fx.ran)
             ? run_history_sim(ss, &fx.creeds, fx.terrain.view(), fx.gw, fx.gh,
-                              fx.params, fx.seed, nullptr, fx.works)
+                              re_fp, fx.seed, nullptr, fx.works)
             : run_history_sim(ss, nullptr, terr.view(),
                             home_grid_width, home_grid_height, params, wp.seed,
                             nullptr, &works);
