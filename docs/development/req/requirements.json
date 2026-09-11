@@ -4876,6 +4876,475 @@
    "promoted_from": "backlog.json BL-750, BL-769 - Sprint 32b",
    "batch": "sprint-32b-wave-2b",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "sweep-sees-the-arc",
+   "title": "BL-926 - the instrument reports the arc",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-926 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep 16 --epoch 0",
+      "code: history_sweep.json new fields"
+     ],
+     "requirement": "The sweep face and the JSON row carry per-polity gross deaths, lifespans (born/peak/peak year/died/killer-or-parent for the top N), breakdown pieces and sizes, the network_supply_q histogram with the share under each floor, cultures per world with tree depth, foundings by source, city-state count over time, civilisations formed, and the arc mode.",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "manual: baseline file in the session scratchpad"
+     ],
+     "requirement": "A 16-seed run on main before any other sprint-39 item is saved as the baseline.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "aggression-lean-once",
+   "title": "BL-927 - the creed-aggression lean applied once",
+   "difficulty": 1,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-927 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep 4 --epoch 0",
+      "code: lean outside the season loop"
+     ],
+     "requirement": "w_aggr_q leans a campaign candidate exactly once, outside the season loop, matching the fear lean; battle and conquest medians re-read before and after.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "culture-diversity-overtuned",
+   "title": "BL-918 - many kin cultures, ranges break into insular groups",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-918 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: colonisation_harness",
+      "headless: world_determinism"
+     ],
+     "requirement": "The walk splits fire more readily (shorter interval, biome trigger on every class transition) and an isolation trigger coins a daughter on a settled component cut off from its origin, in the Culture round only; deterministic, region-index order.",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: colonisation_harness",
+      "headless: history_sweep 4 --epoch 0"
+     ],
+     "requirement": "Cultures per world, tree depth, adjacent kinship and the split census by trigger print on the harness face and on the sweep JSON row; no seed reaches the 1,739 runaway.",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: history_lapse capture (after BL-919)"
+     ],
+     "requirement": "A round-3 capture at three years shows a range coming apart into kin hues.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "lineage-palette",
+   "title": "BL-919 - kin cultures share a hue family",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-919 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: round-3 capture",
+      "code: palette derived from the tree"
+     ],
+     "requirement": "Culture colour derives from the culture tree at record time: hue by root cradle, a fixed step per daughter and a lightness step by depth; round 3 draws culture ground in these hues and round 4 tints the base with them.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "terrain-underlay-on-lapse",
+   "title": "BL-915 - rivers, mountains, seats and whole frontiers on the lapse",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-915 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: round-4 capture at three years",
+      "manual: live click confirms frame rate"
+     ],
+     "requirement": "Rounds 3 and 4 draw a dull terrain base (relief for mountain/highland/canyon/rift, a river stroke on river edges) with the fill as a translucent tint, frontiers on both axes, seats as dots, and adjacent polities coloured distinctly.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "lapse-event-layer",
+   "title": "BL-916 - typed events on the record, shown as they happen",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-916 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: save_roundtrip",
+      "headless: world_determinism"
+     ],
+     "requirement": "era_timelapse carries a typed event list {year, kind, region, polity, other} emitted by the sim at founding, seat capture, realm ended, broke away, capital moved, road promoted, civilisation formed, creed preached and culture split; polity carries a parent id; save format 13 round-trips; recorded and suppressed runs are bit-identical.",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: round-4 capture",
+      "manual: live click"
+     ],
+     "requirement": "The wizard shows an event ticker and map markers, the arc readout counts deaths off the events with a live-stride denominator, and the board draws Population and Might.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "reach-has-a-gradient",
+   "title": "BL-922 - supply priced from the capital over held ground at a cost that bites",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-922 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness",
+      "code: one supply basis"
+     ],
+     "requirement": "network_supply_q and campaign_supply share one basis: a Dijkstra from the capital over held ground only, roads discounting, per-tile cost rescaled so a connected region 30+ tiles from its capital reads materially below one beside it; the staging-hub pricing is gone.",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep 4 --epoch 0",
+      "headless: world_determinism"
+     ],
+     "requirement": "The sweep prints the supply distribution before and after; REFUSED reach gate is neither 0 nor nearly everything; breakdown candidates exist on connected ground; world_determinism green after one authorised re-bless by the main session.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "live-lapse-render",
+   "title": "BL-914 - the pass rounds render while they compute",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-914 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness tapped==untapped",
+      "headless: world_determinism",
+      "manual: live click on rounds 3 and 4"
+     ],
+     "requirement": "A write-only tap publishes the growing record from the worker; the playhead runs at span/30 s clamped to the published year; Pause and a scrubber after landing; no Restart button; tapped and untapped runs are bit-identical.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "roads-and-bridges-on-lapse",
+   "title": "BL-917 - roads grow on the map and cross rivers as bridges",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-917 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: late- and early-span captures of round 4"
+     ],
+     "requirement": "The promoted network draws as it forms from road_promoted events, heavier at Road; a corridor crossing a river edge draws a bridge glyph; walked-once corridors are not drawn.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "city-states-on-culture-ground",
+   "title": "BL-920 - the phase opens on culture ground and city states rise by organising it",
+   "difficulty": 6,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-920 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: world_determinism"
+     ],
+     "requirement": "The opening marks a region a city state when its population is above the threshold (provisional 300,000) and leaves the rest unorganised; an Organise verb, reach-gated from the capital and kinship-priced, brings unorganised ground under control; scheduled foundings arrive unorganised; hinterland points at the nearest seat; a centre crossing the threshold on unorganised ground becomes a new city state.",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep 4 --epoch 0",
+      "visual: round-4 captures"
+     ],
+     "requirement": "The sweep prints city-state count over time and the share of ground organised vs conquered; the round-4 capture at 400 BCE shows a dull culture map with bright seats and colour spread by mid-span.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "force-follows-the-network",
+   "title": "BL-921 - a pooled levy along the supplied network",
+   "difficulty": 5,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-921 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: history_sweep 4 --epoch 0"
+     ],
+     "requirement": "A campaign stack gathers a share of every held region the capital can supply, weighted by network_supply_q and road hops; the defender levy stays local; a fixture with a 3-region and a 30-region polity at one border shows the larger stack; upkeep prices the larger stack.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "prize-reads-the-city",
+   "title": "BL-924 - a region is worth attacking for what stands on it",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-924 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep 4 --epoch 0"
+     ],
+     "requirement": "region value reads centres and seat status; the sweep share of conquests that are seats and TAKEN 3+ TIMES are re-read against the baseline.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "trade-across-kin-borders",
+   "title": "BL-925 - amicable neighbours trade across the border",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-925 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep 4 --epoch 0"
+     ],
+     "requirement": "Kin neighbours with no biting grudge either way trade along a walked corridor joining unlike ground, both capitals paid at the BL-895 constant, a grudge closing the link; the sweep prints open cross-border links and trade share.",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: round-4 capture"
+     ],
+     "requirement": "The lapse draws an open link between the two seats.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "supply-sites-from-the-stockpile",
+   "title": "BL-929 - a polity upgrades supply sites from its stockpile",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-929 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: history_sweep 4 --epoch 0"
+     ],
+     "requirement": "The scorer offers a supply-site upgrade (reach work or corridor tier) where held ground reads low supply from the capital, paid from the capital stockpile, preferring the site that lifts the most ground; deterministic integer scorer.",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: round-4 capture"
+     ],
+     "requirement": "Upgraded sites draw on the lapse.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "breakdown-to-city-states",
+   "title": "BL-923 - over-extended ground breaks into city states",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-923 - Sprint 39, the drama of the time-lapse",
+   "batch": "sprint-39-drama",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness",
+      "headless: world_determinism"
+     ],
+     "requirement": "Each seat the capital can no longer supply becomes its own polity with its hinterland; seatless cut-off regions join the nearest cut-off seat or stand alone; parent id and a broke-away event recorded; successors may re-fragment after their birth round; nothing released to nobody or handed to a neighbour.",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep 16 --epoch 0",
+      "visual: round-4 capture"
+     ],
+     "requirement": "Breakdowns occur on connected ground across the sweep; pieces and sizes print; a round-4 capture shows a realm coming apart with ticker lines.",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
   }
  ]
 }
