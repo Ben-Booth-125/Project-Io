@@ -145,6 +145,190 @@
     "tools/verify/history_sweep.cpp"
    ],
    "design": "FOUND THREE TIMES INDEPENDENTLY ON 2026-09-11, by three agents working different items who had no contact with each other. That convergence is why this is filed at priority A rather than as an observation.\n\nTHE READING, STRAIGHT OFF THE SWEEP: `REFUSED reach gate   median 0   (BL-837)`. Across 16 seeds at --epoch 0, in generation's own run, the reach gate refuses NO campaigns at all.\n\nWHY THAT MATTERS MORE THAN IT LOOKS. BL-823's own resolution note promoted reach-gating from one lever among six to THE PRIMARY LEVER: \"an empire persists while its network holds and fragments when it does not, and the number of nations at 1200 CE is a consequence of what got built and stayed maintainable.\" CIVILISATION.md sec The road is the empire's skeleton is built on the same claim. If the gate refuses nothing, the primary lever is not doing the job the design assigns it -- whatever else is holding the world multipolar, it is not this.\n\nWHAT IT ALREADY BLOCKED, and each was a real cost paid before the cause was known:\n  - BL-887 (reach as centre chains) built a correct, cheap centre-relay model and measured NO movement. Tripling the rebate reproduced the default figures EXACTLY. The agent's diagnosis: cheaper reach can only unlock ground a price was keeping shut, and no ground is shut.\n  - BL-839 (turbulence lean) leans three forces and two of them are inert. Its reach-cost term is \"a toll on a road nobody is stopped on\", and its fear term leans a median of 0 candidates. The lean measured as a null result at calm-vs-turbulent on every headline figure.\n  - BL-838 (fear of being next) fires in only 6 of 16 worlds and moved hegemony not at all.\n\nSO THE QUESTION IS NOT \"TUNE THE GATE\". It is WHY nothing reaches it. Candidates worth measuring before changing anything:\n  (a) the water-gate legality test (BL-778) refuses a median 969 wet contacts per world and may simply be consuming every candidate the reach gate would otherwise see -- the two gates are in sequence and the first one may be doing all the work;\n  (b) the floors are sited where nothing lands, and the recalibration history (250 -> 80 -> 20 on a related floor) suggests this was suspected before;\n  (c) the span. The phase runs 400 of its designed 1,600 years, so realms may never get large enough to outrun their own reach.\n\nDO NOT FIX BY RAISING A FLOOR UNTIL THE CAUSE IS KNOWN. Three wrong diagnoses were published in this file's history and every one was caught by one number contradicting another on the same page. The instrument was right every time; the reasoning ahead of it was not.\n\nDONE WHEN: the reason the reach gate refuses nothing is MEASURED and named; and either the gate refuses a non-trivial share of campaigns, or CIVILISATION.md stops calling it the primary lever and says what actually holds the world multipolar."
+  },
+  {
+   "id": "BL-906",
+   "short_name": "EMPIRE_SPAN_RUNS_TO_1200",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": 4,
+   "glyph": "✓",
+   "sprint": "38",
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+   "requires": [],
+   "parked": false,
+   "category": "Generation",
+   "title": "Decouple pass 1's stop year from the epoch, so Empires runs its full 1,600 years",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/era_minus_one.hpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "design": "THE PRECONDITION FOR EVERY READING IN THE CLOSURE CONTRACT. CIVILISATION.md sec The closure of the Empire era states that its readings are taken AT 1200 CE. They cannot be taken at all today.\n\nWHAT IS ACTUALLY WRONG. The Empires phase is designed 400 BCE -> 1200 CE (1,600 years) and runs 400 BCE -> 0 CE (400 years). The cause is one coupling: pass 1 stops at the EPOCH, and the game's epoch is 0 CE. BL-871 (empire span) shipped the 400 BCE split and named this gap on screen rather than hiding it -- 'reaching 1200 CE needs an epoch past 0 CE'. That framing is what this item overturns: pass 1's stop year does not need to BE the epoch, it needs to be 1200.\n\nTHE SHAPE. Give pass 1 an explicit stop year, defaulting to 1200 CE, independent of the world descriptor's epoch year. stop_after_ancient_era already exists as the halt point (BL-871); what it halts AT is the coupling to remove. Do NOT reach 1200 by moving the epoch to 1960 -- that pulls in Globalisation and Digitisation (BL-913), neither of which is built, and makes this item depend on two phases that do not exist.\n\nTHE CONSEQUENCE IS THE POINT AND MUST NOT BE SOFTENED (Ben, 2026-09-11, told the cost and choosing it anyway). Running 1,600 years instead of 400 will move EVERY number in sprint 38's scoreboard, including the ones already accepted -- hegemony 0/16, largest share median 12%, secessions median 2, the rise/peak/fall count, the materials sink at 8%. Those figures were all read at a quarter span. Re-read them; do not tune anything to preserve them, and do not treat a moved number as a regression. A figure measured over 400 years was never a measurement of this phase.\n\nCOST IS A REAL RISK AND IS MEASURED, NOT ASSUMED. Pass 1 is already the most expensive pass and this quadruples the empire round. Measure the wall clock before and after on history_span_cost; if it lands badly, the affordability rungs in lore/COLLAPSE.md sec The 4000-year problem are the authority, and a shorter STEP is the admissible lever, never a shorter span.\n\nWATCH THE CAPACITY LADDER. CIVILISATION.md sec Open questions already asks whether the ladder's rungs turn over believably in 1,600 years, having been calibrated over 4,000. This item is what makes that question answerable. MEASURE BEFORE TUNING: report the rung turnover, change no constant.\n\nDONE WHEN: the Empires round runs 400 BCE -> 1200 CE with the epoch unchanged at 0 CE; history_sweep reports the span it actually ran on the face of the report; world_determinism is unchanged; and the sprint-38 figures are RE-READ at full span and recorded beside the old ones."
+  },
+  {
+   "id": "BL-907",
+   "short_name": "CLOSURE_CONTRACT_SCOREBOARD",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": 3,
+   "glyph": "✓",
+   "sprint": "38",
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+   "requires": [
+    "BL-906"
+   ],
+   "parked": false,
+   "category": "Generation",
+   "title": "Print the closure contract's seven readings from history_sweep, at 1200 CE",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "tools/verify/history_sweep.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "THE CONTRACT IS A STRUCT PLUS A SCOREBOARD, AND THIS IS THE SCOREBOARD. pass_one_output_valid checks internal consistency -- shares sum to 1000, holdings name living polities, grudges name polities in range. It cannot check SHAPE, and shape is the whole of what the closure requires.\n\nWHY IT EXISTS, stated as plainly as the handoff stated it: four items delivered on 2026-09-11 (BL-887 reach chains, BL-839 turbulence lean, BL-838 fear-of-next, BL-905 reach gate) were each measured honestly and NONE could be JUDGED, because nothing downstream asked for anything specific. A mechanism inside the Empire phase is judged by whether it moves a reading here. Without this surface, sprint 38's pattern repeats by default.\n\nTHE SEVEN READINGS are CIVILISATION.md sec What the closure is judged on: explorer set, strength spread, contact, directed wants, markets, inherited network, grudges still biting. Each is read OVER A SEED SPREAD and never per-world.\n\nNO TARGET NUMBERS ARE SET IN THIS ITEM. The spread is measured first and the admissible band is argued from the measurement, exactly as sprint 38's done_when requires and as the opposition-bar question in CIVILISATION.md sec Open questions already insists. A number picked to make one seed look right is the failure mode this item exists to prevent, not a shortcut it may take.\n\nA SEED THAT REFUSES A READING IS LEGITIMATE; A SPREAD THAT REFUSES ONE IS NOT. Assert on the spread. A per-world assertion here would re-introduce the forced outcome the whole phase is designed against.\n\nDEPENDS on BL-906 (empire span to 1200) for the readings to mean anything, and reports partial readings honestly for the fields BL-908/909/910/911/912 have not yet supplied -- a missing field prints as MISSING, never as zero.\n\nDONE WHEN: history_sweep prints all seven readings with the year they were taken; a field whose source is unbuilt says so; and the spread reading for each is recorded in the item's resolution as the baseline every later mechanism is judged against."
+  },
+  {
+   "id": "BL-908",
+   "short_name": "POLITY_CONTACT_RECORD",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": 3,
+   "glyph": "✓",
+   "sprint": "38",
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+   "requires": [],
+   "parked": false,
+   "category": "Generation",
+   "title": "A directed polity-to-polity contact record, carried across the handoff",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-11, form): CONTACT HOLDS BETWEEN POLITIES, not cultures and not landmasses. CIVILISATION.md sec Contact is polity to polity owns the design.\n\nWHAT IT IS FOR. Without a contact record every region sits in one connected graph, so there is nothing for an exploration age to discover and no way to say that a landmass has never been crossed to. Contact is what makes ignorance a FACT rather than an absence.\n\nTHE SHAPE IS THE GRUDGE TABLE'S. pass_one_output::grudges is already a directed, named, event-carrying record between polities and it validates cleanly; contact is the same object with a different cause. Reuse the idiom rather than inventing a second one -- two tables of the same shape with different conventions is how a reader ends up trusting the wrong one.\n\nWHAT IS DISCOVERED IS PEOPLE, NOT EMPTY LAND, and this constrains the item. COLONISATION.md ends the migration when every habitable landmass carries some culture, and CIVILISATION.md sec What the dark age must leave DECLINED ground released back to nobody. So an unmet landmass at 1200 CE is SETTLED AND UNMET. Do not add an 'unclaimed ground' concept; there is none by ruling.\n\nLANDMASS IDENTITY IS DERIVED, NOT STORED (Ben's choice of grain). A landmass question is answered by walking the polity contact graph against region::domain. A second landmass-grain table would be a competing truth with nothing extra in it.\n\nPOLITIES DIE AND THAT IS A KNOWN COST OF THIS GRAIN. A polity conquered before 1200 CE takes its contacts with it unless conquest INHERITS them. Decide that explicitly and write it down: the defensible reading is that a conqueror inherits what its victim knew, because the knowledge was in the seat. Raise it rather than defaulting it.\n\nDONE WHEN: contact is recorded as it happens during the phase, crosses in pass_one_output, validates in pass_one_output_valid the way grudges do, and the sweep can report at least one unmet pair on some seeds."
+  },
+  {
+   "id": "BL-909",
+   "short_name": "DIRECTED_WANT_TABLE",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": 4,
+   "glyph": "✓",
+   "sprint": "38",
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+   "requires": [
+    "BL-908",
+    "BL-910"
+   ],
+   "parked": false,
+   "category": "Generation",
+   "title": "A directed want table: A knows B holds what A lacks",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-11): a good you know exists, that you do not have, is a MOTIVE on its own. The want needs no price and this phase still has no market during its span. CIVILISATION.md sec The directed want owns the design.\n\nDIRECTED, NOT A SCARCITY LIST (Ben's explicit choice over the per-polity alternative). A scarcity list says a realm is short of something and names no object for the shortage. The directed form is what makes the exploration age's first act explicable -- THIS realm sailed to THAT one, for THAT -- rather than a roll over a list of absences.\n\nTWO INPUTS. (1) Endowment: what B's ground holds that A's reachable ground does not, off the four region windows (farm/ore/energy/port). (2) What B's MARKET SHOWS (Ben, 2026-09-11) -- the conditions a neighbour's market makes visible, which is the signal a trading age actually acts on. The second input is why BL-910 exists and is why this item requires it.\n\nA WANT REQUIRES CONTACT. The table is defined only over pairs BL-908's record already joins. Without that gate it is omniscience with extra steps, and the exploration age has nothing to discover because every realm already wants everything.\n\nNO PRICE, NO ORDER BOOK, NO DEMAND CURVE. CIVILISATION.md sec Materials are spent when something happens is unchanged. Population demand is the economy pass's and must not leak backwards into a phase with no price -- the want is a KNOWN ABSENCE plus a KNOWN HOLDER, nothing more.\n\nTHE MECHANISM TRANSFERS, THE PROPER NOUN DOES NOT. The historical analogy Ben raised is a mechanism reference only (io-standing-rules sec Terms & docs): no Earth name appears in generated content.\n\nDONE WHEN: the want table crosses in pass_one_output, is non-empty on a spread, points ACROSS contact rather than within it, and every entry names both the holder and the thing wanted."
+  },
+  {
+   "id": "BL-910",
+   "short_name": "CAPITALS_AND_MARKETS_AT_CLOSE",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": 4,
+   "glyph": "✓",
+   "sprint": "38",
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+   "requires": [],
+   "parked": false,
+   "category": "Generation",
+   "title": "Capitals exist at the close, and markets stand on them at 1200 CE",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/settlement.hpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-11): near the end of the Empire pass, ensure capital cities exist, and spawn markets centred on them. That gives the exploration age a market substrate in simplified form without giving this phase a market during its span. CIVILISATION.md sec Capitals exist at the close owns the design.\n\nTHIS MOVES A BUILT DESIGN'S TIMING, IT DOES NOT OPEN A NEW ONE, AND THE DISTINCTION IS THE ITEM. economy/MARKETS.md sec Market centres and seeding already carries Ben's 2026-09-03 line -- markets should begin to emerge towards the end of this phase -- and the junction-gated carve LANDED (BL-768, roads and markets from history). But it carves at WORLD-GEN, at the epoch, reading the history's corridor record afterwards. The closure needs markets standing AT 1200 CE as an output of this phase. Read the built carve before writing anything: the intent is to re-time and re-anchor it, not to duplicate it.\n\nTHE CAPITAL IS THE SEAT THE POLITY ALREADY GOVERNS FROM (CIVILISATION.md sec The unit is the city state -- region::is_seat, seeded one per polity at its capital). A market centre is a PROMOTION of an existing fact, never a new placement pass. Do not introduce a capital id space.\n\nNO QUOTA. A polity that ends the phase without a governable seat has no market. That is the same permission a city state gets and it must not become a floor that manufactures a capital for every surviving realm -- manufacturing one is the forced outcome this project files items to avoid.\n\nA MARKET AT THE CLOSE IS A PLACE AND A VISIBLE CONDITION, NOT AN ORDER BOOK. No firms, no clearing tick, no price band, no inventory -- those are the economy pass's and the no-market ruling for this phase is unchanged. What it carries is enough for a stranger to look at it and want something, which is exactly what BL-909's second input reads.\n\nDONE WHEN: surviving polities with a seat carry a capital at 1200 CE, a market centre stands on each, both cross in pass_one_output, and a polity without a seat carries neither."
+  },
+  {
+   "id": "BL-911",
+   "short_name": "NETWORK_CROSSES_HANDOFF",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": 3,
+   "glyph": "✓",
+   "sprint": "38",
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+   "requires": [],
+   "parked": false,
+   "category": "Generation",
+   "title": "The surviving road network crosses the handoff, inherited unevenly",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/road_generation.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-11, form): the roads cross the handoff, in this contract. CIVILISATION.md sec The network is the estate owns the design.\n\nTHE HOLE. CIVILISATION.md sec What the dark age must leave names roads that outlive their builders as one of THREE things the fragments must carry, and pass_one_output carries no network at all. A network that does not cross cannot be inherited by anybody, so output 2 of the dark-age contract is currently unmet by construction rather than by tuning.\n\nTHIS IS WHAT MAKES COLLAPSE CONSEQUENTIAL RATHER THAN MERELY TERMINAL. Collapse is network failure (CIVILISATION.md sec How an empire actually falls), so what an empire leaves is precisely the part of its network that still stands. Whoever holds that ground starts the exploration age ahead of whoever does not.\n\nUNEVEN IS THE REQUIREMENT, NOT A SIDE EFFECT. An evenly-inherited network is the flat map GENERATION_STRATEGY.md sec Asymmetry is the deliverable exists to prevent, so the sweep reads the SPREAD of inherited network across fragments, not its total.\n\nRESPECT THE EXISTING SEAM. BL-768's feasibility finding stands and is not re-litigated here: the sim has no write channel to the world and no tile-grain route, so roads are STAMPED FROM its record by a pass afterwards, never laid inside it. What crosses is therefore the sim's own record of what was built and walked -- the works roster's road rows -- not a tile list.\n\nDONE WHEN: the surviving network crosses in pass_one_output, the stamp pass reads it from there rather than from live sim state, and the sweep reports its spread across surviving polities."
+  },
+  {
+   "id": "BL-912",
+   "short_name": "EMPIRE_TREE_WIRED_TO_SIM",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": 6,
+   "glyph": "✓",
+   "sprint": "38",
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+   "requires": [
+    "BL-906"
+   ],
+   "parked": false,
+   "category": "Generation",
+   "title": "Wire the Empire tree into the sim: the sim reads nodes, and the rim is the explorer threshold",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/era_minus_one.hpp"
+   ],
+   "design": "THE LARGEST OUTSTANDING PIECE OF GENERATION WORK, AND THE ONE THAT MAKES BEN'S SECOND ASPECT REAL. Three trees are authored and lint-green -- 143 nodes across colonisation_tree.json, empire_tree.json and industry_tree.json -- and NOTHING IN src/ READS ANY OF THEM. (src/world/tech_tree.* is the unrelated CAMPAIGN tree loaded from scripts/tech_tree.lua; do not confuse them.) trees/TREES.md states 'the sim reads nodes, not bands' (Ben, 2026-09-10) and the code reads bands only. This item closes that for the EMPIRE tree; colonisation and industry are out of scope.\n\nSCOPE IS WIRE ONLY -- NO GENERATION RENDER (Ben, 2026-09-11, form + notes): 'the tech tree will be available via the tech ledger later - we don't need to render it in generation, and we don't have a reference to view each polity's tree regardless.' Wiring the tree into the sim and showing it to a player are separate decisions and only the first is taken.\n\nWHY A BAND CANNOT DO THIS JOB. A band is a ladder everyone climbs in the same order, so difference under it is only ever HOW FAR, never WHICH WAY. The closure contract's explorer set is a THRESHOLD CROSSED (Ben, 2026-09-11): a per-polity boolean read off EM-SP-4m, 'The Enforceable Promise', whose sole effect opens the industry tree and whose requires are EM-PE-4a and EM-RD-4b. That is a fact about what a realm BUILT, and no scalar expresses it.\n\nTHE FORK IS WHAT MAKES DIFFERENCE INDEPENDENT OF ECONOMIC MIGHT, and it is the half most likely to be dropped as an optimisation. A closed fork side goes dark permanently, so two wealthy realms can end the phase incapable of the same things because they CHOSE differently. Without the fork, technological difference collapses into a restatement of size -- which is the one thing this output must not be. The empire tree carries 1 fork; it is load-bearing.\n\nSTATE, per trees/TREES.md sec State: one 64-bit mask per tree plus one accumulated-progress integer for the node being invested in. Research is a FLOW derived from the labour split (a fraction of the industry slice, scaled by spire ring and contact degree), never a resource -- BL-867 (materials spent on action) already splits labour three ways, so the input exists.\n\nWITHIN THE EXISTING GRANT, and this is asserted rather than assumed. Choosing a node is an argument to the Invest verb the register already covers (ai/AI_OPPONENT.md sec 11); it issues no new verb and plans nothing. If the implementation finds itself wanting a verb the register does not name, STOP and raise a new grant -- NR-517 is the precedent for why reading an existing grant as covering a new subject is the exact failure this rule exists to prevent.\n\nDETERMINISM. Node choice is a seeded, scored argmax over a TOTAL order with an explicit tie-break, in fixed node-id order. No float in the decision path; the sim is integer fixed-point.\n\nSUGGESTED SLICING, since this is difficulty 6: (a) tree state + load the store into a Lua-free TU; (b) the Invest verb spends progress on a node instead of a band; (c) the scorer, per TREES.md sec The scorer; (d) the rim reading into pass_one_output. Slice (d) is what BL-907 needs and can land before (c) is good.\n\nDONE WHEN: a polity's empire-tree mask is real state, Invest buys nodes, the rim milestone is readable per polity at 1200 CE and crosses in pass_one_output, world_determinism is unchanged, and the sweep shows SOME surviving realms holding the rim and not all."
+  },
+  {
+   "id": "BL-913",
+   "short_name": "GLOBALISATION_AND_DIGITISATION_PHASES",
+   "status": "design-owed",
+   "priority": "B",
+   "difficulty": 6,
+   "glyph": "~",
+   "sprint": null,
+   "written": "2026-09-11",
+   "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+   "requires": [
+    "BL-907"
+   ],
+   "parked": false,
+   "category": "Generation",
+   "title": "Split pass 2 into Globalisation (1200-1660) and Digitisation (1660-1960), and remove the coast",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "docs/generation/GENERATION_STRATEGY.md",
+    "docs/ui/STARTUP.md",
+    "src/ui/startup_screens.cpp",
+    "src/world/era_minus_one.hpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-11): 'It's a consequence of splitting exploration and digitisation. The years up to date are: 2400 BCE to 400 BCE for Culture. 400 BCE to 1200 CE for Empires. 1200 CE to 1660 CE for Globalisation. 1660 CE to 1960 CE for Digitisation.'\n\nWHAT THIS SUPERSEDES. Pass 2 was one economy span, 1560 -> 1960, with 1200 -> 1560 a DELIBERATE unsimulated coast (GENERATION_STRATEGY.md sec Pass 2 is the economy pass). Both are now gone: exploration and digitisation are different subjects with different terminating conditions, and the span between 1200 and 1560 is simulated rather than coasted. 1960 and 1200 are unmoved, so pass 1, the epoch and the industrial-band campaign are untouched.\n\nALREADY RECORDED: the new table is written into CIVILISATION.md sec The closure of the Empire era and GENERATION_STRATEGY.md sec Pass 2, which now carries the supersession. This item is the rest.\n\nDESIGN IS OWED, and that is why this is design-owed rather than designed. Settled: the four spans. NOT settled: what Globalisation's terminating condition is beyond a year; whether it is the same engine with sea legs open or a distinct round; which wizard round each becomes (STARTUP.md names five rounds, ending at Industrialisation, and there are now six phases); whether the Industry tree opens at 1200 or at 1660; and what Digitisation does that Globalisation does not.\n\nTHE DOC RECONCILIATION IS PART OF THIS ITEM AND IS NOT SMALL. Sibling docs still assert 1560 -> 1960 and the dark-age coast -- grep the OLD wording, not the new. Ben, 2026-09-11: 'Don't stress too much about contradictions - once we have the full pipeline we will go over it in detail.' So the contradictions are DEFERRED to this item deliberately, not overlooked; that ruling is the licence, and it expires here.\n\nSEQUENCING. Do not start this before the Empire closure is measured. BL-906/907 make the Empire phase readable at 1200 CE, and the closure contract is Globalisation's INPUT -- building the consumer before its input is specified is precisely what the 2026-09-11 redirect stopped.\n\nDONE WHEN: the design questions above are settled on a form, the four spans are consistent across every doc that names one, and the wizard's rounds match the phases."
   }
  ]
 }

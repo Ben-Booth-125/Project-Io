@@ -788,7 +788,24 @@ furnace — is the better-founded alternative and is open; both are consequences
 scalars, and neither is a roll. On an ancient epoch there is no pass 2: the boundary falls past
 the epoch and the sim stops where it stops today.
 
-### Pass 2 is the economy pass, 1560 → 1960 (Ben, 2026-09-08)
+### Pass 2 is the economy pass, and it is TWO phases (Ben, 2026-09-11)
+
+**SUPERSEDED AND REPLACED (Ben, 2026-09-11): pass 2 SPLITS into Globalisation and Digitisation,
+and the 1200 → 1560 coast is gone.** Exploration and digitisation are different subjects with
+different terminating conditions, so they are two phases rather than one 400-year economy span.
+`CIVILISATION.md` § The closure of the Empire era owns the arithmetic; the rest of this section
+predates the split and is read against that table.
+
+| Phase | from | to | years |
+|---|---|---|---|
+| **Culture** — the migration | 2400 BCE | 400 BCE | 2,000 |
+| **Empires** | 400 BCE | 1200 CE | 1,600 |
+| **Globalisation** | 1200 CE | 1660 CE | 460 |
+| **Digitisation** | 1660 CE | 1960 CE | 300 |
+
+**1960 and 1200 are both unmoved**, so pass 1, the epoch and the industrial-band campaign are
+untouched. What changed is that the span between them is now SIMULATED rather than coasted, and
+that the exploration age is a phase in its own right with the Empire closure as its input.
 
 **The calendar is now stated rather than derived.** Pass 1 runs **3,600 years, 2400 BCE → 1200 CE**,
 divided at **400 BCE** into the migration and empire rounds (Ben, 2026-09-09;

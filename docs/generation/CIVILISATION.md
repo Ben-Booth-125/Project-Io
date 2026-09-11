@@ -4,7 +4,8 @@
 > centres become sparse · how materials are spent without a market · where armies come from
 > and which peoples raise them · what a civilisation is, as distinct from a creed · how two
 > cultures come to be similar or opposed, and why that is the engine of conquest · what the
-> Culture phase must hand forward for any of it to work.
+> Culture phase must hand forward for any of it to work · what the phase hands the exploration
+> age at its CLOSURE, and the readings that contract is judged on.
 > **Not here:** how people came to live where they live (COLONISATION) · how force resolves
 > once two polities contest ground (MILITARY_HISTORY) · what a pantheon is or how a tongue is
 > coined (../lore/CREEDS) · the stage ladder this phase sits inside (../lore/HISTORY) · what a
@@ -668,6 +669,176 @@ diffuse, and moves conquests about 6%. **It did not move hegemony at all** — 0
 50% share on both arms, largest share median 10% either way. That is reported rather than tuned
 away, and the reading is open: hegemony was already at its floor before this lever existed, so
 there was no headroom for it to improve (`NR-830`).
+
+---
+
+## The closure of the Empire era (Ben, 2026-09-11)
+
+§ What the dark age must leave names what the fragments have to **carry**. This section names
+what **crosses**, in what form, and how the next phase **judges** it. Together they are the
+contract, and the contract is what makes a mechanism inside this phase judgeable at all: a force
+that moves no reading below is a force nobody asked for.
+
+**THE PHASE THAT FOLLOWS IS GLOBALISATION, AND THE COAST IS GONE (Ben, 2026-09-11).** Pass 2 was
+one economy span, 1560 → 1960, with 1200 → 1560 left unsimulated. Splitting exploration from
+digitisation replaces both:
+
+| Phase | from | to | years |
+|---|---|---|---|
+| **Culture** — the migration | 2400 BCE | 400 BCE | 2,000 |
+| **Empires** — this phase | 400 BCE | 1200 CE | 1,600 |
+| **Globalisation** | 1200 CE | 1660 CE | 460 |
+| **Digitisation** | 1660 CE | 1960 CE | 300 |
+
+**1960 is unmoved and 1200 is unmoved**, so this phase's own span (§ The span is 400 BCE to
+1200 CE) is untouched. What moved is what sits on the far side of 1200: a simulated exploration
+age rather than three and a half centuries of nothing. `GENERATION_STRATEGY.md` § Pass 2 is the
+economy pass carries the pass map and takes its figures from here.
+
+**THE READINGS ARE TAKEN AT 1200 CE.** Not at the year the phase happens to stop, and not at the
+epoch. A reading taken at a quarter of the span is a reading of a different world, and every
+number in this section means nothing until the phase runs its 1,600 years.
+
+---
+
+### Some peoples gain the capacity to explore, and others do not
+
+**Ben, 2026-09-11: this is the output the exploration age is waiting for.** A world in which
+everyone can cross has no age of exploration in it, and neither has a world in which nobody can.
+
+**THE CAPACITY IS A THRESHOLD CROSSED, NOT A SPREAD (Ben, 2026-09-11).** A realm either holds the
+institutions that let it mount a voyage or it does not, and the contract states it that way — a
+per-polity boolean at 1200 CE, read off the Empire tree's rim milestone
+(`trees/EMPIRE_TREE.md`, *The Enforceable Promise*, whose only effect opens the next tree). What
+is *tuned* is the forces that decide who reaches it; what is *stated* is the threshold.
+
+**TUNED FOR, NEVER CLAMPED, and read distributionally.** The requirement is a property of a seed
+spread: across a sweep, some surviving realms hold the rim and not all of them do. No world is
+steered to that outcome, no floor is raised to guarantee it, and a world where nobody crosses is a
+legitimate seed — it is the *spread* that must contain both, exactly as
+`GENERATION_STRATEGY.md` § Asymmetry is the deliverable requires.
+
+**THE SIM READS NODES (Ben, 2026-09-10, `trees/TREES.md`), AND THIS IS WHERE IT STARTS PAYING.**
+The seven-domain capacity band cannot express this: a band is a ladder everyone climbs in the same
+order, so difference under it is only ever *how far*, never *which way*. The rim is a node with
+named `requires`, and holding it is a fact about what a realm built.
+
+**THE FORK IS WHAT MAKES DIFFERENCE INDEPENDENT OF MIGHT (Ben, 2026-09-11).** A closed fork side
+goes dark permanently (`trees/TREES.md` § Diffusion follows kind), so two wealthy realms can end
+the phase incapable of the same things because they *chose* differently — not because one was
+poorer. Without a fork, technological difference collapses back into a restatement of size, which
+is the one thing this output must not be.
+
+**THE TREE IS NOT RENDERED DURING GENERATION (Ben, 2026-09-11).** It is surfaced later through the
+campaign's tech ledger, and there is no per-polity tree view to render it into. Wiring the tree
+into the sim and showing it to a player are separate decisions, and only the first is taken.
+
+---
+
+### Contact is polity to polity
+
+**SETTLED (Ben, 2026-09-11): the contact record holds between POLITIES.** Who has met whom is a
+directed record in the same shape as `pass_one_output::grudges` — a named pair, with the event
+that joined them.
+
+**Contact is what makes ignorance a fact rather than an absence.** Without it every region sits in
+one connected graph and there is nothing for an exploration age to discover; with it, a landmass
+nobody has crossed to is a **recorded** state, and so is the first crossing.
+
+**WHAT IS DISCOVERED IS PEOPLE, NOT EMPTY LAND.** § What the dark age must leave declined ground
+released back to nobody, and that ruling binds here: the migration fills every habitable landmass
+(`COLONISATION.md`), so a far continent at 1200 CE is **settled and unmet**. The new world is a
+world of strangers, not of vacancies.
+
+**Landmass identity falls out of contact rather than standing beside it.** A polity-grain record
+answers the landmass question by walking it; a second landmass-grain table would be a competing
+truth with nothing extra in it.
+
+---
+
+### The directed want — knowing where a good is, is an incentive
+
+**Ben, 2026-09-11, overturning the reading that a want needs a price:** a good you know exists,
+that you do not have, is a motive on its own. Coercion is what happens when you know where it is
+and can reach it. This phase still has **no market during its span** — § Materials are spent when
+something happens is unchanged — and the want does not need one.
+
+**THE WANT IS DIRECTED, in the grudge table's shape: A knows B holds what A lacks.** Not a
+per-polity scarcity list, which says only that a realm is short of something and names no object
+for the shortage. The directed form is what makes the next phase's first act explicable — *this
+realm sailed to that one, for that* — rather than a roll over a list of absences.
+
+**Two inputs, and the second is why the closure spawns markets.** The first is endowment: what
+B's ground holds that A's reachable ground does not. The second is **what B's market shows**
+(Ben, 2026-09-11) — the conditions a neighbour's market makes visible, which is a richer signal
+than geology and the one a trading age actually acts on.
+
+**A want requires contact.** A realm cannot want what it has never heard of, so the want table is
+defined only over pairs the contact record already joins — which is what stops it becoming
+omniscience with extra steps.
+
+---
+
+### Capitals exist at the close, and markets stand on them
+
+**SETTLED (Ben, 2026-09-11): near the end of the Empire pass, ensure capital cities exist, and
+spawn markets centred on them.** That gives the exploration age a market substrate in simplified
+form, without giving this phase a market during its span.
+
+**This extends a design the phase already carries rather than opening a new one.**
+`../economy/MARKETS.md` § Market centres and seeding records Ben's 2026-09-03 line — *markets
+should begin to emerge towards the end of this phase* — and carves markets from the history's
+corridor record. What moves is **when**: that carve is a world-gen act at the epoch, and the
+closure needs markets standing at **1200 CE**, as an output of this phase rather than an artifact
+produced long after it.
+
+**The capital is the seat the polity already governs from** (§ The unit is the city state), so a
+market centre is a promotion of an existing fact, never a new placement pass. A polity that ends
+the phase without a governable seat has no market, which is the same permission a city state gets
+and not a quota.
+
+**A market at the close is a PLACE AND A VISIBLE CONDITION, not an order book.** No firms, no
+clearing tick, no price band — those belong to the economy pass. What it carries is enough for a
+stranger to look at it and want something.
+
+---
+
+### The network is the estate, and it crosses
+
+**The roads cross the handoff (Ben, 2026-09-11).** § What the dark age must leave names roads that
+outlive their builders as one of three things the fragments carry, and a network that does not
+cross cannot be inherited by anybody.
+
+**This is what makes collapse consequential rather than merely terminal.** Collapse is network
+failure (§ How an empire actually falls), so what an empire leaves is precisely the part of its
+network that still stands — and whoever holds that ground starts the exploration age ahead of
+whoever does not. Inherited unevenly is the point; an evenly-inherited network is the flat map
+§ Asymmetry is the deliverable exists to prevent.
+
+---
+
+### What the closure is judged on
+
+The contract's readings, all taken at **1200 CE** and all read over a **seed spread**, never
+per-world:
+
+| Reading | What it must show |
+|---|---|
+| **Explorer set** | Some surviving realms hold the rim milestone; not all do |
+| **Strength spread** | Surviving realms of unequal size — some able to colonise, some only to be colonised |
+| **Contact** | At least one pair unmet, so there is somewhere to go |
+| **Directed wants** | Non-empty, and pointing across contact rather than within it |
+| **Markets** | Standing on capitals, carrying conditions a stranger can read |
+| **Inherited network** | Surviving roads held unevenly across the fragments |
+| **Grudges** | Still biting at 1200 CE — carried, not decayed to nothing |
+
+**A reading is a requirement, not a target.** No number is set ahead of the measured spread, and a
+seed that refuses one of these is a legitimate world; what must not happen is a *spread* that
+refuses one. This is the same distributional rule § The arc the phase must produce already states,
+applied to the handoff instead of to the arc.
+
+**A mechanism inside this phase is judged by whether it moves a reading here.** That is the whole
+purpose of settling the contract before building anything else against it.
 
 ---
 

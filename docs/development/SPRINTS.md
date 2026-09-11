@@ -89,6 +89,13 @@ Decompose CIVILISATION.md's Empires design (settled 2026-09-09) into delivery an
 - BL-896 (collapse is network failure) - an empire fragments when it can no longer reach itself; what it leaves is the next phase's input.
 - BL-897 (universalising creed) - a creed that subsumes pantheons and binds peoples who are neither kin nor share a tongue. DESIGN-OWED: four questions to settle first.
 - BL-898 (grudges must bite) - carried across the handoff today and read by nothing.
+- BL-906 (empire span runs to 1200) - pass 1's stop year decoupled from the epoch. The phase runs 400 of its 1,600 years today; every closure reading is taken at 1200 CE, so nothing below can be measured until this lands.
+- BL-907 (closure contract scoreboard) - the seven readings printed from history_sweep. The surface that makes a mechanism inside this phase judgeable at all.
+- BL-908 (polity contact record) - who has met whom, directed, in the grudge table's shape.
+- BL-909 (directed want table) - A knows B holds what A lacks; endowment plus what B's market shows.
+- BL-910 (capitals and markets at close) - capitals exist at 1200 CE and markets stand on them.
+- BL-911 (network crosses handoff) - the surviving roads are the estate, inherited unevenly.
+- BL-912 (empire tree wired to sim) - the sim reads nodes; the rim milestone is the explorer threshold. Wire only, no generation render.
 
 **Done when.** Across a history_sweep spread, generated worlds show the arc Ben named on 2026-09-10 -- polities eliminated, empires forming, those empires collapsing back, and surviving fragments of unequal size (GENERATION_STRATEGY.md sec The asymmetry is POLITICAL as well as economic). DISTRIBUTIONAL, never per-world: a seed that refuses war is a legitimate outcome and must not be forced. No target number is set ahead of the measured spread. Plus: the wizard opens on a rolled seed (BL-890), the player can see whether a rolled world contains the arc (BL-891), and the sweep's W7b red is resolved (BL-892).
 
@@ -129,6 +136,14 @@ CONSEQUENCE OF THAT RULE: the sprint has no natural close by exhaustion, so its 
 THE PHASE-OUTCOME DESIGN SESSION, 2026-09-11, settled four things and they are in the docs that own them, not here: what the dark age must leave (unequal nations, orphan roads, live grudges -- released ground DECLINED because a colonial era colonises INHABITED ground); collapse is NETWORK FAILURE; war is funded by crude NETWORK INCOME with the no-market exclusion re-affirmed; and a UNIVERSALISING CREED as a second, independent collapse vector. CIVILISATION.md and CREEDS.md carry them.
 
 A SPAN FIX WAS ATTEMPTED AND REVERTED 2026-09-11. The Culture round was believed to end at 0 CE while the Empires round started at 400 BCE, a 400-year overlap. It does not: BL-846's founding schedule already splits regions on sim_start_year, and the 0 CE found in hard_coded_world.cpp is the colonisation flood's BACKSTOP, which settlement.cpp:783 states outright. The change was a no-op that would have deleted the scheduled foundings had it fired. Caught by a digit-identical 4-seed sweep. No doc change was needed -- CIVILISATION.md's span table already matches the code.
+
+THE REDIRECT WAS TAKEN, 2026-09-11 (Ben): 'we are still yet to work on the output data, and what our age of exploration expects to find after the age of empires.' The session that followed wrote the contract instead of more mechanism. CIVILISATION.md sec The closure of the Empire era is the output; BL-906..BL-912 are the work. Ben's framing was that some cultures gain the capacity to explore and others do not -- which turned out to be already designed as the Empire tree's rim milestone EM-SP-4m, whose sole effect opens the Industry tree, and which nothing in src/ reads.
+
+SIX CALLS TAKEN ON TWO FORMS, 2026-09-11. Tech tree: WIRE ONLY, no generation render (surfaced later via the tech ledger). Contact grain: POLITY to polity. Incentive: a DIRECTED WANT table, not a per-polity scarcity list. Explorer capacity: a THRESHOLD CROSSED, not a continuous spread. Roads: they CROSS, in this contract. Sprint close: the contract must be MEASURED at 1200 CE, not merely written -- Ben chose this having been told it re-opens every figure the sprint has already accepted.
+
+THE PHASE MAP CHANGED (Ben, 2026-09-11), as a consequence of splitting exploration from digitisation: Culture 2400 BCE - 400 BCE, Empires 400 BCE - 1200 CE, Globalisation 1200 - 1660 CE, Digitisation 1660 - 1960 CE. This removes the 1200 -> 1560 dark-age coast and supersedes 'pass 2 is the economy pass, 1560 -> 1960'. 1200 and 1960 are both unmoved, so this sprint's own span is untouched. BL-913 carries the rest, including the sibling-doc reconciliation Ben deliberately deferred ('don't stress too much about contradictions - once we have the full pipeline we will go over it in detail').
+
+AN ASPECT WAS CONCEDED AND IS WORTH RECORDING. The first assessment argued that population demand belongs to the economy pass and should be descoped from this phase. Ben overturned it: a good you know exists, that you do not have, is an incentive without any price attached. That is why BL-909 is a want table rather than nothing, and it did not need the no-market ruling relaxed.
 
 ### Sprint 39 — the new world
 *Open · opened 2026-09-10 · Claude (2026-09-10 sprint-assignment sweep)*
