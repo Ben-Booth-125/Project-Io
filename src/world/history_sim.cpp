@@ -3423,6 +3423,122 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     q.progress_q[d] -= cost;
                     ++q.capacity[d];
                 }
+
+                // ---- BL-912: THE EMPIRE TREE, INVESTED ALONGSIDE THE BAND -
+                //
+                // The domain band above is the DERIVED reading TREES.md keeps
+                // for the works gate and the unit roster boundary; this is
+                // the real state -- "the sim reads nodes, not bands"
+                // (TREES.md sec The sim reads nodes). Same Invest verb, same
+                // round: choosing a node is an argument to the verb the AI
+                // grant register already covers (AI_OPPONENT.md sec 11), not
+                // a new one.
+                {
+                    // Ground means, recomputed here: BL-767's own `ground_q`
+                    // locals above went out of scope with their block, and
+                    // this is cheap over one polity's own holdings.
+                    int64_t farm_sum = 0, ore_sum = 0, energy_sum = 0, port_sum = 0;
+                    for (int hi : held)
+                    {
+                        const region& hp = ss.regions[static_cast<std::size_t>(hi)];
+                        farm_sum   += hp.farm_q;
+                        ore_sum    += hp.ore_q;
+                        energy_sum += hp.energy_q;
+                        port_sum   += hp.port_q;
+                    }
+                    const int ground_farm_q = static_cast<int>(farm_sum   / n_held);
+                    const int ground_ore_q  = static_cast<int>(ore_sum    / n_held);
+                    const int ground_fuel_q = static_cast<int>(energy_sum / n_held);
+                    const int ground_port_q = static_cast<int>(port_sum   / n_held);
+
+                    // "Bound" terms reuse this round's own domain arrears —
+                    // the same shape BL-767's `pull` already reads — for the
+                    // three the empire tree also names.
+                    const int reach_bound_q    = clampi(
+                        (6 - q.capacity[static_cast<int>(sim_domain::transport)]) * 180, 0, 1000);
+                    const int manpower_bound_q = clampi(
+                        (6 - q.capacity[static_cast<int>(sim_domain::military)]) * 180, 0, 1000);
+                    const int food_bound_q     = clampi(
+                        (6 - q.capacity[static_cast<int>(sim_domain::agriculture)]) * 180, 0, 1000);
+
+                    // Stores: how empty the seat sits. A placeholder scale
+                    // (TREES.md sec Effects: "magnitudes are authored by
+                    // judgement"), read off the seat's own stock rather than
+                    // invented from nothing.
+                    const region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
+                    const int stores_low_q = clampi(
+                        1000 - static_cast<int>(clampi64(seat.material_stock / 4, 0, 1000)), 0, 1000);
+                    const int surplus_q = 1000 - std::max(
+                        { reach_bound_q, manpower_bound_q, food_bound_q, stores_low_q });
+
+                    // Re-pick only when nothing is targeted, or the target
+                    // went dark under it (a rival fork side closed, or the
+                    // ring it needs is no longer the frontier — cannot
+                    // happen without diffusion, kept as a real check anyway).
+                    if (q.empire_investing < 0
+                     || !empire_node_available(q.empire_mask, q.empire_investing))
+                    {
+                        q.empire_investing = static_cast<int16_t>(choose_empire_node(
+                            q.empire_mask, q.cohesion_q, stores_low_q, reach_bound_q,
+                            manpower_bound_q, food_bound_q, ground_ore_q, ground_farm_q,
+                            ground_fuel_q, ground_port_q, surplus_q));
+                        q.empire_progress_q = 0;
+                    }
+
+                    if (q.empire_investing >= 0)
+                    {
+                        // RESEARCH IS A FLOW (TREES.md sec State): a fraction
+                        // of the industry slice, scaled by the spire ring
+                        // held and by contact degree. Never a stockpile —
+                        // earned and spent the same round, on the node
+                        // currently targeted.
+                        int64_t industry_sum = 0;
+                        for (int hi : held)
+                            industry_sum += region_industry_output(
+                                ss.regions[static_cast<std::size_t>(hi)]);
+
+                        int spire_ring = 0;
+                        for (int i = 0; i < io::empire_tree::node_count; ++i)
+                        {
+                            const io::empire_tree::node& nd = io::empire_tree::nodes[i];
+                            if (nd.kind == io::empire_tree::node_kind::milestone
+                             && (q.empire_mask & (1ULL << i)))
+                                spire_ring = std::max(spire_ring, static_cast<int>(nd.ring));
+                        }
+
+                        // BL-908's directed contact table ("who has met
+                        // whom") is what TREES.md sec State names as the
+                        // second research scale -- OWED, not skipped: this
+                        // worktree's base (main @ 84aad8d3) predates BL-908,
+                        // so `history_sim_state` carries no contact table to
+                        // read yet. contact_degree stays 0 (an inert
+                        // multiplier, `(1000+0*40)/1000 == 1`) until BL-908
+                        // lands and this is wired to it -- a one-line change
+                        // at that point, not a restructure.
+                        const int contact_degree = 0;
+
+                        const int64_t research_q =
+                            (industry_sum * params.empire_research_fraction_q) / 1000
+                                * (1000 + spire_ring * 150) / 1000
+                                * (1000 + clampi(contact_degree, 0, 10) * 40) / 1000;
+                        q.empire_progress_q += static_cast<int32_t>(
+                            clampi64(research_q * step_years, 0, INT32_MAX));
+
+                        const io::empire_tree::node& tn =
+                            io::empire_tree::nodes[q.empire_investing];
+                        const int tn_kind_base =
+                            tn.kind == io::empire_tree::node_kind::minor ? 1
+                          : tn.kind == io::empire_tree::node_kind::major ? 3 : 6;
+                        const int tn_cost =
+                            params.capacity_band_cost * tn_kind_base * static_cast<int>(tn.ring);
+                        if (q.empire_progress_q >= tn_cost)
+                        {
+                            q.empire_mask |= (1ULL << q.empire_investing);
+                            q.empire_progress_q = 0;
+                            q.empire_investing  = -1;
+                        }
+                    }
+                }
                 break;
             }
             case sim_verb::build_work:
@@ -4045,6 +4161,141 @@ history_sim_state run_history_sim(settlement_state&         ss,
     }
 
     return out;
+}
+
+// ---------------------------------------------------------------------------
+// The empire tree (BL-912) — availability, the scorer, the rim
+// ---------------------------------------------------------------------------
+
+bool empire_node_available(uint64_t mask, int node_idx)
+{
+    if (node_idx < 0 || node_idx >= io::empire_tree::node_count) return false;
+    const uint64_t bit = 1ULL << node_idx;
+    if (mask & bit) return false; // already held
+
+    const io::empire_tree::node& n = io::empire_tree::nodes[node_idx];
+
+    // A closed fork side goes dark PERMANENTLY (TREES.md sec Forks): taking
+    // one closes the other's availability window for good, and nothing ever
+    // un-completes, so this is a one-way gate on the mask alone.
+    if (n.excludes >= 0 && (mask & (1ULL << n.excludes))) return false;
+
+    // Rule 1/the spire: ring r+1 is locked until the milestone at ring r is
+    // held (TREES.md sec Milestones). Ring 1 has no gate.
+    if (n.ring > 1)
+    {
+        bool prior_ring_open = false;
+        for (int i = 0; i < io::empire_tree::node_count; ++i)
+        {
+            const io::empire_tree::node& m = io::empire_tree::nodes[i];
+            if (m.kind == io::empire_tree::node_kind::milestone
+             && m.ring == n.ring - 1 && (mask & (1ULL << i)))
+            { prior_ring_open = true; break; }
+        }
+        if (!prior_ring_open) return false;
+    }
+
+    // Rule 2: travel is OR. Available if it is the tree's true root (its OWN
+    // declared `links` was empty — see `node::is_root`'s comment: every
+    // other ring-1 major names EM-SP-1a as ITS prerequisite, which makes
+    // EM-SP-1a non-isolated in the undirected `neighbours_mask` even though
+    // it has none of its own) or at least one linked neighbour is held.
+    if (!n.is_root && n.neighbours_mask != 0 && (mask & n.neighbours_mask) == 0) return false;
+
+    // Rule 4, the AND half: a milestone's `requires` (majors from >=2
+    // branches at its own ring) must ALL be held, plus, if present, one side
+    // of its fork pair (TREES.md sec Milestones: requires_fork, EITHER side).
+    if (n.kind == io::empire_tree::node_kind::milestone)
+    {
+        if ((mask & n.requires_mask) != n.requires_mask) return false;
+        if (n.requires_fork_a >= 0)
+        {
+            const bool a = (mask & (1ULL << n.requires_fork_a)) != 0;
+            const bool b = (mask & (1ULL << n.requires_fork_b)) != 0;
+            if (!a && !b) return false;
+        }
+    }
+
+    return true;
+}
+
+int choose_empire_node(uint64_t mask, int cohesion_q, int stores_low_q,
+                        int reach_bound_q, int manpower_bound_q, int food_bound_q,
+                        int ground_ore_q, int ground_farm_q, int ground_fuel_q,
+                        int ground_port_q, int surplus_q)
+{
+    using namespace io::empire_tree;
+
+    // THE SCORER (TREES.md sec "The scorer — one shape, three trees"): a
+    // frontier node is scored on the term its `pursued_when` names, plus a
+    // constant per-kind pull that keeps the spire climbing (a milestone opens
+    // the next ring for every branch at once, so it outweighs a lone major),
+    // minus its cost. Every term below reads a quantity the round already
+    // computed (ground means, cohesion, arrears-style binding); terms this
+    // slice cannot cheaply derive (`threatened`, `plague_struck`,
+    // `many_peoples`, `known`) are left at 0 rather than guessed — TREES.md
+    // sec Effects allows placeholder magnitudes, and a 0 term simply never
+    // wins the argmax on its own account, which is honest rather than wrong.
+    //
+    // INTEGER THROUGHOUT, and the tie-break is the LOWER NODE INDEX — the
+    // tree's own fixed authored order (io::empire_tree::nodes), so two
+    // polities scoring a tie always resolve it identically.
+    const int term_value[term_count] = {
+        /* spire             */ 1000,
+        /* stores_low        */ stores_low_q,
+        /* surplus           */ surplus_q,
+        /* reach_bound       */ reach_bound_q,
+        /* coastal_holdings  */ ground_port_q,
+        /* threatened        */ 0,
+        /* ground_ore        */ ground_ore_q,
+        /* manpower_bound    */ manpower_bound_q,
+        /* ground_grass      */ ground_farm_q, // farm_q is the pasture proxy
+                                                // elsewhere in this codebase
+                                                // (unit_roster.hpp), reused here
+        /* cohesion_low      */ 1000 - clampi(cohesion_q, 0, 1000),
+        /* ground_fuel       */ ground_fuel_q,
+        /* food_bound        */ food_bound_q,
+        /* ground_farm       */ ground_farm_q,
+        /* plague_struck     */ 0,
+        /* many_peoples      */ 0,
+    };
+
+    // Endowment gates (TREES.md sec The five rules, rule 2: "A major's
+    // endowment gate... [is an] additional AND condition on top of
+    // availability"). `grassland` has no ground signal of its own in this
+    // codebase and reuses the farm mean, exactly as `unit_roster.hpp` does
+    // for pasture ("PROXY FOR PASTURE — horses have no signal of their own").
+    // A bar of 250/1000 is a placeholder, per TREES.md sec Effects.
+    const auto gate_open = [&](gate_atom g) {
+        switch (g)
+        {
+        case gate_atom::none:       return true;
+        case gate_atom::ore_q:      return ground_ore_q  >= 250;
+        case gate_atom::fuel:       return ground_fuel_q >= 250;
+        case gate_atom::arable:     return ground_farm_q >= 250;
+        case gate_atom::coastal:    return ground_port_q > 0;
+        case gate_atom::grassland:  return ground_farm_q >= 250;
+        }
+        return true;
+    };
+
+    int best_idx = -1;
+    int best_score = INT32_MIN;
+    for (int i = 0; i < node_count; ++i)
+    {
+        if (!empire_node_available(mask, i)) continue;
+        const node& n = nodes[i];
+        if (!gate_open(n.gate)) continue;
+        const int kind_bonus = n.kind == node_kind::milestone ? 600
+                              : n.kind == node_kind::major     ? 0
+                                                                : -100; // minors trail their major
+        const int term = clampi(term_value[static_cast<int>(node_term[i])], 0, 1000);
+        const int cost_q = (n.kind == node_kind::minor ? 1 : n.kind == node_kind::major ? 3 : 6)
+                          * static_cast<int>(n.ring);
+        const int score = term + kind_bonus - cost_q;
+        if (score > best_score) { best_score = score; best_idx = i; }
+    }
+    return best_idx;
 }
 
 // ---------------------------------------------------------------------------
