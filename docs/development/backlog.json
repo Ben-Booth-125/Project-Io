@@ -11,29 +11,5 @@
   "  design-owed (glyph ~) - design still owed; must be settled before promotion.",
   "PRIORITY (ascending): F C B A S SSS."
  ],
- "items": [
-  {
-   "status": "design-owed",
-   "glyph": "~",
-   "sprint": null,
-   "written": "2026-09-11",
-   "author": "Ben (2026-09-11, sprint-39 design session); Claude (filed from the holistic generation read)",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "id": "BL-928",
-   "short_name": "RIVERS_MOUNTAINS_IN_COMBAT",
-   "priority": "B",
-   "difficulty": 4,
-   "title": "A river and a mountain defend, in the resolver and in the scorer that chooses the fight",
-   "authority_doc": "docs/generation/MILITARY_HISTORY.md",
-   "files": [
-    "src/world/combat.cpp",
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp"
-   ],
-   "design": "BEN, 2026-09-11: \"I would argue we also need a deeper combat system, so that we take into account defence over rivers and mountains, but before this we must ensure we can see strong growth.\" DEFERRED BY THAT RULING: no sprint until sprint 39's growth items have landed and been read.\n\nWHAT EXISTS. resolve_battle carries a landform defence multiplier on the defender only (mountain strongest, then rift, canyon, crater, highland, valley) and a doctrine mountain_penalty. The campaign scorer never sees the terrain term (battle_trace's own comment: \"the term the scorer never sees\"), so attackers do not avoid mountains, they lose there. Rivers are absent from the resolver and from the Empires sim entirely; only the migration walk reads them.\n\nDESIGN OWED. Whether a river is a defence term on the region behind it or a crossing cost on the corridor; whether the scorer reads terrain so a campaign routes around a range or over a bridge (BL-917 draws bridges; this is what would make them matter); how it composes with works defence. Written against MILITARY_HISTORY.md sec The resolver when taken up."
-  }
- ]
+ "items": []
 }
