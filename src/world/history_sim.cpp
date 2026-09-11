@@ -2173,31 +2173,50 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
                 return false;
             };
-            // BL-835 — THE FIELD ARMY A CAMPAIGN CAN CONCENTRATE AT ONE HUB.
+            // BL-921 — FORCE FOLLOWS THE NETWORK, not a fixed radius.
             //
-            // The hub's own garrison, plus what the polity's holdings ADJACENT
-            // to the hub can spare, and no more than double the hub's own.
+            // THE STRUCTURAL BUG THIS REPLACES (BL-835's model). A hub's own
+            // garrison plus at most as much again from HALF of its immediate
+            // neighbours meant a 150-region empire and a 3-region polity
+            // fielded the SAME-sized stack at any border: success (holding
+            // more ground) wrote nothing into force, and every brake tried on
+            // a riser measured null (BL-838, BL-839, BL-887, BL-905) because
+            // there was no riser to brake.
             //
-            // WHY THE POOL CANNOT BE ONE REGION'S GARRISON ALONE. Measured:
-            // with the attacker fielding a single region's army against a
-            // single region's army, the defender's terrain multiplier and works
-            // made every campaign a losing proposition, `p_win_q` collapsed to
-            // roughly a fifth of what it had been, and the seed-0 fixture went
-            // from 258 battles to 0. A model in which no polity can ever
-            // profitably attack is not a better model than one in which the
-            // same region is taken 258 times; it is the same failure mirrored.
+            // THE SHAPE (Ben, 2026-09-11 form, ruling A on NR-836; NR-838):
+            // A POOLED LEVY along the supplied network, priced from the
+            // capital — no standing field army this sprint (NR-836's call is
+            // parked). Every region this polity HOLDS contributes a share of
+            // its garrison in proportion to `region::network_supply_q`, the
+            // SAME capital-over-held-ground, road-discounted reach term
+            // BL-872/BL-922 already compute once per round for every held
+            // region (loop above, this same polity, this same round) — so a
+            // realm with roads to its holdings brings more of itself to a
+            // border than one without, and reach is finally the lever the
+            // design says it is. Reading from the CAPITAL rather than from
+            // the hub is deliberate, not a shortcut: it is the one network
+            // this sim already prices everything else against, so a second,
+            // hub-relative Dijkstra here would only restate the first at a
+            // different root.
             //
-            // WHY IT IS CAPPED AT 2x THE HUB'S OWN. `neighbours` is a radius,
-            // not a border, so an uncapped sum would let a large realm mass
-            // twenty garrisons on one frontier and roll the map. The cap says
-            // a march can roughly double itself from what it picks up on the
-            // way and no more, which keeps the contest inside the range the
-            // resolver was calibrated on.
+            // THE HUB ITSELF IS UNCONDITIONAL, unchanged from BL-835: a hub
+            // with no army of its own stages nothing (comment at the campaign
+            // loop below), regardless of how well-supplied the rest of the
+            // realm is — the garrison standing at the border does not need to
+            // march to itself.
             //
-            // THE SUPPORTING HOLDINGS SPARE HALF, because they are still
-            // covering their own ground — and what they spare is genuinely
-            // GONE from them while the campaign runs, which is what makes a
-            // wide offensive an uncovered frontier rather than a free action.
+            // NO SEPARATE CAP. The old 2x-the-hub ceiling existed because an
+            // unbounded RADIUS sum could mass twenty garrisons on one
+            // frontier; the network sum is bounded instead by
+            // `network_supply_q` itself, which decays with terrain and
+            // distance from the capital and reads 0 past sustainable reach —
+            // ground the capital cannot supply contributes nothing, which is
+            // the moderator, not an arbitrary multiple.
+            //
+            // WHAT'S TAKEN IS GONE, same as before: a contributing region's
+            // `army_stock` is reduced by exactly its committed share while the
+            // campaign runs, so a wide offensive still uncovers the regions it
+            // draws from.
             //
             // `commit` is the only difference between the estimate and the
             // execution: the scorer asks the question, the campaign takes the
@@ -2207,21 +2226,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const auto gather_army = [&](int hub, bool commit) -> int64_t {
                 const std::size_t hs = static_cast<std::size_t>(hub);
                 int64_t total = ss.regions[hs].army_stock;
-                if (total <= 0) return 0;
+                if (total <= 0) return 0; // BL-835: a hub with no army stages nothing.
                 if (commit) ss.regions[hs].army_stock = 0;
 
-                int64_t budget = total; // The cap: support may match the hub, not exceed it.
-                for (int n : neighbours[hs])
+                for (int hi : held)
                 {
-                    if (budget <= 0) break;
-                    const std::size_t ni = static_cast<std::size_t>(n);
-                    if (owner[ni] != q.id) continue;
-                    const int64_t spare = ss.regions[ni].army_stock / 2;
-                    if (spare <= 0) continue;
-                    const int64_t take = std::min(spare, budget);
-                    total  += take;
-                    budget -= take;
-                    if (commit) ss.regions[ni].army_stock -= take;
+                    if (hi == hub) continue;
+                    const std::size_t hii = static_cast<std::size_t>(hi);
+                    const int64_t stock = ss.regions[hii].army_stock;
+                    if (stock <= 0) continue;
+                    const int supply_q = clampi(ss.regions[hii].network_supply_q, 0, 1000);
+                    if (supply_q <= 0) continue;
+                    const int64_t take = (stock * supply_q) / 1000;
+                    if (take <= 0) continue;
+                    total += take;
+                    if (commit) ss.regions[hii].army_stock -= take;
                 }
                 return total;
             };
@@ -3460,8 +3479,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // The whole column comes back to the STAGING hub rather than
                 // dispersing to the holdings it was drawn from. Deliberate: an
                 // army that fought together is standing together, and the next
-                // round's `gather_army` will redistribute it through the same
-                // half-share rule if it marches again.
+                // round's `gather_army` will redraw it from the realm's network
+                // (BL-921) if it marches again.
                 if (!takes_it)
                     home.army_stock = clampi64(home.army_stock + atk_survivors,
                                                0, 1LL << 40);
