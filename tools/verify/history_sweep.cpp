@@ -185,6 +185,8 @@ struct sweep_row
     // The sim already counts every one of these; the sweep reported two of
     // them. 812,424 refusals across 16 worlds with a single named reason is
     // not a diagnosis, so the whole funnel is surfaced.
+    int64_t mat_trade         = 0; ///< BL-895: materials the network yielded.
+    int64_t mat_total         = 0; ///< ...of this much produced in total.
     int64_t reach_denied      = 0; ///< Refused by the BL-837 reach gate.
     int64_t campaign_contacts = 0; ///< (own region, foreign neighbour) pairs examined.
     int64_t campaign_scored   = 0; ///< Candidates reaching the score comparison.
@@ -454,6 +456,7 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     // migration-era one without deriving generation's whole param set.
     if (name == "settle_requires_razed_ground") { p.settle_requires_razed_ground = v != 0; return true; }
     if (name == "amphibious_weight_crossing")   { p.amphibious_weight_crossing = v != 0;   return true; }
+    if (name == "trade_income_per_link")       { p.trade_income_per_link = v;            return true; }
     return false;
 }
 
@@ -854,6 +857,8 @@ int main(int argc, char** argv)
         row.illegal_campaigns = sim.illegal_campaigns;
         row.starved_campaigns = sim.starved_campaigns;
         row.reach_denied      = sim.reach_denied_campaigns;
+        row.mat_trade         = sim.materials_from_trade;
+        row.mat_total         = sim.materials_produced;
         row.campaign_contacts = sim.campaign_contacts;
         row.campaign_scored   = sim.campaign_scored;
         row.campaign_cleared  = sim.campaign_cleared;
@@ -1376,7 +1381,17 @@ int main(int argc, char** argv)
                 cle.push_back(r.campaign_cleared);  cho.push_back(r.campaign_chosen);
                 ill.push_back(r.illegal_campaigns); rch.push_back(r.reach_denied);
             }
-            std::printf("\n--- BL-889  WHY A CAMPAIGN DID NOT HAPPEN, BY REASON ---\n");
+            {
+            std::vector<int64_t> mt, mp;
+            for (const sweep_row& r : rows) { mt.push_back(r.mat_trade); mp.push_back(r.mat_total); }
+            std::printf("\n--- BL-895  DID THE NETWORK ACTUALLY PAY? ---\n");
+            std::printf("  materials from TRADE   median %lld per world\n", static_cast<long long>(median_of(mt)));
+            std::printf("  materials produced     median %lld\n", static_cast<long long>(median_of(mp)));
+            std::printf("  (A trade figure of ZERO means the mechanism never fired -- a wiring\n"
+                        "   question, not a balance one. REPORTED, not gated.)\n");
+        }
+
+        std::printf("\n--- BL-889  WHY A CAMPAIGN DID NOT HAPPEN, BY REASON ---\n");
             std::printf("  contacts examined      median %lld per world\n", static_cast<long long>(median_of(con)));
             std::printf("    REFUSED traversal    median %lld   (BL-778 water gate)\n", static_cast<long long>(median_of(ill)));
             std::printf("    REFUSED reach gate   median %lld   (BL-837)\n", static_cast<long long>(median_of(rch)));

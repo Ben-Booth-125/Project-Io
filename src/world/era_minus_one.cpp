@@ -61,6 +61,12 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // the round the rule was designed for.
     hp.amphibious_weight_crossing = true;
 
+    // BL-895: the network pays for war. Materials per year per roaded link
+    // between held regions that hold unlike ground. A placeholder magnitude on
+    // the same footing as the w_* weights -- the SHAPE is the ruling, the
+    // number is for history_sweep to tune.
+    hp.trade_income_per_link = 40;
+
     if (two_span)
     {
         // 1160 -> 1560 -> 1960 at the defaults. The ancient span is

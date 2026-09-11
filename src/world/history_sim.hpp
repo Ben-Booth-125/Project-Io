@@ -746,6 +746,33 @@ struct history_sim_params
     /// fixture changes meaning.
     bool amphibious_weight_crossing = false;
 
+    /// TRADE INCOME FROM THE NETWORK (BL-895; Ben, 2026-09-11: "we also need a
+    /// simple cost for war, and this cost can be sourced by rich trade").
+    /// Materials yielded per YEAR by each roaded link between two held regions
+    /// that hold UNLIKE ground. Zero disables it.
+    ///
+    /// NO MARKET, AND THAT IS THE WHOLE CONSTRAINT. `CIVILISATION.md` sec
+    /// Materials are spent when something happens keeps this phase free of an
+    /// order book, a firm, a building stack and a price, and Ben re-affirmed
+    /// that exclusion on 2026-09-11 when offered the chance to reopen it. So
+    /// the income is a property of the NETWORK rather than of a market: only
+    /// DIFFERENCE is read -- that two places hold unlike things -- never a
+    /// price for either, and never a quantity that behaves like one.
+    ///
+    /// WHAT IT BUYS, and each is a job nothing else does:
+    ///   - roads become worth building for a reason other than reach, so BL-837
+    ///     stops being the only argument for a network;
+    ///   - war becomes affordable to the rich and unaffordable to the poor,
+    ///     which is asymmetry in campaigning WITHOUT a term inside any actor;
+    ///   - network failure becomes EXPENSIVE, which is what gives BL-896's
+    ///     collapse-by-network-failure its teeth: a realm whose roads fail
+    ///     loses its income before it loses its ground.
+    ///
+    /// A LINK COUNTS ONCE PER YEAR, from the lower-indexed region, so the pair
+    /// is not paid twice. The tier is read but not scaled on: a Track and a Road
+    /// both carry trade, they differ in what they do to REACH.
+    int trade_income_per_link = 0;
+
     /// Severity of the sack a conquered region suffers, per-mille.
     ///
     /// BL-835 — THIS IS NOW AN URBAN QUANTITY ONLY. It used to be subtracted
@@ -1487,6 +1514,7 @@ struct history_sim_state
     /// live" without reading every region's `material_stock` by hand.
     int64_t materials_produced           = 0;
     int64_t materials_spent_on_campaigns = 0;
+    int64_t materials_from_trade = 0; ///< BL-895: of `materials_produced`, the share the network yielded.
 
     /// BL-869 — every civilisation mixing actually grew, in formation order.
     /// A NAMED RECORD each (creeds.hpp), never a creed: `region::civilisation`

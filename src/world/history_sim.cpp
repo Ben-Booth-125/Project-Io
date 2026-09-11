@@ -636,6 +636,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
         return it != road_uses_live.end() ? road_tier_for_uses(it->second) : 0;
     };
 
+    // BL-895 -- WHAT A PLACE IS BEST AT, as a CLASS rather than a quantity.
+    // The phase has no price, so trade cannot read "how much"; it can only read
+    // "unlike". Three classes because three are what a region carries: farming
+    // ground, ore ground, and a port. Ties resolve in a fixed order so the
+    // classification cannot depend on anything but the region's own numbers.
+    const auto region_trade_class = [](const region& p) {
+        if (p.port_q >= p.farm_q && p.port_q >= p.ore_q) return 2;
+        if (p.ore_q  >= p.farm_q)                        return 1;
+        return 0;
+    };
+
     const auto note_corridor = [&](int a, int b) {
         if (a < 0 || b < 0 || a == b) return;
         if (a >= static_cast<int>(owner_index_limit)
@@ -1237,6 +1248,55 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // has reached (the opening seed and both founding sites below all
             // set it), so this is unconditional rather than a defensive
             // check on a case that should not occur.
+            // BL-895 -- TRADE INCOME FROM THE NETWORK, not from a market.
+            //
+            // A roaded link between two held regions that hold UNLIKE ground
+            // yields materials. Only DIFFERENCE is read: this phase has no
+            // order book, no firm and no price (CIVILISATION.md sec Materials
+            // are spent when something happens), so "what a place holds" is a
+            // CLASS -- what it is best at -- and never a quantity.
+            //
+            // Counted from the lower-indexed region only, so a pair is not paid
+            // twice, and gated on a walked corridor rather than mere adjacency:
+            // trade follows the road, which is what makes BL-837's network
+            // worth building for a second reason and what makes BL-896's
+            // collapse-by-network-failure cost a realm its income before it
+            // costs it ground.
+            if (params.trade_income_per_link > 0)
+            {
+                const int oi = owner[i] == owner_none ? -1 : static_cast<int>(owner[i]);
+                if (oi >= 0)
+                {
+                    for (int nb : neighbours[i])
+                    {
+                        if (nb <= static_cast<int>(i)) continue;          // pay the pair once
+                        if (owner[static_cast<std::size_t>(nb)] != owner[i]) continue;
+                        // ANY WALKED CORRIDOR CARRIES TRADE, not only a promoted
+                        // Track. Measured 2026-09-11: of 1,607 distinct corridors,
+                        // 1,347 are walked ONCE and only 155 reach the 4 uses
+                        // `road_tier1_uses` needs -- about 52 roaded edges per
+                        // world. Gating trade on a Track therefore paid almost
+                        // nothing (0.013% of materials) for a reason that had
+                        // nothing to do with trade. A route people have walked is
+                        // a trade route whether or not it has been widened; the
+                        // TIER is about what a line does to REACH, which is
+                        // BL-837's subject, not this one's.
+                        if (road_uses_live.find(edge_key(static_cast<int>(i), nb))
+                            == road_uses_live.end()) continue;
+                        if (region_trade_class(ss.regions[i])
+                         == region_trade_class(ss.regions[static_cast<std::size_t>(nb)])) continue;
+                        const int seat_t = ss.regions[i].seat_region;
+                        if (seat_t >= 0 && static_cast<std::size_t>(seat_t) < ss.regions.size())
+                        {
+                            ss.regions[static_cast<std::size_t>(seat_t)].material_stock +=
+                                params.trade_income_per_link;
+                            out.materials_produced  += params.trade_income_per_link;
+                            out.materials_from_trade += params.trade_income_per_link;
+                        }
+                    }
+                }
+            }
+
             const int64_t produced = region_industry_output(ss.regions[i]);
             if (produced > 0)
             {
