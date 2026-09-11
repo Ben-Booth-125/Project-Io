@@ -957,6 +957,90 @@ void case_spawned_cultures(int seed_count)
 
 
 // ---------------------------------------------------------------------------
+// C13b — A CROSSING SHOWS UP IN SEA LEGS (BL-901)
+// ---------------------------------------------------------------------------
+//
+// `culture::sea_legs_q` used to read only two of the three upstream facts
+// CREEDS.md names (a coastal cradle, a sea/storm god); the third — a crossing
+// in the migration itself — was dropped one struct short of its consumer.
+// BL-901 wires `culture_spawn::crossed_water` through to
+// `derive_daughter_culture`, so a daughter coined at the far end of the crude
+// overseas hop now reads a HIGHER `sea_legs_q` than its parent, and a daughter
+// coined by an ordinary land split reads the SAME `sea_legs_q` as its parent
+// (the pantheon it inherits, unchanged).
+//
+// Since a spawned culture does not itself record whether ITS OWN coining was
+// a hop, this reads the fact back out the only way it is observable from
+// `creed_state`: a daughter whose `sea_legs_q` is strictly greater than its
+// parent's can only have gotten there via the crossing term, because every
+// other input to the formula (coastal cradle, pantheon) is inherited whole.
+
+void case_sea_legs_crossing(int seed_count)
+{
+    std::printf("\n--- C13b: does a crossing show up in sea legs? -----------------\n");
+
+    int worlds = 0, worlds_with_daughters = 0;
+    int64_t total_daughters = 0, raised_daughters = 0;
+    int64_t sum_delta = 0;
+
+    for (int s = 0; s < seed_count; ++s)
+    {
+        world_params wp;
+        wp.seed = static_cast<uint32_t>(s);
+        wp.prehistory_years = 2000;
+
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{}, nullptr, nullptr, &fx);
+        (void)w;
+        if (!fx.ran) continue;
+        ++worlds;
+
+        const std::vector<culture>& all = fx.creeds.cultures;
+        if (fx.settlement.spawned_cultures.empty()) continue;
+        ++worlds_with_daughters;
+
+        for (const culture& d : fx.settlement.spawned_cultures)
+        {
+            if (d.parent < 0 || d.parent >= static_cast<int>(all.size())) continue;
+            const culture& p = all[static_cast<std::size_t>(d.parent)];
+            ++total_daughters;
+            if (d.sea_legs_q > p.sea_legs_q)
+            {
+                ++raised_daughters;
+                sum_delta += (d.sea_legs_q - p.sea_legs_q);
+            }
+            else
+            {
+                check(d.sea_legs_q == p.sea_legs_q,
+                      "C13b a daughter's sea_legs_q never falls below its parent's "
+                      "(the two inherited terms are never re-rolled)");
+            }
+        }
+    }
+
+    if (worlds == 0) { check(false, "C13b no world ran - the case is vacuous"); return; }
+
+    std::printf("worlds %d, worlds with any daughter %d, daughters %lld, "
+                "raised by a crossing %lld (avg +%.1f when raised)\n",
+                worlds, worlds_with_daughters,
+                static_cast<long long>(total_daughters),
+                static_cast<long long>(raised_daughters),
+                raised_daughters > 0
+                    ? static_cast<double>(sum_delta) / static_cast<double>(raised_daughters)
+                    : 0.0);
+
+    // THE DISTRIBUTION MOVES. Some daughters across the sweep must show the
+    // crossing term (a world with no overseas hop at all would be a bug in the
+    // hop, not this term, but the sweep is wide enough that at least one hop
+    // fires and BL-901's flag actually reaches a real spawn).
+    check(raised_daughters > 0,
+          "C13b  THE THIRD TERM ACTUALLY FIRES — at least one daughter across the sweep "
+          "reads a sea_legs_q strictly above its parent's, which is only possible via "
+          "crossed_water (the two-term derivation could never do this)");
+}
+
+// ---------------------------------------------------------------------------
 // C14 — THE FAMILY TREE SURVIVES THE MIGRATION (BL-865)
 // ---------------------------------------------------------------------------
 //
@@ -1173,6 +1257,7 @@ int main(int argc, char** argv)
     case_route_on_real_worlds(seed_count);
     case_founding_schedule(span_years);
     case_spawned_cultures(seed_count);
+    case_sea_legs_crossing(seed_count);
     case_family_tree(seed_count, span_years);
     case_settlement_seats(seed_count);
 

@@ -86,19 +86,29 @@ struct culture
     ///     dominion, as it does there: how hard a people throws itself at the
     ///     water matters more than how sure it is of winning.
     ///
-    /// THE THIRD FACT — a crossing in the people's own migration — DID NOT
-    /// SURVIVE THE HANDOFF. `colonisation.cpp`'s crude overseas hop knows it
-    /// coined a daughter on the far side of water, but `culture_spawn` records
-    /// only (culture, parent, tile, class, year), so nothing that reaches this
-    /// struct can distinguish a daughter that hopped from one that walked.
-    /// Rather than invent a third fact, this derives on the two that survived;
-    /// adding a `crossed_water` flag to `culture_spawn` is the repair, and it
-    /// belongs to whoever is next in `colonisation.cpp`.
+    /// THE THIRD FACT — a crossing in the people's own migration (BL-901) —
+    /// now survives the handoff: `culture_spawn::crossed_water` is set at the
+    /// crude overseas hop's spawn site in `colonisation.cpp`, and
+    /// `derive_daughter_culture` reads it to add a THIRD term to the sum
+    /// below, on top of the two inherited from the cradle. It is the best
+    /// claim of the three to earn sea legs — a coastal cradle says only where
+    /// a people started and a sea god says only what they believe, but a
+    /// crossing says what they actually did.
     ///
     /// A daughter inherits its parent's pantheon and cradle whole
-    /// (`derive_daughter_culture`), so it inherits this unchanged — which is
-    /// right: it is the same people, later and further away.
+    /// (`derive_daughter_culture`), so the coastal-cradle and sea-god terms
+    /// carry over unchanged; only the crossing term can differ daughter to
+    /// daughter, and only a daughter coined at a hop's landing site ever
+    /// carries it.
     int sea_legs_q = 0;
+
+    /// Weight of the crossing term in `sea_legs_q` (BL-901) — set once here so
+    /// `derive_daughter_culture` and any harness reading the distribution
+    /// share the one number. Sized between the coastal term (400) and the
+    /// sea/storm god's ceiling (zeal 10 * 40 + dominion 10 * 20 = 600):
+    /// large enough to move the distribution, never so large it swamps the
+    /// two terms BL-899 already earned.
+    static constexpr int sea_legs_crossing_bonus = 300;
 
     // --- Descent (BL-865) --------------------------------------------------
     //
