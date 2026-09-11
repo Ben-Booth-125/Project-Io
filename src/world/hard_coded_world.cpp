@@ -9,6 +9,7 @@
 #include "corporation_generation.hpp"
 #include "creeds.hpp"
 #include "era_minus_one.hpp"    // BL-462: the shared Era -1 invocation
+#include "grudge_sentiment.hpp"  // BL-898: the Era -1 grudge record's one consumer
 #include "history_ladder.hpp"
 #include "history_sim.hpp"      // BL-271 wired into generation, 2026-08-12
 #include "sim_terrain_build.hpp" // build_sim_terrain for the sim's terrain view
@@ -598,6 +599,27 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // of it is the record, not the run.
     std::vector<history_corridor> kepler_corridors;
 
+    // BL-898 — THE GRUDGE RECORD, hoisted for the same reason and on the same
+    // terms as the corridors above: its consumer (`seed_grudge_sentiment`) runs
+    // after the political map exists, which is long after the block below has
+    // closed. The sim's `history_sim_state` still stays local to that block —
+    // what crosses out is the record, not the run.
+    //
+    // WHY IT NEEDED HOISTING AT ALL. Before this item the record crossed the
+    // pass 1 -> pass 2 handoff and died there: `grudge_between` had exactly one
+    // caller in the tree (the handoff harness) and this file never read
+    // `pass_one_output::grudges`. Carried is not consequential.
+    std::vector<grudge> kepler_grudges;
+    /// The sim's own `grudge_cap`, carried beside the record so the conversion
+    /// is a fraction of the scale that actually produced these scores rather
+    /// than of a struct default that might have moved.
+    int32_t kepler_grudge_cap = grudge_sentiment_params{}.score_full;
+
+    /// Indexed by region: which POLITY held it at the epoch. Snapshotted before
+    /// `derive_national_character` overwrites `region::nation` with the nation
+    /// index — the same field, read at the one moment it still names a polity.
+    std::vector<int> kepler_region_polity;
+
     nation_params kepler_np =
         nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 });
     {
@@ -865,6 +887,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
             // travels beside.
             kepler_corridors = hs.supply_corridors;
 
+            // BL-898: the directed grudge table, out of the block with the
+            // corridors. Copied for the same reason — `hs` is const and dies
+            // here — and it is sparse, so the copy is a few dozen rows.
+            kepler_grudges    = hs.grudges;
+            kepler_grudge_cap = static_cast<int32_t>(hp.grudge_cap);
+
             // The sim narrates through the same history_event shape the other
             // generation passes use, so its wars join the world log without a
             // new case anywhere.
@@ -930,6 +958,16 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // instead of growing an independent realm out of each anchor.
         kepler_np.seed_polities = settlement_seed_polities(kepler_settlement);
 
+        // BL-898 — THE SAME READ, KEPT FOR THE SAME WINDOW. `seed_polities`
+        // above is filtered to anchored regions because `generate_nations`
+        // reads it as a parallel array; the grudge seeding needs the polity of
+        // EVERY region, including the unanchored ones, to work out which nation
+        // a polity's ground ended up inside. One line, taken at the one moment
+        // `region::nation` still holds a polity id.
+        kepler_region_polity.reserve(kepler_settlement.regions.size());
+        for (const region& p : kepler_settlement.regions)
+            kepler_region_polity.push_back(p.nation);
+
         // Each anchor carries its region's tongue across into Pass 5, so a
         // nation is named in the speech of the people who settled its core
         // rather than out of a bank of its own (BL-290).
@@ -994,6 +1032,76 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Pass 4 draw, which stays as the fallback for bodies with no settlement.
     derive_national_character(kepler_settlement, kepler_creeds, w,
                               kepler_nations, kepler_tiles, home_grid_width, home_grid_height);
+
+    // BL-898 — THE GRUDGES BITE. `derive_national_character` has just put the
+    // nation index in `region::nation`, and `kepler_region_polity` holds what
+    // that same field said one call earlier — so this is the first and only
+    // moment both halves of the polity -> nation correspondence exist at once.
+    //
+    // WHAT THIS IS NOT. It is not a grudge term inside an actor. The Era -1
+    // scorer reads nothing new (BL-827's ruling, written at the field in
+    // `history_sim.hpp` § Grudges, stands untouched); the record crosses the
+    // handoff and becomes SENTIMENT, which is where `RELATIONS.md` § What each
+    // quantity was before said it belonged all along. A campaign-era actor that
+    // later reads sentiment is reading a quantity with an authority doc and a
+    // visible cause, not a hidden weight.
+    //
+    // THE MAPPING IS NOT 1:1 AND IS NOT MADE SO. `merge_undersized_nations`
+    // absorbs realms below the size floor, so a polity can reach the epoch with
+    // no nation of its own; its grudges are DROPPED rather than redirected
+    // (`grudge_sentiment.hpp` says why). The representative nation of a polity
+    // is whichever nation holds the most of its regions, ties to the lowest
+    // nation index — an ascending walk over a vector, so the answer cannot
+    // depend on a container's layout.
+    if (!kepler_grudges.empty() && !kepler_nations.empty()
+        && kepler_region_polity.size() == kepler_settlement.regions.size())
+    {
+        int max_polity = -1;
+        for (int pol : kepler_region_polity)
+            if (pol > max_polity) max_polity = pol;
+
+        if (max_polity >= 0)
+        {
+            const std::size_t pcount  = static_cast<std::size_t>(max_polity) + 1;
+            const std::size_t ncount  = kepler_nations.size();
+            // [polity][nation] region counts. Dense and tiny (~40 x ~40).
+            std::vector<int> tally(pcount * ncount, 0);
+            for (std::size_t ri = 0; ri < kepler_settlement.regions.size(); ++ri)
+            {
+                const int pol = kepler_region_polity[ri];
+                const int nat = kepler_settlement.regions[ri].nation;
+                if (pol < 0 || nat < 0 || static_cast<std::size_t>(nat) >= ncount) continue;
+                ++tally[static_cast<std::size_t>(pol) * ncount + static_cast<std::size_t>(nat)];
+            }
+
+            std::vector<entity_id> polity_nation(pcount, null_entity);
+            for (std::size_t pol = 0; pol < pcount; ++pol)
+            {
+                int best = -1, best_n = -1;
+                for (std::size_t n = 0; n < ncount; ++n)
+                {
+                    const int c = tally[pol * ncount + n];
+                    if (c > best) { best = c; best_n = static_cast<int>(n); }
+                }
+                if (best > 0 && best_n >= 0)
+                    polity_nation[pol] = kepler_nations[static_cast<std::size_t>(best_n)];
+            }
+
+            grudge_sentiment_params gsp;
+            gsp.score_full = kepler_grudge_cap;
+
+            std::vector<grudge_sentiment_seed> seeds;
+            const grudge_sentiment_report grep_ =
+                seed_grudge_sentiment(w.sentiment, kepler_grudges, polity_nation, gsp, &seeds);
+
+            if (report != nullptr)
+            {
+                report->grudge_sentiment_rows      = grep_.rows_seeded;
+                report->grudge_sentiment_dropped   =
+                    grep_.below_floor + grep_.no_successor + grep_.self_pair + grep_.out_of_range;
+            }
+        }
+    }
 
     // BL-750 — THE TARIFF POSTURE, ENACTED. `derive_national_character` has just
     // put the nation index in `region::nation`, so this is the first moment a

@@ -141,6 +141,47 @@ subject), holding two floats per row. Four properties, all load-bearing:
 | `embargo_imposed` | the subject refused to deal with the observer at all |
 | `lobbied_against` | the subject spent to move a nation against the observer — BL-539's political grain |
 | `force_used` | force was used against the observer's interest — the sharpest input, and still only an input |
+| `historical_grudge` | an Era −1 grudge, seeded once at world setup — see § Where a grudge lands |
+
+### Where a grudge lands
+
+The Era −1 sim records a **directed, sparse, decaying grudge** between polities, raised by named
+events that each carry a place and a date (`docs/lore/HISTORY.md`; the record's own rules live at
+`history_sim_state::grudges`). It is a **record, never a decision input**: no Era −1 scorer reads
+one, because a grudge inside an actor is an agent term rather than an in-world force.
+
+It becomes consequential here instead. At world setup, once the political map exists, every
+grudge is converted into **seeded nation→nation sentiment** — the row this doc's table above has
+always named as its destination. Five rules settle what that means:
+
+1. **Direction is preserved.** The **aggrieved** polity's successor nation is the **observer**;
+   the resented polity's is the subject. A resents B is not B resents A, which is why both
+   quantities are directed.
+2. **The sign is negative, and Access takes the larger share.** A grudge is what one people will
+   not *let* another do, more than what it will not believe — so the hit lands mostly on Access,
+   with a smaller share on Trust. The two decay independently afterwards, so a later contract can
+   mend Trust without reopening the border.
+3. **The magnitude is a fraction of a full grudge**, `score / grudge_cap`, clamped. Monotone by
+   construction: a bitterer history opens worse.
+4. **A polity with no successor nation is dropped, never redirected.** The mapping is not 1:1 —
+   realms below the size floor are absorbed — and attaching an orphaned quarrel to whoever now
+   holds the ground would be id arithmetic standing in for a successor concept the generation
+   layer deliberately does not have. A quarrel with no heir is over. Two polities that folded into
+   one nation likewise seed nothing: a nation has no sentiment about itself.
+5. **It seeds, it does not overwrite.** The write goes through the ordinary event fold, so it
+   accumulates and everything computed later by conduct moves the same row from wherever
+   generation left it.
+
+**The seeded value is traceable to its cause.** Each seeded row carries the largest contributing
+event — what was done, in which region, in which year — so the opening sentiment between two
+nations can be read back to the war that produced it rather than presented as a bare number. That
+is the condition on which an inherited grudge is admissible at all.
+
+*This is what `docs/generation/CIVILISATION.md` § What the dark age must leave asks for: a
+colonial era opens with actors who already dislike the right neighbours, because who colonises
+whom is not a fresh roll — it is the last quarrel continued by other means.*
+
+*Owned by BL-898 (grudges must bite).*
 
 ### The authored numbers
 
@@ -160,6 +201,12 @@ procurement rates** (`seed_procurement_sentiment`, `recipe_registry.hpp`: `reput
 1.0, `reputation_on_cancel` −2.0 on Trust) and may be overridden by `economy.sentiment.factors`.
 Every other factor's weight is authored at zero — each is a named seat for its emitter, and a
 factor whose emitter has nothing to say moves nothing.
+
+**`historical_grudge` is the one factor with no Lua row, and that is its definition rather than a
+gap.** It fires exactly once, at world setup, before the first tick, and nothing in the campaign
+raises it again. Generation runs with no Lua state, so its weight lives beside the conversion that
+uses it (`grudge_sentiment_params`) rather than in `economy.sentiment.factors`, where there would
+be nothing at runtime for it to weigh.
 
 The table crosses the serialisation seam in full: `write_sentiment` / `read_sentiment` for the
 substrate's own stream, and the per-pair record in the world snapshot. The procurement stream
