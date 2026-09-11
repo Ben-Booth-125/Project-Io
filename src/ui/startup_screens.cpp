@@ -1048,22 +1048,18 @@ void app::draw_generation_screen()
                 ui::draw_lapse_arc(rec);
 
                 ImGui::Spacing();
-                // WHAT THIS ROUND IS AND IS NOT YET (BL-871), said in as many
-                // words rather than left for a player to discover. The two
-                // rounds now stop at different points — the migration at its
-                // own derived end year, the Empires sim at 400 BCE — so they no
-                // longer replay the same recorded age. What is still owed:
-                // the Empires round's own span is the epoch's last 400 years
-                // rather than the full 1,600 `CIVILISATION.md` § The span is
-                // 400 BCE to 1200 CE asks for, because reaching 1200 CE needs
-                // an epoch this wizard does not yet reach (round 5 /
-                // Industrialisation is still a placeholder). Naming it here is
-                // the alternative to implying a depth the code has not
-                // delivered.
+                // WHAT THIS ROUND IS AND IS NOT (BL-871, then BL-906). The two
+                // rounds stop at different points — the migration at its own
+                // derived end year, the Empires sim at 1200 CE — so they do
+                // not replay the same recorded age. BL-906 (2026-09-11) closed
+                // the gap this note used to name: the Empires round now runs
+                // its full 400 BCE -> 1200 CE span, decoupled from the epoch
+                // (`CIVILISATION.md` § The span is 400 BCE to 1200 CE). Round
+                // 5 / Industrialisation is still a placeholder, but that no
+                // longer bears on this round's own span.
                 if (lapse_index == 1)
-                    dim_text("This round's own span, separate from round 3's migration. "
-                             "Not yet the full 1,600 years the design asks for — "
-                             "see CIVILISATION.md.");
+                    dim_text("This round's own span, separate from round 3's migration — "
+                             "the full 400 BCE to 1200 CE the design asks for.");
             }
         }
         else
