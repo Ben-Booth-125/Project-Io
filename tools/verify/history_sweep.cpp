@@ -195,6 +195,10 @@ struct sweep_row
     int64_t roads_refused     = 0; ///< Corridor promotions refused for want of materials.
     int64_t secessions        = 0; ///< BL-896: successor realms the dark age produced.
     int64_t regions_seceded   = 0; ///< ...and the ground that walked away with them.
+    int64_t creeds_arisen     = 0; ///< BL-897: universalising creeds coined this world.
+    int64_t creed_adoptions   = 0; ///< ...realms that adopted one as an institution.
+    int64_t creed_converted   = 0; ///< ...peoples whose pantheon faded to residue.
+    int64_t creed_reasserted  = 0; ///< ...and peoples whose pantheon won instead.
     int64_t reach_denied      = 0; ///< Refused by the BL-837 reach gate.
     int64_t campaign_contacts = 0; ///< (own region, foreign neighbour) pairs examined.
     int64_t campaign_scored   = 0; ///< Candidates reaching the score comparison.
@@ -474,6 +478,13 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     if (name == "road_build_material_cost")    { p.road_build_material_cost = v;         return true; }
     if (name == "secession_supply_floor_q")    { p.secession_supply_floor_q = v;         return true; }
     if (name == "secession_min_regions")       { p.secession_min_regions = v;            return true; }
+    // BL-897 -- a creed that spans cultures. The first is the master switch.
+    if (name == "universal_creed_humbled_cohesion_q") { p.universal_creed_humbled_cohesion_q = v; return true; }
+    if (name == "universal_creed_min_trade_links")    { p.universal_creed_min_trade_links = v;    return true; }
+    if (name == "universal_creed_network_floor_q")    { p.universal_creed_network_floor_q = v;    return true; }
+    if (name == "universal_creed_hold_years")         { p.universal_creed_hold_years = v;         return true; }
+    if (name == "universal_creed_convert_supply_q")   { p.universal_creed_convert_supply_q = v;   return true; }
+    if (name == "universal_creed_alien_penalty_q")    { p.universal_creed_alien_penalty_q = v;    return true; }
     if (name == "w_aggr_q")                   { p.w_aggr_q = v;                        return true; }
     return false;
 }
@@ -885,6 +896,10 @@ int main(int argc, char** argv)
         row.roads_refused     = sim.road_builds_refused;
         row.secessions        = sim.secessions;
         row.regions_seceded   = sim.regions_seceded;
+        row.creeds_arisen     = sim.universal_creeds_arisen;
+        row.creed_adoptions   = sim.polities_adopted_creed;
+        row.creed_converted   = sim.peoples_converted;
+        row.creed_reasserted  = sim.peoples_reasserted;
         row.campaign_contacts = sim.campaign_contacts;
         row.campaign_scored   = sim.campaign_scored;
         row.campaign_cleared  = sim.campaign_cleared;
@@ -1485,6 +1500,51 @@ int main(int argc, char** argv)
                             static_cast<long long>(median_of(rs)));
                 std::printf("  (ZERO of both is a world whose realms never outran their\n"
                             "   own reach. REPORTED, not gated.)\n");
+            }
+
+            // BL-897 -- DID A CREED THAT SPANS CULTURES ARISE, AND DID IT HOLD?
+            // Ben's ruling: it arises from HUMILIATION and from DENSITY, and
+            // needs both. So a world of intact, isolated realms producing none
+            // is the design speaking, not a broken mechanism -- CREEDS.md calls
+            // that "a legitimate world rather than a failed one". REPORTS, and
+            // does not gate.
+            //
+            // THE LAST TWO LINES ARE THE FAULT LINE, and they are why four
+            // counters are printed rather than one. Adoptions are the
+            // INSTITUTION; converted and reasserted are the PEOPLES. The two
+            // grains are expected to disagree, and the size of the disagreement
+            // is what a later schism slice would cut along.
+            {
+                std::vector<int64_t> ca, cd, cv, cr;
+                int worlds_with_creed = 0;
+                for (const sweep_row& r : rows)
+                {
+                    ca.push_back(r.creeds_arisen);   cd.push_back(r.creed_adoptions);
+                    cv.push_back(r.creed_converted); cr.push_back(r.creed_reasserted);
+                    if (r.creeds_arisen > 0) ++worlds_with_creed;
+                }
+                std::printf("\n--- BL-897  DID A CREED THAT SPANS CULTURES ARISE? ---\n");
+                std::printf("  worlds with a creed    %d of %d\n",
+                            worlds_with_creed, static_cast<int>(rows.size()));
+                // TOTALS BESIDE THE MEDIANS, and the pair is the point. A
+                // mechanism designed to fire in SOME worlds and not others has
+                // a median of zero the moment it fires in fewer than half of
+                // them -- which is the intended shape, not a null result. The
+                // sweep total is the only line that can tell "rare" from
+                // "never", so both are printed on every row.
+                const auto tot = [](const std::vector<int64_t>& v) {
+                    int64_t t = 0; for (int64_t x : v) t += x; return t; };
+                std::printf("  creeds COINED          median %lld per world, %lld across the sweep\n",
+                            static_cast<long long>(median_of(ca)), static_cast<long long>(tot(ca)));
+                std::printf("  realms that ADOPTED    median %lld, %lld total   (the institution)\n",
+                            static_cast<long long>(median_of(cd)), static_cast<long long>(tot(cd)));
+                std::printf("  peoples CONVERTED      median %lld, %lld total   (pantheon -> residue)\n",
+                            static_cast<long long>(median_of(cv)), static_cast<long long>(tot(cv)));
+                std::printf("  peoples REASSERTED     median %lld, %lld total   (the pantheon won)\n",
+                            static_cast<long long>(median_of(cr)), static_cast<long long>(tot(cr)));
+                std::printf("  (ALL sixteen or NONE is the reading to distrust. A creed that\n"
+                            "   arises everywhere is not a consequence of humiliation, and one\n"
+                            "   that arises nowhere is a gate nothing clears. REPORTED, not gated.)\n");
             }
         }
 

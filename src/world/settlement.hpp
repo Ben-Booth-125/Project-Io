@@ -479,6 +479,50 @@ struct region
     /// this one follows the same precedent rather than adding one.
     int network_supply_q = 1000;
 
+    // --- BL-897: a creed that spans cultures, at the PEOPLE grain -----------
+    //
+    // `../../docs/lore/CREEDS.md` sec A creed that spans cultures settles a
+    // creed that subsumes the pantheons it meets and spreads along CONTACT
+    // rather than ancestry. Two grains carry it and they are EXPECTED TO
+    // DISAGREE: the polity adopts it as an institution (`polity::
+    // universal_creed`), and the peoples under that polity convert at their own
+    // pace or refuse. The gap between the two is the fault line.
+    //
+    // THE REGION STANDS FOR THE PEOPLE ON IT. This struct already carries a
+    // culture mix and a plurality, and the sim has no finer grain than ground;
+    // a per-culture creed roll would be a second population model. So "a people
+    // holds the creed" is recorded here, which also makes the unevenness
+    // SPATIAL -- an empire's near ground converts and its far ground does not,
+    // which is the shape a schism needs.
+    //
+    // GENERATION SCRATCH, NOT SAVED, exactly like `network_supply_q` and
+    // `material_stock` above: these are facts the Era -1 sim maintains about
+    // ground it is simulating, and `w_region`/`r_region` do not carry them.
+
+    /// Where this ground stands with the universal creed its owner adopted.
+    /// 0 none, 1 DUAL-HOLD (it carries its pantheon AND the creed), 2 CONVERTED
+    /// (the pantheon has faded to residue), 3 REASSERTED (the pantheon won and
+    /// the people fell back out of the creed).
+    ///
+    /// THE DUAL-HOLD STATE IS THE DESIGN, not an implementation convenience.
+    /// CREEDS.md: "a single-state model -- converted or not -- would have left
+    /// the fracture nothing to fracture along."
+    int8_t creed_hold = 0;
+
+    /// Index into `history_sim_state::universal_creeds`, or -1. Set when this
+    /// ground enters dual-hold; cleared again if the pantheon REASSERTS.
+    int universal_creed = -1;
+
+    /// THE PANTHEON UNDERNEATH -- the culture index whose creed this ground held
+    /// when the universal creed reached it, kept whichever way the pair
+    /// resolved. Never cleared: a subsumed pantheon is RESIDUE, not an erasure,
+    /// and residue is what a later schism is made of.
+    int creed_residue_culture = -1;
+
+    /// Years this ground has carried both at once. Advanced by the sim's own
+    /// `step_years`, exactly like `mix_years` above.
+    int64_t creed_hold_years = 0;
+
     // --- Era -1 works (BL-321) --------------------------------------------
     // What this region has BUILT, and what those works are worth. The works
     // TABLE lives in works_roster.hpp/works.lua; only the per-region record
