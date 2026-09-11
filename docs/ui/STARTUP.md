@@ -155,6 +155,13 @@ produced. Its authority is [`COLONISATION.md`](../generation/COLONISATION.md).
   cultures grouped by route — not the handful its cradles started with.
 - **Most of the land ends habitable and peopled.** Unsettled ground is the exception
   marking hostile country, never the background state of half a continent.
+- **Kin cultures share a hue family** (BL-919, lineage palette). Dozens of related cultures
+  under a dozen identity colours would be plaid, so the map's colour is derived once from the
+  culture tree: hue comes from the root cradle, with the cradles spread evenly around the wheel;
+  a daughter takes its parent's hue shifted by a fixed step (siblings alternate sides of the
+  parent) and bounded to the family's own wedge; lightness steps down by depth, bounded so a deep
+  lineage stays readable. A family reads at a glance and a member on a second look. The same hue
+  family is what round 4 tints its culture base with beneath the polity fill.
 
 **Round 4 — Empires.** The span **400 BCE → 1200 CE**, sixteen hundred years (Ben, 2026-09-09),
 which is the second half of pass 1's three thousand six hundred and what this round owns alone:

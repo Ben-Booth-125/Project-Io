@@ -611,3 +611,12 @@ static_assert(generation_progress::carve_capacity == home_grid_width * home_grid
 std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
                                                      const world_params& params,
                                                      const world_gen_config& gen_cfg = {});
+
+/// Fold a settlement into the MIGRATION's ownership record: one change per
+/// region at its `founded_year`, owned by its plurality CULTURE (not a polity),
+/// ascending by year. Pure and read-only. This is the record the wizard's
+/// Culture round replays; `make_hard_coded_world` calls it at the migration's
+/// end, and the wizard calls it under `--verify` to lift the same record off
+/// a finished report rather than run the pass a second time (BL-919).
+era_timelapse build_migration_timelapse(const settlement_state& ss, int64_t start_year,
+                                        int64_t end_year);

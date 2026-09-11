@@ -13,6 +13,7 @@
 #include "ui/generation_charts.hpp"
 #include "ui/generation_preview.hpp"
 #include "ui/history_lapse.hpp"      // BL-829/BL-830: round 4's map and its board
+#include "world/colonisation.hpp"   // colonisation_start_year -- the Culture round's own first year (BL-919)
 #include "world/era_timelapse.hpp"   // owner_slice_at — the whole replay substrate
 
 #include <algorithm>
@@ -132,7 +133,18 @@ namespace {
 /// change list, the settled regions' positions and names, and generation's own
 /// three era counters. Nothing is re-simulated and nothing is re-derived — see
 /// `app::launch_wizard_history_run` for why that matters more than it looks.
-ui::history_lapse lapse_from_report(const generation_report& rep)
+///
+/// @param migration  True for the Culture round (lapse_index 0), whose owners
+///                   are CULTURES and which therefore carries the lineage
+///                   palette (BL-919). The Empires round's owners are polities
+///                   and it carries none.
+/// @param adopted    True when the report is the harness's own finished world
+///                   rather than a run stopped at this round's end. A finished
+///                   report's record is the Empires sim's, so the Culture round
+///                   folds the migration's own out of the settlement instead —
+///                   the same fold generation makes, on the same regions.
+ui::history_lapse lapse_from_report(const generation_report& rep, bool migration,
+                                    bool adopted)
 {
     ui::history_lapse h;
 
@@ -147,6 +159,42 @@ ui::history_lapse lapse_from_report(const generation_report& rep)
     h.grid_w = home_grid_width;
     h.grid_h = home_grid_height;
 
+    if (migration)
+    {
+        const settlement_state& ss = home->settlement;
+        if (adopted && !ss.regions.empty())
+        {
+            // The plurality on a finished report has drifted a little toward the
+            // conquerors (culture_shares shifts SLOWLY), so this is the migration
+            // as the sim left it rather than as it ended — an approximation the
+            // adopt path already accepts for the sake of not running the pass
+            // twice, and an honest one: every region still carries its people.
+            h.lapse = build_migration_timelapse(ss, colonisation_start_year,
+                                                ss.migration_end_year);
+            // The counters follow the record, not the report: a finished
+            // report's are the Empires sim's, and a migration is a diffusion
+            // with no battles in it (the worker path reports the same).
+            h.battles   = 0;
+            h.conquests = 0;
+            h.foundings = static_cast<int64_t>(ss.regions.size());
+        }
+
+        // THE CULTURE TREE, rebuilt from what the report carries. The cradle
+        // cultures themselves are not in the report — `creed_state` never
+        // crosses it — but every cradle is listed in `cradle_coined_year`, and
+        // the daughters are `spawned_cultures` whole, each naming its parent.
+        // Daughter ids run one past the last cradle culture (BL-856), so the
+        // flat index is cradles first, daughters after, in that order.
+        int32_t cradles = 0;
+        for (const auto& [cid, year] : ss.cradle_coined_year)
+            if (cid >= cradles) cradles = cid + 1;
+        std::vector<int32_t> parent(static_cast<std::size_t>(cradles), -1);
+        parent.reserve(parent.size() + ss.spawned_cultures.size());
+        for (const culture& c : ss.spawned_cultures)
+            parent.push_back(c.parent);
+        ui::build_lineage_palette(h, parent);
+    }
+
     h.region_col.reserve(home->settlement.regions.size());
     h.region_row.reserve(home->settlement.regions.size());
     h.region_name.reserve(home->settlement.regions.size());
@@ -157,9 +205,12 @@ ui::history_lapse lapse_from_report(const generation_report& rep)
         h.region_name.push_back(r.name);
     }
 
-    h.battles   = rep.prehistory_battles;
-    h.conquests = rep.prehistory_conquests;
-    h.foundings = rep.prehistory_foundings;
+    if (!(migration && adopted))
+    {
+        h.battles   = rep.prehistory_battles;
+        h.conquests = rep.prehistory_conquests;
+        h.foundings = rep.prehistory_foundings;
+    }
     return h;
 }
 
@@ -192,7 +243,9 @@ void app::launch_wizard_history_run(int lapse_index)
     // same one. Nothing is faked: it is generation's report either way.
     if (!m_golden_dir.empty())
     {
-        ui::history_lapse adopted = lapse_from_report(m_generation_report);
+        ui::history_lapse adopted = lapse_from_report(m_generation_report,
+                                                      /*migration=*/lapse_index == 0,
+                                                      /*adopted=*/true);
         if (!adopted.empty())
         {
             m_wiz_history[lapse_index]      = std::move(adopted);
@@ -231,7 +284,7 @@ void app::launch_wizard_history_run(int lapse_index)
         // copy of the campaign's own.
         (void)make_hard_coded_world(params, &rep, hist_cfg,
                                     &m_wiz_history_progress[lapse_index], &m_works);
-        return lapse_from_report(rep);
+        return lapse_from_report(rep, /*migration=*/lapse_index == 0, /*adopted=*/false);
     };
 
     if (!m_golden_dir.empty())

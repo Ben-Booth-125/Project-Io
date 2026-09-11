@@ -98,6 +98,31 @@ struct history_lapse
     /// the founders' own tongue — never an Earth proper noun.
     std::vector<int32_t> polity_seat;
 
+    // --- The lineage palette (BL-919), derived ONCE at record time ---------
+    //
+    // On the Culture round the record's `owner` IS a culture index — the
+    // migration record is folded from `region::culture.plurality()` — so the
+    // map's colour is the culture's, and hundreds of cultures under twelve
+    // identity colours would be plaid. These three vectors are indexed by
+    // culture and are EMPTY on the Empires round, whose owners are polities;
+    // `draw_lapse_map` falls back to the polity palette when they are empty.
+    // Filled by `build_lineage_palette` from the culture tree alone: a pure
+    // function of parent indices, no hashing, no per-frame work.
+
+    /// Culture -> its root cradle culture (the hue FAMILY). A sibling surface
+    /// tinting the Empires round's base by family reads this, not the colour.
+    std::vector<int32_t> culture_family;
+
+    /// Culture -> its own position on the wheel, 0-1.
+    std::vector<float> culture_hue;
+
+    /// Culture -> generations below its root, 0 for a cradle culture.
+    std::vector<int32_t> culture_depth;
+
+    /// Culture -> the colour it is painted in (`palette::lineage_colour` of the
+    /// two above). ImU32 layout, kept as uint32_t so this header stays off imgui.
+    std::vector<uint32_t> culture_colour;
+
     bool empty() const { return lapse.empty(); }
 
     /// True once `finish_history_lapse` has run against a surface.
@@ -114,6 +139,26 @@ struct history_lapse
 /// Cheap and one-shot: a multi-source breadth-first walk over ~31,500 tiles with
 /// the columns wrapping and the rows not, exactly as the world's own grid does.
 void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t packed_len);
+
+/// Derive the lineage palette (BL-919) from the culture tree.
+///
+/// THE RULE. Hue comes from the root cradle: the roots are spread evenly around
+/// the wheel, so every family owns one wedge of it. A daughter takes its
+/// parent's hue shifted by a FIXED step — siblings alternate sides of the parent
+/// (+1, -1, +2, -2 steps...) so they are told apart — and the shift is bounded to
+/// the family's own wedge, so no lineage ever wanders into a neighbour's hue.
+/// Lightness steps down by depth (`palette::lineage_colour`), bounded so a deep
+/// lineage stays readable. A family is recognisable at a glance; a member on a
+/// second look.
+///
+/// @param parent  One entry per culture, in `creed_state::cultures` order: the
+///                parent's index, or -1 for a cradle culture. A parent index is
+///                always lower than its daughter's (creeds.hpp), and the walk is
+///                guarded against a malformed tree regardless.
+///
+/// Deterministic and pure: a function of @p parent alone. Call it once, at
+/// record time; nothing here belongs in a frame.
+void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent);
 
 /// Paint the political map for one already-materialised ownership slice into the
 /// current window's remaining content region.

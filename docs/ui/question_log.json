@@ -740,15 +740,17 @@
     "wizard_round_migration": {
       "surface": "New World wizard - round 4, The Migration",
       "answers": "Who reached this ground first, and by which routes?",
-      "because": "THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09). One round covering both the peopling of the world and the empires that followed was tried and failed twice: it drew conquest with the migration already finished off-screen, and then - once the migration was moved inside it - migration with no conquest at all and a static final third. The peopling of an empty world and the contest over it have different subjects, different rules and different terminating conditions, so they are two rounds. This one is the diffusion: where people started, the routes they took, and the cultures those routes produced, ending when all land has some culture rather than at a calendar year. It keeps the 2D map, because a globe shows a world and a map shows a FRONTIER (Ben, 2026-09-08, at the live app), and it keeps the inverted model - the pass cannot be previewed per keystroke, so arriving on the round runs it and the wait IS the content.",
+      "because": "THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09). One round covering both the peopling of the world and the empires that followed was tried and failed twice: it drew conquest with the migration already finished off-screen, and then - once the migration was moved inside it - migration with no conquest at all and a static final third. The peopling of an empty world and the contest over it have different subjects, different rules and different terminating conditions, so they are two rounds. This one is the diffusion: where people started, the routes they took, and the cultures those routes produced, ending when all land has some culture rather than at a calendar year. It keeps the 2D map, because a globe shows a world and a map shows a FRONTIER (Ben, 2026-09-08, at the live app), and it keeps the inverted model - the pass cannot be previewed per keystroke, so arriving on the round runs it and the wait IS the content. THE MAP'S COLOUR IS THE CULTURE'S, AND KIN SHARE A HUE FAMILY (BL-919): the owner on this round is a culture, and dozens of related cultures under twelve identity colours read as plaid, so the palette is derived once from the culture tree at record time - hue by root cradle with the cradles spread evenly round the wheel, each daughter a fixed step off its parent and bounded to the family's wedge, lightness stepping down by depth and bounded so deep lineages stay readable. A migration route reads as one family shading along its length; another cradle's ground reads as a different family.",
       "backlog_item": [
         "BL-816",
         "BL-829",
-        "BL-860"
+        "BL-860",
+        "BL-919"
       ],
       "files": [
         "src/ui/startup_screens.cpp",
-        "src/ui/history_lapse.cpp"
+        "src/ui/history_lapse.cpp",
+        "src/ui/presentation.cpp"
       ],
       "status": "settled"
     },

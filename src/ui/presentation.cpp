@@ -395,6 +395,24 @@ ImU32 nation_colour(entity_id id)
     return nation_table[h % nation_slot_count];
 }
 
+ImU32 lineage_colour(float hue, int depth)
+{
+    // Saturation fixed, value stepping down by generation. Both ends were chosen
+    // against the round's backdrop: the root rung must read as a colour rather
+    // than a pastel over `col_wild` grey, and the capped rung must still stand
+    // off the near-black sea the map is drawn on.
+    hue -= static_cast<float>(static_cast<int>(hue));
+    if (hue < 0.0f) hue += 1.0f;
+    const int   d = depth < 0 ? 0 : (depth > lineage_depth_cap ? lineage_depth_cap : depth);
+    const float s = 0.62f;
+    const float v = 0.90f - 0.10f * static_cast<float>(d);
+    float r = 0.0f, g = 0.0f, b = 0.0f;
+    ImGui::ColorConvertHSVtoRGB(hue, s, v, r, g, b);
+    return IM_COL32(static_cast<int>(r * 255.0f + 0.5f),
+                    static_cast<int>(g * 255.0f + 0.5f),
+                    static_cast<int>(b * 255.0f + 0.5f), 255);
+}
+
 ImU32 building_kind_colour(building_type type)
 {
     // Hue-separated by hand, not hashed: building_type is a closed enumeration of

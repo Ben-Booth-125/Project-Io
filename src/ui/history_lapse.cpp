@@ -40,7 +40,86 @@ ImU32 polity_colour(uint16_t owner)
     return palette::nation_colour(static_cast<entity_id>(owner + 1));
 }
 
+/// The colour one OWNER index is drawn in on this surface, whichever round it
+/// is. On the Culture round the owner is a culture and the record carries a
+/// lineage palette (BL-919); on the Empires round it is a polity and the palette
+/// is empty, so the identity slot applies. One function for the map row and the
+/// board swatch, so a row and its ground cannot disagree on either round.
+ImU32 owner_colour(const history_lapse& h, uint16_t owner)
+{
+    if (owner < h.culture_colour.size())
+        return static_cast<ImU32>(h.culture_colour[owner]);
+    return polity_colour(owner);
+}
+
 } // namespace
+
+void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent)
+{
+    const std::size_t n = parent.size();
+    h.culture_family.assign(n, -1);
+    h.culture_hue.assign(n, 0.0f);
+    h.culture_depth.assign(n, 0);
+    h.culture_colour.assign(n, 0u);
+    if (n == 0) return;
+
+    // Roots first, spread evenly: the k-th cradle culture in index order owns
+    // the k-th wedge. Even spacing rather than a hash is what makes two cradles'
+    // ground read as two different families rather than two slots that happened
+    // to land near each other.
+    int roots = 0;
+    for (std::size_t i = 0; i < n; ++i)
+        if (parent[i] < 0 || static_cast<std::size_t>(parent[i]) >= i) ++roots;
+    const float wedge = 1.0f / static_cast<float>(roots > 0 ? roots : 1);
+    // The fixed step a daughter takes off its parent, and the furthest any
+    // member may drift from the root: inside the wedge with a margin, so the
+    // last member of one family and the first of the next never touch.
+    const float step  = wedge / 6.0f;
+    const float bound = wedge * 0.40f;
+
+    // Deviation from the root hue, tracked separately so the bound is applied
+    // to the whole lineage's drift and not to one generation's step.
+    std::vector<float> deviation(n, 0.0f);
+    // Sibling rank: how many earlier daughters this parent already has.
+    std::vector<int32_t> children(n, 0);
+
+    int root_rank = 0;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        const int32_t p = parent[i];
+        // A root, or a malformed link (a parent at or above its daughter) that is
+        // treated as one rather than followed — the tree contract is that ids
+        // are handed out in arrival order, and a violation is a root, not a loop.
+        if (p < 0 || static_cast<std::size_t>(p) >= i)
+        {
+            h.culture_family[i] = static_cast<int32_t>(i);
+            h.culture_hue[i]    = wedge * static_cast<float>(root_rank++);
+            h.culture_depth[i]  = 0;
+            deviation[i]        = 0.0f;
+        }
+        else
+        {
+            const std::size_t pi = static_cast<std::size_t>(p);
+            const int32_t rank = children[pi]++;
+            // Alternate sides of the parent: +1, -1, +2, -2 ... steps.
+            const float signed_steps = static_cast<float>(rank / 2 + 1)
+                                     * ((rank % 2 == 0) ? 1.0f : -1.0f);
+            float dev = deviation[pi] + signed_steps * step;
+            if (dev >  bound) dev =  bound;
+            if (dev < -bound) dev = -bound;
+            deviation[i]        = dev;
+            h.culture_family[i] = h.culture_family[pi];
+            h.culture_depth[i]  = h.culture_depth[pi] + 1;
+            const std::size_t root = static_cast<std::size_t>(h.culture_family[i]);
+            float hue = h.culture_hue[root] + dev;
+            hue -= static_cast<float>(static_cast<int>(hue));
+            if (hue < 0.0f) hue += 1.0f;
+            h.culture_hue[i] = hue;
+        }
+        h.culture_colour[i] = static_cast<uint32_t>(
+            palette::lineage_colour(h.culture_hue[i], h.culture_depth[i]));
+    }
+}
 
 std::string lapse_year_label(int year)
 {
@@ -187,7 +266,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             if (reg < 0) { row[static_cast<std::size_t>(c)] = 0; continue; } // sea shows through
             const uint16_t o = (static_cast<std::size_t>(reg) < slice.size())
                                    ? slice[static_cast<std::size_t>(reg)] : owner_none;
-            row[static_cast<std::size_t>(c)] = (o == owner_none) ? col_wild : polity_colour(o);
+            row[static_cast<std::size_t>(c)] = (o == owner_none) ? col_wild : owner_colour(h, o);
         }
 
         const float y0 = tl.y + static_cast<float>(r) * scale;
@@ -356,7 +435,7 @@ void draw_lapse_scoreboard(const history_lapse& h,
             const ImVec2 p = ImGui::GetCursorScreenPos();
             const float  s = ImGui::GetTextLineHeight();
             ImGui::GetWindowDrawList()->AddRectFilled(
-                {p.x, p.y + 2.0f}, {p.x + s * 0.55f, p.y + s - 1.0f}, polity_colour(b.owner));
+                {p.x, p.y + 2.0f}, {p.x + s * 0.55f, p.y + s - 1.0f}, owner_colour(h, b.owner));
             swatch_w = s * 0.55f + 5.0f + ImGui::GetStyle().ItemSpacing.x;
             ImGui::Dummy({s * 0.55f + 5.0f, s});
             ImGui::SameLine();

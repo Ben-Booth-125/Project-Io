@@ -217,6 +217,27 @@ inline constexpr int nation_slot_count = 12;
 /// @return   The nation's identity colour.
 ImU32 nation_colour(entity_id id);
 
+/// One rung of a LINEAGE PALETTE (BL-919): the colour a culture is painted in
+/// on the New World wizard's Culture round, given its place on the hue wheel
+/// and its depth below its root cradle. The wheel rule lives here beside the
+/// other identity palettes; the TREE walk that assigns each culture a hue
+/// (root cradles spread evenly, each daughter a fixed step off its parent) is
+/// `ui::build_lineage_palette` in history_lapse.hpp, which is the only caller.
+///
+/// WHY LIGHTNESS BY DEPTH. Hundreds of cultures under twelve identity colours
+/// is plaid. A family must be recognisable at a glance and its members told
+/// apart on a second look, so the family is the hue and the generation is the
+/// lightness: a root is bright, each generation a fixed step darker, bounded at
+/// `lineage_depth_cap` so a deep lineage stays readable over the sea backdrop.
+///
+/// @param hue   Position on the wheel, 0-1, wrapping.
+/// @param depth Generations below the root cradle; 0 for a cradle culture.
+ImU32 lineage_colour(float hue, int depth);
+
+/// Deepest generation the lightness step still descends for; anything deeper
+/// draws at this rung. Four rungs is the most the eye separates within one hue.
+inline constexpr int lineage_depth_cap = 4;
+
 /// Identity colour for a building **kind** — the colour a segment of the stacked-tile
 /// ring is drawn in (`ui::icons::stack_ring`, PLANETARY.md § Building markers).
 ///

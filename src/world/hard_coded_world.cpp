@@ -54,6 +54,11 @@ float deposit_scalar_for(abundance_level a, const world_gen_config& cfg)
     return cfg.deposit_scalar[2];
 }
 
+} // namespace
+
+// THE MIGRATION'S OWN RECORD, declared in hard_coded_world.hpp: the wizard's
+// Culture round lifts it off a finished report under --verify (BL-919), so it
+// sits outside the anonymous namespace the rest of this file's helpers keep.
 // ---------------------------------------------------------------------------
 // The migration's own time-lapse (BL-871).
 // ---------------------------------------------------------------------------
@@ -109,6 +114,8 @@ era_timelapse build_migration_timelapse(const settlement_state& ss, int64_t star
                      });
     return t;
 }
+
+namespace {
 
 // ---------------------------------------------------------------------------
 // Enclosed-sea measurement for the BL-276 acceptance gate. Returns the tile
