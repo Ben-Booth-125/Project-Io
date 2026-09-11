@@ -851,6 +851,86 @@ struct history_sim_params
     /// Raising this makes fragmentation rarer and the pieces larger.
     int secession_min_regions = 2;
 
+    // --- BL-897: A CREED THAT SPANS CULTURES ------------------------------
+    //
+    // `../../docs/lore/CREEDS.md` § The four calls, settled (Ben, 2026-09-11).
+    // Every dial below defaults to ZERO/off, and the first one is the master
+    // switch: with `universal_creed_humbled_cohesion_q` at 0 no creed is ever
+    // coined, no polity adopts, no ground holds, and every existing fixture
+    // means exactly what it meant before.
+    //
+    // IT ARISES FROM HUMILIATION AND FROM DENSITY, NEVER FROM A ROLL OR A DATE.
+    // Both causes are read off scalars this sim already computes every decision
+    // round, which is the standing constraint on the whole phase — a creed that
+    // fired on a year, or on a die, would be a term inside an actor rather than
+    // a force with a visible cause.
+
+    /// HUMILIATION, read as cohesion. A realm may coin a universal creed only
+    /// while `polity::cohesion_q` stands at or below this. Zero disables the
+    /// WHOLE mechanism (the master switch).
+    ///
+    /// THE OBVIOUS READING RUNS THE OTHER WAY and it is the wrong one. A
+    /// triumphant empire declaring its god universal is the intuitive picture;
+    /// Ben ruled against it, because a creed that is FOR EVERYONE answers a
+    /// question the victorious do not have. So the input is the realm's own
+    /// battering: cohesion falls on every defeat and on every secession through
+    /// `cohesion_loss_on_defeat_q`, which means BL-896's fragmentation is what
+    /// feeds this — no new event, and nothing scheduled.
+    int universal_creed_humbled_cohesion_q = 0;
+
+    /// DENSITY, read as PAID TRADE LINKS. The realm must hold at least this
+    /// many unlike-ground pairs joined by a walked corridor — the same pairs
+    /// `trade_income_per_link` pays for, counted rather than banked.
+    ///
+    /// AN ANSWER FOR EVERYONE NEEDS EVERYONE TO BE IN CONTACT. The network is
+    /// what carries a creed, so the density reading is the network measured
+    /// exactly where it already pays: a walked corridor between two places that
+    /// hold different things is contact between two peoples who need each
+    /// other, which is the only kind of contact this phase models. Counting the
+    /// links rather than the materials keeps the gate free of the income
+    /// magnitude, which is a balance number and moves.
+    ///
+    /// A WORLD OF INTACT, ISOLATED REALMS PRODUCES NO UNIVERSALISING CREED, and
+    /// CREEDS.md calls that "a legitimate world rather than a failed one". This
+    /// gate is where that outcome comes from, and it is REPORTED, never gated.
+    int universal_creed_min_trade_links = 0;
+
+    /// The mean `region::network_supply_q` across the realm's held ground must
+    /// also reach this. The link count says the network is BUSY; this says it
+    /// still REACHES — a realm whose corridors carry trade between two clumps
+    /// it can no longer supply is not one place, and a creed that spreads along
+    /// contact has nothing to travel. Zero means the reach half is not asked.
+    int universal_creed_network_floor_q = 0;
+
+    /// HOW LONG A PEOPLE CARRIES BOTH before the pair resolves, in years
+    /// (advanced by `step_years`, like `region::mix_years`).
+    ///
+    /// CONVERSION IS NOT A FLIP. A people carries its pantheon AND the creed
+    /// for a span, and only then does the pair settle — the pantheon fades to
+    /// residue, or it REASSERTS and the people falls back out. Zero collapses
+    /// the span to a single round, which is the model Ben explicitly rejected;
+    /// a caller that wants the mechanism at all should site this above zero.
+    int universal_creed_hold_years = 0;
+
+    /// WHICH WAY THE PAIR SETTLES, as a floor on the ground's own binding.
+    /// Binding is `region::network_supply_q` less
+    /// `universal_creed_alien_penalty_q` where the ground's plurality culture
+    /// is not the realm's own. At or above this floor the pantheon fades to
+    /// residue (CONVERTED); below it the pantheon reasserts and the people
+    /// falls out (REASSERTED).
+    ///
+    /// NOT A ROLL, AND THE TWO TERMS ARE THE FAULT LINE ITSELF. Distance is one
+    /// half — far ground converts less — and DIFFERENCE is the other, which is
+    /// the axis CIVILISATION.md § Culture relations could not supply, because
+    /// kinship there is computed from descent alone. An empire's near, kindred
+    /// ground converts and its far, alien ground refuses, so the split, when a
+    /// later slice draws it, falls where a player could have seen it coming.
+    int universal_creed_convert_supply_q = 0;
+
+    /// How much binding a people loses for not being its realm's own culture.
+    /// Zero makes conversion purely a question of distance.
+    int universal_creed_alien_penalty_q = 0;
+
     /// A CREED'S APPETITE FOR WAR, LEANING THE CAMPAIGN SCORE (BL-868;
     /// CIVILISATION.md sec Armies come from creeds, and only some peoples raise
     /// them). Per-mille pull, applied proportionally and SYMMETRICALLY around a
@@ -1081,6 +1161,43 @@ inline constexpr int64_t k_never_industrialised = INT64_MIN;
 /// political pass runs, and a pre-national ladder (BL-221) is exactly a world
 /// whose actors are peoples. The sim writes `region::nation` as it goes, so
 /// by the stop year the political map is this loop's output.
+// ---------------------------------------------------------------------------
+// BL-897 — A CREED THAT SPANS CULTURES
+// ---------------------------------------------------------------------------
+
+/// ONE UNIVERSALISING CREED, COINED NEW AND BELONGING TO NOBODY
+/// (`../../docs/lore/CREEDS.md` § The four calls, settled; Ben, 2026-09-11).
+///
+/// Every other creed in this codebase is LOCAL BY CONSTRUCTION — a pantheon
+/// belongs to a cradle culture and travels only as that people travels, which
+/// is what made the distribution of pantheons a record of routes
+/// (`../../docs/generation/COLONISATION.md` § Culture arrives by route). This
+/// record inverts exactly that property, and the inversion is why it is a
+/// separate type rather than another `creed`: it has NO CULTURE FIELD, because
+/// it has no cradle culture, and that absence is load-bearing rather than
+/// unfinished. A creed risen *from* a pantheon would still be that people's
+/// creed wearing a larger name, and every other people would read its spread as
+/// that people's spread. Belonging to nobody is what lets it bind peoples who
+/// are not kin, and what makes the pantheons it subsumes RESIDUE UNDERNEATH
+/// (`region::creed_residue_culture`) rather than ancestors above.
+///
+/// ITS NAME IS COINED FROM A PHONOLOGY OF ITS OWN. The standing rule is
+/// unconditional — real history is a mechanism reference, never a name source —
+/// and it bites hardest here, because the mechanism this models has an obvious
+/// proper noun attached to it in every reader's head. So `speech` is a fresh
+/// `roll_tongue` seeded off the run seed, the founding realm and the year: not
+/// drawn from any culture's inventory (which would give it a cradle by the back
+/// door) and not drawn from any list (which would break the rule outright).
+struct universal_creed
+{
+    std::string name;   ///< Coined from `speech`, which belongs to no people.
+    tongue      speech; ///< Its own phonology, rolled for it and used by nothing else.
+
+    int64_t founded_year = 0;  ///< Calendar year it was first coined.
+    int     origin_polity = -1; ///< The humbled realm it arose in — a FACT, not an owner.
+    int     origin_region = -1; ///< That realm's seat at the time.
+};
+
 struct polity
 {
     int id      = -1; ///< Index into `history_sim_state::polities`.
@@ -1189,6 +1306,22 @@ struct polity
     /// True for a seeded great power (BL-299). Majors start with more ground
     /// and an opposed strategic creed; the periphery stays alive as actors.
     bool major = false;
+
+    /// BL-897 — THE INSTITUTION, as distinct from what its peoples believe.
+    /// Index into `history_sim_state::universal_creeds`, or -1.
+    ///
+    /// TWO GRAINS, EXPECTED TO DISAGREE (CREEDS.md § The four calls, settled).
+    /// A realm adopts the creed as an INSTITUTION — that is what makes it able
+    /// to hold ground its own culture never walked — while the peoples under it
+    /// convert at their own pace or refuse (`region::creed_hold`). The gap
+    /// between this field and those is the fault line: an empire whose
+    /// institution is universal and whose subject peoples are not is exactly
+    /// the empire that splits over faith rather than over distance.
+    int universal_creed = -1;
+
+    /// Calendar year this realm adopted, or 0 for never. Kept so a later slice
+    /// can ask how long an institution has stood against its own ground.
+    int64_t creed_adopted_year = 0;
 
     bool alive = true; ///< False once the polity holds no regions.
 };
@@ -1650,6 +1783,24 @@ struct history_sim_state
     /// today, but counted alongside the run's other formation-style counters
     /// — `foundings`, `polities_industrialised` — for the same reason: a
     /// harness reads this list, not the vector, when it only wants the count).
+
+    /// BL-897 — EVERY UNIVERSALISING CREED THIS RUN COINED, in the order they
+    /// arose. A NAMED RECORD each; `region::universal_creed` and
+    /// `polity::universal_creed` index into this. Empty on a world of intact,
+    /// isolated realms, which CREEDS.md rules a legitimate world.
+    std::vector<universal_creed> universal_creeds;
+
+    /// The item's "done when", as four counters that separate the four things
+    /// that can go wrong. ZERO ARISEN is a world nothing humbled or nothing
+    /// connected. Arisen with ZERO ADOPTED means the creed never left the realm
+    /// that coined it — contact is not reaching. Adopted with zero converted
+    /// means the institution stands over ground that never took it, which is
+    /// the fault line at its widest rather than a bug. And REASSERTED is the
+    /// turmoil half: peoples the creed reached and lost.
+    int64_t universal_creeds_arisen = 0;
+    int64_t polities_adopted_creed  = 0;
+    int64_t peoples_converted       = 0;
+    int64_t peoples_reasserted      = 0;
     int64_t civilisations_formed = 0;
 };
 

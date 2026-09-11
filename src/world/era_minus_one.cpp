@@ -100,6 +100,35 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     hp.secession_supply_floor_q = 60;
     hp.secession_min_regions    = 2;
 
+    // BL-897: a creed that spans cultures (Ben, 2026-09-11). Coined new by a
+    // realm that has been HUMBLED and sits in a DENSE network, then spreading
+    // along contact. Placeholder magnitudes on the same footing as the w_* and
+    // the BL-895/896 floors -- the SHAPE is the ruling, history_sweep tunes the
+    // numbers.
+    //
+    // 300 for humiliation, against a cohesion floor of 180 and a start of 1000:
+    // a realm at 300 has taken roughly six defeats' worth of the
+    // `cohesion_loss_on_defeat_q` channel and is near the bottom of the spiral,
+    // which is what "shattered or humbled" has to mean if a victor is not to
+    // qualify. 8 links for density, against the ~52 roaded edges a whole world
+    // carries -- so it asks for a realm holding a real share of the network,
+    // not a realm holding two roads. 200 for mean reach, well above dead ground
+    // and well below a realm that still supplies itself: a creed spreads along
+    // contact, so the realm coining it must still be one place.
+    hp.universal_creed_humbled_cohesion_q = 300;
+    hp.universal_creed_min_trade_links    = 8;
+    hp.universal_creed_network_floor_q    = 200;
+
+    // A PEOPLE HOLDS BOTH, THEN IT RESOLVES. 200 years is a span a world of
+    // 4000 years can show several times over, and long enough that conversion
+    // reads as a generation rather than a flip. The pair then settles on the
+    // ground's own binding: 400 of reach, less 200 where the people is not its
+    // realm's own culture -- so near, kindred ground converts and far, alien
+    // ground reasserts, which is the fault line stated as two numbers.
+    hp.universal_creed_hold_years        = 200;
+    hp.universal_creed_convert_supply_q  = 400;
+    hp.universal_creed_alien_penalty_q   = 200;
+
     // BL-868: creeds raise armies. A placeholder magnitude, like the w_* it
     // sits beside -- the SHAPE is the ruling, history_sweep tunes the number.
     hp.w_aggr_q = 300;

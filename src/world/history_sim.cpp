@@ -3437,6 +3437,218 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
         }
 
+        // ---- BL-897 - A CREED THAT SPANS CULTURES -------------------------
+        //
+        // ../../docs/lore/CREEDS.md sec The four calls, settled (Ben,
+        // 2026-09-11). Every creed in this codebase before this block is LOCAL
+        // BY CONSTRUCTION: a pantheon belongs to a cradle culture and travels
+        // only as that people travels. This block builds the one that does not
+        // -- it is coined new, it belongs to nobody, and it spreads along
+        // CONTACT rather than ancestry.
+        //
+        // SITED AFTER THE SECESSION BLOCK, DELIBERATELY. Humiliation is the
+        // first of the two causes, and BL-896's fragmentation is the largest
+        // producer of it: a realm that has just lost a block of ground took its
+        // cohesion hit a few lines above. Reading cohesion before that would
+        // read last round's realm.
+        //
+        // NOTHING HERE ROLLS. The only stream touched is `salt`, used to coin a
+        // phonology -- the same hash-as-picker idiom `coin_civilisation_name`
+        // uses, and for the same stated reason (this file consumes no RNG).
+        // Every gate below is a comparison against a scalar the round already
+        // computed, and every walk below is in index order.
+        if (params.universal_creed_humbled_cohesion_q > 0)
+        {
+            // How busy and how reachable one realm's network is, counted the
+            // same way BL-895 pays for it: a walked corridor between two held
+            // regions that hold UNLIKE ground. Recomputed on demand rather than
+            // accumulated in the demography pass, so this item adds nothing to
+            // the hot loop and touches none of BL-895's code.
+            const auto realm_network = [&](int qid, int& links, int& mean_supply_q) {
+                links = 0;
+                int64_t sum = 0, held = 0;
+                const std::size_t n = std::min(owner.size(), ss.regions.size());
+                for (std::size_t i = 0; i < n; ++i)
+                {
+                    if (owner[i] != qid) continue;
+                    ++held;
+                    sum += ss.regions[i].network_supply_q;
+                    for (int nb : neighbours[i])
+                    {
+                        if (nb <= static_cast<int>(i)) continue;   // count the pair once
+                        const std::size_t ni = static_cast<std::size_t>(nb);
+                        if (ni >= n || owner[ni] != owner[i]) continue;
+                        if (road_uses_live.find(edge_key(static_cast<int>(i), nb))
+                            == road_uses_live.end()) continue;
+                        if (region_trade_class(ss.regions[i])
+                         == region_trade_class(ss.regions[ni])) continue;
+                        ++links;
+                    }
+                }
+                mean_supply_q = held > 0 ? static_cast<int>(sum / held) : 0;
+            };
+
+            // ---- (a) IT ARISES, from humiliation and from density ---------
+            //
+            // Both are required and neither is sufficient. A shattered realm in
+            // an empty world has nobody to offer an answer for everyone TO; a
+            // rich, dense, intact realm has not been asked the question.
+            const std::size_t pol_count_arise = out.polities.size();
+            for (std::size_t pi = 0; pi < pol_count_arise; ++pi)
+            {
+                if (!out.polities[pi].alive) continue;
+                if (out.polities[pi].universal_creed >= 0) continue;
+                if (out.polities[pi].cohesion_q
+                    > params.universal_creed_humbled_cohesion_q) continue;
+
+                int links = 0, mean_q = 0;
+                realm_network(out.polities[pi].id, links, mean_q);
+                if (links < params.universal_creed_min_trade_links) continue;
+                if (mean_q < params.universal_creed_network_floor_q) continue;
+
+                // IT IS COINED NEW AND BELONGS TO NOBODY. A phonology rolled
+                // for this creed alone -- NOT drawn from the founding realm's
+                // culture, which would hand it a cradle by the back door and
+                // make every other people read its spread as that people's
+                // spread. The stream is the run seed crossed with the realm and
+                // the year, so the same world coins the same creed on replay
+                // and two realms never coin the same name.
+                hash_picker r{salt(salt(seed, static_cast<uint32_t>(out.polities[pi].id)),
+                                   static_cast<uint32_t>(y & 0xFFFF))};
+                universal_creed uc;
+                uc.speech = roll_tongue(r);
+                const int syllables = 2 + r.pick(2);
+                uc.name = tongue_word(r, uc.speech, syllables);
+                if (uc.name.empty()) continue; // Unusable inventory; should not occur.
+                uc.founded_year  = y;
+                uc.origin_polity = out.polities[pi].id;
+                uc.origin_region = out.polities[pi].capital;
+
+                const int ci = static_cast<int>(out.universal_creeds.size());
+                const std::string creed_name = uc.name;
+                out.universal_creeds.push_back(std::move(uc));
+                ++out.universal_creeds_arisen;
+
+                // The realm that coined it adopts it in the same breath: the
+                // institution IS where it arose. Its peoples still convert
+                // unevenly afterwards, exactly like anyone else's.
+                out.polities[pi].universal_creed    = ci;
+                out.polities[pi].creed_adopted_year = y;
+                ++out.polities_adopted_creed;
+
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    creed_name + " is preached in a broken realm, and claims every people",
+                    std::string{}});
+            }
+
+            // ---- (b) THE POLITY ADOPTS IT, ALONG CONTACT ------------------
+            //
+            // Not along ancestry, which is the whole departure. A realm adopts
+            // where its ground touches ground that already holds the creed
+            // ACROSS A WALKED CORRIDOR -- the same contact test trade uses,
+            // because a route people walk is how anything crosses between two
+            // peoples in this phase. Kinship is not consulted: binding two
+            // peoples who are NOT kin is the job CREEDS.md gives this
+            // mechanism, and a kinship gate would quietly undo it.
+            //
+            // FIRST MATCH IN REGION-INDEX ORDER WINS, so a realm touching two
+            // creeds takes one deterministically.
+            const std::size_t pol_count_adopt = out.polities.size();
+            const std::size_t n_reg_creed     = std::min(owner.size(), ss.regions.size());
+            for (std::size_t pi = 0; pi < pol_count_adopt; ++pi)
+            {
+                if (!out.polities[pi].alive) continue;
+                if (out.polities[pi].universal_creed >= 0) continue;
+                const int qid = out.polities[pi].id;
+
+                int found = -1;
+                for (std::size_t i = 0; i < n_reg_creed && found < 0; ++i)
+                {
+                    if (owner[i] != qid) continue;
+                    for (int nb : neighbours[i])
+                    {
+                        const std::size_t ni = static_cast<std::size_t>(nb);
+                        if (ni >= n_reg_creed) continue;
+                        if (owner[ni] == owner_none || owner[ni] == owner[i]) continue;
+                        const int oc = ss.regions[ni].universal_creed;
+                        const int8_t h = ss.regions[ni].creed_hold;
+                        if (oc < 0 || (h != 1 && h != 2)) continue;
+                        if (road_uses_live.find(edge_key(static_cast<int>(i), nb))
+                            == road_uses_live.end()) continue;
+                        found = oc;
+                        break;
+                    }
+                }
+                if (found < 0) continue;
+                out.polities[pi].universal_creed    = found;
+                out.polities[pi].creed_adopted_year = y;
+                ++out.polities_adopted_creed;
+            }
+
+            // ---- (c) ITS PEOPLES CONVERT UNEVENLY AFTER -------------------
+            //
+            // The second grain, and it is EXPECTED TO DISAGREE with the first.
+            // Ground under a realm that has adopted enters DUAL-HOLD, carrying
+            // its pantheon and the creed at once; after
+            // `universal_creed_hold_years` the pair settles, and which way it
+            // settles is read off how bound that ground is to the realm --
+            // distance through `network_supply_q`, difference through the alien
+            // penalty. Neither is a roll and neither is a date.
+            //
+            // A REASSERTED PEOPLE IS NOT RE-OFFERED. It answered. Leaving it
+            // answered is what makes the fault line a STABLE feature of the map
+            // rather than a shimmer, which is what a later schism slice needs
+            // to cut along.
+            for (std::size_t i = 0; i < n_reg_creed; ++i)
+            {
+                if (owner[i] == owner_none) continue;
+                const std::size_t oi = static_cast<std::size_t>(owner[i]);
+                if (oi >= out.polities.size()) continue;
+                const int pc = out.polities[oi].universal_creed;
+                if (pc < 0) continue;
+
+                region& rg = ss.regions[i];
+                if (rg.creed_hold == 0)
+                {
+                    // THE PANTHEON UNDERNEATH is recorded the moment the creed
+                    // arrives, not when it is subsumed: the residue must be the
+                    // creed this ground actually held at contact, and
+                    // assimilation moves `culture` afterwards.
+                    rg.creed_hold            = 1;
+                    rg.universal_creed       = pc;
+                    rg.creed_residue_culture = rg.culture.plurality();
+                    rg.creed_hold_years      = 0;
+                    continue;
+                }
+                if (rg.creed_hold != 1) continue;
+
+                rg.creed_hold_years += step_years;
+                if (rg.creed_hold_years < params.universal_creed_hold_years) continue;
+
+                const int  own_culture = out.polities[oi].culture;
+                const bool alien       = own_culture >= 0
+                                      && rg.culture.plurality() != own_culture;
+                const int  bind_q = rg.network_supply_q
+                                  - (alien ? params.universal_creed_alien_penalty_q : 0);
+                if (bind_q >= params.universal_creed_convert_supply_q)
+                {
+                    rg.creed_hold = 2; // The pantheon fades to residue.
+                    ++out.peoples_converted;
+                }
+                else
+                {
+                    // IT REASSERTS. The people falls back out of the creed and
+                    // the residue is KEPT -- the record of a creed that reached
+                    // this ground and lost it is exactly what a schism is made
+                    // of, and it outlives the institution above it.
+                    rg.creed_hold      = 3;
+                    rg.universal_creed = -1;
+                    ++out.peoples_reasserted;
+                }
+            }
+        }
+
         // Ownership changes are appended where they happen (conquest, founding),
         // so there is nothing to snapshot at the end of a year.
 
