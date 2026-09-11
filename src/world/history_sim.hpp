@@ -2433,6 +2433,43 @@ std::string grudge_event_line(const grudge_event& e, const settlement_state& ss)
 bool has_contact(const history_sim_state& s, int from, int to);
 
 // ---------------------------------------------------------------------------
+// The directed want table (BL-909)
+// ---------------------------------------------------------------------------
+
+/// A directed want, IN THE GRUDGE/CONTACT TABLE'S SHAPE (BL-909): "A wants
+/// what B holds" — a named holder and a named good, never a per-polity
+/// scarcity list. CIVILISATION.md sec The directed want owns the design.
+///
+/// NO PRICE, NO MAGNITUDE. The want is a KNOWN ABSENCE (`from`'s ground never
+/// reaches this good's world-relative dominance floor) plus a KNOWN HOLDER
+/// (`to`'s ground does reach it) — nothing more. Population demand belongs to
+/// the economy pass and never leaks back here.
+struct want
+{
+    uint16_t     from = 0;                  ///< The polity that lacks the good.
+    uint16_t     to   = 0;                  ///< The polity known to hold it.
+    region_class good = region_class::none; ///< Never `none` in a stored entry.
+
+    /// TRUE WHEN `to`'S MARKET ALSO SHOWS THIS GOOD (BL-910), i.e. at least
+    /// one of `to`'s market regions is itself dominant in `good` — a market
+    /// is a visible condition, a place, so a good present at a region that
+    /// also carries a market is doubly legible: geology AND the richer
+    /// signal a trading age actually acts on (CIVILISATION.md sec The
+    /// directed want). False where the want is known only from B's ground,
+    /// with no market region showing it.
+    bool via_market = false;
+};
+
+/// The directed want table (BL-909), crossed at the pass 1 -> pass 2
+/// handoff by `make_pass_one_output`. Sorted ascending by (from, to, good),
+/// so the order is a property of the integers rather than of iteration.
+/// Defined only over pairs `has_contact` already joins — the omniscience
+/// guard CIVILISATION.md sec The directed want is explicit about.
+std::vector<want> derive_wants(const std::vector<region>& regions,
+                                const std::vector<contact>& contacts,
+                                const std::vector<polity>&  polities);
+
+// ---------------------------------------------------------------------------
 // The turbulence lean, resolved (BL-839)
 // ---------------------------------------------------------------------------
 //
@@ -2522,6 +2559,12 @@ struct pass_one_output
     /// consumer that walks it against `region::domain`; it is not stored
     /// here as a second table.
     std::vector<contact> contacts;
+
+    /// THE DIRECTED WANT TABLE (BL-909) — a good `from` knows `to` holds and
+    /// `from` lacks. Derived from `regions` and `contacts` by `derive_wants`,
+    /// never carried as sim state of its own; see `want` for the shape and
+    /// CIVILISATION.md sec The directed want for the design.
+    std::vector<want> wants;
 
     /// Which provinces each polity holds, one entry per LIVING polity, sorted
     /// ascending by polity id. The political map as a set rather than as a

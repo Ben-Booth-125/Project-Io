@@ -223,6 +223,9 @@ struct sweep_row
     int  empire_polities_rim   = 0; ///< ...of those, holding EM-SP-4m (the rim).
     int  empire_nodes_mean_q   = 0; ///< Mean nodes held per living polity, x1000.
     int  empire_nodes_max      = 0; ///< The best-climbed polity's node count.
+    // --- BL-909: the directed want table -------------------------------------
+    int64_t wants_total       = 0; ///< Entries in pass_one_output::wants.
+    int64_t wants_via_market  = 0; ///< ...of those, visible through a market.
     /// Works raised over the run (BL-321), and how many regions ended the run
     /// with at least one. Reported rather than gated, like every other metric
     /// here — but a column of zeroes would mean the roster never fired at all,
@@ -1127,6 +1130,15 @@ int main(int argc, char** argv)
                 if (g.score > 0) ++row.grudges_biting;
                 if (g.score > row.grudge_max_score) row.grudge_max_score = g.score;
             }
+
+            // BL-909 — a one-line diagnostic for the directed want table.
+            // The scoreboard section (BL-907) reports on this properly; this
+            // is just enough to see the count while verifying in isolation.
+            std::size_t via_market = 0;
+            for (const want& w : o.wants) if (w.via_market) ++via_market;
+            std::printf("  wants: %zu (via_market: %zu)\n", o.wants.size(), via_market);
+            row.wants_total      = static_cast<int64_t>(o.wants.size());
+            row.wants_via_market = static_cast<int64_t>(via_market);
         }
 
         for (const region& p : ss.regions)
@@ -1594,9 +1606,24 @@ int main(int argc, char** argv)
                       "BL-907.3 at least some seeds leave a living pair unmet at 1200 CE");
             }
 
-            // Reading 4 -- DIRECTED WANTS (BL-909, DIRECTED_WANT_TABLE).
-            std::printf("  4. directed wants       MISSING (BL-909 not yet built -- no want table"
-                        " exists to read)\n");
+            // Reading 4 -- DIRECTED WANTS (BL-909, DIRECTED_WANT_TABLE). Read
+            // off row.wants_total/wants_via_market, already gathered above.
+            {
+                int64_t wants_t = 0, wants_m = 0;
+                int seeds_with_wants = 0;
+                for (const auto& r : rows)
+                {
+                    wants_t += r.wants_total;
+                    wants_m += r.wants_via_market;
+                    if (r.wants_total > 0) ++seeds_with_wants;
+                }
+                std::printf("  4. directed wants       %lld wants recorded across all seeds"
+                            "  |  %lld via a market  |  %d/%zu seeds carry at least one want\n",
+                            static_cast<long long>(wants_t), static_cast<long long>(wants_m),
+                            seeds_with_wants, rows.size());
+                check(seeds_with_wants > 0,
+                      "BL-907.4 at least some seeds carry a directed want at 1200 CE");
+            }
 
             // Reading 5 -- MARKETS. Standing on capitals (BL-910), off
             // `row.caps_total` / `row.caps_with_market` above.
@@ -1656,9 +1683,8 @@ int main(int argc, char** argv)
                       "BL-907.7 at least some seeds carry a grudge that has not decayed to nothing");
             }
 
-            std::printf("\n  One of the seven readings above prints MISSING because its source\n"
-                        "  is not yet wired (BL-909 directed wants) -- this is the honest state\n"
-                        "  of the contract, never a false zero standing in.\n");
+            std::printf("\n  All seven readings above are live -- the closure contract's baseline,\n"
+                        "  measured over this sweep's seed spread rather than argued in prose.\n");
         }
 
         std::printf("\n--- raised and fielded during the run, SPAN x BAND (all seeds) ---\n");

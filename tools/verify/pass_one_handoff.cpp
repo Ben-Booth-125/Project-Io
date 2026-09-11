@@ -616,6 +616,24 @@ int main()
                     static_cast<int>(o.contacts.size()), unmet_pair ? "yes" : "no");
         std::printf("      real-fixture contact pairs: %d\n",
                     static_cast<int>(real_o.contacts.size()));
+
+        // BL-909 — THE DIRECTED WANT TABLE, checked on the real fixture (the
+        // one with real endowment variety and real markets, not the strip).
+        check(!real_o.wants.empty(),
+              "C7l  the want table is non-empty on a real spread");
+        bool wants_directed = true, wants_named = true;
+        for (const want& w : real_o.wants)
+        {
+            if (w.from == w.to) wants_directed = false;
+            if (!has_contact(real_hs, w.from, w.to)) wants_directed = false;
+            if (w.good == region_class::none) wants_named = false;
+        }
+        check(wants_directed,
+              "C7m  every want points ACROSS a contacted pair, never within one");
+        check(wants_named,
+              "C7n  every want names both the holder (to) and the good");
+        std::printf("      wants: %d\n", static_cast<int>(real_o.wants.size()));
+
         check(o.start_year == war_p.start_year && o.stop_year == war_p.stop_year,
               "C7f  the span crosses with the record it describes");
 
@@ -636,6 +654,15 @@ int main()
                 static_cast<int>(broken2.regions.size()) + 5); // Out of range.
             check(!pass_one_output_valid(broken2, &why),
                   "C7h  the validator catches a holding that names a region off the map");
+        }
+
+        // BL-909 — the validator bites on a want with no contact behind it.
+        pass_one_output broken3 = real_o;
+        if (!broken3.wants.empty())
+        {
+            broken3.wants[0].from = broken3.wants[0].to; // A "want" from oneself.
+            check(!pass_one_output_valid(broken3, &why),
+                  "C7o  the validator catches a want naming its own polity as the holder");
         }
     }
 

@@ -641,6 +641,29 @@
     "tools/verify/history_sweep.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-834",
+   "title": "BL-909 (directed want table): an intermittent history_sweep crash was fixed empirically by switching to bounds-checked lookups, without pinning the actual mechanism",
+   "raised": "2026-09-11",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-909 (DIRECTED_WANT_TABLE), delivered this session.",
+   "what": "The implementing agent's first cut of derive_wants (and its pass_one_output_valid checks) used operator[] on per-polity/per-good lookup vectors and produced an intermittent, unreproducible-by-inspection crash across full 16-seed history_sweep runs. Switching those same lookups to bounds-checked .at() made four consecutive full sweeps pass cleanly (EXIT=0), and pass_one_handoff plus world_determinism (bit-identical digests) both stayed green with the change. The agent could not find an out-of-bounds access by static reading of the code and reported the fix as empirical, not diagnosed.",
+   "why_it_matters": "An .at() swap that silently fixes a crash without a known cause is a real risk in a deterministic sim: if the underlying issue is an actual out-of-bounds read (rather than something environmental to the harness's process spawning, which the BL-907 agent separately reported issues with in this same session), .at() only turns a crash into a caught exception at a different spot, or masks a logic error whose consequence is merely invisible until the vector sizes shift again. Landed as-is because the fix is real and cheap and the harnesses are genuinely green, but nobody has confirmed it is not silently working around something worse.",
+   "options": [
+    "Accept the .at() fix as sufficient (defensive bounds-checking is reasonable regardless of cause) and close this without further investigation.",
+    "Spend a session instrumenting derive_wants (address sanitizer / a debug build with bounds logging) to find the actual OOB access before trusting the currently-green harnesses fully.",
+    "Ask the BL-907 agent's separately-reported 'duplicate process' sandboxing artifact to be ruled out first -- if history_sweep was genuinely being invoked twice concurrently against shared output state in this environment, that could produce exactly this kind of intermittent, non-reproducible-by-inspection failure with no real OOB in the code at all."
+   ],
+   "recommendation": "Option 3 first -- cheap to check (rerun the pre-.at() code once, serially, with no other harness running concurrently) and would fully explain the symptom without implicating derive_wants's logic at all. If it reproduces even in isolation, escalate to option 2.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/history_sweep.cpp",
+    "tools/verify/pass_one_handoff.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

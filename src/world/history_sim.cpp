@@ -4448,6 +4448,92 @@ bool has_contact(const history_sim_state& s, int from, int to)
 }
 
 // ---------------------------------------------------------------------------
+// The directed want table (BL-909)
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    /// Same binary search as `has_contact`, but over a bare table rather than
+    /// `history_sim_state`, since `derive_wants` runs at handoff time against
+    /// the already-copied `pass_one_output::contacts`.
+    bool contact_between(const std::vector<contact>& contacts, uint16_t from, uint16_t to)
+    {
+        const auto it = std::lower_bound(
+            contacts.begin(), contacts.end(), std::pair<uint16_t, uint16_t>{from, to},
+            [](const contact& c, const std::pair<uint16_t, uint16_t>& k) {
+                if (c.from != k.first) return c.from < k.first;
+                return c.to < k.second;
+            });
+        return it != contacts.end() && it->from == from && it->to == to;
+    }
+} // namespace
+
+std::vector<want> derive_wants(const std::vector<region>& regions,
+                                const std::vector<contact>& contacts,
+                                const std::vector<polity>&  polities)
+{
+    // THE FOUR WINDOWS, in `region_class` order — the same world-relative
+    // dominance floor `classify` already applies to `region::dominant`
+    // (settlement.cpp), so this table invents no new threshold of its own.
+    constexpr int             good_count = 4;
+    const region_class goods[good_count] =
+        { region_class::farm, region_class::ore, region_class::energy, region_class::port };
+
+    // Per-polity, per-good: does the polity hold at least one region DOMINANT
+    // in that good, and does at least one of those regions also carry a
+    // market (BL-910)? Both are booleans over already-computed per-region
+    // facts — no magnitude, no price.
+    std::vector<std::array<bool, good_count>> holds(polities.size());
+    std::vector<std::array<bool, good_count>> shows_market(polities.size());
+    for (auto& row : holds)        row.fill(false);
+    for (auto& row : shows_market) row.fill(false);
+
+    for (const region& r : regions)
+    {
+        if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size()) continue;
+        const std::size_t n = static_cast<std::size_t>(r.nation);
+        for (int g = 0; g < good_count; ++g)
+        {
+            if (r.dominant != goods[static_cast<std::size_t>(g)]) continue;
+            holds.at(n).at(static_cast<std::size_t>(g)) = true;
+            if (r.has_market) shows_market.at(n).at(static_cast<std::size_t>(g)) = true;
+        }
+    }
+
+    // A WANT REQUIRES CONTACT (CIVILISATION.md sec The directed want): walked
+    // only over living polities, gated on `contact_between`, so a pair that
+    // never met contributes nothing — the omniscience guard the design is
+    // explicit about.
+    //
+    // Produced already in ascending (from, to, good) order: the outer two
+    // walks are ascending polity id, the inner walk is the fixed `goods`
+    // array order, so no separate sort is needed.
+    std::vector<want> out;
+    for (std::size_t a = 0; a < polities.size(); ++a)
+    {
+        if (!polities[a].alive) continue;
+        for (std::size_t b = 0; b < polities.size(); ++b)
+        {
+            if (a == b || !polities[b].alive) continue;
+            if (!contact_between(contacts, static_cast<uint16_t>(a), static_cast<uint16_t>(b)))
+                continue;
+            for (int g = 0; g < good_count; ++g)
+            {
+                const std::size_t gi = static_cast<std::size_t>(g);
+                if (!holds.at(b).at(gi) || holds.at(a).at(gi)) continue; // B lacks it, or A already has it.
+                want w;
+                w.from       = static_cast<uint16_t>(a);
+                w.to         = static_cast<uint16_t>(b);
+                w.good       = goods[gi];
+                w.via_market = shows_market.at(b).at(gi);
+                out.push_back(w);
+            }
+        }
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
 // The turbulence lean, resolved (BL-839)
 // ---------------------------------------------------------------------------
 //
@@ -4576,6 +4662,13 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
     o.works_by_span_band  = hs.works_by_span_band;
     o.grudges             = hs.grudges;
     o.contacts            = hs.contacts;
+
+    // THE DIRECTED WANT TABLE (BL-909) — a pure derivation over the region
+    // table and the contact table just copied above, computed here (rather
+    // than kept as running sim state) because it needs nothing the sim
+    // accumulates tick by tick.
+    o.wants               = derive_wants(o.regions, o.contacts, o.polities);
+
     o.timelapse           = as_timelapse(hs);
     o.start_year          = hs.start_year;
     o.stop_year           = hs.start_year + hs.years;
@@ -4776,6 +4869,46 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why)
             break;
         }
         if (!found_reverse) return fail("a contact is missing its reverse direction");
+    }
+
+    // 6. The directed want table (BL-909). Sorted, directed, in range, never
+    //    a self-want, gated on contact, and only naming a `to` that actually
+    //    holds the good — the checks the DONE WHEN clause asks for.
+    std::vector<std::array<bool, 4>> holds(o.polities.size());
+    for (auto& row : holds) row.fill(false);
+    const region_class want_goods[4] =
+        { region_class::farm, region_class::ore, region_class::energy, region_class::port };
+    for (const region& r : o.regions)
+    {
+        if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= o.polities.size()) continue;
+        for (int g = 0; g < 4; ++g)
+            if (r.dominant == want_goods[static_cast<std::size_t>(g)])
+                holds.at(static_cast<std::size_t>(r.nation)).at(static_cast<std::size_t>(g)) = true;
+    }
+    std::pair<int, int> last_want_pair{-1, -1};
+    for (const want& w : o.wants)
+    {
+        if (w.from == w.to) return fail("a polity wants a good from itself");
+        if (w.from >= o.polities.size() || w.to >= o.polities.size())
+            return fail("a want names a polity out of range");
+        if (w.good == region_class::none)
+            return fail("a want names no good");
+
+        const std::pair<int, int> pair_key{w.from, w.to};
+        if (pair_key < last_want_pair)
+            return fail("wants are not sorted by (from, to)");
+        last_want_pair = pair_key;
+
+        if (!contact_between(o.contacts, w.from, w.to))
+            return fail("a want crosses a pair with no contact");
+
+        int gi = -1;
+        for (int g = 0; g < 4; ++g)
+            if (want_goods[static_cast<std::size_t>(g)] == w.good) gi = g;
+        if (gi < 0 || !holds.at(w.to).at(static_cast<std::size_t>(gi)))
+            return fail("a want names a holder that does not hold the good");
+        if (holds.at(w.from).at(static_cast<std::size_t>(gi)))
+            return fail("a want names a good the wanting polity already holds");
     }
 
     if (why) why->clear();
