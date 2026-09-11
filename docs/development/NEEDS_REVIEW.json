@@ -620,6 +620,27 @@
     "src/world/world_save.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-833",
+   "title": "BL-903 (communication rung), built and measured, refuses ZERO campaigns -- the settled definition is inert against the only candidate list it can gate",
+   "raised": "2026-09-11",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "BL-903 (COMMUNICATION_RUNG), attempted this session. Not committed -- the code was built, measured, then reverted.",
+   "what": "Implemented the settled rule literally: a region is communication-reachable iff (A) it borders held ground, or (B) it borders a foreign polity's ground that itself borders held ground, gated on that intermediate polity carrying no live grudge from us. Checked FIRST in the Campaign verb's target loop, before the BL-778 water gate and the BL-837 reach gate, with its own counter. `history_sweep --epoch 0`, 16 seeds: `REFUSED comms gate   median 0` on every seed, while `REFUSED traversal (water)  median 967` and `REFUSED reach gate  median 0` (the last matching BL-905's independent finding). The reason is structural, not a tuning miss: Campaign's target loop already only ever enumerates `neighbours[hi]` for `hi` in `held` -- i.e. it is BY CONSTRUCTION already exactly condition (A)'s set, unconditionally. Condition (A) as settled grants that whole set with no test attached, so nothing the gate checks can ever be false for a candidate Campaign generates. Condition (B) only ever ADDS ground beyond that set, and nothing in the file (Campaign, Settle, Invest, Consolidate, Build-a-work) ever offers a two-hop target as a candidate to gate in the first place. The mechanism is mathematically a no-op given today's candidate-generation code, not a tuning problem and not a duplicate of reach (it asks a genuinely different question) -- it simply has nothing to bind on.",
+   "why_it_matters": "The item's own DONE WHEN requires the bound to show up in the sweep, distinguishable from reach. It cannot, as specified, against this file's current candidate lists. Two ways forward exist and only Ben can pick: (1) widen the settled definition so (A) is conditional rather than an unconditional grant -- e.g. requiring good relations even for a direct border -- which changes what 'immediate border' means and was explicitly ruled settled this session; or (2) widen Campaign's candidate GENERATION to actually offer two-hop targets (through a friendly neighbour) as real campaigns, which is what would give condition (B) something to enable and condition (A) something to be compared against -- a materially bigger change than 'add a gate check', touching the execute path (`gather_army`, staging-hub distance, `dry_contact`) as well as the scorer, and arguably a different-sized item than a difficulty-3 single-file gate.",
+   "options": [
+    "Leave BL-903 undelivered and re-scope it as the candidate-widening item (2) above -- bigger, touches execute as well as score.",
+    "Re-open the settled definition and make (A) conditional on relations too, so a hostile direct neighbour's ground stops being a free candidate -- smaller, but reverses a call made this session and changes ordinary border-war behaviour (a polity could no longer campaign against a disliked neighbour it has never fought before).",
+    "Decide BL-903 is answered by its own null result -- ground beyond one hop was already, implicitly, off the table before this item; document that in CIVILISATION.md's arc description instead of building a gate for it."
+   ],
+   "recommendation": "Option 3 is cheapest and matches what BL-905 is independently finding about reach: BOTH of this phase's post-water gates may be doing nothing because the water gate (BL-778, refusing ~967 of every world's contacts) is consuming almost every candidate before either ever gets a chance to matter. Read BL-905's outcome before deciding between 1 and 2 -- if the water gate turns out to be over-tight, loosening it is the one change that would make ALL THREE gates (water, reach, communication) start doing distinguishable work at once, instead of tuning any one of them in isolation.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "resolution": null
   }
  ]
 }
