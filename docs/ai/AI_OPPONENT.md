@@ -1502,3 +1502,36 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   purged BL-447 prose is reference only. Owners: BL-599 (rival roads and hubs), BL-600
   (rival directed dispatch).
 
+
+  **The Era −1 scorer may read the GRUDGE LEDGER, scoped to fear of annihilation (Ben,
+  2026-09-11).** This is the newest widening and it is the one that most needed raising, because
+  the rule it moves is written at the field itself: `history_sim.hpp` § Grudges states that
+  "nothing in this sim reads a grudge to make a decision... the moment it became an input to the
+  scorer it would be an agent term rather than an in-world force" (BL-827). Reading that as
+  already covered by any earlier grant would have been exactly the quiet precedent this section
+  exists to prevent, so it was raised.
+
+  **What it admits, and the scope is the whole of the grant.** The campaign scorer may ask *will
+  others attack me for fear of being wiped out next* — reading grudges held **against a third
+  party**, that is, what a polity has demonstrably done to peoples like the one deciding. Every
+  standing constraint is unchanged: deterministic, seeded, replayable, legal verbs only, never a
+  planner, no cloud model in the loop.
+
+  **What it does NOT admit, and each exclusion is load-bearing.** It does not admit a polity
+  reading *its own* grudges to pick a target — that is the revenge term BL-827 declined, and it
+  is a term inside the actor rather than a fact about the world. It does not admit any reading of
+  SIZE or RANK: "the largest polity" is not the trigger, "the polity that has been doing this to
+  people like me" is, and a quiet reimplementation as a size coefficient would pass every test
+  and violate the rule this grant exists to satisfy. It does not admit treaties, negotiation or
+  alliance objects — this is a fear response inside a generation sim, not a diplomacy layer, and
+  BL-827's unbuilt grudge kinds (*a union refused*, *an ally abandoned*) stay unbuilt.
+
+  **Why it is admissible where a rank term is not.** A grudge is a directed, decaying record
+  carrying named events with a place and a date, so a coalition forming against a riser is
+  explicable **on the map**: the player can ask why and be handed a list of what that polity did
+  to whom and when. That is the bar every in-world force in this project has to clear, and a bare
+  size coefficient cannot clear it. The check that the scope held is behavioural rather than
+  structural: **a large but peaceful polity must attract no coalition, while a smaller aggressive
+  one does.** Owner: BL-838 (fear of being next); `docs/generation/CIVILISATION.md` and
+  `docs/politics/RELATIONS.md` carry the design.
+

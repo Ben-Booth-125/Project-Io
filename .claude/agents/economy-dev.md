@@ -1,7 +1,7 @@
 ---
 name: economy-dev
 description: Focused implementer for economy-layer work — markets, production, finance, stockpiles, corp AI economics — inside src/world/. Spawn with a sharp brief (task text, files, signature targets); it reads only the economy docs its task touches, never the whole corpus. Runs in a worktree; builds and commits on its own branch; the main session merges and verifies.
-tools: "All tools except Agent"
+tools: Read, Write, Edit, Grep, Glob, Bash
 model: inherit
 ---
 

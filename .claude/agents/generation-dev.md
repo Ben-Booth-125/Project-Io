@@ -1,7 +1,7 @@
 ---
 name: generation-dev
 description: Focused implementer for world-generation work — planetology, continents, tile passes, nation/corporation generation, the Era −1 history sim — inside src/world/. Spawn with a sharp brief; it reads only the generation docs its task touches. Runs in a worktree; builds and commits on its own branch; the main session merges, runs the generation harnesses, and verifies.
-tools: "All tools except Agent"
+tools: Read, Write, Edit, Grep, Glob, Bash
 model: inherit
 ---
 

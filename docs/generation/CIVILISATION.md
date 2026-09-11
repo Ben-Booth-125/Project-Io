@@ -628,6 +628,47 @@ player.
 per world, with the arc intact — 15 of 16 worlds still show a polity rise, peak and fall, largest
 share at a median 10%, and hegemony reached in 0 of 16.
 
+### Fear of being next (Ben, 2026-09-11)
+
+A realm is attacked for what it has **done**, not for how big it is. This is the one lever
+`GENERATION_STRATEGY.md` marked *dangerous* — a balancing coalition — and it is admissible only in
+this exact form.
+
+**WHY THE OBVIOUS VERSION IS FORBIDDEN.** A term that reads a polity's RANK and pushes back is an
+agent handicap in a diplomacy costume, and the standing rule against agent handicaps forbids it
+outright. "The largest polity" is not a fact about the world; it is a fact about the scoreboard,
+and a force that reads the scoreboard is not in the world.
+
+**WHAT IS READ INSTEAD.** When a realm weighs a campaign against another, it may ask what that
+other realm has done **to peoples like its own** — the grudges held against it by living realms of
+the decider's own culture. That is a behaviour, recorded as named events with a place and a date,
+so a coalition forming against a riser is explicable **on the map**: the player can ask why and be
+handed the list. It required a dated widening of the AI-behaviour prohibition, raised rather than
+assumed, and `../ai/AI_OPPONENT.md` § 11 carries it with its exclusions.
+
+**THREE EXCLUSIONS, EACH LOAD-BEARING.** A realm never reads its **own** grudges to pick a target
+— that is revenge, a term inside the actor, and it stays declined. Nothing reads **size or rank**
+anywhere. And there are no treaties, no negotiation and no alliance objects: nobody agrees to
+anything, each realm reaches the same conclusion separately, which is what makes this a fear
+response inside a generation sim rather than a diplomacy layer.
+
+**THE LEAN IS ONE-SIDED, unlike the creed-aggression lean beside it.** A ledger's neutral is the
+*absence* of a record, and there is no such thing as fewer than no wrongs done — so a blameless
+realm is never leaned *down*. Leaning it down would be a peace bonus nobody granted, and it would
+make the peaceful half of the check below pass for the wrong reason.
+
+**THE CHECK THAT THE SCOPE HELD IS BEHAVIOURAL, and it cannot be read off a sweep.** In any real
+world a size term and a behaviour term correlate, so aggregates cannot tell them apart. The
+assertion is made instead on a built ledger in which **the peaceful realm is the larger one**: a
+large peaceful realm must attract no coalition while a smaller aggressive one does, and clearing
+the ledger with nothing else changed must drop both to nothing — which a rank term would not do.
+
+**MEASURED, 16 seeds at the 0 CE epoch:** the lean fires in 6 of 16 worlds, clustered rather than
+diffuse, and moves conquests about 6%. **It did not move hegemony at all** — 0 of 16 worlds at a
+50% share on both arms, largest share median 10% either way. That is reported rather than tuned
+away, and the reading is open: hegemony was already at its floor before this lever existed, so
+there was no headroom for it to improve (`NR-830`).
+
 ---
 
 ## What this phase hands the industrial era

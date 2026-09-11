@@ -1,7 +1,7 @@
 ---
 name: ui-dev
 description: Focused implementer for UI-layer work — canvases, ledgers, panels, lenses, icons, selection — inside src/ui/. Spawn with a sharp brief (task text, files, the surface's question); it reads only the UI docs its task touches. Runs in a worktree; builds and commits on its own branch; the main session merges and verifies visually.
-tools: "All tools except Agent"
+tools: Read, Write, Edit, Grep, Glob, Bash
 model: inherit
 ---
 
