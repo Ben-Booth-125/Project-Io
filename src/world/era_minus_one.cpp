@@ -111,6 +111,23 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     hp.unpaid_army_disband_q      = 250;
     hp.road_build_material_cost   = 2000;
 
+    // BL-929: a realm may DELIBERATELY buy a supply site rather than only
+    // win it as the incidental yield of `build_work` or of enough campaigns
+    // having walked a corridor. Priced ON THE SAME FOOTING as the road
+    // promotion it sits beside -- the same 2000 a corridor already costs the
+    // seat to cross a tier by use, since a purchase is buying the identical
+    // outcome by choice. `supply_upgrade_reach_gain_q` at a quarter of
+    // `work_reach_relief_cap_q` (800) means four purchases carry one region
+    // from bare to the ceiling, so the verb is a real lever and not a single
+    // one-shot fix. `supply_upgrade_threshold_q` at `work_threshold_q`'s own
+    // 8 -- deliberately low, so a quiet round can clear it exactly as a
+    // marginal Way Station can. Placeholder magnitudes on the same footing
+    // as the w_* weights beside them -- the SHAPE is the ruling, the numbers
+    // are history_sweep's to tune.
+    hp.supply_upgrade_material_cost = 2000;
+    hp.supply_upgrade_reach_gain_q  = 200;
+    hp.supply_upgrade_threshold_q   = 8;
+
     // BL-896: collapse is NETWORK FAILURE (Ben, 2026-09-11). Ground whose
     // reach from its own seat has fallen this low secedes rather than falling
     // to a neighbour -- a successor realm, which is what the dark age has to

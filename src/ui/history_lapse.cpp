@@ -1308,6 +1308,9 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         else
             std::snprintf(buf, sizeof buf, "A new people parts from its kin at %s.", R);
         break;
+    case lapse_event_kind::supply_site_upgraded:
+        std::snprintf(buf, sizeof buf, "%s buys a waystation, widening its own reach.", R);
+        break;
     default:
         std::snprintf(buf, sizeof buf, "Something happens at %s.", R);
         break;

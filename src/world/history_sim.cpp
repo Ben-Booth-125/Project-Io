@@ -793,6 +793,66 @@ history_sim_state run_history_sim(settlement_state&         ss,
         note_event(lapse_event_kind::road_promoted, lo, after, hi);
     };
 
+    // BL-929 -- A CORRIDOR BOUGHT OUTRIGHT, never merely walked into
+    // existence. Sets the edge's live use count straight to the threshold
+    // its NEXT tier needs, so a purchase always crosses a boundary — there
+    // is no "purchase that changed nothing" the way one more incidental walk
+    // can be. `note_corridor`'s refusal model is deliberately NOT reused: a
+    // refused walk is held one short because the corridor will be walked
+    // again on its own; a refused PURCHASE simply did not happen, so the
+    // uses count is left untouched rather than nudged.
+    const auto try_upgrade_corridor = [&](int a, int b, int payer_seat) -> bool {
+        if (a < 0 || b < 0 || a == b) return false;
+        if (a >= static_cast<int>(owner_index_limit)
+         || b >= static_cast<int>(owner_index_limit)) return false;
+        if (params.supply_upgrade_material_cost <= 0) return false;
+        const int cur_tier = road_tier_between(a, b);
+        if (cur_tier >= 2) return false; // already at the top tier — nothing left to buy
+        if (payer_seat < 0 || static_cast<std::size_t>(payer_seat) >= ss.regions.size())
+            return false;
+        region& seat = ss.regions[static_cast<std::size_t>(payer_seat)];
+        if (seat.material_stock < params.supply_upgrade_material_cost) return false;
+
+        seat.material_stock -= params.supply_upgrade_material_cost;
+        out.materials_spent_on_supply_sites += params.supply_upgrade_material_cost;
+        const int need = cur_tier == 0 ? params.road_tier1_uses : params.road_tier2_uses;
+        road_uses_live[edge_key(a, b)] = need;
+        ++roads_version;
+
+        const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
+        const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
+        // The finished world's road stamp (`road_generation.cpp`) reads
+        // `out.supply_corridors`, itself built from `corridor_uses` at the
+        // end of the run (line ~4350 below) — a bought corridor has to
+        // appear there or it renders as if it had never been walked at all.
+        corridor_uses.push_back({lo, hi});
+        note_event(lapse_event_kind::road_promoted, lo, road_tier_for_uses(need), hi);
+        return true;
+    };
+
+    // BL-929 -- A REGION'S OWN RELIEF, BOUGHT DIRECTLY, rather than only as
+    // the incidental yield of `apply_work_to_region` winning `work_score_q`'s
+    // contest (BL-757 measured that ZERO times across sixteen real
+    // generated worlds). Raises `region::work_reach_mod` by a fixed step,
+    // clamped at the SAME `work_reach_relief_cap_q` every other reader of
+    // that field already clamps against.
+    const auto try_upgrade_region_reach = [&](int hi, int payer_seat) -> bool {
+        if (hi < 0 || static_cast<std::size_t>(hi) >= ss.regions.size()) return false;
+        if (params.supply_upgrade_material_cost <= 0) return false;
+        region& hp = ss.regions[static_cast<std::size_t>(hi)];
+        if (hp.work_reach_mod >= params.work_reach_relief_cap_q) return false;
+        if (payer_seat < 0 || static_cast<std::size_t>(payer_seat) >= ss.regions.size())
+            return false;
+        region& seat = ss.regions[static_cast<std::size_t>(payer_seat)];
+        if (seat.material_stock < params.supply_upgrade_material_cost) return false;
+
+        seat.material_stock -= params.supply_upgrade_material_cost;
+        out.materials_spent_on_supply_sites += params.supply_upgrade_material_cost;
+        hp.work_reach_mod = clampi(hp.work_reach_mod + params.supply_upgrade_reach_gain_q,
+                                   0, params.work_reach_relief_cap_q);
+        return true;
+    };
+
     // --- GRUDGES (BL-827) -------------------------------------------------
     //
     // Directed, sparse, decaying, and carrying its cause. The table is a sorted
@@ -1116,6 +1176,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const region& rb = ss.regions[static_cast<std::size_t>(b)];
         const int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
         return raw_step > 0 ? std::max(1, road_discounted(raw_step, road_tier_between(a, b))) : 1;
+    };
+
+    // BL-929's own reading of the same step, AT A TIER THE EDGE DOES NOT YET
+    // CARRY -- what would this edge cost if the corridor were promoted right
+    // now. `edge_step` cannot answer this: it always reads the edge's LIVE
+    // tier. Scoring "should I buy the next tier" needs the cost the purchase
+    // would actually produce, asked without touching `road_uses_live` --
+    // the scorer must be free to ask this of an edge it does not buy.
+    const auto edge_step_at_tier = [&](int a, int b, int tier) {
+        const region& ra = ss.regions[static_cast<std::size_t>(a)];
+        const region& rb = ss.regions[static_cast<std::size_t>(b)];
+        const int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
+        return raw_step > 0 ? std::max(1, road_discounted(raw_step, tier)) : 1;
     };
 
     // BL-922 -- THE CAPITAL IS THE STRATEGIC HEADQUARTERS (CIVILISATION.md
@@ -2282,6 +2355,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // region and a row and the other verbs' single target already
             // means three different things (region, parent, domain).
             int      best_work_row = -1;
+            // BL-929: the corridor's OTHER endpoint when `upgrade_supply`
+            // chose a corridor site (`best_target` is the near endpoint, the
+            // one whose `network_supply_q` the purchase was scored against);
+            // -1 when the chosen site is a region's own relief instead.
+            int      best_supply_partner = -1;
             // BL-384 instrumentation, READ ONLY BY THE TRACE. The scorer's own
             // estimate of the odds for the candidate it chose, and the staging
             // hub it scored those odds against. Carried because the trace has to
@@ -2971,6 +3049,112 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         {
                             best_score = s; best_verb = sim_verb::build_work;
                             best_target = pi; best_work_row = id; best_winter = false;
+                        }
+                    }
+                }
+            }
+
+            // -- Upgrade supply site (BL-929) -------------------------------
+            //
+            // SCORED LAST, after `build_work`, for the same reason build_work
+            // is scored after everything above it: `>` against `best_score`
+            // means this must strictly beat every other candidate, and it is
+            // the newest verb in the contest.
+            //
+            // OFFERED ONLY WHERE SUPPLY IS ALREADY LOW: every held region at
+            // or below `sustainable_settlement_floor_q` — the SAME floor
+            // growth (BL-872) and secession (BL-896) already read, so "low"
+            // means what it already means everywhere else in this file.
+            // "Falling" is not separately tracked (this file keeps no
+            // history of last round's own reading to compare against, the
+            // same one-round-at-a-time contract `network_supply_q` is read
+            // under everywhere else), so a region already at or under the
+            // floor stands in for both readings the design names.
+            //
+            // TWO SITE KINDS, ONE PRICE, scored against the SAME identity
+            // `network_supply_q` is computed from just above — never a
+            // second Dijkstra. Candidate A is the region's OWN relief;
+            // candidate B is ONE incoming edge from a held neighbour, asked
+            // "what would this region's reach be if THIS edge alone were
+            // promoted" via `edge_step_at_tier`. Neither candidate re-walks
+            // the graph, so a purchase can only ever be scored against the
+            // one region it was asked about — a corridor's benefit to
+            // regions FARTHER OUT than the one scored here is real (the
+            // Dijkstra would carry a cheaper edge onward) but uncounted,
+            // which understates a deep corridor's value rather than
+            // overstating it. Honest and bounded, not exact.
+            if (params.supply_upgrade_material_cost > 0
+             && q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size()
+             && ss.regions[static_cast<std::size_t>(q.capital)].material_stock
+                    >= params.supply_upgrade_material_cost)
+            {
+                for (int hi : held)
+                {
+                    const std::size_t hidx = static_cast<std::size_t>(hi);
+                    region& hp = ss.regions[hidx];
+                    const int old_supply_q = hp.network_supply_q;
+                    if (old_supply_q > params.sustainable_settlement_floor_q) continue;
+
+                    const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
+                                          ? reach[hidx] : (1 << 27);
+                    if (reach_here >= (1 << 27)) continue; // unreachable: no purchase fixes this
+
+                    // -- Candidate A: this region's own relief -------------
+                    if (hp.work_reach_mod < params.work_reach_relief_cap_q)
+                    {
+                        const int new_hub_reach_q = clampi(
+                            hp.work_reach_mod + params.supply_upgrade_reach_gain_q,
+                            0, params.work_reach_relief_cap_q);
+                        const int64_t terrain_cost = static_cast<int64_t>(reach_here)
+                                                   * leaned_terrain_reach_cost_q(params) / 100;
+                        const int64_t terrain_paid =
+                            terrain_cost - (terrain_cost * new_hub_reach_q) / 1000;
+                        const int new_supply_q =
+                            static_cast<int>(clampi64(1000 - terrain_paid, 0, 1000));
+                        const int gain_q = clampi(new_supply_q - old_supply_q, 0, 1000);
+                        if (gain_q > 0)
+                        {
+                            const int s = static_cast<int>(
+                                (static_cast<int64_t>(region_value_q(hp)) * gain_q) / 1000);
+                            if (s > best_score && s >= params.supply_upgrade_threshold_q)
+                            {
+                                best_score = s; best_verb = sim_verb::upgrade_supply;
+                                best_target = hi; best_supply_partner = -1;
+                                best_winter = false;
+                            }
+                        }
+                    }
+
+                    // -- Candidate B: one incoming edge, held neighbour only
+                    for (int nb : neighbours[hidx])
+                    {
+                        const std::size_t nidx = static_cast<std::size_t>(nb);
+                        if (owner[nidx] != q.id) continue;
+                        if (nidx >= reach.size() || reach[nidx] >= (1 << 27)) continue;
+                        const int cur_tier = road_tier_between(nb, hi);
+                        if (cur_tier >= 2) continue;
+                        const int64_t candidate_reach = static_cast<int64_t>(reach[nidx])
+                                                       + edge_step_at_tier(nb, hi, cur_tier + 1);
+                        if (candidate_reach >= reach_here) continue; // not this region's best path
+
+                        const int64_t terrain_cost = candidate_reach
+                                                   * leaned_terrain_reach_cost_q(params) / 100;
+                        const int hub_reach_q =
+                            clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
+                        const int64_t terrain_paid =
+                            terrain_cost - (terrain_cost * hub_reach_q) / 1000;
+                        const int new_supply_q =
+                            static_cast<int>(clampi64(1000 - terrain_paid, 0, 1000));
+                        const int gain_q = clampi(new_supply_q - old_supply_q, 0, 1000);
+                        if (gain_q <= 0) continue;
+
+                        const int s = static_cast<int>(
+                            (static_cast<int64_t>(region_value_q(hp)) * gain_q) / 1000);
+                        if (s > best_score && s >= params.supply_upgrade_threshold_q)
+                        {
+                            best_score = s; best_verb = sim_verb::upgrade_supply;
+                            best_target = hi; best_supply_partner = nb;
+                            best_winter = false;
                         }
                     }
                 }
@@ -3880,6 +4064,42 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 out.history.push_back(history_event{
                     years_from_calendar_year(y), chain_stage::legacy,
                     bp.name + " raises a " + r->name, std::string{}});
+                break;
+            }
+            case sim_verb::upgrade_supply:
+            {
+                if (best_target < 0 || best_target >= static_cast<int>(ss.regions.size())) break;
+                const int payer = q.capital;
+                bool bought = false;
+                bool corridor_kind = false;
+                if (best_supply_partner >= 0)
+                {
+                    corridor_kind = try_upgrade_corridor(best_supply_partner, best_target, payer);
+                    bought = corridor_kind;
+                }
+                else
+                {
+                    bought = try_upgrade_region_reach(best_target, payer);
+                }
+                if (!bought) break; // the scorer's own read of the seat went stale — refused, not forced
+
+                ++out.supply_sites_upgraded;
+                if (corridor_kind) ++out.supply_sites_upgraded_corridors;
+                else                ++out.supply_sites_upgraded_regions;
+                // BL-916 lapse marker — the corridor case already gets one
+                // from `road_promoted` inside `try_upgrade_corridor`; a
+                // region buying its own relief needs its OWN event, or a
+                // waystation purchase would draw nothing on the lapse at all.
+                if (!corridor_kind)
+                    note_event(lapse_event_kind::supply_site_upgraded, best_target, q.id, -1);
+
+                const region& tp = ss.regions[static_cast<std::size_t>(best_target)];
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    corridor_kind
+                        ? (tp.name + " buys a road to widen its supply")
+                        : (tp.name + " buys a waystation to widen its own reach"),
+                    std::string{}});
                 break;
             }
             case sim_verb::consolidate:
