@@ -478,7 +478,7 @@ int main(int argc, char** argv)
 {
     int seed_count = 16;
     int64_t epoch_year = 0;
-    bool derive_from_generation = false;
+    bool derive_from_generation = true;  // BL-900: generation's span is the default
     std::vector<param_override> overrides;
 
     for (int a = 1; a < argc; ++a)
@@ -512,6 +512,32 @@ int main(int argc, char** argv)
             derive_from_generation = true;
             continue;
         }
+        // --struct-default: the OLD behaviour, now opt-IN (BL-900).
+        //
+        // `history_sim_params{}` is a 4000 BCE -> 0 CE span on a six-band clock
+        // (100/50/20/10/5/1-year steps, 136 decision rounds). Generation runs
+        // 400 BCE -> 0 CE on ONE 4-year band, 100 rounds. They are different
+        // worlds, and until this change the harness measured the first by
+        // default while the game ran the second -- BL-462's defect, left half
+        // closed because `--epoch` was made opt-in so old numbers kept meaning
+        // what they meant.
+        //
+        // BL-894 turned that from a SPAN difference into a BEHAVIOUR one:
+        // `settle_requires_razed_ground` is set by era_minus_one_sim_params and
+        // is false in the struct default, so Settle means something different
+        // in each. Measured on the same 8 seeds: 810 battles on generation's
+        // span against 7 on the struct default, rise-peak-fall in 8/8 worlds
+        // against 1/8. A default that reports the second is a default that
+        // reports a world nobody plays.
+        //
+        // The span is still REACHABLE, because colonisation-era questions
+        // genuinely need a migration-era arc -- it just has to be asked for,
+        // and it says so on the banner when it is.
+        if (arg == "--struct-default")
+        {
+            derive_from_generation = false;
+            continue;
+        }
         // AN UNRECOGNISED FLAG IS AN ERROR, NOT A SHRUG (2026-09-11).
         //
         // `--epoch` and `--set` both guard on `a + 1 < argc`, so a malformed
@@ -532,7 +558,8 @@ int main(int argc, char** argv)
         {
             std::printf("FAIL  unknown or malformed flag \"%s\".\n"
                         "      --epoch <year>   (the year is REQUIRED)\n"
-                        "      --set <field>=<value>\n", arg.c_str());
+                        "      --set <field>=<value>\n"
+                        "      --struct-default (the 4000 BCE arc the game does NOT run)\n", arg.c_str());
             return 2;
         }
         const int n = std::atoi(argv[a]);
@@ -576,22 +603,29 @@ int main(int argc, char** argv)
     const bool tuned = !overrides.empty();
     g_overrides = overrides;
 
-    std::printf("=== history sweep (BL-275) — %d seeds, %lld -> %lld ===\n",
+    std::printf("=== history sweep (BL-275) - %d seeds, %lld -> %lld  [%s] ===\n",
                 seed_count,
                 static_cast<long long>(params.start_year),
-                static_cast<long long>(params.stop_year));
+                static_cast<long long>(params.stop_year),
+                derive_from_generation
+                    ? "GENERATION'S OWN RUN"
+                    : "STRUCT-DEFAULT ARC - NOT the run the game performs");
 
     // --- WHAT THIS SWEEP MEASURES, STATED ON THE FACE OF THE REPORT ---------
     //
-    // WITHOUT `--epoch` these are `history_sim_params`'s STRUCT DEFAULTS, and
-    // those are NOT the params generation runs. Generation derives its own
-    // through `era_minus_one_sim_params` — at the 0 CE epoch that is -400 -> 0
-    // on ONE four-year band (100 rounds), against the default's -4000 -> 0 on
-    // six bands (136 rounds). That divergence is the BL-462 defect,
-    // era_minus_one.hpp is the file written to close it, and this harness is
-    // still on the wrong side of it. Printing the numbers does not fix that; it
-    // stops the report being read as a measurement of the shipped run.
+    // WHICH WORLD THIS IS, SAID ON THE FACE OF THE REPORT (BL-900).
     //
+    // The default is now GENERATION'S OWN params (`era_minus_one_sim_params`):
+    // at the 0 CE epoch, -400 -> 0 on ONE four-year band, 100 rounds. That is
+    // the run the game performs. `--struct-default` asks for the old arc
+    // instead -- -4000 -> 0 on six bands, 136 rounds -- which spans the
+    // migration era and is a legitimate thing to want, but is NOT the shipped
+    // run and now says so.
+    //
+    // This closes the half of BL-462 that was left open. The defect was never
+    // that the struct-default arc existed; it was that it was the DEFAULT, so
+    // a report describing a world nobody plays looked like a measurement of the
+    // game. Three sprints were steered by numbers from it.
     // The span is reported from the params rather than assumed, so a two-span
     // run (BL-747) shows both halves and a single-span run says so outright
     // instead of printing a boundary of INT64_MIN as if it meant something.
