@@ -12,6 +12,7 @@
 #include "grudge_sentiment.hpp"  // BL-898: the Era -1 grudge record's one consumer
 #include "history_ladder.hpp"
 #include "history_sim.hpp"      // BL-271 wired into generation, 2026-08-12
+#include "logistics.hpp"        // BL-910: body_tile_grid, for the close's capital markets
 #include "sim_terrain_build.hpp" // build_sim_terrain for the sim's terrain view
 #include "law.hpp" // BL-343: seed_prototype_laws
 #include "nation_generation.hpp"
@@ -932,6 +933,39 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 fixture->conquests = hs.conquests;
                 fixture->foundings = hs.foundings;
                 fixture->years     = hs.years;
+            }
+
+            // --- BL-910: capitals and markets stand at the 1200 CE close ---
+            //
+            // `run_history_sim` marked `region::has_market` on every living
+            // polity's capital (CIVILISATION.md sec Capitals exist at the
+            // close) -- a PLACE AND A VISIBLE CONDITION, not an order book:
+            // the market spawned here is default-constructed (no supply, no
+            // demand, no price, no inventory) except for its anchor. It is a
+            // SEPARATE mechanism from the BL-768 resource/junction carve
+            // below, which prices and populates the campaign's own market
+            // set once population centres exist; that carve is unchanged and
+            // this block does not fold into it, only stands ahead of it.
+            {
+                const std::vector<entity_id>& grid = body_tile_grid(w, kepler);
+                if (static_cast<int>(grid.size()) >= home_grid_width * home_grid_height)
+                {
+                    for (const region& rg : kepler_settlement.regions)
+                    {
+                        if (!rg.has_market) continue;
+                        if (rg.row < 0 || rg.row >= home_grid_height
+                         || rg.col < 0 || rg.col >= home_grid_width)
+                            continue;
+                        const entity_id anchor_tile =
+                            grid[static_cast<std::size_t>(rg.row) * home_grid_width
+                                 + static_cast<std::size_t>(rg.col)];
+                        if (anchor_tile == null_entity) continue;
+                        market_component mc;
+                        mc.body        = kepler;
+                        mc.centre_tile = anchor_tile;
+                        w.markets[w.create_entity()] = mc;
+                    }
+                }
             }
         }
         // OUTSIDE the gate, deliberately: a skipped era must read as zero

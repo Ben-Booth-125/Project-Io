@@ -3970,6 +3970,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
         q.alive = any;
     }
 
+    // --- BL-910: CAPITALS AND MARKETS STAND AT THE CLOSE --------------------
+    // CIVILISATION.md sec Capitals exist at the close. NOT A NEW PLACEMENT
+    // PASS: every living polity already tracks its capital as a region index
+    // (`polity::capital`), kept pointed at whichever of its regions `is_seat`
+    // as ownership moves (see the "capital fell" block above). This is a pure
+    // READ of that fact, at the one moment pass 1 hands its output forward —
+    // it marks the region a market stands on, never invents a capital.
+    //
+    // NO QUOTA. A polity with no living holdings never reaches this loop
+    // (`q.alive` is false), so it and every region it once held carry no
+    // market — the same permission a city state gets, not a floor.
+    for (const polity& q : out.polities)
+    {
+        if (!q.alive) continue;
+        if (q.capital < 0 || q.capital >= static_cast<int>(ss.regions.size()))
+            continue; // Defensive: an alive polity always names a capital above.
+        region& cap = ss.regions[static_cast<std::size_t>(q.capital)];
+        if (!cap.is_seat) continue; // Defensive; the capital IS the seat by construction.
+        cap.has_market = true;
+    }
+
     // --- THE TARIFF POSTURE (BL-750) --------------------------------------
     //
     // A DERIVED OUTPUT READ AT HANDOFF, NEVER A SCORED VERB (Ben, 2026-09-06;
@@ -4314,6 +4335,34 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why)
         for (int k = 1; k < g.events_kept; ++k)
             if (g.events[k - 1].magnitude < g.events[k].magnitude)
                 return fail("a grudge's kept events are not sorted by magnitude");
+    }
+
+    // 4. Capitals and markets at the close (BL-910). A market never stands
+    //    without a seat under it, and a market only ever stands ON a seat —
+    //    never a hinterland region a polity happens to hold.
+    for (std::size_t i = 0; i < o.regions.size(); ++i)
+    {
+        if (o.regions[i].has_market && !o.regions[i].is_seat)
+            return fail("region " + std::to_string(i)
+                        + " carries a market without a seat");
+    }
+    //    And NO QUOTA the other way either: every living polity that holds
+    //    ground names a capital, that capital IS a seat, and that seat
+    //    carries the market — nothing here manufactures one; it only checks
+    //    that the closing block above did not skip one it owed.
+    for (const polity_holdings& h : o.holdings)
+    {
+        const polity& q = o.polities[static_cast<std::size_t>(h.polity)];
+        if (q.capital < 0 || q.capital >= static_cast<int>(o.regions.size()))
+            return fail("polity " + std::to_string(h.polity)
+                        + " holds ground but names no capital");
+        const region& cap = o.regions[static_cast<std::size_t>(q.capital)];
+        if (!cap.is_seat)
+            return fail("polity " + std::to_string(h.polity)
+                        + "'s capital is not a seat");
+        if (!cap.has_market)
+            return fail("polity " + std::to_string(h.polity)
+                        + "'s capital carries no market at the close");
     }
 
     if (why) why->clear();
