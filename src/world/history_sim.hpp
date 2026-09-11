@@ -260,6 +260,16 @@ struct history_sim_params
     /// supply matters enormously), and `holdings_burden_q` (so breadth costs
     /// something at all). See `campaign_supply` in the .cpp, which is the one
     /// place all three are priced.
+    ///
+    /// RETIRED BY BL-922 (Ben, 2026-09-11: the capital is the strategic
+    /// headquarters). `campaign_supply` no longer reads this field: the
+    /// staging-hub distance term it scaled was the reason the reach gate
+    /// refused nothing (BL-905 -- an ordinary neighbour-adjacent march barely
+    /// decayed the currency, and the capital's reach was a footnote to it).
+    /// The march is now priced as the capital's reach to the hub over held
+    /// ground plus one `edge_step` onto the target, all in the
+    /// `terrain_reach_cost_q` currency. The field stays so older harness
+    /// fixtures and `--set` lines still parse; setting it does nothing.
     int supply_decay_per_tile_q = 28;
 
     // --- The army pool (BL-835) -------------------------------------------
@@ -547,10 +557,26 @@ struct history_sim_params
     // whole dynamic range was 10% of combat power, and breadth cost nothing at
     // all — holding 500 regions cost exactly what holding 5 cost.
 
-    /// Extra supply cost per tile of TERRAIN-WEIGHTED reach, on top of the
-    /// per-tile decay. Mountains cost roughly twice what plains cost, using the
-    /// same landform ratios logistics.cpp already defines for the 1960 era.
-    int terrain_reach_cost_q = 10;
+    /// Supply cost per 100 tiles of TERRAIN-WEIGHTED reach from the capital
+    /// over HELD ground (BL-922): `network_supply_q = 1000 - reach x this /
+    /// 100`. Mountains cost roughly twice what plains cost, using the same
+    /// landform ratios logistics.cpp already defines for the 1960 era; a
+    /// road discounts the edge (BL-837) and a town relays (BL-887).
+    ///
+    /// 4000 IS MEASURED, NOT CHOSEN (BL-922, history_sweep 4 seeds at the
+    /// 0 CE epoch, supply priced over the uncapped held-ground index). The
+    /// old 10 lost 0.1 per plains tile, so the longest connected path on the
+    /// map read ~970 and the floors (40/60/80) were reachable only by ground
+    /// in another connected component -- the reach gate refused nothing
+    /// (BL-905). Swept 10 / 1000 / 2000 / 3000 / 4000 / 5000: the gate first
+    /// refuses at 3000 (median 1,593 of ~940,000 contacts, 0.17%); at 4000 it
+    /// refuses 12,129 of ~784,000 (1.5%), the 30+-tile band reads 360-480
+    /// against 880 beside the capital, and a few CONNECTED regions sit under
+    /// the campaign floor; at 5000 it refuses 8.7% and battles fall to a
+    /// third of the 10 figure. 4000 is the smallest swept value at which
+    /// the gate refuses a non-trivial share. Re-tune from the sweep's
+    /// BL-922 block, never by re-guessing.
+    int terrain_reach_cost_q = 4000;
 
     // --- Ancient roads and the reach GATE (BL-837) -------------------------
     //
@@ -2208,6 +2234,15 @@ struct history_sim_state
     /// broken.
     int64_t secessions      = 0;
     int64_t regions_seceded = 0;
+    /// BL-922 -- of `regions_seceded`, how many had a FED region of their
+    /// own realm within `neighbour_radius` when they walked. Under the
+    /// degree-capped campaign index (BL-855) that was 70-80% of all
+    /// secessions -- the graph, not the map, had cut them off -- which is
+    /// why supply walks its own uncapped index. What remains is the
+    /// residual (a fed neighbour that is itself past the floor's distance,
+    /// or a relay that moved this round); a rise here says the supply index
+    /// and the map disagree again. Report-only; `history_sweep` prints it.
+    int64_t regions_seceded_graph_cut = 0;
 
     /// BL-869 — every civilisation mixing actually grew, in formation order.
     /// A NAMED RECORD each (creeds.hpp), never a creed: `region::civilisation`

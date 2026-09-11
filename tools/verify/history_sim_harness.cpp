@@ -269,9 +269,8 @@ settlement_state one_polity_two_regions(int separation)
     return ss;
 }
 
-/// A three-region CHAIN: Home (polity A) — Mid — Far, with Mid and Far
-/// sharing a founding culture (so they seed as one polity, B, exactly like
-/// `two_polity_world` seeds its single rival). Home borders Mid; Mid borders
+/// A three-region CHAIN: Home (polity A) — Mid (polity B) — Far (polity C),
+/// one founding culture each (BL-922; see the note on Far). Home borders Mid; Mid borders
 /// Far; Home does NOT border Far directly at the separations this harness
 /// uses. Used to isolate the road discount (BL-837): once Home takes Mid,
 /// reaching Far is a TWO-HOP question the capital's Dijkstra answers through
@@ -286,10 +285,19 @@ settlement_state road_chain_world(int leg)
     home.culture = culture_shares::pure(0); home.founding_culture = 0;
     home.farm_q = 900; home.ore_q = 500; home.port_q = 100;
     home.settle_score_q = 900; home.name = "Home";
+    // BL-922: HOME IS THE AGGRESSOR, BY WEIGHT OF PEOPLE. The fixture asks a
+    // two-hop question (Home takes Mid, then reaches Far through it), and
+    // that question is only asked if Home wins the first hop. Under the old
+    // currency the gate refused nearly every candidate and the run never got
+    // that far, so who won did not matter; priced from the capital the first
+    // hop is allowed, and a Mid that took Home instead would answer a
+    // different question. A tenfold population makes the first hop Home's.
+    home.population = 2'000'000;
     ss.regions.push_back(home);
 
     region mid;
     mid.col = leg; mid.row = 0; mid.anchor = leg;
+    mid.population = 20'000;
     mid.culture = culture_shares::pure(1); mid.founding_culture = 1;
     mid.farm_q = 700; mid.ore_q = 400; mid.port_q = 100;
     mid.settle_score_q = 700; mid.name = "Mid"; // higher than Far's -> B's capital.
@@ -297,7 +305,13 @@ settlement_state road_chain_world(int leg)
 
     region far;
     far.col = 2 * leg; far.row = 0; far.anchor = 2 * leg;
-    far.culture = culture_shares::pure(1); far.founding_culture = 1;
+    // BL-922: Far is its OWN polity (C), not B's hinterland. Under BL-866 a
+    // seat's hinterland falls WITH the seat, so a Far that pointed at Mid was
+    // taken in the same event as Mid and the two-hop question this fixture
+    // exists to ask was never asked. As a city state of its own it is reached
+    // only by the second hop, which is the whole point.
+    far.culture = culture_shares::pure(2); far.founding_culture = 2;
+    far.population = 20'000;
     far.farm_q = 950; far.ore_q = 900; far.port_q = 100;
     far.settle_score_q = 500; far.name = "Far";
     ss.regions.push_back(far);
@@ -556,6 +570,15 @@ int main()
         // target outright; it is a proportional discount now, so it discourages
         // rather than forbids. Zeroing it still removes the variable.)
         p2.w_dist = 0;
+
+        // BL-922: supply is priced from the capital over held ground in the
+        // `terrain_reach_cost_q` currency alone -- the staging-hub decay
+        // (`supply_decay_per_tile_q`, 28 x hub_dist) that used to drive the
+        // far case to ~50/1000 is gone. Stated explicitly so the far prize
+        // (34 tiles) lands at ~250: under `stalled_supply_q` (300), so it
+        // STALLS, and above `sustainable_campaign_floor_q` (80), so it is
+        // still fought for. An instrument setting, not the shipped value.
+        p2.terrain_reach_cost_q = 2200;
 
         settlement_state near_w = two_polity_world(3);
         settlement_state far_w  = two_polity_world(34);
@@ -824,6 +847,14 @@ int main()
         settlement_state s = k1->settlement;
         history_sim_params p3 = params; // The real epoch — winter is a real axis in it.
         p3.winter_score_premium_q = 0;  // Make winter freely competitive.
+        // BL-922: REACH MUST NOT BE WHAT STOPS THE WAR HERE. This fixture
+        // asks whether winter is chosen as a candidate, which needs campaigns
+        // to happen at all. With `params` carrying no centre relay and the
+        // shipped 4000 (measured on generation's round, relay ON), this seed
+        // fought 2 battles in 4,000 years and the check read "no winter" for
+        // want of any war. Priced at the pre-gradient magnitude the fixture
+        // was written against, so the season axis is the only variable.
+        p3.terrain_reach_cost_q = 10;
         const history_sim_state a = run_history_sim(s, nullptr, no_terrain, kgw, kgh, p3, 4242u);
         // Print the counts BOTH checks read. R5b is trivially true when both are
         // zero, so a bare R5 failure cannot distinguish "winter is never chosen"
@@ -1460,6 +1491,11 @@ int main()
         // production regression — see the field's own comment). A test
         // proving the MECHANISM must not depend on the CALIBRATION.
         const int separation = 30;
+        // BL-922: the currency is now capital-reach x `terrain_reach_cost_q`
+        // alone (the hub-distance decay is gone), so the ~155-160 this case
+        // was calibrated against is restated in it: 30 tiles x 2800 / 100 =
+        // 840 off 1000 -> 160. An instrument setting, not the shipped value.
+        ps.terrain_reach_cost_q = 2800;
 
         history_sim_params gated = ps;
         gated.sustainable_campaign_floor_q = 200; // Above the ~155-160 this target supplies: GATES it.
@@ -1511,7 +1547,13 @@ int main()
         ps.stop_year  = 1200;
         ps.neighbour_radius = 26;      // covers each 24-tile leg, not the 48-tile skip.
         ps.w_dist = 0;
-        ps.terrain_reach_cost_q = 260; // an instrument gain (S2 does the same), not a calibration.
+        // BL-922: restated in the capital-reach currency. Home -> Mid is one
+        // 24-tile hop (480 off 1000: allowed, walked, and so ROADED at
+        // `road_tier1_uses=1`); Mid -> Far is a second hop the capital prices
+        // through Mid: 48 unroaded (960 off -> 40, DENIED at the 80 floor)
+        // against 16 + 24 = 40 roaded (800 off -> 200, allowed). Any value in
+        // 1917..2299 separates the two; 2000 is the round one.
+        ps.terrain_reach_cost_q = 2000;
 
         history_sim_params with_road = ps;
         with_road.road_tier1_uses = 1;
@@ -1567,7 +1609,7 @@ int main()
         ps.stop_year  = 200;
 
         history_sim_params near = ps;
-        near.terrain_reach_cost_q = 10; // the shipped default — comfortably sustained.
+        near.terrain_reach_cost_q = 10; // an instrument setting well inside reach (the shipped value is BL-922's 4000).
 
         history_sim_params far = ps;
         far.terrain_reach_cost_q = 25000; // an instrument gain: saturate the terrain term outright.
@@ -1611,7 +1653,7 @@ int main()
         ps.stop_year  = 600;
 
         history_sim_params near = ps;
-        near.terrain_reach_cost_q = 10; // the shipped default — comfortably sustained.
+        near.terrain_reach_cost_q = 10; // an instrument setting well inside reach (the shipped value is BL-922's 4000).
 
         history_sim_params far = ps;
         // Calibrated (printed below) to land the Outpost's network_supply_q

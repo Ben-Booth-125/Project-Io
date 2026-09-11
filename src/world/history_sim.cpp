@@ -642,12 +642,36 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // campaign-era A* already applies for the same reason, restated here
     // rather than called across the ECS boundary this file is deliberately
     // free of (settlement.hpp: "no `world&`, no tile ids, no allocator").
-    const auto road_discount = [](int tier) {
-        return 1.0f / (1.0f + 0.5f * static_cast<float>(tier));
+    //
+    // BL-922: INTEGER, not float. 1 / (1 + 0.5 x tier) == 2 / (2 + tier), so
+    // the discounted step is `raw x 2 / (2 + tier)` rounded half-up in
+    // integer arithmetic. The float form it replaces was deterministic on
+    // one machine and one compiler; this one is deterministic by construction.
+    const auto road_discounted = [](int raw, int tier) {
+        const int den = 2 + tier;
+        return (raw * 2 + den / 2) / den;
     };
     const auto road_tier_between = [&](int a, int b) {
         const auto it = road_uses_live.find(edge_key(a, b));
         return it != road_uses_live.end() ? road_tier_for_uses(it->second) : 0;
+    };
+
+    // BL-922 -- SUPPLY IS PRICED FROM THE CAPITAL OVER HELD GROUND ONLY, so
+    // reach depends on WHO HOLDS WHAT, and a cache built against one
+    // ownership map is stale against the next. One counter per polity,
+    // bumped for the loser and the gainer whenever a region changes hands
+    // (conquest, founding, secession), so a conquest between two other realms
+    // costs this one no rebuild. Indexed by `polity::id`, grown on demand.
+    std::vector<int> owner_version_by_polity;
+    const auto touch_owner = [&](int pid) {
+        if (pid < 0) return;
+        if (owner_version_by_polity.size() <= static_cast<std::size_t>(pid))
+            owner_version_by_polity.resize(static_cast<std::size_t>(pid) + 1, 0);
+        ++owner_version_by_polity[static_cast<std::size_t>(pid)];
+    };
+    const auto owner_version_of = [&](int pid) -> int {
+        if (pid < 0 || owner_version_by_polity.size() <= static_cast<std::size_t>(pid)) return 0;
+        return owner_version_by_polity[static_cast<std::size_t>(pid)];
     };
 
     // BL-895 -- WHAT A PLACE IS BEST AT, as a CLASS rather than a quantity.
@@ -902,16 +926,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // itself a deterministic function of the seed and the simulation trace,
     // so the result is reproducible byte-for-byte; it is simply no longer a
     // pure function of the region SET alone, the way the uncapped radius was.
+    //
+    // BL-922 -- A SECOND, UNCAPPED INDEX FOR SUPPLY. The degree cap above is
+    // a bound on CAMPAIGN candidates, and it is first-come: a region founded
+    // into a full neighbourhood may carry no edge to its own parent, or to
+    // any region of its own realm, while standing a few tiles from them.
+    // While reach was ownership-blind that was harmless -- some path existed.
+    // Priced over HELD ground only, it is not: measured on this build tree,
+    // 70-80% of the ground that seceded under the capped index had a FED
+    // region of its own realm within `neighbour_radius` (history_sweep's
+    // BL-922 lines). So supply walks `supply_neighbours` -- every region
+    // within `neighbour_radius`, no cap -- and the campaign scorer keeps
+    // `neighbours`. Affordable precisely because the walk is held-only: a
+    // rebuild touches a realm's own regions' lists, never the whole map's.
     std::vector<std::vector<int>> neighbours(ss.regions.size());
+    std::vector<std::vector<int>> supply_neighbours(ss.regions.size());
     std::vector<int> degree(ss.regions.size(), 0);
     const auto link_region = [&](std::size_t i) {
         std::vector<std::pair<int, int>> candidates; // (distance, region index)
         for (std::size_t j = 0; j < i; ++j)
         {
-            if (degree[j] >= params.max_neighbour_degree) continue; // No free slot.
             const int d = region_distance(ss.regions[i], ss.regions[j], gw);
-            if (d <= params.neighbour_radius)
-                candidates.emplace_back(d, static_cast<int>(j));
+            if (d > params.neighbour_radius) continue;
+            supply_neighbours[i].push_back(static_cast<int>(j)); // BL-922: uncapped
+            supply_neighbours[j].push_back(static_cast<int>(i));
+            if (degree[j] >= params.max_neighbour_degree) continue; // No free slot.
+            candidates.emplace_back(d, static_cast<int>(j));
         }
         std::sort(candidates.begin(), candidates.end()); // Nearest first, index tie-break.
         for (const std::pair<int, int>& c : candidates)
@@ -947,15 +987,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
     //
     // WHY THIS IS OUTPUT-IDENTICAL, which is the only property that matters in
     // `world/*`: the cost vector is a function of the capital, the neighbour
-    // graph and the terrain under each region's anchor. Terrain is fixed for the
-    // run and an anchor is written once, at founding. The graph is mutated in
-    // exactly one place — `link_region`, called only when a region is founded —
-    // and that founding also grows `ss.regions`. So the region-count check below
-    // catches every graph mutation, and the capital check catches the only two
-    // places a capital is assigned. There is no third input to go stale.
+    // graph, the terrain under each region's anchor, the road tiers, the
+    // centre map (relay on) and -- since BL-922 -- WHICH REGIONS THIS POLITY
+    // HOLDS. Terrain is fixed for the run and an anchor is written once, at
+    // founding. The graph is mutated in exactly one place — `link_region`,
+    // called only when a region is founded — and that founding also grows
+    // `ss.regions`. A region founded by ANOTHER polity is ground this polity
+    // does not hold, which the held-only walk below never expands, so a grown
+    // region count alone only extends the vector with the sentinel; a region
+    // founded by THIS polity bumps its `owner_version` and rebuilds. The
+    // capital check catches the only two places a capital is assigned.
     struct reach_cache
     {
-        std::vector<int> cost;    ///< Per-region cost from `capital`.
+        std::vector<int> cost;    ///< Per-region cost from `capital`, over HELD ground.
         int              capital = -2; ///< Which capital `cost` was built for.
         /// BL-837: `roads_version` this cost vector was built against. A road
         /// crossing a tier changes an edge weight without moving the capital
@@ -968,6 +1012,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
         /// crossing a road tier -- so it is a FOURTH invalidation input, and
         /// the header comment above is exhaustive only with it listed.
         int              centres_version = -1;
+        /// BL-922: this polity's `owner_version_by_polity` entry the vector
+        /// was built against. Supply crosses HELD ground only, so a region
+        /// gained or lost changes what the capital can reach -- the FIFTH
+        /// input, and the one a conquest moves.
+        int              owner_version = -1;
     };
     std::vector<reach_cache> reach_by_polity;
 
@@ -985,11 +1034,44 @@ history_sim_state run_history_sim(settlement_state&         ss,
         }
     };
 
-    const auto rebuild_reach = [&](reach_cache& rc, int capital) {
+    // THE COST OF ONE STEP between two regions: Chebyshev distance weighted by
+    // the mean landform ratio of the two ends, then discounted by whatever
+    // road tier this history has walked onto that line (BL-837, mirroring
+    // logistics.cpp's `road_traversal_multiplier`: Track ~0.67, Road 0.50).
+    // Never below 1, so no edge is free. ONE definition, read by the Dijkstra
+    // below and by `campaign_supply`'s last hop onto a target (BL-922) -- the
+    // file's standing thesis: a cost authored on one scale and spent on
+    // another is the bug, so both ask the identical question.
+    const auto edge_step = [&](int a, int b) {
+        const region& ra = ss.regions[static_cast<std::size_t>(a)];
+        const region& rb = ss.regions[static_cast<std::size_t>(b)];
+        const int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
+        return raw_step > 0 ? std::max(1, road_discounted(raw_step, road_tier_between(a, b))) : 1;
+    };
+
+    // BL-922 -- THE CAPITAL IS THE STRATEGIC HEADQUARTERS (CIVILISATION.md
+    // § How an empire actually falls, Ben 2026-09-11). Reach is a Dijkstra
+    // from the polity's capital over the ground the polity HOLDS: a region
+    // held by anyone else, or by nobody, is IMPASSABLE to supply. It is
+    // never relaxed and never expanded, so its cost stays at the sentinel.
+    // The consequence is the one the design names: a war that takes the
+    // ground between a capital and its far block cuts that block off, and
+    // the block's `network_supply_q` reads as unreachable on the next round
+    // rather than as if the foreign ground between were a road.
+    //
+    // Campaign TARGETS are foreign by definition and so never carry a cost
+    // here; `campaign_supply` prices one as the staging hub's cost plus ONE
+    // `edge_step` onto the target (the last hop of a march is over ground
+    // the polity does not yet hold, and that is priced, not forbidden).
+    const auto rebuild_reach = [&](reach_cache& rc, int capital, int qid) {
         const scoped_ns prof_reach(prof.ns_reach); // BL-825, report-only
         ++prof.reach_rebuilds;
         std::vector<int>& reach = rc.cost;
         reach.assign(ss.regions.size(), 1 << 28);
+        rc.capital         = capital;
+        rc.roads_version   = roads_version;
+        rc.centres_version = centres_version;
+        rc.owner_version   = owner_version_of(qid);
         if (capital < 0 || capital >= static_cast<int>(ss.regions.size())) return;
         reach[static_cast<std::size_t>(capital)] = 0;
 
@@ -1018,6 +1100,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // `if (best < 0) break`. A region enters the queue only when something
         // relaxes it below its 1 << 28 sentinel, so the queue empties exactly
         // when the scan would have found nothing left under the sentinel.
+        //
+        // BL-922 -- ONLY HELD GROUND IS RELAXED. The neighbour loop skips any
+        // region whose owner is not this polity, so a foreign or empty region
+        // is never enqueued at all, which is the held-only domain stated
+        // above expressed as the cheapest possible test. The walk is therefore
+        // over a SUBGRAPH of the region graph -- smaller than the whole-map
+        // Dijkstra it replaces, by exactly the share of the map this polity
+        // does not hold.
         //
         // BL-887 — THE CENTRE RELAY, AND WHY `done` GOES AWAY WHEN IT IS ON.
         // A relaying region refunds part of the cost that reached it before it
@@ -1086,25 +1176,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 out_c = best_c - static_cast<int>((static_cast<int64_t>(best_c) * frac) / 1000);
                 if (out_c < 0) out_c = 0; // Unreachable given frac < 1000; belt and braces.
             }
-            for (int nb : neighbours[static_cast<std::size_t>(best)])
+            for (int nb : supply_neighbours[static_cast<std::size_t>(best)])
             {
-                const region& np2 = ss.regions[static_cast<std::size_t>(nb)];
-                const int raw_step = region_distance(bp, np2, gw)
-                                    * (tile_cost(bp) + tile_cost(np2)) / 200;
-                // BL-837 — THE ROAD DISCOUNT, applied to the SAME edge this
-                // history's own corridors have actually walked. A tier-2 edge
-                // costs half what an unroaded one does, mirroring
-                // logistics.cpp's `road_traversal_multiplier` exactly (see
-                // `road_discount` above). This is what makes "the only way to
-                // reach further is to BUILD further" literally true of the
-                // Dijkstra: the capital's effective reach grows along lines
-                // the polity has actually used, never along a straight-line
-                // radius.
-                const float discount = road_discount(road_tier_between(best, nb));
-                const int step = raw_step > 0
-                                ? std::max(1, static_cast<int>(raw_step * discount + 0.5f))
-                                : 1;
-                const int cand = out_c + step; // BL-887: `out_c == best_c` with the relay off.
+                // BL-922: foreign or empty ground is impassable to supply.
+                if (owner[static_cast<std::size_t>(nb)] != qid) continue;
+                // BL-837 — THE ROAD DISCOUNT is inside `edge_step`, applied
+                // to the SAME edge this history's own corridors have actually
+                // walked. This is what makes "the only way to reach further
+                // is to BUILD further" literally true of the Dijkstra: the
+                // capital's effective reach grows along lines the polity has
+                // actually used, never along a straight-line radius.
+                const int cand = out_c + edge_step(best, nb); // BL-887: `out_c == best_c` with the relay off.
                 if (cand < reach[static_cast<std::size_t>(nb)])
                 {
                     reach[static_cast<std::size_t>(nb)] = cand;
@@ -1112,9 +1194,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
         }
-        rc.capital         = capital;
-        rc.roads_version   = roads_version;
-        rc.centres_version = centres_version;
     };
 
     // --- Time-lapse change list -------------------------------------------
@@ -1367,7 +1446,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
             ss.regions.push_back(std::move(np));
             owner.push_back(np_owner);
+            touch_owner(np_owner); // BL-922: new held ground changes reach
             neighbours.emplace_back();
+            supply_neighbours.emplace_back();
             degree.push_back(0);
             link_region(ss.regions.size() - 1); // Keep the index complete.
 
@@ -1754,11 +1835,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 reach_by_polity.resize(static_cast<std::size_t>(q.id) + 1);
             reach_cache& rc = reach_by_polity[static_cast<std::size_t>(q.id)];
 
-            if (rc.capital != q.capital || rc.cost.size() != ss.regions.size()
+            if (rc.capital != q.capital
              || rc.roads_version != roads_version // BL-837: a road crossed a tier
+             || rc.owner_version != owner_version_of(q.id) // BL-922: ground changed hands
              || (params.centre_chain_reach
               && rc.centres_version != centres_version)) // BL-887: a relay moved
-                rebuild_reach(rc, q.capital);
+                rebuild_reach(rc, q.capital, q.id);
+            else if (rc.cost.size() != ss.regions.size())
+                // BL-922: a region founded by SOMEONE ELSE since the last
+                // build. Not held here, so never expanded here: the vector
+                // grows with the sentinel and the rest of it stands. A region
+                // founded by THIS polity bumped `owner_version` and took the
+                // branch above.
+                rc.cost.resize(ss.regions.size(), 1 << 28);
             const std::vector<int>& reach = rc.cost;
 
             // ---- What this polity's WORKS are worth it (BL-321) -----------
@@ -1794,11 +1883,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // and it is what makes holding distant ground cost something
             // even when nobody ever contests it.
             //
-            // Read the SAME terrain-and-road reach `campaign_supply` prices a
-            // campaign at (`reach[hi]`, already road-discounted by
-            // `rebuild_reach` above), but WITHOUT the staging-hub relief or
-            // the burden-of-breadth term: a garrison standing at home pays
-            // neither a march's cost nor the empire's own overextension
+            // Read the SAME capital-over-held-ground reach `campaign_supply`
+            // prices a campaign at (`reach[hi]`, already road-discounted by
+            // `rebuild_reach` above; BL-922 -- foreign ground impassable), but
+            // WITHOUT the burden-of-breadth term: a garrison standing at home
+            // pays neither a march's cost nor the empire's own overextension
             // penalty, only the ground's terrain price back to the capital.
             // `sustainable_garrison_floor_q` is deliberately below the
             // campaign floor for exactly that reason (see the field comment).
@@ -1826,9 +1915,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
                                       ? reach[hidx] : (1 << 27);
                 const int hub_reach_q = clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
-                const int terrain_cost = reach_here * leaned_terrain_reach_cost_q(params) / 100;
-                const int terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
-                const int supply_at_q  = clampi(1000 - terrain_paid, 0, 1000);
+                // 64-BIT ON PURPOSE (BL-922): the unreachable sentinel is
+                // 1 << 27, and sentinel x cost overflowed `int` at any cost
+                // above ~15 -- cut-off ground then read as FULLY supplied
+                // instead of as nothing. Latent under the old 10; live now.
+                const int64_t terrain_cost = static_cast<int64_t>(reach_here)
+                                           * leaned_terrain_reach_cost_q(params) / 100;
+                const int64_t terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
+                const int supply_at_q  = static_cast<int>(clampi64(1000 - terrain_paid, 0, 1000));
                 hp.network_supply_q = supply_at_q;
 
                 if (params.unsustained_army_attrition_q > 0 && hp.army_stock > 0
@@ -1902,32 +1996,48 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // better of the two lines but to delete one of them. Priced here,
             // once, the estimate and the outcome cannot drift again.
             //
-            // The three terms are the three costs the design names: LOCAL
-            // staging distance, STRATEGIC terrain-weighted reach from the
-            // capital (BL-316 S2), and the BURDEN OF BREADTH (BL-316 S3).
-            // `hub` is the region the campaign is STAGED FROM, and it is a
-            // parameter rather than a capture because its works discount the
+            // BL-922 -- ONE BASIS: THE CAPITAL, OVER HELD GROUND. The march is
+            // priced as the staging hub's reach from the capital (`reach[hub]`,
+            // the held-only Dijkstra above) plus ONE `edge_step` from the hub
+            // onto the target, which is foreign ground by definition and so
+            // carries no reach of its own. The separate staging-hub distance
+            // term (`supply_decay_per_tile_q x hub_dist`) is GONE: it priced
+            // "can I move at all" off a frontier region and barely decayed for
+            // an ordinary neighbour-adjacent march, which is exactly why the
+            // reach gate refused nothing (BL-905). What is left is the design's
+            // question -- has this empire outrun its network -- asked of the
+            // same `network_supply_q` the holding, growth and secession
+            // readings use, plus the last hop.
+            //
+            // A hub the capital cannot reach over held ground (cut off by a
+            // war, or across water) supplies nothing, and the gate refuses the
+            // campaign: a block the capital cannot feed cannot project force.
+            //
+            // The two remaining terms are the STRATEGIC terrain-weighted reach
+            // from the capital (BL-316 S2) and the BURDEN OF BREADTH (BL-316
+            // S3). `hub` is the region the campaign is STAGED FROM, and it is
+            // a parameter rather than a capture because its works discount the
             // terrain cost (BL-321): reach_mod is authored as a discount on the
             // supply cost through/from a region, so it is the staging
             // holding's roads and wharves doing the carrying, not the capital's.
-            //
-            // The discount applies to the TERRAIN term alone. A span bridge
-            // makes a mountain cheaper to cross; it does not shorten the march,
-            // which is what supply_decay_per_tile_q charges for.
-            const auto campaign_supply = [&](int hub_dist, std::size_t ti, int hub) {
-                const int reach_here = (ti < reach.size() && reach[ti] < (1 << 27))
-                                     ? static_cast<int>(reach[ti]) : hub_dist;
+            const auto campaign_supply = [&](std::size_t ti, int hub) {
+                const std::size_t hs = static_cast<std::size_t>(hub);
+                const bool hub_reached = hub >= 0 && hs < reach.size() && reach[hs] < (1 << 27);
+                const int reach_here = hub_reached
+                                     ? reach[hs] + edge_step(hub, static_cast<int>(ti))
+                                     : (1 << 27);
                 const int hub_reach_q = (hub >= 0)
-                    ? clampi(ss.regions[static_cast<std::size_t>(hub)].work_reach_mod,
-                             0, params.work_reach_relief_cap_q)
+                    ? clampi(ss.regions[hs].work_reach_mod, 0, params.work_reach_relief_cap_q)
                     : 0;
-                const int terrain_cost = reach_here * leaned_terrain_reach_cost_q(params) / 100;
-                const int terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
-                return clampi(1000
-                            - hub_dist * params.supply_decay_per_tile_q
+                // 64-bit for the same reason as the holdings loop above: the
+                // sentinel times the cost does not fit an `int`.
+                const int64_t terrain_cost = static_cast<int64_t>(reach_here)
+                                           * leaned_terrain_reach_cost_q(params) / 100;
+                const int64_t terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
+                return static_cast<int>(clampi64(1000
                             - terrain_paid
                             - clampi(burden, 0, 1000 - params.holdings_burden_floor_q),
-                            0, 1000);
+                            0, 1000));
             };
 
             // ---- BL-899: sea legs — the ration a crossing lands on ---------
@@ -2200,25 +2310,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const region& tgt = ss.regions[ti];
                     const int cap_dist = region_distance(cap, tgt, gw);
 
-                    // SUPPLY PROJECTS FROM THE STAGING HOLDING, NOT THE CAPITAL
-                    // (Ben, 2026-08-12: "perhaps we can try instructing supply
-                    // hubs?").
-                    //
-                    // `hi` is already the polity's own region adjacent to the
-                    // target — it IS a supply hub, and the loop was standing in
-                    // it while measuring supply all the way back to the capital.
-                    // That made reach a property of empire SHAPE rather than of
-                    // frontier presence: a large polity could not attack its own
-                    // border because its capital was far away.
-                    //
-                    // Measuring from the staging region instead is both the
-                    // better model (armies victual at the frontier) and what
-                    // makes reach scale-free — hub_dist is bounded by
-                    // neighbour_radius, so it cannot blow up when the map does.
-                    // The capital still matters, as the preference term below.
-                    const int hub_dist =
-                        region_distance(ss.regions[static_cast<std::size_t>(hi)], tgt, gw);
-
+                    // SUPPLY IS PRICED FROM THE CAPITAL OVER HELD GROUND
+                    // (BL-922, superseding the 2026-08-12 staging-hub model).
+                    // `hi` is the polity's own region adjacent to the target;
+                    // `campaign_supply` reads the capital's reach TO that hub
+                    // plus one step onto the target, so a large polity CAN
+                    // attack its own border -- provided its network actually
+                    // reaches that border. Reach is a property of empire shape
+                    // on purpose: that is the question the gate asks.
                     // Defender's fielded power, as a headcount proxy, raised by
                     // whatever the target has BUILT (BL-321). A Wall Circuit
                     // has to be visible to the scorer, not only to
@@ -2292,9 +2391,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // `campaign_supply`, scaled; never a bonus added on top.
                     const int sl_ration = forages ? 0 : sea_legs_ration(hi);
                     const int supply_here =
-                        forages ? campaign_supply(hub_dist, ti, hi)
+                        forages ? campaign_supply(ti, hi)
                                 : (sl_ration > 0
-                                       ? (campaign_supply(hub_dist, ti, hi) * sl_ration) / 1000
+                                       ? (campaign_supply(ti, hi) * sl_ration) / 1000
                                        : 0);
 
                     // BL-837 — REACH GATES A CAMPAIGN; IT DOES NOT MERELY
@@ -2852,10 +2951,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (raised <= 0) break;
 
                 // FORCE COMMITMENT (BL-277 Q2), priced by the SAME lambda the
-                // scorer used. `src_d` is the staging hub's distance — the army
-                // victuals at the frontier region it marched from, and the
-                // capital still bears on the result through the terrain-weighted
-                // reach term inside `campaign_supply`.
+                // scorer used. `src` is the staging hub; the army is fed from
+                // the capital over held ground to that hub and one step on
+                // (BL-922), through the terrain-weighted reach term inside
+                // `campaign_supply`.
                 //
                 // Execute picks the NEAREST holding while the scorer scored one
                 // (hub, target) pair, so the fought supply is never worse than
@@ -2873,9 +2972,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // actually chose, by the identical lambda the scorer used.
                 const int exec_ration = exec_forages ? 0 : sea_legs_ration(src);
                 const int atk_supply =
-                    exec_forages ? campaign_supply(src_d, ti, src)
+                    exec_forages ? campaign_supply(ti, src)
                                  : (exec_ration > 0
-                                        ? (campaign_supply(src_d, ti, src) * exec_ration) / 1000
+                                        ? (campaign_supply(ti, src) * exec_ration) / 1000
                                         : 0);
                 const int def_supply = 1000;
                 if (!exec_forages)
@@ -3154,6 +3253,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
+                    touch_owner(loser_id); // BL-922: ground changed hands, both
+                    touch_owner(q.id);     // realms' held-only reach is stale
 
                     // BL-866 — GROUND IS NOT CONQUERED REGION BY REGION.
                     // Taking a SEAT takes every region that points at it, in
@@ -3175,8 +3276,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             if (hi == ti) continue;
                             region& h = ss.regions[hi];
                             if (h.seat_region != static_cast<int>(ti)) continue;
+                            touch_owner(owner[hi]); // BL-922: whoever held it
                             owner[hi] = q.id;
                             h.nation  = q.id;
+                            // BL-922: RECORDED, like every other transfer.
+                            // The seat's own change is pushed below; its
+                            // hinterland's were not, so a replay of the
+                            // change list (`owner_slice_at`) drifted from the
+                            // map by every region a seat capture carried.
+                            out.owner_changes.push_back(owner_change{
+                                static_cast<int32_t>(y), static_cast<uint16_t>(hi),
+                                static_cast<uint16_t>(q.id)});
                         }
                     }
                     else
@@ -3448,7 +3558,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 ss.regions.push_back(np);
                 owner.push_back(q.id);
+                touch_owner(q.id); // BL-922: new held ground changes reach
                 neighbours.emplace_back();
+                supply_neighbours.emplace_back();
                 degree.push_back(0);
                 link_region(ss.regions.size() - 1); // Keep the index complete.
 
@@ -3849,11 +3961,33 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     np.industrial_year = out.polities[pi].industrial_year;
                     out.polities.push_back(np);
 
+                    // BL-922 -- REPORT-ONLY: was this block cut off by the
+                    // MAP or by the GRAPH? A seceding region with a FED region
+                    // of its own realm standing within `neighbour_radius` was
+                    // not out of reach geographically; the degree-capped
+                    // neighbour index (BL-855) simply carried no edge to it.
+                    // Counted before ownership moves, read by history_sweep.
+                    // Touches no decision.
+                    for (int r : block)
+                    {
+                        const region& br = ss.regions[static_cast<std::size_t>(r)];
+                        bool fed_near = false;
+                        for (std::size_t j = 0; j < owner.size() && !fed_near; ++j)
+                        {
+                            if (owner[j] != qid || ss.regions[j].network_supply_q <= 0) continue;
+                            if (region_distance(br, ss.regions[j], gw) <= params.neighbour_radius)
+                                fed_near = true;
+                        }
+                        if (fed_near) ++out.regions_seceded_graph_cut;
+                    }
+
                     for (int r : block)
                     {
                         const std::size_t ri = static_cast<std::size_t>(r);
                         owner[ri]                  = np.id;
                         ss.regions[ri].nation      = np.id;
+                        touch_owner(out.polities[pi].id); // BL-922: the parent lost ground
+                        touch_owner(np.id);              // and the successor gained it
                         ss.regions[ri].seat_region = seat;
                         ss.regions[ri].is_seat     = (r == seat);
                         out.owner_changes.push_back(owner_change{
