@@ -122,6 +122,44 @@ struct lapse_relief_seg
     uint8_t  lit; ///< 1 = the north rim (lit), 0 = the south rim (shadow).
 };
 
+/// A bridge glyph: a promoted corridor's straight line crosses a river edge
+/// here, in TILE units. Belongs to the `lapse_road_seg` whose line produced it.
+struct lapse_bridge
+{
+    float col = 0.0f;
+    float row = 0.0f;
+};
+
+/// ONE PROMOTED ROAD CORRIDOR (BL-917), baked once when the record lands —
+/// straight-line anchor to anchor, in TILE units, the pane scale applied at
+/// draw time like every other baked layer here.
+///
+/// Built from `lapse_event_kind::road_promoted` events ALONE: a corridor the
+/// era only ever walked once carries no such event and never gets a
+/// `lapse_road_seg`, so it is never drawn (CIVILISATION.md's "sparse road
+/// network" — the settle tree is dense and mostly one-use, and drawing it
+/// would be plaid). The GEOMETRY is fixed at bake time; the TIER a corridor
+/// draws at is a function of the playhead year, so it is read at draw time
+/// off the two year fields below rather than baked in.
+struct lapse_road_seg
+{
+    uint16_t region_a = 0;
+    uint16_t region_b = 0;
+    float c0 = 0.0f, r0 = 0.0f; ///< Region A's anchor tile centre.
+    float c1 = 0.0f, r1 = 0.0f; ///< Region B's anchor tile centre.
+
+    /// The year this corridor first crossed into Track — always set, since a
+    /// segment with no promotion event is never created. `INT32_MAX` never
+    /// appears here; it is the sentinel for `year_road` below, which is
+    /// legitimately unset on a corridor that never went past Track.
+    int32_t year_track = 0;
+    int32_t year_road   = 0x7FFFFFFF; ///< The year it reached Road, or unset.
+
+    /// Where this corridor's straight line crosses a river edge — a pure
+    /// geometric fact, computed once against `history_lapse::river_segs`.
+    std::vector<lapse_bridge> bridges;
+};
+
 /// The recorded era, plus the derived fields the map and the board need.
 ///
 /// Lifted whole out of `generation_report` on the worker that produced it (see
@@ -211,6 +249,11 @@ struct history_lapse
     std::vector<lapse_base_run>   base_runs;
     std::vector<lapse_river_seg>  river_segs;
     std::vector<lapse_relief_seg> relief_segs;
+
+    /// The promoted road network (BL-917), baked from `lapse.events` once at
+    /// record time — see `lapse_road_seg`. Empty on the Culture round, whose
+    /// record carries no `road_promoted` events.
+    std::vector<lapse_road_seg> road_segs;
 
     /// The map prints its primitive count to stderr ONCE per record, so the
     /// draw-index bound is a measured number in every capture log. Mutable

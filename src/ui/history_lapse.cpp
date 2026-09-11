@@ -48,6 +48,16 @@ constexpr ImU32 col_relief_dark = IM_COL32(  8,   8,  10, 160); ///< Its shadowe
 constexpr ImU32 col_river       = IM_COL32( 92, 150, 200, 230);
 constexpr ImU32 col_seat_ring   = IM_COL32(  8,   9,  12, 230);
 
+// THE PROMOTED ROAD NETWORK (BL-917). Track is a faint scratch, barely apart
+// from the ground it crosses; Road is the same hue brightened and widened, so
+// a corridor visibly THICKENS the frame it crosses a tier rather than
+// changing colour outright — the skeleton hardens, it does not relabel
+// itself. `col_bridge` is deliberately paler than either: a bridge is a point
+// fact, not a line, and reads best as a small bright mark ON the road.
+constexpr ImU32 col_road_track = IM_COL32(150, 130,  90, 130);
+constexpr ImU32 col_road       = IM_COL32(215, 190, 130, 235);
+constexpr ImU32 col_bridge     = IM_COL32(240, 240, 235, 255);
+
 /// The fill's opacity over the base. High enough that a colour reads as a
 /// colour on the board's swatch too; low enough that a mountain range and a
 /// river still show through it, which is the whole point of the base.
@@ -69,6 +79,29 @@ ImU32 polity_colour(const history_lapse& h, uint16_t owner)
 ImU32 with_alpha(ImU32 c, int a)
 {
     return (c & 0x00FFFFFFu) | (static_cast<ImU32>(a) << IM_COL32_A_SHIFT);
+}
+
+/// Do two line segments cross, and where — plain 2D segment intersection in
+/// TILE units, used once per candidate (road corridor, river edge) pair at
+/// bake time (BL-917). Parallel or collinear segments report no crossing:
+/// a road running exactly along a river for a stretch is not a bridge, it is
+/// the kind of degenerate case a straight-line corridor abstraction can
+/// simply decline to draw a glyph for.
+bool lapse_segments_cross(float ax, float ay, float bx, float by,
+                          float cx, float cy, float dx, float dy,
+                          float& out_x, float& out_y)
+{
+    const float rx = bx - ax, ry = by - ay;
+    const float sx = dx - cx, sy = dy - cy;
+    const float denom = rx * sy - ry * sx;
+    if (std::fabs(denom) < 1e-6f) return false;
+    const float qpx = cx - ax, qpy = cy - ay;
+    const float t = (qpx * sy - qpy * sx) / denom;
+    const float u = (qpx * ry - qpy * rx) / denom;
+    if (t < 0.0f || t > 1.0f || u < 0.0f || u > 1.0f) return false;
+    out_x = ax + t * rx;
+    out_y = ay + t * ry;
+    return true;
 }
 
 /// Which base band a landform is drawn in. Crater and plains are flat: a crater
@@ -354,6 +387,55 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
                                             static_cast<int16_t>(nb.gx), static_cast<int16_t>(nb.gy)});
                 }
             }
+    }
+
+    // --- Promoted road corridors (BL-917), baked once -------------------------
+    //
+    // Built from `road_promoted` events alone, one segment per DISTINCT (a, b)
+    // pair the events ever name, anchor centre to anchor centre. A corridor the
+    // era only walked never gets an event and never gets a segment here — see
+    // `lapse_road_seg`. The Culture round's record carries no such events, so
+    // this loop leaves `road_segs` empty there without a round flag to check.
+    h.road_segs.clear();
+    for (const lapse_event& e : h.lapse.events)
+    {
+        if (e.kind != static_cast<uint8_t>(lapse_event_kind::road_promoted)) continue;
+        if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
+        const uint16_t a = e.region, b = e.other; // note_corridor: region = lo, other = hi
+        if (static_cast<std::size_t>(a) >= h.region_col.size()
+         || static_cast<std::size_t>(b) >= h.region_col.size()) continue;
+
+        auto it = std::find_if(h.road_segs.begin(), h.road_segs.end(),
+                               [&](const lapse_road_seg& s) { return s.region_a == a && s.region_b == b; });
+        if (it == h.road_segs.end())
+        {
+            lapse_road_seg seg;
+            seg.region_a = a;
+            seg.region_b = b;
+            seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
+            seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
+            seg.c1 = static_cast<float>(h.region_col[b]) + 0.5f;
+            seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
+            seg.year_track = e.year;
+            if (e.polity >= 2) seg.year_road = e.year; // robust to a corridor's first event already being Road
+            // Bridges: where this corridor's straight line crosses a river
+            // edge — a pure geometric fact, tested once against every river
+            // segment already baked above.
+            for (const lapse_river_seg& r : h.river_segs)
+            {
+                float ix = 0.0f, iy = 0.0f;
+                if (lapse_segments_cross(seg.c0, seg.r0, seg.c1, seg.r1,
+                                         static_cast<float>(r.c0), static_cast<float>(r.r0),
+                                         static_cast<float>(r.c1), static_cast<float>(r.r1),
+                                         ix, iy))
+                    seg.bridges.push_back({ix, iy});
+            }
+            h.road_segs.push_back(std::move(seg));
+        }
+        else if (e.polity >= 2)
+        {
+            it->year_road = e.year; // the second crossing this pair can ever get
+        }
     }
 
     // The Culture round's record carries a lineage palette (BL-919); its hue
@@ -669,6 +751,30 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         prims += static_cast<int>(h.river_segs.size());
     }
 
+    // ── 3b. THE PROMOTED ROAD NETWORK (BL-917), over the rivers: a corridor
+    //    not yet promoted at the playhead's year is not drawn at all — the
+    //    walked-once settle tree stays invisible by construction, since it
+    //    never got a `lapse_road_seg` in the first place (finish_history_lapse).
+    //    A promoted one draws faint at Track and thickens at Road; a bridge
+    //    glyph marks every point its line crosses a river, but only once the
+    //    corridor carrying it is actually drawn. ──
+    for (const lapse_road_seg& s : h.road_segs)
+    {
+        if (year < s.year_track) continue; // not promoted yet at this playhead
+        const bool at_road = year >= s.year_road;
+        const float w = at_road ? std::max(1.5f, scale * 0.30f)
+                                : std::max(1.0f, scale * 0.16f);
+        dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)},
+                   at_road ? col_road : col_road_track, w);
+        ++prims;
+        for (const lapse_bridge& br : s.bridges)
+        {
+            const ImVec2 at{px(br.col), py(br.row)};
+            dl->AddCircleFilled(at, std::clamp(scale * 0.35f, 1.5f, 3.5f), col_bridge, 8);
+            ++prims;
+        }
+    }
+
     // ── 4. SEATS: one dot per polity HOLDING GROUND in this slice, at the
     //    region it first held. Seats only, not every region — the in-game Ages
     //    view draws a dot per region, and at blob granularity that is a rash;
@@ -695,8 +801,9 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     {
         h.prim_report_done = true;
         std::fprintf(stderr, "history_lapse: %zu base runs, %zu relief rims, %zu river segments, "
-                             "%d primitives this frame\n",
-                     h.base_runs.size(), h.relief_segs.size(), h.river_segs.size(), prims);
+                             "%zu road corridors, %d primitives this frame\n",
+                     h.base_runs.size(), h.relief_segs.size(), h.river_segs.size(),
+                     h.road_segs.size(), prims);
     }
 
     // The year, over the map's own corner. It is the one thing a watcher needs
