@@ -1063,6 +1063,13 @@ int main(int argc, char** argv)
             row.surv_polities_holding = holding;
             row.surv_corridors_min    = mn < 0 ? 0 : mn;
             row.surv_corridors_max    = mx;
+
+            // BL-909 — a one-line diagnostic for the directed want table.
+            // The scoreboard section (BL-907) reports on this properly; this
+            // is just enough to see the count while verifying in isolation.
+            std::size_t via_market = 0;
+            for (const want& w : o.wants) if (w.via_market) ++via_market;
+            std::printf("  wants: %zu (via_market: %zu)\n", o.wants.size(), via_market);
         }
 
         for (const region& p : ss.regions)
