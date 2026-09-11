@@ -426,6 +426,11 @@ struct culture_spawn
     /// The calendar year the daughter was coined — when its stream landed on the
     /// tile that split it off (BL-873). Same clock as `colonisation_field::arrival_year`.
     int64_t coined_year = 0;
+    /// True when this daughter was coined at the far end of the crude overseas
+    /// hop (BL-857) rather than at an ordinary land split (BL-901). The one
+    /// fact of the three `sea_legs_q` terms that is a DEED rather than a
+    /// circumstance — set only at the hop's spawn site in `colonisation.cpp`.
+    bool crossed_water = false;
 };
 
 /// Radius of the window a cradle coins its package from.

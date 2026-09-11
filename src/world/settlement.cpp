@@ -569,7 +569,8 @@ namespace
 /// EVERY NAME STAYS SCI-FI/FANTASY, out of the seeded phoneme tables — never an
 /// Earth proper noun (.claude/rules/io-standing-rules.md § Terms & docs).
 culture derive_daughter_culture(const culture& parent, int parent_id, int8_t origin_class,
-                                uint32_t seed, int spawn_index, int64_t coined_year)
+                                uint32_t seed, int spawn_index, int64_t coined_year,
+                                bool crossed_water)
 {
     culture d = parent;                 // Pantheon, cradle and speech inherited whole.
     // DESCENT (BL-865). The tree the migration builds is retained rather than
@@ -600,6 +601,14 @@ culture derive_daughter_culture(const culture& parent, int parent_id, int8_t ori
     d.name = coined.empty() ? parent.name : coined;
 
     d.aggression_q = clampi(parent.aggression_q - 60 + r.pick(121), 0, 1000);
+
+    // SEA LEGS' THIRD TERM (BL-901). The coastal-cradle and sea/storm-god
+    // terms are inherited whole with the pantheon above; a hop across water
+    // is a fact of THIS spawn, not the parent's, so it is added here rather
+    // than re-derived from scratch.
+    if (crossed_water)
+        d.sea_legs_q = clampi(parent.sea_legs_q + culture::sea_legs_crossing_bonus, 0, 1000);
+
     return d;
 }
 
@@ -836,7 +845,7 @@ settlement_state run_settlement(const planetology_state& pl,
         culture daughter =
             derive_daughter_culture(*par, pid, static_cast<int8_t>(sp.origin_class),
                                     seed ^ 0xC0DAu, static_cast<int>(si),
-                                    sp.coined_year);
+                                    sp.coined_year, sp.crossed_water);
         out.spawned_cultures.push_back(std::move(daughter));
     }
 
