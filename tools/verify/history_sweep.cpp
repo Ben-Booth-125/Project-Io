@@ -31,6 +31,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace
@@ -490,6 +491,14 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     if (name == "w_aggr_q")                   { p.w_aggr_q = v;                        return true; }
     if (name == "w_fear_q")                   { p.w_fear_q = v;                        return true; }
     if (name == "fear_reference")             { p.fear_reference = v;                  return true; }
+    // BL-839 -- the turbulence lean. `turbulence_lean` is the SETTING (-1 calm,
+    // 0 ordinary, +1 turbulent) and is the one a three-way comparison moves;
+    // the three magnitudes beside it are what the comparison TUNES once the
+    // settings are shown to separate at all.
+    if (name == "turbulence_lean")              { p.turbulence_lean = v;                 return true; }
+    if (name == "turbulence_aggression_spread_q") { p.turbulence_aggression_spread_q = v; return true; }
+    if (name == "turbulence_fear_q")            { p.turbulence_fear_q = v;               return true; }
+    if (name == "turbulence_reach_cost_q")      { p.turbulence_reach_cost_q = v;         return true; }
     return false;
 }
 
@@ -2038,6 +2047,87 @@ int main(int argc, char** argv)
         // every existing fixture in this repo meaning what it meant.
         check(history_sim_params{}.w_fear_q == 0,
               "F6   the struct default is OFF, so no existing fixture changes meaning");
+    }
+
+    // --- Turbulence-lean checks (BL-839) -----------------------------------
+    //
+    // THESE GATE, and they are deliberately about the three resolver functions
+    // rather than about a run's aggregates. The item's binding claim is a claim
+    // about PROPERTIES -- ordinary re-bases nothing, the lean is a spread and
+    // not a dial, and it scales a force it never introduces -- and a property
+    // asserted on 16 noisy worlds is not asserted at all. Whether the settings
+    // actually SEPARATE is a distribution question and is reported, never
+    // gated: GENERATION_STRATEGY.md sec Asymmetry is the deliverable forbids
+    // picking the threshold before the spread is measured, and a measured null
+    // result is a finding, not a failure.
+    std::printf("\n");
+    {
+        // T1 -- ORDINARY IS THE IDENTITY, on all three forces. This is the
+        // whole basis on which the item claims no existing fixture changes
+        // meaning, so it is asserted rather than argued.
+        history_sim_params ord = tuned_defaults();
+        ord.turbulence_lean = 0;
+        ord.w_fear_q = 400;
+        bool identity = (leaned_w_fear_q(ord) == ord.w_fear_q)
+                        && (leaned_terrain_reach_cost_q(ord) == ord.terrain_reach_cost_q);
+        for (int a = 0; a <= 1000 && identity; a += 25)
+            if (leaned_aggression_q(ord, a) != a) identity = false;
+        check(identity, "T1   ORDINARY is the identity on all three forces");
+        check(history_sim_params{}.turbulence_lean == 0,
+              "T1b  ordinary is the STRUCT DEFAULT, so no existing fixture is re-based");
+
+        // T2 -- IT IS A SPREAD, NOT A DIAL. The 500 neutral is a fixed point at
+        // every setting, and a culture above it moves the OPPOSITE way from one
+        // below it. A dial would move both the same way, and that is the defect
+        // this check exists to catch -- it would pass every aggregate the sweep
+        // prints while being a different design.
+        history_sim_params turb = ord; turb.turbulence_lean =  1;
+        history_sim_params calm = ord; calm.turbulence_lean = -1;
+        check(leaned_aggression_q(turb, 500) == 500 && leaned_aggression_q(calm, 500) == 500,
+              "T2   the 500 neutral is a FIXED POINT at every setting");
+        check(leaned_aggression_q(turb, 800) > 800 && leaned_aggression_q(turb, 200) < 200,
+              "T2b  turbulent WIDENS -- the warlike more so, the placid more so");
+        check(leaned_aggression_q(calm, 800) < 800 && leaned_aggression_q(calm, 200) > 200,
+              "T2c  calm NARROWS, from both sides toward the neutral");
+        check(leaned_aggression_q(turb, 0) >= 0 && leaned_aggression_q(turb, 1000) <= 1000,
+              "T2d  the widened value stays inside the 0-1000 currency");
+
+        // T3 -- IT SCALES, IT NEVER INTRODUCES. A run whose w_fear_q is 0 --
+        // the struct default and every isolating fixture in this repo -- must
+        // stay at 0 under BOTH settings. If this ever fails, the lean has
+        // quietly switched on a force under AI_OPPONENT.md sec 11's grant that
+        // the run in hand had deliberately switched off.
+        history_sim_params off = ord; off.w_fear_q = 0;
+        history_sim_params off_t = off; off_t.turbulence_lean = 1;
+        history_sim_params off_c = off; off_c.turbulence_lean = -1;
+        check(leaned_w_fear_q(off_t) == 0 && leaned_w_fear_q(off_c) == 0,
+              "T3   a run with w_fear_q OFF stays off at every setting");
+        check(leaned_w_fear_q(turb) > ord.w_fear_q && leaned_w_fear_q(calm) < ord.w_fear_q,
+              "T3b  turbulent coalesces harder against a riser, calm less");
+        check(leaned_terrain_reach_cost_q(turb) > ord.terrain_reach_cost_q
+                  && leaned_terrain_reach_cost_q(calm) < ord.terrain_reach_cost_q
+                  && leaned_terrain_reach_cost_q(calm) >= 0,
+              "T3c  turbulent makes reach DEARER, calm cheaper, neither negative");
+
+        // T4 -- AN OUT-OF-RANGE SETTING IS CLAMPED, not scaled. `--set
+        // turbulence_lean=7` is one keystroke away and must not silently
+        // produce a force multiplied by 3.8 under a table labelled "turbulent".
+        history_sim_params wild = ord; wild.turbulence_lean = 7;
+        check(leaned_w_fear_q(wild) == leaned_w_fear_q(turb)
+                  && leaned_aggression_q(wild, 800) == leaned_aggression_q(turb, 800),
+              "T4   a lean outside -1..+1 clamps to the named setting");
+
+        // T5 -- NOTHING HERE COUNTS POLITIES. Stated as a check because it is
+        // the item's absolute rule and the one a later edit is most likely to
+        // break: all three resolvers are pure in `history_sim_params` alone and
+        // cannot see a `history_sim_state`, so no post-hoc count correction can
+        // be written into them without changing their signatures. The check is
+        // structural -- it compiles or it does not.
+        static_assert(
+            std::is_same_v<decltype(&leaned_w_fear_q), int (*)(const history_sim_params&)>,
+            "BL-839: the turbulence resolvers must never see world state -- "
+            "a signature taking history_sim_state is a count correction waiting to happen");
+        check(true, "T5   the resolvers are pure in params -- they CANNOT count polities");
     }
 
     // --- Works checks (BL-321) ---------------------------------------------

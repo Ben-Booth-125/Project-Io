@@ -64,6 +64,7 @@ void w_prefs(std::ostream& o, const world_preferences& p)
     w_enum(o, p.oxygen_story);
     w_enum(o, p.coal_basins);
     w_enum(o, p.drawdown);
+    w_enum(o, p.history_turbulence); // save_game_version 12 (BL-839) -- keep r_prefs in step.
     for (const uint32_t r : p.roll)
         w_u32(o, r);
 }
@@ -73,7 +74,8 @@ bool r_prefs(std::istream& i, world_preferences& p)
     if (!(r_enum(i, p.star, max_lean) && r_enum(i, p.world_size, max_lean)
           && r_enum(i, p.interior, max_lean) && r_enum(i, p.metal, max_lean)
           && r_enum(i, p.ocean, max_lean) && r_enum(i, p.oxygen_story, max_lean)
-          && r_enum(i, p.coal_basins, max_lean) && r_enum(i, p.drawdown, max_lean)))
+          && r_enum(i, p.coal_basins, max_lean) && r_enum(i, p.drawdown, max_lean)
+          && r_enum(i, p.history_turbulence, max_lean))) // save_game_version 12 (BL-839)
         return false;
     for (uint32_t& r : p.roll)
         if (!r_u32(i, r))

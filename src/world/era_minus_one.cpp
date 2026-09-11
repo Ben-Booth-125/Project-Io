@@ -160,6 +160,28 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     hp.w_fear_q       = 400;
     hp.fear_reference = 2000;
 
+    // BL-839: THE HISTORICAL TURBULENCE LEAN, the player's one axis on this
+    // pass (Ben, 2026-09-08). Resolved HERE, and nowhere else, because this is
+    // the single function that turns a world descriptor into the params
+    // generation's own round runs on -- so the lean reaches the sim by the same
+    // route every other generation setting does, and `history_sim_params`
+    // itself stays a struct of forces with no knowledge of a wizard.
+    //
+    // `lean::any` READS AS ORDINARY. An unset preference -- an old save, a
+    // harness that built a bare `world_params` -- must run the world it always
+    // ran, and `world_preferences`'s eight planetology axes default to `any`,
+    // so a fixture that zero-initialises the block lands here too. See
+    // `planetology.hpp` for why this axis has no sampled range to give `any`
+    // its usual meaning.
+    switch (params.preferences.history_turbulence)
+    {
+        case lean::low:  hp.turbulence_lean = -1; break; // calm
+        case lean::high: hp.turbulence_lean =  1; break; // turbulent
+        case lean::mid:
+        case lean::any:
+        default:         hp.turbulence_lean =  0; break; // ordinary
+    }
+
     if (two_span)
     {
         // 1160 -> 1560 -> 1960 at the defaults. The ancient span is

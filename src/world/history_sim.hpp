@@ -1060,6 +1060,100 @@ struct history_sim_params
     /// an existential threat.
     int fear_reference = 2000;
 
+    // --- THE HISTORICAL TURBULENCE LEAN (BL-839) ---------------------------
+    //
+    // Ben, 2026-09-08: "we are really looking to encourage historical
+    // turbulence as a parameter -- so that players can roll for worlds which
+    // have fewer countries at this step, or more countries at this step."
+    //
+    // IT TUNES FORCES AND TARGETS NO COUNT, AND THAT IS THE WHOLE OF ITS
+    // DESIGN, not a caveat on it. `../generation/GENERATION_STRATEGY.md`
+    // sec Asymmetry is the deliverable and sec The asymmetry is POLITICAL both
+    // settle the same rule -- generation is answerable for the DISTRIBUTION of
+    // an outcome across a spread of worlds and for nothing at all about any
+    // single one -- and the 2026-07-30 emergent-nation-count ruling and
+    // BL-224's non-hegemony invariant say the same thing from the other side.
+    // So there is deliberately NOTHING here that counts polities, and nothing
+    // downstream may acquire a post-hoc correction that does: "fewer countries"
+    // is the SHAPE the player is buying odds on, never a quota the sim is told
+    // to hit. A calm world that happens to fragment is a correct calm world.
+    //
+    // IT LEANS THREE FORCES THAT ALREADY EXIST, AND ADDS NO FOURTH. Each was
+    // built by a separate item for its own reasons; what this adds is one
+    // player-facing axis that moves all three the same way, because they are
+    // the three that decide whether conquest COMPOUNDS:
+    //
+    //   1. THE SPREAD OF CULTURE AGGRESSION (`turbulence_aggression_spread_q`,
+    //      applied wherever `culture::aggression_q` enters the sim). A SPREAD,
+    //      not a dial -- widening it does not make every people warlike, it
+    //      makes the warlike ones more so and the placid ones more placid.
+    //      Two archetypes fall out of the same engine at the wide end, and
+    //      they are different SHAPES rather than two ends of one axis: a
+    //      people that EXPANDS AND INCORPORATES, whose neighbours are placid
+    //      enough to be absorbed and kept, and a world that CYCLES, where
+    //      several warlike peoples unify, stabilise, fragment and re-unify.
+    //      Which one a given world shows is decided by where its cultures
+    //      actually fell, which is a fact about its own migration
+    //      (`../generation/COLONISATION.md` sec Culture arrives by route) --
+    //      so it is a consequence, not a setting.
+    //   2. HOW SHARPLY NEIGHBOURS COALESCE AGAINST A RISER
+    //      (`turbulence_fear_q`, scaling `w_fear_q`). Strictly a scale on the
+    //      existing lean, so it inherits BL-838's grant WHOLE and widens it
+    //      nowhere: still third-party grudges only, still never size or rank,
+    //      still never the scoring polity's own grudge. A scale of zero is the
+    //      force switched off, which is the struct default's meaning too.
+    //   3. HOW FAST REACH DECAYS WITH DISTANCE (`turbulence_reach_cost_q`,
+    //      scaling `terrain_reach_cost_q`). BL-316's burden-of-breadth term:
+    //      dear reach means a conquest held far from the seat feeds itself
+    //      badly, so an empire that overruns its supply cannot keep what it
+    //      took. Cheap reach means it can.
+    //
+    // WHY ALL THREE AND NOT ONE. Turbulence is not a quantity of war; a world
+    // can run hundreds of conquests and end the shape it started
+    // (GENERATION_STRATEGY.md sec The asymmetry is POLITICAL, on conquest that
+    // does not COMPOUND). Wide aggression supplies the attempts, fear supplies
+    // the counter-pressure that turns a rise into a peak, and dear reach
+    // supplies the fall. One alone moves volume; the three together move the
+    // SHAPE of the arc, which is what the player is actually choosing between.
+    //
+    // ORDINARY IS ZERO AND ZERO IS THE STRUCT DEFAULT, so every fixture in the
+    // repo keeps its meaning and no existing measurement is re-based by this
+    // item landing. The three magnitudes below are placeholders on the same
+    // footing as the `w_*` weights beside them -- `history_sweep --set` tunes
+    // them, and the DONE-WHEN is that the three settings visibly move the
+    // spread of outcomes, never that they hit a number.
+
+    /// -1 calm, 0 ordinary, +1 turbulent. Deliberately a three-valued axis and
+    /// not a continuous slider: the player has to be able to tell what they
+    /// rolled, and a raw per-mille dial on a force nobody can see is a control
+    /// that cannot be read back off the world it made
+    /// (`../ui/STARTUP.md` sec Rounds 4, 5 and 6 -- "you set conditions, you do
+    /// not steer"). Values outside -1..+1 are clamped where they are read.
+    int turbulence_lean = 0;
+
+    /// Per-mille WIDENING of each culture's distance from the 500 neutral, at
+    /// |lean| == 1. At 400: a turbulent world multiplies the deviation by 1.4
+    /// and a calm one by 0.6, so a culture already at the neutral is untouched
+    /// by either -- which is the property that makes this a spread rather than
+    /// a dial, and the reason the no-creeds fallback (a flat 500) is
+    /// identically unmoved at every setting.
+    int turbulence_aggression_spread_q = 400;
+
+    /// Per-mille scale on `w_fear_q` at |lean| == 1. 500: turbulent x1.5, calm
+    /// x0.5. Scaling rather than replacing matters -- a run with `w_fear_q`
+    /// at 0 (every isolating fixture, and the struct default) stays at 0 under
+    /// every setting, so the lean cannot switch a force ON that its own run
+    /// had deliberately switched off.
+    int turbulence_fear_q = 500;
+
+    /// Per-mille scale on `terrain_reach_cost_q` at |lean| == 1. 500:
+    /// turbulent x1.5, calm x0.5. Same scale-don't-replace property as
+    /// `turbulence_fear_q`, and the reason this leans the COST rather than the
+    /// BL-837 reach gate's floors: the floors are a wall with a road through
+    /// it, and moving a wall by a player setting is a much larger claim than
+    /// making the ground dearer to cross.
+    int turbulence_reach_cost_q = 500;
+
     /// Severity of the sack a conquered region suffers, per-mille.
     ///
     /// BL-835 — THIS IS NOW AN URBAN QUANTITY ONLY. It used to be subtracted
@@ -2123,6 +2217,34 @@ int fear_of_next_q(const history_sim_state& s, const history_sim_params& p,
 /// One line naming a grudge event: what, where, when. The printable half of
 /// "it must carry its cause".
 std::string grudge_event_line(const grudge_event& e, const settlement_state& ss);
+
+// ---------------------------------------------------------------------------
+// The turbulence lean, resolved (BL-839)
+// ---------------------------------------------------------------------------
+//
+// THREE FREE FUNCTIONS RATHER THAN THREE INLINE MULTIPLICATIONS, for the same
+// reason `fear_of_next_q` is a free function: the claim the item has to make is
+// a claim about these, and a harness can put it to them directly instead of
+// inferring it from a run's aggregates. Each is PURE in its arguments, uses
+// integer arithmetic only, and returns its input unchanged when
+// `turbulence_lean` is 0 -- which is what "the ordinary setting re-bases
+// nothing" means, stated as a property rather than as a comment.
+
+/// A culture's `aggression_q`, with the turbulence lean's SPREAD applied.
+///
+/// Widens or narrows the distance from the 500 neutral, so the neutral itself
+/// is a fixed point at every setting and the no-creeds fallback (a flat 500)
+/// is identically unmoved. Clamped to 0-1000, which is the currency every
+/// consumer of `aggression_q` already speaks.
+int leaned_aggression_q(const history_sim_params& p, int culture_aggression_q);
+
+/// `w_fear_q` with the turbulence lean applied. Scales, never replaces: a run
+/// whose `w_fear_q` is 0 stays at 0 at every setting.
+int leaned_w_fear_q(const history_sim_params& p);
+
+/// `terrain_reach_cost_q` with the turbulence lean applied. Scales, never
+/// replaces, and never goes negative.
+int leaned_terrain_reach_cost_q(const history_sim_params& p);
 
 // ---------------------------------------------------------------------------
 // The pass 1 -> pass 2 handoff (BL-828)

@@ -169,6 +169,12 @@ save_envelope make_envelope()
     e.params.preferences.oxygen_story = lean::mid;
     e.params.preferences.coal_basins  = lean::high;
     e.params.preferences.drawdown     = lean::low;
+    // BL-839 (save_game_version 12): the turbulence lean is the NINTH lean and
+    // the newest, so it is the one most exposed to a writer/reader drift. Given
+    // `high` -- distinct from its neighbour `drawdown` above and from the field
+    // default (`mid`), so neither a transposition nor a silently-unread field
+    // round-trips clean.
+    e.params.preferences.history_turbulence = lean::high;
     e.params.preferences.roll[0]      = 11;
     e.params.preferences.roll[1]      = 22;
     e.params.preferences.roll[2]      = 33;
@@ -378,9 +384,16 @@ int main()
                   && lp.interior == ep.interior && lp.metal == ep.metal
                   && lp.ocean == ep.ocean && lp.oxygen_story == ep.oxygen_story
                   && lp.coal_basins == ep.coal_basins && lp.drawdown == ep.drawdown
+                  && lp.history_turbulence == ep.history_turbulence
                   && lp.roll[0] == ep.roll[0] && lp.roll[1] == ep.roll[1]
                   && lp.roll[2] == ep.roll[2],
-              "S3 world_params.preferences survives (8 leans + roll[3], each distinct)");
+              "S3 world_params.preferences survives (9 leans + roll[3], each distinct)");
+        // Pinned to a LITERAL, not compared to the original: a writer and
+        // reader that both omitted the field would compare equal at the default
+        // and say nothing. BL-839's field default is `mid`, so `high` here can
+        // only have arrived through the seam.
+        check(lp.history_turbulence == lean::high,
+              "S3 the BL-839 turbulence lean survives (high, not the mid default)");
         // The differential the requirement actually asks for: the two year
         // fields must come back DISTINCT and in the right slots. Comparing
         // round-tripped-to-original cannot catch a swap if the writer and reader
