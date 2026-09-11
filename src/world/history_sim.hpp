@@ -1596,6 +1596,16 @@ struct polity
     /// and an opposed strategic creed; the periphery stays alive as actors.
     bool major = false;
 
+    /// BL-926 — THE LINEAGE HOOK. The polity this one BROKE AWAY FROM, as an
+    /// index into `history_sim_state::polities`, or -1 where the sim records
+    /// no parent (every seeded polity; every polity born by any route other
+    /// than the BL-896 secession block, which is the only site that writes
+    /// it today). A RECORD, never a decision input: nothing in the loop reads
+    /// it. NOT SERIALISED — `polity` does not cross the save seam (only
+    /// `polity_sample` does, era_timelapse.hpp), so no flat-binary path is
+    /// owed. The sweep's per-polity table prints '-' when this is -1.
+    int parent = -1;
+
     /// BL-897 — THE INSTITUTION, as distinct from what its peoples believe.
     /// Index into `history_sim_state::universal_creeds`, or -1.
     ///
@@ -2239,6 +2249,28 @@ struct history_sim_state
     int64_t peoples_converted       = 0;
     int64_t peoples_reasserted      = 0;
     int64_t civilisations_formed = 0;
+
+    // --- BL-926 — THE INSTRUMENT SEES THE ARC. Pure counters, decision-free.
+    //
+    // Every field below is written beside an event the sim already performs
+    // and read by nothing inside the loop. They exist so history_sweep can
+    // report the shape of a run rather than its net: `secessions` above counts
+    // PIECES and cannot tell one empire shedding six provinces from six
+    // empires each losing one, and `foundings` sums two sources with opposite
+    // meanings (a schedule playing back vs a polity choosing to settle).
+
+    /// BREAKDOWNS: parent polities that lost at least one block in a round —
+    /// the event count, where `secessions` is the piece count.
+    int64_t breakdowns = 0;
+    /// The size, in regions, of every piece that walked, in the order the
+    /// BL-896 block allocated them. Sums to `regions_seceded`.
+    std::vector<int32_t> secession_piece_sizes;
+
+    /// `foundings`, split by source. The schedule is the colonisation
+    /// diffusion's playback (BL-846, `pending_foundings`); the verb is a
+    /// polity's own Settle. `foundings == foundings_scheduled + foundings_settled`.
+    int64_t foundings_scheduled = 0;
+    int64_t foundings_settled   = 0;
 };
 
 /// Sentinel for "no polity owns this region in this year slice".

@@ -1377,6 +1377,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     static_cast<uint16_t>(ss.regions.size() - 1),
                     static_cast<uint16_t>(np_owner)});
             ++out.foundings;
+            ++out.foundings_scheduled; // BL-926: the schedule played back.
             out.history.push_back(history_event{
                 years_from_calendar_year(y), chain_stage::legacy,
                 ss.regions.back().name + " is settled", std::string{}});
@@ -3464,6 +3465,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     static_cast<uint16_t>(ss.regions.size() - 1),
                     static_cast<uint16_t>(q.id)});
                 ++out.foundings;
+                ++out.foundings_settled; // BL-926: the Settle verb chose it.
                 out.history.push_back(history_event{
                     years_from_calendar_year(y), chain_stage::legacy,
                     np.name + " is settled", std::string{}});
@@ -3790,6 +3792,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (static_cast<int>(cut.size()) < params.secession_min_regions) continue;
 
                 std::vector<char> taken(cut.size(), 0);
+                bool any_piece_left = false; // BL-926: one breakdown per parent per round.
                 for (std::size_t ci = 0; ci < cut.size(); ++ci)
                 {
                     if (taken[ci]) continue;
@@ -3847,6 +3850,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     }
                     np.cohesion_q      = out.polities[pi].cohesion_q;
                     np.industrial_year = out.polities[pi].industrial_year;
+                    np.parent          = qid; // BL-926: the lineage hook, written here only.
                     out.polities.push_back(np);
 
                     for (int r : block)
@@ -3878,6 +3882,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     ++out.secessions;
                     out.regions_seceded += static_cast<int64_t>(block.size());
+                    out.secession_piece_sizes.push_back(static_cast<int32_t>(block.size())); // BL-926
+                    if (!any_piece_left) { any_piece_left = true; ++out.breakdowns; }   // BL-926
                     out.history.push_back(history_event{
                         years_from_calendar_year(y), chain_stage::legacy,
                         ss.regions[static_cast<std::size_t>(seat)].name

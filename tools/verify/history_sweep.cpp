@@ -386,7 +386,82 @@ struct sweep_row
     int      flips_per_region  = 0; ///< Mean changes per touched region, x100.
     int64_t last_change_year  = 0;
     int      early_change_pct = 0;
+
+    // --- BL-926: THE INSTRUMENT SEES THE ARC ---------------------------------
+    //
+    // Every figure below is REPORTED, never gated. The item's premise: before
+    // any sprint-39 mechanism lands, the sweep has to be able to see what that
+    // mechanism is meant to move -- and `powers_end < powers_start` nets births
+    // against deaths, so a world where 27 polities died read as a loss of 9.
+    //
+    /// One polity's whole arc, replayed EXACTLY off `owner_changes` (one
+    /// forward walk per seed, never the 40-sample walk above -- a peak that
+    /// lasted one round is still a peak). `died` is INT64_MIN while alive.
+    struct polity_arc
+    {
+        int     id          = -1;
+        int64_t born        = 0;  ///< Year of its first held region.
+        int     peak        = 0;  ///< Most regions held at once.
+        int64_t peak_year   = 0;  ///< First year it held that many.
+        int     peak_share_q = 0; ///< `peak` over regions live that year, per-mille.
+        int     end_hold    = 0;  ///< Regions at the stop year.
+        int64_t died        = INT64_MIN;
+        /// The polity that took its LAST region, or -1. Derived from the replay
+        /// (the change that emptied it), not from a sim field -- there is none.
+        int     killer      = -1;
+        /// `polity::parent` (BL-926 hook) -- the realm it broke away from, or -1.
+        int     parent      = -1;
+        bool    alive       = false;
+    };
+    std::vector<polity_arc> arcs; ///< ALL polities that ever held ground, by id.
+    int polities_ever_held = 0;
+    /// GROSS deaths: ever held ground, not alive at the stop year. Sits beside
+    /// the net figure (`powers_start - powers_end`) on the face; the gap
+    /// between them is the birth count.
+    int polities_dead_gross = 0;
+
+    /// BL-896 secession, at event grain: `breakdowns` is parents-that-lost-
+    /// a-block; `secessions` (above) is pieces; the sizes are per piece.
+    int64_t breakdowns = 0;
+    std::vector<int32_t> piece_sizes;
+
+    /// `region::network_supply_q` over HELD regions at the stop year. Shares are
+    /// per-mille of `supply_held`. The floors are the ones the run ACTUALLY
+    /// used (read off the params in force, never assumed).
+    int64_t supply_held        = 0;
+    int64_t supply_zero        = 0; ///< == 0: disconnected outright.
+    int64_t supply_le_settle   = 0; ///< <= sustainable_settlement_floor_q.
+    int64_t supply_le_secede   = 0; ///< <= secession_supply_floor_q.
+    int64_t supply_le_campaign = 0; ///< <  sustainable_campaign_floor_q.
+    int64_t supply_hist[10]    = {0,0,0,0,0,0,0,0,0,0}; ///< Deciles of 0..1000.
+    int floor_settle   = 0;
+    int floor_secede   = 0;
+    int floor_campaign = 0;
+
+    /// The culture census, off the creeds the run was handed. -1 = no creeds
+    /// (the struct-default path runs with a null creed pointer).
+    int cultures       = -1;
+    int culture_depth  = -1; ///< Longest `parent` chain, roots at 0.
+    int cultures_root  = -1; ///< Cultures with no parent.
+
+    int64_t foundings_scheduled = 0;
+    int64_t foundings_settled   = 0;
+    int64_t civilisations       = 0;
+
+    /// Polities holding EXACTLY ONE region, at each of the 40-step samples the
+    /// rise/peak/fall walk already takes (index 0 = start year).
+    std::vector<int> city_states_series;
+    int64_t city_states_step = 0;
+
+    /// Which span this row measured -- so a JSON row can say what it is.
+    std::string arc_name;
+    int64_t     arc_start = 0;
+    int64_t     arc_stop  = 0;
 };
+
+/// How many polities the per-world arc table prints and the JSON row carries.
+/// A bound on OUTPUT, never on what is measured: `sweep_row::arcs` holds all.
+constexpr int arc_table_n = 8;
 
 /// A polity holding this share of all regions counts as a hegemon. 0.5 is
 /// the plainest reading of "one power dominates the world" and is a REPORTING
@@ -875,6 +950,9 @@ int main(int argc, char** argv)
         // run — the silently-ignored-flag failure the whitelist exists to stop,
         // one layer down. The fixture is copied rather than mutated so the
         // acceptance test below still knows what generation actually ran.
+        // BL-926: the params the run ACTUALLY used, for the floors the supply
+        // histogram is read against. `fp` below is scoped to its branch.
+        history_sim_params ran = params;
         history_sim_state sim;
         if (derive_from_generation)
         {
@@ -893,6 +971,7 @@ int main(int argc, char** argv)
             // with it on or off (history_sim.cpp's own comment on the field).
             fp.trace_battles = true;
             for (const param_override& o : overrides) apply_override(fp, o.name, o.value);
+            ran = fp;
             sim = run_history_sim(ss, &fx.creeds, fx.terrain.view(), fx.gw, fx.gh,
                                   fp, fx.seed, nullptr, fx.works);
         }
@@ -1265,17 +1344,21 @@ int main(int argc, char** argv)
                     ++live;
                     if (o < static_cast<uint16_t>(n_pol)) ++count[o];
                 }
+                int city_states_now = 0; // BL-926: exactly one region held.
                 for (int i = 0; i < n_pol; ++i)
                 {
                     const std::size_t ui = static_cast<std::size_t>(i);
                     if (first_sample) start[ui] = count[ui];
                     if (count[ui] > peak[ui]) peak[ui] = count[ui];
+                    if (count[ui] == 1) ++city_states_now;
                     if (live > 0)
                     {
                         const int share = (count[ui] * 1000) / live;
                         if (share > row.shape_top_peak_q) row.shape_top_peak_q = share;
                     }
                 }
+                row.city_states_series.push_back(city_states_now);
+                row.city_states_step = step;
                 first_sample = false;
             }
             {
@@ -1298,6 +1381,145 @@ int main(int argc, char** argv)
                 if (fell) ++row.shape_fell;
                 if (rose && fell) ++row.shape_rpf;
             }
+        }
+
+        // --- BL-926: THE ARC, per polity, replayed EXACTLY -------------------
+        //
+        // One forward walk of `owner_changes`, tracking every region's owner
+        // and every polity's count. Born = first region held; peak = the most
+        // held at once and the first year it was; died = the year the count
+        // returned to zero; killer = the owner the emptying change handed the
+        // last region to. NOTHING HERE READS THE SIM'S DECISION STATE and
+        // nothing gates: a world of immortal city states is a legitimate row.
+        {
+            const int n_pol = static_cast<int>(sim.polities.size());
+            std::vector<int> owner_of;                 // region -> polity id, -1 unowned
+            std::vector<int> count(static_cast<std::size_t>(n_pol), 0);
+            std::vector<sweep_row::polity_arc> arcs(static_cast<std::size_t>(n_pol));
+            std::vector<char> ever(static_cast<std::size_t>(n_pol), 0);
+            int live = 0;
+            for (int i = 0; i < n_pol; ++i)
+            {
+                arcs[static_cast<std::size_t>(i)].id     = i;
+                arcs[static_cast<std::size_t>(i)].parent = sim.polities[static_cast<std::size_t>(i)].parent;
+                arcs[static_cast<std::size_t>(i)].alive  = sim.polities[static_cast<std::size_t>(i)].alive;
+            }
+            // PEAKS ARE READ AT YEAR-END, not per change. The seeding year
+            // writes one change per region in sequence, so a share taken
+            // mid-batch would credit the first polity written with most of
+            // a map that is still being filled in.
+            const auto flush_year = [&](int64_t year) {
+                for (int i = 0; i < n_pol; ++i)
+                {
+                    const std::size_t ui = static_cast<std::size_t>(i);
+                    if (count[ui] > arcs[ui].peak)
+                    {
+                        arcs[ui].peak         = count[ui];
+                        arcs[ui].peak_year    = year;
+                        arcs[ui].peak_share_q = live > 0 ? (count[ui] * 1000) / live : 0;
+                    }
+                }
+            };
+            bool    have_year = false;
+            int64_t cur_year  = 0;
+            for (const owner_change& c : sim.owner_changes)
+            {
+                if (have_year && c.year != cur_year) flush_year(cur_year);
+                cur_year = c.year; have_year = true;
+
+                const std::size_t r = static_cast<std::size_t>(c.region);
+                if (r >= owner_of.size()) owner_of.resize(r + 1, -1);
+                const int prev = owner_of[r];
+                const int next = c.owner == owner_none ? -1 : static_cast<int>(c.owner);
+                if (prev == next) continue;
+                if (prev < 0 && next >= 0) ++live;
+                if (prev >= 0 && next < 0) --live;
+                owner_of[r] = next;
+                if (prev >= 0 && prev < n_pol)
+                {
+                    const std::size_t up = static_cast<std::size_t>(prev);
+                    if (--count[up] == 0)
+                    {
+                        arcs[up].died   = c.year;
+                        arcs[up].killer = next;
+                    }
+                }
+                if (next >= 0 && next < n_pol)
+                {
+                    const std::size_t un = static_cast<std::size_t>(next);
+                    if (!ever[un]) { ever[un] = 1; arcs[un].born = c.year; }
+                    ++count[un];
+                    // A polity that emptied and was refilled is not dead.
+                    arcs[un].died = INT64_MIN; arcs[un].killer = -1;
+                }
+            }
+            if (have_year) flush_year(cur_year);
+            for (int i = 0; i < n_pol; ++i)
+            {
+                const std::size_t ui = static_cast<std::size_t>(i);
+                if (!ever[ui]) continue;
+                arcs[ui].end_hold = count[ui];
+                ++row.polities_ever_held;
+                if (!arcs[ui].alive) ++row.polities_dead_gross;
+                row.arcs.push_back(arcs[ui]);
+            }
+            // Top-N by peak share, ties by id -- a stable, seed-independent order.
+            std::stable_sort(row.arcs.begin(), row.arcs.end(),
+                             [](const sweep_row::polity_arc& a, const sweep_row::polity_arc& b) {
+                                 if (a.peak_share_q != b.peak_share_q) return a.peak_share_q > b.peak_share_q;
+                                 return a.id < b.id;
+                             });
+
+            row.breakdowns  = sim.breakdowns;
+            row.piece_sizes = sim.secession_piece_sizes;
+            row.foundings_scheduled = sim.foundings_scheduled;
+            row.foundings_settled   = sim.foundings_settled;
+            row.civilisations       = sim.civilisations_formed;
+
+            // The supply histogram, over HELD ground at the stop year, against
+            // the floors the run actually used.
+            row.floor_settle   = ran.sustainable_settlement_floor_q;
+            row.floor_secede   = ran.secession_supply_floor_q;
+            row.floor_campaign = ran.sustainable_campaign_floor_q;
+            for (const region& p : ss.regions)
+            {
+                if (p.nation < 0) continue;
+                ++row.supply_held;
+                const int s = p.network_supply_q;
+                if (s == 0)                  ++row.supply_zero;
+                if (s <= row.floor_settle)   ++row.supply_le_settle;
+                if (s <= row.floor_secede)   ++row.supply_le_secede;
+                if (s <  row.floor_campaign) ++row.supply_le_campaign;
+                const int b = std::clamp(s / 100, 0, 9);
+                ++row.supply_hist[b];
+            }
+
+            // The culture census: count, roots, and the deepest parent chain.
+            // Bounded: a parent is always lower-indexed (creeds.hpp), so the
+            // walk cannot loop; a malformed link just stops it.
+            if (derive_from_generation)
+            {
+                const std::vector<culture>& cu = fx.creeds.cultures;
+                row.cultures = static_cast<int>(cu.size());
+                row.cultures_root = 0;
+                row.culture_depth = 0;
+                for (std::size_t ci = 0; ci < cu.size(); ++ci)
+                {
+                    if (cu[ci].parent < 0) ++row.cultures_root;
+                    int depth = 0;
+                    int at = static_cast<int>(ci);
+                    while (at >= 0 && static_cast<std::size_t>(at) < cu.size()
+                           && cu[static_cast<std::size_t>(at)].parent >= 0
+                           && cu[static_cast<std::size_t>(at)].parent < at)
+                    { at = cu[static_cast<std::size_t>(at)].parent; ++depth; }
+                    if (depth > row.culture_depth) row.culture_depth = depth;
+                }
+            }
+
+            row.arc_name  = derive_from_generation ? "generation" : "struct-default";
+            if (tuned) row.arc_name += "+tuned";
+            row.arc_start = ran.start_year;
+            row.arc_stop  = ran.stop_year;
         }
 
         // --- BL-750: the scalar at POLITY grain -----------------------------
@@ -2281,6 +2503,156 @@ int main(int argc, char** argv)
         }
     }
 
+    // --- BL-926: THE INSTRUMENT SEES THE ARC ---------------------------------
+    //
+    // REPORTED, NEVER GATED -- the item's own rule and the harness's. This is
+    // the baseline every later sprint-39 mechanism is read against, so every
+    // line prints whether or not the number is flattering.
+    if (!rows.empty())
+    {
+        std::printf("\n=== BL-926  THE ARC -- lifespans, gross deaths, pieces, supply, cultures ===\n");
+        std::printf("  arc measured: %s  %lld -> %lld\n", rows.front().arc_name.c_str(),
+                    static_cast<long long>(rows.front().arc_start),
+                    static_cast<long long>(rows.front().arc_stop));
+
+        // (1) Deaths, GROSS beside NET, and the secession event grain.
+        std::printf("\n--- BL-926.1  DEATHS (gross beside net) and BREAKDOWNS, per world ---\n");
+        std::printf("  seed   ever held   alive   dead GROSS   net loss   breakdowns   pieces   "
+                    "regions walked   piece sizes\n");
+        for (const sweep_row& r : rows)
+        {
+            std::string sizes;
+            for (std::size_t i = 0; i < r.piece_sizes.size() && i < 12; ++i)
+            {
+                if (i) sizes += ' ';
+                sizes += std::to_string(r.piece_sizes[i]);
+            }
+            if (r.piece_sizes.size() > 12) sizes += " ...";
+            if (r.piece_sizes.empty()) sizes = "-";
+            std::printf("  %4u   %9d   %5d   %10d   %8d   %10lld   %6lld   %14lld   %s\n",
+                        r.seed, r.polities_ever_held, r.polities_alive, r.polities_dead_gross,
+                        r.powers_start - r.powers_end,
+                        static_cast<long long>(r.breakdowns),
+                        static_cast<long long>(r.secessions),
+                        static_cast<long long>(r.regions_seceded), sizes.c_str());
+        }
+        {
+            std::vector<int64_t> gross, net, bd, pc;
+            int64_t pieces_all = 0, piece_max = 0;
+            for (const sweep_row& r : rows)
+            {
+                gross.push_back(r.polities_dead_gross);
+                net.push_back(r.powers_start - r.powers_end);
+                bd.push_back(r.breakdowns);
+                pc.push_back(r.secessions);
+                for (int32_t s : r.piece_sizes) { ++pieces_all; if (s > piece_max) piece_max = s; }
+            }
+            std::printf("\n  DEAD, GROSS            median %lld per world   (NET loss median %lld --"
+                        " the gap is births)\n",
+                        static_cast<long long>(median_of(gross)), static_cast<long long>(median_of(net)));
+            std::printf("  BREAKDOWNS             median %lld   PIECES median %lld   "
+                        "largest piece %lld regions (%lld pieces pooled)\n",
+                        static_cast<long long>(median_of(bd)), static_cast<long long>(median_of(pc)),
+                        static_cast<long long>(piece_max), static_cast<long long>(pieces_all));
+        }
+
+        // (2) The per-polity table, top N by peak share.
+        std::printf("\n--- BL-926.2  THE TOP %d POLITIES BY PEAK SHARE, per world ---\n", arc_table_n);
+        std::printf("  (born = first region held; peak = most held at once, and the first year;"
+                    " died = year emptied, or ALIVE;\n   killer = who took the last region;"
+                    " parent = the realm it broke from. '-' = the sim records none.)\n");
+        for (const sweep_row& r : rows)
+        {
+            std::printf("  seed %u:\n", r.seed);
+            std::printf("    id    born    peak  (share)   peak yr    end    died      killer   parent\n");
+            for (std::size_t i = 0; i < r.arcs.size() && i < static_cast<std::size_t>(arc_table_n); ++i)
+            {
+                const sweep_row::polity_arc& a = r.arcs[i];
+                char died[16], killer[8], parent[8];
+                if (a.alive || a.died == INT64_MIN) std::snprintf(died, sizeof died, "  ALIVE");
+                else std::snprintf(died, sizeof died, "%7lld", static_cast<long long>(a.died));
+                if (a.killer < 0) std::snprintf(killer, sizeof killer, "-");
+                else              std::snprintf(killer, sizeof killer, "%d", a.killer);
+                if (a.parent < 0) std::snprintf(parent, sizeof parent, "-");
+                else              std::snprintf(parent, sizeof parent, "%d", a.parent);
+                std::printf("    %3d  %6lld  %6d  (%3d%%)   %7lld  %5d  %s   %6s   %6s\n",
+                            a.id, static_cast<long long>(a.born), a.peak, a.peak_share_q / 10,
+                            static_cast<long long>(a.peak_year), a.end_hold, died, killer, parent);
+            }
+        }
+
+        // (3) The supply histogram over held ground at the stop year.
+        std::printf("\n--- BL-926.3  network_supply_q OVER HELD GROUND at the stop year ---\n");
+        std::printf("  floors in force: settlement %d   secession %d   campaign %d\n",
+                    rows.front().floor_settle, rows.front().floor_secede, rows.front().floor_campaign);
+        std::printf("  seed   held   ==0    <=settle   <=secede   <campaign   "
+                    "deciles 0..9 (per-mille of held)\n");
+        for (const sweep_row& r : rows)
+        {
+            const auto pm = [&](int64_t n) {
+                return r.supply_held > 0 ? (n * 1000) / r.supply_held : 0; };
+            std::printf("  %4u   %4lld   %3lld%%   %7lld%%   %7lld%%   %8lld%%   ",
+                        r.seed, static_cast<long long>(r.supply_held),
+                        static_cast<long long>(pm(r.supply_zero) / 10),
+                        static_cast<long long>(pm(r.supply_le_settle) / 10),
+                        static_cast<long long>(pm(r.supply_le_secede) / 10),
+                        static_cast<long long>(pm(r.supply_le_campaign) / 10));
+            for (int b = 0; b < 10; ++b)
+                std::printf("%4lld", static_cast<long long>(pm(r.supply_hist[b])));
+            std::printf("\n");
+        }
+        std::printf("  (A '<=secede' column at 0%% in every world means the BL-896 floor never bit;\n"
+                    "   a '==0' column that is most of the map means the network is disconnected.\n"
+                    "   Both are FINDINGS. REPORTED, not gated.)\n");
+
+        // (4) Cultures, foundings by source, civilisations, city states over time.
+        std::printf("\n--- BL-926.4  CULTURES, FOUNDINGS BY SOURCE, CIVILISATIONS, CITY STATES ---\n");
+        std::printf("  seed   cultures   roots   tree depth   foundings sched / settle   "
+                    "civilisations   city states over time (start .. stop)\n");
+        for (const sweep_row& r : rows)
+        {
+            char cu[12], ro[12], de[12];
+            if (r.cultures < 0) { std::snprintf(cu, sizeof cu, "-"); std::snprintf(ro, sizeof ro, "-");
+                                  std::snprintf(de, sizeof de, "-"); }
+            else { std::snprintf(cu, sizeof cu, "%d", r.cultures);
+                   std::snprintf(ro, sizeof ro, "%d", r.cultures_root);
+                   std::snprintf(de, sizeof de, "%d", r.culture_depth); }
+            std::printf("  %4u   %8s   %5s   %10s   %9lld / %-9lld   %13lld   ",
+                        r.seed, cu, ro, de,
+                        static_cast<long long>(r.foundings_scheduled),
+                        static_cast<long long>(r.foundings_settled),
+                        static_cast<long long>(r.civilisations));
+            // Five points across the series: start, quarter, half, three-quarter, stop.
+            const std::size_t n = r.city_states_series.size();
+            for (int k = 0; k < 5; ++k)
+            {
+                if (n == 0) break;
+                const std::size_t at = std::min(n - 1, (n - 1) * static_cast<std::size_t>(k) / 4);
+                std::printf("%s%d", k ? " " : "", r.city_states_series[at]);
+            }
+            std::printf("\n");
+        }
+        {
+            std::vector<int64_t> cu, dp, civ, sched, settled;
+            for (const sweep_row& r : rows)
+            {
+                if (r.cultures >= 0) { cu.push_back(r.cultures); dp.push_back(r.culture_depth); }
+                civ.push_back(r.civilisations);
+                sched.push_back(r.foundings_scheduled);
+                settled.push_back(r.foundings_settled);
+            }
+            if (!cu.empty())
+                std::printf("\n  CULTURES               median %lld per world   tree depth median %lld\n",
+                            static_cast<long long>(median_of(cu)), static_cast<long long>(median_of(dp)));
+            std::printf("  FOUNDINGS by source    schedule median %lld   Settle verb median %lld\n",
+                        static_cast<long long>(median_of(sched)), static_cast<long long>(median_of(settled)));
+            std::printf("  CIVILISATIONS formed   median %lld per world\n",
+                        static_cast<long long>(median_of(civ)));
+            std::printf("  (city states = polities holding EXACTLY ONE region, sampled every %lld years.)\n",
+                        static_cast<long long>(rows.front().city_states_step));
+        }
+    }
+
     // --- JSON ---------------------------------------------------------------
     if (FILE* f = std::fopen("history_sweep.json", "w"))
     {
@@ -2298,7 +2670,7 @@ int main(int argc, char** argv)
                 "\"conquests\": %lld, \"foundings\": %lld, \"peak_population\": %lld, "
                 "\"peak_year\": %lld, \"epoch_population\": %lld, \"lacunae\": %d, "
                 "\"industrial_first\": %lld, \"industrial_median\": %lld, "
-                "\"industrial_last\": %lld, \"ms\": %lld}%s\n",
+                "\"industrial_last\": %lld, \"ms\": %lld,\n",
                 r.seed, r.regions_start, r.regions_end, r.powers_start, r.powers_end,
                 r.top_share_q, r.peak_share_q, r.smallest_holding,
                 static_cast<long long>(r.hegemony_year),
@@ -2307,8 +2679,88 @@ int main(int argc, char** argv)
                 static_cast<long long>(r.peak_year), static_cast<long long>(r.epoch_population),
                 r.lacunae, static_cast<long long>(r.industrial_first),
                 static_cast<long long>(r.industrial_median),
-                static_cast<long long>(r.industrial_last), static_cast<long long>(r.ms),
-                (i + 1 < rows.size()) ? "," : "");
+                static_cast<long long>(r.industrial_last), static_cast<long long>(r.ms));
+
+            // BL-926 -- the arc, on the row. Everything the face prints above
+            // and enough of the funnel/churn/secession/creed figures that two
+            // runs can be diffed off disk.
+            std::fprintf(f,
+                "   \"arc\": \"%s\", \"arc_start\": %lld, \"arc_stop\": %lld,\n"
+                "   \"polities_ever_held\": %d, \"polities_alive\": %d, \"polities_dead_gross\": %d, "
+                "\"net_loss\": %d,\n"
+                "   \"breakdowns\": %lld, \"secessions\": %lld, \"regions_seceded\": %lld, "
+                "\"piece_sizes\": [",
+                json_escape(r.arc_name).c_str(),
+                static_cast<long long>(r.arc_start), static_cast<long long>(r.arc_stop),
+                r.polities_ever_held, r.polities_alive, r.polities_dead_gross,
+                r.powers_start - r.powers_end,
+                static_cast<long long>(r.breakdowns), static_cast<long long>(r.secessions),
+                static_cast<long long>(r.regions_seceded));
+            for (std::size_t k = 0; k < r.piece_sizes.size(); ++k)
+                std::fprintf(f, "%s%d", k ? "," : "", r.piece_sizes[k]);
+            std::fprintf(f,
+                "],\n"
+                "   \"supply_held\": %lld, \"supply_zero\": %lld, \"supply_le_settle\": %lld, "
+                "\"supply_le_secede\": %lld, \"supply_lt_campaign\": %lld,\n"
+                "   \"floor_settle\": %d, \"floor_secede\": %d, \"floor_campaign\": %d, "
+                "\"supply_hist\": [",
+                static_cast<long long>(r.supply_held), static_cast<long long>(r.supply_zero),
+                static_cast<long long>(r.supply_le_settle), static_cast<long long>(r.supply_le_secede),
+                static_cast<long long>(r.supply_le_campaign),
+                r.floor_settle, r.floor_secede, r.floor_campaign);
+            for (int b = 0; b < 10; ++b)
+                std::fprintf(f, "%s%lld", b ? "," : "", static_cast<long long>(r.supply_hist[b]));
+            std::fprintf(f,
+                "],\n"
+                "   \"cultures\": %d, \"cultures_root\": %d, \"culture_depth\": %d,\n"
+                "   \"foundings_scheduled\": %lld, \"foundings_settled\": %lld, "
+                "\"civilisations\": %lld,\n"
+                "   \"city_states_step\": %lld, \"city_states_series\": [",
+                r.cultures, r.cultures_root, r.culture_depth,
+                static_cast<long long>(r.foundings_scheduled),
+                static_cast<long long>(r.foundings_settled),
+                static_cast<long long>(r.civilisations),
+                static_cast<long long>(r.city_states_step));
+            for (std::size_t k = 0; k < r.city_states_series.size(); ++k)
+                std::fprintf(f, "%s%d", k ? "," : "", r.city_states_series[k]);
+            // The funnel, churn and creed figures that were face-only before.
+            std::fprintf(f,
+                "],\n"
+                "   \"shape_rose\": %d, \"shape_fell\": %d, \"shape_rpf\": %d, "
+                "\"shape_top_peak_q\": %d,\n"
+                "   \"campaign_contacts\": %lld, \"campaign_scored\": %lld, "
+                "\"campaign_cleared\": %lld, \"campaign_chosen\": %lld, "
+                "\"illegal_campaigns\": %lld, \"starved_campaigns\": %lld, \"reach_denied\": %lld,\n"
+                "   \"regions_touched\": %d, \"regions_once\": %d, \"regions_thrice\": %d, "
+                "\"max_flips\": %d,\n"
+                "   \"creeds_arisen\": %lld, \"creed_adoptions\": %lld, "
+                "\"creed_converted\": %lld, \"creed_reasserted\": %lld, "
+                "\"fear_leaned\": %lld, \"fear_targets\": %lld,\n"
+                "   \"polities\": [",
+                r.shape_rose, r.shape_fell, r.shape_rpf, r.shape_top_peak_q,
+                static_cast<long long>(r.campaign_contacts), static_cast<long long>(r.campaign_scored),
+                static_cast<long long>(r.campaign_cleared), static_cast<long long>(r.campaign_chosen),
+                static_cast<long long>(r.illegal_campaigns), static_cast<long long>(r.starved_campaigns),
+                static_cast<long long>(r.reach_denied),
+                r.regions_touched, r.regions_once, r.regions_thrice, r.max_flips,
+                static_cast<long long>(r.creeds_arisen), static_cast<long long>(r.creed_adoptions),
+                static_cast<long long>(r.creed_converted), static_cast<long long>(r.creed_reasserted),
+                static_cast<long long>(r.fear_leaned), static_cast<long long>(r.fear_targets));
+            for (std::size_t k = 0; k < r.arcs.size() && k < static_cast<std::size_t>(arc_table_n); ++k)
+            {
+                const sweep_row::polity_arc& a = r.arcs[k];
+                std::fprintf(f,
+                    "%s\n    {\"id\": %d, \"born\": %lld, \"peak\": %d, \"peak_year\": %lld, "
+                    "\"peak_share_q\": %d, \"end_hold\": %d, \"alive\": %s, \"died\": %s, "
+                    "\"killer\": %d, \"parent\": %d}",
+                    k ? "," : "", a.id, static_cast<long long>(a.born), a.peak,
+                    static_cast<long long>(a.peak_year), a.peak_share_q, a.end_hold,
+                    a.alive ? "true" : "false",
+                    (a.alive || a.died == INT64_MIN) ? "null"
+                        : std::to_string(static_cast<long long>(a.died)).c_str(),
+                    a.killer, a.parent);
+            }
+            std::fprintf(f, "\n   ]}%s\n", (i + 1 < rows.size()) ? "," : "");
         }
         std::fprintf(f, " ]\n}\n");
         std::fclose(f);
