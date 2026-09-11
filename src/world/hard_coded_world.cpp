@@ -245,9 +245,21 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
 
     const uint32_t tile_seed = choose_home_tile_seed(st, cs.height_bias, cs.convergent,
                                                      params.seed, deposit_scalar);
-    return generate_body_tiles(w, body, home_grid_width, home_grid_height,
-                               st.profile, tile_seed, deposit_scalar, &st,
-                               nullptr, &cs.height_bias, &cs.convergent, &cs);
+    generation_record record;
+    std::vector<entity_id> tiles =
+        generate_body_tiles(w, body, home_grid_width, home_grid_height,
+                            st.profile, tile_seed, deposit_scalar, &st,
+                            &record, &cs.height_bias, &cs.convergent, &cs);
+
+    // RIVERS TOO (BL-915). The wizard's Culture and Empires maps draw the river
+    // strokes under the political fill, and the only surface those rounds hold
+    // is this one — so the river pass runs here with the SAME seed formula
+    // make_hard_coded_world uses (`params.seed ^ 0x52490001u`), and the rivers
+    // a frontier stalls at in the wizard are the rivers the campaign has. The
+    // political layer stays skipped.
+    generate_rivers(w, tiles, home_grid_width, home_grid_height,
+                    record.height, /*seed=*/params.seed ^ 0x52490001u);
+    return tiles;
 }
 
 world make_hard_coded_world(world_params params, generation_report* report,

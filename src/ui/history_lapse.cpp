@@ -9,11 +9,13 @@
 #include "presentation.hpp"       // identity colours; they live there, never here
 #include "text_fit.hpp"           // the board's name cell, elided AND recorded
 
-#include "world/components.hpp"   // is_water
+#include "world/components.hpp"   // is_water, terrain_landform
+#include "world/hex_neighbors.hpp" // the odd-r side offsets the river bits are keyed by
 
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <deque>
 
@@ -26,18 +28,63 @@ namespace {
 // duplicated here (presentation.hpp owns them).
 constexpr ImU32 col_sea      = IM_COL32( 16,  24,  38, 255);
 constexpr ImU32 col_void     = IM_COL32( 10,  11,  15, 255);
-constexpr ImU32 col_wild     = IM_COL32( 46,  48,  44, 255); ///< Land, unclaimed.
 constexpr ImU32 col_frontier = IM_COL32(  8,   9,  12, 200); ///< The line between holders.
 constexpr ImU32 col_dim      = IM_COL32(120, 128, 145, 255);
 constexpr ImU32 col_bright   = IM_COL32(225, 230, 240, 255);
 
+// THE TERRAIN BASE (BL-915). Dull on purpose: it is the ground the fill is read
+// against, never a subject of its own, so every value here sits in a narrow
+// grey-olive band and the political tint over it carries the hue. Indexed by
+// `lapse_base_run::kind`.
+constexpr ImU32 col_base[5] = {
+    IM_COL32( 60,  62,  54, 255), // 0 flat land
+    IM_COL32( 70,  74,  58, 255), // 1 valley — faintly lighter and greener
+    IM_COL32( 88,  86,  76, 255), // 2 highland
+    IM_COL32(118, 114, 106, 255), // 3 mountain
+    IM_COL32( 40,  38,  42, 255), // 4 canyon / rift — a cut, so darker
+};
+constexpr ImU32 col_relief_lit  = IM_COL32(210, 206, 196, 120); ///< The lit rim of a range.
+constexpr ImU32 col_relief_dark = IM_COL32(  8,   8,  10, 160); ///< Its shadowed rim.
+constexpr ImU32 col_river       = IM_COL32( 92, 150, 200, 230);
+constexpr ImU32 col_seat_ring   = IM_COL32(  8,   9,  12, 230);
+
+/// The fill's opacity over the base. High enough that a colour reads as a
+/// colour on the board's swatch too; low enough that a mountain range and a
+/// river still show through it, which is the whole point of the base.
+constexpr int tint_alpha = 170;
+
 /// The colour one polity index is drawn in, everywhere on this surface — the map
 /// swatch and the board row are the same call, so a row and its territory cannot
-/// disagree. `+1` matches the Ages view's own keying (a polity index of 0 is a
-/// real polity; `null_entity` is not a colour input).
-ImU32 polity_colour(uint16_t owner)
+/// disagree. The SLOT comes from the greedy colouring over the adjacency graph
+/// (`assign_polity_colours`), not from the id, so two neighbours never share it.
+/// A polity the colouring never saw (a record still deriving) falls back to its
+/// own index, which is at least stable.
+ImU32 polity_colour(const history_lapse& h, uint16_t owner)
 {
-    return palette::nation_colour(static_cast<entity_id>(owner + 1));
+    const int32_t slot = (owner < h.polity_slot.size()) ? h.polity_slot[owner]
+                                                        : static_cast<int32_t>(owner);
+    return palette::lapse_polity_colour(slot);
+}
+
+ImU32 with_alpha(ImU32 c, int a)
+{
+    return (c & 0x00FFFFFFu) | (static_cast<ImU32>(a) << IM_COL32_A_SHIFT);
+}
+
+/// Which base band a landform is drawn in. Crater and plains are flat: a crater
+/// is an airless-body form the homeworld barely has, and drawing it as relief
+/// would invent a barrier the walk never priced.
+uint8_t base_kind(terrain_landform lf)
+{
+    switch (lf)
+    {
+    case terrain_landform::valley:   return 1;
+    case terrain_landform::highland: return 2;
+    case terrain_landform::mountain: return 3;
+    case terrain_landform::canyon:
+    case terrain_landform::rift:     return 4;
+    default:                         return 0;
+    }
 }
 
 } // namespace
@@ -50,7 +97,8 @@ std::string lapse_year_label(int year)
     return buf;
 }
 
-void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t packed_len)
+void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t packed_len,
+                          const uint16_t* terrain, std::size_t terrain_len)
 {
     if (h.derived() || h.empty()) return;
     if (h.grid_w <= 0 || h.grid_h <= 0) return;
@@ -122,6 +170,233 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
         if (h.polity_seat[c.owner] < 0)
             h.polity_seat[c.owner] = static_cast<int32_t>(c.region);
     }
+
+    // --- The terrain base, baked once (BL-915) -------------------------------
+    //
+    // Run-merged along each row by base KIND, land only, in tile units. This is
+    // the "cached draw list" the item asks for in the form the map can actually
+    // use: the pane can change size between frames, so what is cached is the
+    // merge, and the scale is applied at draw time. A missing terrain raster
+    // (the async build not landed, or an older caller) bakes flat land, so the
+    // map is never blocked on the ground.
+    h.base_runs.clear();
+    h.river_segs.clear();
+    h.relief_segs.clear();
+    const bool have_terrain = (terrain != nullptr && terrain_len == n);
+
+    // The base band per tile, 0xFF for water. Computed once so the run merge
+    // and the relief edges below read the same thing.
+    std::vector<uint8_t> band(n, 0xFF);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        if (is_water(preview_substrate(packed[i]))) continue;
+        band[i] = have_terrain ? base_kind(lapse_landform(terrain[i])) : 0;
+    }
+
+    for (int r = 0; r < gh; ++r)
+    {
+        int c = 0;
+        while (c < gw)
+        {
+            const uint8_t kind = band[static_cast<std::size_t>(r * gw + c)];
+            if (kind == 0xFF) { ++c; continue; }
+            int e = c + 1;
+            while (e < gw && band[static_cast<std::size_t>(r * gw + e)] == kind) ++e;
+            h.base_runs.push_back({static_cast<uint16_t>(r), static_cast<uint16_t>(c),
+                                   static_cast<uint16_t>(e), kind});
+            c = e;
+        }
+    }
+
+    // RELIEF EDGES. Only MOUNTAIN (band 3) gets a rim, and only where its north
+    // or south neighbour is LOW ground — flat, valley, a cut, or water; a step
+    // down to highland is left to the band colours. The landform field is noisy
+    // at tile grain, so rimming every highland step drew scanlines across whole
+    // continents (measured: 978 rims for 1,966 base runs) — a rim is worth
+    // drawing only where the drop is a real one. The north rim is lit and the
+    // south rim shadowed, the same top-left light every canvas here assumes.
+    // Merged along the row.
+    {
+        const auto elevated = [](uint8_t b) { return b == 3; };
+        const auto height_of = [](uint8_t b) { return (b == 0xFF || b == 4) ? 0 : (b >= 2 ? 2 : 0); };
+        for (int r = 0; r < gh; ++r)
+        {
+            for (int lit = 1; lit >= 0; --lit)
+            {
+                const int nr = lit ? r - 1 : r + 1;
+                int c = 0;
+                while (c < gw)
+                {
+                    const uint8_t b = band[static_cast<std::size_t>(r * gw + c)];
+                    const bool rim = elevated(b)
+                        && (nr < 0 || nr >= gh
+                            || height_of(band[static_cast<std::size_t>(nr * gw + c)]) < height_of(b));
+                    if (!rim) { ++c; continue; }
+                    int e = c + 1;
+                    while (e < gw)
+                    {
+                        const uint8_t b2 = band[static_cast<std::size_t>(r * gw + e)];
+                        const bool rim2 = elevated(b2)
+                            && (nr < 0 || nr >= gh
+                                || height_of(band[static_cast<std::size_t>(nr * gw + e)]) < height_of(b2));
+                        if (!rim2) break;
+                        ++e;
+                    }
+                    h.relief_segs.push_back({static_cast<uint16_t>(r), static_cast<uint16_t>(c),
+                                             static_cast<uint16_t>(e), static_cast<uint8_t>(lit)});
+                    c = e;
+                }
+            }
+        }
+    }
+
+    // Rivers: one segment per DOWNSTREAM edge, from the tile's centre to its
+    // downstream neighbour's — so every river edge is drawn exactly once, by the
+    // tile upstream of it, and consecutive edges chain into a polyline. The
+    // river bits are keyed by odd-r hex side (river_generation.hpp), so the
+    // neighbour is read off the shared side table rather than a square-grid
+    // guess. A segment that would cross the wrap seam is dropped: a line across
+    // the whole map is not a river.
+    if (have_terrain)
+    {
+        for (int r = 0; r < gh; ++r)
+            for (int c = 0; c < gw; ++c)
+            {
+                const uint16_t t = terrain[static_cast<std::size_t>(r * gw + c)];
+                const uint8_t down = lapse_river_downstream(t) & lapse_river_edges(t);
+                if (down == 0) continue;
+                for (int side = 0; side < 6; ++side)
+                {
+                    if ((down & (1u << side)) == 0) continue;
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, side);
+                    if (nb.gy < 0 || nb.gy >= gh) continue;
+                    if (nb.gx < 0 || nb.gx >= gw) continue; // the wrap seam
+                    h.river_segs.push_back({static_cast<int16_t>(c),     static_cast<int16_t>(r),
+                                            static_cast<int16_t>(nb.gx), static_cast<int16_t>(nb.gy)});
+                }
+            }
+    }
+
+    assign_polity_colours(h, nullptr);
+}
+
+void assign_polity_colours(history_lapse& h, const std::vector<int32_t>* hue_family)
+{
+    h.polity_slot.clear();
+    if (h.tile_region.empty()) return;
+
+    const int gw = h.grid_w, gh = h.grid_h;
+    const std::size_t nreg = h.region_col.size();
+
+    // 1. REGION adjacency, off the nearest-region raster: two regions touch if
+    //    any two of their tiles do, under the same four-neighbour, column-wrapping
+    //    rule the raster itself was walked with. A sorted, deduplicated edge list
+    //    rather than an n^2 matrix — a few hundred regions, a few hundred edges.
+    std::vector<std::pair<int32_t, int32_t>> region_edges;
+    for (int r = 0; r < gh; ++r)
+        for (int c = 0; c < gw; ++c)
+        {
+            const int32_t a = h.tile_region[static_cast<std::size_t>(r * gw + c)];
+            if (a < 0) continue;
+            const int steps[2][2] = { {1, 0}, {0, 1} }; // east and south: each pair once
+            for (const auto& s : steps)
+            {
+                int nc = c + s[0], nr = r + s[1];
+                if (nr >= gh) continue;
+                if (nc >= gw) nc -= gw;
+                const int32_t b = h.tile_region[static_cast<std::size_t>(nr * gw + nc)];
+                if (b < 0 || b == a) continue;
+                region_edges.emplace_back(std::min(a, b), std::max(a, b));
+            }
+        }
+    std::sort(region_edges.begin(), region_edges.end());
+    region_edges.erase(std::unique(region_edges.begin(), region_edges.end()), region_edges.end());
+
+    std::vector<std::vector<int32_t>> region_nbrs(nreg);
+    for (const auto& e : region_edges)
+    {
+        region_nbrs[static_cast<std::size_t>(e.first)].push_back(e.second);
+        region_nbrs[static_cast<std::size_t>(e.second)].push_back(e.first);
+    }
+
+    // 2. POLITY adjacency, across the WHOLE record rather than one slice. Two
+    //    polities are adjacent if they ever held neighbouring regions at the
+    //    same time — and a neighbouring pair can only come into being when one
+    //    side changes hands, so folding the change list and looking around each
+    //    changed region sees every pair that ever existed. Linear in changes
+    //    times region degree.
+    std::size_t npol = h.polity_seat.size();
+    std::vector<uint16_t> owner(nreg, owner_none);
+    std::vector<std::pair<int32_t, int32_t>> polity_edges;
+    for (const owner_change& ch : h.lapse.changes)
+    {
+        if (ch.region >= nreg) continue;
+        owner[ch.region] = ch.owner;
+        if (ch.owner == owner_none) continue;
+        if (ch.owner >= npol) npol = static_cast<std::size_t>(ch.owner) + 1;
+        for (const int32_t nb : region_nbrs[ch.region])
+        {
+            const uint16_t o = owner[static_cast<std::size_t>(nb)];
+            if (o == owner_none || o == ch.owner) continue;
+            polity_edges.emplace_back(std::min<int32_t>(ch.owner, o),
+                                      std::max<int32_t>(ch.owner, o));
+        }
+    }
+    std::sort(polity_edges.begin(), polity_edges.end());
+    polity_edges.erase(std::unique(polity_edges.begin(), polity_edges.end()), polity_edges.end());
+
+    std::vector<std::vector<int32_t>> polity_nbrs(npol);
+    for (const auto& e : polity_edges)
+    {
+        polity_nbrs[static_cast<std::size_t>(e.first)].push_back(e.second);
+        polity_nbrs[static_cast<std::size_t>(e.second)].push_back(e.first);
+    }
+
+    // 3. GREEDY, in a fixed order: highest degree first, then index, which is
+    //    the standard heuristic and deterministic. Each polity takes the lowest
+    //    slot no already-coloured neighbour holds. With a HUE FAMILY supplied,
+    //    the search starts at the family's band of the palette and wraps, so
+    //    kin share a neighbourhood of hues where the constraint allows it. If
+    //    every slot is taken by a neighbour (a degree above the palette, which
+    //    the greedy order makes unlikely), the least-used slot among the
+    //    neighbours is taken and that one shared edge is left to the frontier
+    //    line — a bound met honestly rather than a palette silently widened.
+    std::vector<int32_t> order(npol);
+    for (std::size_t i = 0; i < npol; ++i) order[i] = static_cast<int32_t>(i);
+    std::sort(order.begin(), order.end(), [&](int32_t a, int32_t b) {
+        const std::size_t da = polity_nbrs[static_cast<std::size_t>(a)].size();
+        const std::size_t db = polity_nbrs[static_cast<std::size_t>(b)].size();
+        if (da != db) return da > db;
+        return a < b;
+    });
+
+    constexpr int k_slots = palette::lapse_polity_slot_count;
+    h.polity_slot.assign(npol, -1);
+    for (const int32_t p : order)
+    {
+        int used[k_slots] = {};
+        for (const int32_t nb : polity_nbrs[static_cast<std::size_t>(p)])
+        {
+            const int32_t s = h.polity_slot[static_cast<std::size_t>(nb)];
+            if (s >= 0) ++used[s % k_slots];
+        }
+        const bool has_family = hue_family != nullptr
+                             && static_cast<std::size_t>(p) < hue_family->size()
+                             && (*hue_family)[static_cast<std::size_t>(p)] >= 0;
+        const int start = has_family
+                              ? ((*hue_family)[static_cast<std::size_t>(p)] * 7) % k_slots
+                              : 0;
+        int chosen = -1;
+        for (int k = 0; k < k_slots && chosen < 0; ++k)
+            if (used[(start + k) % k_slots] == 0) chosen = (start + k) % k_slots;
+        if (chosen < 0)
+        {
+            chosen = 0;
+            for (int k = 1; k < k_slots; ++k)
+                if (used[k] < used[chosen]) chosen = k;
+        }
+        h.polity_slot[static_cast<std::size_t>(p)] = chosen;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -173,47 +448,174 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
 
     dl->AddRectFilled(tl, {tl.x + mw, tl.y + mh}, col_sea);
 
-    // One colour per tile, then RUN-MERGED along the row. A political map is long
-    // runs of one colour, so this collapses ~31,500 cells to on the order of a
-    // thousand rects — which is what keeps the whole map inside ImGui's 16-bit
-    // draw indices without dropping to a coarser grid than the frontier deserves.
-    std::vector<ImU32> row(static_cast<std::size_t>(gw));
+    // TILE EDGES SNAP TO WHOLE PIXELS. At ~4.6 px per tile a rect edge lands on
+    // a fraction, and the rasteriser's anti-aliasing then either leaves a
+    // hairline seam between rows (edge-exact rects) or doubles the tint's alpha
+    // along a hairline (rects that bleed) — both drew stripes across the whole
+    // map. Snapped, neighbouring rows and runs share one integer edge exactly:
+    // no seam, no overlap, and no bleed needed anywhere below.
+    const auto px = [&](float c) { return std::floor(tl.x + c * scale); };
+    const auto py = [&](float r) { return std::floor(tl.y + r * scale); };
+
+    // ── 1. THE GROUND (BL-915). The baked base runs, scaled and emitted: land
+    //    by landform band, then the lit north rim and shadowed south rim of
+    //    every range so it reads as relief rather than as a paler patch.
+    //    Nothing here depends on the slice, and nothing here is merged per
+    //    frame — see finish_history_lapse. ──
+    int prims = 0;
+    for (const lapse_base_run& b : h.base_runs)
+    {
+        const float x0 = px(static_cast<float>(b.c0));
+        const float x1 = px(static_cast<float>(b.c1));
+        const float y0 = py(static_cast<float>(b.row));
+        const float y1 = py(static_cast<float>(b.row + 1));
+        dl->AddRectFilled({x0, y0}, {x1, y1}, col_base[b.kind]);
+        ++prims;
+    }
+    for (const lapse_relief_seg& s : h.relief_segs)
+    {
+        const float x0 = px(static_cast<float>(s.c0));
+        const float x1 = px(static_cast<float>(s.c1));
+        const float y  = s.lit ? py(static_cast<float>(s.row)) + 0.5f
+                               : py(static_cast<float>(s.row + 1)) - 0.5f;
+        dl->AddLine({x0, y}, {x1, y}, s.lit ? col_relief_lit : col_relief_dark, 1.0f);
+        ++prims;
+    }
+
+    // ── 2. THE FILL, as a translucent TINT over the ground. One owner per tile,
+    //    RUN-MERGED along the row: a political map is long runs of one owner,
+    //    so this collapses ~31,500 cells to on the order of a thousand rects.
+    //    (The 16-bit draw-index bound this was written against is met by the
+    //    SDL3 backend's VtxOffset support; the merge is still what keeps a
+    //    frame cheap.) Unclaimed land gets no tint: the bare ground IS the
+    //    "nobody here yet" colour. ──
+    //
+    // Owner keys: -1 sea (nothing drawn, nothing bordered), -2 wild, else the
+    // polity index. The frontier is drawn between any two DIFFERENT non-sea
+    // keys, on both axes.
+    std::vector<int32_t> row(static_cast<std::size_t>(gw));
+    std::vector<int32_t> above(static_cast<std::size_t>(gw), -1);
+    std::vector<char>    present; // owner -> holds ground in this slice
     for (int r = 0; r < gh; ++r)
     {
         for (int c = 0; c < gw; ++c)
         {
             const std::size_t i = static_cast<std::size_t>(r * gw + c);
             const int32_t reg = h.tile_region[i];
-            if (reg < 0) { row[static_cast<std::size_t>(c)] = 0; continue; } // sea shows through
+            if (reg < 0) { row[static_cast<std::size_t>(c)] = -1; continue; }
             const uint16_t o = (static_cast<std::size_t>(reg) < slice.size())
                                    ? slice[static_cast<std::size_t>(reg)] : owner_none;
-            row[static_cast<std::size_t>(c)] = (o == owner_none) ? col_wild : polity_colour(o);
+            row[static_cast<std::size_t>(c)] = (o == owner_none) ? -2 : static_cast<int32_t>(o);
         }
 
-        const float y0 = tl.y + static_cast<float>(r) * scale;
-        const float y1 = y0 + scale + 0.5f; // half a pixel of bleed: no seam rows
+        // Edge-exact on the snapped grid (see px/py): a TRANSLUCENT rect that
+        // overlapped its neighbour would double its alpha along the overlap.
+        const float y0 = py(static_cast<float>(r));
+        const float y1 = py(static_cast<float>(r + 1));
         int c = 0;
         while (c < gw)
         {
-            const ImU32 col = row[static_cast<std::size_t>(c)];
+            const int32_t key = row[static_cast<std::size_t>(c)];
             int e = c + 1;
-            while (e < gw && row[static_cast<std::size_t>(e)] == col) ++e;
-            if (col != 0)
+            while (e < gw && row[static_cast<std::size_t>(e)] == key) ++e;
+            if (key >= 0)
             {
-                dl->AddRectFilled({tl.x + static_cast<float>(c) * scale, y0},
-                                  {tl.x + static_cast<float>(e) * scale + 0.5f, y1}, col);
-                // The frontier LINE. Twelve identity colours cover many more
-                // polities, so two neighbours can share one — without a separating
-                // line a border between them would simply not exist on screen, and
-                // the border is this round's whole subject.
-                if (c > 0 && row[static_cast<std::size_t>(c - 1)] != col
-                          && row[static_cast<std::size_t>(c - 1)] != 0)
-                    dl->AddLine({tl.x + static_cast<float>(c) * scale, y0},
-                                {tl.x + static_cast<float>(c) * scale, y1},
-                                col_frontier, 1.0f);
+                const uint16_t o = static_cast<uint16_t>(key);
+                if (present.size() <= o) present.resize(static_cast<std::size_t>(o) + 1, 0);
+                present[o] = 1;
+                dl->AddRectFilled({px(static_cast<float>(c)), y0},
+                                  {px(static_cast<float>(e)), y1},
+                                  with_alpha(polity_colour(h, o), tint_alpha));
+                ++prims;
+            }
+            // The VERTICAL frontier: between this run and the one to its west.
+            if (key >= -2 && c > 0)
+            {
+                const int32_t west = row[static_cast<std::size_t>(c - 1)];
+                if (west >= -2 && west != key)
+                {
+                    // +0.5: a 1 px line centred ON the pixel column, not
+                    // anti-aliased across two.
+                    dl->AddLine({px(static_cast<float>(c)) + 0.5f, y0},
+                                {px(static_cast<float>(c)) + 0.5f, y1}, col_frontier, 1.0f);
+                    ++prims;
+                }
             }
             c = e;
         }
+
+        // The HORIZONTAL frontier: between this row and the one above, merged
+        // into segments along the row. Until BL-915 only the vertical line was
+        // drawn, so a north-south border between two holders did not exist on
+        // screen — and the border is this round's whole subject.
+        if (r > 0)
+        {
+            int s = 0;
+            while (s < gw)
+            {
+                const bool edge = row[static_cast<std::size_t>(s)] >= -2
+                               && above[static_cast<std::size_t>(s)] >= -2
+                               && row[static_cast<std::size_t>(s)] != above[static_cast<std::size_t>(s)];
+                if (!edge) { ++s; continue; }
+                int e = s + 1;
+                while (e < gw && row[static_cast<std::size_t>(e)] >= -2
+                              && above[static_cast<std::size_t>(e)] >= -2
+                              && row[static_cast<std::size_t>(e)] != above[static_cast<std::size_t>(e)]
+                              && row[static_cast<std::size_t>(e)] == row[static_cast<std::size_t>(s)]
+                              && above[static_cast<std::size_t>(e)] == above[static_cast<std::size_t>(s)])
+                    ++e;
+                dl->AddLine({px(static_cast<float>(s)), y0 + 0.5f},
+                            {px(static_cast<float>(e)) + 1.0f, y0 + 0.5f}, col_frontier, 1.0f);
+                ++prims;
+                s = e;
+            }
+        }
+        std::swap(row, above);
+    }
+
+    // ── 3. RIVERS, over the fill: a river is what a frontier stops at, so it
+    //    reads best on top of the tint rather than dimmed under it. Tile centre
+    //    to downstream centre, baked once. ──
+    {
+        const float half = scale * 0.5f;
+        const float w    = std::max(1.0f, scale * 0.28f);
+        for (const lapse_river_seg& s : h.river_segs)
+        {
+            dl->AddLine({px(static_cast<float>(s.c0)) + half, py(static_cast<float>(s.r0)) + half},
+                        {px(static_cast<float>(s.c1)) + half, py(static_cast<float>(s.r1)) + half},
+                        col_river, w);
+        }
+        prims += static_cast<int>(h.river_segs.size());
+    }
+
+    // ── 4. SEATS: one dot per polity HOLDING GROUND in this slice, at the
+    //    region it first held. Seats only, not every region — the in-game Ages
+    //    view draws a dot per region, and at blob granularity that is a rash;
+    //    a seat per power is what makes a fragmentation into successors legible
+    //    when two of them happen to sit in neighbouring hues. ──
+    {
+        const float rad = std::clamp(scale * 0.7f, 2.0f, 4.5f);
+        for (std::size_t o = 0; o < present.size() && o < h.polity_seat.size(); ++o)
+        {
+            if (!present[o]) continue;
+            const int32_t seat = h.polity_seat[o];
+            if (seat < 0 || static_cast<std::size_t>(seat) >= h.region_col.size()) continue;
+            const ImVec2 at{px(static_cast<float>(h.region_col[static_cast<std::size_t>(seat)]) + 0.5f),
+                            py(static_cast<float>(h.region_row[static_cast<std::size_t>(seat)]) + 0.5f)};
+            dl->AddCircleFilled(at, rad, polity_colour(h, static_cast<uint16_t>(o)), 10);
+            dl->AddCircle(at, rad, col_seat_ring, 10, 1.0f);
+            prims += 2;
+        }
+    }
+
+    // The draw cost, reported once per record under the capture harness so the
+    // bound is a measured number rather than an assumption. Never in play.
+    if (!h.prim_report_done)
+    {
+        h.prim_report_done = true;
+        std::fprintf(stderr, "history_lapse: %zu base runs, %zu relief rims, %zu river segments, "
+                             "%d primitives this frame\n",
+                     h.base_runs.size(), h.relief_segs.size(), h.river_segs.size(), prims);
     }
 
     // The year, over the map's own corner. It is the one thing a watcher needs
@@ -356,7 +758,7 @@ void draw_lapse_scoreboard(const history_lapse& h,
             const ImVec2 p = ImGui::GetCursorScreenPos();
             const float  s = ImGui::GetTextLineHeight();
             ImGui::GetWindowDrawList()->AddRectFilled(
-                {p.x, p.y + 2.0f}, {p.x + s * 0.55f, p.y + s - 1.0f}, polity_colour(b.owner));
+                {p.x, p.y + 2.0f}, {p.x + s * 0.55f, p.y + s - 1.0f}, polity_colour(h, b.owner));
             swatch_w = s * 0.55f + 5.0f + ImGui::GetStyle().ItemSpacing.x;
             ImGui::Dummy({s * 0.55f + 5.0f, s});
             ImGui::SameLine();
