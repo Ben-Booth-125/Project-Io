@@ -458,7 +458,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                   const history_sim_params& params,
                                   uint32_t                  seed,
                                   std::atomic<int>*         year_progress,
-                                  const works_registry*     works)
+                                  const works_registry*     works,
+                                  era_lapse_tap*            tap)
 {
     history_sim_profile& prof = history_sim_last_profile();
     prof = history_sim_profile{}; // this run's split, never the last one's.
@@ -466,6 +467,29 @@ history_sim_state run_history_sim(settlement_state&         ss,
     history_sim_state out;
     if (ss.regions.empty() || params.stop_year <= params.start_year)
         return out;
+
+    // BL-914: seed the tap's geometry mirror with the regions this call
+    // already opens on (round 4 always does — settlement/migration ran
+    // first), so the very first renderer poll already has something to draw
+    // a map from. `tap_region_col/row/name` is this run's own running,
+    // append-only flattening of `ss.regions`, kept local because
+    // `era_timelapse.hpp` cannot depend on `settlement.hpp`'s `region` type.
+    std::vector<int32_t>     tap_region_col;
+    std::vector<int32_t>     tap_region_row;
+    std::vector<std::string> tap_region_name;
+    if (tap != nullptr)
+    {
+        tap_region_col.reserve(ss.regions.size());
+        tap_region_row.reserve(ss.regions.size());
+        tap_region_name.reserve(ss.regions.size());
+        for (const region& r : ss.regions)
+        {
+            tap_region_col.push_back(r.col);
+            tap_region_row.push_back(r.row);
+            tap_region_name.push_back(r.name);
+        }
+        tap->publish_regions(tap_region_col, tap_region_row, tap_region_name);
+    }
 
     // --- Seed polities from cultures --------------------------------------
     //
@@ -1494,6 +1518,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             year_progress->store(static_cast<int>(y - params.start_year + 1),
                                  std::memory_order_relaxed);
 
+        // BL-914: publish last year's finished record before this year's own
+        // work begins. One year behind is deliberate, not a rounding slip —
+        // it guarantees the tap never reports a year whose events might still
+        // be mid-append, so a renderer reading it can never run ahead of what
+        // is actually settled. Write-only: nothing below ever reads `tap` back.
+        if (tap != nullptr)
+            tap->publish(out.owner_changes, out.culture_changes, out.events,
+                        static_cast<int32_t>(y - 1));
+
         const std::size_t century =
             static_cast<std::size_t>((y - params.start_year) / 100);
 
@@ -1603,6 +1636,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
             supply_neighbours.emplace_back();
             degree.push_back(0);
             link_region(ss.regions.size() - 1); // Keep the index complete.
+
+            // BL-914: this region's geometry joins the tap's mirror the
+            // instant it exists, well ahead of the per-year ownership publish
+            // below — a founding this rare (hundreds, not thousands, across a
+            // run) costs nothing extra locked.
+            if (tap != nullptr)
+            {
+                tap_region_col.push_back(ss.regions.back().col);
+                tap_region_row.push_back(ss.regions.back().row);
+                tap_region_name.push_back(ss.regions.back().name);
+                tap->publish_regions(tap_region_col, tap_region_row, tap_region_name);
+            }
 
             if (np_owner >= 0)
                 out.owner_changes.push_back(owner_change{
@@ -3854,6 +3899,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 degree.push_back(0);
                 link_region(ss.regions.size() - 1); // Keep the index complete.
 
+                // BL-914: the Settle verb's own founding, the far commoner of
+                // this function's two region-creating sites (see the founding
+                // schedule above, near the top of the year loop) — most of a
+                // run's regions are minted HERE, not there.
+                if (tap != nullptr)
+                {
+                    tap_region_col.push_back(ss.regions.back().col);
+                    tap_region_row.push_back(ss.regions.back().row);
+                    tap_region_name.push_back(ss.regions.back().name);
+                    tap->publish_regions(tap_region_col, tap_region_row, tap_region_name);
+                }
+
                 // BL-768 — the road a founding party walked. The daughter is
                 // reached FROM its parent and supplied from there until it can
                 // feed itself, so (parent, daughter) is the second and by far
@@ -4741,6 +4798,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ? out.polities[static_cast<std::size_t>(o)].protection_q : 0;
         }
     }
+
+    // BL-914: the final flush. The per-year publish above always lags by one
+    // year, so the last year simulated is never folded in inside the loop —
+    // this is the one place that year's record reaches the tap.
+    if (tap != nullptr)
+        tap->publish(out.owner_changes, out.culture_changes, out.events,
+                    static_cast<int32_t>(params.stop_year - 1));
 
     return out;
 }

@@ -2443,7 +2443,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                   const history_sim_params& params,
                                   uint32_t                  seed,
                                   std::atomic<int>*         year_progress = nullptr,
-                                  const works_registry*     works         = nullptr);
+                                  const works_registry*     works         = nullptr,
+                                  era_lapse_tap*            tap           = nullptr);
 
 /// Tile distance between two regions on the cylinder — column difference
 /// wraps, row difference does not. Exposed because the harness asserts the

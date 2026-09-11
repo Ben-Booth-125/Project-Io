@@ -861,6 +861,41 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 build_migration_timelapse(kepler_settlement, kepler_creeds,
                                           colonisation_start_year,
                                           kepler_settlement.migration_end_year);
+
+            // BL-914: round 3 gets the same tap round 4 does. `run_settlement`
+            // itself is not instrumented (out of this item's files), so this is
+            // ONE publish of the finished migration record rather than a
+            // growing one — but it still lands here, on the worker thread,
+            // before `make_hard_coded_world` returns and long before the
+            // std::async future resolves on the app side. So the renderer's
+            // playhead can start moving as soon as this publish happens rather
+            // than waiting for the future AND the report-to-lapse conversion
+            // both to finish, which is the whole gap this item closes.
+            if (progress != nullptr && progress->lapse_tap != nullptr)
+            {
+                // Geometry alongside ownership, same reasoning as round 4's
+                // per-founding publish (history_sim.cpp): the renderer cannot
+                // draw a single tile without a region position.
+                std::vector<int32_t>     tap_region_col;
+                std::vector<int32_t>     tap_region_row;
+                std::vector<std::string> tap_region_name;
+                tap_region_col.reserve(kepler_settlement.regions.size());
+                tap_region_row.reserve(kepler_settlement.regions.size());
+                tap_region_name.reserve(kepler_settlement.regions.size());
+                for (const region& r : kepler_settlement.regions)
+                {
+                    tap_region_col.push_back(r.col);
+                    tap_region_row.push_back(r.row);
+                    tap_region_name.push_back(r.name);
+                }
+                progress->lapse_tap->publish_regions(tap_region_col, tap_region_row,
+                                                     tap_region_name);
+                progress->lapse_tap->publish(
+                    migration_lapse.changes, migration_lapse.culture_changes,
+                    migration_lapse.events,
+                    static_cast<int32_t>(kepler_settlement.migration_end_year));
+            }
+
             if (report)
             {
                 report->prehistory_years     = kepler_settlement.migration_end_year
@@ -955,7 +990,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                 hseed,
                                 progress != nullptr ? &progress->sub_progress
                                                     : nullptr,
-                                works); // BL-321: the Era -1 works table, or null.
+                                works, // BL-321: the Era -1 works table, or null.
+                                progress != nullptr ? progress->lapse_tap
+                                                    : nullptr); // BL-914: null off the wizard's path.
 
             if (progress != nullptr)
                 progress->sub_total.store(0, std::memory_order_relaxed);
