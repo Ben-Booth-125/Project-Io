@@ -526,6 +526,60 @@ needs is only *difference* — that two places hold unlike things — never a pr
 
 ---
 
+### What materials are FOR (Ben, 2026-09-11)
+
+§ War is paid for, and trade is what pays gave this phase an income. Measurement then found the
+other half missing: **campaigns are the only thing materials are ever spent on** — one site in the
+whole sim — and industry produces about 241,000,000 per world against campaign spending in the
+*hundreds*. Materials were not merely abundant, they had **no sink**, and an income that nothing
+competes for cannot make war affordable to the rich and unaffordable to the poor however large it
+is.
+
+**TWO SINKS, BOTH CHOSEN.**
+
+- **A STANDING ARMY EATS MATERIALS EVERY YEAR**, not only when it marches. An army is a permanent
+  claim on a realm's production rather than a one-off purchase, which is what makes a large one a
+  *decision* instead of a free accumulation. It also gives a losing realm a way to be strangled
+  rather than only beaten.
+- **ROADS AND WORKS COST MATERIALS TO BUILD.** This is the one that closes a loop: trade pays for
+  the network, and the network is what carries trade. It also turns `NR-823`'s ruling — *the wall
+  moves when you win* — from a purely geographic statement into an economic one, because a realm
+  that cannot afford roads cannot extend its reach however much ground it takes.
+
+**STOCK STAYS UNBOUNDED, and that is consistent rather than an oversight.** With two live sinks a
+realm's stock is limited by what it chooses to keep paying for; a cap or a decay would be a second
+mechanism doing a job the sinks already do, and would need a magnitude nobody has a reason to pick.
+
+### How an empire actually falls (Ben, 2026-09-11)
+
+§ What the dark age must leave settles the CAUSE as network failure. These are the two calls that
+make it a mechanism.
+
+**THE NETWORK IS REACH, NOT THE ROAD GRAPH.** § The road is the empire's skeleton calls roads the
+skeleton, and reach is what a skeleton *does*: `rebuild_reach` already discounts the corridors a
+history has actually walked, so reach **is** the road network, measured densely instead of
+sparsely. The practical difference is decisive — the road graph is about **fifty edges per world**
+(1,347 of 1,607 recorded corridors are walked once and never promoted), which is not a structure an
+empire can be said to hang on, while `region::network_supply_q` is computed for **every held
+region every decision round** and today gates nothing but town growth (`BL-872`).
+
+**GROUND THE REALM CAN NO LONGER REACH SECEDES.** It does not fall to a neighbour, and that choice
+is the arc's. A region lost to whoever can reach it **concentrates** the map and works against
+everything this phase is for; a region that secedes becomes a **successor** — a new polity, holding
+real ground, carrying the culture and the grudges it already had. That is precisely what § What the
+dark age must leave asks the phase to hand forward: *nations of unequal strength*, some large
+enough to colonise and some only to be colonised.
+
+**MECHANICAL, NEVER SCHEDULED.** No collapse fires on a date or a counter. A realm fragments
+because a specific region's supply fell under a floor, for reasons a player could read off the map
+— distance, terrain, a road that was never built, a war that emptied the ground between.
+
+**SECESSION MUST BE DETERMINISTIC**, which is a real constraint rather than a note: a seceding
+polity needs an id and a seat allocated in an order that depends only on the sim's own state, never
+on iteration order over a container whose order is undefined.
+
+---
+
 ## What this phase hands the industrial era
 
 **Ben, 2026-09-09 (elicitation notes): this phase feeds directly into the industrial era sim,
