@@ -12353,6 +12353,143 @@
         "resolved",
         "resolution"
       ]
+    },
+    "BL-907": {
+      "id": "BL-907",
+      "short_name": "CLOSURE_CONTRACT_SCOREBOARD",
+      "status": "complete",
+      "priority": "A",
+      "difficulty": 3,
+      "glyph": "✓",
+      "sprint": "38",
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+      "requires": [
+        "BL-906"
+      ],
+      "parked": false,
+      "category": "Generation",
+      "title": "Print the closure contract's seven readings from history_sweep, at 1200 CE",
+      "authority_doc": "docs/generation/CIVILISATION.md",
+      "files": [
+        "tools/verify/history_sweep.cpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "THE CONTRACT IS A STRUCT PLUS A SCOREBOARD, AND THIS IS THE SCOREBOARD. pass_one_output_valid checks internal consistency -- shares sum to 1000, holdings name living polities, grudges name polities in range. It cannot check SHAPE, and shape is the whole of what the closure requires.\n\nWHY IT EXISTS, stated as plainly as the handoff stated it: four items delivered on 2026-09-11 (BL-887 reach chains, BL-839 turbulence lean, BL-838 fear-of-next, BL-905 reach gate) were each measured honestly and NONE could be JUDGED, because nothing downstream asked for anything specific. A mechanism inside the Empire phase is judged by whether it moves a reading here. Without this surface, sprint 38's pattern repeats by default.\n\nTHE SEVEN READINGS are CIVILISATION.md sec What the closure is judged on: explorer set, strength spread, contact, directed wants, markets, inherited network, grudges still biting. Each is read OVER A SEED SPREAD and never per-world.\n\nNO TARGET NUMBERS ARE SET IN THIS ITEM. The spread is measured first and the admissible band is argued from the measurement, exactly as sprint 38's done_when requires and as the opposition-bar question in CIVILISATION.md sec Open questions already insists. A number picked to make one seed look right is the failure mode this item exists to prevent, not a shortcut it may take.\n\nA SEED THAT REFUSES A READING IS LEGITIMATE; A SPREAD THAT REFUSES ONE IS NOT. Assert on the spread. A per-world assertion here would re-introduce the forced outcome the whole phase is designed against.\n\nDEPENDS on BL-906 (empire span to 1200) for the readings to mean anything, and reports partial readings honestly for the fields BL-908/909/910/911/912 have not yet supplied -- a missing field prints as MISSING, never as zero.\n\nDONE WHEN: history_sweep prints all seven readings with the year they were taken; a field whose source is unbuilt says so; and the spread reading for each is recorded in the item's resolution as the baseline every later mechanism is judged against.",
+      "resolved": "2026-09-11",
+      "resolution": "DELIVERED 2026-09-11 (f2b13c20, wired live c2 commits later). tools/verify/history_sweep.cpp now prints all seven of CIVILISATION.md's closure-contract readings at 1200 CE, each read as a spread over the 16-seed sweep, never per-world, with no target numbers set (measurement only, per the item's own instruction). Built against a main tip that had BL-906/908/910/911 but not yet BL-912 or BL-909, so two readings (explorer set, directed wants) were correctly printed as MISSING with a stated reason rather than a false zero. As BL-912 and BL-909 landed on top in the same wave, the main session wired both readings for real against the newly-landed data (BL-912's row.empire_polities_alive/rim, BL-909's row.wants_total/via_market) instead of leaving stale MISSING strings in place -- the same class of bug as a stale UI disclaimer caught earlier this session (BL-891/904). All seven readings are now live: strength spread (surviving polities/world median 42, largest holder share median 11.5%), contact (16/16 seeds show an unmet pair), explorer set (75/566 polities hold the rim, 16/16 seeds show at least one, 0/16 show everyone -- discriminates), directed wants (654 total across seeds, 263 via market, 16/16 seeds), markets (566/566 capitals carry one), inherited network (16/16 seeds split across 2+ survivors), grudges (758/758 recorded pairs still biting). This is the closure contract's measured baseline every later mechanism gets judged against. history_sweep and world_determinism both independently reverified ALL PASS (0 failures) at each stage.",
+      "_row_keys": [
+        "id",
+        "short_name",
+        "status",
+        "priority",
+        "difficulty",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "parked",
+        "category",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved",
+        "resolution"
+      ]
+    },
+    "BL-909": {
+      "id": "BL-909",
+      "short_name": "DIRECTED_WANT_TABLE",
+      "status": "complete",
+      "priority": "A",
+      "difficulty": 4,
+      "glyph": "✓",
+      "sprint": "38",
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+      "requires": [
+        "BL-908",
+        "BL-910"
+      ],
+      "parked": false,
+      "category": "Generation",
+      "title": "A directed want table: A knows B holds what A lacks",
+      "authority_doc": "docs/generation/CIVILISATION.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "SETTLED (Ben, 2026-09-11): a good you know exists, that you do not have, is a MOTIVE on its own. The want needs no price and this phase still has no market during its span. CIVILISATION.md sec The directed want owns the design.\n\nDIRECTED, NOT A SCARCITY LIST (Ben's explicit choice over the per-polity alternative). A scarcity list says a realm is short of something and names no object for the shortage. The directed form is what makes the exploration age's first act explicable -- THIS realm sailed to THAT one, for THAT -- rather than a roll over a list of absences.\n\nTWO INPUTS. (1) Endowment: what B's ground holds that A's reachable ground does not, off the four region windows (farm/ore/energy/port). (2) What B's MARKET SHOWS (Ben, 2026-09-11) -- the conditions a neighbour's market makes visible, which is the signal a trading age actually acts on. The second input is why BL-910 exists and is why this item requires it.\n\nA WANT REQUIRES CONTACT. The table is defined only over pairs BL-908's record already joins. Without that gate it is omniscience with extra steps, and the exploration age has nothing to discover because every realm already wants everything.\n\nNO PRICE, NO ORDER BOOK, NO DEMAND CURVE. CIVILISATION.md sec Materials are spent when something happens is unchanged. Population demand is the economy pass's and must not leak backwards into a phase with no price -- the want is a KNOWN ABSENCE plus a KNOWN HOLDER, nothing more.\n\nTHE MECHANISM TRANSFERS, THE PROPER NOUN DOES NOT. The historical analogy Ben raised is a mechanism reference only (io-standing-rules sec Terms & docs): no Earth name appears in generated content.\n\nDONE WHEN: the want table crosses in pass_one_output, is non-empty on a spread, points ACROSS contact rather than within it, and every entry names both the holder and the thing wanted.",
+      "resolved": "2026-09-11",
+      "resolution": "DELIVERED 2026-09-11 (50b0489c). Directed want table crosses in pass_one_output: struct want{from, to, good, via_market}, populated by derive_wants() gated on BL-908's contact table (has_contact) -- no contact, no want, the omniscience guard the item required. Endowment comparison uses region::dominant (the existing farm/ore/energy/port argmax); a want fires when B holds a good A's reachable ground does not. via_market is a provenance flag (true when the dominant region is also BL-910's has_market), not a second gate. No price, no order book, no demand curve, per the settled design. pass_one_output_valid extended: sorted, no self-want, in-range, good never none, holder actually holds it, wanter doesn't already hold it, pair has contact. Measured: 16-seed sweep, 654 wants total (263 via market), every seed carries at least one, every entry directed and named. pass_one_handoff gained C7l-o (all PASS). A merge conflict with BL-907's own report additions at the same insertion point in history_sweep.cpp was resolved by keeping both (independent sections). world_determinism and history_sweep both ALL PASS (0 failures), independently reverified by the main session. NR-834 filed: the building agent hit an intermittent crash during development, fixed empirically by switching two lookups to bounds-checked .at() without confirming the actual OOB mechanism -- landed because the fix is cheap and the harnesses are genuinely green, but the root cause is unconfirmed and Ben's call is owed on whether to investigate further.",
+      "_row_keys": [
+        "id",
+        "short_name",
+        "status",
+        "priority",
+        "difficulty",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "parked",
+        "category",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved",
+        "resolution"
+      ]
+    },
+    "BL-912": {
+      "id": "BL-912",
+      "short_name": "EMPIRE_TREE_WIRED_TO_SIM",
+      "status": "complete",
+      "priority": "A",
+      "difficulty": 6,
+      "glyph": "✓",
+      "sprint": "38",
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+      "requires": [
+        "BL-906"
+      ],
+      "parked": false,
+      "category": "Generation",
+      "title": "Wire the Empire tree into the sim: the sim reads nodes, and the rim is the explorer threshold",
+      "authority_doc": "docs/generation/CIVILISATION.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp",
+        "src/world/era_minus_one.hpp"
+      ],
+      "design": "THE LARGEST OUTSTANDING PIECE OF GENERATION WORK, AND THE ONE THAT MAKES BEN'S SECOND ASPECT REAL. Three trees are authored and lint-green -- 143 nodes across colonisation_tree.json, empire_tree.json and industry_tree.json -- and NOTHING IN src/ READS ANY OF THEM. (src/world/tech_tree.* is the unrelated CAMPAIGN tree loaded from scripts/tech_tree.lua; do not confuse them.) trees/TREES.md states 'the sim reads nodes, not bands' (Ben, 2026-09-10) and the code reads bands only. This item closes that for the EMPIRE tree; colonisation and industry are out of scope.\n\nSCOPE IS WIRE ONLY -- NO GENERATION RENDER (Ben, 2026-09-11, form + notes): 'the tech tree will be available via the tech ledger later - we don't need to render it in generation, and we don't have a reference to view each polity's tree regardless.' Wiring the tree into the sim and showing it to a player are separate decisions and only the first is taken.\n\nWHY A BAND CANNOT DO THIS JOB. A band is a ladder everyone climbs in the same order, so difference under it is only ever HOW FAR, never WHICH WAY. The closure contract's explorer set is a THRESHOLD CROSSED (Ben, 2026-09-11): a per-polity boolean read off EM-SP-4m, 'The Enforceable Promise', whose sole effect opens the industry tree and whose requires are EM-PE-4a and EM-RD-4b. That is a fact about what a realm BUILT, and no scalar expresses it.\n\nTHE FORK IS WHAT MAKES DIFFERENCE INDEPENDENT OF ECONOMIC MIGHT, and it is the half most likely to be dropped as an optimisation. A closed fork side goes dark permanently, so two wealthy realms can end the phase incapable of the same things because they CHOSE differently. Without the fork, technological difference collapses into a restatement of size -- which is the one thing this output must not be. The empire tree carries 1 fork; it is load-bearing.\n\nSTATE, per trees/TREES.md sec State: one 64-bit mask per tree plus one accumulated-progress integer for the node being invested in. Research is a FLOW derived from the labour split (a fraction of the industry slice, scaled by spire ring and contact degree), never a resource -- BL-867 (materials spent on action) already splits labour three ways, so the input exists.\n\nWITHIN THE EXISTING GRANT, and this is asserted rather than assumed. Choosing a node is an argument to the Invest verb the register already covers (ai/AI_OPPONENT.md sec 11); it issues no new verb and plans nothing. If the implementation finds itself wanting a verb the register does not name, STOP and raise a new grant -- NR-517 is the precedent for why reading an existing grant as covering a new subject is the exact failure this rule exists to prevent.\n\nDETERMINISM. Node choice is a seeded, scored argmax over a TOTAL order with an explicit tie-break, in fixed node-id order. No float in the decision path; the sim is integer fixed-point.\n\nSUGGESTED SLICING, since this is difficulty 6: (a) tree state + load the store into a Lua-free TU; (b) the Invest verb spends progress on a node instead of a band; (c) the scorer, per TREES.md sec The scorer; (d) the rim reading into pass_one_output. Slice (d) is what BL-907 needs and can land before (c) is good.\n\nDONE WHEN: a polity's empire-tree mask is real state, Invest buys nodes, the rim milestone is readable per polity at 1200 CE and crosses in pass_one_output, world_determinism is unchanged, and the sweep shows SOME surviving realms holding the rim and not all.",
+      "resolved": "2026-09-11",
+      "resolution": "DELIVERED 2026-09-11 (ff4b37b0). Per-polity state: empire_mask (uint64), empire_investing (node index), empire_progress_q -- added alongside the existing capacity-band ladder, not replacing it, per TREES.md's own guidance that the band stays a derived reading. The 52-node empire tree is loaded via a generated, Lua-free static C++ table (src/world/empire_tree_data.hpp, from tools/session/gen_empire_tree_table.js reading empire_tree.json -- re-run this generator, then tree_lint.js, if the store ever changes). The Invest verb now spends progress on a node via a deterministic integer argmax scorer (fixed node-id tie-break, no floats), reading real polity/ground state for its terms; some terms (threatened, plague_struck, many_peoples, known) are left at 0 as documented placeholders, not guessed. The fork (EM-HA-2a/2b) closes for real -- a mask check, not cosmetic. The rim milestone (EM-SP-4m) reads per-polity and crosses in pass_one_output for free, since pass_one_output::polities copies the whole polity vector. A real root-reachability bug was found and fixed during the build (the tree's root was permanently unlockable under the first cut's symmetric neighbour-mask construction; fixed by tracking true roots separately) -- caught by the sweep showing 0 nodes bought at any span before the fix. This worktree's base was stale (84aad8d3, 9 commits behind main) despite being briefed to fetch first; the main session resolved one merge conflict (history_sweep.cpp, two independent report sections) and independently reverified after merge rather than trusting the building agent's self-report. Measured: 16-seed sweep, 9/16 worlds have >=1 realm holding the rim, 0/16 have every realm holding it (discriminates, as required), best polities reach 19-51 of 52 nodes. world_determinism and history_sweep both ALL PASS (0 failures), confirmed twice (once after the initial merge, again after BL-907/909 landed on top). Contact-degree scaling in the research-flow formula is stubbed at a neutral multiplier pending a follow-up -- a one-line change, not a design gap.",
+      "_row_keys": [
+        "id",
+        "short_name",
+        "status",
+        "priority",
+        "difficulty",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "parked",
+        "category",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved",
+        "resolution"
+      ]
     }
   }
 }
