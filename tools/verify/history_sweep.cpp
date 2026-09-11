@@ -209,11 +209,31 @@ struct sweep_row
     int64_t fear_leaned       = 0; ///< BL-838: candidates leaned by fear of being next.
     int64_t fear_targets      = 0; ///< ...against this many DISTINCT polities.
     int64_t regions_seceded   = 0; ///< ...and the ground that walked away with them.
+    int64_t seceded_graph_cut = 0; ///< BL-922: ...of which had a fed same-realm region within neighbour_radius (graph, not map).
     int64_t creeds_arisen     = 0; ///< BL-897: universalising creeds coined this world.
     int64_t creed_adoptions   = 0; ///< ...realms that adopted one as an institution.
     int64_t creed_converted   = 0; ///< ...peoples whose pantheon faded to residue.
     int64_t creed_reasserted  = 0; ///< ...and peoples whose pantheon won instead.
     int64_t reach_denied      = 0; ///< Refused by the BL-837 reach gate.
+    // BL-922 -- the supply distribution over HELD ground at the epoch, read
+    // off `region::network_supply_q` (the last decision round's reading) for
+    // every region with an owner. The gate/floors are in this currency, so
+    // the share under each floor is what says whether a floor can bite at all.
+    int64_t held_regions      = 0; ///< Regions with an owner at the epoch.
+    int64_t supply_zero       = 0; ///< ...reading 0 (unreachable from the capital).
+    int64_t zero_kin_near     = 0; ///< ...of those, with a FED same-realm region within neighbour_radius (cut off by the graph, not the map).
+    int64_t zero_no_link      = 0; ///< ...of those, with NO same-realm region within neighbour_radius at all (cut off by the map).
+    int64_t supply_le_settle  = 0; ///< ...at or under the settlement floor.
+    int64_t supply_le_secede  = 0; ///< ...at or under the secession floor.
+    int64_t supply_le_campaign= 0; ///< ...at or under the campaign floor.
+    int64_t supply_p10        = 0; ///< 10th percentile of the reading.
+    int64_t supply_p50        = 0; ///< median.
+    int64_t supply_p90        = 0; ///< 90th percentile.
+    int64_t supply_band_med[4] = {0, 0, 0, 0}; ///< median by Chebyshev distance to capital: <10, 10-19, 20-29, 30+.
+    int64_t supply_band_n[4]   = {0, 0, 0, 0}; ///< ...and how many regions each band holds.
+    int64_t era_reach_ms      = 0; ///< `rebuild_reach` time in this run (profile).
+    int64_t era_reach_rebuilds= 0; ///< ...and how many rebuilds.
+    int64_t era_decisions_ms  = 0; ///< The whole decision round (reach included).
     int64_t campaign_contacts = 0; ///< (own region, foreign neighbour) pairs examined.
     int64_t campaign_scored   = 0; ///< Candidates reaching the score comparison.
     int64_t campaign_cleared  = 0; ///< Candidates clearing campaign_threshold_q.
@@ -1101,6 +1121,80 @@ int main(int argc, char** argv)
         row.fear_leaned       = sim.fear_leaned_campaigns;
         row.fear_targets      = sim.fear_targets_distinct;
         row.regions_seceded   = sim.regions_seceded;
+        row.seceded_graph_cut = sim.regions_seceded_graph_cut;
+
+        // BL-922 -- THE SUPPLY DISTRIBUTION OVER HELD GROUND. Read off the
+        // post-sim settlement, per region with an owner, in region-index order.
+        {
+            const history_sim_params& sp = derive_from_generation ? fx.params : params;
+            const int sweep_gw = derive_from_generation ? fx.gw : home_grid_width;
+            std::vector<int64_t> all;
+            std::vector<int64_t> band[4];
+            for (const region& p : ss.regions)
+            {
+                if (p.nation < 0) continue;
+                const int64_t v = p.network_supply_q;
+                ++row.held_regions;
+                all.push_back(v);
+                if (v <= 0) ++row.supply_zero;
+                if (v <= sp.sustainable_settlement_floor_q) ++row.supply_le_settle;
+                if (v <= sp.secession_supply_floor_q)       ++row.supply_le_secede;
+                if (v <= sp.sustainable_campaign_floor_q)   ++row.supply_le_campaign;
+                const std::size_t pid = static_cast<std::size_t>(p.nation);
+                if (pid < sim.polities.size())
+                {
+                    const int capi = sim.polities[pid].capital;
+                    if (capi >= 0 && static_cast<std::size_t>(capi) < ss.regions.size())
+                    {
+                        const int d = region_distance(p, ss.regions[static_cast<std::size_t>(capi)], sweep_gw);
+                        const int bi = d < 10 ? 0 : d < 20 ? 1 : d < 30 ? 2 : 3;
+                        band[bi].push_back(v);
+                    }
+                }
+            }
+            // WHY is a region at 0? If a fed region of the SAME realm stands
+            // within `neighbour_radius` of it, the map did not cut it off --
+            // the degree-capped neighbour graph (BL-855) did. Epoch-only and
+            // O(N^2) over ~1,000 regions: cheap, and it is the one reading
+            // that tells a graph artefact from a geographic one.
+            for (std::size_t i = 0; i < ss.regions.size(); ++i)
+            {
+                const region& p = ss.regions[i];
+                if (p.nation < 0 || p.network_supply_q > 0) continue;
+                bool fed_near = false, any_near = false;
+                for (std::size_t j = 0; j < ss.regions.size(); ++j)
+                {
+                    if (j == i) continue;
+                    const region& o = ss.regions[j];
+                    if (o.nation != p.nation) continue;
+                    if (region_distance(p, o, sweep_gw) > sp.neighbour_radius) continue;
+                    any_near = true;
+                    if (o.network_supply_q > 0) { fed_near = true; break; }
+                }
+                if (fed_near)      ++row.zero_kin_near;
+                else if (!any_near) ++row.zero_no_link;
+            }
+            if (!all.empty())
+            {
+                std::vector<int64_t> sorted = all;
+                std::sort(sorted.begin(), sorted.end());
+                const auto pct = [&](int q) {
+                    std::size_t i = (sorted.size() - 1) * static_cast<std::size_t>(q) / 100;
+                    return sorted[i]; };
+                row.supply_p10 = pct(10);
+                row.supply_p50 = pct(50);
+                row.supply_p90 = pct(90);
+            }
+            for (int bi = 0; bi < 4; ++bi)
+            {
+                row.supply_band_n[bi]   = static_cast<int64_t>(band[bi].size());
+                row.supply_band_med[bi] = band[bi].empty() ? -1 : median_of(band[bi]);
+            }
+            const history_sim_profile& hp = history_sim_last_profile();
+            row.era_reach_ms       = hp.ns_reach / 1000000;
+            row.era_reach_rebuilds = hp.reach_rebuilds;
+            row.era_decisions_ms   = hp.ns_decisions / 1000000;
+        }
         row.creeds_arisen     = sim.universal_creeds_arisen;
         row.creed_adoptions   = sim.polities_adopted_creed;
         row.creed_converted   = sim.peoples_converted;
@@ -2191,8 +2285,65 @@ int main(int argc, char** argv)
                             static_cast<long long>(median_of(sc)));
                 std::printf("  regions that walked    median %lld\n",
                             static_cast<long long>(median_of(rs)));
+                {
+                    std::vector<int64_t> gc;
+                    for (const sweep_row& r : rows) gc.push_back(r.seceded_graph_cut);
+                    std::printf("  ...with a FED same-realm region within neighbour_radius  median %lld   (BL-922: a fed neighbour stood within radius -- the residual the uncapped supply index leaves)\n",
+                                static_cast<long long>(median_of(gc)));
+                }
                 std::printf("  (ZERO of both is a world whose realms never outran their\n"
                             "   own reach. REPORTED, not gated.)\n");
+            }
+
+            // BL-922 -- IS THERE A GRADIENT? The supply currency the three
+            // floors and the gate are priced in, over every held region. The
+            // distance bands are the item's own DONE WHEN: a connected region
+            // 30+ tiles from its capital must read materially below one
+            // beside it. REPORTED, not gated: the magnitude is measured here,
+            // never chosen to hit a target.
+            {
+                std::printf("\n--- BL-922  SUPPLY OVER HELD GROUND (network_supply_q, 0-1000; floors are the run's own) ---\n");
+                std::printf("  seed   held   at 0   <=settle  <=secede  <=campaign   p10  p50  p90   | median by tiles from capital: <10 (n)   10-19 (n)   20-29 (n)   30+ (n)   | reach ms / rebuilds / decisions ms\n");
+                int64_t held_t = 0, zero_t = 0, settle_t = 0, secede_t = 0, camp_t = 0;
+                for (const sweep_row& r : rows)
+                {
+                    held_t += r.held_regions; zero_t += r.supply_zero;
+                    settle_t += r.supply_le_settle; secede_t += r.supply_le_secede;
+                    camp_t += r.supply_le_campaign;
+                    std::printf("  %4d  %5lld  %5lld  %8lld  %8lld  %10lld   %4lld %4lld %4lld   | %4lld (%4lld)  %4lld (%4lld)  %4lld (%4lld)  %4lld (%4lld)   | %lld / %lld / %lld\n",
+                                r.seed,
+                                static_cast<long long>(r.held_regions),
+                                static_cast<long long>(r.supply_zero),
+                                static_cast<long long>(r.supply_le_settle),
+                                static_cast<long long>(r.supply_le_secede),
+                                static_cast<long long>(r.supply_le_campaign),
+                                static_cast<long long>(r.supply_p10),
+                                static_cast<long long>(r.supply_p50),
+                                static_cast<long long>(r.supply_p90),
+                                static_cast<long long>(r.supply_band_med[0]), static_cast<long long>(r.supply_band_n[0]),
+                                static_cast<long long>(r.supply_band_med[1]), static_cast<long long>(r.supply_band_n[1]),
+                                static_cast<long long>(r.supply_band_med[2]), static_cast<long long>(r.supply_band_n[2]),
+                                static_cast<long long>(r.supply_band_med[3]), static_cast<long long>(r.supply_band_n[3]),
+                                static_cast<long long>(r.era_reach_ms),
+                                static_cast<long long>(r.era_reach_rebuilds),
+                                static_cast<long long>(r.era_decisions_ms));
+                }
+                if (held_t > 0)
+                    std::printf("  SHARE of held ground   at 0: %lld%%   under settlement floor: %lld%%   under secession floor: %lld%%   under campaign floor: %lld%%\n",
+                                static_cast<long long>(zero_t * 100 / held_t),
+                                static_cast<long long>(settle_t * 100 / held_t),
+                                static_cast<long long>(secede_t * 100 / held_t),
+                                static_cast<long long>(camp_t * 100 / held_t));
+                {
+                    int64_t kin = 0, nolink = 0;
+                    for (const sweep_row& r : rows) { kin += r.zero_kin_near; nolink += r.zero_no_link; }
+                    std::printf("  of the %lld at 0:  %lld have a FED same-realm region within neighbour_radius (the graph cut them off), %lld have NO same-realm region that close (the map did)\n",
+                                static_cast<long long>(zero_t), static_cast<long long>(kin), static_cast<long long>(nolink));
+                }
+                std::printf("  (Read the distance bands against each other. A 30+ band that\n"
+                            "   reads level with the <10 band is a currency with no gradient,\n"
+                            "   and a floor sited in it cannot bite on connected ground.\n"
+                            "   REPORTED, not gated.)\n");
             }
 
             // BL-897 -- DID A CREED THAT SPANS CULTURES ARISE, AND DID IT HOLD?
