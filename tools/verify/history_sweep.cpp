@@ -840,6 +840,19 @@ int main(int argc, char** argv)
         if (derive_from_generation)
         {
             history_sim_params fp = fx.params;
+            // BL-905: the derive_from_generation path builds `fp` from the
+            // fixture's OWN params, never from the harness's `params` above --
+            // so the `params.trace_battles = true` set for the banner's default
+            // path never reached this one. campaign_contacts/scored/cleared/
+            // chosen are ALL gated on this flag (history_sim.cpp), so every
+            // seed run through generation's own params read them as a harness
+            // artifact of zero, indistinguishable from a genuine empty funnel.
+            // `illegal_campaigns`/`reach_denied_campaigns` are NOT gated (same
+            // file), which is why those two counters stayed trustworthy while
+            // the rest of the funnel read as an artifact. Tracing is bookkeeping
+            // only -- it changes no decision and the run stays byte-identical
+            // with it on or off (history_sim.cpp's own comment on the field).
+            fp.trace_battles = true;
             for (const param_override& o : overrides) apply_override(fp, o.name, o.value);
             sim = run_history_sim(ss, &fx.creeds, fx.terrain.view(), fx.gw, fx.gh,
                                   fp, fx.seed, nullptr, fx.works);

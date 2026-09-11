@@ -860,10 +860,27 @@ that range produce an industrial era with nothing to industrialise against. This
 non-hegemony constraint the anti-hegemon levers serve (`BL-823 (anti-hegemon levers)`), read from
 the far end: it is not only that a hegemon is dull to watch, it is that the next pass has no input.
 
-**Reach-gating is what makes the collapse mechanical rather than scripted.** An empire persists
-while its network holds and fragments when it does not, so the number of nations at 1200 CE is a
-consequence of what got built and what stopped being maintainable — never a target count, and
-never a collapse event fired at a date.
+**Reach-gating is what makes the collapse mechanical rather than scripted, as designed** — but
+`history_sweep`'s own instrumentation (`BL-905`, 2026-09-11, measured against generation's full
+1,600-year Empires span, `BL-906`) shows `sustainable_campaign_floor_q` (80, in the 0–1000
+currency) refusing a **median of 0 campaigns per world** against ~71,000 legal contacts examined.
+Raising the floor to 700 still refuses under 0.2%; only at 900+ does it start biting (94% refused
+at 999, collapsing battles from ~815/world to ~34/world) — there is no middle value that refuses a
+non-trivial share without refusing nearly everything. The cause: `campaign_supply` is priced from
+the STAGING HUB, not the capital (§ SUPPLY PROJECTS FROM THE STAGING HOLDING, NOT THE CAPITAL,
+below), so an ordinary neighbour-adjacent campaign's distance term is bounded by
+`neighbour_radius` and barely decays the currency — the floor would have to sit near the ceiling
+to gate an *ordinary* march at all, which is a different mechanism than "an empire outruns its
+own network." This is a genuine design question (does the gate need a different reach basis, an
+empire-size-scaled burden, or a much higher floor with a redesigned currency?), not a constant to
+re-guess; it is left unfixed here rather than tuned to force a result.
+
+**What is actually filtering campaigns today, measured on the same run:** the water-gate
+traversal-legality test (`BL-778`) refuses ~1.4% of contacts; of the ~28% of scored candidates
+that clear `campaign_threshold_q`, most that do are chosen, so the load-bearing filters in
+practice are the **score threshold** and **verb competition** (Settle/Invest/Consolidate
+outscoring Campaign), not reach. The number of nations at 1200 CE is currently a consequence of
+those two, not of a network outrunning itself.
 
 **RESOURCES BECOME CAPITAL IN PASS 2, NOT HERE.** This phase abstracts natural resources into what
 conquest consumes; the reading of ground as capital belongs to the economy pass and must not leak
