@@ -4528,7 +4528,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
         }
 
-        // ---- BL-896 - GROUND THE REALM CANNOT REACH SECEDES ---------------
+        // ---- BL-896/BL-923 - GROUND THE REALM CANNOT REACH SECEDES --------
         //
         // Ben's ruling, 2026-09-11: collapse is NETWORK FAILURE. Succession,
         // exhaustion and external shock were all offered as causes and none was
@@ -4545,16 +4545,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // road graph is sparse (about fifty promoted edges per world), and no
         // road-density fix is needed first.
         //
+        // BL-923, SAME DAY: THE UNIT IS THE CITY STATE, NOT A CONTIGUOUS BLOCK
+        // OF TWO OR MORE. Each seat the capital can no longer supply becomes
+        // its own polity, taking the hinterland that already points at it
+        // (`region::seat_region`) whether or not every one of those hinterland
+        // regions independently reads as cut off -- a hinterland shares its
+        // seat's fate, it is not measured seat-by-seat. A cut-off region that
+        // is not itself a seat, and whose OWN seat did not also fall (so it is
+        // not already carried along above), joins the nearest cut-off seat by
+        // `region_distance`; where this realm has no cut-off seat at all this
+        // round, such a region stands alone as a city state of its own -- it
+        // is never handed to a neighbour and never released to nobody. This
+        // REPLACES BL-896's block-of-two-or-more policy (NR-826 call 2,
+        // reversed by NR-837); the seat's plurality culture rule (NR-826 call
+        // 3) is unchanged.
+        //
         // AFTER THE DECISION LOOP, NEVER INSIDE IT. A successor is a
         // `push_back` onto `out.polities`, which invalidates the `polity&` that
         // loop holds. Everything below therefore indexes rather than
         // references.
         //
         // DETERMINISM IS THE REAL CONSTRAINT HERE and every choice below is
-        // made for it: polities are walked in id order, regions in index order,
-        // blocks grow by a breadth-first walk seeded from the lowest index in
-        // the block, and successors are allocated in the order those blocks are
-        // found. Nothing below reads a container whose order is undefined.
+        // made for it: polities are walked in id order, regions in index
+        // order, cut-off seats are walked in index order, leftover cut-off
+        // ground attaches by index order too, and successors are allocated in
+        // the order those blocks are found. Nothing below reads a container
+        // whose order is undefined.
         if (params.secession_supply_floor_q > 0)
         {
             // Snapshot the count: a successor born this round does not itself
@@ -4579,39 +4595,78 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         <= params.secession_supply_floor_q)
                         cut.push_back(static_cast<int>(i));
                 }
-                if (static_cast<int>(cut.size()) < params.secession_min_regions) continue;
+                if (cut.empty()) continue;
 
-                std::vector<char> taken(cut.size(), 0);
-                bool any_piece_left = false; // BL-926: one breakdown per parent per round.
+                // CUT-OFF SEATS, INDEX ORDER. Each becomes its own city state,
+                // carrying the whole hinterland that already points at it.
+                std::vector<int> cut_seats;
+                for (int r : cut)
+                    if (ss.regions[static_cast<std::size_t>(r)].is_seat)
+                        cut_seats.push_back(r);
+
+                // BLOCK PER CUT-OFF SEAT: every region this realm still holds
+                // whose `seat_region` already points at that seat, cut off or
+                // not -- the hinterland leaves with its seat, not piecemeal.
+                std::vector<std::vector<int>> blocks(cut_seats.size());
+                std::vector<char> covered(cut.size(), 0); // which `cut` entries a block already claimed
+                for (std::size_t si = 0; si < cut_seats.size(); ++si)
+                {
+                    const int seat = cut_seats[si];
+                    for (std::size_t i = 0; i < owner.size(); ++i)
+                    {
+                        if (owner[i] != qid) continue;
+                        if (ss.regions[i].seat_region != seat) continue;
+                        blocks[si].push_back(static_cast<int>(i));
+                    }
+                    for (std::size_t ci = 0; ci < cut.size(); ++ci)
+                        if (ss.regions[static_cast<std::size_t>(cut[ci])].seat_region == seat)
+                            covered[ci] = 1;
+                }
+
+                // LEFTOVER CUT-OFF GROUND: no seat of its own, and its actual
+                // seat was not itself cut off this round. It joins the nearest
+                // cut-off seat's block; with no cut-off seat in this realm at
+                // all, it becomes a singleton city state (block of one, self-
+                // seated) in cut order, which is index order.
+                std::vector<int> singleton_seats; // seats with no cut-off seat to join
                 for (std::size_t ci = 0; ci < cut.size(); ++ci)
                 {
-                    if (taken[ci]) continue;
-
-                    // A CONTIGUOUS BLOCK LEAVES TOGETHER. One region leaving
-                    // alone shatters a realm into specks; a cut-off block
-                    // leaving as one SPLITS it, and a split is what produces
-                    // the nations of unequal strength the dark age is asked to
-                    // hand forward.
-                    std::vector<int> block;
-                    std::vector<int> queue{cut[ci]};
-                    taken[ci] = 1;
-                    for (std::size_t qi = 0; qi < queue.size(); ++qi)
+                    if (covered[ci]) continue;
+                    const int r = cut[ci];
+                    if (cut_seats.empty())
                     {
-                        const int r = queue[qi];
-                        block.push_back(r);
-                        for (int nb : neighbours[static_cast<std::size_t>(r)])
-                            for (std::size_t cj = 0; cj < cut.size(); ++cj)
-                                if (!taken[cj] && cut[cj] == nb)
-                                { taken[cj] = 1; queue.push_back(nb); }
-                    }
-                    if (static_cast<int>(block.size()) < params.secession_min_regions)
+                        singleton_seats.push_back(r);
                         continue;
-                    std::sort(block.begin(), block.end());
+                    }
+                    int nearest = -1, nearest_d = 1 << 30;
+                    for (int seat : cut_seats)
+                    {
+                        const int d = region_distance(
+                            ss.regions[static_cast<std::size_t>(r)],
+                            ss.regions[static_cast<std::size_t>(seat)], gw);
+                        if (d < nearest_d) { nearest_d = d; nearest = seat; }
+                    }
+                    for (std::size_t si = 0; si < cut_seats.size(); ++si)
+                        if (cut_seats[si] == nearest) { blocks[si].push_back(r); break; }
+                }
 
-                    // The successor's seat is the block's lowest index -
-                    // placement order, which is best-ground first: the same
-                    // rule the capital-fell branch above already uses.
-                    const int seat = block.front();
+                // ONE POLITY PER SEAT-BLOCK, THEN ONE PER SINGLETON, both in
+                // the deterministic orders built above.
+                std::vector<std::pair<int, std::vector<int>>> pieces; // (seat, block)
+                for (std::size_t si = 0; si < cut_seats.size(); ++si)
+                {
+                    std::sort(blocks[si].begin(), blocks[si].end());
+                    pieces.push_back({cut_seats[si], blocks[si]});
+                }
+                for (int r : singleton_seats)
+                    pieces.push_back({r, std::vector<int>{r}});
+
+                bool any_piece_left = false; // BL-926: one breakdown per parent per round.
+                for (auto& piece : pieces)
+                {
+                    const int seat = piece.first;
+                    std::vector<int>& block = piece.second;
+                    if (block.empty()) continue;
                     if (out.polities.size() >= owner_index_limit) break;
 
                     polity np;

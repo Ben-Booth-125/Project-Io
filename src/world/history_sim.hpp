@@ -1070,11 +1070,14 @@ struct history_sim_params
     /// it; nothing in this file orders the three.
     int secession_supply_floor_q = 0;
 
-    /// Smallest contiguous cut-off block that may secede. The BLOCK is the unit
-    /// (Ben left this open; resolved at build time): one region leaving alone
-    /// SHATTERS a realm into specks, while a cut-off block leaving together
-    /// SPLITS it -- and a split is what produces nations of unequal strength.
-    /// Raising this makes fragmentation rarer and the pieces larger.
+    /// UNUSED BY THE FRAGMENTATION LOGIC SINCE BL-923 (Ben, 2026-09-11, ruling
+    /// NR-837). The build-time call this dial encoded -- a contiguous
+    /// cut-off block of at least this many regions leaves together -- is
+    /// reversed: the unit is now the CITY STATE, one per cut-off seat (with
+    /// its hinterland), and a seatless cut-off region joins the nearest
+    /// cut-off seat or stands alone, down to size one. Left in place only so
+    /// existing callers (`era_minus_one.cpp`, `history_sweep.cpp`'s CLI) keep
+    /// compiling; setting it no longer changes fragmentation behaviour.
     int secession_min_regions = 2;
 
     // --- BL-897: A CREED THAT SPANS CULTURES ------------------------------
