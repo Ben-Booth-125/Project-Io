@@ -769,6 +769,60 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 std::swap(g->events[i], g->events[i - 1]);
     };
 
+    // --- CONTACT (BL-908) --------------------------------------------------
+    //
+    // Directed, sparse, event-carrying — the grudge table's own shape and
+    // discipline (sorted vector, binary search, never a keyed map). The
+    // difference from a grudge is what it records: a FACT of meeting, never
+    // a magnitude, so there is nothing here to decay.
+    const auto contact_slot = [&](int from, int to) -> contact* {
+        if (from < 0 || to < 0 || from == to) return nullptr;
+        if (from > 0xFFFE || to > 0xFFFE) return nullptr;
+        const uint16_t f = static_cast<uint16_t>(from), t = static_cast<uint16_t>(to);
+        const auto it = std::lower_bound(
+            out.contacts.begin(), out.contacts.end(), std::pair<uint16_t, uint16_t>{f, t},
+            [](const contact& c, const std::pair<uint16_t, uint16_t>& k) {
+                if (c.from != k.first) return c.from < k.first;
+                return c.to < k.second;
+            });
+        if (it != out.contacts.end() && it->from == f && it->to == t) return &*it;
+        contact c;
+        c.from = f;
+        c.to   = t;
+        return &*out.contacts.insert(it, c);
+    };
+
+    /// True where the pair already has an entry EITHER way — checked before
+    /// inserting rather than after, since `contact_slot` inserts on lookup.
+    const auto contact_exists = [&](int from, int to) -> bool {
+        if (from < 0 || to < 0 || from > 0xFFFE || to > 0xFFFE) return false;
+        const uint16_t f = static_cast<uint16_t>(from), t = static_cast<uint16_t>(to);
+        const auto it = std::lower_bound(
+            out.contacts.begin(), out.contacts.end(), std::pair<uint16_t, uint16_t>{f, t},
+            [](const contact& c, const std::pair<uint16_t, uint16_t>& k) {
+                if (c.from != k.first) return c.from < k.first;
+                return c.to < k.second;
+            });
+        return it != out.contacts.end() && it->from == f && it->to == t;
+    };
+
+    /// Establish contact in BOTH directions if the pair has never met. A
+    /// no-op on a pair that already has an entry — the record keeps the
+    /// FIRST meeting, never the latest, because "who met whom first" is the
+    /// fact and a later re-contact adds nothing to it.
+    const auto raise_contact = [&](int a, int b, contact_kind kind,
+                                   int region_idx, int64_t year) {
+        if (a < 0 || b < 0 || a == b) return;
+        if (contact_exists(a, b)) return; // symmetric: (a,b) implies (b,a)
+        contact_event e;
+        e.year   = static_cast<int32_t>(year);
+        e.region = (region_idx >= 0 && region_idx < static_cast<int>(owner_index_limit))
+                     ? static_cast<uint16_t>(region_idx) : owner_none;
+        e.kind   = kind;
+        if (contact* c = contact_slot(a, b)) c->first = e;
+        if (contact* c = contact_slot(b, a)) c->first = e;
+    };
+
     /// A polity died. ITS GRUDGES ARE LOST, IN BOTH DIRECTIONS — see the
     /// `history_sim_state::grudges` note for why that is the call rather than
     /// inheritance. What survives is `realm_ended`, raised from every surviving
@@ -784,6 +838,33 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                    || g.to   == static_cast<uint16_t>(dead);
                            }),
             out.grudges.end());
+
+        // BL-908 — A CONQUEROR INHERITS WHAT ITS VICTIM KNEW, because the
+        // knowledge of who else exists was in the SEAT, not in the dead
+        // ruler — the opposite call from the grudge erase just above, on
+        // purpose (see the `contacts` field note for why the two differ).
+        // Every polity `dead` had met, the killer now has met too, unless
+        // the killer already had (`raise_contact` is a no-op there). Walked
+        // in ascending polity-id order so the transfer is deterministic
+        // regardless of the dead polity's own contact-table order.
+        if (killer >= 0)
+        {
+            for (const polity& other : out.polities)
+            {
+                if (other.id == dead || other.id == killer) continue;
+                if (!contact_exists(dead, other.id)) continue;
+                raise_contact(killer, other.id, contact_kind::inherited,
+                              region_idx, year);
+            }
+        }
+        out.contacts.erase(
+            std::remove_if(out.contacts.begin(), out.contacts.end(),
+                           [&](const contact& c) {
+                               return c.from == static_cast<uint16_t>(dead)
+                                   || c.to   == static_cast<uint16_t>(dead);
+                           }),
+            out.contacts.end());
+
         if (killer < 0 || dead_culture < 0) return;
         for (const polity& kin : out.polities)
         {
@@ -3134,6 +3215,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                      static_cast<int>(ti), y,
                                      was_seat ? params.grudge_seat_sacked
                                               : params.grudge_ground_taken);
+
+                    // BL-908 — A CAMPAIGN THAT TOOK GROUND IS A MEETING, first
+                    // and regardless of the grudge magnitude: q now knows the
+                    // loser exists (and the reverse), which a grudge alone
+                    // cannot say if `grudge_ground_taken` were ever tuned to 0.
+                    if (loser_id >= 0)
+                        raise_contact(q.id, loser_id, contact_kind::campaign,
+                                     static_cast<int>(ti), y);
                     out.owner_changes.push_back(owner_change{
                         static_cast<int32_t>(y), static_cast<uint16_t>(ti),
                         static_cast<uint16_t>(q.id)});
@@ -3168,6 +3257,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // itself accumulates.
                     raise_grudge(dq->id, q.id, grudge_kind::border_raided,
                                  static_cast<int>(ti), y, params.grudge_border_raided);
+
+                    // BL-908 — A RAID THAT MOVED NOTHING IS STILL A MEETING.
+                    raise_contact(q.id, dq->id, contact_kind::campaign,
+                                 static_cast<int>(ti), y);
                 }
 
                 // BL-835 — AND IF IT DID NOT TAKE THE GROUND, THE ARMY MARCHES
@@ -4087,6 +4180,23 @@ int grudge_between(const history_sim_state& s, int from, int to)
 }
 
 // ---------------------------------------------------------------------------
+// Contact reads (BL-908)
+// ---------------------------------------------------------------------------
+
+bool has_contact(const history_sim_state& s, int from, int to)
+{
+    if (from < 0 || to < 0 || from > 0xFFFE || to > 0xFFFE) return false;
+    const uint16_t f = static_cast<uint16_t>(from), t = static_cast<uint16_t>(to);
+    const auto it = std::lower_bound(
+        s.contacts.begin(), s.contacts.end(), std::pair<uint16_t, uint16_t>{f, t},
+        [](const contact& c, const std::pair<uint16_t, uint16_t>& k) {
+            if (c.from != k.first) return c.from < k.first;
+            return c.to < k.second;
+        });
+    return it != s.contacts.end() && it->from == f && it->to == t;
+}
+
+// ---------------------------------------------------------------------------
 // The turbulence lean, resolved (BL-839)
 // ---------------------------------------------------------------------------
 //
@@ -4214,6 +4324,7 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
     o.culture_count       = culture_count;
     o.works_by_span_band  = hs.works_by_span_band;
     o.grudges             = hs.grudges;
+    o.contacts            = hs.contacts;
     o.timelapse           = as_timelapse(hs);
     o.start_year          = hs.start_year;
     o.stop_year           = hs.start_year + hs.years;
@@ -4383,6 +4494,37 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why)
         if (!cap.has_market)
             return fail("polity " + std::to_string(h.polity)
                         + "'s capital carries no market at the close");
+    }
+
+    // 5. Contact (BL-908). Sorted, directed, in range, symmetric, and CARRYING
+    //    THE EVENT that joined the pair — a fact with no cause is exactly the
+    //    unsourced modifier the grudge table already refuses.
+    std::pair<int, int> last_contact_key{-1, -1};
+    for (const contact& c : o.contacts)
+    {
+        const std::pair<int, int> key{c.from, c.to};
+        if (!(last_contact_key < key)) return fail("contacts are not sorted by (from, to)");
+        last_contact_key = key;
+        if (c.from == c.to) return fail("a polity is recorded in contact with itself");
+        if (c.from >= o.polities.size() || c.to >= o.polities.size())
+            return fail("a contact names a polity out of range");
+        if (static_cast<int>(c.first.kind) < 0
+            || static_cast<int>(c.first.kind) >= contact_kind_count)
+            return fail("a contact names an out-of-range contact_kind");
+
+        // SYMMETRIC BY CONSTRUCTION: meeting is mutual, so the reverse pair
+        // must exist too, with the same first-contact year (the fact of
+        // meeting has one date, not one per direction).
+        bool found_reverse = false;
+        for (const contact& r : o.contacts)
+        {
+            if (r.from != c.to || r.to != c.from) continue;
+            found_reverse = true;
+            if (r.first.year != c.first.year)
+                return fail("a contact pair disagrees on its first-contact year");
+            break;
+        }
+        if (!found_reverse) return fail("a contact is missing its reverse direction");
     }
 
     if (why) why->clear();

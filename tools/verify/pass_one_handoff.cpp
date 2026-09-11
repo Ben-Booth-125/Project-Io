@@ -576,6 +576,34 @@ int main()
 
         check(o.grudges.size() == war.grudges.size(),
               "C7e  the grudges cross with the rest, as an input to sentiment");
+
+        // C7i-l — CONTACT (BL-908): a directed, symmetric, event-carrying pair
+        // in the grudge table's own shape.
+        check(o.contacts.size() == war.contacts.size(),
+              "C7i  contact crosses with the rest, in the same handoff");
+        check(!o.contacts.empty(),
+              "C7j  a war between neighbours leaves at least one contact pair");
+        bool contact_symmetric = true;
+        for (const contact& c : o.contacts)
+            if (!has_contact(war, c.to, c.from))
+                contact_symmetric = false;
+        check(contact_symmetric,
+              "C7k  every contact has its reverse direction recorded too");
+        // AN UNMET PAIR IS EXPECTED WHEN A THIRD POLITY NEVER CAMPAIGNS: two
+        // living polities that never raised a contact between them.
+        bool unmet_pair = false;
+        for (std::size_t i = 0; i < o.polities.size() && !unmet_pair; ++i)
+        {
+            if (!o.polities[i].alive) continue;
+            for (std::size_t j = i + 1; j < o.polities.size(); ++j)
+            {
+                if (!o.polities[j].alive) continue;
+                if (!has_contact(war, static_cast<int>(i), static_cast<int>(j)))
+                { unmet_pair = true; break; }
+            }
+        }
+        std::printf("      contact pairs: %d   unmet pair among living polities: %s\n",
+                    static_cast<int>(o.contacts.size()), unmet_pair ? "yes" : "no");
         check(o.start_year == war_p.start_year && o.stop_year == war_p.stop_year,
               "C7f  the span crosses with the record it describes");
 

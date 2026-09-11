@@ -177,6 +177,12 @@ struct sweep_row
     int64_t battles   = 0;
     int64_t conquests = 0;
     int64_t foundings = 0;
+
+    /// BL-908 — the directed contact table, at the epoch. `unmet_pair` is
+    /// true where at least two LIVING polities never raised a contact between
+    /// them, i.e. an ad-hoc, world-independent read of "settled and unmet".
+    int64_t contact_pairs = 0;
+    bool    unmet_pair    = false;
     /// BL-778 / BL-779 — what the water model produced. All three are
     /// CALIBRATION readings, never coverage targets to raise: rare naval
     /// combat is the design (docs/generation/MILITARY_HISTORY.md § Naval).
@@ -861,6 +867,24 @@ int main(int argc, char** argv)
             sim = run_history_sim(ss, nullptr, terr.view(),
                                   home_grid_width, home_grid_height, params, wp.seed,
                                   nullptr, &works);
+        }
+
+        // BL-908 — CONTACT AT THE EPOCH. Cheap: `sim.contacts` is already
+        // sorted, so "does this pair have an entry" is a binary search, and
+        // the O(polities^2) pair scan below is fine at the polity counts
+        // this sim ever reaches (tens, not thousands).
+        {
+            row.contact_pairs = static_cast<int64_t>(sim.contacts.size());
+            for (std::size_t pi = 0; pi < sim.polities.size() && !row.unmet_pair; ++pi)
+            {
+                if (!sim.polities[pi].alive) continue;
+                for (std::size_t pj = pi + 1; pj < sim.polities.size(); ++pj)
+                {
+                    if (!sim.polities[pj].alive) continue;
+                    if (!has_contact(sim, static_cast<int>(pi), static_cast<int>(pj)))
+                    { row.unmet_pair = true; break; }
+                }
+            }
         }
 
         {
@@ -1984,6 +2008,23 @@ int main(int argc, char** argv)
         std::fprintf(f, " ]\n}\n");
         std::fclose(f);
         std::printf("\nWrote history_sweep.json (%d rows)\n", static_cast<int>(rows.size()));
+    }
+
+    // BL-908 — CONTACT, print-only (BL-907 owns surfacing this in the report
+    // face proper). One line per seed, so a run can be pointed at as evidence
+    // that the record populates and that "settled and unmet" is reachable.
+    {
+        std::printf("\n--- BL-908  CONTACT AT THE EPOCH (all seeds) ---\n");
+        int any_unmet = 0;
+        for (const sweep_row& r : rows)
+        {
+            std::printf("  seed %5u: %4lld contact pairs   unmet pair: %s\n",
+                        r.seed, static_cast<long long>(r.contact_pairs),
+                        r.unmet_pair ? "YES" : "no");
+            if (r.unmet_pair) ++any_unmet;
+        }
+        std::printf("  %d of %d seeds show at least one unmet pair among living polities\n",
+                    any_unmet, static_cast<int>(rows.size()));
     }
 
     // --- Structural checks only --------------------------------------------
