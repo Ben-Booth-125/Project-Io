@@ -11905,6 +11905,53 @@
         "resolved",
         "resolution"
       ]
+    },
+    "BL-913": {
+      "id": "BL-913",
+      "short_name": "GLOBALISATION_AND_DIGITISATION_PHASES",
+      "status": "cancelled",
+      "priority": "B",
+      "difficulty": 6,
+      "glyph": "~",
+      "sprint": null,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, two elicitation forms); Claude (itemisation)",
+      "requires": [
+        "BL-907"
+      ],
+      "parked": false,
+      "category": "Generation",
+      "title": "Split pass 2 into Globalisation (1200-1660) and Digitisation (1660-1960), and remove the coast",
+      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+      "files": [
+        "docs/generation/GENERATION_STRATEGY.md",
+        "docs/ui/STARTUP.md",
+        "src/ui/startup_screens.cpp",
+        "src/world/era_minus_one.hpp"
+      ],
+      "design": "SETTLED (Ben, 2026-09-11): 'It's a consequence of splitting exploration and digitisation. The years up to date are: 2400 BCE to 400 BCE for Culture. 400 BCE to 1200 CE for Empires. 1200 CE to 1660 CE for Globalisation. 1660 CE to 1960 CE for Digitisation.'\n\nWHAT THIS SUPERSEDES. Pass 2 was one economy span, 1560 -> 1960, with 1200 -> 1560 a DELIBERATE unsimulated coast (GENERATION_STRATEGY.md sec Pass 2 is the economy pass). Both are now gone: exploration and digitisation are different subjects with different terminating conditions, and the span between 1200 and 1560 is simulated rather than coasted. 1960 and 1200 are unmoved, so pass 1, the epoch and the industrial-band campaign are untouched.\n\nALREADY RECORDED: the new table is written into CIVILISATION.md sec The closure of the Empire era and GENERATION_STRATEGY.md sec Pass 2, which now carries the supersession. This item is the rest.\n\nDESIGN IS OWED, and that is why this is design-owed rather than designed. Settled: the four spans. NOT settled: what Globalisation's terminating condition is beyond a year; whether it is the same engine with sea legs open or a distinct round; which wizard round each becomes (STARTUP.md names five rounds, ending at Industrialisation, and there are now six phases); whether the Industry tree opens at 1200 or at 1660; and what Digitisation does that Globalisation does not.\n\nTHE DOC RECONCILIATION IS PART OF THIS ITEM AND IS NOT SMALL. Sibling docs still assert 1560 -> 1960 and the dark-age coast -- grep the OLD wording, not the new. Ben, 2026-09-11: 'Don't stress too much about contradictions - once we have the full pipeline we will go over it in detail.' So the contradictions are DEFERRED to this item deliberately, not overlooked; that ruling is the licence, and it expires here.\n\nSEQUENCING. Do not start this before the Empire closure is measured. BL-906/907 make the Empire phase readable at 1200 CE, and the closure contract is Globalisation's INPUT -- building the consumer before its input is specified is precisely what the 2026-09-11 redirect stopped.\n\nDONE WHEN: the design questions above are settled on a form, the four spans are consistent across every doc that names one, and the wizard's rounds match the phases.",
+      "resolved": "2026-09-11",
+      "resolution": "CANCELLED (Ben, 2026-09-11): filed too early. Globalisation/Digitisation phase split is real future work, but naming it now -- before the Empire closure contract (BL-906/907) is even measured -- got ahead of the sequencing this item's own text argued for. Re-file when the closure contract has landed and the Empire era's actual shape is known.",
+      "_row_keys": [
+        "id",
+        "short_name",
+        "status",
+        "priority",
+        "difficulty",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "parked",
+        "category",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved",
+        "resolution"
+      ]
     }
   }
 }
