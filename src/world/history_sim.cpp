@@ -458,9 +458,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             q.id      = static_cast<int>(out.polities.size());
             q.culture = c;
             if (cs && c < static_cast<int>(cs->cultures.size()))
-                q.aggression_q = cs->cultures[static_cast<std::size_t>(c)].aggression_q;
+                q.aggression_q = leaned_aggression_q(
+                    params, cs->cultures[static_cast<std::size_t>(c)].aggression_q);
             else
                 q.aggression_q = 500; // Neutral when creeds were not supplied.
+            // BL-839: the turbulence lean's SPREAD is applied HERE, at the one
+            // place a culture's temperament enters a polity, rather than in
+            // `build_creeds` -- the pantheon is a fact about the people and is
+            // not the player's to lean; how hard that temperament pushes on the
+            // sim's scorer is.
 
             // Capital: the best-settled region of this culture. Ties break on
             // the lower index, which is placement order (best ground first).
@@ -1252,8 +1258,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 q.culture = np_culture;
                 q.aggression_q =
                     (cs && np_culture < static_cast<int>(cs->cultures.size()))
-                        ? cs->cultures[static_cast<std::size_t>(np_culture)].aggression_q
-                        : 500;
+                        ? leaned_aggression_q(
+                              params, cs->cultures[static_cast<std::size_t>(np_culture)].aggression_q)
+                        : 500; // BL-839: same lean as the founding read above.
                 // Its seat is the region it just founded — the only one it has.
                 q.capital = static_cast<int>(ss.regions.size());
                 np_owner  = q.id;
@@ -1738,7 +1745,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
                                       ? reach[hidx] : (1 << 27);
                 const int hub_reach_q = clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
-                const int terrain_cost = reach_here * params.terrain_reach_cost_q / 100;
+                const int terrain_cost = reach_here * leaned_terrain_reach_cost_q(params) / 100;
                 const int terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
                 const int supply_at_q  = clampi(1000 - terrain_paid, 0, 1000);
                 hp.network_supply_q = supply_at_q;
@@ -1833,7 +1840,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ? clampi(ss.regions[static_cast<std::size_t>(hub)].work_reach_mod,
                              0, params.work_reach_relief_cap_q)
                     : 0;
-                const int terrain_cost = reach_here * params.terrain_reach_cost_q / 100;
+                const int terrain_cost = reach_here * leaned_terrain_reach_cost_q(params) / 100;
                 const int terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
                 return clampi(1000
                             - hub_dist * params.supply_decay_per_tile_q
@@ -2053,7 +2060,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             std::vector<int> fear_cache;
             const auto fear_here = [&](int target) -> int
             {
-                if (params.w_fear_q == 0) return 0;
+                // BL-839: the LEANED weight, so a turbulence setting that
+                // scales fear to zero short-circuits exactly as w_fear_q == 0 does.
+                if (leaned_w_fear_q(params) == 0) return 0;
                 if (fear_cache.empty())
                     fear_cache.assign(out.polities.size(), -1);
                 if (target < 0 || target >= static_cast<int>(fear_cache.size())) return 0;
@@ -2369,12 +2378,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // because both seasons score the same objective against the
                     // same ledger and the fear is a property of the target, not
                     // of the campaigning weather.
-                    if (params.w_fear_q != 0)
+                    // BL-839: the turbulence lean SCALES this weight; it never
+                    // replaces or introduces it, so a run with w_fear_q at 0 --
+                    // the struct default and every isolating fixture -- is
+                    // untouched at every setting.
+                    const int w_fear_leaned = leaned_w_fear_q(params);
+                    if (w_fear_leaned != 0)
                     {
                         const int fear_q = fear_here(to);
                         if (fear_q > 0)
                         {
-                            const int lean = (params.w_fear_q * fear_q) / 1000;
+                            const int lean = (w_fear_leaned * fear_q) / 1000;
                             value = value + (value * lean) / 1000;
                             if (value < 0) value = 0;
                             ++out.fear_leaned_campaigns;
@@ -3609,8 +3623,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     np.aggression_q =
                         (cs && np.culture >= 0
                          && np.culture < static_cast<int>(cs->cultures.size()))
-                            ? cs->cultures[static_cast<std::size_t>(np.culture)].aggression_q
-                            : 500;
+                            ? leaned_aggression_q(
+                                  params, cs->cultures[static_cast<std::size_t>(np.culture)].aggression_q)
+                            : 500; // BL-839: same lean as the founding read above.
                     // INSTITUTIONS ARE INHERITED, not reset. A province of an
                     // empire knows what the empire knew, and that is the whole
                     // reason a dark age leaves unequal nations rather than a
@@ -4048,6 +4063,52 @@ int grudge_between(const history_sim_state& s, int from, int to)
         });
     if (it != s.grudges.end() && it->from == f && it->to == t) return it->score;
     return 0;
+}
+
+// ---------------------------------------------------------------------------
+// The turbulence lean, resolved (BL-839)
+// ---------------------------------------------------------------------------
+//
+// All three clamp the lean to -1..+1 at the point of use rather than trusting
+// the field, because `--set turbulence_lean=7` is one keystroke away and a
+// scale of x3.8 arriving silently is exactly the "table labelled as a trial of
+// a force that was never changed" failure `apply_override`'s whitelist exists
+// to stop, one layer further in.
+
+static int turbulence_scale_q(const history_sim_params& p, int magnitude_q)
+{
+    const int lean = clampi(p.turbulence_lean, -1, 1);
+    if (lean == 0) return 1000;                       // ORDINARY IS THE IDENTITY.
+    const int m = magnitude_q < 0 ? 0 : magnitude_q;
+    // Floored at 0: a calm magnitude above 1000 would otherwise flip the sign
+    // of the force it scales, which is a different force, not a calmer one.
+    return clampi(1000 + lean * m, 0, 100000);
+}
+
+int leaned_aggression_q(const history_sim_params& p, int culture_aggression_q)
+{
+    const int a = clampi(culture_aggression_q, 0, 1000);
+    const int s = turbulence_scale_q(p, p.turbulence_aggression_spread_q);
+    if (s == 1000) return a;
+    // ABOUT THE 500 NEUTRAL, which is what makes this a spread. Integer
+    // division truncates toward zero on both signs, so a widening and a
+    // narrowing round the same way and the neutral is an exact fixed point.
+    return clampi(500 + ((a - 500) * s) / 1000, 0, 1000);
+}
+
+int leaned_w_fear_q(const history_sim_params& p)
+{
+    const int s = turbulence_scale_q(p, p.turbulence_fear_q);
+    if (s == 1000) return p.w_fear_q;
+    return static_cast<int>((static_cast<int64_t>(p.w_fear_q) * s) / 1000);
+}
+
+int leaned_terrain_reach_cost_q(const history_sim_params& p)
+{
+    const int s = turbulence_scale_q(p, p.turbulence_reach_cost_q);
+    if (s == 1000) return p.terrain_reach_cost_q;
+    const int64_t v = (static_cast<int64_t>(p.terrain_reach_cost_q) * s) / 1000;
+    return v < 0 ? 0 : static_cast<int>(v);
 }
 
 int fear_of_next_q(const history_sim_state& s, const history_sim_params& p,

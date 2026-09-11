@@ -643,6 +643,28 @@ struct world_preferences
     // --- Round C: Inheritance ---
     lean drawdown = lean::any; ///< barely touched / worked / stripped
 
+    /// HOW TURBULENT THE ERA -1 HISTORY IS (BL-839; Ben, 2026-09-08: "we are
+    /// really looking to encourage historical turbulence as a parameter -- so
+    /// that players can roll for worlds which have fewer countries at this
+    /// step, or more countries at this step"). Taken on the wizard's EMPIRES
+    /// round, which is the pass it leans.
+    ///
+    /// `low` is calm, `mid` ordinary, `high` turbulent, and the default is
+    /// `mid` rather than `any` -- which is the one place this axis departs from
+    /// its eight neighbours above, deliberately. `any` means "sample the whole
+    /// viable range" for a planetology preference because those name a VALUE
+    /// drawn from a distribution; this one names a FORCE, and there is no
+    /// distribution of forces to sample. A read of `any` is therefore treated
+    /// as `mid` (`era_minus_one.cpp`), so a save or a fixture that never set
+    /// this field runs the ordinary world it always ran.
+    ///
+    /// IT TARGETS NO COUNT AND MUST NEVER ACQUIRE ONE. See
+    /// `../world/history_sim.hpp` sec THE HISTORICAL TURBULENCE LEAN for what
+    /// it actually moves and why counting polities is the one thing forbidden
+    /// to it (`../../docs/generation/GENERATION_STRATEGY.md` sec Asymmetry is
+    /// the deliverable).
+    lean history_turbulence = lean::mid;
+
     /// Per-round reroll counter. Bumping one re-draws that round (and everything
     /// downstream of it) without disturbing the rounds already committed above it.
     uint32_t roll[3] = { 0, 0, 0 };

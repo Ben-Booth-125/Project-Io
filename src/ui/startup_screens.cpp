@@ -606,6 +606,47 @@ bool lean_row(const char* id, const char* label, lean& value,
     return changed;
 }
 
+/// The turbulence lean's own row (BL-839), and NOT `lean_row` above.
+///
+/// THREE OPTIONS, NOT FOUR, and that is the whole reason this is a separate
+/// function. `lean_row` leads with "Any", which means "sample the whole viable
+/// range" -- honest for a planetology preference, which names a VALUE drawn
+/// from a distribution. This axis names a FORCE (`world/history_sim.hpp` sec
+/// THE HISTORICAL TURBULENCE LEAN), and there is no distribution of forces to
+/// sample, so an "Any" the resolver would silently read as "Ordinary" would be
+/// a control that lies about what it does.
+///
+/// NAMED SETTINGS RATHER THAN A SLIDER, for the reason STARTUP.md sec Rounds 4,
+/// 5 and 6 gives the wizard as a whole: the player has to be able to tell what
+/// they rolled. "Turbulent" is a thing you can look for in the arc readout
+/// above; a per-mille dial on a force nobody can see is not.
+bool turbulence_row(lean& value)
+{
+    static constexpr lean order[3] = { lean::low, lean::mid, lean::high };
+    const char* names[3] = { "Calm", "Ordinary", "Turbulent" };
+
+    ImGui::PushID("turbulence");
+    ImGui::TextUnformatted("History");
+
+    bool changed = false;
+    for (int i = 0; i < 3; ++i)
+    {
+        if (i > 0) ImGui::SameLine();
+        int v = static_cast<int>(value);
+        // `any` can arrive here from an old save or a bare `world_params`; the
+        // resolver reads it as ordinary, so the row shows it that way rather
+        // than lighting nothing and implying a fourth state.
+        if (value == lean::any) v = static_cast<int>(lean::mid);
+        if (ImGui::RadioButton(names[i], &v, static_cast<int>(order[i])))
+        {
+            value   = order[i];
+            changed = true;
+        }
+    }
+    ImGui::PopID();
+    return changed;
+}
+
 } // namespace
 
 void app::draw_generation_screen()
@@ -1032,6 +1073,38 @@ void app::draw_generation_screen()
             case 2:
                 if (lean_row("drawdown", "Drawdown", pf.drawdown,
                              "Barely touched", "Worked", "Stripped"))                m_wiz_dirty = true;
+                break;
+
+            // THE EMPIRES ROUND TAKES THE TURBULENCE LEAN (BL-839; Ben,
+            // 2026-09-08). It is sited on the round whose own pass it leans, so
+            // the control and the thing it moves are on the same screen: set it,
+            // roll, and the arc readout beside it is the answer.
+            //
+            // IT SETS CONDITIONS, IT DOES NOT STEER. The three settings move the
+            // spread of culture aggression, how sharply neighbours coalesce
+            // against a riser, and how fast reach decays -- and not one of them
+            // names, targets or corrects a number of realms. A calm world that
+            // fragments anyway is a correct calm world. See
+            // `world/history_sim.hpp` sec THE HISTORICAL TURBULENCE LEAN.
+            case 3:
+                if (turbulence_row(pf.history_turbulence))
+                {
+                    m_wiz_dirty = true;
+                    // THIS ROUND'S OWN RECORD GOES TOO, which is why the
+                    // argument is `m_wiz_round - 1` and not `m_wiz_round`. The
+                    // setting is an INPUT to the pass this round runs, so a
+                    // record made under the previous setting is an account of a
+                    // history the player has just stopped asking for -- exactly
+                    // the silent failure `invalidate_wizard_rounds_below` was
+                    // wired ahead of the passes to prevent, one round earlier
+                    // than the reroll button needs it.
+                    invalidate_wizard_rounds_below(m_wiz_round - 1);
+                }
+                dim_text("Calm: peoples differ less, neighbours let a riser rise, and "
+                         "distance is cheap to hold. Turbulent: the warlike are more so, "
+                         "a riser draws a coalition, and an over-reached empire cannot "
+                         "feed what it took. It leans the forces - it sets no number of "
+                         "realms, and either setting can surprise you.");
                 break;
 
             default:
