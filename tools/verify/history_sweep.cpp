@@ -220,12 +220,8 @@ struct sweep_row
     // every region with an owner. The gate/floors are in this currency, so
     // the share under each floor is what says whether a floor can bite at all.
     int64_t held_regions      = 0; ///< Regions with an owner at the epoch.
-    int64_t supply_zero       = 0; ///< ...reading 0 (unreachable from the capital).
     int64_t zero_kin_near     = 0; ///< ...of those, with a FED same-realm region within neighbour_radius (cut off by the graph, not the map).
     int64_t zero_no_link      = 0; ///< ...of those, with NO same-realm region within neighbour_radius at all (cut off by the map).
-    int64_t supply_le_settle  = 0; ///< ...at or under the settlement floor.
-    int64_t supply_le_secede  = 0; ///< ...at or under the secession floor.
-    int64_t supply_le_campaign= 0; ///< ...at or under the campaign floor.
     int64_t supply_p10        = 0; ///< 10th percentile of the reading.
     int64_t supply_p50        = 0; ///< median.
     int64_t supply_p90        = 0; ///< 90th percentile.
@@ -1123,7 +1119,8 @@ int main(int argc, char** argv)
         row.regions_seceded   = sim.regions_seceded;
         row.seceded_graph_cut = sim.regions_seceded_graph_cut;
 
-        // BL-922 -- THE SUPPLY DISTRIBUTION OVER HELD GROUND. Read off the
+        // BL-922 -- THE SUPPLY DISTRIBUTION OVER HELD GROUND (bands, percentiles,
+        // the graph-vs-map cut-off diagnostic; the floor counts are BL-926 s, below). Read off the
         // post-sim settlement, per region with an owner, in region-index order.
         {
             const history_sim_params& sp = derive_from_generation ? fx.params : params;
@@ -1136,10 +1133,6 @@ int main(int argc, char** argv)
                 const int64_t v = p.network_supply_q;
                 ++row.held_regions;
                 all.push_back(v);
-                if (v <= 0) ++row.supply_zero;
-                if (v <= sp.sustainable_settlement_floor_q) ++row.supply_le_settle;
-                if (v <= sp.secession_supply_floor_q)       ++row.supply_le_secede;
-                if (v <= sp.sustainable_campaign_floor_q)   ++row.supply_le_campaign;
                 const std::size_t pid = static_cast<std::size_t>(p.nation);
                 if (pid < sim.polities.size())
                 {

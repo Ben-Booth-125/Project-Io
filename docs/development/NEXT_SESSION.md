@@ -18,21 +18,11 @@ Wave 1 items **merged into main, built (`build_app.bat` BUILD_OK) and captured c
 | BL-916 lapse event layer | typed events on era_timelapse, `polity::parent`, save v13, ticker + markers + arc from events + Pop/Mt columns | 4-seed: 1,039 events, 73 realm ended, 5 broke away. Verify world arc: "37 polities, 12 destroyed" (was 0). Road promotions ringed but not narrated. Ticker 6 rows above the arc; at 1080p the arc's first line sits at the fold. |
 | BL-915 terrain underlay | baked terrain base, rivers, relief, seats, frontiers both axes, greedy 20-slot neighbour colouring | **the wizard preview had no rivers; `generate_rivers` added to `generate_home_surface_preview` (world-side, same seed formula as the campaign).** Merge with BL-919/916 needed a link fix: `build_migration_timelapse` now has a roster-less overload that rebuilds the culture list from the settlement record. |
 
-**BL-922 (reach has a gradient) is NOT merged.** Its agent was still probing five magnitudes
-(uncapped supply cost 10 / 1000 / 2000 / 3000 / 5000) when the session paused. Its worktree
-`.claude/worktrees/agent-a344894c3ea02f0f6` (branch `worktree-agent-a344894c3ea02f0f6`, base
-6995b41e) holds **uncommitted** edits to era_minus_one.cpp, history_sim.cpp/.hpp,
-history_sim_harness.cpp, history_sweep.cpp. First thing: look at that diff. If it is coherent,
-finish it there (choose the smallest rescale at which "REFUSED reach gate" is neither 0 nor nearly
-everything, print the supply histogram before/after, adjust only the fixtures whose premise was the
-old currency, commit with the BL-922 message shape); if not, re-brief a `generation-dev` agent from
-the item text. The ruling is binding: **capital is the basis for everything, traversal over HELD
-ground only, rescaled so distance bites** (NR-838). It will conflict with BL-926/916's
-history_sim.hpp/.cpp and history_sweep.cpp additions — resolve by keeping both.
+**BL-922 (reach has a gradient) IS MERGED (5e08b708).** Capital-based Dijkstra over HELD ground; supply walks its own uncapped neighbour index (the degree-capped campaign index left founded regions with no edge to their parent and secessions exploded to 117/world -- a Ben call whether the campaign index should be uncapped too, file it); `terrain_reach_cost_q` 10 -> 4000 (measured: at 4000 the reach gate refuses 1.5% of contacts, at 3000 0.17%, at 5000 8.7% -- Ben may prefer 3000); staging-hub pricing gone; a latent int overflow that made cut-off ground read fully supplied and a missing owner_change on seat-hinterland capture both fixed. Digests moved (seedA/on BFF4F830... -> 5A641C67838E8B54, seedB/on -> B16BF946D3CE19D6, two-span -> E5513B203E2DA268). Era -1 ms per seed roughly halved. 4-seed at 4000: battles 1800, conquests 829, secessions 6, largest share 18%, rose+fell 3/4. history_sim_harness 79 PASS / 2 FAIL (R3a2/R3a3 fail on main too); B384c now passes; stepped_clock_harness variants are now identical (supply_decay_per_tile_q retired) -- fix that harness.
 
 ## Wave-1 close-out still owed (do before wave 2)
 
-1. Merge BL-922; `build_app.bat`; `node tools/verify/build_harness.js history_sweep`.
+1. (done) BL-922 merged; app builds.
 2. **One authorised re-bless of `world_determinism`** for the wave (BL-918 and BL-922 both move the
    digest): `cmd //c "tools\verify\build_lua_harness.bat world_determinism"` then run it; record
    old→new digests in the DEVLOG. Never per item.
