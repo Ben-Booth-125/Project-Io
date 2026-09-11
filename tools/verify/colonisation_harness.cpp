@@ -1208,7 +1208,14 @@ void case_settlement_seats(int seed_count)
             if (r.seat_region >= n) { ++dangling; continue; }
             const region& seat = regions[static_cast<std::size_t>(r.seat_region)];
             if (!seat.is_seat) ++dangling; // Points somewhere that is not a seat at all.
-            else if (seat.nation != r.nation) ++mismatched;
+            // BL-920: UNORGANISED ground (`nation < 0`) points at the
+            // geometrically-nearest seat as a pure distance pointer — the
+            // fact ORGANISE's own reach test and the render need — with no
+            // ownership claim at all, so it is exempt from the nation-match
+            // test below. A TAKEN region always carries `nation >= 0` and
+            // the invariant this check exists for (hinterland shares its
+            // seat's nation) still applies to it in full.
+            else if (r.nation >= 0 && seat.nation != r.nation) ++mismatched;
         }
 
         const bool consistent = (dangling == 0 && mismatched == 0);
