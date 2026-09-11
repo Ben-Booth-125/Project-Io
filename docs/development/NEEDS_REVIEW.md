@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*22 entries — 17 open, 5 resolved.*
+*26 entries — 21 open, 5 resolved.*
 
 ---
 
@@ -277,6 +277,62 @@ With a standing-army upkeep of 200 per 1000 heads per year and a road build cost
 > **Recommendation:** Option 2 is the only one that changes the mechanism rather than the arithmetic, and it keeps the no-market constraint intact -- 'how many unlike things can this realm reach' is still a property of the network and still reads only DIFFERENCE.
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/CIVILISATION.md`*
+
+### NR-828 — BL-899: no launched crossing starves any more, and the max ration (900) sits close to the full forage you rejected
+*question · raised 2026-09-11 · from BL-899 (seafaring creed), delivered 2026-09-11. Measured across 16 seeds at --epoch 0 against a sea_legs_ration_q=0 control.*
+
+The spectrum is genuinely live in the code -- ration = sea_legs_ration_q * legs / 1000, so a people at the floor lands on 270 per-mille and one at full legs on 900. But of the 405 wet crossings that actually LAUNCH across the sweep, ZERO starve: every hub that clears the port and can_field_naval gates also clears the sea-legs floor of 300, so the floor is redundant with the port gate rather than discriminating on its own. Wet launches themselves fell 816 -> 405 and conquests rose about 9% (median 526 -> 573); the arc held, hegemony stayed 0/16.
+
+**Why it matters.** Your call 1 was explicit that a people with no sea legs STILL STARVES, and in the measured world nothing does. The discrimination that makes 'most peoples cannot' true is happening upstream at the BL-778 legality gate (median 969 wet contacts refused per world), not at this floor. Separately, 900 is close enough to full forage that the inversion you rejected -- coastal ground becoming cheaper to take than inland ground -- is worth testing directly rather than assumed absent.
+
+- Leave both magnitudes; the upstream legality gate is doing the discriminating and that is legitimate.
+- Lower the max ration well below 900 so a crossing is always visibly dearer than a dry march, and re-measure whether coastal ground is cheaper.
+- Raise the floor above what the port gate already implies, so the floor discriminates on its own rather than being redundant.
+
+> **Recommendation:** Worth one measurement before any tuning: compare the cost of taking coastal ground against inland ground directly. If coastal is not cheaper, option 1 is honest and nothing needs changing. Neither magnitude should be moved to make a number look right.
+
+*Files: `src/world/history_sim.cpp`, `src/world/era_minus_one.cpp`, `docs/lore/CREEDS.md`*
+
+### NR-829 — BL-898: an inherited grudge decays away in about three campaign years
+*question · raised 2026-09-11 · from BL-898 (grudges seed nation sentiment), delivered 2026-09-11. Raised by the building agent; nothing about decay was changed.*
+
+Era -1 grudges now seed nation->nation sentiment at world setup: on a real generated era, 22 grudge pairs produced 17 seeded rows, worst trust -8.835, mean -4.621, and the quarrel stays printable as who-wronged-whom-where. But the authored trust decay is a NINE-TICK HALF-LIFE (economy.sentiment, NR-568), so a -8.8 opening grudge is under -1 within roughly three campaign years.
+
+**Why it matters.** CIVILISATION.md sec What the dark age must leave names live grudges as one of three things the dark age hands to a colonial era, on the reasoning that WHO COLONISES WHOM IS NOT A FRESH ROLL -- it is the last quarrel continued by other means. A grudge that is gone before the player has finished their opening moves cannot do that job, and the item would be delivered in the letter while failing in the substance. The opposite reading is equally defensible: a starting condition SHOULD fade, because a history the player did not live through should not bind them forever.
+
+- Leave it. Seeded sentiment is an opening condition and fading is correct.
+- Exempt the historical_grudge factor from decay, or give it a much longer half-life, so an inherited quarrel persists as a standing fact.
+- Keep the decay but let the grudge re-assert -- a slow floor the pair cannot rise above while the record stands.
+
+> **Recommendation:** Option 3 if the colonial-era reading is the one you want: it keeps the quarrel legible and consequential without making a thousand-year-old wrong permanent. Worth deciding before any colonial-phase item reads this sentiment, because all three produce very different opening maps.
+
+*Files: `src/world/grudge_sentiment.cpp`, `docs/politics/RELATIONS.md`*
+
+### NR-830 — BL-838: fear of being next fires, but hegemony does not move at all -- the item's third done-when is unmet
+*question · raised 2026-09-11 · from BL-838 (fear of being next), delivered 2026-09-11 under your dated grant. Measured across 16 seeds at --epoch 0 against a w_fear_q=0 control.*
+
+The mechanism works and the scope demonstrably held: six hand-built checks show a LARGER PEACEFUL polity attracting zero fear while a smaller aggressive one attracts it, and clearing the ledger with nothing else changed drops both to zero -- which a size coefficient could not do. In the sweep the lean fires in 6 of 16 worlds, worst world 4,323 leans against 4 realms, conquests median 526 -> 558. BUT the two headline figures are digit-identical on both arms: HEGEMONY RATE 0/16 at 50% share, largest share median 10% (range 6-18%). The item's third 'done when' -- hegemony frequency falls across a seed sweep -- is NOT met.
+
+**Why it matters.** The magnitude (w_fear_q = 400) is a placeholder and was deliberately not tuned toward the target, because tuning it until hegemony moved would be fitting a figure to a done-when. Two readings are open and they lead opposite ways. (1) The weight is too small and the lever is real. (2) Fear of annihilation is simply NOT a brake on a riser at this span -- and note the phase runs 400 of its designed 1,600 years, so there may not be a riser large enough to fear yet. There is also a third possibility worth stating: hegemony is ALREADY 0/16 without this lever, so there may be no headroom for it to improve anything, and the done-when may have been written against a world that no longer exists.
+
+- Raise w_fear_q and re-measure -- but only against a stated target, and knowing hegemony has no headroom at 0/16.
+- Accept it. The lever is admissible, legible and live; hegemony was already controlled by reach and secession, and this adds a second cause rather than a needed brake.
+- Re-write the done-when. It asks for a fall in something already at its floor, which no lever can deliver.
+
+> **Recommendation:** Option 3 then 2. The done-when predates BL-837, BL-894 and BL-896, all of which landed since and between them took hegemony to 0/16 -- so the bar it sets cannot be cleared by anything, and passing it is not evidence of quality. Judge this lever on whether a coalition is legible and caused, which it measurably is.
+
+*Files: `src/world/history_sim.cpp`, `docs/ai/AI_OPPONENT.md`, `docs/generation/CIVILISATION.md`*
+
+### NR-831 — w_aggr_q's lean sits INSIDE the season loop and so compounds across summer and winter
+*observation · raised 2026-09-11 · from Noticed by the BL-838 agent while siting its own lean; out of that item's scope, so flagged rather than changed.*
+
+BL-868's creed-aggression lean (`w_aggr_q`) is applied inside the per-season loop in `history_sim.cpp`, so it is applied more than once per candidate and compounds across the seasons. BL-838's fear lean was deliberately sited OUTSIDE that loop, on the reasoning that the property being read is a fact about the TARGET rather than about the weather.
+
+**Why it matters.** If the compounding is unintended, then BL-868's delivered magnitude is not the magnitude it appears to be -- it was tuned through seven failed attempts to a figure that includes a doubling nobody wrote down, and any future tuning of it starts from a false baseline. If it IS intended, the two lean sites now disagree about what a per-mille weight means in this file, which is the kind of quiet inconsistency that makes the next calibration wrong.
+
+> **Recommendation:** Worth ten minutes to read and then either fix or comment. It is cheap to settle now and expensive to discover during a future calibration -- this file has already published three wrong diagnoses that were caught only by one number contradicting another.
+
+*Files: `src/world/history_sim.cpp`*
 
 ---
 

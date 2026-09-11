@@ -1553,7 +1553,6 @@ int main(int argc, char** argv)
                             "   that arises nowhere is a gate nothing clears. REPORTED, not gated.)\n");
             }
 
-            {
             // BL-838 -- DID FEAR OF BEING NEXT MOVE ANY CAMPAIGN?
             // REPORTED, NOT GATED, and the two numbers must be read together.
             // A large lean count against ONE polity is the coalition this item
