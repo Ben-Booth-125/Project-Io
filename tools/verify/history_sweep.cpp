@@ -269,6 +269,18 @@ struct sweep_row
     int64_t surv_corridors_min   = 0; ///< Fewest corridor-ends held by any one surviving holder.
     int64_t surv_corridors_max   = 0; ///< Most corridor-ends held by any one surviving holder.
 
+    // --- BL-907 -- THE CLOSURE CONTRACT SCOREBOARD, at 1200 CE -------------
+    // Two of CIVILISATION.md's seven readings (explorer set / BL-912, directed
+    // wants / BL-909) have no source built yet and are NOT measured here --
+    // the report prints MISSING for them rather than a false zero. The other
+    // five are read off `pass_one_output` below, the same struct the handoff
+    // itself carries, never a private re-derivation.
+    int64_t caps_total        = 0; ///< Living polities carrying a capital seat.
+    int64_t caps_with_market  = 0; ///< ...of those, how many carry a market.
+    int64_t grudges_total     = 0; ///< Directed grudge pairs recorded at all.
+    int64_t grudges_biting    = 0; ///< ...still carrying a positive standing score.
+    int64_t grudge_max_score  = 0; ///< The single highest standing score.
+
     int64_t peak_population  = 0;
     int64_t peak_year        = 0;
     int64_t epoch_population = 0;
@@ -1063,6 +1075,32 @@ int main(int argc, char** argv)
             row.surv_polities_holding = holding;
             row.surv_corridors_min    = mn < 0 ? 0 : mn;
             row.surv_corridors_max    = mx;
+
+            // BL-907 -- markets standing on capitals (BL-910), read off the
+            // SAME `o` rather than a second call. A polity without a seat
+            // carries neither capital nor market (BL-910's NO QUOTA clause),
+            // so `caps_total` is a count of living polities that actually
+            // HAVE a capital, never all living polities.
+            for (const polity& p : o.polities)
+            {
+                if (!p.alive || p.capital < 0) continue;
+                ++row.caps_total;
+                if (static_cast<std::size_t>(p.capital) < o.regions.size() &&
+                    o.regions[static_cast<std::size_t>(p.capital)].has_market)
+                    ++row.caps_with_market;
+            }
+
+            // BL-907 -- grudges still biting at 1200 CE. `grudge::score` is
+            // ALREADY the decayed standing figure (the struct's own comment:
+            // "the standing, decayed score"), so a positive score here means
+            // the resentment survived to the close rather than decaying to
+            // nothing, exactly what CIVILISATION.md's reading asks for.
+            row.grudges_total = static_cast<int64_t>(o.grudges.size());
+            for (const grudge& g : o.grudges)
+            {
+                if (g.score > 0) ++row.grudges_biting;
+                if (g.score > row.grudge_max_score) row.grudge_max_score = g.score;
+            }
         }
 
         for (const region& p : ss.regions)
@@ -1437,6 +1475,143 @@ int main(int argc, char** argv)
                 std::printf("  no seed left two or more surviving polities holding network --"
                             " spread unmeasurable this run\n");
             }
+        }
+
+        // ------------------------------------------------------------------
+        // BL-907 -- THE CLOSURE CONTRACT SCOREBOARD, at 1200 CE.
+        //
+        // CIVILISATION.md sec "What the closure is judged on" names SEVEN
+        // readings a mechanism inside this phase is judged by whether it
+        // moves. Every reading below is read OVER THE SEED SPREAD, never
+        // per-world -- a seed refusing a reading is legitimate, a SPREAD
+        // refusing one is not, and the only PASS/FAIL rows are asserted at
+        // the spread level for that reason. NO TARGET NUMBERS: this table
+        // is the measurement the admissible band gets argued from later, not
+        // an argument for one already.
+        {
+            std::printf("\n=== BL-907  CLOSURE CONTRACT SCOREBOARD (1200 CE, %d seeds) ===\n",
+                        static_cast<int>(rows.size()));
+
+            // Reading 1 -- EXPLORER SET (BL-912, EMPIRE_TREE_WIRED_TO_SIM).
+            // The rim milestone is a per-polity boolean read off the empire
+            // tree's mask, and nothing in src/ reads that tree yet.
+            std::printf("  1. explorer set        MISSING (BL-912 not yet wired -- no empire-tree"
+                        " mask exists to read the rim milestone off)\n");
+
+            // Reading 2 -- STRENGTH SPREAD. Surviving realms of unequal size,
+            // off the SAME top_share_q / smallest_holding this report already
+            // takes at stop_year (the epoch), never a private re-slice.
+            {
+                std::vector<int64_t> tops, smalls2, survivors;
+                for (const auto& r : rows)
+                {
+                    tops.push_back(r.top_share_q);
+                    smalls2.push_back(r.smallest_holding);
+                    survivors.push_back(r.powers_end);
+                }
+                const int64_t top_med   = median_of(tops);
+                const int64_t small_med = median_of(smalls2);
+                const int64_t surv_med  = median_of(survivors);
+                std::sort(tops.begin(), tops.end());
+                std::sort(smalls2.begin(), smalls2.end());
+                std::printf("  2. strength spread     surviving polities/world: median %lld"
+                            "  |  largest holder share (per-mille): min %lld, median %lld, max %lld"
+                            "  |  smallest survivor's regions: min %lld, median %lld, max %lld\n",
+                            static_cast<long long>(surv_med),
+                            static_cast<long long>(tops.empty() ? 0 : tops.front()),
+                            static_cast<long long>(top_med),
+                            static_cast<long long>(tops.empty() ? 0 : tops.back()),
+                            static_cast<long long>(smalls2.empty() ? 0 : smalls2.front()),
+                            static_cast<long long>(small_med),
+                            static_cast<long long>(smalls2.empty() ? 0 : smalls2.back()));
+                check(!tops.empty() && tops.back() < 1000,
+                      "BL-907.2 at least some seeds show unequal strength (largest holder < 100%)");
+            }
+
+            // Reading 3 -- CONTACT. At least one pair unmet, so there is
+            // somewhere to go, read off `row.unmet_pair` already computed
+            // above from `sim.contacts` (BL-908).
+            {
+                int unmet_seeds = 0;
+                std::vector<int64_t> pairs2;
+                for (const auto& r : rows)
+                {
+                    if (r.unmet_pair) ++unmet_seeds;
+                    pairs2.push_back(r.contact_pairs);
+                }
+                std::printf("  3. contact              %d/%zu seeds carry at least one unmet living"
+                            " pair  |  contact_pairs recorded: median %lld\n",
+                            unmet_seeds, rows.size(),
+                            static_cast<long long>(median_of(pairs2)));
+                check(unmet_seeds > 0,
+                      "BL-907.3 at least some seeds leave a living pair unmet at 1200 CE");
+            }
+
+            // Reading 4 -- DIRECTED WANTS (BL-909, DIRECTED_WANT_TABLE).
+            std::printf("  4. directed wants       MISSING (BL-909 not yet built -- no want table"
+                        " exists to read)\n");
+
+            // Reading 5 -- MARKETS. Standing on capitals (BL-910), off
+            // `row.caps_total` / `row.caps_with_market` above.
+            {
+                int64_t caps_t = 0, caps_m = 0;
+                int seeds_with_market = 0;
+                for (const auto& r : rows)
+                {
+                    caps_t += r.caps_total;
+                    caps_m += r.caps_with_market;
+                    if (r.caps_with_market > 0) ++seeds_with_market;
+                }
+                std::printf("  5. markets              %lld/%lld capitals carry a market across all"
+                            " seeds  |  %d/%zu seeds show at least one market standing\n",
+                            static_cast<long long>(caps_m), static_cast<long long>(caps_t),
+                            seeds_with_market, rows.size());
+                check(caps_t > 0,
+                      "BL-907.5 at least some seeds leave a living polity holding a capital");
+                check(seeds_with_market > 0,
+                      "BL-907.5 at least some seeds stand a market on a capital by 1200 CE");
+            }
+
+            // Reading 6 -- INHERITED NETWORK. Surviving roads held unevenly
+            // across the fragments, off the BL-911 spread already reported
+            // just above -- restated here so the whole contract prints as
+            // one table rather than requiring the reader to scroll back.
+            {
+                int multi_holder_seeds = 0;
+                for (const auto& r : rows) if (r.surv_polities_holding >= 2) ++multi_holder_seeds;
+                std::printf("  6. inherited network    %d/%zu seeds leave 2+ surviving polities"
+                            " holding network (see BL-911 spread above for the held-unevenly figure)\n",
+                            multi_holder_seeds, rows.size());
+                check(multi_holder_seeds > 0,
+                      "BL-907.6 at least some seeds leave the network split across multiple survivors");
+            }
+
+            // Reading 7 -- GRUDGES. Still biting at 1200 CE -- carried, not
+            // decayed to nothing, off `grudge::score`, the decayed standing
+            // figure the struct itself carries.
+            {
+                int64_t gt = 0, gb = 0, gmax = 0;
+                int seeds_biting = 0;
+                for (const auto& r : rows)
+                {
+                    gt += r.grudges_total;
+                    gb += r.grudges_biting;
+                    if (r.grudge_max_score > gmax) gmax = r.grudge_max_score;
+                    if (r.grudges_biting > 0) ++seeds_biting;
+                }
+                std::printf("  7. grudges              %lld/%lld recorded pairs still biting"
+                            " (positive standing score) at 1200 CE across all seeds"
+                            "  |  highest single standing score: %lld  |  %d/%zu seeds carry a biting"
+                            " grudge\n",
+                            static_cast<long long>(gb), static_cast<long long>(gt),
+                            static_cast<long long>(gmax), seeds_biting, rows.size());
+                check(seeds_biting > 0,
+                      "BL-907.7 at least some seeds carry a grudge that has not decayed to nothing");
+            }
+
+            std::printf("\n  Two of the seven readings above print MISSING because their source\n"
+                        "  is not yet wired (BL-912 explorer set, BL-909 directed wants) -- this\n"
+                        "  is the honest state of the contract, never a false zero standing in.\n");
         }
 
         std::printf("\n--- raised and fielded during the run, SPAN x BAND (all seeds) ---\n");
