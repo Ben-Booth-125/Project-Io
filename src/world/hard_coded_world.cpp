@@ -881,11 +881,21 @@ world make_hard_coded_world(world_params params, generation_report* report,
             if (progress != nullptr)
                 progress->sub_total.store(0, std::memory_order_relaxed);
 
-            // BL-768: the corridors the history walked, carried out of this
-            // block. Copied rather than moved — `hs` is const, and the record is
-            // small (one row per distinct region pair) against the settlement it
-            // travels beside.
-            kepler_corridors = hs.supply_corridors;
+            // BL-911: fold into the pass 1 -> pass 2 handoff HERE, while `hs`
+            // and the now-final `kepler_settlement` ownership are both still
+            // live, so the stamp pass below reads the crossed record rather
+            // than reaching back into live sim state. `kepler_settlement` is
+            // the ownership read `make_pass_one_output` wants — `run_history_sim`
+            // took it by reference and wrote every ownership change into it in
+            // place, so by this line it already holds the map at the epoch.
+            const pass_one_output kepler_pass_one = make_pass_one_output(
+                kepler_settlement, hs, static_cast<int>(kepler_creeds.cultures.size()));
+
+            // BL-768/BL-911: the corridors the history walked, filtered to the
+            // ones a surviving polity still holds an end of (§ The network is
+            // the estate, and it crosses) — never the raw `hs.supply_corridors`
+            // record, which carries corridors held by realms that fell too.
+            kepler_corridors = kepler_pass_one.surviving_corridors;
 
             // BL-898: the directed grudge table, out of the block with the
             // corridors. Copied for the same reason — `hs` is const and dies

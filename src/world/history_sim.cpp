@@ -4221,6 +4221,26 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
         h.regions = by_polity[pi];
         o.holdings.push_back(std::move(h));
     }
+
+    // THE SURVIVING NETWORK CROSSES THE HANDOFF, UNEVENLY (BL-911). A corridor
+    // (already sorted ascending by (a, b) at the source, BL-768) survives when
+    // at least one endpoint region is held, at the epoch, by a polity `alive`
+    // in `o.polities` — the same ownership read `by_polity` above just took,
+    // so a segment on ground held by nobody living is dropped rather than
+    // carried on the strength of the OTHER end alone... unless that other end
+    // is itself held by a survivor, which is exactly the "at least one" test.
+    const auto region_survives = [&](uint16_t region_idx) {
+        if (region_idx >= o.regions.size()) return false;
+        const int n = o.regions[static_cast<std::size_t>(region_idx)].nation;
+        if (n < 0 || n >= static_cast<int>(o.polities.size())) return false;
+        return o.polities[static_cast<std::size_t>(n)].alive;
+    };
+    o.surviving_corridors.reserve(hs.supply_corridors.size());
+    for (const history_corridor& c : hs.supply_corridors)
+    {
+        if (region_survives(c.a) || region_survives(c.b))
+            o.surviving_corridors.push_back(c);
+    }
     return o;
 }
 
