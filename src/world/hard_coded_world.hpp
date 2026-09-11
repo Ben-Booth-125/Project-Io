@@ -473,6 +473,18 @@ struct generation_report
     int64_t prehistory_conquests = 0; ///< Regions that changed hands.
     int64_t prehistory_foundings = 0; ///< Regions founded by the sim.
 
+    // --- What the grudge record seeded (BL-898) -----------------------------
+    //
+    // Reported for exactly the reason the four counters above are, and this
+    // item is the reason that reason is worth restating: the grudge table was
+    // CARRIED across the pass 1 -> pass 2 handoff for a whole sprint with no
+    // consumer at all, and a carried-but-unread field is indistinguishable from
+    // one that was never carried — except that it looks finished. These two
+    // make the seeding countable, so a generation that seeded nothing cannot
+    // pass for one that was never wired.
+    int32_t grudge_sentiment_rows    = 0; ///< Grudges that became a sentiment row.
+    int32_t grudge_sentiment_dropped = 0; ///< Grudges refused: below floor, no successor, self pair.
+
     // --- The ancient road record and what it carved (BL-768) ----------------
     //
     // Reported for the reason the four counters above are: the acceptance test
