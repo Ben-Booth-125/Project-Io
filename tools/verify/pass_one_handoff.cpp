@@ -23,8 +23,11 @@
 // Headless: world/* logic only, no SDL and no Lua.
 // ---------------------------------------------------------------------------
 
+#include "world/era_minus_one.hpp"
+#include "world/hard_coded_world.hpp"
 #include "world/history_sim.hpp"
 #include "world/settlement.hpp"
+#include "world/world.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -307,6 +310,55 @@ int main()
     }
 
     // -----------------------------------------------------------------------
+    // BL-902 — THE REAL ERA GENERATION FIXTURE, for the checks the synthetic
+    // strip can no longer carry.
+    //
+    // MEASURED ON THIS TIP: the strip above resolves 2 battles, 2 conquests
+    // and ZERO grudge pairs, and the two conquests it does log are held
+    // 2890 and 3000 years respectively — both past 900/1000 digested, so
+    // there is no digestion GAP left to order either. BL-894 (re-settlement),
+    // BL-837 (reach gating) and BL-896 (ground secession) have each made the
+    // strip settle rather than fight since it was authored, and tuning its
+    // parameters until a war reappears would be fitting the fixture to its
+    // assertions rather than measuring anything — the exact trap BL-898's G7
+    // named and declined for `grudge_sentiment_harness`.
+    //
+    // So this re-runs the era generation ACTUALLY RUNS, via
+    // `era_minus_one_fixture` (BL-462: no second construction to drift), and
+    // every row below that needs a real quarrel reads off THIS run instead of
+    // the strip. Nothing here replaces C3/C4a/c/d or C5b-f/j/l, which the
+    // strip already carries honestly (several of them vacuously true on an
+    // empty grudge table, which is a fact about the strip, not a defect in
+    // the check).
+    // -----------------------------------------------------------------------
+    world_params real_wp;
+    real_wp.seed = 20260911u;
+    world_gen_config real_stop_early;
+    real_stop_early.stop_after_ancient_era = true; // The era is all this needs.
+
+    era_minus_one_fixture real_fx;
+    generation_report     real_fr{};
+    (void)make_hard_coded_world(real_wp, &real_fr, real_stop_early, nullptr, nullptr, &real_fx);
+
+    check(real_fx.ran, "R0a  generation ran the Era -1 sim and handed back its fixture");
+
+    settlement_state   real_ss = real_fx.settlement;
+    const history_sim_state real_hs =
+        run_history_sim(real_ss, &real_fx.creeds, real_fx.terrain.view(), real_fx.gw, real_fx.gh,
+                        real_fx.params, real_fx.seed, nullptr, real_fx.works);
+
+    std::printf("      real era: %lld battles / %lld conquests / %lld foundings, %zu grudge pairs, %zu polities\n",
+                static_cast<long long>(real_hs.battles),
+                static_cast<long long>(real_hs.conquests),
+                static_cast<long long>(real_hs.foundings),
+                real_hs.grudges.size(), real_hs.polities.size());
+
+    check(real_hs.conquests > 0,
+          "R0b  the real era fights and takes ground (the rows below need it)");
+    check(!real_hs.grudges.empty(),
+          "R0c  the real era raises grudges at all (was C5a on the strip)");
+
+    // -----------------------------------------------------------------------
     // C4 — A LONG-HELD CONQUEST HAS ASSIMILATED, A RECENT ONE HAS NOT, IN THE
     //      SIM ITSELF rather than in the arithmetic above.
     // -----------------------------------------------------------------------
@@ -315,24 +367,32 @@ int main()
     // last `owner_change` on a region is the year its current holder took it,
     // and its holder's share is what assimilation has done since. One source,
     // so the check cannot pass against a record the sim does not actually keep.
+    //
+    // RE-POINTED AT THE REAL ERA FIXTURE (BL-902). The strip's own two
+    // conquests are held 2890 and 3000 years respectively — both already past
+    // 900/1000 digested — so there is no digestion GAP left between them for
+    // C4b to order; C4c/C4d still hold on the strip and are left there. The
+    // real generation's 400-year span holds many regions for very different
+    // spans (some taken at the start, some in the closing years), which is
+    // the separation this check is actually about.
     {
         std::vector<std::pair<int64_t, int>> held; // (years held, holder share)
-        std::vector<int64_t> taken(war_ss.regions.size(), INT64_MIN);
-        std::vector<int>     from_someone(war_ss.regions.size(), 0);
-        for (const owner_change& c : war.owner_changes)
+        std::vector<int64_t> taken(real_ss.regions.size(), INT64_MIN);
+        std::vector<int>     from_someone(real_ss.regions.size(), 0);
+        for (const owner_change& c : real_hs.owner_changes)
         {
-            if (c.region >= war_ss.regions.size()) continue;
+            if (c.region >= real_ss.regions.size()) continue;
             if (taken[c.region] != INT64_MIN) from_someone[c.region] = 1; // Not the seed row.
             taken[c.region] = c.year;
         }
-        for (std::size_t i = 0; i < war_ss.regions.size(); ++i)
+        for (std::size_t i = 0; i < real_ss.regions.size(); ++i)
         {
             if (!from_someone[i]) continue; // Never changed hands: nothing to digest.
-            const int owner_id = war_ss.regions[i].nation;
-            if (owner_id < 0 || owner_id >= static_cast<int>(war.polities.size())) continue;
-            const int c = war.polities[static_cast<std::size_t>(owner_id)].culture;
-            held.push_back({war_p.stop_year - taken[i],
-                            war_ss.regions[i].culture.share_of(c)});
+            const int owner_id = real_ss.regions[i].nation;
+            if (owner_id < 0 || owner_id >= static_cast<int>(real_hs.polities.size())) continue;
+            const int c = real_hs.polities[static_cast<std::size_t>(owner_id)].culture;
+            held.push_back({real_fx.params.stop_year - taken[i],
+                            real_ss.regions[i].culture.share_of(c)});
         }
         std::sort(held.begin(), held.end());
 
@@ -358,11 +418,15 @@ int main()
 
     // -----------------------------------------------------------------------
     // C5 — GRUDGES: raised by named events, carrying their cause.
+    //
+    // C5a IS R0c (BL-902): the strip world raises zero grudge pairs, so
+    // "a war raises grudges at all" has nothing to assert against on it.
+    // C5b/c/d/e/f/j/l stay on the strip below — they hold vacuously true on
+    // an empty table, which is honest about a table with nothing in it, not
+    // a hole in the check. C5g/h/i, which each need a QUARREL to exist, are
+    // re-pointed at the real fixture from R0.
     // -----------------------------------------------------------------------
     {
-        check(!war.grudges.empty(),
-              "C5a  a war raises grudges at all");
-
         bool sorted = true, directed = true, caused = true, placed = true, dated = true;
         std::pair<int, int> last{-1, -1};
         for (const grudge& g : war.grudges)
@@ -386,38 +450,6 @@ int main()
         check(placed,   "C5e  every kept event names a real place");
         check(dated,    "C5f  every kept event carries a date inside the run");
 
-        // ASYMMETRY IS THE FLAVOUR. If every pair were mirrored the direction
-        // would be decoration; at least one pair must be one-sided or unequal.
-        bool asymmetric = false;
-        for (const grudge& g : war.grudges)
-            if (grudge_between(war, g.to, g.from) != g.score) asymmetric = true;
-        check(asymmetric, "C5g  resentment is not symmetric — at least one pair is one-sided");
-
-        // DECAY IS LIVE, and the direction is what is asserted. Same world,
-        // same seed, decay off — the standing scores must come out higher.
-        history_sim_params nodecay = war_p;
-        nodecay.grudge_decay_per_year_q = 0;
-        settlement_state nd_ss = rival_strip(6);
-        const history_sim_state nd = run_history_sim(nd_ss, nullptr, sim_terrain_view{},
-                                                     syn_gw, syn_gh, nodecay, 0x51DEu);
-        int64_t decayed_sum = 0, undecayed_sum = 0;
-        for (const grudge& g : war.grudges) decayed_sum   += g.score;
-        for (const grudge& g : nd.grudges)  undecayed_sum += g.score;
-        std::printf("      grudge totals: decay on %lld / decay off %lld"
-                    " (%d pairs on, %d off)\n",
-                    static_cast<long long>(decayed_sum),
-                    static_cast<long long>(undecayed_sum),
-                    static_cast<int>(war.grudges.size()),
-                    static_cast<int>(nd.grudges.size()));
-        check(undecayed_sum > decayed_sum,
-              "C5h  decay is LIVE — the same war leaves smaller standing scores with it on");
-
-        // A DECAYED SCORE IS BELOW ITS PEAK somewhere, or `peak` is a second
-        // copy of `score` and the record cannot show a feud that cooled.
-        bool cooled = false;
-        for (const grudge& g : war.grudges) if (g.peak > g.score) cooled = true;
-        check(cooled, "C5i  at least one feud cooled — peak outlives the standing score");
-
         // SPARSE. Most pairs never meet, so the table must be far short of the
         // dense n*(n-1) it would be if every polity resented every other.
         const std::size_t n = war.polities.size();
@@ -425,16 +457,57 @@ int main()
         check(war.grudges.size() < dense,
               "C5j  the table is sparse — not every pair is aggrieved");
 
+        // ASYMMETRY IS THE FLAVOUR. If every pair were mirrored the direction
+        // would be decoration; at least one pair must be one-sided or unequal.
+        // RE-POINTED AT THE REAL FIXTURE (BL-902): the strip's empty grudge
+        // table makes this vacuously true on the strip, which is not evidence
+        // the property holds.
+        bool asymmetric = false;
+        for (const grudge& g : real_hs.grudges)
+            if (grudge_between(real_hs, g.to, g.from) != g.score) asymmetric = true;
+        check(asymmetric, "C5g  resentment is not symmetric — at least one pair is one-sided");
+
+        // DECAY IS LIVE, and the direction is what is asserted. Same fixture,
+        // same seed, decay off — the standing scores must come out higher.
+        // RE-POINTED AT THE REAL FIXTURE: the strip's zero grudge pairs left
+        // both sums at zero, so C5h could never observe a difference.
+        history_sim_params real_nodecay = real_fx.params;
+        real_nodecay.grudge_decay_per_year_q = 0;
+        settlement_state nd_ss = real_fx.settlement;
+        const history_sim_state nd =
+            run_history_sim(nd_ss, &real_fx.creeds, real_fx.terrain.view(), real_fx.gw, real_fx.gh,
+                            real_nodecay, real_fx.seed, nullptr, real_fx.works);
+        int64_t decayed_sum = 0, undecayed_sum = 0;
+        for (const grudge& g : real_hs.grudges) decayed_sum   += g.score;
+        for (const grudge& g : nd.grudges)      undecayed_sum += g.score;
+        std::printf("      grudge totals: decay on %lld / decay off %lld"
+                    " (%d pairs on, %d off)\n",
+                    static_cast<long long>(decayed_sum),
+                    static_cast<long long>(undecayed_sum),
+                    static_cast<int>(real_hs.grudges.size()),
+                    static_cast<int>(nd.grudges.size()));
+        check(undecayed_sum > decayed_sum,
+              "C5h  decay is LIVE — the same war leaves smaller standing scores with it on");
+
+        // A DECAYED SCORE IS BELOW ITS PEAK somewhere, or `peak` is a second
+        // copy of `score` and the record cannot show a feud that cooled.
+        // RE-POINTED AT THE REAL FIXTURE, for the same reason as C5g/C5h.
+        bool cooled = false;
+        for (const grudge& g : real_hs.grudges) if (g.peak > g.score) cooled = true;
+        check(cooled, "C5i  at least one feud cooled — peak outlives the standing score");
+
         // PRINTABLE, TOP-N, WITH THE EVENTS BEHIND EACH. The design's whole
-        // point: a number a player cannot ask about is a modifier, not a story.
-        const std::vector<grudge> top = top_grudges(war, 3);
+        // point: a number a player cannot ask about is a modifier, not a
+        // story. RE-POINTED AT THE REAL FIXTURE: `top_grudges` on an empty
+        // table returns nothing to print, which is what C5k measured before.
+        const std::vector<grudge> top = top_grudges(real_hs, 3);
         std::printf("      --- top grudges, with their causes ---\n");
         for (const grudge& g : top)
         {
             std::printf("      polity %u -> %u : %d (peak %d, %d events)\n",
                         g.from, g.to, g.score, g.peak, g.event_count);
             for (int k = 0; k < g.events_kept; ++k)
-                std::printf("          %s\n", grudge_event_line(g.events[k], war_ss).c_str());
+                std::printf("          %s\n", grudge_event_line(g.events[k], real_ss).c_str());
         }
         check(!top.empty() && top.front().events_kept > 0,
               "C5k  the top grudges print with the events behind each");
@@ -458,10 +531,20 @@ int main()
               "C6a  the same seed produces a bit-identical run, shares and grudges included");
 
         // And a DIFFERENT seed does not, or the equality above would be vacuous.
-        settlement_state c_ss = rival_strip(6);
-        const history_sim_state c = run_history_sim(c_ss, nullptr, sim_terrain_view{},
-                                                    syn_gw, syn_gh, war_p, 0x9F03u);
-        check(!same_run(a, c, a_ss, c_ss),
+        // RE-POINTED AT THE REAL FIXTURE (BL-902): the strip is now so quiet
+        // (2 battles, 2 conquests) that a different seed lands on the same
+        // outcome anyway — the strip has too little going on left for the
+        // seed to move, not a determinism defect. The real fixture's fuller
+        // world gives the seed somewhere to actually make a difference.
+        settlement_state d1_ss = real_fx.settlement;
+        settlement_state d2_ss = real_fx.settlement;
+        const history_sim_state d1 =
+            run_history_sim(d1_ss, &real_fx.creeds, real_fx.terrain.view(), real_fx.gw, real_fx.gh,
+                            real_fx.params, real_fx.seed, nullptr, real_fx.works);
+        const history_sim_state d2 =
+            run_history_sim(d2_ss, &real_fx.creeds, real_fx.terrain.view(), real_fx.gw, real_fx.gh,
+                            real_fx.params, real_fx.seed ^ 0x9F03u, nullptr, real_fx.works);
+        check(!same_run(d1, d2, d1_ss, d2_ss),
               "C6b  a different seed produces a different history (C6a is not vacuous)");
     }
 
