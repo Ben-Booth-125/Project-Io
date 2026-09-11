@@ -193,6 +193,8 @@ struct sweep_row
     int64_t heads_unpaid      = 0; ///< Heads sent home unpaid.
     int64_t roads_refused     = 0; ///< Corridor promotions refused for want of materials.
     int64_t secessions        = 0; ///< BL-896: successor realms the dark age produced.
+    int64_t fear_leaned       = 0; ///< BL-838: candidates leaned by fear of being next.
+    int64_t fear_targets      = 0; ///< ...against this many DISTINCT polities.
     int64_t regions_seceded   = 0; ///< ...and the ground that walked away with them.
     int64_t reach_denied      = 0; ///< Refused by the BL-837 reach gate.
     int64_t campaign_contacts = 0; ///< (own region, foreign neighbour) pairs examined.
@@ -470,6 +472,8 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     if (name == "secession_supply_floor_q")    { p.secession_supply_floor_q = v;         return true; }
     if (name == "secession_min_regions")       { p.secession_min_regions = v;            return true; }
     if (name == "w_aggr_q")                   { p.w_aggr_q = v;                        return true; }
+    if (name == "w_fear_q")                   { p.w_fear_q = v;                        return true; }
+    if (name == "fear_reference")             { p.fear_reference = v;                  return true; }
     return false;
 }
 
@@ -878,6 +882,8 @@ int main(int argc, char** argv)
         row.heads_unpaid      = sim.army_heads_unpaid_disbanded;
         row.roads_refused     = sim.road_builds_refused;
         row.secessions        = sim.secessions;
+        row.fear_leaned       = sim.fear_leaned_campaigns;
+        row.fear_targets      = sim.fear_targets_distinct;
         row.regions_seceded   = sim.regions_seceded;
         row.campaign_contacts = sim.campaign_contacts;
         row.campaign_scored   = sim.campaign_scored;
@@ -1452,6 +1458,47 @@ int main(int argc, char** argv)
                 std::printf("  (ZERO of both is a world whose realms never outran their\n"
                             "   own reach. REPORTED, not gated.)\n");
             }
+
+            // BL-838 -- DID FEAR OF BEING NEXT MOVE ANY CAMPAIGN?
+            // REPORTED, NOT GATED, and the two numbers must be read together.
+            // A large lean count against ONE polity is the coalition this item
+            // is about; the same count spread across dozens is diffuse
+            // resentment and means something else. Zero of both is a legitimate
+            // world -- one in which nobody accumulated a reputation among
+            // anybody's kin -- and never a reason to tune the weight up.
+            {
+                std::vector<int64_t> fl, ft;
+                for (const sweep_row& r : rows)
+                { fl.push_back(r.fear_leaned); ft.push_back(r.fear_targets); }
+                std::printf("\n--- BL-838  DID FEAR OF BEING NEXT MOVE ANY CAMPAIGN? ---\n");
+                std::printf("  candidates LEANED      median %lld per world\n",
+                            static_cast<long long>(median_of(fl)));
+                std::printf("  DISTINCT feared realms median %lld\n",
+                            static_cast<long long>(median_of(ft)));
+                // A MEDIAN ALONE HIDES THIS ONE. Fear is rare and clustered:
+                // the first reading had a median of 0 in both arms while the
+                // conquest totals plainly differed between them, which is a
+                // median reporting the quiet half of the sweep rather than the
+                // mechanism being inert. The count and the peak say which.
+                {
+                    int64_t worlds = 0, peak = 0, peak_t = 0;
+                    for (const sweep_row& r : rows)
+                    {
+                        if (r.fear_leaned > 0) ++worlds;
+                        if (r.fear_leaned > peak)   peak   = r.fear_leaned;
+                        if (r.fear_targets > peak_t) peak_t = r.fear_targets;
+                    }
+                    std::printf("  worlds with ANY lean    %lld of %lld\n",
+                                static_cast<long long>(worlds),
+                                static_cast<long long>(rows.size()));
+                    std::printf("  WORST world             %lld leans against %lld realms\n",
+                                static_cast<long long>(peak),
+                                static_cast<long long>(peak_t));
+                }
+                std::printf("  (The trigger is what a polity DID, read from the grudge ledger\n"
+                            "   held against it by the decider's OWN people -- never its size.\n"
+                            "   REPORTED, not gated.)\n");
+            }
         }
 
         std::printf("\n--- BL-889  WHY A CAMPAIGN DID NOT HAPPEN, BY REASON ---\n");
@@ -1818,6 +1865,86 @@ int main(int argc, char** argv)
         if (r.battles != rows.front().battles) { spread = true; break; }
     check(spread || rows.size() <= 1,
           "S3   seeds actually diverge — the sweep measures a spread, not one world N times");
+
+    // --- F: fear of being next (BL-838) -------------------------------------
+    //
+    // THESE ARE THE ITEM'S DONE-WHEN, AND THEY GATE. AI_OPPONENT.md sec 11's
+    // 2026-09-11 grant lets the Era -1 scorer read the grudge ledger for one
+    // question only, and says the check that the scope held is BEHAVIOURAL
+    // rather than structural: "a large but peaceful polity must attract no
+    // coalition, while a smaller aggressive one does."
+    //
+    // WHY A HAND-BUILT LEDGER RATHER THAN A RUN'S AGGREGATES. The failure this
+    // guards against is a size coefficient smuggled in by the back door, and a
+    // size coefficient CORRELATES with the behavioural one in any real world --
+    // realms that conquer a lot are also large. Only a fixture that separates
+    // the two can tell them apart, so this one does by construction.
+    std::printf("\n");
+    {
+        history_sim_params fp = tuned_defaults();
+        fp.w_fear_q       = 400;
+        fp.fear_reference = 2000;
+
+        history_sim_state fs;
+        // Four polities. 0 = the DECIDER. 1 = its KIN, same culture. 2 = a
+        // LARGE, PEACEFUL realm. 3 = a SMALL, AGGRESSIVE one.
+        for (int i = 0; i < 4; ++i)
+        {
+            polity q; q.id = i; q.alive = true;
+            q.culture = (i <= 1) ? 7 : (10 + i);
+            fs.polities.push_back(q);
+        }
+        // THE ONLY DIFFERENCE BETWEEN 2 AND 3 THAT THIS CODE CAN SEE is the
+        // ledger. Nothing in `fear_of_next_q` reads holdings, so there is no
+        // size field to set here at all -- which is itself the point.
+        //
+        // Sorted by (from, to), as the real table is.
+        const auto g = [](int from, int to, int score) {
+            grudge x; x.from = static_cast<uint16_t>(from);
+            x.to = static_cast<uint16_t>(to); x.score = score; x.peak = score;
+            return x;
+        };
+        fs.grudges.push_back(g(0, 2, 4000)); // The decider's OWN grudge against the peaceful realm.
+        fs.grudges.push_back(g(1, 3, 1200)); // Kin resent the aggressive one.
+        fs.grudges.push_back(g(2, 3,  900)); // ...and so does a stranger.
+
+        const int fear_peaceful  = fear_of_next_q(fs, fp, 0, 2);
+        const int fear_aggressor = fear_of_next_q(fs, fp, 0, 3);
+
+        check(fear_peaceful == 0,
+              "F1   a PEACEFUL polity attracts no fear -- and the decider's OWN 4000-point "
+              "grudge against it is NOT read (the revenge term BL-827 declined)");
+        check(fear_aggressor > 0,
+              "F2   an AGGRESSIVE polity does -- what it did to the decider's people is read");
+        check(fear_aggressor == 600,
+              "F3   ...and only the KIN grudge counts: 1200/2000 = 600, the stranger's 900 ignored");
+
+        // F4 -- THE SIZE-COEFFICIENT TRAP, PUT DIRECTLY. Kill every grudge and
+        // leave the polities exactly as they were. If anything in this term
+        // read rank, the answer would still separate them.
+        {
+            history_sim_state nf = fs;
+            nf.grudges.clear();
+            check(fear_of_next_q(nf, fp, 0, 2) == 0 && fear_of_next_q(nf, fp, 0, 3) == 0,
+                  "F4   with the LEDGER EMPTY nobody is feared -- the trigger is behaviour, "
+                  "never size or rank (the exclusion the grant exists to enforce)");
+        }
+
+        // F5 -- a dead aggrieved party's resentment does not vote, matching
+        // `extinguish_polity`: the dead leave a grudge in their kin, not a
+        // standing entry of their own.
+        {
+            history_sim_state nf = fs;
+            nf.polities[1].alive = false;
+            check(fear_of_next_q(nf, fp, 0, 3) == 0,
+                  "F5   a DEAD kin's grudge does not vote");
+        }
+
+        // F6 -- w_fear_q 0 is genuinely off: the struct default must leave
+        // every existing fixture in this repo meaning what it meant.
+        check(history_sim_params{}.w_fear_q == 0,
+              "F6   the struct default is OFF, so no existing fixture changes meaning");
+    }
 
     // --- Works checks (BL-321) ---------------------------------------------
     //
