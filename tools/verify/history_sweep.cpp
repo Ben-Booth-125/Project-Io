@@ -251,6 +251,18 @@ struct sweep_row
     int64_t corridor_degree_hist[4] = {0, 0, 0, 0};
     int64_t corridor_max_degree = 0;
 
+    /// BL-911 — THE SURVIVING NETWORK CROSSES THE HANDOFF, UNEVENLY. Read off
+    /// `pass_one_output::surviving_corridors`, never off the raw sim record —
+    /// this is the subset a polity still `alive` at the epoch holds an end of.
+    /// The SPREAD across surviving polities is the reading the contract is
+    /// judged on, never the total (CIVILISATION.md § The network is the
+    /// estate, and it crosses): an even split would be the flat map the
+    /// design exists to avoid.
+    int64_t surv_corridors       = 0; ///< Total corridors crossing (subset of `corridors`).
+    int64_t surv_polities_holding = 0; ///< Distinct surviving polities holding >= 1 corridor end.
+    int64_t surv_corridors_min   = 0; ///< Fewest corridor-ends held by any one surviving holder.
+    int64_t surv_corridors_max   = 0; ///< Most corridor-ends held by any one surviving holder.
+
     int64_t peak_population  = 0;
     int64_t peak_year        = 0;
     int64_t epoch_population = 0;
@@ -982,6 +994,40 @@ int main(int argc, char** argv)
                 ++row.corridor_degree_hist[b];
             }
         }
+        // BL-911 — the surviving network crosses the handoff, unevenly. Fold
+        // the SAME sim + settlement output through the real handoff function
+        // rather than re-deriving survival here: `make_pass_one_output` is
+        // what the stamp pass in generation now reads, so this measures what
+        // generation actually produces.
+        {
+            const pass_one_output o = make_pass_one_output(ss, sim, /*culture_count=*/0);
+            row.surv_corridors = static_cast<int64_t>(o.surviving_corridors.size());
+
+            std::vector<int64_t> per_polity(o.polities.size(), 0);
+            for (const history_corridor& c : o.surviving_corridors)
+            {
+                const auto credit = [&](uint16_t idx) {
+                    if (idx >= ss.regions.size()) return;
+                    const int n = ss.regions[idx].nation;
+                    if (n >= 0 && static_cast<std::size_t>(n) < per_polity.size())
+                        ++per_polity[static_cast<std::size_t>(n)];
+                };
+                credit(c.a);
+                credit(c.b);
+            }
+            int64_t mn = -1, mx = 0, holding = 0;
+            for (std::size_t pi = 0; pi < per_polity.size(); ++pi)
+            {
+                if (!o.polities[pi].alive || per_polity[pi] == 0) continue;
+                ++holding;
+                if (mn < 0 || per_polity[pi] < mn) mn = per_polity[pi];
+                if (per_polity[pi] > mx) mx = per_polity[pi];
+            }
+            row.surv_polities_holding = holding;
+            row.surv_corridors_min    = mn < 0 ? 0 : mn;
+            row.surv_corridors_max    = mx;
+        }
+
         for (const region& p : ss.regions)
             if (p.works_built != 0) ++row.regions_with_works;
 
@@ -1308,6 +1354,52 @@ int main(int argc, char** argv)
                         static_cast<long long>(max_deg));
             check(tot_c > 0,
                   "BL-768 the sim records supply corridors (the ancient road record is wired)");
+        }
+
+        // ------------------------------------------------------------------
+        // BL-911 — THE SURVIVING NETWORK CROSSES THE HANDOFF, UNEVENLY.
+        //
+        // Read off `pass_one_output::surviving_corridors`, per seed, so this
+        // reports what the stamp pass in generation now actually consumes.
+        // The SPREAD (min vs max corridor-ends held by a surviving polity) is
+        // the reading the contract is judged on, never the total — an even
+        // split across holders is the flat map the design exists to avoid.
+        {
+            int64_t tot_sc = 0, tot_c2 = 0;
+            std::vector<int64_t> spreads; // max - min per seed, holders >= 2 only
+            for (const auto& r : rows)
+            {
+                tot_sc += r.surv_corridors;
+                tot_c2 += r.corridors;
+                std::printf("  seed row: surviving %lld/%lld corridors held by %lld polities"
+                            "  (min %lld, max %lld)\n",
+                            static_cast<long long>(r.surv_corridors),
+                            static_cast<long long>(r.corridors),
+                            static_cast<long long>(r.surv_polities_holding),
+                            static_cast<long long>(r.surv_corridors_min),
+                            static_cast<long long>(r.surv_corridors_max));
+                if (r.surv_polities_holding >= 2)
+                    spreads.push_back(r.surv_corridors_max - r.surv_corridors_min);
+            }
+            std::printf("\n--- BL-911  THE SURVIVING NETWORK CROSSES THE HANDOFF (all seeds) ---\n");
+            std::printf("  surviving corridors   %lld of %lld recorded (the rest died with their realm)\n",
+                        static_cast<long long>(tot_sc), static_cast<long long>(tot_c2));
+            if (!spreads.empty())
+            {
+                std::sort(spreads.begin(), spreads.end());
+                const int64_t med = spreads[spreads.size() / 2];
+                std::printf("  spread (max-min held) across %zu multi-holder seeds:"
+                            " smallest %lld, median %lld, largest %lld\n",
+                            spreads.size(), static_cast<long long>(spreads.front()),
+                            static_cast<long long>(med), static_cast<long long>(spreads.back()));
+                check(spreads.back() > 0,
+                      "BL-911 the surviving network is held UNEVENLY across surviving polities");
+            }
+            else
+            {
+                std::printf("  no seed left two or more surviving polities holding network --"
+                            " spread unmeasurable this run\n");
+            }
         }
 
         std::printf("\n--- raised and fielded during the run, SPAN x BAND (all seeds) ---\n");

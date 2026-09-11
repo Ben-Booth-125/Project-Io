@@ -2388,6 +2388,24 @@ struct pass_one_output
     era_timelapse timelapse;
     int64_t start_year = 0;
     int64_t stop_year  = 0;
+
+    /// THE SURVIVING NETWORK CROSSES THE HANDOFF, UNEVENLY (BL-911).
+    ///
+    /// A subset of the sim's own `supply_corridors` record (BL-768) — never a
+    /// second, tile-grain route; that seam stays exactly as BL-768 left it. A
+    /// corridor survives here when AT LEAST ONE of its two endpoint regions is
+    /// held, at `stop_year`, by a polity `alive` in `polities` above. Collapse
+    /// is network failure (CIVILISATION.md § How an empire actually falls), so
+    /// a segment held by a realm that did not collapse survives; one held only
+    /// by ground that fell to nobody living does not. Sorted ascending by
+    /// (a, b), same as the source, so the stamping pass stays order-independent.
+    ///
+    /// UNEVEN BY CONSTRUCTION: this is a filter over ownership, not a share —
+    /// a large surviving realm keeps a large slice of what it built, a
+    /// fragment keeps little, and a realm that fell keeps none. The spread
+    /// this produces across `holdings` is the reading the contract is judged
+    /// on (§ The network is the estate, and it crosses), never its total.
+    std::vector<history_corridor> surviving_corridors;
 };
 
 /// Fold the live sim state and settlement state into the handoff value.
