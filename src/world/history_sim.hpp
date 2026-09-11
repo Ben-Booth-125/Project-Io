@@ -180,6 +180,12 @@ struct history_sim_params
     int w_ore  = 250; ///< Weight on its ore endowment.
     int w_port = 200; ///< Weight on its port endowment.
     int w_ring = 400; ///< Weight on ENCLOSED-SEA RING CLOSURE — see `ring_closure_q`.
+    /// Weight on what stands on the target BEYOND bare endowment — centres,
+    /// urban population, works, and the seat premium (BL-924). See
+    /// `campaign_prize_q`. Zero on any region nothing has settled yet, so
+    /// every harness fixture that opens synthetic/undeveloped regions is
+    /// untouched regardless of this weight's value.
+    int w_prize = 300;
     int w_dist = 120; ///< Penalty per tile of supply distance from the capital.
     int w_def  = 500; ///< Penalty on the defender's fielded power.
     /// Penalty for taking ground of a foreign culture. BL-826 made it a

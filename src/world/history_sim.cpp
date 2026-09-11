@@ -117,42 +117,46 @@ std::string coin_civilisation_name(const std::vector<culture>& cultures, int a, 
 /// an honest comparison rather than a coincidence of scales.
 int region_value_q(const region& p)
 {
-    // Bare ground endowment -- what the region would be worth if nothing
-    // stood on it at all.
-    const int endowment_q = (p.farm_q + p.ore_q + p.port_q) / 3;
+    return (p.farm_q + p.ore_q + p.port_q) / 3;
+}
 
-    // BL-924 -- A CITY IS A PRIZE, A SEAT IS THE PRIZE.
-    //
-    // The endowment term alone made every region worth the same regardless
-    // of what stood on it, so a capital scored no higher than an empty
-    // hamlet and campaign targeting had no gradient toward a decisive
-    // objective -- the 4-seed sweep showed the consequence as border churn
-    // (28% of contested regions taken 3+ times). Reading what actually
-    // stands on the ground closes that gap: centres and urban population are
-    // the settlement itself, the accumulated work effects are the
-    // infrastructure built on top of it, and `is_seat` marks the one region
-    // per polity worth the most of all.
-    //
-    // Each `_q` term below is folded into the same 0-1000 endowment window
-    // before combining, so "what stands here" weighs roughly as much as
-    // "what the ground offers" rather than swamping it -- the scorer already
-    // prices defence and works separately (`work_score_q`,
-    // `terrain_combat.hpp`), so a rich or seated region is also correctly
-    // harder to take, not merely more attractive.
+/// BL-924 -- A CITY IS A PRIZE, A SEAT IS THE PRIZE. What a region carries
+/// BEYOND bare endowment, worth reading only for CAMPAIGN's own target
+/// valuation -- never folded into `region_value_q` above.
+///
+/// `region_value_q` alone made every region worth the same regardless of
+/// what stood on it, so a capital scored no higher than an empty hamlet and
+/// campaign targeting had no gradient toward a decisive objective -- the
+/// 4-seed sweep showed the consequence as border churn (28% of contested
+/// regions taken 3+ times). Centres and urban population are the settlement
+/// itself, the accumulated work effects are the infrastructure built on top
+/// of it, and `is_seat` marks the one region per polity worth the most of
+/// all.
+///
+/// KEPT OUT OF `region_value_q` DELIBERATELY (first cut folded it in and
+/// cost history_sim_harness six checks: B318c, BL384a, R5, B384c, BL837b1,
+/// M2b). `region_value_q` is THE shared currency Settle, Consolidate,
+/// build_work's reach gain and a polity's own holdings-value sum all read —
+/// none of those verbs are about what a region is worth to ATTACK, and
+/// inflating their common currency crowded Campaign out of the argmax in
+/// every fixture built assuming pure endowment. Campaign's own `value` at
+/// its scoring site never went through `region_value_q` in the first place
+/// (it reads `w_farm`/`w_ore`/`w_port` against the target directly), so this
+/// term is added there, and there only.
+int campaign_prize_q(const region& p)
+{
     const int centre_q = clampi(p.centres * 200, 0, 1000);
     const int urban_q  = clampi(static_cast<int>(p.urban_population / 100), 0, 1000);
     const int works_q  = clampi((p.work_capacity_mod + p.work_manpower_mod
                                 + p.work_industrial_mod) / 3, 0, 1000);
-    const int built_q  = (centre_q + urban_q + works_q) / 3;
-
-    int value_q = endowment_q + built_q;
-    // The seat premium sits on top of everything above: a capital is worth
-    // half again what a bare city of the same size would be, so sacking one
-    // (BL-895 already razes its centres) is worth far more than trading an
-    // ordinary border region, and retaking a sacked one is worth far less --
-    // the churn this item exists to cool.
-    if (p.is_seat) value_q += value_q / 2;
-    return value_q;
+    int prize_q = (centre_q + urban_q + works_q) / 3;
+    // The seat premium: a capital is worth half again what a bare city of
+    // the same size would be, so sacking one (BL-895 already razes its
+    // centres) is worth far more than trading an ordinary border region,
+    // and retaking a sacked one is worth far less -- the churn this item
+    // exists to cool.
+    if (p.is_seat) prize_q = clampi(prize_q + prize_q / 2, 0, 1000);
+    return prize_q;
 }
 
 /// What a candidate work is worth this year, IN THE SHARED CURRENCY (BL-321).
@@ -2570,6 +2574,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     int value = (jitter(params.w_farm, qs, 0xA1u, 160) * tgt.farm_q
                               +  jitter(params.w_ore,  qs, 0xB2u, 160) * tgt.ore_q
                               +  jitter(params.w_port, qs, 0xC3u, 160) * tgt.port_q) / 1000;
+
+                    // BL-924 -- A CITY IS A PRIZE, A SEAT IS THE PRIZE. Read
+                    // directly off the target, not through the shared
+                    // `region_value_q` every other verb's score is built
+                    // from — see `campaign_prize_q`'s own comment for why.
+                    value += (jitter(params.w_prize, qs, 0xD4u, 160)
+                              * campaign_prize_q(tgt)) / 1000;
 
                     // RING CLOSURE — the mechanical answer to "what makes a
                     // Rome" (BL-277 Q1). A coastal target next to coast this
