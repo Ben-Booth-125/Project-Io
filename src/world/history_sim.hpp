@@ -381,6 +381,11 @@ struct history_sim_params
     int settle_threshold_q    = 60;
     int invest_threshold_q    = 50;
     int consolidate_threshold_q = 30;
+    /// BL-920 — ORGANISE, the fifth verb: growth over UNORGANISED culture
+    /// ground the polity's network can reach (CIVILISATION.md sec "A city
+    /// state spawns where a region's population is above a threshold"). Same
+    /// shared currency as the four above.
+    int organise_threshold_q = 40;
 
     /// Share of a target's endowment value a conqueror expects to keep.
     int campaign_gain_q = 700;
@@ -834,6 +839,53 @@ struct history_sim_params
     /// EMPIRE-era round. A settled map with a fixed region count is this
     /// phase's premise (`CIVILISATION.md` § The arc the phase must produce).
     bool settle_requires_razed_ground = false;
+
+    // --- BL-920: the opening seeds culture ground, not polities -----------
+    //
+    // CIVILISATION.md sec "A city state spawns where a region's population
+    // is above a threshold" (Ben, 2026-09-11, ruling on NR-835): "City states
+    // spawn in provinces above a threshold population... 300,000 heads,
+    // provisional." A region above this line IS a city state -- at the
+    // opening and whenever it crosses the line later; everything else is
+    // unorganised ground of its culture (`region::nation == -1`), never a
+    // free holding of the plurality polity as the old one-per-culture seed
+    // read it.
+    //
+    // FALSE BY DEFAULT, DELIBERATELY -- the same idiom
+    // `settle_requires_razed_ground` beside it uses. Dozens of
+    // `history_sim_harness` fixtures (`two_polity_world`,
+    // `one_polity_two_regions`, `road_chain_world`...) build a synthetic
+    // world whose whole premise is "one polity per founding culture, holding
+    // every region of it, from year zero" -- BL-826's seed, which this item
+    // supersedes for GENERATION's OWN round but must not silently rewrite
+    // underneath every harness that isolates a DIFFERENT mechanism (BL-837
+    // garrison maintenance, BL-922 supply pricing, the road discount...) on
+    // top of that premise. Generation's own round sets this true
+    // (`era_minus_one_sim_params`); every existing fixture keeps the old
+    // seed, unchanged in meaning, by never setting it.
+    bool city_states_by_population_threshold = false;
+
+    int64_t city_state_population_threshold = 300000;
+
+    /// ORGANISE is priced by KINSHIP (`culture_opposition_q`, 0 = own people,
+    /// 1000 = fully opposed): own culture cheapest, kin dearer, and a people
+    /// at or above this bar cannot be organised at all -- only conquered
+    /// (CIVILISATION.md sec "The unit is the city state"). A placeholder on
+    /// the same footing as the w_* weights beside it -- the SHAPE is the
+    /// ruling, history_sweep tunes the number.
+    int organise_opposition_bar_q = 700;
+
+    /// Materials the polity's capital pays to organise one region of its own
+    /// culture (op_q == 0); a kin people costs proportionally more, up to
+    /// double at the opposition bar itself. Same footing as
+    /// `road_build_material_cost` beside it in `era_minus_one_sim_params`.
+    int64_t organise_material_cost = 400;
+
+    /// Growth over unorganised ground is gated exactly like holding it
+    /// (`sustainable_settlement_floor_q`) -- BL-922's "the network must
+    /// supply the ground" reach test, asked of the CANDIDATE region rather
+    /// than of ground already held.
+    int organise_reach_floor_q = 40;
 
     /// AMPHIBIOUS CAPTURE BY WEIGHT (BL-893; Ben, 2026-09-10: "units can move
     /// into and capture coast tiles if the adjoined land province has a higher
@@ -1727,6 +1779,7 @@ enum class sim_verb : uint8_t
     invest,
     consolidate,
     build_work, ///< Raise an Era -1 work on a held region (BL-321).
+    organise,   ///< BL-920: grow onto reachable unorganised culture ground.
 };
 
 // ---------------------------------------------------------------------------
@@ -2080,6 +2133,12 @@ struct history_sim_state
     int64_t battles     = 0;
     int64_t conquests   = 0;
     int64_t foundings   = 0;
+    /// BL-920 -- unorganised ground the ORGANISE verb actually took.
+    int64_t organised          = 0;
+    /// BL-920 -- regions that crossed `city_state_population_threshold` on
+    /// unorganised ground and rose as a new city state, watched across the
+    /// span rather than read off only at the opening.
+    int64_t city_states_risen  = 0;
     int64_t winter_campaigns = 0;
     /// Campaigns that reached their objective under `stalled_supply_q` supply
     /// — launched, but arriving too thin for the distance. The supply-decay

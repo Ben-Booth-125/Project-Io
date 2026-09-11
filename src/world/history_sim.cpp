@@ -432,17 +432,110 @@ history_sim_state run_history_sim(settlement_state&         ss,
     if (ss.regions.empty() || params.stop_year <= params.start_year)
         return out;
 
-    // --- Seed polities from cultures --------------------------------------
-    //
-    // At the antiquity start `region::nation` is -1: the political pass has
-    // not run, and a pre-national world's actors ARE its peoples (BL-221). The
-    // sim writes `nation` as it goes, so the political map is this loop's
-    // output rather than its input.
+    // Population and manpower are seeded for EVERY region either way — the
+    // city-state test (BL-920) and the old plurality seed (BL-826) both need
+    // a headcount to read or to grow from.
+    for (region& p : ss.regions)
     {
-        // BL-826 — PLURALITY. A polity is seeded per distinct people on the
-        // map, and a people is present where it is the largest share. At the
-        // seed the shares are pure (settlement writes `pure`), so this is
-        // exactly the old set; it only differs on a state handed in mid-history.
+        // Seed a headcount so demography has something to grow from — the
+        // graduation path settlement.hpp's demography note leaves to this item.
+        if (p.population <= 0)
+            p.population = region_seed_population(p.farm_q); // BL-766: ONE derivation,
+                                                             // shared with `draw_urban_map`.
+        p.last_demography_year = params.start_year;
+        replenish_manpower(p);
+        // BL-835 — THE WORLD OPENS WITH ARMIES ALREADY STANDING. Seeded at the
+        // target rather than at zero: a run that began with every region bare
+        // would spend its first century as a free-for-all of undefended ground,
+        // which is an artefact of the start and not a fact about the world.
+        p.army_stock = garrison_target(p, params.garrison_fraction_q);
+        p.manpower_stock = clampi64(p.manpower_stock - p.army_stock, 0, p.manpower_stock);
+    }
+
+    // Region -> owning polity, -1 for unorganised or unowned ground.
+    std::vector<int> owner(ss.regions.size(), -1);
+
+    // BL-920 -- FALSE BY DEFAULT (struct default), TRUE ON GENERATION'S OWN
+    // ROUND (`era_minus_one_sim_params`). See the field comment on
+    // `city_states_by_population_threshold`: dozens of `history_sim_harness`
+    // fixtures build a synthetic world whose whole premise is BL-826's old
+    // seed, isolating a DIFFERENT mechanism on top of it, and this keeps
+    // every one of them meaning exactly what it always meant.
+    if (params.city_states_by_population_threshold)
+    {
+        // --- BL-920: THE OPENING SEEDS CULTURE GROUND, NOT POLITIES -------
+        //
+        // CIVILISATION.md sec "A city state spawns where a region's
+        // population is above a threshold" (Ben, 2026-09-11, ruling on
+        // NR-835): "City states spawn in provinces above a threshold
+        // population... 300,000 heads, provisional." The rule is per
+        // REGION, never per culture, and never a quota: a region whose
+        // population already stands above `city_state_population_threshold`
+        // IS a city state; everything else opens as UNORGANISED ground of
+        // its culture (`region::nation == -1`), grown later by the ORGANISE
+        // verb, taken by conquest, or promoted in its own right once ITS
+        // population crosses the line (the per-year rise check further down
+        // this function).
+        //
+        // This SUPERSEDES BL-826's one-polity-per-plurality-culture seed,
+        // which put one polity per distinct people on the map and handed it
+        // EVERY region of that culture — 24 to 60 culture-blobs, never a
+        // field of city states, and every scheduled founding thereafter
+        // free hinterland for the incumbent.
+        //
+        // ONE POLITY PER QUALIFYING REGION, walked in ascending region
+        // index — the order the rest of this file uses — so id assignment
+        // is a property of the map, never of a culture list's own order. A
+        // culture that clears the threshold on several regions at once opens
+        // with several separate city states, not one polity holding several
+        // seats; growing into an empire is what the rest of this phase is
+        // for.
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+        {
+            region& p = ss.regions[i];
+            const int pc = p.culture.plurality();
+            if (pc < 0) continue;
+            if (p.population < params.city_state_population_threshold) continue;
+
+            polity q;
+            q.id      = static_cast<int>(out.polities.size());
+            q.culture = pc;
+            if (cs && pc < static_cast<int>(cs->cultures.size()))
+                q.aggression_q = leaned_aggression_q(
+                    params, cs->cultures[static_cast<std::size_t>(pc)].aggression_q);
+            else
+                q.aggression_q = 500; // Neutral when creeds were not supplied.
+            q.capital = static_cast<int>(i);
+
+            p.nation      = q.id;
+            p.is_seat     = true;
+            p.seat_region = static_cast<int>(i);
+            owner[i]      = q.id;
+            out.polities.push_back(q);
+        }
+        // NO EARLY RETURN ON AN EMPTY OPENING (BL-920, superseding the old
+        // guard below). Under the one-per-culture seed a run with no
+        // polities meant a region set with no cultures at all -- a fact
+        // about the map that made the rest of this function meaningless.
+        // Under the threshold seed, ZERO regions clearing
+        // `city_state_population_threshold` at the opening is a LEGITIMATE,
+        // even likely, outcome for a sparsely-farmed world -- the ruling's
+        // own "a minority of regions... never a quota" language admits a
+        // minority of zero. The founding schedule and the per-year rise
+        // check below can still seed the first city state from nothing, so
+        // returning here would silence a world the mechanism is built to
+        // grow.
+    }
+    else
+    {
+        // --- BL-826: ONE POLITY PER PLURALITY CULTURE (the old seed) -----
+        //
+        // At the antiquity start `region::nation` is -1: the political pass
+        // has not run, and a pre-national world's actors ARE its peoples
+        // (BL-221). A polity is seeded per distinct people on the map, and a
+        // people is present where it is the largest share. At the seed the
+        // shares are pure (settlement writes `pure`), so this is exactly the
+        // old set; it only differs on a state handed in mid-history.
         std::vector<int> cultures;
         for (const region& p : ss.regions)
         {
@@ -462,11 +555,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     params, cs->cultures[static_cast<std::size_t>(c)].aggression_q);
             else
                 q.aggression_q = 500; // Neutral when creeds were not supplied.
-            // BL-839: the turbulence lean's SPREAD is applied HERE, at the one
-            // place a culture's temperament enters a polity, rather than in
-            // `build_creeds` -- the pantheon is a fact about the people and is
-            // not the player's to lean; how hard that temperament pushes on the
-            // sim's scorer is.
 
             // Capital: the best-settled region of this culture. Ties break on
             // the lower index, which is placement order (best ground first).
@@ -474,16 +562,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
             for (std::size_t i = 0; i < ss.regions.size(); ++i)
             {
                 const region& p = ss.regions[i];
-                // BL-826 — PLURALITY. A seat sits where this people is the
-                // largest, which is the same question the seed above asked.
                 if (p.culture.plurality() != c) continue;
                 if (p.settle_score_q > best_q) { best_q = p.settle_score_q; best = static_cast<int>(i); }
             }
             q.capital = best;
             out.polities.push_back(q);
         }
+        if (out.polities.empty()) return out;
+
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+            for (const polity& q : out.polities)
+                if (q.culture == ss.regions[i].culture.plurality()) { owner[i] = q.id; break; }
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+            ss.regions[i].nation = owner[i];
     }
-    if (out.polities.empty()) return out;
 
     // --- Great-power seed (BL-299) ----------------------------------------
     //
@@ -494,25 +586,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // this seed does is set two aggressions apart and mark the pair.
     if (params.seed_great_powers && out.polities.size() >= 2)
     {
-        // Largest two by starting holdings, ties to the lower id so the choice
-        // does not depend on iteration order.
-        std::vector<std::pair<int, int>> by_size; // (count, id)
+        // Largest two, ties to the lower id so the choice does not depend on
+        // iteration order. BL-920: a polity opens as ONE seat rather than a
+        // whole culture's ground under the new seed, so SIZE is read as the
+        // seat's own population; under the old seed a polity IS a whole
+        // culture's ground, so size stays the share-weighted region count
+        // BL-826 measured it as (a half-held region is half a holding).
+        std::vector<std::pair<int64_t, int>> by_size; // (size, id)
         for (const polity& q : out.polities)
         {
-            // BL-826 — SHARE-WEIGHTED, and this is the one place a plurality
-            // count would have been actively wrong. "Largest two by starting
-            // holdings" is a MEASURE OF SIZE, and a half-held region is half a
-            // holding; counting it as a whole one (or as none) makes the
-            // great-power seed jump on a single per-mille crossing 500. The sum
-            // of shares is the continuous reading and it is exactly the old
-            // count on the pure shares the seed actually sees.
-            int64_t share_sum = 0;
-            for (const region& p : ss.regions) share_sum += p.culture.share_of(q.culture);
-            const int n = static_cast<int>(share_sum / 1000);
-            by_size.push_back({n, q.id});
+            int64_t size = 0;
+            if (params.city_states_by_population_threshold)
+                size = (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                     ? ss.regions[static_cast<std::size_t>(q.capital)].population : 0;
+            else
+                for (const region& p : ss.regions) size += p.culture.share_of(q.culture) / 1000;
+            by_size.push_back({size, q.id});
         }
         std::sort(by_size.begin(), by_size.end(),
-                  [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+                  [](const std::pair<int64_t, int>& a, const std::pair<int64_t, int>& b) {
                       if (a.first != b.first) return a.first > b.first;
                       return a.second < b.second;
                   });
@@ -525,65 +617,58 @@ history_sim_state run_history_sim(settlement_state&         ss,
         preserving.aggression_q   = clampi(params.major_preserving_aggression_q, 0, 1000);
     }
 
-    // Region -> owning polity. Seeded from culture, then owned by conquest.
-    std::vector<int> owner(ss.regions.size(), -1);
-    for (std::size_t i = 0; i < ss.regions.size(); ++i)
+    if (params.city_states_by_population_threshold)
+    {
+        // --- BL-920: NEAREST-SEAT POINTER FOR UNORGANISED GROUND ---------
+        //
+        // The region adjacency graph (`neighbours`) is grown below from the
+        // FINAL region set and does not exist yet, so the opening's own
+        // pointer is geometric — the same Chebyshev `region_distance` a
+        // campaign's own target choice reads. It is a POINTER ONLY:
+        // unorganised ground carries no `nation` and is nobody's holding,
+        // but a hinterland region has always pointed at the seat it feeds
+        // (§ The unit is the city state), and unorganised ground needs the
+        // same fact to answer "nearest to whom" for the render and for
+        // ORGANISE's own reach test below.
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+        {
+            region& p = ss.regions[i];
+            if (p.is_seat) continue; // Already points at itself, above.
+            int nearest = -1, nearest_d = 1 << 30;
+            for (const polity& q : out.polities)
+            {
+                if (q.capital < 0) continue;
+                const int d = region_distance(p, ss.regions[static_cast<std::size_t>(q.capital)], gw);
+                if (d < nearest_d) { nearest_d = d; nearest = q.capital; }
+            }
+            p.seat_region = nearest;
+        }
+    }
+    else
+    {
+        // --- SETTLEMENT SEATS, SPARSE FROM THE OPENING MAP (BL-866) ------
+        //
+        // CIVILISATION.md § The unit is the city state: "a settlement is a
+        // SEAT FLAG on a region, and every region points at the seat it
+        // feeds." Each polity's `capital` above is already derived as "the
+        // best-settled region of this culture" — exactly what a founding
+        // city state's seat is — so this reuses that choice rather than
+        // running a second placement pass.
         for (const polity& q : out.polities)
-            // BL-826 — PLURALITY, matching the seed: a polity exists per
-            // distinct plurality culture, so this assigns each region to the
-            // polity of the people who are largest on it.
-            if (q.culture == ss.regions[i].culture.plurality()) { owner[i] = q.id; break; }
-
-    for (std::size_t i = 0; i < ss.regions.size(); ++i)
-    {
-        region& p = ss.regions[i];
-        p.nation = owner[i];
-        // Seed a headcount so demography has something to grow from — the
-        // graduation path settlement.hpp's demography note leaves to this item.
-        if (p.population <= 0)
-            p.population = region_seed_population(p.farm_q); // BL-766: ONE derivation,
-                                                             // shared with `draw_urban_map`.
-        p.last_demography_year = params.start_year;
-        replenish_manpower(p);
-        // BL-835 — THE WORLD OPENS WITH ARMIES ALREADY STANDING. Seeded at the
-        // target rather than at zero: a run that began with every region bare
-        // would spend its first century as a free-for-all of undefended ground,
-        // which is an artefact of the start and not a fact about the world.
-        p.army_stock = garrison_target(p, params.garrison_fraction_q);
-        p.manpower_stock = clampi64(p.manpower_stock - p.army_stock, 0, p.manpower_stock);
-    }
-
-    // --- SETTLEMENT SEATS, SPARSE FROM THE OPENING MAP (BL-866) -----------
-    //
-    // CIVILISATION.md § The unit is the city state: "a settlement is a SEAT
-    // FLAG on a region, and every region points at the seat it feeds." Each
-    // polity's `capital` above is already derived as "the best-settled region
-    // of this culture" — exactly what a founding city state's seat is — so
-    // this reuses that choice rather than running a second placement pass.
-    // One seat per polity is the sparse first cut: with dozens to hundreds of
-    // regions per surviving culture, seats land at a small fraction of the
-    // map, and an empire's later seat count (several, once it has conquered
-    // other polities' capitals — see the conquest block below) is a
-    // consequence of war, not of this seeding.
-    //
-    // EVERY REGION RESOLVES TO A SEAT HERE: `owner[i]` was just derived from
-    // `out.polities`, and every polity's `capital` is a valid index (the loop
-    // above never leaves one at -1 when regions exist), so no region opens
-    // the run already outside anyone's reach.
-    for (const polity& q : out.polities)
-    {
-        if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= ss.regions.size())
-            continue;
-        region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
-        seat.is_seat     = true;
-        seat.seat_region = q.capital;
-    }
-    for (std::size_t i = 0; i < ss.regions.size(); ++i)
-    {
-        region& p = ss.regions[i];
-        if (p.is_seat) continue; // Already points at itself, above.
-        if (p.nation < 0 || p.nation >= static_cast<int>(out.polities.size())) continue;
-        p.seat_region = out.polities[static_cast<std::size_t>(p.nation)].capital;
+        {
+            if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= ss.regions.size())
+                continue;
+            region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
+            seat.is_seat     = true;
+            seat.seat_region = q.capital;
+        }
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+        {
+            region& p = ss.regions[i];
+            if (p.is_seat) continue; // Already points at itself, above.
+            if (p.nation < 0 || p.nation >= static_cast<int>(out.polities.size())) continue;
+            p.seat_region = out.polities[static_cast<std::size_t>(p.nation)].capital;
+        }
     }
 
     // --- THE ANCIENT ROAD RECORD (BL-768) ---------------------------------
@@ -1419,83 +1504,101 @@ history_sim_state run_history_sim(settlement_state&         ss,
             region np = std::move(ss.pending_foundings.front());
             ss.pending_foundings.erase(ss.pending_foundings.begin());
 
-            // WHOSE IT IS: the polity of the people whose stream arrived. The
-            // same plurality rule the world-opening seed uses, so a region
-            // founded in year -3000 is owned on identical terms to one that was
-            // there at tick zero.
-            const int np_culture = np.culture.plurality();
             int np_owner = -1;
-            for (const polity& q : out.polities)
-                if (q.culture == np_culture) { np_owner = q.id; break; }
 
-            // A PEOPLE THAT COMES INTO BEING AND SETTLES GROUND IS A POWER
-            // (Ben, 2026-09-09, choosing this over adopting daughters into their
-            // parent's polity).
-            //
-            // THE DEFECT THIS CLOSES, and it was measured rather than guessed:
-            // polities are seeded ONCE, at the top of this function, from the
-            // cultures present in the opening region set — the cradle cultures.
-            // A region founded mid-span carrying a culture the MIGRATION coined
-            // (BL-856) therefore matched no polity, took `nation = -1`, and
-            // never entered the ownership record at all. On seed 0 that was 604
-            // foundings against 523 ownership changes: EIGHTY-ONE regions
-            // founded and owned by nobody, whose ground the wizard's map drew as
-            // permanent grey wilderness. Half a continent of "unsettled" land
-            // was in fact settled by peoples the sim had no seat for.
-            //
-            // Seeding on demand is the honest reading: a people exists, it holds
-            // ground, so it is a power — however small, and it starts with
-            // exactly one region because it has only just arrived.
-            //
-            // DETERMINISTIC: the schedule is drained in (year, anchor) order, so
-            // ids are handed out in that order on every machine. `reach_by_polity`
-            // is keyed on `polity::id` and resizes on demand, so a polity
-            // appearing mid-run costs it nothing. No iterator over `out.polities`
-            // is live here — this block runs before the decision round opens.
-            if (np_owner < 0 && np_culture >= 0)
+            if (params.city_states_by_population_threshold)
             {
-                polity q;
-                q.id      = static_cast<int>(out.polities.size());
-                q.culture = np_culture;
-                q.aggression_q =
-                    (cs && np_culture < static_cast<int>(cs->cultures.size()))
-                        ? leaned_aggression_q(
-                              params, cs->cultures[static_cast<std::size_t>(np_culture)].aggression_q)
-                        : 500; // BL-839: same lean as the founding read above.
-                // Its seat is the region it just founded — the only one it has.
-                q.capital = static_cast<int>(ss.regions.size());
-                np_owner  = q.id;
-                out.polities.push_back(q);
-                // BL-916: a people that founds its first seat mid-run is a
-                // polity founded, dated to the founding.
-                note_event(lapse_event_kind::founded, q.capital, q.id, -1);
+                // BL-920 — A SCHEDULED FOUNDING ARRIVES AS UNORGANISED
+                // GROUND OF ITS OWN CULTURE, NOT FREE HINTERLAND FOR AN
+                // INCUMBENT. This supersedes the BL-856/BL-867 reading that
+                // matched the founding culture to an existing polity (or
+                // minted one on the spot) and handed it the new region
+                // outright — under that rule every scheduled founding after
+                // the opening grew SOME polity for free, so a realm's size
+                // at 1200 CE tracked how far its people walked rather than
+                // how it acted (CIVILISATION.md sec "WHAT THE OPENING IS
+                // TODAY"). A founding now sits on the map exactly as the
+                // opening's own unorganised ground does: peopled, carrying
+                // its culture, owned by nobody, organised later by
+                // ORGANISE, by conquest, or promoted in its own right once
+                // its population crosses `city_state_population_threshold`
+                // (the per-year rise check below).
+                np.nation  = -1;
+                np.is_seat = false;
+
+                // NEAREST-SEAT POINTER, geometric like the opening's own
+                // (above): `neighbours` exists by this point in the run but
+                // a fresh founding is not linked into it until
+                // `link_region` below, so this reads the same Chebyshev
+                // distance the opening used rather than a graph walk. No
+                // seat anywhere yet (a frontier the migration reached
+                // before any city state did) leaves `seat_region == -1` —
+                // "falls outside anyone's reach", the honest reading for
+                // ground no seat touches yet.
+                int nearest = -1, nearest_d = 1 << 30;
+                for (const polity& q : out.polities)
+                {
+                    if (q.capital < 0
+                     || static_cast<std::size_t>(q.capital) >= ss.regions.size())
+                        continue;
+                    const int d = region_distance(np, ss.regions[static_cast<std::size_t>(q.capital)], gw);
+                    if (d < nearest_d) { nearest_d = d; nearest = q.capital; }
+                }
+                np.seat_region = nearest;
             }
-            np.nation = np_owner;
-
-            // BL-867 — EVERY FOUNDING GETS A SEAT POINTER, on the same rule
-            // the opening map uses (above): a brand-new polity's first
-            // region IS its seat (its `capital` was just set to this very
-            // index, above), an existing polity's new region is ordinary
-            // hinterland pointing at the capital it already has. Without
-            // this a region founded here defaults to `seat_region == -1` —
-            // "falls outside anyone's reach", the honest reading for ground
-            // no seat touches, but the wrong one for ground a seat's own
-            // people just walked onto.
-            if (np_owner >= 0)
+            else
             {
-                const int cap = out.polities[static_cast<std::size_t>(np_owner)].capital;
-                np.seat_region = cap;
-                if (cap == static_cast<int>(ss.regions.size())) np.is_seat = true;
+                // --- BL-846/BL-856/BL-867 (the old reading) --------------
+                //
+                // WHOSE IT IS: the polity of the people whose stream
+                // arrived. The same plurality rule the world-opening seed
+                // uses, so a region founded in year -3000 is owned on
+                // identical terms to one that was there at tick zero. A
+                // people that comes into being and settles ground with no
+                // existing polity of its culture mints one on the spot,
+                // seated on the region it just founded.
+                const int np_culture = np.culture.plurality();
+                for (const polity& q : out.polities)
+                    if (q.culture == np_culture) { np_owner = q.id; break; }
+
+                if (np_owner < 0 && np_culture >= 0)
+                {
+                    polity q;
+                    q.id      = static_cast<int>(out.polities.size());
+                    q.culture = np_culture;
+                    q.aggression_q =
+                        (cs && np_culture < static_cast<int>(cs->cultures.size()))
+                            ? leaned_aggression_q(
+                                  params, cs->cultures[static_cast<std::size_t>(np_culture)].aggression_q)
+                            : 500;
+                    q.capital = static_cast<int>(ss.regions.size());
+                    np_owner  = q.id;
+                    out.polities.push_back(q);
+                    note_event(lapse_event_kind::founded, q.capital, q.id, -1);
+                }
+                np.nation = np_owner;
+
+                if (np_owner >= 0)
+                {
+                    const int cap = out.polities[static_cast<std::size_t>(np_owner)].capital;
+                    np.seat_region = cap;
+                    if (cap == static_cast<int>(ss.regions.size())) np.is_seat = true;
+                }
             }
 
             ss.regions.push_back(std::move(np));
             owner.push_back(np_owner);
-            touch_owner(np_owner); // BL-922: new held ground changes reach
+            touch_owner(np_owner); // BL-922: new held ground changes reach (a no-op at -1).
             neighbours.emplace_back();
             supply_neighbours.emplace_back();
             degree.push_back(0);
             link_region(ss.regions.size() - 1); // Keep the index complete.
 
+            // NO OWNER_CHANGE for unorganised ground (BL-920): it is
+            // `owner_none` in the timelapse until something organises it,
+            // which is what lets the render show it in the dull culture
+            // tint rather than a polity's colour. The old path always
+            // carries an owner and records the change as it always did.
             if (np_owner >= 0)
                 out.owner_changes.push_back(owner_change{
                     static_cast<int32_t>(y),
@@ -1503,6 +1606,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     static_cast<uint16_t>(np_owner)});
             ++out.foundings;
             ++out.foundings_scheduled; // BL-926: the schedule played back.
+            // BL-916: a people arriving on new ground is still an event,
+            // even though (per COLONISATION.md) nothing here is an actor's
+            // choice — `-1` is "no polity", the same sentinel `note_event`
+            // already uses for "no place".
+            if (params.city_states_by_population_threshold)
+                note_event(lapse_event_kind::founded,
+                           static_cast<int>(ss.regions.size() - 1), -1, -1);
             out.history.push_back(history_event{
                 years_from_calendar_year(y), chain_stage::legacy,
                 ss.regions.back().name + " is settled", std::string{}});
@@ -1685,6 +1795,56 @@ history_sim_state run_history_sim(settlement_state&         ss,
         {
             out.peak_population = total_pop;
             out.peak_year       = y;
+        }
+
+        // ---- BL-920: A CENTRE THAT CROSSES THE THRESHOLD RISES ------------
+        //
+        // CIVILISATION.md sec "A CITY STATE SPAWNS WHERE A REGION'S
+        // POPULATION IS ABOVE A THRESHOLD": city states keep RISING through
+        // the span as later-founded ground grows toward its ceiling, not
+        // only at the opening. Checked every year, at demography's own
+        // grain, rather than the coarse decision clock below — a threshold
+        // crossing is a fact about population, not a decision anybody makes,
+        // exactly like the founding schedule it sits beside. Walked in
+        // ascending region index, so two regions crossing in the same year
+        // hand out ids in an order the map determines, not iteration order.
+        //
+        // GATED ON THE SAME FLAG AS THE OPENING (BL-920). Under the old
+        // BL-826 seed every region is already somebody's from year zero
+        // (`owner[i] >= 0` always), so this loop is a guaranteed no-op there
+        // — gated anyway so it costs the old path nothing, not even the scan.
+        for (std::size_t i = 0; params.city_states_by_population_threshold
+                              && i < ss.regions.size(); ++i)
+        {
+            region& r = ss.regions[i];
+            if (owner[i] >= 0) continue; // Already organised: not this mechanism's ground.
+            if (r.population < params.city_state_population_threshold) continue;
+            const int culture = r.culture.plurality();
+            if (culture < 0) continue;
+
+            polity q;
+            q.id      = static_cast<int>(out.polities.size());
+            q.culture = culture;
+            q.aggression_q =
+                (cs && culture < static_cast<int>(cs->cultures.size()))
+                    ? leaned_aggression_q(
+                          params, cs->cultures[static_cast<std::size_t>(culture)].aggression_q)
+                    : 500; // BL-839: same lean as every other seat above.
+            q.capital = static_cast<int>(i);
+
+            r.nation      = q.id;
+            r.is_seat     = true;
+            r.seat_region = static_cast<int>(i);
+            owner[i]      = q.id;
+            out.polities.push_back(q);
+
+            out.owner_changes.push_back(owner_change{
+                static_cast<int32_t>(y), static_cast<uint16_t>(i),
+                static_cast<uint16_t>(q.id)});
+            // BL-916: a city state rising is an event with a place and a date,
+            // the same `founded` kind the opening and the schedule both use.
+            note_event(lapse_event_kind::founded, static_cast<int>(i), q.id, -1);
+            ++out.city_states_risen;
         }
 
         // ---- The decision gate -------------------------------------------
@@ -2875,6 +3035,57 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     best_target = -1; best_winter = false;
                 }
             }
+            // -- Organise (BL-920) ------------------------------------------
+            //
+            // Growth over UNORGANISED culture ground the polity's network
+            // can reach (CIVILISATION.md sec "The unit is the city state").
+            // Bounded by construction like the other four: the polity's own
+            // frontier, one neighbour deep, one candidate chosen. Priced by
+            // KINSHIP (`culture_opposition_q`, 0 own people, 1000 fully
+            // opposed): own culture cheapest, kin dearer, and a people at or
+            // above `organise_opposition_bar_q` is refused here — it can
+            // only be taken by Campaign, above.
+            {
+                for (int hi : held)
+                {
+                    for (int tn : neighbours[static_cast<std::size_t>(hi)])
+                    {
+                        const std::size_t ti = static_cast<std::size_t>(tn);
+                        if (owner[ti] >= 0) continue; // Somebody's already -- Campaign's ground, not this verb's.
+                        const region& tgt = ss.regions[ti];
+                        const int tgt_culture = tgt.culture.plurality();
+                        if (tgt_culture < 0) continue;
+
+                        const int op_q = (cs != nullptr)
+                            ? culture_opposition_q(cs->cultures, q.culture, tgt_culture)
+                            : 0;
+                        if (op_q >= params.organise_opposition_bar_q) continue;
+
+                        // BL-922 -- THE NETWORK MUST SUPPLY THE GROUND, read
+                        // exactly as `campaign_supply` reads a march's last
+                        // hop: the hub's own reach from the capital, plus ONE
+                        // `edge_step` onto ground the polity does not yet
+                        // hold.
+                        const std::size_t hidx = static_cast<std::size_t>(hi);
+                        const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
+                                              ? reach[hidx] : (1 << 27);
+                        const int64_t terrain_cost =
+                            static_cast<int64_t>(reach_here + edge_step(hi, tn))
+                                * leaned_terrain_reach_cost_q(params) / 100;
+                        const int supply_here_q =
+                            static_cast<int>(clampi64(1000 - terrain_cost, 0, 1000));
+                        if (supply_here_q <= params.organise_reach_floor_q) continue;
+
+                        const int s = (region_value_q(tgt) * (1000 - op_q)) / 1000;
+                        if (s > best_score && s >= params.organise_threshold_q)
+                        {
+                            best_score = s; best_verb = sim_verb::organise;
+                            best_target = static_cast<int>(ti); best_winter = false;
+                        }
+                    }
+                }
+            }
+
             // -- Build a work (BL-321) -------------------------------------
             //
             // Scored LAST, and that ordering carries a small contract: because
@@ -3845,6 +4056,61 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 out.history.push_back(history_event{
                     years_from_calendar_year(y), chain_stage::legacy,
                     bp.name + " raises a " + r->name, std::string{}});
+                break;
+            }
+            case sim_verb::organise:
+            {
+                if (best_target < 0 || best_target >= static_cast<int>(ss.regions.size())) break;
+                const std::size_t ti = static_cast<std::size_t>(best_target);
+                if (owner[ti] >= 0) break; // Overtaken this round -- nothing left to organise.
+                region& tgt = ss.regions[ti];
+                const int tgt_culture = tgt.culture.plurality();
+                if (tgt_culture < 0) break;
+
+                const int op_q = (cs != nullptr)
+                    ? culture_opposition_q(cs->cultures, q.culture, tgt_culture) : 0;
+                if (op_q >= params.organise_opposition_bar_q) break; // Opposed -- conquest only.
+
+                // PRICED BY KINSHIP, FROM THE CAPITAL'S OWN STOCKPILE
+                // (CIVILISATION.md sec "What materials are FOR"): own people
+                // cheapest, kin dearer, up to double the base cost at the
+                // opposition bar itself. A REFUSAL DELAYS, IT DOES NOT
+                // FORBID -- the same shape a refused corridor promotion
+                // takes above: next round tries again with materials stood.
+                region* seat = (q.capital >= 0
+                             && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                             ? &ss.regions[static_cast<std::size_t>(q.capital)] : nullptr;
+                const int64_t cost = (params.organise_material_cost * (1000 + op_q)) / 1000;
+                if (seat == nullptr || seat->material_stock < cost) break;
+                seat->material_stock -= cost;
+
+                owner[ti]  = q.id;
+                tgt.nation = q.id;
+                touch_owner(q.id); // BL-922: this polity's held-only reach is now stale.
+
+                // A CENTRE ORGANISED ABOVE THE CITY-STATE THRESHOLD IS ITS
+                // OWN SEAT within the same empire; below it, ordinary
+                // hinterland pointing at the capital that organised it
+                // (CIVILISATION.md sec "A city state spawns where a
+                // region's population is above a threshold").
+                if (tgt.population >= params.city_state_population_threshold)
+                {
+                    tgt.is_seat     = true;
+                    tgt.seat_region = static_cast<int>(ti);
+                }
+                else
+                {
+                    tgt.is_seat     = false;
+                    tgt.seat_region = q.capital;
+                }
+
+                out.owner_changes.push_back(owner_change{
+                    static_cast<int32_t>(y), static_cast<uint16_t>(ti),
+                    static_cast<uint16_t>(q.id)});
+                ++out.organised;
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    tgt.name + " is organised", std::string{}});
                 break;
             }
             case sim_verb::consolidate:

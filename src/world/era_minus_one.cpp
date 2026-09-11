@@ -64,6 +64,13 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // keeps the rule it was written against.
     hp.settle_requires_razed_ground = true;
 
+    // BL-920: generation's own round opens on culture ground, growing city
+    // states by ORGANISE and by the population-threshold rise check, rather
+    // than one polity per founding culture holding everything (BL-826). See
+    // the field comment on `city_states_by_population_threshold` for why
+    // this is set HERE rather than on the struct default.
+    hp.city_states_by_population_threshold = true;
+
     // BL-893: the water gate's weight escape, on for the same reason -- this is
     // the round the rule was designed for.
     hp.amphibious_weight_crossing = true;
