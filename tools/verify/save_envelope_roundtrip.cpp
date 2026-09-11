@@ -283,6 +283,13 @@ save_envelope make_envelope()
     cc1.other_q = 0;
     be.prehistory_timelapse.culture_changes.push_back(cc0);
     be.prehistory_timelapse.culture_changes.push_back(cc1);
+    // BL-916, save_game_version 13 -- the event layer. Every field distinct
+    // from its neighbours so a transposition between the three u16 slots is
+    // visible; one entry carries the none sentinel so it survives the range
+    // check as the sentinel and not as an out-of-stride index.
+    be.prehistory_timelapse.events.push_back(lapse_event{-3900, 0, 0, 3, lapse_event_none});
+    be.prehistory_timelapse.events.push_back(lapse_event{-1200, 2, 1, 7, 3});
+    be.prehistory_timelapse.events.push_back(lapse_event{-1150, 5, 0, 2, 1});
 
     e.report.bodies.push_back(be);
 
@@ -489,6 +496,15 @@ int main()
             check(play_ok,
                   "S3 the playback record survives whole -- steps, per-polity samples and "
                   "the culture-share change list, slot for slot (BL-817)");
+            bool ev_ok = t.events.size() == o.events.size();
+            for (std::size_t i = 0; ev_ok && i < o.events.size(); ++i)
+                ev_ok = t.events[i].year   == o.events[i].year
+                     && t.events[i].kind   == o.events[i].kind
+                     && t.events[i].region == o.events[i].region
+                     && t.events[i].polity == o.events[i].polity
+                     && t.events[i].other  == o.events[i].other;
+            check(ev_ok && o.events.size() == 3,
+                  "S3 the event layer survives whole, field for field, sentinel included (BL-916)");
         }
         check(le.report.bodies.size() == 1
                   && le.report.bodies[0].settlement.lacunae == 6
@@ -593,6 +609,25 @@ int main()
             f.write(reinterpret_cast<const char*>(&bad), sizeof(bad));
         }
         check(!read_save_game(k_path, lw, le), "S7 a bad magic is refused too");
+
+        // BL-916, save_game_version 13: the IMMEDIATE previous format, PINNED
+        // TO A LITERAL. A v12 stream has no event-list length where v13 expects
+        // one, so a reader that accepted it would take the next body entry's
+        // name length as an event count. Refused whole. The literal is a PAST
+        // format, which is the only kind this file pins (save_roundtrip.cpp's
+        // rule): it can never be broken by a later bump, only made older.
+        static_assert(save_game_version >= 13,
+                      "BL-916 released layout 13; S8 names v12 as a refused predecessor");
+        {
+            write_save_game(k_path, w, make_envelope());
+            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(4, std::ios::beg);
+            const uint32_t v12 = 12;
+            f.write(reinterpret_cast<const char*>(&v12), sizeof(v12));
+        }
+        le.speed = 99;
+        check(!read_save_game(k_path, lw, le) && le.speed == 99,
+              "S8 a v12-versioned stream (pre event layer) is refused with the destination untouched");
     }
 
     std::remove(k_path);

@@ -1095,7 +1095,11 @@ void app::draw_generation_screen()
                 dim_text(buf);
                 ImGui::Separator();
 
-                ui::draw_lapse_scoreboard(rec, hist_slice, hist_lagged);
+                ui::draw_lapse_scoreboard(rec, hist_slice, hist_lagged,
+                                          m_wiz_history_year[lapse_index]);
+                // BL-916: the ticker — the named moments at or before the
+                //         playhead, the newest of which is the marker on the map.
+                ui::draw_lapse_ticker(rec, m_wiz_history_year[lapse_index]);
                 // BL-891: the arc, so a rolled world can be judged without
                 //         watching the whole replay.
                 ui::draw_lapse_arc(rec);

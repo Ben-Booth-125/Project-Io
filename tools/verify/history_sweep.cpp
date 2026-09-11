@@ -202,6 +202,10 @@ struct sweep_row
     int64_t heads_unpaid      = 0; ///< Heads sent home unpaid.
     int64_t roads_refused     = 0; ///< Corridor promotions refused for want of materials.
     int64_t secessions        = 0; ///< BL-896: successor realms the dark age produced.
+    int64_t events            = 0; ///< BL-916: typed events the record carries.
+    int64_t events_ended      = 0; ///< ...of which realm_ended (the wizard's "destroyed").
+    int64_t events_broke      = 0; ///< ...of which broke_away.
+    int64_t events_seats      = 0; ///< ...of which seat_captured.
     int64_t fear_leaned       = 0; ///< BL-838: candidates leaned by fear of being next.
     int64_t fear_targets      = 0; ///< ...against this many DISTINCT polities.
     int64_t regions_seceded   = 0; ///< ...and the ground that walked away with them.
@@ -1084,6 +1088,16 @@ int main(int argc, char** argv)
         row.heads_unpaid      = sim.army_heads_unpaid_disbanded;
         row.roads_refused     = sim.road_builds_refused;
         row.secessions        = sim.secessions;
+        // BL-916 — the event layer, counted per kind. `realm_ended` is the
+        // wizard's "destroyed" figure, so it is the one worth printing beside
+        // the sweep's own death count.
+        row.events            = static_cast<int64_t>(sim.events.size());
+        for (const lapse_event& ev : sim.events)
+        {
+            if (ev.kind == static_cast<uint8_t>(lapse_event_kind::realm_ended)) ++row.events_ended;
+            if (ev.kind == static_cast<uint8_t>(lapse_event_kind::broke_away))  ++row.events_broke;
+            if (ev.kind == static_cast<uint8_t>(lapse_event_kind::seat_captured)) ++row.events_seats;
+        }
         row.fear_leaned       = sim.fear_leaned_campaigns;
         row.fear_targets      = sim.fear_targets_distinct;
         row.regions_seceded   = sim.regions_seceded;
@@ -1689,6 +1703,20 @@ int main(int argc, char** argv)
                         static_cast<long long>(max_deg));
             check(tot_c > 0,
                   "BL-768 the sim records supply corridors (the ancient road record is wired)");
+        }
+
+        // BL-916 — the event layer, one line: total and the three kinds the
+        // wizard's ticker and arc readout are judged on. `realm ended` here is
+        // the figure the round's "destroyed" must match on the same seed.
+        {
+            int64_t ev = 0, ended = 0, broke = 0, seats = 0;
+            for (const auto& r : rows)
+            { ev += r.events; ended += r.events_ended; broke += r.events_broke; seats += r.events_seats; }
+            std::printf("  events recorded      %lld (%lld realm ended, %lld broke away, %lld seats captured)"
+                        "   <- BL-916 the wizard's ticker reads this\n",
+                        static_cast<long long>(ev), static_cast<long long>(ended),
+                        static_cast<long long>(broke), static_cast<long long>(seats));
+            check(ev > 0, "BL-916 the sim records typed events (the event layer is wired)");
         }
 
         // ------------------------------------------------------------------

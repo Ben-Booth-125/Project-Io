@@ -307,7 +307,37 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         dl->AddText(at, col_bright, label.c_str()); // fit-exempt: a year stamp sized by CalcTextSize
     }
 
+    // BL-916 -- THE EVENT MARKER. Every event inside the marker window behind
+    // the playhead draws a ring at its region that GROWS AND FADES with the
+    // playhead's distance past it: the pulse is a function of the year alone,
+    // so it is deterministic under --verify (where the year is script-set and
+    // nothing animates) and reads as a pulse in play, where the year advances
+    // ~span/30 a second. Nothing here is a widget; the no-input rule holds.
+    {
+        const int window = lapse_marker_window_years(h);
+        for (const lapse_event& e : h.lapse.events)
+        {
+            if (e.year > year) break;                // ascending by year
+            if (year - e.year >= window) continue;
+            if (e.region == lapse_event_none
+             || static_cast<std::size_t>(e.region) >= h.region_col.size()) continue;
+            const float t = static_cast<float>(year - e.year) / static_cast<float>(window);
+            const float cx = tl.x + (static_cast<float>(h.region_col[e.region]) + 0.5f) * scale;
+            const float cy = tl.y + (static_cast<float>(h.region_row[e.region]) + 0.5f) * scale;
+            const float r  = 4.0f + 14.0f * t;
+            const int   a  = static_cast<int>(255.0f * (1.0f - t));
+            dl->AddCircle({cx, cy}, r, IM_COL32(245, 240, 220, a), 0, 2.0f);
+            dl->AddCircleFilled({cx, cy}, 2.5f, IM_COL32(245, 240, 220, 255));
+        }
+    }
+
     ImGui::Dummy(avail);
+}
+
+int lapse_marker_window_years(const history_lapse& h)
+{
+    // One screen-second of the transport (startup_screens.cpp: span / 30 s).
+    return std::max(1, h.lapse.years / 30);
 }
 
 // ---------------------------------------------------------------------------
@@ -354,14 +384,72 @@ std::vector<board_row> rank_slice(const history_lapse& h,
 
 constexpr int k_board_rows = 16;
 
+/// The recorded step at or before @p year, or -1 before the first. `steps` is
+/// ascending by year, so this is one binary search.
+int step_at_or_before(const era_timelapse& t, int year)
+{
+    int lo = 0, hi = static_cast<int>(t.steps.size()) - 1, best = -1;
+    while (lo <= hi)
+    {
+        const int mid = lo + (hi - lo) / 2;
+        if (t.steps[static_cast<std::size_t>(mid)].year <= year) { best = mid; lo = mid + 1; }
+        else hi = mid - 1;
+    }
+    return best;
+}
+
+/// A headcount in the width a board column can afford.
+void fmt_population(char* buf, std::size_t n, int64_t pop)
+{
+    if (pop >= 1000000)     std::snprintf(buf, n, "%.2fM", static_cast<double>(pop) / 1e6);
+    else if (pop >= 10000)  std::snprintf(buf, n, "%.0fk", static_cast<double>(pop) / 1e3);
+    else if (pop >= 1000)   std::snprintf(buf, n, "%.1fk", static_cast<double>(pop) / 1e3);
+    else                    std::snprintf(buf, n, "%lld", static_cast<long long>(pop));
+}
+
+/// A region's generated name, or an honest placeholder — never an Earth name.
+const char* region_name_of(const history_lapse& h, uint16_t region)
+{
+    if (region == lapse_event_none || static_cast<std::size_t>(region) >= h.region_name.size()
+     || h.region_name[region].empty())
+        return "unnamed ground";
+    return h.region_name[region].c_str();
+}
+
+/// A polity's name is its seat's name — the same rule the board uses.
+const char* polity_name_of(const history_lapse& h, uint16_t polity)
+{
+    if (polity == lapse_event_none || static_cast<std::size_t>(polity) >= h.polity_seat.size()
+     || h.polity_seat[polity] < 0)
+        return "an unnamed realm";
+    return region_name_of(h, static_cast<uint16_t>(h.polity_seat[polity]));
+}
+
 } // namespace
 
 void draw_lapse_scoreboard(const history_lapse& h,
                            const std::vector<uint16_t>& slice,
-                           const std::vector<uint16_t>& lagged)
+                           const std::vector<uint16_t>& lagged,
+                           int year)
 {
     const std::vector<board_row> now  = rank_slice(h, slice);
     const std::vector<board_row> then = rank_slice(h, lagged);
+
+    // BL-916 on BL-817: the sample this instant's Population and Might columns
+    // read. The step AT OR BEFORE the playhead, so the board never shows a
+    // number from a future the map has not reached.
+    const int step = step_at_or_before(h.lapse, year);
+    const auto sample_for = [&](uint16_t polity) -> const polity_sample* {
+        if (step < 0) return nullptr;
+        const timelapse_step& st = h.lapse.steps[static_cast<std::size_t>(step)];
+        for (int i = 0; i < st.sample_count; ++i)
+        {
+            const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
+            if (k < h.lapse.samples.size() && h.lapse.samples[k].polity == polity)
+                return &h.lapse.samples[k];
+        }
+        return nullptr;
+    };
 
     int32_t held = 0;
     for (const board_row& b : now) held += b.land;
@@ -380,26 +468,29 @@ void draw_lapse_scoreboard(const history_lapse& h,
     ImGui::PopStyleColor();
     ImGui::Spacing();
 
-    // POPULATION and MILITARY COLUMNS GO HERE (BL-817, in flight). They need a
-    // per-polity sample series the ownership record does not carry; the record is
-    // a change list over regions and nothing else. Add them as two columns beside
-    // Land, ordered still by Land unless Ben rules otherwise.
+    // POPULATION and MIGHT are read off BL-817's per-polity sample series at the
+    // step this instant falls in (BL-916). Still ORDERED BY LAND: share of ground
+    // is the round's subject, and the two columns qualify a row rather than rank
+    // it. Might is the military capacity band, 1-6, exactly as the sim holds it.
     //
     // A RESEARCH COLUMN DOES NOT GO HERE, and that is a standing refusal rather
     // than a deferral: research points accrue from population (BL-822), so the
     // column would restate population under a second name and show a correlation
     // it never measured — on the board Ben is judging the research levers with.
-    if (!ImGui::BeginTable("##lapse_board", 4,
+    if (!ImGui::BeginTable("##lapse_board", 6,
                            ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
         return;
 
     // "Rgn", not "Regions": the header is drawn by ImGui's own TableHeadersRow,
     // which neither elides nor reports, so a header wider than its column simply
-    // clips ("Re...") with nothing recording that it did.
+    // clips ("Re...") with nothing recording that it did. "Pop" and "Mt" for the
+    // same reason.
     ImGui::TableSetupColumn("#",    ImGuiTableColumnFlags_WidthFixed, 22.0f);
     ImGui::TableSetupColumn("Seat", ImGuiTableColumnFlags_WidthStretch);
-    ImGui::TableSetupColumn("Land", ImGuiTableColumnFlags_WidthFixed, 52.0f);
-    ImGui::TableSetupColumn("Rgn",  ImGuiTableColumnFlags_WidthFixed, 34.0f);
+    ImGui::TableSetupColumn("Land", ImGuiTableColumnFlags_WidthFixed, 48.0f);
+    ImGui::TableSetupColumn("Rgn",  ImGuiTableColumnFlags_WidthFixed, 30.0f);
+    ImGui::TableSetupColumn("Pop",  ImGuiTableColumnFlags_WidthFixed, 46.0f);
+    ImGui::TableSetupColumn("Mt",   ImGuiTableColumnFlags_WidthFixed, 24.0f);
     ImGui::TableHeadersRow();
 
     const int shown = std::min(k_board_rows, static_cast<int>(now.size()));
@@ -471,6 +562,32 @@ void draw_lapse_scoreboard(const history_lapse& h,
 
         ImGui::TableSetColumnIndex(3);
         ImGui::Text("%d", b.regions);
+
+        // The two sampled columns. A polity with no sample at this step — the
+        // record starts on the first decision round, so the opening years have
+        // none — draws a dim dash rather than a zero it never measured.
+        const polity_sample* smp = sample_for(b.owner);
+        ImGui::TableSetColumnIndex(4);
+        if (smp != nullptr)
+        {
+            char pop[24];
+            fmt_population(pop, sizeof pop, smp->population);
+            ImGui::TextUnformatted(pop);
+        }
+        else
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+            ImGui::TextUnformatted("-");
+            ImGui::PopStyleColor();
+        }
+        ImGui::TableSetColumnIndex(5);
+        if (smp != nullptr) ImGui::Text("%d", static_cast<int>(smp->cap_military));
+        else
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+            ImGui::TextUnformatted("-");
+            ImGui::PopStyleColor();
+        }
     }
     ImGui::EndTable();
 
@@ -503,24 +620,63 @@ lapse_arc summarise_lapse_arc(const history_lapse& h)
     lapse_arc out;
     const int stride = h.lapse.region_stride > 0 ? h.lapse.region_stride : 1;
 
-    // Per polity: first holding, peak holding, last holding. `polity` ids are
-    // sparse, so a map keyed by id would iterate in an order the record does not
-    // define — a vector indexed by id keeps this deterministic.
-    std::vector<int> first_r, peak_r, last_r;
-    for (const polity_sample& s : h.lapse.samples)
+    // THE LIVE STRIDE PER STEP (BL-916). Regions are founded all through the
+    // run, so the denominator of a share is how many EXISTED at that step, not
+    // how many the run ended with. Each region's first appearance is its first
+    // ownership change; `changes` is ascending by year, so one forward pointer
+    // over it, advanced step by step, counts the regions live at each step.
+    std::vector<int> live_at_step(h.lapse.steps.size(), stride);
     {
-        const std::size_t id = s.polity;
-        if (id >= first_r.size())
+        std::vector<char> seen(static_cast<std::size_t>(stride), 0);
+        int live = 0;
+        std::size_t ci = 0;
+        for (std::size_t si = 0; si < h.lapse.steps.size(); ++si)
         {
-            first_r.resize(id + 1, -1);
-            peak_r.resize(id + 1, 0);
-            last_r.resize(id + 1, 0);
+            const int32_t sy = h.lapse.steps[si].year;
+            while (ci < h.lapse.changes.size() && h.lapse.changes[ci].year <= sy)
+            {
+                const uint16_t r = h.lapse.changes[ci].region;
+                if (r < seen.size() && !seen[r]) { seen[r] = 1; ++live; }
+                ++ci;
+            }
+            live_at_step[si] = std::max(1, live);
         }
-        const int r = static_cast<int>(s.regions);
-        if (first_r[id] < 0) first_r[id] = r;
-        if (r > peak_r[id])  peak_r[id]  = r;
-        last_r[id] = r;
     }
+
+    // Per polity: first holding, peak holding, last holding, and the peak's
+    // share against the stride live at ITS step. `polity` ids are sparse, so a
+    // map keyed by id would iterate in an order the record does not define — a
+    // vector indexed by id keeps this deterministic.
+    std::vector<int> first_r, peak_r, last_r, peak_q;
+    for (std::size_t si = 0; si < h.lapse.steps.size(); ++si)
+    {
+        const timelapse_step& st = h.lapse.steps[si];
+        for (int k = 0; k < st.sample_count; ++k)
+        {
+            const std::size_t idx = static_cast<std::size_t>(st.first_sample + k);
+            if (idx >= h.lapse.samples.size()) break;
+            const polity_sample& s = h.lapse.samples[idx];
+            const std::size_t id = s.polity;
+            if (id >= first_r.size())
+            {
+                first_r.resize(id + 1, -1);
+                peak_r.resize(id + 1, 0);
+                last_r.resize(id + 1, 0);
+                peak_q.resize(id + 1, 0);
+            }
+            const int r = static_cast<int>(s.regions);
+            if (first_r[id] < 0) first_r[id] = r;
+            if (r > peak_r[id])  peak_r[id]  = r;
+            const int q = (r * 1000) / live_at_step[si];
+            if (q > peak_q[id]) peak_q[id] = q;
+            last_r[id] = r;
+        }
+    }
+
+    // A REALM THAT ENDED is one the sim recorded ending — never one merely
+    // missing from the closing step, which is what every dead realm is.
+    for (const lapse_event& e : h.lapse.events)
+        if (e.kind == static_cast<uint8_t>(lapse_event_kind::realm_ended)) ++out.eliminated;
 
     int biggest_end = 0, smallest_end = 0;
     for (std::size_t id = 0; id < first_r.size(); ++id)
@@ -528,11 +684,19 @@ lapse_arc summarise_lapse_arc(const history_lapse& h)
         if (first_r[id] < 0) continue;       // never seen
         if (peak_r[id] <= 0) continue;       // never held ground
         ++out.polities;
+        if (peak_q[id] > out.peak_share_q) out.peak_share_q = peak_q[id];
 
-        const int pq = (peak_r[id] * 1000) / stride;
-        if (pq > out.peak_share_q) out.peak_share_q = pq;
-
-        if (last_r[id] <= 0) { ++out.eliminated; continue; }
+        // A polity absent from the closing step ended before it; its end is
+        // already counted above and it has no closing standing.
+        const timelapse_step& last = h.lapse.steps.back();
+        bool at_end = false;
+        for (int k = 0; k < last.sample_count; ++k)
+        {
+            const std::size_t idx = static_cast<std::size_t>(last.first_sample + k);
+            if (idx < h.lapse.samples.size() && h.lapse.samples[idx].polity == id)
+            { at_end = true; break; }
+        }
+        if (!at_end || last_r[id] <= 0) continue;
 
         // THE SWEEP'S OWN SHAPE TEST: doubled AND gained at least three
         // regions, then ended at or under 60% of the peak.
@@ -575,6 +739,120 @@ void draw_lapse_arc(const history_lapse& h)
         ImGui::TextWrapped("At the end the greatest holds %d%%, the least %d region%s.",
                            a.biggest_end_q / 10, a.smallest_end,
                            a.smallest_end == 1 ? "" : "s");
+        ImGui::PopStyleColor();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BL-916 -- the ticker, and the prose each event is phrased as
+// ---------------------------------------------------------------------------
+//
+// THE MOMENTS ARE PART OF THE TIME-LAPSE (Ben, 2026-09-11). A colour flipping
+// on the map is a fact with no cause; these lines are the cause, dated and
+// placed, in the order they happened. Every noun is a generated region name off
+// the record's own table — the seat a polity rose from names the polity, exactly
+// as the board names it — so nothing here can be an Earth name.
+
+std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
+{
+    char buf[256];
+    const char* R = region_name_of(h, e.region);
+    switch (static_cast<lapse_event_kind>(e.kind))
+    {
+    case lapse_event_kind::founded:
+        std::snprintf(buf, sizeof buf, "A realm rises at %s.", R);
+        break;
+    case lapse_event_kind::seat_captured:
+        std::snprintf(buf, sizeof buf, "%s, seat of %s, falls to %s.",
+                      R, polity_name_of(h, e.other), polity_name_of(h, e.polity));
+        break;
+    case lapse_event_kind::realm_ended:
+        if (e.other == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "The realm of %s ends.", polity_name_of(h, e.polity));
+        else
+            std::snprintf(buf, sizeof buf, "The realm of %s ends; %s takes its last ground at %s.",
+                          polity_name_of(h, e.polity), polity_name_of(h, e.other), R);
+        break;
+    case lapse_event_kind::broke_away:
+        std::snprintf(buf, sizeof buf, "%s breaks away from %s.",
+                      R, polity_name_of(h, e.other));
+        break;
+    case lapse_event_kind::capital_moved:
+        std::snprintf(buf, sizeof buf, "%s re-seats itself at %s.",
+                      polity_name_of(h, e.polity), R);
+        break;
+    case lapse_event_kind::road_promoted:
+        std::snprintf(buf, sizeof buf, "A %s is laid between %s and %s.",
+                      e.polity >= 2 ? "road" : "track", R, region_name_of(h, e.other));
+        break;
+    case lapse_event_kind::civilisation_formed:
+        std::snprintf(buf, sizeof buf, "Two peoples settle a shared way of life at %s.", R);
+        break;
+    case lapse_event_kind::creed_preached:
+        std::snprintf(buf, sizeof buf, "A creed is preached at %s, and claims every people.", R);
+        break;
+    case lapse_event_kind::culture_split:
+        if (e.region == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "A new people parts from its kin on the march.");
+        else
+            std::snprintf(buf, sizeof buf, "A new people parts from its kin at %s.", R);
+        break;
+    default:
+        std::snprintf(buf, sizeof buf, "Something happens at %s.", R);
+        break;
+    }
+    return lapse_year_label(e.year) + "  " + buf;
+}
+
+void draw_lapse_ticker(const history_lapse& h, int year, int max_rows)
+{
+    if (h.lapse.events.empty() || max_rows <= 0) return;
+
+    // The last event at or before the playhead: one binary search over the
+    // ascending list, then up to `max_rows` NARRATED events back from it.
+    int lo = 0, hi = static_cast<int>(h.lapse.events.size()) - 1, last = -1;
+    while (lo <= hi)
+    {
+        const int mid = lo + (hi - lo) / 2;
+        if (h.lapse.events[static_cast<std::size_t>(mid)].year <= year) { last = mid; lo = mid + 1; }
+        else hi = mid - 1;
+    }
+
+    // ROADS ARE RINGED, NOT NARRATED. A road promotion is the commonest event
+    // by far — on a full-span world they outnumber every other kind together —
+    // and a ticker that prints them shows nothing else for the last centuries
+    // of the replay (measured on the first capture: eight road lines, no
+    // realm). They still pulse on the map; the ticker is for the moments of
+    // the ARC, which is what the round exists to show.
+    const auto narrated = [](const lapse_event& e) {
+        return e.kind != static_cast<uint8_t>(lapse_event_kind::road_promoted);
+    };
+
+    ImGui::SeparatorText("As it happened");
+    std::vector<int> rows; // Indices, newest last.
+    for (int i = last; i >= 0 && static_cast<int>(rows.size()) < max_rows; --i)
+        if (narrated(h.lapse.events[static_cast<std::size_t>(i)])) rows.push_back(i);
+    if (rows.empty())
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+        ImGui::TextUnformatted("Nothing yet.");
+        ImGui::PopStyleColor();
+        return;
+    }
+    std::reverse(rows.begin(), rows.end());
+
+    const float avail = ImGui::GetContentRegionAvail().x;
+    for (std::size_t k = 0; k < rows.size(); ++k)
+    {
+        const int i = rows[k];
+        const std::string line = lapse_event_prose(h, h.lapse.events[static_cast<std::size_t>(i)]);
+        // The newest line is the one the marker on the map belongs to.
+        ImGui::PushStyleColor(ImGuiCol_Text, k + 1 == rows.size() ? col_bright : col_dim);
+        // Elided and RECORDED (BL-714): a long generated name in a narrow
+        // column is the shape that overruns, and a wrapped ticker would push
+        // the board off the fold.
+        ui::fit_text(text_box::table_cell, "wizard.round4.ticker", line.c_str(),
+                     std::max(24.0f, avail));
         ImGui::PopStyleColor();
     }
 }

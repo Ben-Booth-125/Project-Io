@@ -1600,7 +1600,7 @@ struct polity
     /// index into `history_sim_state::polities`, or -1 where the sim records
     /// no parent (every seeded polity; every polity born by any route other
     /// than the BL-896 secession block, which is the only site that writes
-    /// it today). A RECORD, never a decision input: nothing in the loop reads
+    /// it today; BL-916 names a successor "X, broken from Y" off it). A RECORD, never a decision input: nothing in the loop reads
     /// it. NOT SERIALISED — `polity` does not cross the save seam (only
     /// `polity_sample` does, era_timelapse.hpp), so no flat-binary path is
     /// owed. The sweep's per-polity table prints '-' when this is -1.
@@ -1982,6 +1982,13 @@ struct history_sim_state
     std::vector<timelapse_step>  steps;
     std::vector<polity_sample>   samples;
     std::vector<culture_change>  culture_changes;
+
+    /// THE EVENT LAYER (BL-916) — the named moments, typed, appended at the
+    /// sites that already push a prose line into `history`. Ascending by year.
+    /// Same discipline as the three above: written by the sim, read by nothing
+    /// in it, empty when `params.record_playback` is false. See
+    /// era_timelapse.hpp § The event layer for the kinds.
+    std::vector<lapse_event>     events;
 
     /// THE ANCIENT ROAD RECORD (BL-768) — every region-to-region corridor the
     /// history actually moved along, deduplicated and counted.
@@ -2392,6 +2399,12 @@ inline int64_t playback_record_bytes(const history_sim_state& s)
          + static_cast<int64_t>(s.culture_changes.size()) * static_cast<int64_t>(sizeof(culture_change));
 }
 
+/// Bytes the EVENT LAYER occupies (BL-916). Disjoint from the two above.
+inline int64_t event_record_bytes(const history_sim_state& s)
+{
+    return static_cast<int64_t>(s.events.size()) * static_cast<int64_t>(sizeof(lapse_event));
+}
+
 /// Materialise the ownership map as it stood at the END of @p year — the
 /// time-lapse read. Returns `region_stride` entries, `owner_none` where the
 /// region did not exist yet or was unowned.
@@ -2410,6 +2423,7 @@ inline era_timelapse as_timelapse(const history_sim_state& s)
     t.steps           = s.steps;
     t.samples         = s.samples;
     t.culture_changes = s.culture_changes;
+    t.events          = s.events;
     t.region_stride = s.region_stride;
     t.start_year    = static_cast<int32_t>(s.start_year);
     t.years         = static_cast<int32_t>(s.years);

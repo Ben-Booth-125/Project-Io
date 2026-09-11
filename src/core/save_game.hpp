@@ -124,7 +124,16 @@ inline constexpr uint32_t save_game_magic =
 /// why that matters: two items each bumping "the next number" in separate
 /// worktrees produce two on-disk layouts sharing one version, each readable
 /// only by the build that wrote it.
-inline constexpr uint32_t save_game_version = 12; // BL-839, the TURBULENCE LEAN on world_preferences
+///
+/// LAYOUT 13 = LAYOUT 12 PLUS ONE VECTOR AT THE TAIL OF EVERY TIME-LAPSE
+/// (BL-916, the event layer): `era_timelapse::events`, written after the
+/// culture-change list by `w_timelapse` and read back in the same place by
+/// `r_timelapse` with a range check on the kind byte. A v12 stream has no
+/// length prefix where v13 expects one, so it is refused whole on the same
+/// strict-equality contract; there is no "older saves read an empty list" path
+/// because there is no partial read at all — an unversioned tail would be read
+/// as the NEXT body entry's name length.
+inline constexpr uint32_t save_game_version = 13; // BL-916, the EVENT LAYER on era_timelapse
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

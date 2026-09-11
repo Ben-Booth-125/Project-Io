@@ -142,6 +142,59 @@ struct timelapse_step
     int32_t sample_count = 0; ///< Samples belonging to this step.
 };
 
+// ---------------------------------------------------------------------------
+// The event layer (BL-916)
+// ---------------------------------------------------------------------------
+//
+// THE MOMENTS OF THE ARC ARE PART OF THE TIME-LAPSE, not outcomes read off at
+// the end (Ben, 2026-09-11; CIVILISATION.md § The arc is watched, not read off
+// at the end). The three records above can show WHERE the colour moved and WHO
+// led; they cannot say WHY a colour flipped. A secession and a conquest are the
+// same ownership change on the map, and a realm ending is a polity simply
+// missing from the next step's samples — which is how "0 destroyed" was read
+// off a world in which a dozen powers had fallen.
+//
+// So the sim also records the NAMED MOMENTS, typed, at the sites where it
+// already pushes a prose line. Delta / append only, ascending by year, and a
+// pure record in the sense every other array here is: nothing in world/* reads
+// an event back, no field feeds a decision or a draw, and the list is suppressed
+// together with the playback record by `record_playback` so the harness can
+// hold a recorded and a suppressed run bit-identical on every other output.
+//
+// INTEGER ONLY and five fields wide, so the whole list is a flat array that
+// serialises with no strings in it. Names are resolved on the READ side from the
+// region index — the region table already carries a generated, in-world name
+// for every region, and a polity is named by its seat there too.
+
+/// What happened. The `other` field's meaning depends on the kind; see each.
+/// Values are the wire form — append only, never renumber.
+enum class lapse_event_kind : uint8_t
+{
+    founded             = 0, ///< A polity came into being; `region` = its seat.
+    seat_captured       = 1, ///< A seat changed hands by conquest; `other` = the loser.
+    realm_ended         = 2, ///< A polity lost its last ground; `other` = the killer.
+    broke_away          = 3, ///< A successor seceded; `other` = the parent polity.
+    capital_moved       = 4, ///< A polity re-seated; `other` = the OLD capital region.
+    road_promoted       = 5, ///< A corridor crossed a tier; `region`/`other` = its ends, `polity` = the tier.
+    civilisation_formed = 6, ///< Two peoples settled a shared way of life; `other` = the civilisation index.
+    creed_preached      = 7, ///< A universal creed arose; `other` = the creed index.
+    culture_split       = 8, ///< The migration coined a daughter people; `polity` = the daughter culture, `other` = its parent culture.
+    count
+};
+
+/// No party in this slot — a founding has no killer, a cradle culture no parent.
+inline constexpr uint16_t lapse_event_none = 0xFFFFu;
+
+/// One named moment. Ascending by year in `era_timelapse::events`.
+struct lapse_event
+{
+    int32_t  year   = 0;
+    uint8_t  kind   = 0;                ///< `lapse_event_kind`, as its wire byte.
+    uint16_t region = lapse_event_none; ///< Where — the region the moment is pinned to.
+    uint16_t polity = lapse_event_none; ///< Whose — the acting or affected polity (a tier / culture for two kinds).
+    uint16_t other  = lapse_event_none; ///< The counterparty, per kind.
+};
+
 /// The recorded Era -1 ownership history of one body: everything the Ages view
 /// needs to replay it, and nothing else.
 ///
@@ -164,6 +217,11 @@ struct era_timelapse
     std::vector<polity_sample>   samples;
     std::vector<culture_change>  culture_changes;
 
+    /// THE EVENT LAYER (BL-916) — the named moments, ascending by year. Empty
+    /// with `record_playback` off and on every body the era never ran for; the
+    /// migration record carries `culture_split` alone.
+    std::vector<lapse_event>     events;
+
     /// Ownership alone. The playback record can be present with no ownership
     /// change ever recorded, and a caller replaying colour wants to know about
     /// exactly that, so this stays the ownership question it always was.
@@ -177,6 +235,13 @@ struct era_timelapse
         return static_cast<int64_t>(steps.size())           * static_cast<int64_t>(sizeof(timelapse_step))
              + static_cast<int64_t>(samples.size())         * static_cast<int64_t>(sizeof(polity_sample))
              + static_cast<int64_t>(culture_changes.size()) * static_cast<int64_t>(sizeof(culture_change));
+    }
+
+    /// Bytes the event layer occupies — the quantity BL-916 bounds, disjoint
+    /// from the two figures above so the three add.
+    int64_t event_bytes() const
+    {
+        return static_cast<int64_t>(events.size()) * static_cast<int64_t>(sizeof(lapse_event));
     }
 };
 
