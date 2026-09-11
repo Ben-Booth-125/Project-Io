@@ -1937,6 +1937,53 @@ history_sim_state run_history_sim(settlement_state&         ss,
             int      best_campaign_score  = 0;
             bool     campaign_cleared_now = false;
 
+            // -- BL-838: FEAR OF BEING NEXT, the decider's side of it -------
+            //
+            // AI_OPPONENT.md sec 11, the grant "The Era -1 scorer may read the
+            // GRUDGE LEDGER, scoped to fear of annihilation" (Ben, 2026-09-11).
+            // Until that grant the rule written at the grudge field itself was
+            // absolute -- nothing in this sim reads a grudge to make a
+            // decision -- so this lambda is the ONE place the ledger is read
+            // for a decision, and everything it refuses to read is as much the
+            // specification as what it reads.
+            //
+            // WHAT IT ANSWERS: how much have people LIKE ME suffered at this
+            // polity's hands. Third-party grudges only, kin-filtered.
+            //
+            //   - `g.from == q.id` IS SKIPPED. D reading its own ledger to pick
+            //     a target is the revenge term BL-827 declined and the grant
+            //     explicitly excludes; it is a term inside the actor rather
+            //     than a fact about the world. Without this line the mechanism
+            //     would still "work" and would be the wrong mechanism.
+            //   - NOTHING HERE TOUCHES SIZE, RANK, holdings, population or
+            //     army. The whole input is the ledger, which is a record of
+            //     what the target DID, with a place and a date attached to
+            //     every contributing event -- which is exactly why a coalition
+            //     forming here is explicable on the map and a rank term is not.
+            //   - The kin filter is `culture`, the sim's only notion of "a
+            //     people like me", and the same one `extinguish_polity` walks
+            //     for `realm_ended`. It is not an alliance: nobody agrees to
+            //     anything, nobody is told, and each polity reaches the same
+            //     conclusion separately from public facts.
+            //
+            // CACHED PER ROUND, per polity, because the table is scanned
+            // linearly and one polity may score many targets in a year. The
+            // cache is declared HERE, inside the round, so it cannot outlive a
+            // year in which the ledger moves. The scan order is the sorted
+            // (from, to) order of `out.grudges`, so the sum is a property of
+            // the integers in the table and not of any container's layout.
+            std::vector<int> fear_cache;
+            const auto fear_here = [&](int target) -> int
+            {
+                if (params.w_fear_q == 0) return 0;
+                if (fear_cache.empty())
+                    fear_cache.assign(out.polities.size(), -1);
+                if (target < 0 || target >= static_cast<int>(fear_cache.size())) return 0;
+                int& slot = fear_cache[static_cast<std::size_t>(target)];
+                if (slot < 0) slot = fear_of_next_q(out, params, q.id, target);
+                return slot;
+            };
+
             // -- Campaign --------------------------------------------------
             for (int hi : held)
             {
@@ -2226,6 +2273,42 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int cult_q =
                             (clampi(cult_w, 0, 1000) * clampi(foreign_q, 0, 1000)) / 1000;
                         value = (value * (1000 - cult_q)) / 1000;
+                    }
+
+                    // BL-838 -- FEAR OF BEING NEXT, leaning the prize upward
+                    // in proportion to what this target has done to peoples
+                    // like the one deciding. Same idiom as `w_cult`, `w_dist`
+                    // and `w_aggr_q`: one term reads a richer input instead of
+                    // a second term being added beside the score.
+                    //
+                    // ONE-SIDED AND APPLIED ONCE. One-sided because a grudge
+                    // ledger's neutral is the ABSENCE of a record and there is
+                    // no "fewer than no wrongs done" to lean the other way --
+                    // so a blameless target scores exactly what it scored
+                    // before this term existed, which is what "a large but
+                    // peaceful polity attracts no coalition" has to mean.
+                    // Applied once, HERE rather than inside the season loop,
+                    // because both seasons score the same objective against the
+                    // same ledger and the fear is a property of the target, not
+                    // of the campaigning weather.
+                    if (params.w_fear_q != 0)
+                    {
+                        const int fear_q = fear_here(to);
+                        if (fear_q > 0)
+                        {
+                            const int lean = (params.w_fear_q * fear_q) / 1000;
+                            value = value + (value * lean) / 1000;
+                            if (value < 0) value = 0;
+                            ++out.fear_leaned_campaigns;
+                            const uint16_t tid = static_cast<uint16_t>(to);
+                            const auto fit = std::lower_bound(
+                                out.fear_targets_seen.begin(),
+                                out.fear_targets_seen.end(), tid);
+                            if (fit == out.fear_targets_seen.end() || *fit != tid)
+                                out.fear_targets_seen.insert(fit, tid);
+                            out.fear_targets_distinct =
+                                static_cast<int64_t>(out.fear_targets_seen.size());
+                        }
                     }
 
                     // Season as an action axis: summer and winter are two
@@ -3883,6 +3966,34 @@ int grudge_between(const history_sim_state& s, int from, int to)
         });
     if (it != s.grudges.end() && it->from == f && it->to == t) return it->score;
     return 0;
+}
+
+int fear_of_next_q(const history_sim_state& s, const history_sim_params& p,
+                   int decider, int target)
+{
+    if (decider < 0 || target < 0 || decider == target) return 0;
+    if (decider >= static_cast<int>(s.polities.size())) return 0;
+    if (target  >= static_cast<int>(s.polities.size())) return 0;
+    const int kin_culture = s.polities[static_cast<std::size_t>(decider)].culture;
+    if (kin_culture < 0) return 0;
+    const uint16_t tid  = static_cast<uint16_t>(target);
+    const uint16_t self = static_cast<uint16_t>(decider);
+    int64_t total = 0;
+    // The scan order is the SORTED (from, to) order of the table, so the sum is
+    // a property of the integers in it and not of any container layout.
+    for (const grudge& g : s.grudges)
+    {
+        if (g.to != tid) continue;
+        if (g.from == self) continue; // THE REVENGE EXCLUSION -- the grant's, not an optimisation.
+        const std::size_t fi = static_cast<std::size_t>(g.from);
+        if (fi >= s.polities.size()) continue;
+        const polity& kin = s.polities[fi];
+        if (!kin.alive) continue;
+        if (kin.culture != kin_culture) continue;
+        total += g.score;
+    }
+    return static_cast<int>(clampi64(
+        (total * 1000) / std::max(1, p.fear_reference), 0, 1000));
 }
 
 std::vector<grudge> top_grudges(const history_sim_state& s, int n)

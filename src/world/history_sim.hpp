@@ -1007,6 +1007,59 @@ struct history_sim_params
     /// seeded, deterministic, replayable, only legal verbs, never a planner.
     int w_aggr_q = 0;
 
+    /// FEAR OF BEING NEXT, LEANING THE CAMPAIGN SCORE (BL-838; AI_OPPONENT.md
+    /// sec 11, the grant "The Era -1 scorer may read the GRUDGE LEDGER, scoped
+    /// to fear of annihilation", Ben, 2026-09-11). Per-mille pull. Zero
+    /// disables it, and zero is the struct default, so no existing fixture
+    /// changes meaning.
+    ///
+    /// THE QUESTION IT ASKS IS "WILL OTHERS ATTACK ME FOR FEAR OF BEING WIPED
+    /// OUT NEXT". When polity D scores a campaign against polity A, it reads
+    /// the grudges held AGAINST A BY THIRD PARTIES OF D'S OWN PEOPLE -- what A
+    /// has demonstrably done to peoples like D -- and leans the prize upward in
+    /// proportion. A becomes a target because of its BEHAVIOUR.
+    ///
+    /// THE THREE EXCLUSIONS ARE THE GRANT, NOT AN IMPLEMENTATION CHOICE, and
+    /// each of them is load-bearing:
+    ///   - D NEVER READS ITS OWN GRUDGE against A. That is the revenge term
+    ///     BL-827 declined -- a term inside the actor rather than a fact about
+    ///     the world -- so `from == D` is skipped explicitly in `fear_of_next_q`.
+    ///   - NOTHING HERE READS SIZE OR RANK. "The largest polity" is not the
+    ///     trigger; "the polity that has been doing this to people like me" is.
+    ///     A quiet reimplementation as a size coefficient would pass every
+    ///     obvious check and violate the exact rule this grant exists to
+    ///     satisfy, which is why the check is behavioural: a large but PEACEFUL
+    ///     polity must attract no lean, a smaller AGGRESSIVE one must.
+    ///   - NO TREATIES, NEGOTIATION OR ALLIANCE OBJECTS. This is a fear
+    ///     response inside a generation sim, not a diplomacy layer, and
+    ///     BL-827's two unbuilt grudge kinds stay unbuilt.
+    ///
+    /// ONE-SIDED, WHERE `w_aggr_q` IS SYMMETRIC, and that is deliberate rather
+    /// than an omission. `aggression_q` has a genuine neutral at 500 with a
+    /// meaningful half below it, so leaning both ways says something true. A
+    /// grudge ledger's neutral is ZERO -- the absence of a record -- and there
+    /// is no "less than no wrongs done". Leaning a blameless target DOWN would
+    /// be a peace bonus nobody granted, and it would make the peaceful-polity
+    /// half of the check pass for the wrong reason. So a clean target is
+    /// UNCHANGED from baseline, which is what "attracts no coalition" means.
+    ///
+    /// SAME IDIOM AS `w_cult`, `w_dist` AND `w_aggr_q`: a proportional lean on
+    /// a value that already exists, never a new term added beside the score.
+    int w_fear_q = 0;
+
+    /// The grudge total, summed across D's aggrieved kin, that counts as FULL
+    /// fear -- the denominator that turns an unbounded ledger sum into the
+    /// 0-1000 currency every other lean in this file speaks.
+    ///
+    /// A PLACEHOLDER MAGNITUDE on the same footing as the `w_*` weights and
+    /// `grudge_ground_taken` beside it. 2000 is roughly two sacked seats, or
+    /// seven taken regions, held recently enough to have survived
+    /// `grudge_decay_per_year_q` -- i.e. a polity in the middle of a career of
+    /// conquest against this people, not one that fought a war once. Raising it
+    /// makes fear rarer and later; lowering it makes every border raid read as
+    /// an existential threat.
+    int fear_reference = 2000;
+
     /// Severity of the sack a conquered region suffers, per-mille.
     ///
     /// BL-835 — THIS IS NOW AN URBAN QUANTITY ONLY. It used to be subtracted
@@ -1730,6 +1783,28 @@ struct history_sim_state
     /// differ here first, before either differs in battles.
     int64_t reach_denied_campaigns = 0;
 
+    // --- BL-838: fear of being next ----------------------------------------
+    //
+    // REPORTED, NEVER GATED. Both are bookkeeping: nothing reads them to make
+    // a decision, so a run is byte-identical whether they are examined or not.
+
+    /// Campaign CANDIDATES whose score was leaned by `w_fear_q` -- i.e. the
+    /// target carried a non-zero grudge total among the decider's own people.
+    /// Zero on a world where nobody has yet done anything to anybody, and on
+    /// every world at the struct default, where `w_fear_q` is 0.
+    int64_t fear_leaned_campaigns = 0;
+
+    /// DISTINCT polities that attracted at least one such lean. Read WITH the
+    /// count above and not instead of it: a large figure here with a small one
+    /// above is diffuse resentment, the reverse is one realm everybody fears,
+    /// and only the second is the coalition this item is about.
+    int64_t fear_targets_distinct = 0;
+
+    /// The ids behind `fear_targets_distinct`, kept SORTED and unique so the
+    /// count is a property of the integers in it rather than of an insertion
+    /// order -- the same discipline `grudges` itself is held to.
+    std::vector<uint16_t> fear_targets_seen;
+
     /// Years in which a standing garrison's own ground could not supply it
     /// (`sustainable_garrison_floor_q`) and its `army_stock` attrited as a
     /// result — "an army beyond sustainable reach cannot be maintained",
@@ -2024,6 +2099,26 @@ int grudge_between(const history_sim_state& s, int from, int to);
 /// on (from, to). A TOTAL order with an explicit tie-break, so the listing is
 /// identical on every machine — the same discipline the scorer's argmax uses.
 std::vector<grudge> top_grudges(const history_sim_state& s, int n);
+
+/// BL-838 -- FEAR OF BEING NEXT, in the 0-1000 currency every lean in this file
+/// speaks. "How much have people LIKE `decider` suffered at `target`'s hands",
+/// read from the sparse grudge ledger and normalised by
+/// `history_sim_params::fear_reference`.
+///
+/// A FREE FUNCTION RATHER THAN A LAMBDA INSIDE THE SCORER so the rule can be
+/// asserted directly. The scope of AI_OPPONENT.md sec 11's 2026-09-11 grant is
+/// behavioural, not structural -- a large but PEACEFUL polity must attract no
+/// coalition while a smaller AGGRESSIVE one does -- and that is a claim about
+/// THIS function, which history_sweep's F-checks put to it on a hand-built
+/// ledger rather than inferring it from a run's aggregates.
+///
+/// Sums the grudges held against `target` by LIVING polities of `decider`'s own
+/// culture, EXCLUDING `decider` itself. The exclusion is the grant's, not an
+/// optimisation: a polity reading its own ledger to pick a target is the
+/// revenge term BL-827 declined. Nothing here reads size, rank, holdings,
+/// population or army.
+int fear_of_next_q(const history_sim_state& s, const history_sim_params& p,
+                   int decider, int target);
 
 /// One line naming a grudge event: what, where, when. The printable half of
 /// "it must carry its cause".

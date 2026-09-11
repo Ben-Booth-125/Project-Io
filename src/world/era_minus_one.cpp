@@ -150,6 +150,16 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // sits beside -- the SHAPE is the ruling, history_sweep tunes the number.
     hp.w_aggr_q = 300;
 
+    // BL-838: fear of being next. Switched ON for generation's own round --
+    // struct-default OFF, so every isolating fixture in the repo keeps its
+    // meaning and only the real world runs it. The grant it stands on is
+    // AI_OPPONENT.md sec 11 (Ben, 2026-09-11) and the whole of its scope is
+    // third-party grudges: a polity is feared for what it has DONE, never for
+    // how large it is. Placeholder magnitudes like the w_* beside them -- the
+    // SHAPE is the ruling, history_sweep tunes the numbers.
+    hp.w_fear_q       = 400;
+    hp.fear_reference = 2000;
+
     if (two_span)
     {
         // 1160 -> 1560 -> 1960 at the defaults. The ancient span is
