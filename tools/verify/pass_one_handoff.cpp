@@ -581,7 +581,17 @@ int main()
         // in the grudge table's own shape.
         check(o.contacts.size() == war.contacts.size(),
               "C7i  contact crosses with the rest, in the same handoff");
-        check(!o.contacts.empty(),
+        // C7j READS THE REAL FIXTURE, NOT THE SYNTHETIC STRIP (same reasoning
+        // as BL-902's C5/C4b/C6b repoints, same file, same root cause): the
+        // strip's `war` fixture leaves loser_id == -1 on its conquests, so it
+        // can never raise a contact pair no matter how the contact code is
+        // written. That is a fixture defect, not something this row should
+        // assert past by tuning the strip -- reading the real generation is
+        // the fix the sibling rows already took, and BL-908's own C7i/C7k
+        // pass on the SAME strip, so only the "a war leaves a contact" claim
+        // -- which needs a real loser -- moves fixtures.
+        const pass_one_output real_o = make_pass_one_output(real_ss, real_hs, /*culture_count=*/3);
+        check(!real_o.contacts.empty(),
               "C7j  a war between neighbours leaves at least one contact pair");
         bool contact_symmetric = true;
         for (const contact& c : o.contacts)
@@ -604,6 +614,8 @@ int main()
         }
         std::printf("      contact pairs: %d   unmet pair among living polities: %s\n",
                     static_cast<int>(o.contacts.size()), unmet_pair ? "yes" : "no");
+        std::printf("      real-fixture contact pairs: %d\n",
+                    static_cast<int>(real_o.contacts.size()));
         check(o.start_year == war_p.start_year && o.stop_year == war_p.stop_year,
               "C7f  the span crosses with the record it describes");
 
