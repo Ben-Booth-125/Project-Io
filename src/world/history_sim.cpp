@@ -2484,6 +2484,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         }
                     }
 
+                    // BL-868 -- THE CREED'S APPETITE, leaning the value the
+                    // score is built from. Symmetric around a neutral 500 so
+                    // a peaceable people is discouraged exactly as much as a
+                    // warlike one is encouraged, and proportional so it
+                    // scales with the prize rather than swamping it. Applied
+                    // to `value` for the same reason w_cult is: one term
+                    // reads a richer input instead of a second term being
+                    // added beside the score. `q.aggression_q` already carries
+                    // BL-839's turbulence lean (`leaned_aggression_q`), so this
+                    // site reads it as-is.
+                    //
+                    // APPLIED ONCE, OUTSIDE THE SEASON LOOP (BL-927, NR-831).
+                    // The creed's appetite is a property of the DECIDER, not of
+                    // the campaigning weather, so summer and winter must read
+                    // the same leaned value -- the same rule the fear lean above
+                    // follows. Sited inside the loop it re-leaned the already-
+                    // leaned summer value for winter (x1.30 became x1.69 at
+                    // w_aggr_q = 300), a squaring nobody wrote down.
+                    if (params.w_aggr_q != 0)
+                    {
+                        const int lean =
+                            (params.w_aggr_q * (clampi(q.aggression_q, 0, 1000) - 500)) / 500;
+                        value = value + (value * lean) / 1000;
+                        if (value < 0) value = 0;
+                    }
+
                     // Season as an action axis: summer and winter are two
                     // candidates over the same objective, not two ticks.
                     //
@@ -2500,21 +2526,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int def_ready = winter ? (1000 - params.winter_readiness_penalty_q) : 1000;
                         const int def_eff   = (def_scaled * def_ready) / 1000;
 
-                        // BL-868 -- THE CREED'S APPETITE, leaning the value the
-                        // score is built from. Symmetric around a neutral 500 so
-                        // a peaceable people is discouraged exactly as much as a
-                        // warlike one is encouraged, and proportional so it
-                        // scales with the prize rather than swamping it. Applied
-                        // to `value` for the same reason w_cult is: one term
-                        // reads a richer input instead of a second term being
-                        // added beside the score.
-                        if (params.w_aggr_q != 0)
-                        {
-                            const int lean =
-                                (params.w_aggr_q * (clampi(q.aggression_q, 0, 1000) - 500)) / 500;
-                            value = value + (value * lean) / 1000;
-                            if (value < 0) value = 0;
-                        }
                         int s = value - (params.w_def * def_eff) / 2000;
                         if (winter) s -= params.winter_score_premium_q;
                         if (params.trace_battles) ++out.campaign_scored;
