@@ -203,6 +203,12 @@ THE FIVE CALLS, TAKEN 2026-09-11 (Ben, form): city states spawn in regions above
 - BL-936
 - BL-937
 - BL-938
+- BL-939
+- BL-940
+- BL-941
+- BL-942
+- BL-943
+- BL-944
 
 **Done when.** The span runs 1200 -> 1660 on the shared engine; the ten readings in EXPLORATION.md sec What the phase is judged on are instrumented and taken over a seed spread; the displacement ratio moves in the right direction with total conflict still well above zero; and both a consolidator and an expansionist appear among the strongest realms in a sweep, each traceable to its creed.
 
@@ -284,7 +290,7 @@ RENUMBERED FROM 39 TO 40 (Ben, 2026-09-11): sprint 39 was reassigned to a lever-
 | 40 | three trees, one grammar | CLOSED 2026-09-10, the same day it opened, as a DESIGN sprint: the three trees, the grammar, the lint and the Empire scorer are written and linted; the six build items BL-881..BL-886 go to the pool. Ben: "I'm reluctant to push further when Empire and Industry have not landed yet" - the build waits on sprints 38 and 39. |
 | 38 | empire — the whole phase | 8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). REFRAMED 2026-09-10 on Ben's call (option B): the sprint no longer closes on BL-868's harness, but on a DISTRIBUTIONAL reading of history_sweep. The sweep was run and the reading is in: conflict is fixed, asymmetry and volatility are not. BL-889, BL-890, BL-891 and BL-892 were added to the sprint on that basis; BL-868 is now blocked on BL-889. |
 | 39 | the drama of the time-lapse | OPEN. Redefined 2026-09-11 (Ben) from "tighten the levers" to the DRAMA of generation: the political map is highly stable and empires never fragment back into city states, and the rounds render a computed record after the fact. Sixteen items filed off a holistic read of the generation layer (seven parallel readers, 67 stability claims adversarially checked); five design calls resolved on the form 2026-09-11 (NR-835..NR-839). Batch-delivered in one go. |
-| 40 | exploration | DESIGNED AND DECOMPOSED 2026-09-11. Nine items, BL-930..BL-938. The phase doc, the placeholder for digitisation, and a linting mock-up of the fourth technology tree all exist; nothing is built. BL-930 (exploration tree) and BL-931 (the span runs) gate the rest. |
+| 40 | exploration | DESIGNED AND DECOMPOSED 2026-09-11. Fifteen items, BL-930..BL-944 (BL-945 filed but PARKED for digitisation). The phase doc, the digitisation placeholder and a linting mock-up of the fourth technology tree all exist; nothing is built. SEQUENCE: BL-937 (readings) FIRST, then BL-930/BL-931, then the quantities (BL-932, BL-939, BL-940), then the mechanisms that read them. |
 
 **Next up.** SPRINT 39 IS OPEN (redefined 2026-09-11) - the drama of the time-lapse. Sixteen items filed (BL-914..BL-929, BL-928 sprintless); the five calls (NR-835..NR-839) are resolved. Batch-deliver in one go: BL-926 first, then the independent wave, then the dependents, BL-923 last. Sprint 38 is closed for real (2026-09-11); sprint 40 (the new world) waits on what this sprint leaves unorganised.
 

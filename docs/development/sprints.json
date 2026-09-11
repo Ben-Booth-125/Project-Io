@@ -181,7 +181,7 @@
    "id": "40",
    "theme": "exploration",
    "state": "open",
-   "status_line": "DESIGNED AND DECOMPOSED 2026-09-11. Nine items, BL-930..BL-938. The phase doc, the placeholder for digitisation, and a linting mock-up of the fourth technology tree all exist; nothing is built. BL-930 (exploration tree) and BL-931 (the span runs) gate the rest.",
+   "status_line": "DESIGNED AND DECOMPOSED 2026-09-11. Fifteen items, BL-930..BL-944 (BL-945 filed but PARKED for digitisation). The phase doc, the digitisation placeholder and a linting mock-up of the fourth technology tree all exist; nothing is built. SEQUENCE: BL-937 (readings) FIRST, then BL-930/BL-931, then the quantities (BL-932, BL-939, BL-940), then the mechanisms that read them.",
    "opened_date": "2026-09-11",
    "closed_date": null,
    "author": "Ben (2026-09-11, Exploration design session); Claude (decomposed from EXPLORATION.md)",
@@ -195,7 +195,13 @@
     "BL-935",
     "BL-936",
     "BL-937",
-    "BL-938"
+    "BL-938",
+    "BL-939",
+    "BL-940",
+    "BL-941",
+    "BL-942",
+    "BL-943",
+    "BL-944"
    ],
    "risk": "THE FROZEN MAP. Every mechanism in this phase damps conflict near home -- treaties, deterrence, the arms race -- and the obvious failure is to damp it everywhere and hand digitisation a world that stopped moving. CIVILISATION.md's handoff requires FRAGMENTATION, not peace. BL-937 exists to make that visible before any dial is touched, and it should land EARLY rather than last.\n\nSECOND RISK: the phase rewarding one strategy. EXPLORATION.md sec Two ways to be strong is the answer, and it rests on an untested claim -- that a creed's zeal, dominion and sea_legs_q actually separate consolidators from expansionists. If a sweep says they do not, the fix is upstream in the Empire phase, never a flag in this one.",
    "done_when": "The span runs 1200 -> 1660 on the shared engine; the ten readings in EXPLORATION.md sec What the phase is judged on are instrumented and taken over a seed spread; the displacement ratio moves in the right direction with total conflict still well above zero; and both a consolidator and an expansionist appear among the strongest realms in a sweep, each traceable to its creed.",
