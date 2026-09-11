@@ -687,6 +687,65 @@ struct history_sim_params
     /// main reason losers regrew faster than they were conquered.
     int settle_cohesion_gate_q = 620;
 
+    /// SETTLE IS RE-SETTLEMENT IN THE EMPIRES ROUND (BL-894; Ben, 2026-09-11:
+    /// "For our stage, land should already be settled. Settle in our stage is
+    /// just a consequence of when polities decide to raze settlements and
+    /// destroy cultures."). When true, the Settle verb may only fire from a
+    /// held region that carries `centres_razed > 0` -- ground somebody has
+    /// already harmed. No razing, no settling.
+    ///
+    /// WHY THIS RATHER THAN A WEIGHT. BL-889 measured Campaign in the running
+    /// 5,204 rounds per world and winning 61 of them -- 1.2%. Nothing blocks
+    /// war: the reach gate denies nothing, the water gate accounts for 2% of
+    /// contacts, and 90% of conquered ground is taken once and kept. Peaceful
+    /// expansion is simply always available and always cheaper, because Settle
+    /// MANUFACTURES new ground on population pressure alone and never asks
+    /// whether there is anywhere to go. Raising `w_campaign` or lowering
+    /// `campaign_threshold_q` would be a term inside the actor -- forbidden by
+    /// the standing rule, and the shape Ben declined for the reach gate
+    /// (NR-823). This changes what is LEGAL, not what is preferred, and leaves
+    /// the scorer honest.
+    ///
+    /// FALSE BY DEFAULT, DELIBERATELY. The struct default spans a 4000 BCE ->
+    /// 0 CE arc that INCLUDES the migration era, and `COLONISATION.md` owns a
+    /// diffusion that has to fill the map. Generation's own Empires round sets
+    /// it true (`era_minus_one_sim_params`); harnesses measuring the old arc
+    /// keep the old rule, so no existing fixture changes meaning under it.
+    ///
+    /// THE FROZEN REGION COUNT IS THE POINT, NOT A COST. The Settle block's
+    /// own comment justifies the verb by "without this verb a 2000-year run has
+    /// a frozen region count" — a MIGRATION-era argument running inside an
+    /// EMPIRE-era round. A settled map with a fixed region count is this
+    /// phase's premise (`CIVILISATION.md` § The arc the phase must produce).
+    bool settle_requires_razed_ground = false;
+
+    /// AMPHIBIOUS CAPTURE BY WEIGHT (BL-893; Ben, 2026-09-10: "units can move
+    /// into and capture coast tiles if the adjoined land province has a higher
+    /// population count than the defender"). When true, the BL-778 water gate
+    /// gains a fourth escape: a wet contact is legal if the attacker's STAGING
+    /// region carries strictly more population than the target.
+    ///
+    /// ADMISSIBLE UNDER THE STANDING RULE because population in adjacent ground
+    /// is a FORCE WITH A VISIBLE CAUSE ON THE MAP -- the player can see it, and
+    /// it is symmetric: the same rule lets a heavy neighbour take from you. It
+    /// is not a term inside an actor and does not scale with rank.
+    ///
+    /// THE CROSSING STILL STARVES, and that is not an oversight. `forages` is
+    /// `dry || shore`, so a force that crosses on weight alone feeds on nothing
+    /// -- exactly as one carried by ships does. Ships get a force there; they do
+    /// not feed it, and neither does numbers. Without that, coastal ground would
+    /// be CHEAPER to take than inland ground, which inverts the intent.
+    ///
+    /// STRICTLY GREATER, so a tie fails, matching how ties resolve elsewhere.
+    ///
+    /// REGION, NOT PROVINCE, and this is a KNOWN DIVERGENCE from Ben's wording.
+    /// He said "province"; the sim indexes regions and has no province grain at
+    /// this point in the pass. Raise it if the coarser unit is wanted.
+    ///
+    /// False by default; generation's Empires round sets it true, so no existing
+    /// fixture changes meaning.
+    bool amphibious_weight_crossing = false;
+
     /// Severity of the sack a conquered region suffers, per-mille.
     ///
     /// BL-835 — THIS IS NOW AN URBAN QUANTITY ONLY. It used to be subtracted

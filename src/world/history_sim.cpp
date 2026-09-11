@@ -1778,7 +1778,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // candidate. See the two lambdas above for the rule.
                     const bool dry   = dry_contact(hi, ti);
                     const bool shore = dry ? true : owns_shore_at(ti);
-                    if (!dry && !shore
+                    // BL-893: THE FOURTH ESCAPE -- weight of the land behind
+                    // the attacker. A wet contact is legal if the staging
+                    // region carries strictly more population than the target.
+                    // The force still does not forage (`forages` below is
+                    // `dry || shore`), so it crosses hungry exactly as a
+                    // ship-carried one does.
+                    const bool heavier =
+                        params.amphibious_weight_crossing
+                     && ss.regions[static_cast<std::size_t>(hi)].population
+                            > ss.regions[ti].population;
+                    if (!dry && !shore && !heavier
                      && !can_field_naval(ss.regions[static_cast<std::size_t>(hi)], mil_band))
                     {
                         ++out.illegal_campaigns;
@@ -2090,6 +2100,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // more crowded than it is and sent it out to settle land it
                     // did not need — the settle pressure and the growth model
                     // must divide by the same K or the verb fires on a fiction.
+                    // RE-SETTLEMENT ONLY (BL-894). In the Empires round Settle
+                    // refounds ground somebody emptied; it does not manufacture
+                    // new ground on population pressure alone. `centres_razed`
+                    // is the record of that harm and it PERSISTS -- a razed city
+                    // later rebuilt still says it was razed (settlement.cpp
+                    // sack_region_urban) -- so this reads "has this ground ever
+                    // been sacked", not "is it empty right now".
+                    if (params.settle_requires_razed_ground && p.centres_razed <= 0) continue;
                     const int64_t K = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
                     if (K <= 0) continue;
                     const int pressure = static_cast<int>(clampi64((p.population * 1000) / K, 0, 1000));

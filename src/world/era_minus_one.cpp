@@ -44,6 +44,23 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     const bool two_span = era_minus_one_has_industrial_span(params);
     hp.stop_year = params.epoch_year;
 
+    // SETTLE IS RE-SETTLEMENT IN GENERATION'S OWN ROUND (BL-894; Ben,
+    // 2026-09-11). This is the Empires round -- the land is already settled
+    // when it opens, and the migration that filled it ran before this sim
+    // starts (`run_settlement`, plus BL-846's founding schedule for anything
+    // dated after the start year). A verb that manufactures fresh ground on
+    // population pressure alone belongs to that earlier diffusion, not here.
+    //
+    // Set on the DERIVED params rather than on the struct default, so every
+    // harness measuring the old 4000 BCE -> 0 CE arc -- which spans the
+    // migration era and therefore still needs pressure-driven settling --
+    // keeps the rule it was written against.
+    hp.settle_requires_razed_ground = true;
+
+    // BL-893: the water gate's weight escape, on for the same reason -- this is
+    // the round the rule was designed for.
+    hp.amphibious_weight_crossing = true;
+
     if (two_span)
     {
         // 1160 -> 1560 -> 1960 at the defaults. The ancient span is
