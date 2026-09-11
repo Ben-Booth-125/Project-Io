@@ -606,8 +606,10 @@ static_assert(generation_progress::carve_capacity == home_grid_width * home_grid
 /// planetology chain, same Continents pass, same BL-276 acceptance gate, same
 /// seed formulas — the gate is literally the same function. The New World
 /// wizard's preview pane calls this so the map a player rerolls IS the map
-/// "Begin" hands them. Rivers and the political layer (sibling passes the
-/// preview does not show) are skipped. Returns raster-order tile ids.
+/// "Begin" hands them. The river pass runs too, under the same seed formula, so
+/// the wizard's lapse maps draw the campaign's rivers (BL-915); the political
+/// layer (a sibling pass the preview does not show) is skipped. Returns
+/// raster-order tile ids.
 std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
                                                      const world_params& params,
                                                      const world_gen_config& gen_cfg = {});
@@ -618,5 +620,14 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
 /// Culture round replays; `make_hard_coded_world` calls it at the migration's
 /// end, and the wizard calls it under `--verify` to lift the same record off
 /// a finished report rather than run the pass a second time (BL-919).
+era_timelapse build_migration_timelapse(const settlement_state& ss, const creed_state& cs,
+                                        int64_t start_year, int64_t end_year);
+
+/// The same fold without a creeds roster: the culture tree is REBUILT from the
+/// settlement's own record (`cradle_coined_year` first, then `spawned_cultures`
+/// in allocation order -- the exact numbering the roster carries, per
+/// settlement.hpp), so the `culture_split` events are the same ones. This is the
+/// `--verify` adoption path (BL-919), where the report holds a settlement and
+/// no `creed_state`.
 era_timelapse build_migration_timelapse(const settlement_state& ss, int64_t start_year,
                                         int64_t end_year);

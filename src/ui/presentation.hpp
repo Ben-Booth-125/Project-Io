@@ -238,6 +238,27 @@ ImU32 lineage_colour(float hue, int depth);
 /// draws at this rung. Four rungs is the most the eye separates within one hue.
 inline constexpr int lineage_depth_cap = 4;
 
+/// Number of slots in the LAPSE POLITY palette — the colours the New World
+/// wizard's Culture and Empires maps paint the recorded era's powers in
+/// (BL-915). Larger than `nation_slot_count` because a recorded age holds
+/// 24-60 powers and the map assigns slots by GREEDY COLOURING over the polity
+/// adjacency graph rather than by hashing the id, so no two neighbours share a
+/// hue: the palette must be wider than the largest neighbourhood the greedy
+/// walk meets, and twelve was not.
+inline constexpr int lapse_polity_slot_count = 20;
+
+/// The lapse polity palette, by SLOT — the slot is what the greedy colouring
+/// hands out (`ui::history_lapse::polity_slot`), never a polity id, so this is
+/// a table lookup and carries no hash. Wraps modulo the count so any index is
+/// safe. Sits here rather than in history_lapse.cpp because identity colour is
+/// presentation's job; a sibling item derives CULTURE hue families from the
+/// culture tree, and will feed a family into the slot assignment rather than
+/// into this table.
+///
+/// @param slot Palette slot from the colouring.
+/// @return     That slot's identity colour.
+ImU32 lapse_polity_colour(int slot);
+
 /// Identity colour for a building **kind** — the colour a segment of the stacked-tile
 /// ring is drawn in (`ui::icons::stack_ring`, PLANETARY.md § Building markers).
 ///

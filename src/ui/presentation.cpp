@@ -413,6 +413,40 @@ ImU32 lineage_colour(float hue, int depth)
                     static_cast<int>(b * 255.0f + 0.5f), 255);
 }
 
+ImU32 lapse_polity_colour(int slot)
+{
+    // Twenty hues, ordered so that consecutive slots are far apart on the wheel
+    // and alternate light/dark: the greedy colouring hands out the LOWEST free
+    // slot, so the first few slots carry most of the map and must be the most
+    // distinct from each other. Mid luminance throughout, because the map lays
+    // these over a relief base as a translucent tint (BL-915) and a very dark
+    // hue would vanish into the shading.
+    static constexpr ImU32 table[lapse_polity_slot_count] = {
+        IM_COL32(213,  94,   0, 255), // vermillion
+        IM_COL32(  0, 114, 178, 255), // blue
+        IM_COL32(240, 228,  66, 255), // yellow
+        IM_COL32(  0, 158, 115, 255), // bluish green
+        IM_COL32(204, 121, 167, 255), // reddish purple
+        IM_COL32(230, 159,   0, 255), // orange
+        IM_COL32( 86, 180, 233, 255), // sky blue
+        IM_COL32(170, 200,  60, 255), // lime
+        IM_COL32(150,  80, 110, 255), // reddish purple, shaded
+        IM_COL32(200, 200, 200, 255), // pale grey
+        IM_COL32(140,  60,   0, 255), // vermillion, shaded
+        IM_COL32(150, 180, 220, 255), // blue, tinted
+        IM_COL32(120, 110,  40, 255), // olive
+        IM_COL32( 40, 120, 130, 255), // teal, shaded
+        IM_COL32(230, 130, 130, 255), // salmon
+        IM_COL32( 90,  90, 170, 255), // indigo
+        IM_COL32(150, 210, 180, 255), // bluish green, tinted
+        IM_COL32(190, 140,  90, 255), // tan
+        IM_COL32(110, 160,  60, 255), // green, shaded
+        IM_COL32(220, 180, 220, 255), // lilac
+    };
+    if (slot < 0) slot = -slot;
+    return table[slot % lapse_polity_slot_count];
+}
+
 ImU32 building_kind_colour(building_type type)
 {
     // Hue-separated by hand, not hashed: building_type is a closed enumeration of

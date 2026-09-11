@@ -552,7 +552,11 @@ private:
     // golden capture never races the worker. The future is never destroyed while
     // pending (std::async's dtor would block); a params move mid-build sets the
     // stale flag and the poll relaunches on arrival.
-    std::future<std::vector<uint8_t>> m_wiz_surface_future;
+    //
+    // Since BL-915 the build returns TWO rasters: the packed axes the globe
+    // samples, and the packed landform + river edges the lapse maps draw their
+    // terrain base from (ui::wizard_surface).
+    std::future<ui::wizard_surface> m_wiz_surface_future;
 
     // --- Async world generation (2026-08-12) --------------------------------
     /// The worker running make_hard_coded_world. Valid only while `building`.
@@ -572,6 +576,7 @@ private:
     std::vector<int16_t> m_carve_view;
     uint32_t             m_carve_seen = 0;
     std::vector<uint8_t> m_wiz_surface;       ///< Raster compositions; empty = not yet built.
+    std::vector<uint16_t> m_wiz_terrain;      ///< Packed landform + river edges per tile (ui::pack_lapse_terrain, BL-915); same length as m_wiz_surface.
     bool m_wiz_surface_stale = false;         ///< Params moved while a build was in flight.
     void launch_wizard_surface_build();       ///< Start the worker for the CURRENT pending params.
     void poll_wizard_surface();               ///< Per-frame: adopt a finished build, relaunch if stale.

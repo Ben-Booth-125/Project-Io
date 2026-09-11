@@ -100,9 +100,14 @@ void app::refresh_wizard_preview()
         const auto tiles = generate_home_surface_preview(scratch, probe,
                                                          m_pending_world_params);
         m_wiz_surface.resize(tiles.size());
+        m_wiz_terrain.resize(tiles.size());
         for (std::size_t i = 0; i < tiles.size(); ++i)
-            m_wiz_surface[i] = ui::preview_pack(scratch.tiles.at(tiles[i]).substrate,
-                                                scratch.tiles.at(tiles[i]).cover);
+        {
+            const tile_component& tc = scratch.tiles.at(tiles[i]);
+            m_wiz_surface[i] = ui::preview_pack(tc.substrate, tc.cover);
+            m_wiz_terrain[i] = ui::pack_lapse_terrain(tc.landform, tc.river_edges,
+                                                      tc.river_downstream);
+        }
     }
     else if (m_wiz_surface_future.valid())
         m_wiz_surface_stale = true;
@@ -117,11 +122,17 @@ void app::launch_wizard_surface_build()
             world scratch;
             const entity_id probe = scratch.create_entity();
             const auto tiles = generate_home_surface_preview(scratch, probe, params);
-            std::vector<uint8_t> comp(tiles.size());
+            ui::wizard_surface out;
+            out.comp.resize(tiles.size());
+            out.terrain.resize(tiles.size());
             for (std::size_t i = 0; i < tiles.size(); ++i)
-                comp[i] = ui::preview_pack(scratch.tiles.at(tiles[i]).substrate,
-                                           scratch.tiles.at(tiles[i]).cover);
-            return comp;
+            {
+                const tile_component& tc = scratch.tiles.at(tiles[i]);
+                out.comp[i]    = ui::preview_pack(tc.substrate, tc.cover);
+                out.terrain[i] = ui::pack_lapse_terrain(tc.landform, tc.river_edges,
+                                                        tc.river_downstream);
+            }
+            return out;
         });
 }
 
@@ -338,7 +349,9 @@ void app::poll_wizard_surface()
     if (m_wiz_surface_future.wait_for(std::chrono::seconds(0))
             != std::future_status::ready)
         return;
-    m_wiz_surface = m_wiz_surface_future.get();
+    ui::wizard_surface built = m_wiz_surface_future.get();
+    m_wiz_surface = std::move(built.comp);
+    m_wiz_terrain = std::move(built.terrain);
     if (m_wiz_surface_stale)
     {
         // Preferences moved while that build ran: it is already the wrong
@@ -816,7 +829,9 @@ void app::draw_generation_screen()
         ui::history_lapse& rec = m_wiz_history[lapse_index];
         ui::finish_history_lapse(rec,
                                  m_wiz_surface.empty() ? nullptr : m_wiz_surface.data(),
-                                 m_wiz_surface.size());
+                                 m_wiz_surface.size(),
+                                 m_wiz_terrain.empty() ? nullptr : m_wiz_terrain.data(),
+                                 m_wiz_terrain.size());
 
         const int first = rec.lapse.start_year;
         const int last  = first + rec.lapse.years;

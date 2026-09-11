@@ -1,5 +1,6 @@
 #pragma once
 
+#include "world/components.hpp"    // terrain_landform, for the packed terrain raster (BL-915)
 #include "world/era_timelapse.hpp"
 
 #include <cstddef>
@@ -55,6 +56,71 @@
 // ---------------------------------------------------------------------------
 
 namespace ui {
+
+// ---------------------------------------------------------------------------
+// The terrain the map is drawn on (BL-915)
+// ---------------------------------------------------------------------------
+//
+// THE GROUND, NOT ONLY THE FILL (STARTUP.md § The pass rounds draw the ground,
+// not only the fill; Ben, 2026-09-11). Rivers and relief are drawn under the
+// culture or polity fill and the fill is a translucent TINT over them, because a
+// frontier is legible only against the terrain it crosses — a border that stops
+// at a river reads as a river border, and on a flat colour it read as nothing.
+//
+// The wizard's surface build packs one uint16 per tile: the landform in the low
+// four bits, the six river-edge bits above it, and the six downstream bits above
+// those. Only facts the tile pass already decided; nothing is re-derived here.
+
+/// Pack a tile's landform and river edges for the lapse map's terrain base.
+inline uint16_t pack_lapse_terrain(terrain_landform lf, uint8_t river_edges,
+                                   uint8_t river_downstream)
+{
+    return static_cast<uint16_t>((static_cast<unsigned>(lf) & 0x0Fu)
+                                 | ((river_edges      & 0x3Fu) << 4)
+                                 | ((river_downstream & 0x3Fu) << 10));
+}
+inline terrain_landform lapse_landform(uint16_t t)
+{
+    return static_cast<terrain_landform>(t & 0x0Fu);
+}
+inline uint8_t lapse_river_edges(uint16_t t)      { return static_cast<uint8_t>((t >> 4)  & 0x3Fu); }
+inline uint8_t lapse_river_downstream(uint16_t t) { return static_cast<uint8_t>((t >> 10) & 0x3Fu); }
+
+/// What the wizard's async surface build hands back: the packed axes the globe
+/// samples (`preview_pack`) and the packed terrain the lapse maps draw.
+struct wizard_surface
+{
+    std::vector<uint8_t>  comp;
+    std::vector<uint16_t> terrain;
+};
+
+/// One run-merged rect of the baked terrain base, in TILE units — the pane
+/// scale is applied at draw time, so the bake survives a pane resize.
+struct lapse_base_run
+{
+    uint16_t row;
+    uint16_t c0;
+    uint16_t c1;   ///< Exclusive.
+    uint8_t  kind; ///< 0 flat land, 1 valley, 2 highland, 3 mountain, 4 canyon/rift.
+};
+
+/// One river segment, tile centre to downstream tile centre, in TILE units.
+struct lapse_river_seg
+{
+    int16_t c0, r0, c1, r1;
+};
+
+/// One relief edge: a run along the NORTH or SOUTH edge of a row where the
+/// landform band steps down to the neighbouring row — the lit and shadowed
+/// rims of a range. Edges, not rows: shading every mountain row reads as
+/// scanlines, shading where the ground drops reads as relief.
+struct lapse_relief_seg
+{
+    uint16_t row;
+    uint16_t c0;
+    uint16_t c1;  ///< Exclusive.
+    uint8_t  lit; ///< 1 = the north rim (lit), 0 = the south rim (shadow).
+};
 
 /// The recorded era, plus the derived fields the map and the board need.
 ///
@@ -131,6 +197,27 @@ struct history_lapse
     /// two above). ImU32 layout, kept as uint32_t so this header stays off imgui.
     std::vector<uint32_t> culture_colour;
 
+    /// Polity index -> palette slot (`palette::lapse_polity_colour`), from the
+    /// greedy colouring over the polity ADJACENCY graph (BL-915): two polities
+    /// are adjacent if they ever held neighbouring regions anywhere in the
+    /// record, and no two adjacent polities share a slot. Assigned once at
+    /// record time by `assign_polity_colours`; the map and the board both read
+    /// it, so a row and its territory cannot disagree.
+    std::vector<int32_t> polity_slot;
+
+    // --- The baked terrain base (BL-915) -------------------------------------
+    // Run-merged ONCE, in tile units, when the record lands. Per frame the map
+    // only scales and emits these; nothing under the fill is re-merged.
+    std::vector<lapse_base_run>   base_runs;
+    std::vector<lapse_river_seg>  river_segs;
+    std::vector<lapse_relief_seg> relief_segs;
+
+    /// The map prints its primitive count to stderr ONCE per record, so the
+    /// draw-index bound is a measured number in every capture log. Mutable
+    /// because the draw takes the record by const reference and this is not
+    /// state the map reads.
+    mutable bool prim_report_done = false;
+
     bool empty() const { return lapse.empty(); }
 
     /// True once `finish_history_lapse` has run against a surface.
@@ -144,9 +231,27 @@ struct history_lapse
 ///                frontier stalls at is the coastline the campaign has. Pass
 ///                nullptr / 0 and this is a no-op; the caller retries next frame.
 ///
+/// @param terrain The packed landform + river raster (`pack_lapse_terrain`) the
+///                same build produced, or nullptr: the map then draws a flat base
+///                and no rivers rather than waiting, because the political
+///                record is the round's subject and the ground is its context.
+///
 /// Cheap and one-shot: a multi-source breadth-first walk over ~31,500 tiles with
 /// the columns wrapping and the rows not, exactly as the world's own grid does.
-void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t packed_len);
+/// Then the terrain bake, the polity adjacency graph and the greedy colouring —
+/// all linear in the raster or in the change list.
+void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t packed_len,
+                          const uint16_t* terrain = nullptr, std::size_t terrain_len = 0);
+
+/// Greedy-colour the polities over their adjacency graph so no two neighbours
+/// share a palette slot (BL-915). Called by `finish_history_lapse`; exposed so a
+/// sibling item can re-run it with a HUE FAMILY per polity.
+///
+/// @param hue_family Optional, one entry per polity: polities in the same family
+///                   are assigned slots from the same band of the palette where
+///                   the adjacency constraint allows. nullptr = no families; the
+///                   walk hands out the lowest free slot.
+void assign_polity_colours(history_lapse& h, const std::vector<int32_t>* hue_family = nullptr);
 
 /// Derive the lineage palette (BL-919) from the culture tree.
 ///

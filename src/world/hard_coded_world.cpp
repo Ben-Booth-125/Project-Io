@@ -86,6 +86,29 @@ float deposit_scalar_for(abundance_level a, const world_gen_config& cfg)
 // PURE AND READ-ONLY: folds `settlement_state` as it stood the instant
 // `run_settlement` returned, before the empire sim (or anything else) has
 // touched it. No randomness, no clock, no write-back.
+era_timelapse build_migration_timelapse(const settlement_state& ss, int64_t start_year,
+                                        int64_t end_year)
+{
+    // Rebuild the roster's numbering from the settlement record alone: cradles
+    // first (parentless, coined at the migration's start), then the daughters
+    // in allocation order -- settlement.hpp says spawned ids run one past the
+    // last cradle, so this is the same list `creed_state::cultures` ends up as.
+    creed_state cs;
+    std::size_t cradle_slots = 0;
+    for (const auto& cy : ss.cradle_coined_year)
+        if (cy.first >= 0) cradle_slots = std::max(cradle_slots, static_cast<std::size_t>(cy.first) + 1);
+    cs.cultures.resize(cradle_slots); // placed BY ID, so a cradle slot is never a daughter slot
+    for (const auto& cy : ss.cradle_coined_year)
+    {
+        if (cy.first < 0) continue;
+        culture& cu    = cs.cultures[static_cast<std::size_t>(cy.first)];
+        cu.parent      = -1;
+        cu.coined_year = cy.second;
+    }
+    for (const culture& d : ss.spawned_cultures) cs.cultures.push_back(d);
+    return build_migration_timelapse(ss, cs, start_year, end_year);
+}
+
 era_timelapse build_migration_timelapse(const settlement_state& ss, const creed_state& cs,
                                         int64_t start_year, int64_t end_year)
 {
@@ -287,9 +310,21 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
 
     const uint32_t tile_seed = choose_home_tile_seed(st, cs.height_bias, cs.convergent,
                                                      params.seed, deposit_scalar);
-    return generate_body_tiles(w, body, home_grid_width, home_grid_height,
-                               st.profile, tile_seed, deposit_scalar, &st,
-                               nullptr, &cs.height_bias, &cs.convergent, &cs);
+    generation_record record;
+    std::vector<entity_id> tiles =
+        generate_body_tiles(w, body, home_grid_width, home_grid_height,
+                            st.profile, tile_seed, deposit_scalar, &st,
+                            &record, &cs.height_bias, &cs.convergent, &cs);
+
+    // RIVERS TOO (BL-915). The wizard's Culture and Empires maps draw the river
+    // strokes under the political fill, and the only surface those rounds hold
+    // is this one — so the river pass runs here with the SAME seed formula
+    // make_hard_coded_world uses (`params.seed ^ 0x52490001u`), and the rivers
+    // a frontier stalls at in the wizard are the rivers the campaign has. The
+    // political layer stays skipped.
+    generate_rivers(w, tiles, home_grid_width, home_grid_height,
+                    record.height, /*seed=*/params.seed ^ 0x52490001u);
+    return tiles;
 }
 
 world make_hard_coded_world(world_params params, generation_report* report,
