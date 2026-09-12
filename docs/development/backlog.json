@@ -21,30 +21,6 @@
    "parked": false,
    "category": "Generation",
    "status": "designed",
-   "id": "BL-932",
-   "short_name": "POLITY_TREASURY",
-   "priority": "A",
-   "difficulty": 4,
-   "title": "The treasury: material becomes capital, and it stands at the capital seat",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "src/world/history_sim.hpp",
-    "src/world/history_sim.cpp"
-   ],
-   "design": "=== SUPERSEDES THE 2026-09-11 MORNING RULING. Ben chose a free-floating per-polity scalar, then moved it: \"The treasury is moved to the capital for this phase.\" ===\n\nTHE TREASURY SITS AT THE CAPITAL SEAT, one per polity, AND IT IS CAPTURABLE. That is the whole reason the location matters: CIVILISATION.md sec Materials are spent when something happens puts Empire-phase stores at the seat precisely so \"a conqueror who takes the seat takes the stores standing in it\", and a treasury with no location would discard that in the phase where distant conquest is supposed to pay. A fleet that sacks a capital must take something real.\n\nCONSOLIDATION IS THE PHASE'S OPENING ACT AND IT IS VISIBLE. Ben, 2026-09-11: \"We can just consolidate all stores of material into the polity level as the initial part of Exploration... it doesn't bother me if we introduce major centralisation as an initial step.\" At 1200 CE every seat's stores flow to the capital, ONCE. The time-lapse can show it, and it is the moment a realm stops being a set of provisioned cities and becomes a state with a purse.\n\nFED BY four sources, all of them things the polity already holds or reaches: endowment on held ground, the inherited `surviving_corridors` network, the markets standing on its seats (`region::has_market`), and subject tribute. NOTHING TOPS IT UP -- a polity that inherited little is poor, which is the asymmetry the 1200 CE handoff exists to produce.\n\nTHIS IS WHERE CIVILISATION.md's DEFERRAL LANDS: that doc says resources become capital in pass 2 and not in the Empire phase. Exploration is pass 2's first half, so the promise is kept exactly here and the Empire span stays priceless.\n\nOPEN, AND A MEASUREMENT NOT A GUESS: the arithmetic of the four income terms. Set it from a sweep that produces both rich and poor survivors, never from a number picked to make one seed solvent.\n\nDONE WHEN: a capital holds a treasury, sacking a capital transfers it, the consolidation fires once at 1200, and the treasury spread across a sweep correlates with the inherited corridor network rather than with polity size alone (BL-937's reading).",
-   "requires": [
-    "BL-931"
-   ]
-  },
-  {
-   "glyph": "✓",
-   "sprint": 40,
-   "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "status": "designed",
    "id": "BL-933",
    "short_name": "TREATIES_WITH_A_TERM",
    "priority": "A",
@@ -162,55 +138,6 @@
     "docs/generation/trees/TREES.md"
    ],
    "design": "BEN, 2026-09-11: \"we should shrink the industry tree\" (resolving NR-844, which reported it oversized after the span fell 400 -> 300 years).\n\nTHE NAIVE SHRINK IS WRONG AND MUST NOT BE DONE. Dropping the outer ring is the obvious cut and it removes RING 4: Electrification, Internal Combustion & Oil, Flight, Automotive Transport, Broadcast, Antibiotics & Mass Vaccination, Synthetic Chemistry, Fixed-Nitrogen Synthesis, Tractor & Fertiliser. That is the twentieth century, and the campaign epoch is 1960. Ring 4 stays.\n\nTHE REAL FINDING: RING 1 IS THE EXPLORATION AGE. Measured 2026-09-11 while authoring EXPLORATION_TREE.md. Ring 1 holds Full-Rigged Ship, Celestial Navigation, Chronometer, Joint-Stock & Public Credit, Chartered Capital, Movable-Type Press, Crop-Package Exchange. Those are 1200-1660 subjects, and they sat in the Industry tree only because no Exploration tree existed to hold them. TWO ARE OUTRIGHT DUPLICATES of nodes now authored: IN-MV-1b Full-Rigged Ship and IN-MV-1c Celestial Navigation against EX-HL-2a Ocean Carrack and EX-HL-3a Oceanic Navigation; IN-CH-1b/IN-CH-1d against EX-SP-2a The Chartered Company.\n\nTHE WORK. Ring 1 (18 nodes) migrates out: some subjects are already covered by the Exploration tree and are simply dropped, others may earn a place in it. Rings 2/3/4 shift down to 1/2/3. Industry becomes 3 rings, 5 branches, 3 milestones, ~44 nodes -- which is also the proportional target (62 x 300/400 = 46), reached by MEANING rather than by arithmetic, which is why it is believable.\n\nEVERY NODE ID CHANGES, because an id carries its ring. That is the bulk of the work and it is mechanical: renumber, rewrite links/requires/excludes, rewrite the doc's tables, re-run tree_lint.js industry. THE RIM MILESTONE'S MEANING IS UNCHANGED -- it still opens nothing and ends the chain; only its id moves.\n\nWATCH FOR: rule 4 breakage. Each milestone requires majors at ITS OWN ring from two branches; after a shift the old ring-2 milestone's requires are still ring-2 ids that are now ring 1, so they travel together, but any milestone whose requires named a ring-1 major that got DROPPED needs a new requirement. The lint catches this; do not hand-wave it.\n\nDONE WHEN: tree_lint.js passes on both industry and exploration, no subject appears in both trees, ring 4's contents survive as ring 3, and TREES.md's size row states the new shape."
-  },
-  {
-   "glyph": "✓",
-   "sprint": 40,
-   "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "status": "designed",
-   "id": "BL-939",
-   "short_name": "SCARCITY_SIGNAL_PER_MARKET",
-   "priority": "A",
-   "difficulty": 4,
-   "title": "A scarcity signal per good per market — the demand half, and never a price",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "src/world/history_sim.hpp",
-    "src/world/history_sim.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-11): \"For prices, I like this cheap resolution of a scarcity signal.\"\n\nTHE PROBLEM IT RESOLVES. Ben's earlier ruling gave this phase \"markets that trade named goods in a simplified form\" and gave Digitisation the companies; he then said Digitisation receives \"what prices different goods have.\" Those could not both hold. The signal is the resolution: Exploration says WHAT IS WANTED AND HOW MUCH, Digitisation resolves that into a price.\n\nTHE SHAPE. One integer per (good, market) -- how badly this market wants this good. NO CLEARING, NO ORDER BOOK, NO FIRM, NO PRICE BAND. It sits on the market regions BL-910 already stands up (`region::has_market` on capital seats).\n\nTHIS IS WHAT KEEPS CIVILISATION.md's BOUNDARY FROM DRIFTING. That doc's markets at the close are \"a place and a visible condition, not an order book\"; a real price in this phase would build the economy layer two phases early. The signal is the smallest thing that carries the information forward without becoming a market.\n\nIT IS THE DEMAND HALF ONLY. BL-940 owns the flow half, and neither is sufficient alone: a want with no throughput is an appetite that never resolves, throughput with no want is traffic with no reason.\n\nDERIVED, NEVER ROLLED. Inputs are already recorded: the directed want table (`derive_wants`), what the market's own ground is dominant in, and the holding polity's population. The existing `want::via_market` flag is the seed of this -- it already asks whether a holder's market SHOWS a good.\n\nDONE WHEN: every market carries a signal per good, the signal is legible across the contact graph to a polity that has met it, EXPLORATION tree node EX-GD-2a (Quayside Market) makes it legible to strangers, and BL-937's preference reading can be taken off it.",
-   "requires": [
-    "BL-931"
-   ]
-  },
-  {
-   "glyph": "✓",
-   "sprint": 40,
-   "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "status": "designed",
-   "id": "BL-940",
-   "short_name": "CORRIDOR_THROUGHPUT_AND_THE_ROAD_LADDER",
-   "priority": "A",
-   "difficulty": 5,
-   "title": "Goods move as one number per corridor, and the road ladder gets its third rung",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "src/world/history_sim.hpp",
-    "src/world/history_sim.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-11), AND A READING CORRECTED IN THE SAME EXCHANGE. Ben: \"For moving goods, we should skip this as you suggested above and use scarcity signals. Let me know if I'm reading this wrong.\" HE WAS, BY ONE STEP. What is skipped is PER-GOOD ROUTING; what is kept is ONE NUMBER PER CORRIDOR. Skipping flow entirely would leave the fleet/caravan visual (BL-943) with no quantity to threshold against, and \"throughput based logistics\" with nothing to be a throughput OF.\n\nNO CARGO OBJECT EVER EXISTS. Nothing paths a good, nothing owns a good, no convoy is an entity. GENERATION_STRATEGY.md records that the Empire pass already pays a full Dijkstra per polity per round against a region count that GROWS INSIDE THE RUN; routing goods on top of that multiplies the known hot spot across another 460 years. That is the cost this item exists to avoid.\n\nWHAT MOVES IS A QUANTITY ON A GRAPH ALREADY WALKED. `region::network_supply_q` is already 0-1000, terrain-weighted reach from the capital over held ground, discounted by a road (BL-837) and relayed by a town (BL-887) -- throughput in everything but name. Read it along the `surviving_corridors` graph the pass already carries.\n\nTHE THIRD RUNG OF THE ROAD LADDER (Ben, 2026-09-11: \"upgrade of roads\"). The Empire sim promotes a corridor by USE -- Track at `road_tier1_uses` (4), Road above it, nothing beyond. This phase adds the rung above, and it is BOUGHT WITH CAPITAL rather than earned by traffic (tree node EX-WY-1a Post Roads). That is what makes a treasury matter to a realm that never sails, and it is half of the consolidator's path.\n\nPAIRS WITH BL-939. Scarcity says what is wanted; throughput says how much arrives. The pair is what makes a trade route a consequence rather than a drawing.\n\nDONE WHEN: corridors carry materially different volumes across a sweep, the difference is traceable to the road rung, the sim's per-round cost has not materially regressed (measure it), and `throughput_bound` (BL-930's scorer term) can read a real quantity.",
-   "requires": [
-    "BL-931",
-    "BL-932"
-   ]
   },
   {
    "glyph": "✓",

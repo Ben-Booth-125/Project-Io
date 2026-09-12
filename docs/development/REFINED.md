@@ -24,19 +24,36 @@ BL-931 -> BL-937 opens the sprint, ahead of the NEXT_SESSION.md wave table's lit
       history_sim_harness at their pre-existing baselines. NR-848 flags the operationalisation.
       Archived.
 
-## Wave 2 — the three quantities everything else reads
+## Wave 2 — the three quantities everything else reads — LANDED 2026-09-12
 
-- [ ] **BL-932** (POLITY_TREASURY) — capital-seat treasury, consolidated once at 1200 CE.
-- [ ] **BL-939** (SCARCITY_SIGNAL_PER_MARKET) — one integer per (good, market), never a price.
-- [ ] **BL-940** (CORRIDOR_THROUGHPUT_AND_THE_ROAD_LADDER) — throughput off `network_supply_q`,
-      the road ladder's third rung.
+- [x] **BL-932** (POLITY_TREASURY) — commit `670d7072`. Capital-seat treasury, one-time 1200
+      consolidation plus recurring per-round income (NR-850 flags the recurring-vs-one-time
+      reading for Ben). Correlation with corridor touch: 0.330.
+- [x] **BL-939** (SCARCITY_SIGNAL_PER_MARKET) — commit `2c3b0a59`. One integer per (good, market),
+      contact-gated read, no price.
+- [x] **BL-940** (CORRIDOR_THROUGHPUT_AND_THE_ROAD_LADDER) — commit `a6afe7b7`. Throughput reads
+      `network_supply_q`; the road ladder's third rung (Post Roads) never fired in an 8-seed sweep
+      (NR-849, flagged not silently re-tuned).
+      All three: BL-930's stubbed scorer terms now read live quantities. Independently rebuilt and
+      reverified — `exploration_sim_harness` 39/39 PASS, `world_determinism` ALL PASS (digests
+      unmoved), `history_sim_harness` at the pre-existing 2-failure baseline. Archived.
 
-These three feed BL-930's stubbed scorer terms (`purse_low`, `wants_unmet`, `throughput_bound`)
-and BL-937's readings 8-9 — landing them should turn those stubs live and move the sweep.
+## Wave 3 — the mechanisms that spend and bind
 
-## Waves 3-5 — not yet promoted
+- [ ] **BL-933** (TREATIES_WITH_A_TERM) — directed/mutual pair, term of years, five clause kinds
+      (non-aggression, trade access, sphere of claim, tribute, mutual defence). Breaking one writes
+      a grudge (reuses Empire-phase machinery).
+- [ ] **BL-934** (COLONIES_ARE_SUBJECTS) — a colony is a live polity with an overlord link (its own
+      field, NOT `polity::parent`), its own wants, trade provinces vs subjected polities.
+- [ ] **BL-935** (PORTS_NAVIES_AND_UPKEEP) — three treasury-maintained stocks (port/navy/standing
+      army), each decays if underfunded.
 
-BL-933/934/935 (treaties/subjects/ports), BL-941/942/936 (deterrence/two-strategies/preference),
-BL-943/938 (exemplars/tree migration). `BL-944` gated on a Ben decision (NEXT_SESSION.md § One
-decision owed). `BL-945` parked for Digitisation, not this sprint. Promoted wave by wave as the
-prior wave lands and verifies.
+These three are the biggest wave: treaties and subjects both touch the polity table's shape, and
+BL-935 needs BL-932's treasury upkeep cadence already landed. Read EXPLORATION.md §§ "Diplomacy
+becomes real", "A colony is a subject", "Force persists now" before briefing.
+
+## Waves 4-5 — not yet promoted
+
+BL-941/942/936 (deterrence/two-strategies/preference), BL-943/938 (exemplars/tree migration).
+`BL-944` gated on a Ben decision (NEXT_SESSION.md § One decision owed). `BL-945` parked for
+Digitisation, not this sprint. Promoted wave by wave as the prior wave lands and verifies.

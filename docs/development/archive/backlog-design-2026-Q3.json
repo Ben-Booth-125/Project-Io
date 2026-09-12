@@ -13458,6 +13458,142 @@
         "requires",
         "resolution"
       ]
+    },
+    "BL-932": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-932",
+      "short_name": "POLITY_TREASURY",
+      "priority": "A",
+      "difficulty": 4,
+      "title": "The treasury: material becomes capital, and it stands at the capital seat",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "=== SUPERSEDES THE 2026-09-11 MORNING RULING. Ben chose a free-floating per-polity scalar, then moved it: \"The treasury is moved to the capital for this phase.\" ===\n\nTHE TREASURY SITS AT THE CAPITAL SEAT, one per polity, AND IT IS CAPTURABLE. That is the whole reason the location matters: CIVILISATION.md sec Materials are spent when something happens puts Empire-phase stores at the seat precisely so \"a conqueror who takes the seat takes the stores standing in it\", and a treasury with no location would discard that in the phase where distant conquest is supposed to pay. A fleet that sacks a capital must take something real.\n\nCONSOLIDATION IS THE PHASE'S OPENING ACT AND IT IS VISIBLE. Ben, 2026-09-11: \"We can just consolidate all stores of material into the polity level as the initial part of Exploration... it doesn't bother me if we introduce major centralisation as an initial step.\" At 1200 CE every seat's stores flow to the capital, ONCE. The time-lapse can show it, and it is the moment a realm stops being a set of provisioned cities and becomes a state with a purse.\n\nFED BY four sources, all of them things the polity already holds or reaches: endowment on held ground, the inherited `surviving_corridors` network, the markets standing on its seats (`region::has_market`), and subject tribute. NOTHING TOPS IT UP -- a polity that inherited little is poor, which is the asymmetry the 1200 CE handoff exists to produce.\n\nTHIS IS WHERE CIVILISATION.md's DEFERRAL LANDS: that doc says resources become capital in pass 2 and not in the Empire phase. Exploration is pass 2's first half, so the promise is kept exactly here and the Empire span stays priceless.\n\nOPEN, AND A MEASUREMENT NOT A GUESS: the arithmetic of the four income terms. Set it from a sweep that produces both rich and poor survivors, never from a number picked to make one seed solvent.\n\nDONE WHEN: a capital holds a treasury, sacking a capital transfers it, the consolidation fires once at 1200, and the treasury spread across a sweep correlates with the inherited corridor network rather than with polity size alone (BL-937's reading).",
+      "requires": [
+        "BL-931"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit 670d7072). region::treasury on the capital seat (settlement.hpp), same discipline as material_stock. run_exploration_upkeep does one-time consolidation at year==start_year (material_stock -> treasury, zeroed) plus RECURRING per-round income from three live terms (endowment, corridor touch, market bonus) -- tribute left at 0, a named hook for BL-933/934. Capture transfers treasury with the seat, same path material_stock already uses. purse_low_q wired live into choose_exploration_node. Constants are first-cut, not measured (NR-850). Sweep (8 seeds, independently reproduced in the main session): 322 living polities, treasury spread 4,048-625,424,068, correlation(treasury, corridor-touch)=0.330 -- meets the done-when bar. exploration_sim_harness 39/39 PASS (T3.x/R5.x), world_determinism ALL PASS (digests unmoved), history_sim_harness at the pre-existing 2-failure baseline.",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
+    },
+    "BL-939": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-939",
+      "short_name": "SCARCITY_SIGNAL_PER_MARKET",
+      "priority": "A",
+      "difficulty": 4,
+      "title": "A scarcity signal per good per market — the demand half, and never a price",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "SETTLED (Ben, 2026-09-11): \"For prices, I like this cheap resolution of a scarcity signal.\"\n\nTHE PROBLEM IT RESOLVES. Ben's earlier ruling gave this phase \"markets that trade named goods in a simplified form\" and gave Digitisation the companies; he then said Digitisation receives \"what prices different goods have.\" Those could not both hold. The signal is the resolution: Exploration says WHAT IS WANTED AND HOW MUCH, Digitisation resolves that into a price.\n\nTHE SHAPE. One integer per (good, market) -- how badly this market wants this good. NO CLEARING, NO ORDER BOOK, NO FIRM, NO PRICE BAND. It sits on the market regions BL-910 already stands up (`region::has_market` on capital seats).\n\nTHIS IS WHAT KEEPS CIVILISATION.md's BOUNDARY FROM DRIFTING. That doc's markets at the close are \"a place and a visible condition, not an order book\"; a real price in this phase would build the economy layer two phases early. The signal is the smallest thing that carries the information forward without becoming a market.\n\nIT IS THE DEMAND HALF ONLY. BL-940 owns the flow half, and neither is sufficient alone: a want with no throughput is an appetite that never resolves, throughput with no want is traffic with no reason.\n\nDERIVED, NEVER ROLLED. Inputs are already recorded: the directed want table (`derive_wants`), what the market's own ground is dominant in, and the holding polity's population. The existing `want::via_market` flag is the seed of this -- it already asks whether a holder's market SHOWS a good.\n\nDONE WHEN: every market carries a signal per good, the signal is legible across the contact graph to a polity that has met it, EXPLORATION tree node EX-GD-2a (Quayside Market) makes it legible to strangers, and BL-937's preference reading can be taken off it.",
+      "requires": [
+        "BL-931"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit 2c3b0a59). region::scarcity_q[4] (farm/ore/energy/port), valid only where has_market. refresh_market_scarcity derives it each round from dominant-good match, whether the holding polity holds the good anywhere, and polity population -- no clearing, no price. market_scarcity_q is the contact-gated read: a polity always reads its own market; a foreign one only once has_contact records the pair has met (the omniscience guard). wants_unmet_q wired live at the capital market into choose_exploration_node. Independently reverified: exploration_sim_harness T4.x/T5.x all PASS (own-market unconditional read, foreign-market gated-then-ungated on contact, no-market carries no signal), world_determinism ALL PASS, history_sim_harness at baseline.",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
+    },
+    "BL-940": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-940",
+      "short_name": "CORRIDOR_THROUGHPUT_AND_THE_ROAD_LADDER",
+      "priority": "A",
+      "difficulty": 5,
+      "title": "Goods move as one number per corridor, and the road ladder gets its third rung",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "SETTLED (Ben, 2026-09-11), AND A READING CORRECTED IN THE SAME EXCHANGE. Ben: \"For moving goods, we should skip this as you suggested above and use scarcity signals. Let me know if I'm reading this wrong.\" HE WAS, BY ONE STEP. What is skipped is PER-GOOD ROUTING; what is kept is ONE NUMBER PER CORRIDOR. Skipping flow entirely would leave the fleet/caravan visual (BL-943) with no quantity to threshold against, and \"throughput based logistics\" with nothing to be a throughput OF.\n\nNO CARGO OBJECT EVER EXISTS. Nothing paths a good, nothing owns a good, no convoy is an entity. GENERATION_STRATEGY.md records that the Empire pass already pays a full Dijkstra per polity per round against a region count that GROWS INSIDE THE RUN; routing goods on top of that multiplies the known hot spot across another 460 years. That is the cost this item exists to avoid.\n\nWHAT MOVES IS A QUANTITY ON A GRAPH ALREADY WALKED. `region::network_supply_q` is already 0-1000, terrain-weighted reach from the capital over held ground, discounted by a road (BL-837) and relayed by a town (BL-887) -- throughput in everything but name. Read it along the `surviving_corridors` graph the pass already carries.\n\nTHE THIRD RUNG OF THE ROAD LADDER (Ben, 2026-09-11: \"upgrade of roads\"). The Empire sim promotes a corridor by USE -- Track at `road_tier1_uses` (4), Road above it, nothing beyond. This phase adds the rung above, and it is BOUGHT WITH CAPITAL rather than earned by traffic (tree node EX-WY-1a Post Roads). That is what makes a treasury matter to a realm that never sails, and it is half of the consolidator's path.\n\nPAIRS WITH BL-939. Scarcity says what is wanted; throughput says how much arrives. The pair is what makes a trade route a consequence rather than a drawing.\n\nDONE WHEN: corridors carry materially different volumes across a sweep, the difference is traceable to the road rung, the sim's per-round cost has not materially regressed (measure it), and `throughput_bound` (BL-930's scorer term) can read a real quantity.",
+      "requires": [
+        "BL-931",
+        "BL-932"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit a6afe7b7). throughput_bound_q = 1000 - mean(network_supply_q) over held ground -- a read of the existing quantity, no new pathing, no cargo object. Road ladder third rung: road_tier_for_uses returns 3 above road_tier3_uses (200, first cut); try_build_post_road (mirrors try_upgrade_corridor) spends TREASURY (never material_stock), gated on holding EX-WY-1a, at most one promotion per polity per round, deterministic ordering. throughput_bound_q wired live into choose_exploration_node. OBSERVED AND FLAGGED RATHER THAN RETUNED (NR-849): post_roads_built totalled 0 across an 8-seed sweep -- corridors DO carry materially different volumes (15,949 corridors, uses 1-799), but the rung itself never fired, likely because holding EX-WY-1a + a tier-2 corridor + sufficient treasury is a rare simultaneous condition this early in tree/treasury adoption. Independently reverified: exploration_sim_harness T4b.x all PASS, world_determinism ALL PASS, history_sim_harness at baseline.",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
     }
   }
 }

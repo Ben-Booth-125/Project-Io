@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*31 entries — 27 open, 4 resolved.*
+*33 entries — 29 open, 4 resolved.*
 
 ---
 
@@ -398,6 +398,16 @@ EXPLORATION.md names the reading ("neighbour-war rate falls relative to frontier
 **Why it matters.** This is a judgement call on an underspecified measurement, not a mechanism decision -- but it sets what "displacement" means for every future sweep of this reading, including once BL-940/deterrence lands and the ratio is expected to move. If the intended comparison was actually against the Empires round's own rate (rather than within-span), the harness's verdict and its printed guidance text would need to change, though the raw counts it reports would not.
 
 *Files: `tools/verify/exploration_sweep.cpp`, `src/world/era_minus_one.hpp`, `src/world/hard_coded_world.cpp`*
+
+### NR-849 — OBSERVATION: the road ladder's third rung never fired in an 8-seed sweep
+*observation · raised 2026-09-12 · from BL-940, wave 2 of sprint 40.*
+
+post_roads_built totalled 0 across all 8 seeds in tools/verify/exploration_sweep.cpp's reading 9. Corridors DO carry materially different volumes (the throughput half of the reading passes), but the third-rung purchase (Post Roads, spend treasury on a tier-2->3 promotion) never fired. Likely cause: only 5-7 of ~375 polities hold ANY exploration-tree node by 1660 on a single-seed read, and firing needs a polity to hold EX-WY-1a specifically, on a tier-2 corridor, with enough treasury, simultaneously -- three independent-ish rarities compounding. Not re-tuned silently (post_road_treasury_cost is a first-cut constant, see NR-850 for the sibling treasury-constants call).
+
+### NR-850 — DECISION TAKEN: treasury income is per-round recurring (three live terms) plus the one-time 1200 consolidation, not one-time alone
+*decision taken on your behalf · raised 2026-09-12 · from BL-932, wave 2 of sprint 40.*
+
+EXPLORATION.md names the one-time material_stock->treasury consolidation as the phase's visible opening act, and separately says the treasury is 'fed by' four sources (endowment, corridor network, markets, tribute) without saying whether that feeding is a single event or continuous. Read as CONTINUOUS (three of the four sources feed it every round; tribute is a hook, zero, until BL-934 subjects exist) because 'the treasury earns, then pays its stocks, then invests' in EXPLORATION.md sec The engine is shared reads as a recurring round-level cadence, not a one-time transfer. The three income-rate constants (treasury_endowment_income_q, treasury_corridor_income_q, treasury_market_income_q) are first-cut, not measured -- sweep shows a 4,048 to 625M spread correlating 0.33 with corridor touch, which meets BL-932's own done-when bar, but the constants themselves are mine to defend, not Ben's settled numbers.
 
 ---
 
