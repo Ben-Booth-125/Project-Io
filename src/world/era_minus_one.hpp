@@ -244,4 +244,57 @@ struct era_minus_one_fixture
     int64_t ms_before_settlement = 0;
     int64_t ms_settlement        = 0;
     int64_t ms_after_era         = 0;
+
+    // --- BL-937: the Exploration span's own capture -----------------------
+    //
+    // SAME DISCIPLINE AS THE EMPIRES CAPTURE ABOVE: a harness needs the span's
+    // real input and output, and re-deriving either here would be the second
+    // construction this file exists to prevent. Populated only when
+    // `exploration_sim_enabled(params)` held AND the Empires round actually
+    // produced a living polity to hand it (hard_coded_world.cpp's own gate) —
+    // `exploration_ran` says which; every field below is the struct default
+    // otherwise.
+
+    /// True when generation actually ran the Exploration span this call.
+    bool exploration_ran = false;
+
+    history_sim_params exploration_params; ///< The span/clock the Exploration round ran on.
+    uint32_t           exploration_seed = 0;
+
+    /// The directed contact table AS THE SPAN OPENED — `pass_one_output::
+    /// contacts` at 1200 CE, i.e. before a single Exploration-round campaign
+    /// ran. This is the "already met by 1200" baseline BL-937's displacement
+    /// reading classifies a battle's pair against: a pair present here is a
+    /// LONG-CONTACTED NEIGHBOUR; a pair absent here but present in
+    /// `exploration_state.contacts` met for the first time DURING this span,
+    /// i.e. is a NEWLY-CONTACTED, frontier pair.
+    std::vector<contact> pre_exploration_contacts;
+
+    /// The Exploration span's own full output, EXACTLY as generation's own
+    /// (untraced — `exploration_params.trace_battles` is false in the real
+    /// run) call produced it — polities, the closing contact table,
+    /// battles/conquests/foundings, all of it. The ground-truth counts a
+    /// harness's own re-run (below) must reproduce bit for bit.
+    history_sim_state exploration_state;
+
+    // --- The Exploration span's PRE-SIM inputs, for a harness re-run -------
+    //
+    // WHY A SECOND CAPTURE RATHER THAN JUST TURNING ON `trace_battles` ABOVE.
+    // The Empires capture above never sets `trace_battles` on the run
+    // generation itself performs either — the field's own comment states a
+    // traced and an untraced run are byte-identical in every other output,
+    // but that guarantee is exactly why tracing belongs in a harness's own
+    // second, disposable run rather than in the one the player's world is
+    // built from: it costs memory (one `battle_trace` per battle) that a
+    // shipped generation pass has no reason to carry. So a harness wanting
+    // BL-937's per-battle attacker/defender pairs re-invokes `run_history_sim`
+    // from these captured PRE-Exploration inputs with `trace_battles` forced
+    // on, on the same "capture, do not re-derive" footing as the Empires
+    // block: everything below is what generation itself handed the span,
+    // copied before the call rather than reconstructed independently.
+    settlement_state      pre_exploration_settlement; ///< `kepler_settlement` as the span opened.
+    creed_state           pre_exploration_creeds;     ///< `kepler_creeds` as the span opened.
+    std::vector<polity>   pre_exploration_polities;   ///< `pass_one_output::polities` at 1200.
+    std::vector<grudge>   pre_exploration_grudges;    ///< `pass_one_output::grudges` at 1200.
+    std::vector<history_corridor> pre_exploration_corridors; ///< `pass_one_output::surviving_corridors` at 1200.
 };
