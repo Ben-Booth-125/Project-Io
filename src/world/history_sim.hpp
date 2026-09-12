@@ -631,10 +631,39 @@ struct history_sim_params
     /// a founding party that never returns, four is repeat traffic).
     int road_tier1_uses = 4;
     /// Uses before a Track becomes a Road (tier 2), the ancient network's
-    /// busiest lines. No tier 3 in the sim itself — Highway-grade promotion
-    /// wants a built work at both ends (`road_generation.cpp::ancient_tier`),
-    /// which is campaign-era-only bookkeeping this pass does not carry.
+    /// busiest lines. NO TIER EARNED BY TRAFFIC BEYOND THIS ONE — Highway-
+    /// grade promotion wants a built work at both ends
+    /// (`road_generation.cpp::ancient_tier`), which is campaign-era-only
+    /// bookkeeping this pass does not carry. BL-940 adds a THIRD rung below
+    /// (`road_tier3_uses`), but it is bought, never walked into existence —
+    /// see that field's own comment.
     int road_tier2_uses = 12;
+
+    // --- BL-940: the road ladder's third rung, bought with capital --------
+    // EXPLORATION.md sec Goods move as throughput: "The road ladder gets its
+    // third rung here... bought with capital rather than earned by traffic"
+    // (tree node EX-WY-1a, Post Roads).
+
+    /// THE THRESHOLD ORDINARY TRAFFIC IS NOT MEANT TO REACH. `road_tier_for_
+    /// uses` still reads a plain use count, so a purchase and enough
+    /// centuries of ordinary walking are not formally distinguishable in the
+    /// data — this is set well above what `road_tier2_uses` traffic could
+    /// plausibly accumulate across one 460-year span, so in PRACTICE the rung
+    /// is reached only by `try_build_post_road`'s direct set. A FIRST CUT,
+    /// not a measurement: raise it further if a sweep ever shows ordinary
+    /// traffic crossing it unpurchased.
+    int road_tier3_uses = 200;
+
+    /// Treasury spent (BL-932's `region::treasury`, NEVER `material_stock`)
+    /// to promote one corridor from Road (tier 2) to Post Road (tier 3), once
+    /// the spending polity holds EX-WY-1a. A FIRST CUT on the same footing as
+    /// the treasury income weights above — a measurement owed from
+    /// `exploration_sweep`, not a guess dressed up as one. Read only when
+    /// `exploration_upkeep_enabled` is set (BL-931's own default-off
+    /// discipline), so the Empire span and every fixture that never opts in
+    /// is untouched regardless of this field's value; zero disables the
+    /// purchase even where upkeep runs.
+    int64_t post_road_treasury_cost = 3000;
 
     /// SUSTAINABLE-REACH FLOOR FOR LAUNCHING A CAMPAIGN, in the same 0..1000
     /// supply currency `campaign_supply` already prices. At or below this,
@@ -1627,6 +1656,33 @@ struct history_sim_params
     // change at that hook rather than a new call site threaded through the
     // round loop from scratch.
     bool exploration_upkeep_enabled = false;
+
+    // --- BL-932: what earns the treasury -----------------------------------
+    // EXPLORATION.md sec Capital arrives names four sources; subject tribute
+    // (BL-933/934) is not built yet and contributes 0. THE ARITHMETIC IS A
+    // MEASUREMENT, NOT A GUESS (the doc's own words) — these three are a
+    // FIRST CUT, sized to produce a visible spread rather than tuned against
+    // a sweep. Re-tune from `history_sweep`/`exploration_sweep`, not by
+    // re-guessing a round number.
+
+    /// Per-mille of a polity's mean held-ground endowment
+    /// (`(farm_q+ore_q+energy_q+port_q)/4`), earned into the capital's
+    /// `region::treasury` EVERY DECISION ROUND (a rate, scaled by the step —
+    /// see § The stepped decision clock). A polity sitting on rich, wide
+    /// ground earns faster than one on poor or narrow ground BY CONSTRUCTION.
+    int treasury_endowment_income_q = 40;
+
+    /// Capital earned per decision round PER INHERITED CORRIDOR touching held
+    /// ground (`history_sim_state::supply_corridors`, seeded from
+    /// `resume_corridors` at the span's open and grown by ordinary use
+    /// thereafter) — the network term BL-937's reading binds treasury spread
+    /// to. A rate, scaled by the step.
+    int treasury_corridor_income_q = 6;
+
+    /// Flat capital earned per decision round while the capital itself
+    /// carries a market (`region::has_market`, BL-910). A rate, scaled by
+    /// the step; zero for a polity whose seat never stood a market.
+    int treasury_market_income_q = 50;
 };
 
 // ---------------------------------------------------------------------------
@@ -1656,15 +1712,27 @@ struct dated_object
 /// never a roll.
 void expire_dated_objects(std::vector<dated_object>& objects, int64_t year);
 
-/// THE UPKEEP STEP ITSELF (BL-931), called once per decision round when
-/// `history_sim_params::exploration_upkeep_enabled` is set. A DOCUMENTED
-/// NO-OP TODAY: there is no treasury to earn into, no stock to pay upkeep
-/// from, and nothing to invest beyond what the ordinary Invest verb already
-/// does — BL-932 is what gives "earn, then pay stocks, then invest"
-/// (EXPLORATION.md sec The engine is shared) an actual quantity to move.
-/// Landing the call site now, rather than at BL-932, is what keeps that item
-/// a one-line change inside this function instead of a new threading job.
-void run_exploration_upkeep(std::vector<polity>& polities, int64_t year);
+/// THE UPKEEP STEP ITSELF (BL-931/BL-932), called once per decision round
+/// when `history_sim_params::exploration_upkeep_enabled` is set. "Earn, then
+/// pay stocks, then invest" (EXPLORATION.md sec The engine is shared) — this
+/// item builds EARN: every living polity's capital seat (`region::treasury`)
+/// draws income from its held ground's endowment, the inherited corridor
+/// network, and a standing market (`history_sim_params::treasury_*_income_q`),
+/// and — ONCE, on the round at @p year == @p params.start_year, the phase's
+/// visible opening act — the seat's accumulated `material_stock` is folded
+/// into it (EXPLORATION.md sec Capital arrives: "material becomes capital").
+/// Also refreshes every market's scarcity signal (`refresh_market_scarcity`,
+/// BL-939) — the demand half runs on the same round-level cadence the
+/// treasury's own earn does, for the same reason: both are facts that go
+/// stale the moment ground changes hands. PAY (ports/navies/standing armies
+/// decaying, BL-933's stocks) and INVEST beyond the ordinary verb are still
+/// owed to a later item.
+void run_exploration_upkeep(std::vector<region>&                 regions,
+                            std::vector<polity>&                 polities,
+                            const std::vector<history_corridor>& corridors,
+                            const history_sim_params&             params,
+                            int64_t                                year,
+                            int                                    step_years);
 
 // ---------------------------------------------------------------------------
 // Actors
@@ -1984,14 +2052,16 @@ bool exploration_node_available(uint64_t mask, int node_idx);
 /// `throughput_bound`, `subject_held`) read quantities this item does not
 /// build — the capital treasury (BL-932), the scarcity signal (BL-939),
 /// corridor throughput (BL-940), and the overlord/subject link (BL-933/934)
-/// respectively — and are STUBBED AT A PINNED NEUTRAL VALUE inside the
-/// function body rather than threaded through as parameters, exactly as
-/// `choose_empire_node` already stubs `threatened`/`plague_struck`/
-/// `many_peoples` at 0. A 0 term never wins the argmax on its own account,
-/// which is honest rather than wrong, and a harness pins each stub's value
-/// so a later item's landing shows as a diff.
+/// respectively. `purse_low_q`, `wants_unmet_q` and `throughput_bound_q` are
+/// now real, threaded-through parameters (BL-932/939/940); `subject_held`
+/// alone is still STUBBED AT A PINNED NEUTRAL VALUE inside the function body,
+/// exactly as `choose_empire_node` stubs `threatened`/`plague_struck`/
+/// `many_peoples` at 0 — a 0 term never wins the argmax on its own account,
+/// which is honest rather than wrong, and a harness pins the remaining
+/// stub's value so BL-933/934 landing shows as a diff.
 int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
-                             int ground_port_q, int ground_farm_q, int surplus_q);
+                             int ground_port_q, int ground_farm_q, int surplus_q,
+                             int purse_low_q, int wants_unmet_q, int throughput_bound_q);
 
 /// THE RIM (BL-930): has this polity crossed EX-SP-3m, "The Long Reckoning"?
 /// A per-polity boolean, read straight off the mask — this is the fact
@@ -2558,6 +2628,13 @@ struct history_sim_state
     int64_t supply_sites_upgraded_corridors = 0;
     int64_t materials_spent_on_supply_sites = 0;
 
+    /// BL-940 -- corridors promoted to the road ladder's third rung (Post
+    /// Road), and the treasury actually spent on them. The observable that
+    /// separates "the mechanism never fires" from "no polity ever holds
+    /// EX-WY-1a in this seed", the same split `supply_sites_upgraded` makes.
+    int64_t post_roads_built           = 0;
+    int64_t treasury_spent_on_roads    = 0;
+
     /// BL-896 -- how many successor realms the dark age produced, and how much
     /// ground walked away with them. The pair is the item's "done when": an
     /// empire that forms and then fragments shows both non-zero, and a world
@@ -2864,6 +2941,35 @@ struct want
 std::vector<want> derive_wants(const std::vector<region>& regions,
                                 const std::vector<contact>& contacts,
                                 const std::vector<polity>&  polities);
+
+// ---------------------------------------------------------------------------
+// The scarcity signal (BL-939) — EXPLORATION.md sec There is no price here,
+// only a scarcity signal.
+// ---------------------------------------------------------------------------
+
+/// Index into `region::scarcity_q`/the fixed 4-good order, or -1 for
+/// `region_class::none` (never scored). farm=0, ore=1, energy=2, port=3.
+int scarcity_good_index(region_class good);
+
+/// Refreshes every market region's `scarcity_q`, in place, for one decision
+/// round (BL-939). NO PRICE, NO CLEARING — a market's signal for a good is 0
+/// where its OWN ground is dominant in it (nothing to want locally), and
+/// otherwise a function of whether its HOLDING POLITY lacks the good
+/// anywhere on its ground at all, plus that polity's own population as a
+/// demand-pressure term. Called from `run_exploration_upkeep`, never on its
+/// own — see that function for when in the round it runs.
+void refresh_market_scarcity(std::vector<region>& regions, const std::vector<polity>& polities);
+
+/// Read @p market_region's scarcity signal for @p good, AS VISIBLE TO
+/// @p viewer_polity — the omniscience guard every want-shaped read in this
+/// file applies (CIVILISATION.md sec The directed want): a polity reads its
+/// OWN market's signal unconditionally, a foreign market's once
+/// `has_contact` says the pair has met, and 0 otherwise (never a market at
+/// all, or a stranger who has not met the holder — EXPLORATION_TREE.md's
+/// EX-GD-2a, Quayside Market, is what widens the latter case for a polity
+/// that holds it; that node's own consumer is not built by this item).
+int market_scarcity_q(const std::vector<region>& regions, const history_sim_state& s,
+                       int viewer_polity, int market_region, region_class good);
 
 // ---------------------------------------------------------------------------
 // The turbulence lean, resolved (BL-839)

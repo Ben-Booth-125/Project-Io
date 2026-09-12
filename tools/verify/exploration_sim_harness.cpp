@@ -29,6 +29,7 @@
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -132,15 +133,121 @@ int main()
         check(exploration_node_available(mask, sp2a),
               "T3.0  EX-SP-2a (purse_low) is a legal target once ring 2 opens");
 
-        // Called with every OTHER term maxed out, the argmax still considers
+        // Called with every OTHER term maxed out and purse_low itself EMPTY
+        // (treasury full, so purse_low_q == 0), the argmax still considers
         // EX-SP-2a (it does not vanish from the candidate set), and it never
-        // wins over a live term at the same ring -- confirming purse_low
-        // contributes nothing to the score it competes on.
+        // wins over a live term at the same ring -- confirming an EMPTY
+        // purse_low loses fairly rather than by being wired wrong.
         const int chosen_high_signals = choose_exploration_node(
             mask, /*stores_low_q=*/1000, /*reach_bound_q=*/1000,
-            /*ground_port_q=*/1000, /*ground_farm_q=*/1000, /*surplus_q=*/1000);
+            /*ground_port_q=*/1000, /*ground_farm_q=*/1000, /*surplus_q=*/1000,
+            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
         check(chosen_high_signals != sp2a,
-              "T3.1  purse_low (stubbed 0) loses to any live ring-2 term when one is available");
+              "T3.1  purse_low at 0 (full treasury) loses to any live ring-2 term when one is "
+              "available");
+
+        // BL-932: purse_low IS live now -- an EMPTY treasury (purse_low_q at
+        // its own max) DOES win EX-SP-2a when nothing else competes at all.
+        const int chosen_empty_purse = choose_exploration_node(
+            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
+            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
+            /*purse_low_q=*/1000, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
+        check(chosen_empty_purse == sp2a,
+              "T3.2  purse_low at 1000 (an empty treasury) wins EX-SP-2a when nothing else "
+              "competes -- BL-932 wired it live");
+    }
+
+    // -----------------------------------------------------------------
+    // T4: BL-939 -- wants_unmet, live at EX-GD-2a (Quayside Market)
+    // -----------------------------------------------------------------
+    {
+        const int gd1a = find_node("EX-GD-1a");
+        const int gd2a = find_node("EX-GD-2a"); // wants_unmet
+        const int sp1m = find_node("EX-SP-1m");
+        const uint64_t mask = (1ULL << sp1m) | (1ULL << gd1a);
+
+        check(exploration_node_available(mask, gd2a),
+              "T4.0  EX-GD-2a (wants_unmet) is a legal target once its ring-1 neighbour is held");
+
+        const int chosen_no_want = choose_exploration_node(
+            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
+            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
+            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
+        check(chosen_no_want != gd2a,
+              "T4.1  wants_unmet at 0 (every want already met) does not single out EX-GD-2a");
+
+        const int chosen_high_want = choose_exploration_node(
+            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
+            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
+            /*purse_low_q=*/0, /*wants_unmet_q=*/1000, /*throughput_bound_q=*/0);
+        check(chosen_high_want == gd2a,
+              "T4.2  wants_unmet at 1000 wins EX-GD-2a when nothing else competes -- BL-939 "
+              "wired it live");
+    }
+
+    // -----------------------------------------------------------------
+    // T4b: BL-940 -- throughput_bound, live at EX-WY-2a
+    // -----------------------------------------------------------------
+    {
+        const int wy1a = find_node("EX-WY-1a");
+        const int wy2a = find_node("EX-WY-2a"); // throughput_bound
+        const int sp1m = find_node("EX-SP-1m");
+        const uint64_t mask = (1ULL << sp1m) | (1ULL << wy1a);
+
+        check(exploration_node_available(mask, wy2a),
+              "T4b.0  EX-WY-2a (throughput_bound) is a legal target once Post Roads is held");
+
+        const int chosen_unbound = choose_exploration_node(
+            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
+            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
+            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
+        check(chosen_unbound != wy2a,
+              "T4b.1  throughput_bound at 0 (a free-flowing network) does not single out EX-WY-2a");
+
+        const int chosen_bound = choose_exploration_node(
+            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
+            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
+            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/1000);
+        check(chosen_bound == wy2a,
+              "T4b.2  throughput_bound at 1000 wins EX-WY-2a when nothing else competes -- "
+              "BL-940 wired it live");
+    }
+
+    // -----------------------------------------------------------------
+    // T5: BL-939 -- the scarcity signal itself (refresh + the contact gate)
+    // -----------------------------------------------------------------
+    {
+        std::vector<region> regions(2);
+        regions[0].nation = 0; regions[0].has_market = true;
+        regions[0].dominant = region_class::none; // wants everything, dominates nothing
+        regions[1].nation = 1; regions[1].dominant = region_class::farm; // no market
+
+        std::vector<polity> qs(2);
+        qs[0].id = 0; qs[0].alive = true;
+        qs[1].id = 1; qs[1].alive = true;
+
+        refresh_market_scarcity(regions, qs);
+        check(regions[0].scarcity_q[scarcity_good_index(region_class::farm)] > 0,
+              "T5.1  a market on ground its own polity holds nowhere carries a live scarcity signal");
+        check(regions[1].scarcity_q[0] == 0 && regions[1].scarcity_q[1] == 0
+           && regions[1].scarcity_q[2] == 0 && regions[1].scarcity_q[3] == 0,
+              "T5.2  a region with no market carries no scarcity signal at all");
+
+        history_sim_state s;
+        check(market_scarcity_q(regions, s, /*viewer=*/0, /*market_region=*/0, region_class::farm)
+                  == regions[0].scarcity_q[scarcity_good_index(region_class::farm)],
+              "T5.3  a polity reads its OWN market's signal unconditionally");
+        check(market_scarcity_q(regions, s, /*viewer=*/1, /*market_region=*/0, region_class::farm) == 0,
+              "T5.4  a polity that has never met the market's holder reads 0 (the omniscience guard)");
+
+        s.contacts.push_back(contact{1, 0}); // viewer 1 reading holder 0's market
+        std::sort(s.contacts.begin(), s.contacts.end(),
+                  [](const contact& a, const contact& b) {
+                      return a.from != b.from ? a.from < b.from : a.to < b.to;
+                  });
+        check(market_scarcity_q(regions, s, /*viewer=*/1, /*market_region=*/0, region_class::farm)
+                  == regions[0].scarcity_q[scarcity_good_index(region_class::farm)],
+              "T5.5  once contact is recorded, a foreign viewer reads the same signal the holder does");
     }
 
     // -----------------------------------------------------------------
@@ -222,6 +329,15 @@ int main()
                     static_cast<long long>(ex1.conquests), static_cast<long long>(ex1.foundings),
                     static_cast<int>(p1.polities.size()), static_cast<int>(ex1.polities.size()));
 
+        // BL-940 -- REPORTED, not gated: whether any polity in THIS seed ever
+        // held EX-WY-1a and had a treasury to spend is a fact about the seed,
+        // same discipline `unsustained_attrition_events` and the naval
+        // counters already hold to elsewhere in this codebase.
+        std::printf("      exploration road ladder: post_roads_built=%lld  "
+                    "treasury_spent_on_roads=%lld\n",
+                    static_cast<long long>(ex1.post_roads_built),
+                    static_cast<long long>(ex1.treasury_spent_on_roads));
+
         // BL-930, folded into a real run: at least the tree's own root can
         // fire once the empire rim is available to SOME polity, or none do
         // (a legitimate seed, per EXPLORATION_TREE.md's own sizing caveat) --
@@ -260,20 +376,37 @@ int main()
     }
 
     // -----------------------------------------------------------------
-    // R5: the upkeep hook is callable and moves nothing (documented no-op)
+    // R5: the upkeep hook is callable and EARNS (BL-932 gave it a body)
     // -----------------------------------------------------------------
     {
+        std::vector<region> regions(2);
+        regions[0].nation = 0; regions[0].farm_q = 1000; regions[0].ore_q = 1000;
+        regions[0].energy_q = 1000; regions[0].port_q = 1000;
+        regions[0].has_market = true;
+        regions[1].nation = 1; // a poor, unconnected polity's capital: no endowment set
+
         std::vector<polity> qs(2);
-        qs[0].capacity[0] = 3; qs[1].cohesion_q = 700;
-        const std::vector<polity> before = qs;
-        run_exploration_upkeep(qs, 1234);
-        bool unchanged = qs.size() == before.size();
-        for (std::size_t i = 0; unchanged && i < qs.size(); ++i)
-            unchanged = qs[i].capacity[0] == before[i].capacity[0]
-                     && qs[i].cohesion_q == before[i].cohesion_q
-                     && qs[i].exploration_mask == before[i].exploration_mask
-                     && qs[i].empire_mask == before[i].empire_mask;
-        check(unchanged, "R5  run_exploration_upkeep moves nothing today (BL-932 gives it a body)");
+        qs[0].capital = 0; qs[0].capacity[0] = 3;
+        qs[1].capital = 1; qs[1].cohesion_q = 700;
+        history_sim_params ep2;
+        ep2.start_year = 1200; // consolidation year: not this call's `year`
+
+        run_exploration_upkeep(regions, qs, /*corridors=*/{}, ep2, /*year=*/1234, /*step_years=*/4);
+
+        check(regions[0].treasury > regions[1].treasury,
+              "R5.1  a rich, market-carrying capital earns more treasury than a bare one");
+        check(regions[1].treasury == 0,
+              "R5.2  a capital with no endowment, no market and no corridor touch earns nothing");
+        check(qs[0].capacity[0] == 3 && qs[1].cohesion_q == 700,
+              "R5.3  upkeep does not disturb fields it has no business touching");
+
+        // R5.4: the ONE-TIME consolidation, at year == start_year only.
+        regions[0].material_stock = 500;
+        const int64_t before_treasury = regions[0].treasury;
+        run_exploration_upkeep(regions, qs, {}, ep2, /*year=*/1200, /*step_years=*/4);
+        check(regions[0].treasury >= before_treasury + 500 && regions[0].material_stock == 0,
+              "R5.4  consolidation folds material_stock into treasury once, at the span's own "
+              "start year, and empties the seat's material_stock");
     }
 
     std::printf("\n%s (%d failure%s)\n",

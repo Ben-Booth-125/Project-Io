@@ -7,6 +7,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <queue>
 #include <unordered_map>
 
@@ -466,15 +467,170 @@ void expire_dated_objects(std::vector<dated_object>& objects, int64_t year)
         objects.end());
 }
 
-void run_exploration_upkeep(std::vector<polity>& /*polities*/, int64_t /*year*/)
+// ---------------------------------------------------------------------------
+// BL-939 — the scarcity signal
+// ---------------------------------------------------------------------------
+
+int scarcity_good_index(region_class good)
 {
-    // A DOCUMENTED NO-OP (BL-931/BL-932). "The treasury earns, then pays its
-    // stocks, then invests" (EXPLORATION.md sec The engine is shared) needs a
-    // treasury to earn into and stocks to pay upkeep from, and neither exists
-    // yet — the capital arrives at BL-932. This function is the call site the
-    // round loop already reaches every decision round
-    // (`history_sim_params::exploration_upkeep_enabled`), so BL-932 fills in
-    // a body here rather than threading a new hook through the loop.
+    switch (good)
+    {
+    case region_class::farm:   return 0;
+    case region_class::ore:    return 1;
+    case region_class::energy: return 2;
+    case region_class::port:   return 3;
+    case region_class::none:   return -1;
+    }
+    return -1;
+}
+
+void refresh_market_scarcity(std::vector<region>& regions, const std::vector<polity>& polities)
+{
+    constexpr int             good_count = 4;
+    const region_class goods[good_count] =
+        { region_class::farm, region_class::ore, region_class::energy, region_class::port };
+
+    // Per-polity, per-good: does it hold AT LEAST ONE region dominant in the
+    // good, anywhere on its ground? Independently derived here rather than
+    // read off `derive_wants`'s own private table -- that function runs once,
+    // at the pass 1 -> pass 2 handoff; this one runs every decision round of
+    // the Exploration span, on ground that is still changing hands.
+    std::vector<std::array<bool, good_count>> holds(polities.size());
+    for (auto& row : holds) row.fill(false);
+    std::vector<int64_t> polity_population(polities.size(), 0);
+    for (const region& r : regions)
+    {
+        if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size()) continue;
+        const std::size_t n = static_cast<std::size_t>(r.nation);
+        polity_population[n] += r.population;
+        for (int g = 0; g < good_count; ++g)
+            if (r.dominant == goods[static_cast<std::size_t>(g)])
+                holds[n][static_cast<std::size_t>(g)] = true;
+    }
+
+    for (region& r : regions)
+    {
+        if (!r.has_market)
+        {
+            for (int g = 0; g < good_count; ++g) r.scarcity_q[g] = 0;
+            continue;
+        }
+        if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size())
+        {
+            for (int g = 0; g < good_count; ++g) r.scarcity_q[g] = 0;
+            continue;
+        }
+        const std::size_t n = static_cast<std::size_t>(r.nation);
+
+        // A DEMAND-PRESSURE TERM FROM THE POLITY'S OWN POPULATION. A
+        // placeholder scale (same footing as the treasury income weights,
+        // BL-932) -- a measurement owed, not a guess dressed up as one.
+        const int pop_term_q = clampi(static_cast<int>(polity_population[n] / 5000), 0, 1000);
+
+        for (int g = 0; g < good_count; ++g)
+        {
+            // The market's OWN ground already carries this good -- nothing
+            // to want locally, regardless of what the rest of the realm
+            // holds.
+            if (r.dominant == goods[static_cast<std::size_t>(g)]) { r.scarcity_q[g] = 0; continue; }
+
+            // A good the polity holds NOWHERE is a sharper want than one it
+            // merely lacks at this particular market.
+            const int base_q = holds[n][static_cast<std::size_t>(g)] ? 300 : 700;
+            r.scarcity_q[g] = clampi(base_q + pop_term_q / 4, 0, 1000);
+        }
+    }
+}
+
+int market_scarcity_q(const std::vector<region>& regions, const history_sim_state& s,
+                       int viewer_polity, int market_region, region_class good)
+{
+    if (market_region < 0 || static_cast<std::size_t>(market_region) >= regions.size()) return 0;
+    const region& r = regions[static_cast<std::size_t>(market_region)];
+    if (!r.has_market) return 0;
+    const int gi = scarcity_good_index(good);
+    if (gi < 0) return 0;
+    if (r.nation == viewer_polity) return r.scarcity_q[gi]; // a polity always knows its own market
+    if (!has_contact(s, viewer_polity, r.nation)) return 0; // the omniscience guard
+    return r.scarcity_q[gi];
+}
+
+void run_exploration_upkeep(std::vector<region>&                 regions,
+                            std::vector<polity>&                 polities,
+                            const std::vector<history_corridor>& corridors,
+                            const history_sim_params&             params,
+                            int64_t                                year,
+                            int                                    step_years)
+{
+    // BL-939 -- the demand half, refreshed on the same round-level cadence
+    // the treasury's own earn runs on: a market's signal is a fact about
+    // ground that is still changing hands, exactly like the treasury's own
+    // endowment/network/market terms below.
+    refresh_market_scarcity(regions, polities);
+
+    // BL-932 -- EARN, the first of "earn, then pay stocks, then invest"
+    // (EXPLORATION.md sec The engine is shared). PAY and INVEST beyond the
+    // ordinary verb are still owed to a later item (BL-933's stocks).
+    for (polity& q : polities)
+    {
+        if (!q.alive) continue;
+        if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= regions.size()) continue;
+        region& seat = regions[static_cast<std::size_t>(q.capital)];
+
+        // ---- CONSOLIDATION: THE PHASE'S OPENING ACT, ONCE (EXPLORATION.md
+        // sec Capital arrives: "material becomes capital"). Fires exactly on
+        // the round at the span's own start year -- which for every caller
+        // before this item is unreachable, because `exploration_upkeep_
+        // enabled` is false throughout the Empire span.
+        if (year == params.start_year)
+        {
+            seat.treasury += seat.material_stock;
+            seat.material_stock = 0;
+        }
+
+        // ---- ONGOING EARN: endowment, the inherited network, a market. ----
+        // "Fed by what the polity already holds and already reaches" — read
+        // fresh every round rather than cached, so ground lost or gained this
+        // round is reflected the very next time the treasury earns.
+        int64_t endowment_sum_q = 0;
+        int64_t held_count      = 0;
+        for (const region& r : regions)
+        {
+            if (r.nation != q.id) continue;
+            endowment_sum_q += (r.farm_q + r.ore_q + r.energy_q + r.port_q) / 4;
+            ++held_count;
+        }
+        const int64_t endowment_mean_q = held_count > 0 ? endowment_sum_q / held_count : 0;
+
+        int64_t corridor_touch = 0;
+        for (const history_corridor& c : corridors)
+        {
+            const bool a_held = static_cast<std::size_t>(c.a) < regions.size()
+                              && regions[c.a].nation == q.id;
+            const bool b_held = static_cast<std::size_t>(c.b) < regions.size()
+                              && regions[c.b].nation == q.id;
+            if (a_held || b_held) ++corridor_touch;
+        }
+
+        const int64_t endowment_income =
+            (endowment_mean_q * params.treasury_endowment_income_q / 1000)
+                * std::max(step_years, 1);
+        const int64_t corridor_income =
+            corridor_touch * params.treasury_corridor_income_q * std::max(step_years, 1);
+        const int64_t market_income =
+            seat.has_market
+                ? static_cast<int64_t>(params.treasury_market_income_q) * std::max(step_years, 1)
+                : 0;
+        // Subject tribute (EXPLORATION.md sec Capital arrives): a fourth
+        // source named by the design, left at 0 -- subjects do not exist yet
+        // (BL-933/934). A hook, not a guess: the design says four sources
+        // and this is the fourth's place, ready for that item to fill.
+        const int64_t tribute_income = 0;
+
+        seat.treasury = clampi64(
+            seat.treasury + endowment_income + corridor_income + market_income + tribute_income,
+            0, 1LL << 48);
+    }
 }
 
 history_sim_state run_history_sim(settlement_state&         ss,
@@ -841,6 +997,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
         return (static_cast<uint64_t>(lo) << 32) | static_cast<uint64_t>(hi);
     };
     const auto road_tier_for_uses = [&](int uses) {
+        // BL-940: the third rung. ORDINARY TRAFFIC is not meant to reach
+        // `road_tier3_uses` (see that field's own comment) — it is bought,
+        // by `try_build_post_road` below, which sets the live count straight
+        // to the threshold rather than incrementing toward it.
+        if (uses >= params.road_tier3_uses) return 3;
         if (uses >= params.road_tier2_uses) return 2;
         if (uses >= params.road_tier1_uses) return 1;
         return 0;
@@ -1029,6 +1190,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // appear there or it renders as if it had never been walked at all.
         corridor_uses.push_back({lo, hi});
         note_event(lapse_event_kind::road_promoted, lo, road_tier_for_uses(need), hi);
+        return true;
+    };
+
+    // BL-940 -- THE ROAD LADDER'S THIRD RUNG, BOUGHT WITH CAPITAL
+    // (EXPLORATION.md sec Goods move as throughput: EX-WY-1a, Post Roads).
+    // SAME SHAPE AS `try_upgrade_corridor` ABOVE, deliberately not folded
+    // into it: that function spends `material_stock` and stops at tier 2 by
+    // construction (`cur_tier >= 2` refuses); this one spends the TREASURY
+    // (BL-932, `region::treasury`) and is the only path that can ever reach
+    // `road_tier3_uses`. Gated on `params.exploration_upkeep_enabled` at the
+    // call site, not here, exactly like `try_upgrade_corridor`'s own
+    // material-cost gate — a zero cost disables it unconditionally.
+    const auto try_build_post_road = [&](int a, int b, int payer_capital) -> bool {
+        if (a < 0 || b < 0 || a == b) return false;
+        if (a >= static_cast<int>(owner_index_limit)
+         || b >= static_cast<int>(owner_index_limit)) return false;
+        if (params.post_road_treasury_cost <= 0) return false;
+        if (road_tier_between(a, b) != 2) return false; // only a Road may become a Post Road
+        if (payer_capital < 0 || static_cast<std::size_t>(payer_capital) >= ss.regions.size())
+            return false;
+        region& seat = ss.regions[static_cast<std::size_t>(payer_capital)];
+        if (seat.treasury < params.post_road_treasury_cost) return false;
+
+        seat.treasury -= params.post_road_treasury_cost;
+        road_uses_live[edge_key(a, b)] = params.road_tier3_uses;
+        ++roads_version;
+        ++out.post_roads_built;
+        out.treasury_spent_on_roads += params.post_road_treasury_cost;
+
+        const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
+        const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
+        corridor_uses.push_back({lo, hi}); // same reasoning as try_upgrade_corridor's own push.
+        note_event(lapse_event_kind::road_promoted, lo, 3, hi);
         return true;
     };
 
@@ -2185,7 +2379,67 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // Empire span — every caller before this item — never takes it.
         expire_dated_objects(out.dated_objects, y);
         if (params.exploration_upkeep_enabled)
-            run_exploration_upkeep(out.polities, y);
+        {
+            run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
+                                   params, y, step_years);
+
+            // ---- BL-940: THE ROAD LADDER'S THIRD RUNG, BOUGHT WITH CAPITAL.
+            //
+            // A polity holding EX-WY-1a (Post Roads) may promote AT MOST ONE
+            // of its own Road-tier (2) corridors to a Post Road (3) per
+            // round, if its treasury covers `post_road_treasury_cost` — the
+            // treasury decides which frontier earns it, not traffic
+            // (`try_build_post_road` above refuses anything not already at
+            // tier 2). Bounded to one purchase per polity per round so this
+            // addition's cost cannot scale with corridor count.
+            //
+            // THE PICK IS DETERMINISTIC: the polity's own held regions,
+            // walked in ascending region-index order (owner[] order, not a
+            // hash), each one's neighbour list read in its own stored
+            // (insertion) order — the same discipline `rebuild_reach`'s own
+            // walks already hold to.
+            // NOT a function-local `static`: `run_history_sim` is called
+            // repeatedly within one process (every determinism harness does
+            // this), and while the looked-up index cannot itself change
+            // between calls, a cached local defeats any inspection tool that
+            // assumes this function carries no state across invocations.
+            // The tree is ~31 nodes; the lookup costs nothing measurable.
+            int post_roads_node = -1;
+            for (int i = 0; i < io::exploration_tree::node_count; ++i)
+                if (std::strcmp(io::exploration_tree::nodes[i].id, "EX-WY-1a") == 0)
+                { post_roads_node = i; break; }
+            if (post_roads_node >= 0 && params.post_road_treasury_cost > 0)
+            {
+                for (polity& q : out.polities)
+                {
+                    if (!q.alive) continue;
+                    if (!(q.exploration_mask & (1ULL << post_roads_node))) continue;
+                    if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= ss.regions.size())
+                        continue;
+                    if (ss.regions[static_cast<std::size_t>(q.capital)].treasury
+                        < params.post_road_treasury_cost)
+                        continue;
+
+                    int found_a = -1, found_b = -1;
+                    for (std::size_t hi = 0; hi < ss.regions.size() && found_a < 0; ++hi)
+                    {
+                        if (ss.regions[hi].nation != q.id) continue;
+                        if (hi >= neighbours.size()) continue;
+                        for (int nb : neighbours[hi])
+                        {
+                            if (nb < 0 || static_cast<std::size_t>(nb) >= ss.regions.size()) continue;
+                            if (ss.regions[static_cast<std::size_t>(nb)].nation != q.id) continue;
+                            if (road_tier_between(static_cast<int>(hi), nb) != 2) continue;
+                            found_a = static_cast<int>(hi);
+                            found_b = nb;
+                            break;
+                        }
+                    }
+                    if (found_a >= 0)
+                        try_build_post_road(found_a, found_b, q.capital);
+                }
+            }
+        }
 
         // ---- GRUDGE DECAY (BL-827) ---------------------------------------
         //
@@ -4518,9 +4772,48 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (q.exploration_investing < 0
                          || !exploration_node_available(q.exploration_mask, q.exploration_investing))
                         {
+                            // BL-932 -- PURSE_LOW, same shape as `stores_low_q`
+                            // above (a placeholder scale, TREES.md sec Effects),
+                            // read off the capital's own `treasury` (`seat`,
+                            // declared above in this same block) rather than
+                            // its `material_stock`: how empty the PURSE sits,
+                            // as distinct from how empty the granary does.
+                            const int purse_low_q = clampi(
+                                1000 - static_cast<int>(clampi64(seat.treasury / 4, 0, 1000)),
+                                0, 1000);
+                            // BL-939 -- WANTS_UNMET, read off the capital's
+                            // OWN market (a polity always knows its own
+                            // want, so no contact gate applies here -- that
+                            // gate is `market_scarcity_q`'s, for reading a
+                            // FOREIGN market). Mean over the four goods;
+                            // zero where the capital never stood a market.
+                            int wants_unmet_q = 0;
+                            if (seat.has_market)
+                            {
+                                int sum_q = 0;
+                                for (int g = 0; g < 4; ++g) sum_q += seat.scarcity_q[g];
+                                wants_unmet_q = clampi(sum_q / 4, 0, 1000);
+                            }
+                            // BL-940 -- THROUGHPUT_BOUND: how constrained the
+                            // polity's own network currently runs, read off
+                            // `region::network_supply_q` (already 0-1000,
+                            // terrain-and-road-priced reach from the capital
+                            // over held ground -- EXPLORATION.md sec Goods
+                            // move as throughput: "throughput in everything
+                            // but name") over the SAME `held` set the ground
+                            // means above already walk. Mean supply, inverted:
+                            // a realm whose own roads run thin scores high
+                            // here, which is what makes Post Roads (EX-WY-1a)
+                            // and its ring-2 siblings worth investing in.
+                            int64_t supply_sum_q = 0;
+                            for (int hi : held)
+                                supply_sum_q += ss.regions[static_cast<std::size_t>(hi)].network_supply_q;
+                            const int throughput_bound_q = clampi(
+                                1000 - static_cast<int>(supply_sum_q / n_held), 0, 1000);
                             q.exploration_investing = static_cast<int16_t>(choose_exploration_node(
                                 q.exploration_mask, stores_low_q, reach_bound_q,
-                                ground_port_q, ground_farm_q, surplus_q));
+                                ground_port_q, ground_farm_q, surplus_q,
+                                purse_low_q, wants_unmet_q, throughput_bound_q));
                             q.exploration_progress_q = 0;
                         }
 
@@ -5570,7 +5863,8 @@ bool exploration_node_available(uint64_t mask, int node_idx)
 }
 
 int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
-                             int ground_port_q, int ground_farm_q, int surplus_q)
+                             int ground_port_q, int ground_farm_q, int surplus_q,
+                             int purse_low_q, int wants_unmet_q, int throughput_bound_q)
 {
     using namespace io::exploration_tree;
 
@@ -5578,36 +5872,32 @@ int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
     // against this tree's own term set (exploration_tree_data.hpp's
     // `scorer_term`, 12 distinct terms across the 31 nodes).
     //
-    // FOUR TERMS ARE STUBBED AT A PINNED 0, NAMED HERE (BL-930, per
-    // EXPLORATION_TREE.md sec The scorer):
-    //   purse_low        -- the capital treasury (BL-932) does not exist yet.
-    //   wants_unmet       -- the scarcity signal (BL-939) does not exist yet.
-    //   throughput_bound  -- corridor throughput (BL-940) does not exist yet.
-    //   subject_held      -- the overlord/subject link (BL-933/934) does not
-    //                        exist yet.
-    // A 0 term never wins the argmax on its own account (it can still lose to
-    // one), which is honest rather than wrong -- exactly the discipline
-    // `choose_empire_node` already applies to `threatened`/`plague_struck`/
-    // `many_peoples`. `threatened` and `known` are ALSO 0 here for the same
-    // reason `choose_empire_node` leaves `threatened` at 0: this slice has no
-    // cheap "visible capability" or "foreign agent" signal to read yet.
+    // `purse_low`/`wants_unmet`/`throughput_bound` are now real, threaded-
+    // through arguments (BL-932/BL-939/BL-940). `subject_held` STAYS STUBBED
+    // AT A PINNED 0 (BL-930, per EXPLORATION_TREE.md sec The scorer): the
+    // overlord/subject link (BL-933/934) does not exist yet. A 0 term never
+    // wins the argmax on its own account (it can still lose to one), which is
+    // honest rather than wrong -- exactly the discipline `choose_empire_node`
+    // already applies to `threatened`/`plague_struck`/`many_peoples`.
+    // `threatened` and `known` are ALSO 0 here for the same reason
+    // `choose_empire_node` leaves `threatened` at 0: this slice has no cheap
+    // "visible capability" or "foreign agent" signal to read yet.
     //
-    // A HARNESS PINS ALL SIX OF THESE AT 0 (BL-930's own assertion), so the
-    // day any of `purse_low`/`wants_unmet`/`throughput_bound`/`subject_held`
+    // A HARNESS PINS THE REMAINING STUB (`subject_held`) AT 0, so the day it
     // stops being a constant is visible as a diff rather than a silent
     // change.
     const int term_value[term_count] = {
         /* stores_low       */ stores_low_q,
         /* spire            */ 1000,
-        /* purse_low        */ 0, // BL-932
+        /* purse_low        */ purse_low_q,       // BL-932
         /* surplus          */ surplus_q,
         /* coastal_holdings */ ground_port_q,
         /* reach_bound      */ reach_bound_q,
-        /* wants_unmet      */ 0, // BL-939
+        /* wants_unmet      */ wants_unmet_q,     // BL-939
         /* threatened       */ 0,
         /* ground_port      */ ground_port_q,
         /* subject_held     */ 0, // BL-933/934
-        /* throughput_bound */ 0, // BL-940
+        /* throughput_bound */ throughput_bound_q, // BL-940
         /* known            */ 0,
     };
 
