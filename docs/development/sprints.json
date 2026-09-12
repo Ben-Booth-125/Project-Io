@@ -215,7 +215,7 @@
    ]
   }
  ],
- "next_up": "SPRINT 39 IS OPEN (redefined 2026-09-11) - the drama of the time-lapse. Sixteen items filed (BL-914..BL-929, BL-928 sprintless); the five calls (NR-835..NR-839) are resolved. Batch-deliver in one go: BL-926 first, then the independent wave, then the dependents, BL-923 last. Sprint 38 is closed for real (2026-09-11); sprint 40 (the new world) waits on what this sprint leaves unorganised.",
+ "next_up": "SPRINT 40 IS OPEN AND DECOMPOSED (2026-09-11) - EXPLORATION, the simulated age 1200 -> 1660 CE. Fifteen items, BL-930..BL-944 (BL-945 filed but PARKED for digitisation). docs/generation/EXPLORATION.md is the authority; its technology tree is authored and linting; nothing is built and src/ is untouched. SEQUENCE: BL-937 (the ten readings) FIRST - the named risk is a frozen map and it is invisible without instrumentation - then BL-930/BL-931 (tree and span), then the three quantities (BL-932 treasury, BL-939 scarcity signal, BL-940 corridor throughput), then the mechanisms that spend and bind, then the claims, then presentation. docs/development/NEXT_SESSION.md is the handover. ONE DECISION OWED FROM BEN before BL-944 (the schism verb): reassertion fires zero times in sixteen worlds, so the creed substrate needs a higher floor or a second binding term. Sprint 39 closed 2026-09-11.",
  "footer_notes": [
   "**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first."
  ]

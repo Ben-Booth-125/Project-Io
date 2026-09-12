@@ -10,6 +10,62 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-11 — Sprint 39's session concludes: the full-tree reading, BL-928 dropped, levers accepted for sprint 40
+
+**Runtime:** closing entry for the same session as the two below. Full / Batch Delivery close-out,
+final step.
+
+### The full-tree 16-seed reading, on top of the wave-1 reading already on file
+
+The two entries below each carry a reading taken partway through integration (wave 1 alone, then
+the wave-2/3 close-out that didn't re-sweep). This is the honest one: all fifteen sprint-39 items
+together, 16 seeds, `--epoch 0`, against the pre-sprint main baseline (`6995b41e`):
+
+| metric | pre-sprint-39 baseline | wave 1 alone | full tree (all 15 items) |
+|---|---|---|---|
+| powers at epoch | 42 | 42 | 59 |
+| largest share | 11% | 21% | 8% |
+| battles/world | 3114 | 689 | 6694 |
+| conquests/world | 1812 | 311 | 5569 |
+| secessions/world | 2 | 2 | 164 |
+| regions ever conquered | 54 | — | 621 (of ~1340) |
+| taken once & kept | 66% | 66% | 24% |
+| taken 3+ times | 31% | 25% | 67% |
+| worlds showing rise-and-fall | 15/16 | 7/16 | 16/16 |
+
+Two things worth naming plainly, since they pull in opposite directions. Rise-and-fall is now
+**universal** — every one of 16 worlds shows at least one empire forming and later falling, up
+from 7/16 with wave 1 alone and 15/16 on the pre-sprint baseline: the "drama" the sprint set out
+to deliver is unambiguously present. But TAKEN 3+ TIMES more than doubled to 67%, which
+`CIVILISATION.md`'s own diagnostic reads as the BAD reading ("the same ground trading hands,
+which logs conquests without ever moving the political map") rather than accumulation — worse
+than the 31% baseline BL-924 was built specifically to bring down. Secessions went from a
+baseline of 2/world to 164/world, roughly a fifth of the map. No single item's own isolated sweep
+predicted this; it is very likely genuine compounding across BL-920 (many more, smaller starting
+polities), BL-921 (bigger realms field disproportionately bigger armies, so a win snowballs
+further before the next one), and BL-923 (anything overextended fragments hard) — three
+mechanisms that each read as reasonable alone and as considerably more violent stacked.
+
+**Ben's call, 2026-09-11: accepted as-is.** The levers for sprint 40 ("the new world," the
+exploration/colonisation phase) are declared in place on this reading — no dial was touched, and
+none is proposed here. The churn number is on record for whoever next reads this sweep, not
+silently resolved.
+
+### BL-928 dropped
+
+`BL-928` (a river and a mountain defend, in the resolver and the scorer) was deferred at filing
+on exactly this precondition — "before this we must ensure we can see strong growth" — which the
+table above settles. Ben's call was not to take it up now regardless: cancelled, backlog now
+empty, folded into "a future pass on history alongside tech" rather than filed as its own item.
+
+### Session close
+
+Backlog is empty. Sprint 39 is closed at fifteen items. No sprint 40 decomposition happened this
+session — its own record (`sprints.json` id 40, "the new world") is still open and empty by
+design, waiting on someone to read this table and start filing.
+
+---
+
 ## 2026-09-11 — Sprint 39 closes in full: waves 2 and 3 land, eight items, one cross-item bug caught and fixed
 
 **Runtime:** long session (continuation of the same session that closed wave 1 below), Full /
