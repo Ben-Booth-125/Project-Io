@@ -2,7 +2,7 @@
 
 > **Settles:** what the Empire tree is for and what it must produce · its spire, its four branches
 > and every node on them · the one fork and the four milestones · the scorer — for every node,
-> the situation in which a polity pursues it · what the tree hands the Industry tree.
+> the situation in which a polity pursues it · what the tree hands the Exploration tree.
 > **Not here:** the grammar the tree obeys — kinds, rings, the five rules, diffusion, state, where
 > research comes from (TREES) · the phase it runs in — seats, stores, reach-gating, culture
 > relations (../CIVILISATION) · what a work row does once unlocked (../../lore/HISTORY § The
@@ -26,7 +26,7 @@ took.
 by capacity alone.** Before the industrial band connected polities sit within a band of each
 other; what makes two empires different at 1200 CE is which fork they took, which gates their
 ground let them pass, and how many rounds they had left when the spire's rim opened. The tree's
-rim milestone is the reason a polity enters the Industry tree early or late, which is where the
+rim milestone is the reason a polity enters the Exploration tree early or late, which is where the
 1960 spread is manufactured.
 
 **Sizing.** Four rings, four branches and the spire: 52 nodes of a 64 cap — 34 majors, 14 minors,
@@ -51,7 +51,7 @@ phase read as technology.
 | EM-SP-3a | Endowed Scholarship | major | 3 | SP-2m · PE-3c | — | practice | research +120‰; institution: the record survives the dynasty | *surplus* — nothing binds; the polity buys the rate |
 | EM-SP-3m | **The Lettered Court** | milestone | 3 | SP-3a | — | — | opens ring 4 | *spire* — requires PE-3b, HA-3a |
 | EM-SP-4a | Credit Instruments & Double Entry | major | 4 | SP-3m · PE-4a | — | practice | stores +100‰; research +60‰ | *stores_low* — campaigns outrun the seat; a promise is cheaper than a store |
-| EM-SP-4m | **The Enforceable Promise** | milestone | 4 | SP-4a | — | — | opens the Industry tree | *spire* — requires PE-4a, RD-4b |
+| EM-SP-4m | **The Enforceable Promise** | milestone | 4 | SP-4a | — | — | opens the Exploration tree | *spire* — requires PE-4a, RD-4b |
 
 Links are written without the `EM-` prefix in the tables for width; the store carries them in
 full, each edge once from the lower id.
@@ -171,7 +171,7 @@ Parenthesised links are edges the other node's row already lists.
 | EM-SP-4m | The Enforceable Promise | 4 | an entity that outlives its members can own, sue and be sued, and the realm is mapped | Chartered Companies (PE), Imperial Cartography (RD) |
 
 Each requires majors from two branches at its own ring (rule 4), so no polity climbs the spire
-by running one wedge to the rim. The rim milestone is what the Industry tree's root requires.
+by running one wedge to the rim. The rim milestone is what the Exploration tree's root requires.
 
 ---
 
@@ -223,7 +223,7 @@ it and the next landmass. *coastal_holdings* dominates and *Deep-Hull Sail* is t
 after the root road; Arms stalls at *Drill & Levy Rolls* because *Bloomery Iron*'s gate is never
 satisfied, so its defence comes from *Wall Circuit* on the *threatened* reading. Its Blast Furnace
 never lights — which is the endowment story the ladder exists to tell, and the polity that enters
-the Industry tree with *Chartered Companies* and *Ocean-Rated Hulls* and nothing to smelt.
+the Exploration tree with *Chartered Companies* and *Ocean-Rated Hulls* and nothing to smelt.
 
 ### What "research to spare" buys
 
@@ -235,18 +235,20 @@ comfortable polity alone — every one of those is a node a pressed polity also 
 
 ---
 
-## What the tree hands the Industry tree
+## What the tree hands the Exploration tree
 
-- **Entry timing.** A polity holding *The Enforceable Promise* at 1200 CE starts the Industry
-  tree at its root when pass 2 opens at 1560; one that does not starts once it does. This is the
-  first input to the 1960 spread.
-- **Sea legs.** Held *Deep-Hull Sail* / *Lateen* / *Ocean-Rated Hulls* are what pass 2's
-  colonisation across water stages from; a landlocked rim is a landlocked empire.
+- **Entry timing.** A polity holding *The Enforceable Promise* at 1200 CE starts the
+  **Exploration** tree at its root the moment that phase opens — which is 1200 CE itself, with
+  the coast retired (`../EXPLORATION.md`); one that does not starts once it holds the rim. This
+  is the first input to the 1960 spread, and it is now two trees away rather than one.
+- **Sea legs.** Held *Deep-Hull Sail* / *Lateen* / *Ocean-Rated Hulls* are what Exploration's
+  crossings and overseas claims stage from; a landlocked rim is a landlocked empire.
 - **The furnace road.** *Blast Furnace* and *Mill Networks* held are the `industrial_mod` a polity
   crosses the industrial rung with; a polity without them lights late.
 - **Corporate soil.** *Chartered Companies* is the institutional half of what the Industry tree's
   Works Doctrine and General Incorporation decide about whether a corporation can be chartered
-  there at 1960.
+  there at 1960 — reached through Exploration, which is where a charter first has a treasury
+  behind it.
 - **The civilisation.** *Syncretic Rites* held on ground carrying two peoples is the condition
   under which a civilisation record is coined (`../CIVILISATION.md`).
 

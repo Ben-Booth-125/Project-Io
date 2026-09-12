@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*26 entries — 25 open, 1 resolved.*
+*28 entries — 25 open, 3 resolved.*
 
 ---
 
@@ -404,4 +404,24 @@ BL-868's creed-aggression lean (`w_aggr_q`) is applied inside the per-season loo
 > **RESOLVED.** BL-927 (2026-09-11): the lean was relocated outside the per-season loop in history_sim.cpp, so it applies once per candidate instead of compounding across summer and winter -- confirming the compounding WAS unintended, per this entry's own concern. Measured before/after on the wave-1 sweep: battles 3114 -> 3114 median (unchanged); world_determinism digests for seeds A and B unchanged by this item alone, but seeds 0 and 3 in the 4-seed reading moved slightly. No further action.
 
 *Files: `src/world/history_sim.cpp`*
+
+### NR-843 — NOVEL WORK: two new authority docs and a FOURTH tree, from one design session
+*novel-work · raised 2026-09-11 · from Exploration design session (BL-930..BL-937).*
+
+No doc owned the phase after Empires, so the session created two: docs/generation/EXPLORATION.md (full authority for 1200-1660) and docs/generation/DIGITISATION.md (a PLACEHOLDER, per Ben's ruling, owning only the boundary). Both are now rows in CLAUDE.md section 3.
+
+The scope growth worth flagging is the TREE. trees/TREES.md asserted "three trees, one grammar" as a settled shape (Ben, 2026-09-10); Ben's 2026-09-11 ruling that "exploration and industry use different trees" makes it four. The session re-pointed the chain in prose and in one store string - Empire's rim milestone now opens the EXPLORATION tree, and the Industry tree's root is gated behind Exploration's rim - but the fourth tree itself is unauthored and is BL-930's work. Until it exists, the rim milestone opens a tree that is not there.
+
+FLAGGED BECAUSE a design session turning a settled three into a four is the kind of growth the novelty rule wants chosen rather than accreted. Nothing in src/ moved.
+
+=== RESOLVED (Ben, 2026-09-11): "please go ahead and design a mock-up tech tree." EXPLORATION_TREE.md and exploration_tree.json now exist -- 31 nodes, 3 rings, 4 branches + spire, 3 milestones, 3 forks, lint OK. tree_lint.js knows the tree. The four-tree chain is confirmed and the rim no longer opens a tree that is not there. ===
+
+### NR-844 — DECISION TAKEN: Exploration tree sized at 3 rings / 4 branches / ~34 nodes, from the span ratio alone
+*decision taken on your behalf · raised 2026-09-11 · from Exploration design session; trees/TREES.md sec Sizes, BL-930.*
+
+TREES.md's sizing rule is that a tree is sized to the rounds its phase gives a leading polity, asserted by the sweep rather than picked. The Exploration tree has no sweep yet, so its row was set by SPAN RATIO: 460 years against the Empire phase's 1,600, so three rings rather than four, four branches, three milestones, ~34 nodes of the 64 cap. That is a guess wearing the rule's clothes, and it is recorded as a target.
+
+RELATED, AND NOT FIXED: the INDUSTRY tree is authored at 62 nodes across 4 rings for a 400-year span, and the split leaves it 300 years. By the same rule it is now oversized. The size row in TREES.md was left stating what the tree IS (4 rings, ~60) rather than what the rule wants, with a paragraph saying so - reshaping an authored 62-node tree is real work, not a row edit, and it was not in this session's scope.
+
+=== RESOLVED (Ben, 2026-09-11): "we should shrink the industry tree." BOTH HALVES ANSWERED, and the second differently than expected. (1) The Exploration tree is authored at 31 nodes over 3 rings -- under the ~34 target, reported rather than padded. (2) The Industry shrink is NOT a trim: measurement showed ring 4 is the twentieth century (electrification, oil, flight, broadcast, antibiotics) and must survive, while RING 1 IS THE EXPLORATION AGE and duplicates newly-authored Exploration nodes. The shrink is a migration of ring 1 with every ring shifting down, landing at ~44 nodes. BL-938 owns it. ===
 

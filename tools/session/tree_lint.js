@@ -2,7 +2,7 @@
 // tree_lint.js — the five adjacency rules and the store/doc cross-check for the three
 // pre-game technology trees (docs/generation/trees/TREES.md § The five rules).
 //
-// Run: node tools/session/tree_lint.js [colonisation|empire|industry|all]   (default: all)
+// Run: node tools/session/tree_lint.js [colonisation|empire|exploration|industry|all]   (default: all)
 // Exit 0 clean, 1 on any failure. Prints one summary line per tree.
 //
 // Rules enforced (each named in the failure text):
@@ -28,6 +28,7 @@ const dir = path.join(root, 'docs', 'generation', 'trees');
 const TREES = {
   colonisation: { prefix: 'CO', doc: 'COLONISATION_TREE.md', store: 'colonisation_tree.json', invested: false },
   empire:       { prefix: 'EM', doc: 'EMPIRE_TREE.md',       store: 'empire_tree.json',       invested: true },
+  exploration:  { prefix: 'EX', doc: 'EXPLORATION_TREE.md',  store: 'exploration_tree.json',  invested: true },
   industry:     { prefix: 'IN', doc: 'INDUSTRY_TREE.md',     store: 'industry_tree.json',     invested: true },
 };
 

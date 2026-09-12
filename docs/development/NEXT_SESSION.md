@@ -1,73 +1,109 @@
-# Next session — finish wave 1 of sprint 39, then waves 2 and 3
+# Next session — build sprint 40, Exploration
 
-Written 2026-09-11, mid-batch, when the session had to pause. Delivery — Full, Batch Delivery
-(DELIVERY.md § Batch Delivery). Read `docs/development/sprints.json` sprint 39 for the goal, the
-sequencing and the eight ranked causes of stability; `REFINED.md` is the worklist.
+Written 2026-09-11 at the close of the Exploration design session, for the session that builds it.
+**Mode: Delivery — Full** (the economy seam, the save format, >2 logic files, determinism risk).
+Read `docs/development/DELIVERY.md` before starting.
 
-## State of main (0d5f4144)
+Design is **settled and written down**. Do not redesign it. If something here looks wrong, say so
+and ask Ben — do not quietly pick a different answer.
 
-Wave 1 items **merged into main, built (`build_app.bat` BUILD_OK) and captured clean**
-(`history_lapse_press.lua` 0 failures, `history_lapse.lua` 0 failures):
+## Read these, in this order, and nothing else
 
-| item | what landed | notes |
+1. `docs/generation/EXPLORATION.md` — the phase. The whole authority. ~475 lines.
+2. `docs/generation/trees/EXPLORATION_TREE.md` — its technology tree, already authored.
+3. `docs/development/sprints.json` sprint 40 — goal, risk, done-when, sequence.
+4. `node tools/session/backlog_query.js --grep BL-9xx --full` — one item at a time, as you take it.
+
+`CIVILISATION.md` § The closure of the Empire era is the input contract — read **only** that
+section when you need to know what crosses at 1200 CE. The corpus is ~650K tokens; do not sweep it.
+
+## What this phase is, in five lines
+
+Exploration runs **1200 → 1660 CE**, on the shared `history_sim` engine, taking `pass_one_output`
+as its only input. Where Empires asks *who holds this ground*, it asks *who wants what someone else
+holds, and what they will do about it*. Its one structural claim is that **conflict MOVES** —
+neighbour-war rate falls *relative to* frontier-skirmish rate. It is the phase where material
+becomes capital. It hands digitisation the treasuries, the scarcity signals and the preferences
+that a saturated corporate web will form around.
+
+## The sequence, and why it is this order
+
+**BL-937 (the ten readings) LANDS FIRST.** Not last. The sprint's named risk is the *frozen map*:
+every mechanism here damps conflict near home, and a phase that damps it everywhere looks identical
+to one that displaces it until somebody measures the ratio. BL-905/BL-906 already proved on the
+Empire span that instrumentation is what turns a guessed constant into a measured one.
+
+Then, in order:
+
+| Wave | Items | Why together |
 |---|---|---|
-| BL-926 sweep sees the arc | per-polity table, gross deaths, pieces, supply histogram, culture census, 70-key JSON row | determinism unchanged |
-| BL-927 aggression lean once | lean outside the season loop | digests unchanged; before/after: battles 3114→3114 median, seeds 0 and 3 moved slightly. **Record these beside NR-831 and prune it.** |
-| BL-919 lineage palette | hue by root cradle, step per daughter; round 3 under `--verify` now replays the migration record (it used to replay the Empires sim silently) | `build_migration_timelapse` declared in hard_coded_world.hpp |
-| BL-918 culture diversity | split interval 600→200 y; biome trigger on every class transition; ISOLATION pass in run_settlement (Culture round only); census on colonisation_harness C15 | **digests moved on all four arcs — re-bless owed**. **Pre-existing defect fixed on the way: `culture_kinship_years` returned −1 for every BCE coining year, so opposition treated every neighbour as a stranger; the kin discount is live for the first time — file a `novel-work` NR.** Cultures per world ~800→~380 (old depth-16 chains were tile noise); cultures holding ground slightly down (61→39 seed 0); the four constants are dials, C15 is the gauge — Ben may want more. |
-| BL-916 lapse event layer | typed events on era_timelapse, `polity::parent`, save v13, ticker + markers + arc from events + Pop/Mt columns | 4-seed: 1,039 events, 73 realm ended, 5 broke away. Verify world arc: "37 polities, 12 destroyed" (was 0). Road promotions ringed but not narrated. Ticker 6 rows above the arc; at 1080p the arc's first line sits at the fold. |
-| BL-915 terrain underlay | baked terrain base, rivers, relief, seats, frontiers both axes, greedy 20-slot neighbour colouring | **the wizard preview had no rivers; `generate_rivers` added to `generate_home_surface_preview` (world-side, same seed formula as the campaign).** Merge with BL-919/916 needed a link fix: `build_migration_timelapse` now has a roster-less overload that rebuilds the culture list from the settlement record. |
+| 0 | **BL-937** | Nothing else is judgeable without it |
+| 1 | **BL-931** (the span runs), **BL-930** (wire the tree) | The engine and the actor's technology |
+| 2 | **BL-932** (treasury), **BL-939** (scarcity signal), **BL-940** (corridor throughput) | The three quantities everything else reads |
+| 3 | **BL-933** (treaties), **BL-934** (subjects), **BL-935** (ports/navies/armies) | The mechanisms that spend and bind |
+| 4 | **BL-941** (deterrence), **BL-942** (two strategies), **BL-936** (preference) | The phase's claims, which need wave 3 to exist |
+| 5 | **BL-943** (fleet/caravan exemplars), **BL-938** (Industry ring-1 migration) | Presentation, and the tree cleanup |
 
-**BL-922 (reach has a gradient) IS MERGED (5e08b708).** Capital-based Dijkstra over HELD ground; supply walks its own uncapped neighbour index (the degree-capped campaign index left founded regions with no edge to their parent and secessions exploded to 117/world -- a Ben call whether the campaign index should be uncapped too, file it); `terrain_reach_cost_q` 10 -> 4000 (measured: at 4000 the reach gate refuses 1.5% of contacts, at 3000 0.17%, at 5000 8.7% -- Ben may prefer 3000); staging-hub pricing gone; a latent int overflow that made cut-off ground read fully supplied and a missing owner_change on seat-hinterland capture both fixed. Digests moved (seedA/on BFF4F830... -> 5A641C67838E8B54, seedB/on -> B16BF946D3CE19D6, two-span -> E5513B203E2DA268). Era -1 ms per seed roughly halved. 4-seed at 4000: battles 1800, conquests 829, secessions 6, largest share 18%, rose+fell 3/4. history_sim_harness 79 PASS / 2 FAIL (R3a2/R3a3 fail on main too); B384c now passes; stepped_clock_harness variants are now identical (supply_decay_per_tile_q retired) -- fix that harness.
+`BL-944` (the schism verb) is **gated on a Ben decision** — see below. `BL-945` (depletion) is
+parked for digitisation and is not sprint 40 work.
 
-**INTEGRATED 2-SEED READING (main 74f9a5e6, all seven items together):** largest share median 30% (was 11%), battles 844 (was 3114), reach gate refusing 28,921 contacts (the agent measured 1.5% alone; combined with BL-918 it is far more), secessions 0 on both seeds. The combination moves much further than either item alone -- run the 16-seed sweep FIRST and put the spread in front of Ben before touching any dial; `terrain_reach_cost_q` 3000 is the one number to shift if the gate is now refusing too much.
+## Four rulings you must not re-litigate
 
-## Wave-1 close-out still owed (do before wave 2)
+1. **The treasury sits at the CAPITAL SEAT and is capturable** — one per polity, consolidated from
+   the seats once at 1200 as the phase's visible opening act. Ben moved it there deliberately so
+   that sacking a capital takes something real. It is *not* a free-floating per-polity scalar.
+2. **There is a SCARCITY SIGNAL, never a price.** One integer per (good, market), no clearing, no
+   order book. Digitisation resolves prices. A price here builds the economy layer two phases early.
+3. **Goods move as ONE NUMBER PER CORRIDOR. No cargo object ever exists.** Per-good routing is cut
+   because the Empire pass already pays a full Dijkstra per polity per round against a region count
+   that grows inside the run. `region::network_supply_q` is already throughput in all but name.
+4. **Both consolidation and expansion must pay**, and which a realm reaches for is *derived* from
+   its creed (`zeal`, `dominion`, `sea_legs_q`) — never a flag, never a term inside the scorer.
 
-1. (done) BL-922 merged; app builds.
-2. **One authorised re-bless of `world_determinism`** for the wave (BL-918 and BL-922 both move the
-   digest): `cmd //c "tools\verify\build_lua_harness.bat world_determinism"` then run it; record
-   old→new digests in the DEVLOG. Never per item.
-3. Run `history_sim_harness` (3 pre-existing failures on main: R3a2, R3a3, B384c — BL-922 should
-   move R3a2/R3a3), `save_roundtrip`, `save_envelope_roundtrip` (`build_app.bat save_envelope_roundtrip`),
-   `colonisation_harness`.
-4. `history_sweep 16 --epoch 0` from a scratch dir; compare against the baseline at
-   `C:\Users\benbo\AppData\Local\Temp\claude\gen_sweep\baseline\sweep16.txt` (main 6995b41e:
-   powers 42, largest share 11%, peak 20%, battles 3114, conquests 1812, taken-3+ 31%, secessions 2,
-   reach refusals 0, rose-and-fell 2/world in 15/16). Record the wave-1 readings in the DEVLOG.
-5. `verifier-review` over the integrated diff, then a `code-reviewer` pass (author ≠ reviewer).
-6. **Live click**: open build_rel (rebuild it — it is stale), arrive on rounds 3 and 4, watch them,
-   confirm the ticker, seats, rivers, relief, Pop/Mt columns. The captures prove render, not reach.
-7. Bookkeeping per item: flip the `requirements.json` rows (batch `sprint-39-drama`) with result
-   metrics from the agents' reports (each report is in this session's DEVLOG entry to write), drain
-   the REFINED.md tasks, run `backlog_lint.js`, `archive_landed.js` for the seven, `mirror_check.js`,
-   `devlog_index.js`. NR entries to file: the kinship defect (novel-work), BL-915's rivers-in-preview
-   world change and BL-919's verify-path change (decision-taken), NR-831 numbers (then prune).
-8. Push.
+## Three traps this session already fell into — do not repeat them
 
-## Wave 2 (after the close-out): BL-914, BL-917, BL-920, BL-921, BL-924, BL-925, BL-929
+**The Industry tree's obvious shrink is wrong.** Its ring 4 is the twentieth century
+(electrification, oil, flight, broadcast, antibiotics) and the campaign epoch is 1960. Its **ring 1
+is the exploration age** and duplicates the newly-authored Exploration tree. `BL-938` is a
+*migration*, not a trim. Read the item before touching either tree.
 
-Brief each `generation-dev` / `ui-dev` (`claude` for cross-layer) worktree agent as wave 1 was:
-fetch and confirm the merge-base, read only the item (`backlog_query.js --grep BL-9xx --full`) and
-its named doc sections, block on waits, commit on the branch with the item message, report, stop.
-Specifics learned this wave:
-- Tell agents `cmd //c` is refused inside a worktree; use `bash tools/verify/build_lua_harness.sh`.
-- Tell agents not to yield mid-wait (several did, and resumed on their own notifications).
-- BL-920: on the 0 CE arc **every founding is the Settle verb** (schedule = 0, BL-926's census); a
-  Settle daughter belongs to its founder, only scheduled ground arrives unorganised. Threshold
-  provisional 300,000 heads; BL-926's census prints the opening distribution.
-- BL-914: `run_secs` is already 30; the work is the write-only tap and the clamped playhead;
-  retire Restart on both pass rounds and give its row to the board; Pause + scrubber after landing.
-- BL-917: BL-916 already emits `road_promoted` events with year (region = end a, other = end b).
-- BL-921 and BL-929 read BL-922's capital-based supply.
+**`polity::parent` is NOT the overlord link.** `parent` records lineage — who broke away from whom.
+Subjection is a live relation that begins, ends and transfers. `BL-934` adds its own field.
 
-Wave 3: BL-923 (requires BL-920 and BL-922).
+**There is NO unclaimed ground.** The migration fills every habitable landmass, so a far continent
+at 1200 CE is **settled and unmet**. What is discovered is *people*. Sprint 40's original premise
+said otherwise and has been corrected; if you find that premise anywhere else, it is stale.
 
-## Traps
-- The shell rejects long inline commands (ENAMETOOLONG / spurious EOF): write scripts to the
-  scratchpad and run them.
-- `build/` holds stale harness exes; build the target before running it.
-- The tree carries another session's `history_sweep.json` and six `perf_*.csv` — never sweep them
-  into a commit; `REFINED.md` and `req/requirements.json` are this batch's and are committed here.
-- Three items rewrote `history_lapse.cpp` at once; expect the same in wave 2 (BL-914, BL-917, BL-925
-  all draw on it) — sequence their merges and reconcile by hand.
+## One decision owed from Ben before BL-944
+
+The universalising creed landed 2026-09-11 with the residue a schism cuts along. But **reassertion
+fired zero times in 16 worlds** — held ground under an adopting realm sits above the binding floor,
+because BL-896's secession floor had already removed the badly-reached ground. A schism verb built
+on that substrate would also fire zero times. `universal_creed_convert_supply_q` and
+`universal_creed_alien_penalty_q` are the dials; the honest reading is that it needs a higher floor
+or a second binding term. **Ask Ben; do not pick one.**
+
+## Working rules for this sprint
+
+- **Sub-agents run in separate worktrees** when they write code. Brief each on a tight block with
+  the one or two docs it needs. Tell it explicitly: `cmd //c` is refused inside a worktree, use
+  `bash tools/verify/build_lua_harness.sh`; block on your own long waits, do not yield mid-wait;
+  stop once you have a decision. The main session merges, builds and verifies — **assume nothing
+  from a self-report** (four of five capable lanes failed independent review last time).
+- **`git fetch origin` and integrate before minting any id.** `next_id.js` can hand out a taken id
+  on a stale branch; its SCAN INCOMPLETE line is the tell.
+- **Determinism is non-negotiable.** Every new quantity is a deterministic consequence of upstream
+  scalars. No dice, no roll, no wall-clock.
+- **Any change to a tree store re-runs `node tools/session/tree_lint.js`.** All four pass today.
+- **`header_graph.js` FAILs on main** at 80 dangling — compare the *count*, never the verdict.
+- **A UI requirement needs a live click** (BL-943), not just a capture.
+- Log anything wanting Ben's judgement into `NEEDS_REVIEW.json` *as it arises*, not at the close.
+  A CALL only Ben can make → the queue. WORK somebody must do → `backlog.json`.
+
+## State
+
+Branch `claude/exploration-era-design-e0f6d7`, two commits: `2fff2443` (the phase gets a doc) and
+`b24dc243` (rename, deepening, the tree). Working tree otherwise clean. **Nothing in `src/` has
+changed** — this sprint starts from a green build.
+
+All four tree lints pass. `backlog_lint` is 0 fails, 1 pre-existing warning (BL-746 absent).

@@ -297,7 +297,7 @@ through what it produced.
 | 10 | **Nation carve (Voronoi BFS)** | **Loading screen, live**; Country lens in play | Watched |
 | 11 | National character derivation | Nation detail in the Selection band | Watched |
 | 12 | Historical ruptures | Checkpoints + lacunae in the History ledger | Watched (as text) |
-| 13 | Institutional history / globalisation | Biography lines | Watched (as text) |
+| 13 | Institutional history / exploration | Biography lines | Watched (as text) |
 | 14 | Roads | Road tiers on the planetary canvas | Watched |
 | 15 | Pre-authored homeworld installations | On-canvas buildings | Invisible by design — two authored stubs, not a generated fact |
 | 16 | **Corporations (placement + finance)** | **Loading screen, live** — map markers + charter ledger | Watched |
@@ -790,17 +790,18 @@ the epoch and the sim stops where it stops today.
 
 ### Pass 2 is the economy pass, and it is TWO phases (Ben, 2026-09-11)
 
-**SUPERSEDED AND REPLACED (Ben, 2026-09-11): pass 2 SPLITS into Globalisation and Digitisation,
+**SUPERSEDED AND REPLACED (Ben, 2026-09-11): pass 2 SPLITS into Exploration and Digitisation,
 and the 1200 → 1560 coast is gone.** Exploration and digitisation are different subjects with
 different terminating conditions, so they are two phases rather than one 400-year economy span.
-`CIVILISATION.md` § The closure of the Empire era owns the arithmetic; the rest of this section
-predates the split and is read against that table.
+`CIVILISATION.md` § The closure of the Empire era owns the arithmetic; **`EXPLORATION.md` and
+`DIGITISATION.md` own the two phases themselves**; the rest of this section predates the split and
+is read against that table.
 
 | Phase | from | to | years |
 |---|---|---|---|
 | **Culture** — the migration | 2400 BCE | 400 BCE | 2,000 |
 | **Empires** | 400 BCE | 1200 CE | 1,600 |
-| **Globalisation** | 1200 CE | 1660 CE | 460 |
+| **Exploration** | 1200 CE | 1660 CE | 460 |
 | **Digitisation** | 1660 CE | 1960 CE | 300 |
 
 **1960 and 1200 are both unmoved**, so pass 1, the epoch and the industrial-band campaign are
@@ -814,7 +815,11 @@ divided at **400 BCE** into the migration and empire rounds (Ben, 2026-09-09;
 pass 2 runs **1560 → 1960**; the epoch is **1960**. That makes the campaign an **industrial-band**
 world (`era_band_for_epoch` flips at 1700), not the ancient one the 0 CE default produced.
 
-**The 1200 → 1560 gap is deliberate and is the dark age.** Pass 1's arc ends in *a stable dark age*
+**SUPERSEDED — THE GAP IS GONE (Ben, 2026-09-11).** Exploration opens at 1200 CE, so there is no
+coast to advance accumulators across; `EXPLORATION.md` owns the span. The paragraph below
+records the reasoning that held while the coast existed.
+
+**The 1200 → 1560 gap was deliberate and was the dark age.** Pass 1's arc ends in *a stable dark age*
 (§ Round 4's arc), and a span whose defining property is that little changes is the one span not
 worth simulating. It is a **coast**, not an omission: the world arrives at 1560 holding what 1200
 left it. If that turns out to lose something — a slow assimilation, a decaying grudge — the honest

@@ -1,0 +1,218 @@
+{
+  "_schema": "tree/io-v1",
+  "_note": [
+    "The Exploration tree — the exploration age, 1200 → 1660 CE (TREES.md § The store; ../EXPLORATION.md owns the phase). Invested: the Invest verb takes one node a round, chosen by the scorer.",
+    "A MOCK-UP (Ben, 2026-09-11, resolving NR-843). The shape, the branches, the three forks and the milestone chain are the design; every per_mille is a placeholder the sweep re-prices, exactly as the other three trees' are.",
+    "EXPLORATION_TREE.md is the authority; this file transcribes its tables. tree_lint.js cross-checks the two both ways and enforces the five rules.",
+    "Ids carry branch and ring (EX-<BR>-<ring><seq>; seq m is the ring's milestone). Links are undirected and stored once, from the lower id.",
+    "Names are generic mechanism nouns — real history is a mechanism reference, never a name source; earth_ref is calibration prose only."
+  ],
+  "tree": "exploration",
+  "cap": 64,
+  "branches": [
+    { "key": "SP", "name": "The Purse (the spire)", "concern": "material becomes capital, and capital acquires an institution that outlives a reign — the phase's clock" },
+    { "key": "HL", "name": "Hulls", "concern": "what can cross, how much it carries, and whether it arrives able to fight" },
+    { "key": "PT", "name": "Port & Garrison", "concern": "the harbour that stages a crossing, and the standing force a neighbour can see" },
+    { "key": "WY", "name": "Ways", "concern": "the road ladder's third rung and the throughput that runs on it" },
+    { "key": "GD", "name": "Goods", "concern": "what a people does with a good it did not grow — naming it, counting it, wanting it" }
+  ],
+  "scorer_terms": [
+    "reach_bound", "stores_low", "purse_low", "threatened", "cohesion_low",
+    "ground_ore", "ground_farm", "ground_port", "coastal_holdings",
+    "wants_unmet", "throughput_bound", "subject_held", "spire", "known", "surplus"
+  ],
+  "nodes": [
+
+    { "id": "EX-SP-1a", "name": "Consolidated Stores", "kind": "major", "ring": 1, "branch": "SP",
+      "links": [ "EX-SP-1m" ], "gate": null, "diffusion": "practice", "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "stores", "per_mille": 200 }, { "kind": "institution", "target": "the treasury stands at the capital" } ],
+      "pursued_when": { "term": "stores_low", "situation": "Seats hold materials the realm cannot spend as one; gathering them to the capital is the cheapest increase in what can be bought." },
+      "earth_ref": "the fisc centralises; a realm stops being a set of provisioned cities" },
+
+    { "id": "EX-SP-1m", "name": "The Common Purse", "kind": "milestone", "ring": 1, "branch": "SP",
+      "links": [ "EX-SP-1a", "EX-SP-2a" ], "gate": null, "excludes": null,
+      "requires": [ "EX-PT-1a", "EX-WY-1a" ],
+      "effects": [ { "kind": "open", "target": "ring 2" } ],
+      "pursued_when": { "term": "spire", "situation": "A realm with a harbour and a posted road can gather what its seats hold into one purse, and spend it where it chooses. Ring 2 opens." },
+      "earth_ref": "a single treasury, reachable and defensible" },
+
+    { "id": "EX-SP-2a", "name": "The Chartered Company", "kind": "major", "ring": 2, "branch": "SP",
+      "links": [ "EX-SP-1m", "EX-SP-2m" ], "gate": null, "diffusion": "practice", "excludes": null,
+      "effects": [ { "kind": "institution", "target": "an entity that outlives its members may hold capital and bind a term" }, { "kind": "modifier", "target": "stores", "per_mille": 120 } ],
+      "pursued_when": { "term": "purse_low", "situation": "The purse cannot fund a distant venture from one reign's revenue; an entity that persists can borrow against the next." },
+      "earth_ref": "the joint venture with a life of its own" },
+
+    { "id": "EX-SP-2m", "name": "The Standing Charter", "kind": "milestone", "ring": 2, "branch": "SP",
+      "links": [ "EX-SP-2a", "EX-SP-3a" ], "gate": null, "excludes": null,
+      "requires": [ "EX-GD-2a", "EX-PT-2a" ],
+      "requires_fork": [ "EX-HL-2a", "EX-HL-2b" ],
+      "effects": [ { "kind": "open", "target": "ring 3" } ],
+      "pursued_when": { "term": "spire", "situation": "A market to trade in, a force to be seen holding, and hulls of one kind or the other. A promise can now run for years. Ring 3 opens." },
+      "earth_ref": "contract with a term, enforced at a distance" },
+
+    { "id": "EX-SP-3a", "name": "Double-Entry Reckoning", "kind": "major", "ring": 3, "branch": "SP",
+      "links": [ "EX-SP-2m", "EX-SP-3m" ], "gate": null, "diffusion": "practice", "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "research", "per_mille": 140 }, { "kind": "modifier", "target": "stores", "per_mille": 100 } ],
+      "pursued_when": { "term": "surplus", "situation": "Nothing binds; the realm buys the ability to know what it is owed, which compounds into everything else." },
+      "earth_ref": "accounts that survive the accountant" },
+
+    { "id": "EX-SP-3m", "name": "The Long Reckoning", "kind": "milestone", "ring": 3, "branch": "SP",
+      "links": [ "EX-SP-3a" ], "gate": null, "excludes": null,
+      "requires": [ "EX-GD-3a", "EX-HL-3a" ],
+      "requires_fork": [ "EX-WY-3a", "EX-WY-3b" ],
+      "effects": [ { "kind": "open", "target": "industry tree" } ],
+      "pursued_when": { "term": "spire", "situation": "A realm that knows what a good is worth to whom, can reach it, and can carry it. The rim: the Industry tree opens when digitisation does." },
+      "earth_ref": "capital, accounted and mobile — the threshold of an industrial economy" },
+
+    { "id": "EX-HL-1a", "name": "Decked Coaster", "kind": "major", "ring": 1, "branch": "HL",
+      "links": [ "EX-SP-1a", "EX-HL-1b", "EX-HL-2c" ], "gate": "coastal", "diffusion": "artifact", "excludes": null,
+      "effects": [ { "kind": "access", "target": "a crossing may be staged from a held port" }, { "kind": "modifier", "target": "reach", "per_mille": 80 } ],
+      "pursued_when": { "term": "coastal_holdings", "situation": "The realm holds water frontage and wants what is across it; a decked hull is the first thing that survives the passage." },
+      "earth_ref": "the coaster that dares the open leg" },
+
+    { "id": "EX-HL-1b", "name": "Sounding & Chart", "kind": "minor", "ring": 1, "branch": "HL",
+      "links": [ "EX-HL-1a", "EX-GD-1a" ], "gate": null, "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "reach", "per_mille": 40 } ],
+      "pursued_when": { "term": "coastal_holdings", "situation": "Taken on the way to a larger hull; a known depth is a passage that can be repeated." },
+      "earth_ref": "the lead line and the written coast" },
+
+    { "id": "EX-HL-2c", "name": "Careening & Refit", "kind": "minor", "ring": 2, "branch": "HL",
+      "links": [ "EX-HL-1a", "EX-HL-2a", "EX-HL-2b" ], "gate": null, "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "reach", "per_mille": 50 } ],
+      "pursued_when": { "term": "reach_bound", "situation": "A hull that can be kept is a hull that stays at sea; the shared step before the realm chooses what kind of fleet it wants." },
+      "earth_ref": "the careening beach; a hull maintained rather than replaced" },
+
+    { "id": "EX-HL-2a", "name": "Ocean Carrack", "kind": "major", "ring": 2, "branch": "HL",
+      "links": [ "EX-HL-2c", "EX-HL-3a", "EX-PT-2b" ], "gate": "coastal", "diffusion": "artifact", "excludes": "EX-HL-2b",
+      "effects": [ { "kind": "modifier", "target": "reach", "per_mille": 200 }, { "kind": "modifier", "target": "forage", "per_mille": 120 } ],
+      "pursued_when": { "term": "wants_unmet", "situation": "The realm wants goods it cannot grow and knows where they are; burden, not broadside, is what closes that gap." },
+      "earth_ref": "the bulk carrier: cargo first, guns as an afterthought" },
+
+    { "id": "EX-HL-2b", "name": "Fleet of the Line", "kind": "major", "ring": 2, "branch": "HL",
+      "links": [ "EX-HL-2c" ], "gate": "coastal", "diffusion": "artifact", "excludes": "EX-HL-2a",
+      "effects": [ { "kind": "modifier", "target": "defence", "per_mille": 180 }, { "kind": "unlock", "target": "Ship of the Line" } ],
+      "pursued_when": { "term": "threatened", "situation": "A neighbour's hulls are visible and the realm would rather contest the water than carry across it." },
+      "earth_ref": "the fighting fleet; a navy that denies rather than delivers" },
+
+    { "id": "EX-HL-3a", "name": "Oceanic Navigation", "kind": "major", "ring": 3, "branch": "HL",
+      "links": [ "EX-HL-2a", "EX-GD-3b" ], "gate": "coastal", "diffusion": "practice", "excludes": null,
+      "effects": [ { "kind": "access", "target": "a crossing to unmet ground no longer requires an adjacent shore" }, { "kind": "modifier", "target": "reach", "per_mille": 260 } ],
+      "pursued_when": { "term": "wants_unmet", "situation": "Every want the realm can reach is already met; the remaining ones are across water nobody has crossed." },
+      "earth_ref": "latitude, then longitude — a passage that can be repeated blind" },
+
+    { "id": "EX-PT-1a", "name": "Harbour Works", "kind": "major", "ring": 1, "branch": "PT",
+      "links": [ "EX-SP-1a", "EX-PT-1b", "EX-PT-2a" ], "gate": "coastal", "diffusion": "capacity", "excludes": null,
+      "effects": [ { "kind": "unlock", "target": "Port" }, { "kind": "modifier", "target": "stores", "per_mille": 90 } ],
+      "pursued_when": { "term": "ground_port", "situation": "The realm holds ground with a port window and nothing built on it; the harbour is what turns endowment into a staging place." },
+      "earth_ref": "mole, quay and a dredged approach" },
+
+    { "id": "EX-PT-1b", "name": "Pilot & Lighthouse", "kind": "minor", "ring": 1, "branch": "PT",
+      "links": [ "EX-PT-1a", "EX-HL-1a" ], "gate": null, "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "reach", "per_mille": 40 } ],
+      "pursued_when": { "term": "ground_port", "situation": "A harbour a stranger's hull can enter at night is a harbour that earns; taken alongside the works." },
+      "earth_ref": "the marked approach" },
+
+    { "id": "EX-PT-2a", "name": "Standing Garrison", "kind": "major", "ring": 2, "branch": "PT",
+      "links": [ "EX-PT-1a", "EX-PT-2b", "EX-PT-3c" ], "gate": null, "diffusion": "practice", "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "defence", "per_mille": 150 }, { "kind": "modifier", "target": "muster_cost", "per_mille": -80 }, { "kind": "doctrine", "target": "force already raised; visible to neighbours" } ],
+      "pursued_when": { "term": "threatened", "situation": "Neighbours can see what the realm keeps standing, and a force already raised is what makes a treaty cheaper than a test." },
+      "earth_ref": "the permanent establishment; deterrence as a running cost" },
+
+    { "id": "EX-PT-2b", "name": "Naval Stores", "kind": "minor", "ring": 2, "branch": "PT",
+      "links": [ "EX-PT-2a", "EX-HL-2a" ], "gate": null, "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "stores", "per_mille": 60 } ],
+      "pursued_when": { "term": "stores_low", "situation": "Cordage, pitch and timber kept at the quay; the difference between a fleet that sails and one that is listed." },
+      "earth_ref": "the victualling yard" },
+
+    { "id": "EX-PT-3c", "name": "Dry Dock", "kind": "minor", "ring": 3, "branch": "PT",
+      "links": [ "EX-PT-2a", "EX-PT-3a", "EX-PT-3b" ], "gate": null, "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "defence", "per_mille": 50 } ],
+      "pursued_when": { "term": "ground_port", "situation": "The shared step before the realm decides whether its coast projects force or refuses it." },
+      "earth_ref": "the graving dock; hulls repaired rather than abandoned" },
+
+    { "id": "EX-PT-3a", "name": "Blue-Water Squadron", "kind": "major", "ring": 3, "branch": "PT",
+      "links": [ "EX-PT-3c", "EX-WY-3d" ], "gate": "coastal", "diffusion": "practice", "excludes": "EX-PT-3b",
+      "effects": [ { "kind": "modifier", "target": "reach", "per_mille": 220 }, { "kind": "doctrine", "target": "force projected to ground the realm does not hold" } ],
+      "pursued_when": { "term": "subject_held", "situation": "The realm holds something across water and must be able to reach it faster than a rival can take it." },
+      "earth_ref": "the standing squadron on a distant station" },
+
+    { "id": "EX-PT-3b", "name": "Fortified Roadstead", "kind": "major", "ring": 3, "branch": "PT",
+      "links": [ "EX-PT-3c" ], "gate": "coastal", "diffusion": "capacity", "excludes": "EX-PT-3a",
+      "effects": [ { "kind": "modifier", "target": "defence", "per_mille": 300 }, { "kind": "unlock", "target": "Sea Fort" } ],
+      "pursued_when": { "term": "threatened", "situation": "The realm would rather no hull entered its water at all than own hulls that leave it." },
+      "earth_ref": "chain, battery and a defended anchorage" },
+
+    { "id": "EX-WY-1a", "name": "Post Roads", "kind": "major", "ring": 1, "branch": "WY",
+      "links": [ "EX-SP-1a", "EX-WY-2a" ], "gate": null, "diffusion": "capacity", "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "reach", "per_mille": 150 }, { "kind": "upgrade", "target": "Road becomes Highway on a corridor that carries" } ],
+      "pursued_when": { "term": "reach_bound", "situation": "The realm's own ground is the constraint: corridors that carry are worn past what a Road answers, and the next rung is the cheapest relief." },
+      "earth_ref": "the maintained trunk line; the third rung above track and road" },
+
+    { "id": "EX-WY-2a", "name": "Bonded Warehouse", "kind": "major", "ring": 2, "branch": "WY",
+      "links": [ "EX-WY-1a", "EX-GD-2b", "EX-WY-3c" ], "gate": null, "diffusion": "practice", "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "stores", "per_mille": 180 }, { "kind": "institution", "target": "goods may stand in transit without a holder" } ],
+      "pursued_when": { "term": "throughput_bound", "situation": "The corridor carries more than the far end can absorb; a place to hold goods mid-route is what stops throughput capping at the destination." },
+      "earth_ref": "the entrepôt; goods at rest but not at home" },
+
+    { "id": "EX-WY-3c", "name": "Wayhouse Relay", "kind": "minor", "ring": 3, "branch": "WY",
+      "links": [ "EX-WY-2a", "EX-WY-3a", "EX-WY-3b" ], "gate": null, "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "reach", "per_mille": 60 } ],
+      "pursued_when": { "term": "throughput_bound", "situation": "The shared step before the realm chooses whether its bulk moves overland or on water." },
+      "earth_ref": "staged relays; a load handed on rather than hauled through" },
+
+    { "id": "EX-WY-3a", "name": "Trunk Highway", "kind": "major", "ring": 3, "branch": "WY",
+      "links": [ "EX-WY-3c", "EX-WY-3d" ], "gate": null, "diffusion": "capacity", "excludes": "EX-WY-3b",
+      "effects": [ { "kind": "modifier", "target": "reach", "per_mille": 280 }, { "kind": "modifier", "target": "muster_cost", "per_mille": -60 } ],
+      "pursued_when": { "term": "reach_bound", "situation": "The realm is continental and its constraint is interior distance; the road answers both trade and the march." },
+      "earth_ref": "the all-weather trunk; distance collapsed by surface" },
+
+    { "id": "EX-WY-3b", "name": "Canal Cut", "kind": "major", "ring": 3, "branch": "WY",
+      "links": [ "EX-WY-3c" ], "gate": "arable", "diffusion": "capacity", "excludes": "EX-WY-3a",
+      "effects": [ { "kind": "modifier", "target": "stores", "per_mille": 300 }, { "kind": "modifier", "target": "carrying_capacity", "per_mille": 90 } ],
+      "pursued_when": { "term": "throughput_bound", "situation": "Bulk is the constraint rather than speed; water carriage moves tonnage a road never will, and only on ground that permits the cut." },
+      "earth_ref": "inland water carriage; bulk over pace" },
+
+    { "id": "EX-WY-3d", "name": "Toll & Escort", "kind": "minor", "ring": 3, "branch": "WY",
+      "links": [ "EX-WY-3a", "EX-PT-3a" ], "gate": null, "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "stores", "per_mille": 70 } ],
+      "pursued_when": { "term": "throughput_bound", "situation": "A route that pays for its own protection; the point at which the ways branch and the garrison branch stop being separate concerns." },
+      "earth_ref": "the escorted convoy, paid for by what it carries" },
+
+    { "id": "EX-GD-1a", "name": "Named Staples", "kind": "major", "ring": 1, "branch": "GD",
+      "links": [ "EX-SP-1a", "EX-GD-1b", "EX-HL-1b", "EX-GD-2a" ], "gate": null, "diffusion": "practice", "excludes": null,
+      "effects": [ { "kind": "intel", "target": "goods are named and countable rather than an undifferentiated store" }, { "kind": "modifier", "target": "stores", "per_mille": 70 } ],
+      "pursued_when": { "term": "wants_unmet", "situation": "The realm lacks something and cannot say what; naming the staples is what turns a shortage into a want with a direction." },
+      "earth_ref": "the staple: a good with a name, a measure and a place it is sold" },
+
+    { "id": "EX-GD-1b", "name": "Weights & Tally", "kind": "minor", "ring": 1, "branch": "GD",
+      "links": [ "EX-GD-1a", "EX-WY-1a" ], "gate": null, "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "stores", "per_mille": 50 } ],
+      "pursued_when": { "term": "stores_low", "situation": "A measure two parties agree on; the smallest thing that makes a good countable at both ends of a road." },
+      "earth_ref": "the standard measure, enforced" },
+
+    { "id": "EX-GD-2a", "name": "Quayside Market", "kind": "major", "ring": 2, "branch": "GD",
+      "links": [ "EX-GD-1a", "EX-GD-2b", "EX-GD-3a" ], "gate": null, "diffusion": "practice", "excludes": null,
+      "effects": [ { "kind": "intel", "target": "a market's scarcity signal is legible to a stranger" }, { "kind": "modifier", "target": "stores", "per_mille": 110 } ],
+      "pursued_when": { "term": "wants_unmet", "situation": "The realm's own market must be readable before a stranger will sail to it; legibility is what converts a want into an arrival." },
+      "earth_ref": "the open quay where a price is asked aloud" },
+
+    { "id": "EX-GD-2b", "name": "Bill of Lading", "kind": "minor", "ring": 2, "branch": "GD",
+      "links": [ "EX-GD-2a", "EX-WY-2a" ], "gate": null, "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "stores", "per_mille": 60 } ],
+      "pursued_when": { "term": "throughput_bound", "situation": "A claim on goods that are somewhere else; what lets a cargo be owned while it is still moving." },
+      "earth_ref": "the transferable claim on a shipment" },
+
+    { "id": "EX-GD-3a", "name": "Standing Preference", "kind": "major", "ring": 3, "branch": "GD",
+      "links": [ "EX-GD-2a", "EX-GD-3b" ], "gate": null, "diffusion": "practice", "excludes": null,
+      "effects": [ { "kind": "intel", "target": "a people's preference for a good is durable and readable across the contact graph" }, { "kind": "modifier", "target": "stores", "per_mille": 140 } ],
+      "pursued_when": { "term": "surplus", "situation": "Nothing binds materially; the realm buys knowledge of what other peoples will keep paying for, which is what a trading age compounds on." },
+      "earth_ref": "taste becomes a market fact rather than a curiosity" },
+
+    { "id": "EX-GD-3b", "name": "Factor's Ledger", "kind": "minor", "ring": 3, "branch": "GD",
+      "links": [ "EX-GD-3a", "EX-HL-3a" ], "gate": null, "excludes": null,
+      "effects": [ { "kind": "modifier", "target": "research", "per_mille": 70 } ],
+      "pursued_when": { "term": "known", "situation": "An agent kept at a foreign market, reporting what it holds and wants; the cheapest intelligence a trading realm buys." },
+      "earth_ref": "the resident factor, writing home" }
+
+  ]
+}
