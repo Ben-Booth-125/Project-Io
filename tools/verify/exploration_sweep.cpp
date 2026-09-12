@@ -39,10 +39,12 @@
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -110,6 +112,13 @@ struct exploration_row
     int64_t ambiguous_battles = 0; ///< defender id 0 — unowned ground or polity 0, indistinguishable (see note below).
 
     bool traced_matches_untraced = false; ///< The acceptance check: re-run reproduces battles/conquests/foundings bit for bit.
+
+    /// BL-932 DIAGNOSTIC (not yet reading 8's formal row — that is BL-940's,
+    /// once throughput exists too): (capital treasury, corridors touching
+    /// held ground) at the traced run's own close, one pair per living
+    /// polity. A cheap proxy for "the inherited corridor network" ahead of
+    /// BL-940 giving throughput its own real quantity.
+    std::vector<std::pair<int64_t, int64_t>> polity_treasury_corridor;
 };
 
 /// Century-scaled rate, avoiding a divide-by-zero span.
@@ -226,6 +235,26 @@ int main(int argc, char** argv)
             else               ++row.frontier_skirmishes;
         }
 
+        // BL-932 DIAGNOSTIC — read straight off the traced re-run above,
+        // which already mutated `ss_copy` in place and is disposable.
+        for (const polity& q : traced.polities)
+        {
+            if (!q.alive || q.capital < 0
+             || static_cast<std::size_t>(q.capital) >= ss_copy.regions.size())
+                continue;
+            int64_t touch = 0;
+            for (const history_corridor& c : traced.supply_corridors)
+            {
+                const bool a_held = static_cast<std::size_t>(c.a) < ss_copy.regions.size()
+                                  && ss_copy.regions[c.a].nation == q.id;
+                const bool b_held = static_cast<std::size_t>(c.b) < ss_copy.regions.size()
+                                  && ss_copy.regions[c.b].nation == q.id;
+                if (a_held || b_held) ++touch;
+            }
+            row.polity_treasury_corridor.push_back(
+                {ss_copy.regions[static_cast<std::size_t>(q.capital)].treasury, touch});
+        }
+
         row.ok = true;
         rows.push_back(row);
     }
@@ -331,6 +360,53 @@ int main(int argc, char** argv)
                     "spread, excluded from both counts above (battle_trace's own comment: defender "
                     "0 is the sentinel for \"unowned\", indistinguishable from a real polity id 0 — "
                     "a pre-existing ambiguity in the struct, not introduced here).\n", ambiguous_total);
+
+    // -----------------------------------------------------------------------
+    // BL-932 DIAGNOSTIC — treasury spread vs. inherited corridor touch.
+    // NOT reading 8's formal row (that is BL-940's, once throughput also
+    // exists — the doc credits reading 8 to "BL-932 / BL-940" jointly); this
+    // is BL-932's own "measurement, not a guess" (EXPLORATION.md sec Capital
+    // arrives), taken here rather than off one eyeballed seed.
+    // -----------------------------------------------------------------------
+    {
+        std::vector<std::pair<int64_t, int64_t>> pairs; // (treasury, corridor_touch)
+        for (const exploration_row& r : rows)
+            for (const auto& tc : r.polity_treasury_corridor) pairs.push_back(tc);
+
+        std::printf("\n--- BL-932 diagnostic: treasury vs. inherited corridor touch ---\n");
+        if (pairs.size() < 2)
+        {
+            std::printf("  fewer than two living polities across the spread — no spread to read.\n");
+        }
+        else
+        {
+            int64_t min_t = pairs[0].first, max_t = pairs[0].first, sum_t = 0;
+            for (const auto& p : pairs) { min_t = std::min(min_t, p.first);
+                                          max_t = std::max(max_t, p.first); sum_t += p.first; }
+            const double mean_t = static_cast<double>(sum_t) / static_cast<double>(pairs.size());
+
+            // Pearson correlation, integer inputs, double accumulation --
+            // a report figure, not a decision input, so float is fine here.
+            double mean_c = 0.0;
+            for (const auto& p : pairs) mean_c += static_cast<double>(p.second);
+            mean_c /= static_cast<double>(pairs.size());
+            double cov = 0.0, var_t = 0.0, var_c = 0.0;
+            for (const auto& p : pairs)
+            {
+                const double dt = static_cast<double>(p.first)  - mean_t;
+                const double dc = static_cast<double>(p.second) - mean_c;
+                cov += dt * dc; var_t += dt * dt; var_c += dc * dc;
+            }
+            const double corr = (var_t > 0.0 && var_c > 0.0) ? cov / std::sqrt(var_t * var_c) : 0.0;
+
+            std::printf("  %zu living polities across the spread: treasury min=%lld max=%lld mean=%.1f\n",
+                        pairs.size(), static_cast<long long>(min_t), static_cast<long long>(max_t), mean_t);
+            std::printf("  correlation(treasury, corridor-touch) = %.3f\n", corr);
+            std::printf("  %s\n", corr > 0.2
+                ? "positive — treasury tracks the inherited/grown corridor network, as the done-when criterion asks."
+                : "not clearly positive on this spread — report to Ben rather than re-tuning the formula silently.");
+        }
+    }
 
     // -----------------------------------------------------------------------
     // READINGS 3-10 — SCAFFOLDING. Each has no mechanism yet; the slot is

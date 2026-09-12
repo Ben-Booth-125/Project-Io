@@ -371,6 +371,27 @@ struct region
     /// locally.
     int64_t material_stock = 0;
 
+    // --- BL-932: the treasury -----------------------------------------------
+    // EXPLORATION.md sec Capital arrives, and it sits in the capital. SETTLED
+    // (Ben, 2026-09-11, superseding a same-day morning ruling that floated it
+    // free of the map): "the treasury is moved to the capital for this phase."
+    // ONE PER POLITY, AND IT LIVES ON THE REGION, EXACTLY LIKE `material_stock`
+    // ABOVE, FOR THE SAME REASON. A conqueror who takes the seat must take
+    // something real; putting the treasury on `polity` instead would have
+    // meant inventing a SECOND capture path (an explicit transfer at the
+    // conquest site) where `material_stock` needs none at all — it is a fact
+    // about the ground, so ownership changing above (`nation`/`owner[]`) is
+    // the whole of the transfer, for free, by construction.
+
+    /// Capital standing at this region, valid only where this region is a
+    /// living polity's `capital` (which is always its seat — BL-866). Zero
+    /// and unused everywhere else. Fed by `run_exploration_upkeep` (BL-932):
+    /// endowment on held ground, the inherited corridor network, and a
+    /// standing market — nothing tops it up, so a polity that inherited
+    /// little stays poor. GENERATION SCRATCH, NOT SAVED, same footing as
+    /// `material_stock`/`network_supply_q` above.
+    int64_t treasury = 0;
+
     // --- Civilisations (BL-869) ---------------------------------------------
     // CIVILISATION.md § A civilisation is what mixing makes, and it is not a
     // creed. "A region carrying two peoples in quantity, for a long time" is

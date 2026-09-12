@@ -1627,6 +1627,33 @@ struct history_sim_params
     // change at that hook rather than a new call site threaded through the
     // round loop from scratch.
     bool exploration_upkeep_enabled = false;
+
+    // --- BL-932: what earns the treasury -----------------------------------
+    // EXPLORATION.md sec Capital arrives names four sources; subject tribute
+    // (BL-933/934) is not built yet and contributes 0. THE ARITHMETIC IS A
+    // MEASUREMENT, NOT A GUESS (the doc's own words) — these three are a
+    // FIRST CUT, sized to produce a visible spread rather than tuned against
+    // a sweep. Re-tune from `history_sweep`/`exploration_sweep`, not by
+    // re-guessing a round number.
+
+    /// Per-mille of a polity's mean held-ground endowment
+    /// (`(farm_q+ore_q+energy_q+port_q)/4`), earned into the capital's
+    /// `region::treasury` EVERY DECISION ROUND (a rate, scaled by the step —
+    /// see § The stepped decision clock). A polity sitting on rich, wide
+    /// ground earns faster than one on poor or narrow ground BY CONSTRUCTION.
+    int treasury_endowment_income_q = 40;
+
+    /// Capital earned per decision round PER INHERITED CORRIDOR touching held
+    /// ground (`history_sim_state::supply_corridors`, seeded from
+    /// `resume_corridors` at the span's open and grown by ordinary use
+    /// thereafter) — the network term BL-937's reading binds treasury spread
+    /// to. A rate, scaled by the step.
+    int treasury_corridor_income_q = 6;
+
+    /// Flat capital earned per decision round while the capital itself
+    /// carries a market (`region::has_market`, BL-910). A rate, scaled by
+    /// the step; zero for a polity whose seat never stood a market.
+    int treasury_market_income_q = 50;
 };
 
 // ---------------------------------------------------------------------------
@@ -1656,15 +1683,23 @@ struct dated_object
 /// never a roll.
 void expire_dated_objects(std::vector<dated_object>& objects, int64_t year);
 
-/// THE UPKEEP STEP ITSELF (BL-931), called once per decision round when
-/// `history_sim_params::exploration_upkeep_enabled` is set. A DOCUMENTED
-/// NO-OP TODAY: there is no treasury to earn into, no stock to pay upkeep
-/// from, and nothing to invest beyond what the ordinary Invest verb already
-/// does — BL-932 is what gives "earn, then pay stocks, then invest"
-/// (EXPLORATION.md sec The engine is shared) an actual quantity to move.
-/// Landing the call site now, rather than at BL-932, is what keeps that item
-/// a one-line change inside this function instead of a new threading job.
-void run_exploration_upkeep(std::vector<polity>& polities, int64_t year);
+/// THE UPKEEP STEP ITSELF (BL-931/BL-932), called once per decision round
+/// when `history_sim_params::exploration_upkeep_enabled` is set. "Earn, then
+/// pay stocks, then invest" (EXPLORATION.md sec The engine is shared) — this
+/// item builds EARN: every living polity's capital seat (`region::treasury`)
+/// draws income from its held ground's endowment, the inherited corridor
+/// network, and a standing market (`history_sim_params::treasury_*_income_q`),
+/// and — ONCE, on the round at @p year == @p params.start_year, the phase's
+/// visible opening act — the seat's accumulated `material_stock` is folded
+/// into it (EXPLORATION.md sec Capital arrives: "material becomes capital").
+/// PAY (ports/navies/standing armies decaying, BL-933's stocks) and INVEST
+/// beyond the ordinary verb are still owed to a later item.
+void run_exploration_upkeep(std::vector<region>&                 regions,
+                            std::vector<polity>&                 polities,
+                            const std::vector<history_corridor>& corridors,
+                            const history_sim_params&             params,
+                            int64_t                                year,
+                            int                                    step_years);
 
 // ---------------------------------------------------------------------------
 // Actors
@@ -1984,14 +2019,16 @@ bool exploration_node_available(uint64_t mask, int node_idx);
 /// `throughput_bound`, `subject_held`) read quantities this item does not
 /// build — the capital treasury (BL-932), the scarcity signal (BL-939),
 /// corridor throughput (BL-940), and the overlord/subject link (BL-933/934)
-/// respectively — and are STUBBED AT A PINNED NEUTRAL VALUE inside the
-/// function body rather than threaded through as parameters, exactly as
-/// `choose_empire_node` already stubs `threatened`/`plague_struck`/
-/// `many_peoples` at 0. A 0 term never wins the argmax on its own account,
-/// which is honest rather than wrong, and a harness pins each stub's value
-/// so a later item's landing shows as a diff.
+/// respectively. `purse_low_q`, `wants_unmet_q` and `throughput_bound_q` are
+/// now real, threaded-through parameters (BL-932/939/940); `subject_held`
+/// alone is still STUBBED AT A PINNED NEUTRAL VALUE inside the function body,
+/// exactly as `choose_empire_node` stubs `threatened`/`plague_struck`/
+/// `many_peoples` at 0 — a 0 term never wins the argmax on its own account,
+/// which is honest rather than wrong, and a harness pins the remaining
+/// stub's value so BL-933/934 landing shows as a diff.
 int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
-                             int ground_port_q, int ground_farm_q, int surplus_q);
+                             int ground_port_q, int ground_farm_q, int surplus_q,
+                             int purse_low_q, int wants_unmet_q, int throughput_bound_q);
 
 /// THE RIM (BL-930): has this polity crossed EX-SP-3m, "The Long Reckoning"?
 /// A per-polity boolean, read straight off the mask — this is the fact

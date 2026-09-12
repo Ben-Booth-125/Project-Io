@@ -132,15 +132,28 @@ int main()
         check(exploration_node_available(mask, sp2a),
               "T3.0  EX-SP-2a (purse_low) is a legal target once ring 2 opens");
 
-        // Called with every OTHER term maxed out, the argmax still considers
+        // Called with every OTHER term maxed out and purse_low itself EMPTY
+        // (treasury full, so purse_low_q == 0), the argmax still considers
         // EX-SP-2a (it does not vanish from the candidate set), and it never
-        // wins over a live term at the same ring -- confirming purse_low
-        // contributes nothing to the score it competes on.
+        // wins over a live term at the same ring -- confirming an EMPTY
+        // purse_low loses fairly rather than by being wired wrong.
         const int chosen_high_signals = choose_exploration_node(
             mask, /*stores_low_q=*/1000, /*reach_bound_q=*/1000,
-            /*ground_port_q=*/1000, /*ground_farm_q=*/1000, /*surplus_q=*/1000);
+            /*ground_port_q=*/1000, /*ground_farm_q=*/1000, /*surplus_q=*/1000,
+            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
         check(chosen_high_signals != sp2a,
-              "T3.1  purse_low (stubbed 0) loses to any live ring-2 term when one is available");
+              "T3.1  purse_low at 0 (full treasury) loses to any live ring-2 term when one is "
+              "available");
+
+        // BL-932: purse_low IS live now -- an EMPTY treasury (purse_low_q at
+        // its own max) DOES win EX-SP-2a when nothing else competes at all.
+        const int chosen_empty_purse = choose_exploration_node(
+            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
+            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
+            /*purse_low_q=*/1000, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
+        check(chosen_empty_purse == sp2a,
+              "T3.2  purse_low at 1000 (an empty treasury) wins EX-SP-2a when nothing else "
+              "competes -- BL-932 wired it live");
     }
 
     // -----------------------------------------------------------------
@@ -260,20 +273,37 @@ int main()
     }
 
     // -----------------------------------------------------------------
-    // R5: the upkeep hook is callable and moves nothing (documented no-op)
+    // R5: the upkeep hook is callable and EARNS (BL-932 gave it a body)
     // -----------------------------------------------------------------
     {
+        std::vector<region> regions(2);
+        regions[0].nation = 0; regions[0].farm_q = 1000; regions[0].ore_q = 1000;
+        regions[0].energy_q = 1000; regions[0].port_q = 1000;
+        regions[0].has_market = true;
+        regions[1].nation = 1; // a poor, unconnected polity's capital: no endowment set
+
         std::vector<polity> qs(2);
-        qs[0].capacity[0] = 3; qs[1].cohesion_q = 700;
-        const std::vector<polity> before = qs;
-        run_exploration_upkeep(qs, 1234);
-        bool unchanged = qs.size() == before.size();
-        for (std::size_t i = 0; unchanged && i < qs.size(); ++i)
-            unchanged = qs[i].capacity[0] == before[i].capacity[0]
-                     && qs[i].cohesion_q == before[i].cohesion_q
-                     && qs[i].exploration_mask == before[i].exploration_mask
-                     && qs[i].empire_mask == before[i].empire_mask;
-        check(unchanged, "R5  run_exploration_upkeep moves nothing today (BL-932 gives it a body)");
+        qs[0].capital = 0; qs[0].capacity[0] = 3;
+        qs[1].capital = 1; qs[1].cohesion_q = 700;
+        history_sim_params ep2;
+        ep2.start_year = 1200; // consolidation year: not this call's `year`
+
+        run_exploration_upkeep(regions, qs, /*corridors=*/{}, ep2, /*year=*/1234, /*step_years=*/4);
+
+        check(regions[0].treasury > regions[1].treasury,
+              "R5.1  a rich, market-carrying capital earns more treasury than a bare one");
+        check(regions[1].treasury == 0,
+              "R5.2  a capital with no endowment, no market and no corridor touch earns nothing");
+        check(qs[0].capacity[0] == 3 && qs[1].cohesion_q == 700,
+              "R5.3  upkeep does not disturb fields it has no business touching");
+
+        // R5.4: the ONE-TIME consolidation, at year == start_year only.
+        regions[0].material_stock = 500;
+        const int64_t before_treasury = regions[0].treasury;
+        run_exploration_upkeep(regions, qs, {}, ep2, /*year=*/1200, /*step_years=*/4);
+        check(regions[0].treasury >= before_treasury + 500 && regions[0].material_stock == 0,
+              "R5.4  consolidation folds material_stock into treasury once, at the span's own "
+              "start year, and empties the seat's material_stock");
     }
 
     std::printf("\n%s (%d failure%s)\n",
