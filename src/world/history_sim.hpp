@@ -55,6 +55,7 @@
 #include "settlement.hpp"
 #include "works_roster.hpp"
 #include "empire_tree_data.hpp" // BL-912 — the empire tree's generated node table
+#include "exploration_tree_data.hpp" // BL-930 — the exploration tree's generated node table
 
 #include <array>
 #include <atomic>
@@ -126,6 +127,17 @@ inline constexpr int sim_tick_band_max = 8;
 // ---------------------------------------------------------------------------
 // Tunables
 // ---------------------------------------------------------------------------
+
+// Forward declarations for BL-931's resume pointers below — all four are
+// defined later in this header (`polity`, `grudge`, `contact`,
+// `history_corridor`); a pointer needs no more than the name at this point,
+// and `history_sim_params` stays a plain, allocation-free, trivially-copyable
+// struct (its own long-standing rule, see the comment on the struct itself)
+// because these are raw non-owning pointers, never containers by value.
+struct polity;
+struct grudge;
+struct contact;
+struct history_corridor;
 
 /// Scorer weights and loop bounds. Defaults are PLACEHOLDERS, not tuned
 /// values: BL-277 records that the `w_*` weights are BL-275 sweep outputs
@@ -1564,7 +1576,95 @@ struct history_sim_params
     /// the trap `owner_changes` already avoided once by not being a grid.
     /// Values below 1 are treated as 1.
     int record_interval_years = 20;
+
+    // -----------------------------------------------------------------------
+    // BL-931 — RESUMING A SECOND SPAN ON THE SAME ENGINE (the Exploration
+    // phase over the Empire phase's close), rather than seeding a fresh
+    // opening.
+    // -----------------------------------------------------------------------
+    //
+    // "The same engine" (EXPLORATION.md sec The engine is shared) means one
+    // `run_history_sim`, called a second time, over the polities the first
+    // call left alive — not a second simulator and not a fork of this
+    // function's opening. `nullptr` (every field's default) is exactly
+    // TODAY'S BEHAVIOUR: no existing caller sets any of these, so no existing
+    // run's opening or record changes by one bit.
+
+    /// When non-null, `run_history_sim` skips its own opening entirely --
+    /// the population/army seeding loop, the polity-construction branch
+    /// (BL-826 or BL-920's), the great-power seed, and the seat-placement
+    /// pass -- and starts `out.polities` as a COPY of these instead. The
+    /// caller owns the matching region state: resuming means `ss.regions` is
+    /// already the closing region set (population, army_stock, ownership,
+    /// `is_seat`/`seat_region`, all live) -- typically
+    /// `pass_one_output::regions`, copied in by the caller before this call,
+    /// paired with `pass_one_output::polities` here. `army_stock` therefore
+    /// CARRIES rather than being re-seeded at the new span's target
+    /// (EXPLORATION.md sec Force persists now: "`army_stock` CARRIES across
+    /// the handoff").
+    const std::vector<polity>* resume_polities = nullptr;
+
+    /// Grudges/contacts/corridors carried from the prior span's close, folded
+    /// into this run's own tables at the top rather than starting empty. Each
+    /// is independent of `resume_polities` in principle but is only ever set
+    /// alongside it in practice (BL-931's one caller sets all four together).
+    const std::vector<grudge>*           resume_grudges   = nullptr;
+    const std::vector<contact>*          resume_contacts  = nullptr;
+    const std::vector<history_corridor>* resume_corridors = nullptr;
+
+    // -----------------------------------------------------------------------
+    // BL-931 — THE ROUND-LEVEL UPKEEP STEP.
+    // -----------------------------------------------------------------------
+    //
+    // EXPLORATION.md sec The engine is shared names two honest additions the
+    // shared engine does not already have. This is the first: "the treasury
+    // earns, then pays its stocks, then invests" every round. OFF by default,
+    // so the Empire span (every caller before this item) is unaffected bit
+    // for bit. There is no treasury yet (BL-932) -- the hook fires every
+    // decision round and calls `run_exploration_upkeep`, which is a
+    // documented no-op until that item gives it something to earn, pay or
+    // invest. Landing the STEP now, empty, is what makes BL-932 a one-line
+    // change at that hook rather than a new call site threaded through the
+    // round loop from scratch.
+    bool exploration_upkeep_enabled = false;
 };
+
+// ---------------------------------------------------------------------------
+// BL-931 — OBJECTS WITH A TERM.
+// ---------------------------------------------------------------------------
+//
+// EXPLORATION.md sec The engine is shared's second honest addition: "treaties
+// expire, which nothing in the Empire phase does." This is the MECHANISM —
+// a dated object that ticks down and is removed once its term ends — with no
+// treaty semantics yet (a treaty's clauses are BL-933's). `kind`/`a`/`b` are
+// deliberately opaque integers here: this file interprets none of them, so a
+// later item can give `kind` a meaning (non-aggression, trade access, ...)
+// without this struct or its expiry pass changing shape.
+struct dated_object
+{
+    int64_t expires_year = 0; ///< The object is gone once the round reaches this year.
+    int32_t kind = 0;         ///< Opaque to this file; a future item's clause kind.
+    int32_t a = -1;           ///< Opaque to this file; typically a polity id.
+    int32_t b = -1;           ///< Opaque to this file; typically a polity id.
+};
+
+/// Removes every `dated_object` whose term has ended AT OR BEFORE @p year,
+/// in place. Stable relative order preserved (`std::remove_if` + `erase`),
+/// so two callers walking the same vector before and after a tie-breaking
+/// year see the same survivors in the same order. Pure and seedless: a
+/// deterministic consequence of the year and the terms already recorded,
+/// never a roll.
+void expire_dated_objects(std::vector<dated_object>& objects, int64_t year);
+
+/// THE UPKEEP STEP ITSELF (BL-931), called once per decision round when
+/// `history_sim_params::exploration_upkeep_enabled` is set. A DOCUMENTED
+/// NO-OP TODAY: there is no treasury to earn into, no stock to pay upkeep
+/// from, and nothing to invest beyond what the ordinary Invest verb already
+/// does — BL-932 is what gives "earn, then pay stocks, then invest"
+/// (EXPLORATION.md sec The engine is shared) an actual quantity to move.
+/// Landing the call site now, rather than at BL-932, is what keeps that item
+/// a one-line change inside this function instead of a new threading job.
+void run_exploration_upkeep(std::vector<polity>& polities, int64_t year);
 
 // ---------------------------------------------------------------------------
 // Actors
@@ -1799,6 +1899,34 @@ struct polity
     /// domain ladder's `progress_q` uses; the unit is `capacity_band_cost`-
     /// scaled, per node kind and ring (TREES.md sec Nodes: "cost is base x ring").
     int32_t empire_progress_q = 0;
+
+    // -----------------------------------------------------------------------
+    // BL-930 — THE EXPLORATION TREE, held alongside the empire tree's state.
+    // -----------------------------------------------------------------------
+    //
+    // Exactly the empire tree's shape (BL-912, above), copied rather than
+    // templated: `trees/TREES.md` sec State fixes "one 64-bit mask per tree
+    // plus one accumulated progress integer for the node being invested in"
+    // as the per-tree shape every tree gets, and a polity holds one of these
+    // triples per tree it can invest in. The Exploration tree opens behind
+    // the empire tree's rim (`polity_holds_empire_rim`), so a polity that
+    // never reaches that rim simply never sets a bit here.
+    //
+    // `exploration_mask` bit i is set iff this polity holds
+    // `exploration_tree::nodes[i]` (docs/generation/trees/exploration_tree.json,
+    // via the generated `exploration_tree_data.hpp` — see
+    // `tools/session/gen_empire_tree_table.js exploration`). A closed fork
+    // side (`node::excludes`) never sets its bit once the other side is held;
+    // see `exploration_node_available` in history_sim.cpp.
+    uint64_t exploration_mask = 0;
+
+    /// Index into `exploration_tree::nodes`, or -1 when nothing is targeted.
+    /// Same Invest verb, same round, as `empire_investing`.
+    int16_t exploration_investing = -1;
+
+    /// Progress accumulated toward `exploration_investing`'s cost. Same
+    /// currency as `empire_progress_q`.
+    int32_t exploration_progress_q = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -1834,6 +1962,45 @@ int choose_empire_node(uint64_t mask, int cohesion_q, int stores_low_q,
 inline bool polity_holds_empire_rim(const polity& q)
 {
     return (q.empire_mask & (1ULL << io::empire_tree::rim_node_index)) != 0;
+}
+
+// ---------------------------------------------------------------------------
+// The exploration tree (BL-930) — availability, the scorer, and the rim read
+// ---------------------------------------------------------------------------
+//
+// EXACT PRECEDENT: `empire_node_available`/`choose_empire_node` above,
+// re-read against `io::exploration_tree` instead of `io::empire_tree`. The
+// five rules (`TREES.md` sec The five rules) are the tree grammar, not an
+// empire-specific mechanic, so the availability test is identical in shape.
+
+/// True iff `node_idx` is a legal Invest target for a polity holding
+/// `mask` in the EXPLORATION tree — same five-rule test
+/// `empire_node_available` runs, over `io::exploration_tree::nodes`.
+bool exploration_node_available(uint64_t mask, int node_idx);
+
+/// The scorer (TREES.md sec The scorer — one shape, four trees), read against
+/// `io::exploration_tree`. Four of the terms this tree adds
+/// (`EXPLORATION_TREE.md` sec The scorer: `purse_low`, `wants_unmet`,
+/// `throughput_bound`, `subject_held`) read quantities this item does not
+/// build — the capital treasury (BL-932), the scarcity signal (BL-939),
+/// corridor throughput (BL-940), and the overlord/subject link (BL-933/934)
+/// respectively — and are STUBBED AT A PINNED NEUTRAL VALUE inside the
+/// function body rather than threaded through as parameters, exactly as
+/// `choose_empire_node` already stubs `threatened`/`plague_struck`/
+/// `many_peoples` at 0. A 0 term never wins the argmax on its own account,
+/// which is honest rather than wrong, and a harness pins each stub's value
+/// so a later item's landing shows as a diff.
+int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
+                             int ground_port_q, int ground_farm_q, int surplus_q);
+
+/// THE RIM (BL-930): has this polity crossed EX-SP-3m, "The Long Reckoning"?
+/// A per-polity boolean, read straight off the mask — this is the fact
+/// `EXPLORATION_TREE.md` sec What the tree hands the Industry tree calls
+/// "entry timing": a polity holding this at 1660 starts the Industry tree at
+/// its root.
+inline bool polity_holds_exploration_rim(const polity& q)
+{
+    return (q.exploration_mask & (1ULL << io::exploration_tree::rim_node_index)) != 0;
 }
 
 /// What the scorer chose for one polity in one year — kept for the harness and
@@ -2188,6 +2355,13 @@ struct history_sim_state
     /// grudge is a feeling a person or lineage holds, which the seat does not
     /// carry forward; contact is a fact about the map, which the seat does.
     std::vector<contact> contacts;
+
+    /// BL-931 — OBJECTS WITH A TERM, ticked down and expired once per decision
+    /// round (`expire_dated_objects`). Empty and untouched unless a caller
+    /// populates it — nothing in the Empire span's own rules writes here, and
+    /// nothing in this item's scope does either; this is the seam BL-933's
+    /// treaty objects land in.
+    std::vector<dated_object> dated_objects;
 
     int      region_stride = 0; ///< Final region count (slice width for replay).
     int64_t  years           = 0; ///< Years simulated.

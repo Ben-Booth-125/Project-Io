@@ -325,3 +325,45 @@ uint32_t era_minus_one_sim_seed(const world_params& params)
     // existing world, golden and fixture is unmoved.
     return (params.seed ^ 0x415C1E17u) + params.era_seed * 0x9E3779B9u;
 }
+
+// ---------------------------------------------------------------------------
+// BL-931 — the Exploration span
+// ---------------------------------------------------------------------------
+
+bool exploration_sim_enabled(const world_params& params)
+{
+    return params.exploration_sim_enabled
+        && era_minus_one_enabled(params)
+        && !era_minus_one_has_industrial_span(params);
+}
+
+history_sim_params exploration_sim_params(const world_params& params)
+{
+    history_sim_params hp; // struct defaults throughout except the span/clock
+                            // and the upkeep opt-in below.
+
+    hp.start_year = params.empires_stop_year;      // 1200, wherever Empires closed.
+    hp.stop_year  = params.exploration_stop_year;  // 1660 by default.
+    hp.tick_bands[0]   = {hp.stop_year, 4};        // Same 4-year cadence as the
+    hp.tick_band_count = 1;                        // Empires round's own close.
+
+    // BL-931 — the round-level upkeep hook. Empty until BL-932, but this is
+    // the one caller that wants it called at all.
+    hp.exploration_upkeep_enabled = true;
+
+    // Carried opening behaviour from the Empires round, unchanged: a founding
+    // that arrives inside this span (there are none scheduled — the migration
+    // ends long before 1200 — but the flag is a property of the WORLD's rule
+    // set, not of the span) still resolves as unorganised culture ground.
+    hp.city_states_by_population_threshold = true;
+    hp.settle_requires_razed_ground         = true;
+
+    return hp;
+}
+
+uint32_t exploration_sim_seed(const world_params& params)
+{
+    // Own constant, own additive fold — neither the Empires round's seed
+    // (`0x415C1E17u`) nor a bare re-use of the world seed.
+    return (params.seed ^ 0x3720A7E1u) + params.era_seed * 0x9E3779B9u;
+}

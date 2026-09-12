@@ -123,6 +123,34 @@ struct world_params
     /// Default 1200 matches the doc for every existing single-span caller —
     /// nothing opts in, the shipped world simply runs its documented span.
     int64_t         empires_stop_year = 1200;
+
+    /// BL-931 — RUN THE EXPLORATION SPAN, 1200 -> `exploration_stop_year`,
+    /// on the SAME `history_sim` engine, immediately after the single-span
+    /// Empires round closes (EXPLORATION.md sec The engine is shared).
+    ///
+    /// OFF BY DEFAULT, deliberately, unlike the Empires round itself. Wiring
+    /// this on unconditionally would move `region::nation` (read by
+    /// `derive_national_character` right after the era block) from the 1200
+    /// CE political map to whatever the exploration span leaves at
+    /// `exploration_stop_year` — every generation golden and every harness
+    /// that checks post-generation political state would move with it. That
+    /// is real work this item does not do (verifying the downstream
+    /// consequences and re-baselining what moves), so the capability lands
+    /// real and tested but does not yet change what a caller who asks for
+    /// nothing new gets. A caller that wants the span opts in here.
+    ///
+    /// Only read on a SINGLE-span Empires run (`!era_minus_one_has_industrial
+    /// _span(params)`) — a two-span (>= 1700) epoch's own industrial arc
+    /// already plays past 1660 on a different calendar mapping, and stacking
+    /// this on top of it is a question this item does not answer.
+    bool exploration_sim_enabled = false;
+
+    /// The calendar year the Exploration span closes. Default 1660 is
+    /// EXPLORATION.md's own span end; exposed as a field on the same footing
+    /// as `empires_stop_year` rather than a compile-time constant, for a
+    /// harness that wants to bind a shorter span.
+    int64_t         exploration_stop_year = 1660;
+
     int             body_count = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a
     // *consequence* of its habitable land area and the minimum-viable-territory floor

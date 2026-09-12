@@ -1,6 +1,6 @@
 // GENERATED FILE — DO NOT HAND-EDIT.
 // Source: docs/generation/trees/empire_tree.json
-// Regenerate: node tools/session/gen_empire_tree_table.js
+// Regenerate: node tools/session/gen_empire_tree_table.js empire
 // Lint first: node tools/session/tree_lint.js empire
 #pragma once
 
@@ -22,11 +22,11 @@ struct node
     gate_atom   gate;
     int8_t      excludes;    ///< fork partner index, or -1
     bool        is_root;     ///< OWN declared `links` was empty in the store -- the
-                             ///< tree's true entry point (EM-SP-1a). NOT the same as
-                             ///< "no undirected neighbour": every other ring-1 major
-                             ///< names it as ITS prerequisite, which would otherwise
-                             ///< make the root look like it needs a neighbour held --
-                             ///< an unlockable tree. Rule 2's OR-availability is skipped
+                             ///< tree's true entry point. NOT the same as "no
+                             ///< undirected neighbour": every other ring-1 major names
+                             ///< it as ITS prerequisite, which would otherwise make the
+                             ///< root look like it needs a neighbour held -- an
+                             ///< unlockable tree. Rule 2's OR-availability is skipped
                              ///< entirely for a root.
     uint64_t    neighbours_mask; ///< undirected link set (rule 2, OR-availability)
     uint64_t    requires_mask;   ///< milestones: AND set (rule 4)
