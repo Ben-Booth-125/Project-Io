@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*30 entries — 26 open, 4 resolved.*
+*31 entries — 27 open, 4 resolved.*
 
 ---
 
@@ -389,6 +389,15 @@ Before BL-919, `lapse_from_report` built BOTH wizard lapse rounds (Culture and E
 *decision taken on your behalf · raised 2026-09-12 · from BL-931, wave 1 of sprint 40.*
 
 Flipping exploration_sim_enabled to true by default would move region::nation from the 1200 CE map to the 1660 CE one and shift every generation golden -- real re-baselining work BL-931 did not scope in. Landed opt-in instead so the rest of sprint 40 can build against a real, running span without moving main's default generated world out from under every other in-flight consumer. A later item (likely the wave-5 tree-migration/exemplar wave, or its own item) needs to flip the default once the phase is far enough along that the golden move is worth taking once rather than piecemeal.
+
+### NR-848 — DECISION TAKEN: BL-937's displacement reading operationalizes "long-contacted neighbour" vs "newly-contacted, frontier" off the directed contact table, and reads the ratio WITHIN the Exploration span
+*decision taken on your behalf · raised 2026-09-12 · from BL-937, sprint 40 wave 1 (the readings harness).*
+
+EXPLORATION.md names the reading ("neighbour-war rate falls relative to frontier-skirmish rate") but does not say how a battle's pair is classified, or against what the two rates are compared. Taken: a pair is a LONG-CONTACTED NEIGHBOUR if the directed contact table (`pass_one_output::contacts`) already names it at 1200 CE (i.e. the Empires round already recorded a meeting); it is NEWLY-CONTACTED / frontier otherwise, i.e. the pair's first-ever contact falls inside 1200-1660. The two resulting rates (battles/century) are then compared to EACH OTHER within the Exploration span, not each independently against the Empires round's own rate -- read alongside reading 2 (conflict persists, which IS compared against Empires explicitly), this still catches the named trap (a world that simply stopped fighting passes neither reading, since both would read as a fall to near-zero rather than a displacement). Built and run over 16 seeds: median ratio (frontier-rate / neighbour-rate) 0.21 across seeds with any neighbour war -- neighbour-war rate leads throughout the spread, so NO DISPLACEMENT is measured yet on the bare BL-931 span (expected: the arms-race/deterrence mechanism this reading is meant to detect is Ben's later item, not built by BL-931 alone).
+
+**Why it matters.** This is a judgement call on an underspecified measurement, not a mechanism decision -- but it sets what "displacement" means for every future sweep of this reading, including once BL-940/deterrence lands and the ratio is expected to move. If the intended comparison was actually against the Empires round's own rate (rather than within-span), the harness's verdict and its printed guidance text would need to change, though the raw counts it reports would not.
+
+*Files: `tools/verify/exploration_sweep.cpp`, `src/world/era_minus_one.hpp`, `src/world/hard_coded_world.cpp`*
 
 ---
 

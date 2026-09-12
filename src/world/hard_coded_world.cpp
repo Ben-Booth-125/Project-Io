@@ -1056,6 +1056,19 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 ep.resume_contacts  = &kepler_pass_one.contacts;
                 ep.resume_corridors = &kepler_pass_one.surviving_corridors;
 
+                // BL-937: the PRE-sim capture, taken before this call mutates
+                // `kepler_settlement`/`kepler_creeds` in place — see the field
+                // comments on `era_minus_one_fixture::pre_exploration_*` for
+                // why a harness needs these rather than the post-sim state.
+                if (fixture != nullptr)
+                {
+                    fixture->pre_exploration_settlement = kepler_settlement;
+                    fixture->pre_exploration_creeds     = kepler_creeds;
+                    fixture->pre_exploration_polities   = kepler_pass_one.polities;
+                    fixture->pre_exploration_grudges    = kepler_pass_one.grudges;
+                    fixture->pre_exploration_corridors  = kepler_pass_one.surviving_corridors;
+                }
+
                 const history_sim_state kepler_exploration_hs = run_history_sim(
                     kepler_settlement, &kepler_creeds, terr.view(),
                     home_grid_width, home_grid_height, ep,
@@ -1067,6 +1080,19 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 kepler_settlement.history.insert(kepler_settlement.history.end(),
                                                  kepler_exploration_hs.history.begin(),
                                                  kepler_exploration_hs.history.end());
+
+                // BL-937: hand the sweep harness the span's real input and
+                // output, on the same capture-not-re-derive footing as the
+                // Empires block above. Costs nothing when no fixture was
+                // asked for.
+                if (fixture != nullptr)
+                {
+                    fixture->exploration_ran    = true;
+                    fixture->exploration_params = ep;
+                    fixture->exploration_seed   = exploration_sim_seed(params);
+                    fixture->pre_exploration_contacts = kepler_pass_one.contacts;
+                    fixture->exploration_state        = kepler_exploration_hs;
+                }
             }
 
             // Report what the era actually produced, into the generation record
