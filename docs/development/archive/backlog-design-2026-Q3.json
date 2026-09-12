@@ -13320,6 +13320,99 @@
         "resolved",
         "resolution"
       ]
+    },
+    "BL-930": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-930",
+      "short_name": "EXPLORATION_TREE",
+      "priority": "A",
+      "difficulty": 5,
+      "title": "Wire the Exploration tree into the sim, and validate its sizing",
+      "authority_doc": "docs/generation/trees/EXPLORATION_TREE.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp",
+        "tools/session/gen_empire_tree_table.js",
+        "docs/generation/trees/EXPLORATION_TREE.md",
+        "docs/generation/trees/exploration_tree.json"
+      ],
+      "design": "BEN, 2026-09-11: \"Globalisation and industry use different trees.\" The chain is Colonisation -> Empire -> EXPLORATION -> Industry.\n\n=== THE TREE IS AUTHORED (2026-09-11, resolving NR-843). WHAT REMAINS IS WIRING. ===\nEXPLORATION_TREE.md and exploration_tree.json exist: 31 nodes of a 64 cap, 3 rings, 4 branches + spire (Purse / Hulls / Port & Garrison / Ways / Goods), 3 milestones, 3 forks. tree_lint.js knows the tree and passes on all four. EMPIRE_TREE.md and empire_tree.json re-point the rim milestone at it; INDUSTRY_TREE.md is gated behind its rim.\n\nTHE WORK IS THE SIM SIDE, and BL-912 (empire tree wired) is the exact precedent to copy. Add per-polity state alongside `empire_mask`: `exploration_mask` (uint64), `exploration_investing` (int16), `exploration_progress_q` (int32). Generate the node table the way gen_empire_tree_table.js does -- generalise that tool rather than forking it. Honour `excludes`: a closed fork side never sets its bit, per empire_node_available.\n\nFOUR NEW SCORER TERMS the Empire tree cannot express, defined in EXPLORATION_TREE.md sec The scorer: `purse_low`, `wants_unmet`, `throughput_bound`, `subject_held`. THREE OF THE FOUR READ QUANTITIES THAT DO NOT EXIST YET -- the treasury (BL-932), the scarcity signal (BL-939) and corridor throughput (BL-940) -- so this item either lands after them or lands with the terms stubbed and a harness pinning each one as its quantity arrives. `throughput_bound` is the load-bearing one: it is the only term a landlocked realm with no subjects can ever be bound by, and without it the scorer has nothing to say to a consolidator.\n\nSIZING IS AN ASSERTION, NOT A NUMBER (NR-844, TREES.md sec Sizes). 31 nodes is UNDER the ~34 target and is reported rather than padded. What the sweep must show: the leading polity reaches *The Long Reckoning* shortly before 1660, the median stands near *The Standing Charter*. If it does not, the tree wants a fourth ring -- that is a measurement, not a guess.\n\nONE OPEN SHAPE QUESTION worth settling while wiring: only the *Ocean Carrack* side of the Hulls fork leads to ring 3, so a realm that bought *Fleet of the Line* ends the branch. That is deliberate and it is the tree's most arguable claim; the alternative is a second ring-3 node behind the fighting fork.",
+      "requires": [],
+      "resolution": "BUILT 2026-09-12 (commit 85501a31). exploration_mask/exploration_investing/exploration_progress_q added to polity, structural copy of BL-912s empire-tree wiring. gen_empire_tree_table.js generalised to take a tree-name argument. Fixed a real bug found while wiring: exploration_tree.json never marked EX-SP-1a as the trees root, so it was permanently unreachable -- tree_lint.js reachability check is graph-only and missed it (same latent gap flagged in colonisation/industry, currently harmless because they are unwired -- worth a follow-up). Four new scorer terms (purse_low, wants_unmet, throughput_bound, subject_held) stubbed at a pinned 0, each named to its owning future item (BL-932/939/940/933-934), with a harness assertion pinning the value. tools/verify/exploration_sim_harness.cpp: tree availability/fork/rim/stub-pinning tests all PASS. tree_lint.js OK on all four trees. Independently rebuilt and reverified in the main session.",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
+    },
+    "BL-931": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-931",
+      "short_name": "EXPLORATION_PHASE_RUNS",
+      "priority": "A",
+      "difficulty": 5,
+      "title": "The Exploration span runs: 1200 to 1660, on the shared engine, with an upkeep step",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/history_sim.hpp",
+        "src/world/hard_coded_world.cpp",
+        "docs/generation/GENERATION_STRATEGY.md"
+      ],
+      "design": "BEN, 2026-09-11: \"Let's use the same engine - if needs be we can revise this later.\"\n\nTHE SPAN. 1200 -> 1660 CE, 460 years, opening the instant the Empire pass closes. The 1200 -> 1560 coast is RETIRED (GENERATION_STRATEGY.md sec Pass 2 now records the supersession). Pass 1's 3600 years and the 1960 epoch are both unmoved.\n\nTHE ENGINE. history_sim over the same region and polity tables, taking pass_one_output as its input and nothing else. Two honest additions, both named in EXPLORATION.md sec The engine is shared: a ROUND-LEVEL UPKEEP STEP (earn, pay stocks, invest) because every other item depends on a recurring bill, and OBJECTS WITH A TERM, because treaties expire and nothing in the Empire phase does.\n\nTHE VERBS. Settle, Invest, Consolidate and Campaign carry over unchanged; what the phase adds is what a treasury makes purchasable, scored on the one shape (TREES.md sec The scorer).\n\nNOT IN SCOPE: a second simulator, and any change to the Empire span's rules.",
+      "requires": [
+        "BL-930"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit e06445d8). The 1200->1660 span runs on the shared history_sim engine via new history_sim_params resume fields (resume_polities/resume_grudges/resume_contacts/resume_corridors); nullptr (every existing caller) is byte-identical to pre-change behaviour. dated_object + expire_dated_objects is the term mechanism (ticked once per decision round, no treaty semantics yet). run_exploration_upkeep is the round-level upkeep call site, a documented no-op until BL-932. Wired into make_hard_coded_world OPT-IN ONLY via world_params::exploration_sim_enabled (default false) -- flagged for Ben rather than flipped by default, since doing so would move region::nation onto the 1660 map and shift every generation golden (real re-baselining work, not this items scope). Verification, independently reproduced in the main session: exploration_sim_harness ALL PASS (0 failures) including deterministic byte-identical reruns of the resumed span; world_determinism ALL PASS (0 failures), digests unmoved from pre-change baseline (exploration_sim_enabled defaults false, so the existing path is untouched); history_sim_harness 2 failures (R3a2/R3a3), identical to the pre-existing main baseline -- no regression. Full ProjectIo build clean (BUILD_OK).",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
     }
   }
 }

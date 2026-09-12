@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*29 entries — 25 open, 4 resolved.*
+*30 entries — 26 open, 4 resolved.*
 
 ---
 
@@ -384,6 +384,11 @@ Before BL-919, `lapse_from_report` built BOTH wizard lapse rounds (Culture and E
 > **Recommendation:** No action needed; confirmed live in the round-3 click-through (lineage-palette hue families visible, ticker text is migration-flavoured, not battle-flavoured).
 
 *Files: `src/ui/startup_screens.cpp`, `src/world/hard_coded_world.cpp`, `docs/ui/STARTUP.md`*
+
+### NR-847 — DECISION TAKEN: BL-931 wires the Exploration span opt-in, world_params::exploration_sim_enabled default false
+*decision taken on your behalf · raised 2026-09-12 · from BL-931, wave 1 of sprint 40.*
+
+Flipping exploration_sim_enabled to true by default would move region::nation from the 1200 CE map to the 1660 CE one and shift every generation golden -- real re-baselining work BL-931 did not scope in. Landed opt-in instead so the rest of sprint 40 can build against a real, running span without moving main's default generated world out from under every other in-flight consumer. A later item (likely the wave-5 tree-migration/exemplar wave, or its own item) needs to flip the default once the phase is far enough along that the golden move is worth taking once rather than piecemeal.
 
 ---
 

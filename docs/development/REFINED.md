@@ -4,16 +4,15 @@ Sprint 40 ("Exploration") opens 2026-09-12, Delivery — Full, Batch Delivery
 (`docs/development/DELIVERY.md` § Batch Delivery). Sequencing corrected per NR-846: BL-930 ->
 BL-931 -> BL-937 opens the sprint, ahead of the NEXT_SESSION.md wave table's literal order.
 
-## Wave 1 — the engine and the actor's technology
+## Wave 1 — the engine and the actor's technology — LANDED 2026-09-12
 
-- [ ] **BL-930** (EXPLORATION_TREE) — wire the Exploration tree into `history_sim`: `exploration_mask`,
-      `exploration_investing`, `exploration_progress_q` per polity; generalise
-      `gen_empire_tree_table.js`; honour `excludes`. Four new scorer terms (`purse_low`,
-      `wants_unmet`, `throughput_bound`, `subject_held`) land STUBBED — their real quantities
-      (treasury/scarcity/throughput) don't exist until wave 2. `requires: []`.
-- [ ] **BL-931** (EXPLORATION_PHASE_RUNS) — the 1200->1660 span runs on the shared `history_sim`
-      engine, taking `pass_one_output`. Round-level upkeep step (earn/pay/invest) and objects-with-
-      a-term (treaties expire) as the two honest additions. `requires: [BL-930]`.
+- [x] **BL-930** (EXPLORATION_TREE) — commit `85501a31`. Tree wired, stubs pinned, tree_lint OK.
+- [x] **BL-931** (EXPLORATION_PHASE_RUNS) — commit `e06445d8`. Span runs opt-in
+      (`world_params::exploration_sim_enabled`, default false — flagged for Ben, NR pending).
+      Both independently rebuilt and reverified in the main session: `exploration_sim_harness`
+      ALL PASS, `world_determinism` ALL PASS (digests unmoved), `history_sim_harness` 2
+      pre-existing failures only (R3a2/R3a3), full app BUILD_OK. Archived to
+      `archive/backlog-design-2026-Q3.json`.
 
 ## Wave 1.5 — instrumentation (lands before any mechanism item, not at the close)
 
