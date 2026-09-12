@@ -55,6 +55,7 @@
 #include "settlement.hpp"
 #include "works_roster.hpp"
 #include "empire_tree_data.hpp" // BL-912 — the empire tree's generated node table
+#include "exploration_tree_data.hpp" // BL-930 — the exploration tree's generated node table
 
 #include <array>
 #include <atomic>
@@ -1799,6 +1800,34 @@ struct polity
     /// domain ladder's `progress_q` uses; the unit is `capacity_band_cost`-
     /// scaled, per node kind and ring (TREES.md sec Nodes: "cost is base x ring").
     int32_t empire_progress_q = 0;
+
+    // -----------------------------------------------------------------------
+    // BL-930 — THE EXPLORATION TREE, held alongside the empire tree's state.
+    // -----------------------------------------------------------------------
+    //
+    // Exactly the empire tree's shape (BL-912, above), copied rather than
+    // templated: `trees/TREES.md` sec State fixes "one 64-bit mask per tree
+    // plus one accumulated progress integer for the node being invested in"
+    // as the per-tree shape every tree gets, and a polity holds one of these
+    // triples per tree it can invest in. The Exploration tree opens behind
+    // the empire tree's rim (`polity_holds_empire_rim`), so a polity that
+    // never reaches that rim simply never sets a bit here.
+    //
+    // `exploration_mask` bit i is set iff this polity holds
+    // `exploration_tree::nodes[i]` (docs/generation/trees/exploration_tree.json,
+    // via the generated `exploration_tree_data.hpp` — see
+    // `tools/session/gen_empire_tree_table.js exploration`). A closed fork
+    // side (`node::excludes`) never sets its bit once the other side is held;
+    // see `exploration_node_available` in history_sim.cpp.
+    uint64_t exploration_mask = 0;
+
+    /// Index into `exploration_tree::nodes`, or -1 when nothing is targeted.
+    /// Same Invest verb, same round, as `empire_investing`.
+    int16_t exploration_investing = -1;
+
+    /// Progress accumulated toward `exploration_investing`'s cost. Same
+    /// currency as `empire_progress_q`.
+    int32_t exploration_progress_q = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -1834,6 +1863,45 @@ int choose_empire_node(uint64_t mask, int cohesion_q, int stores_low_q,
 inline bool polity_holds_empire_rim(const polity& q)
 {
     return (q.empire_mask & (1ULL << io::empire_tree::rim_node_index)) != 0;
+}
+
+// ---------------------------------------------------------------------------
+// The exploration tree (BL-930) — availability, the scorer, and the rim read
+// ---------------------------------------------------------------------------
+//
+// EXACT PRECEDENT: `empire_node_available`/`choose_empire_node` above,
+// re-read against `io::exploration_tree` instead of `io::empire_tree`. The
+// five rules (`TREES.md` sec The five rules) are the tree grammar, not an
+// empire-specific mechanic, so the availability test is identical in shape.
+
+/// True iff `node_idx` is a legal Invest target for a polity holding
+/// `mask` in the EXPLORATION tree — same five-rule test
+/// `empire_node_available` runs, over `io::exploration_tree::nodes`.
+bool exploration_node_available(uint64_t mask, int node_idx);
+
+/// The scorer (TREES.md sec The scorer — one shape, four trees), read against
+/// `io::exploration_tree`. Four of the terms this tree adds
+/// (`EXPLORATION_TREE.md` sec The scorer: `purse_low`, `wants_unmet`,
+/// `throughput_bound`, `subject_held`) read quantities this item does not
+/// build — the capital treasury (BL-932), the scarcity signal (BL-939),
+/// corridor throughput (BL-940), and the overlord/subject link (BL-933/934)
+/// respectively — and are STUBBED AT A PINNED NEUTRAL VALUE inside the
+/// function body rather than threaded through as parameters, exactly as
+/// `choose_empire_node` already stubs `threatened`/`plague_struck`/
+/// `many_peoples` at 0. A 0 term never wins the argmax on its own account,
+/// which is honest rather than wrong, and a harness pins each stub's value
+/// so a later item's landing shows as a diff.
+int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
+                             int ground_port_q, int ground_farm_q, int surplus_q);
+
+/// THE RIM (BL-930): has this polity crossed EX-SP-3m, "The Long Reckoning"?
+/// A per-polity boolean, read straight off the mask — this is the fact
+/// `EXPLORATION_TREE.md` sec What the tree hands the Industry tree calls
+/// "entry timing": a polity holding this at 1660 starts the Industry tree at
+/// its root.
+inline bool polity_holds_exploration_rim(const polity& q)
+{
+    return (q.exploration_mask & (1ULL << io::exploration_tree::rim_node_index)) != 0;
 }
 
 /// What the scorer chose for one polity in one year — kept for the harness and

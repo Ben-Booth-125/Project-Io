@@ -24,7 +24,7 @@
   "nodes": [
 
     { "id": "EX-SP-1a", "name": "Consolidated Stores", "kind": "major", "ring": 1, "branch": "SP",
-      "links": [ "EX-SP-1m" ], "gate": null, "diffusion": "practice", "excludes": null,
+      "links": [], "gate": null, "diffusion": "practice", "excludes": null,
       "effects": [ { "kind": "modifier", "target": "stores", "per_mille": 200 }, { "kind": "institution", "target": "the treasury stands at the capital" } ],
       "pursued_when": { "term": "stores_low", "situation": "Seats hold materials the realm cannot spend as one; gathering them to the capital is the cheapest increase in what can be bought." },
       "earth_ref": "the fisc centralises; a realm stops being a set of provisioned cities" },

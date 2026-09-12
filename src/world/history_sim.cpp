@@ -4438,6 +4438,59 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             q.empire_investing  = -1;
                         }
                     }
+
+                    // ---- BL-930: THE EXPLORATION TREE, invested alongside -
+                    // the empire tree, in the SAME round, on the SAME held-
+                    // ground means computed above. Gated on the empire rim
+                    // (`polity_holds_empire_rim`): EX-SP-1a's own gate is the
+                    // Empire tree's rim milestone (`EXPLORATION_TREE.md` sec
+                    // The spire; CIVILISATION.md sec "Some peoples gain the
+                    // capacity to explore"), so a polity that never reaches
+                    // that rim never invests here at all -- exactly the
+                    // per-polity threshold that doc names, expressed as an
+                    // ordinary availability gate rather than a special case.
+                    if (polity_holds_empire_rim(q))
+                    {
+                        if (q.exploration_investing < 0
+                         || !exploration_node_available(q.exploration_mask, q.exploration_investing))
+                        {
+                            q.exploration_investing = static_cast<int16_t>(choose_exploration_node(
+                                q.exploration_mask, stores_low_q, reach_bound_q,
+                                ground_port_q, ground_farm_q, surplus_q));
+                            q.exploration_progress_q = 0;
+                        }
+
+                        if (q.exploration_investing >= 0)
+                        {
+                            // Same "research is a flow" shape as the empire
+                            // tree's (TREES.md sec State): a fraction of the
+                            // held ground's industry output, spent the same
+                            // round it is earned.
+                            int64_t industry_sum = 0;
+                            for (int hi : held)
+                                industry_sum += region_industry_output(
+                                    ss.regions[static_cast<std::size_t>(hi)]);
+
+                            const int64_t research_q =
+                                (industry_sum * params.empire_research_fraction_q) / 1000;
+                            q.exploration_progress_q += static_cast<int32_t>(
+                                clampi64(research_q * step_years, 0, INT32_MAX));
+
+                            const io::exploration_tree::node& tn =
+                                io::exploration_tree::nodes[q.exploration_investing];
+                            const int tn_kind_base =
+                                tn.kind == io::exploration_tree::node_kind::minor ? 1
+                              : tn.kind == io::exploration_tree::node_kind::major ? 3 : 6;
+                            const int tn_cost =
+                                params.capacity_band_cost * tn_kind_base * static_cast<int>(tn.ring);
+                            if (q.exploration_progress_q >= tn_cost)
+                            {
+                                q.exploration_mask |= (1ULL << q.exploration_investing);
+                                q.exploration_progress_q = 0;
+                                q.exploration_investing  = -1;
+                            }
+                        }
+                    }
                 }
                 break;
             }
@@ -5387,6 +5440,134 @@ int choose_empire_node(uint64_t mask, int cohesion_q, int stores_low_q,
     for (int i = 0; i < node_count; ++i)
     {
         if (!empire_node_available(mask, i)) continue;
+        const node& n = nodes[i];
+        if (!gate_open(n.gate)) continue;
+        const int kind_bonus = n.kind == node_kind::milestone ? 600
+                              : n.kind == node_kind::major     ? 0
+                                                                : -100; // minors trail their major
+        const int term = clampi(term_value[static_cast<int>(node_term[i])], 0, 1000);
+        const int cost_q = (n.kind == node_kind::minor ? 1 : n.kind == node_kind::major ? 3 : 6)
+                          * static_cast<int>(n.ring);
+        const int score = term + kind_bonus - cost_q;
+        if (score > best_score) { best_score = score; best_idx = i; }
+    }
+    return best_idx;
+}
+
+// ---------------------------------------------------------------------------
+// The exploration tree (BL-930) — availability, the scorer, the rim
+// ---------------------------------------------------------------------------
+
+bool exploration_node_available(uint64_t mask, int node_idx)
+{
+    if (node_idx < 0 || node_idx >= io::exploration_tree::node_count) return false;
+    const uint64_t bit = 1ULL << node_idx;
+    if (mask & bit) return false; // already held
+
+    const io::exploration_tree::node& n = io::exploration_tree::nodes[node_idx];
+
+    // A closed fork side goes dark PERMANENTLY (TREES.md sec Forks) — same
+    // one-way gate `empire_node_available` runs.
+    if (n.excludes >= 0 && (mask & (1ULL << n.excludes))) return false;
+
+    // Rule 1/the spire: ring r+1 is locked until the milestone at ring r is
+    // held. Ring 1 has no gate.
+    if (n.ring > 1)
+    {
+        bool prior_ring_open = false;
+        for (int i = 0; i < io::exploration_tree::node_count; ++i)
+        {
+            const io::exploration_tree::node& m = io::exploration_tree::nodes[i];
+            if (m.kind == io::exploration_tree::node_kind::milestone
+             && m.ring == n.ring - 1 && (mask & (1ULL << i)))
+            { prior_ring_open = true; break; }
+        }
+        if (!prior_ring_open) return false;
+    }
+
+    // Rule 2: travel is OR. Available if it is the tree's true root, or at
+    // least one linked neighbour is held.
+    if (!n.is_root && n.neighbours_mask != 0 && (mask & n.neighbours_mask) == 0) return false;
+
+    // Rule 4, the AND half: a milestone's `requires` set must ALL be held,
+    // plus, if present, one side of its fork pair.
+    if (n.kind == io::exploration_tree::node_kind::milestone)
+    {
+        if ((mask & n.requires_mask) != n.requires_mask) return false;
+        if (n.requires_fork_a >= 0)
+        {
+            const bool a = (mask & (1ULL << n.requires_fork_a)) != 0;
+            const bool b = (mask & (1ULL << n.requires_fork_b)) != 0;
+            if (!a && !b) return false;
+        }
+    }
+
+    return true;
+}
+
+int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
+                             int ground_port_q, int ground_farm_q, int surplus_q)
+{
+    using namespace io::exploration_tree;
+
+    // THE SCORER (TREES.md sec "The scorer — one shape, four trees"), read
+    // against this tree's own term set (exploration_tree_data.hpp's
+    // `scorer_term`, 12 distinct terms across the 31 nodes).
+    //
+    // FOUR TERMS ARE STUBBED AT A PINNED 0, NAMED HERE (BL-930, per
+    // EXPLORATION_TREE.md sec The scorer):
+    //   purse_low        -- the capital treasury (BL-932) does not exist yet.
+    //   wants_unmet       -- the scarcity signal (BL-939) does not exist yet.
+    //   throughput_bound  -- corridor throughput (BL-940) does not exist yet.
+    //   subject_held      -- the overlord/subject link (BL-933/934) does not
+    //                        exist yet.
+    // A 0 term never wins the argmax on its own account (it can still lose to
+    // one), which is honest rather than wrong -- exactly the discipline
+    // `choose_empire_node` already applies to `threatened`/`plague_struck`/
+    // `many_peoples`. `threatened` and `known` are ALSO 0 here for the same
+    // reason `choose_empire_node` leaves `threatened` at 0: this slice has no
+    // cheap "visible capability" or "foreign agent" signal to read yet.
+    //
+    // A HARNESS PINS ALL SIX OF THESE AT 0 (BL-930's own assertion), so the
+    // day any of `purse_low`/`wants_unmet`/`throughput_bound`/`subject_held`
+    // stops being a constant is visible as a diff rather than a silent
+    // change.
+    const int term_value[term_count] = {
+        /* stores_low       */ stores_low_q,
+        /* spire            */ 1000,
+        /* purse_low        */ 0, // BL-932
+        /* surplus          */ surplus_q,
+        /* coastal_holdings */ ground_port_q,
+        /* reach_bound      */ reach_bound_q,
+        /* wants_unmet      */ 0, // BL-939
+        /* threatened       */ 0,
+        /* ground_port      */ ground_port_q,
+        /* subject_held     */ 0, // BL-933/934
+        /* throughput_bound */ 0, // BL-940
+        /* known            */ 0,
+    };
+
+    // Endowment gates, same shape as `choose_empire_node`'s: `coastal` reads
+    // whether the polity's held ground carries a port endowment, `arable`
+    // whether its farm mean clears the same placeholder 250/1000 bar.
+    const auto gate_open = [&](gate_atom g) {
+        switch (g)
+        {
+        case gate_atom::none:       return true;
+        case gate_atom::ore_q:      return true; // unused by this tree; open rather than blocking
+        case gate_atom::fuel:       return true; // unused by this tree
+        case gate_atom::arable:     return ground_farm_q >= 250;
+        case gate_atom::coastal:    return ground_port_q > 0;
+        case gate_atom::grassland:  return ground_farm_q >= 250;
+        }
+        return true;
+    };
+
+    int best_idx = -1;
+    int best_score = INT32_MIN;
+    for (int i = 0; i < node_count; ++i)
+    {
+        if (!exploration_node_available(mask, i)) continue;
         const node& n = nodes[i];
         if (!gate_open(n.gate)) continue;
         const int kind_bonus = n.kind == node_kind::milestone ? 600
