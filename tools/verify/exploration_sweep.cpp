@@ -119,6 +119,36 @@ struct exploration_row
     /// polity. A cheap proxy for "the inherited corridor network" ahead of
     /// BL-940 giving throughput its own real quantity.
     std::vector<std::pair<int64_t, int64_t>> polity_treasury_corridor;
+
+    // --- Reading 4: treaty depth --------------------------------------------
+    int64_t treaties_formed_total  = 0;
+    int64_t treaties_broken_total  = 0;
+    int64_t treaty_blocked_campaigns = 0;
+    std::vector<int64_t> treaty_years_left; ///< one per standing non-aggression pair at 1660.
+
+    // --- Reading 5: colonial asymmetry --------------------------------------
+    int64_t subjects_alive       = 0; ///< living polities with `overlord >= 0`.
+    int64_t overlords_alive      = 0; ///< distinct living polities holding >= 1 subject.
+    int64_t alive_polities       = 0;
+    int64_t max_subject_distance = 0; ///< Chebyshev, capital to overlord's capital.
+    int64_t subjections_formed   = 0;
+    int64_t subjections_freed    = 0;
+    int64_t tribute_remitted     = 0;
+
+    // --- Reading 6: subject friction (operationalized -- see the printed
+    // note beside readings 1-2's own operationalization disclosure). A
+    // subject's contact graph is read as a proxy for its want graph (no live
+    // want table is maintained during the span; contact is the want table's
+    // own precondition -- CIVILISATION.md sec The directed want: "a want
+    // requires contact"): friction is counted where a subject has met a
+    // THIRD polity its overlord has never met.
+    int64_t subjects_with_friction = 0;
+
+    // --- Reading 7: fleets ---------------------------------------------------
+    int64_t navy_holders          = 0; ///< living polities with navy_stock > 0 at 1660.
+    int64_t treasury_spent_on_navies = 0;
+    int64_t treasury_spent_on_ports  = 0;
+    int64_t treasury_spent_on_standing_armies = 0;
 };
 
 /// Century-scaled rate, avoiding a divide-by-zero span.
@@ -254,6 +284,77 @@ int main(int argc, char** argv)
             row.polity_treasury_corridor.push_back(
                 {ss_copy.regions[static_cast<std::size_t>(q.capital)].treasury, touch});
         }
+
+        // --- BL-933/934/935 -- readings 4, 5, 6, 7, off the traced re-run ---
+        row.treaties_formed_total     = traced.treaties_formed;
+        row.treaties_broken_total     = traced.treaties_broken;
+        row.treaty_blocked_campaigns  = traced.treaty_blocked_campaigns;
+        row.subjections_formed        = traced.subjections_formed;
+        row.subjections_freed         = traced.subjections_freed;
+        row.tribute_remitted          = traced.tribute_remitted;
+        row.treasury_spent_on_navies          = traced.treasury_spent_on_navies;
+        row.treasury_spent_on_ports           = traced.treasury_spent_on_ports;
+        row.treasury_spent_on_standing_armies = traced.treasury_spent_on_standing_armies;
+
+        {
+            std::vector<std::pair<uint16_t, uint16_t>> active_pairs;
+            for (const dated_object& o : traced.dated_objects)
+                if (o.kind == static_cast<int32_t>(treaty_clause::non_aggression))
+                    active_pairs.push_back({o.a, o.b});
+            for (const auto& pr : active_pairs)
+            {
+                for (const dated_object& o : traced.dated_objects)
+                    if (o.kind == static_cast<int32_t>(treaty_clause::non_aggression)
+                     && o.a == pr.first && o.b == pr.second)
+                    {
+                        row.treaty_years_left.push_back(o.expires_year - (ep2.start_year + traced.years));
+                        break;
+                    }
+            }
+        }
+
+        for (const polity& q : traced.polities)
+        {
+            if (!q.alive) continue;
+            ++row.alive_polities;
+            if (q.overlord >= 0 && static_cast<std::size_t>(q.overlord) < traced.polities.size()
+             && traced.polities[static_cast<std::size_t>(q.overlord)].alive)
+            {
+                ++row.subjects_alive;
+                if (q.capital >= 0
+                 && traced.polities[static_cast<std::size_t>(q.overlord)].capital >= 0
+                 && static_cast<std::size_t>(q.capital) < ss_copy.regions.size()
+                 && static_cast<std::size_t>(traced.polities[static_cast<std::size_t>(q.overlord)].capital)
+                        < ss_copy.regions.size())
+                {
+                    const region& sc = ss_copy.regions[static_cast<std::size_t>(q.capital)];
+                    const region& oc = ss_copy.regions[static_cast<std::size_t>(
+                        traced.polities[static_cast<std::size_t>(q.overlord)].capital)];
+                    int dc = std::abs(sc.col - oc.col), dr = std::abs(sc.row - oc.row);
+                    row.max_subject_distance = std::max<int64_t>(row.max_subject_distance,
+                                                                   std::max(dc, dr));
+                }
+                // Reading 6: does this subject know a THIRD polity its
+                // overlord has never met?
+                bool friction = false;
+                for (const contact& c : traced.contacts)
+                {
+                    if (c.from != q.id) continue;
+                    if (c.to == q.overlord) continue;
+                    if (!contact_exists(traced.contacts, q.overlord, c.to)) { friction = true; break; }
+                }
+                if (friction) ++row.subjects_with_friction;
+            }
+        }
+        {
+            std::vector<bool> is_overlord(traced.polities.size(), false);
+            for (const polity& q : traced.polities)
+                if (q.alive && q.overlord >= 0 && static_cast<std::size_t>(q.overlord) < is_overlord.size())
+                    is_overlord[static_cast<std::size_t>(q.overlord)] = true;
+            for (bool v : is_overlord) if (v) ++row.overlords_alive;
+        }
+        for (const polity& q : traced.polities)
+            if (q.alive && q.navy_stock > 0) ++row.navy_holders;
 
         row.ok = true;
         rows.push_back(row);
@@ -462,18 +563,121 @@ int main(int argc, char** argv)
     }
 
     // -----------------------------------------------------------------------
-    // READINGS 3-7, 10 — SCAFFOLDING. Each has no mechanism yet; the slot is
-    // real, the number is not, and the report says so rather than omitting
-    // the row.
+    // READING 4 — TREATY DEPTH (BL-933).
     // -----------------------------------------------------------------------
-    std::printf("\n--- readings 3-7, 10 (scaffolding — mechanism lands in a later wave) ---\n");
+    std::printf("\n--- reading 4: treaty depth ---\n");
+    {
+        int64_t formed = 0, broken = 0, blocked_campaigns = 0;
+        std::vector<int64_t> years_left;
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok) continue;
+            formed += r.treaties_formed_total;
+            broken += r.treaties_broken_total;
+            blocked_campaigns += r.treaty_blocked_campaigns;
+            for (int64_t yl : r.treaty_years_left) years_left.push_back(yl);
+        }
+        std::printf("  treaties formed=%lld broken=%lld  non-aggression-blocked campaigns=%lld  "
+                    "(across %d seeds)\n",
+                    static_cast<long long>(formed), static_cast<long long>(broken),
+                    static_cast<long long>(blocked_campaigns), seed_count);
+        if (years_left.empty())
+        {
+            std::printf("  no treaty stood at 1660 on this spread — NOT MEASURED (or the "
+                        "formation threshold sat too high; see treaty_formation_threshold_q).\n");
+        }
+        else
+        {
+            std::sort(years_left.begin(), years_left.end());
+            std::printf("  %zu standing at 1660, years-left min=%lld median=%lld max=%lld\n",
+                        years_left.size(), static_cast<long long>(years_left.front()),
+                        static_cast<long long>(years_left[years_left.size() / 2]),
+                        static_cast<long long>(years_left.back()));
+            std::printf("  %s\n", years_left.size() > 0 && broken > 0
+                ? "treaties both stand AND break on this spread — depth without a frozen map."
+                : "treaties stand but none broke on this spread — report to Ben, do not re-tune silently.");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // READING 5 — COLONIAL ASYMMETRY (BL-934).
+    // -----------------------------------------------------------------------
+    std::printf("\n--- reading 5: colonial asymmetry ---\n");
+    {
+        int64_t subjects = 0, overlords = 0, alive = 0, formed = 0, freed = 0, tribute = 0;
+        int64_t max_dist = 0;
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok) continue;
+            subjects += r.subjects_alive; overlords += r.overlords_alive; alive += r.alive_polities;
+            formed += r.subjections_formed; freed += r.subjections_freed; tribute += r.tribute_remitted;
+            max_dist = std::max(max_dist, r.max_subject_distance);
+        }
+        std::printf("  subjects=%lld overlords=%lld alive-polities=%lld (formed=%lld freed=%lld) "
+                    "tribute remitted total=%lld  max subject-overlord distance=%lld\n",
+                    static_cast<long long>(subjects), static_cast<long long>(overlords),
+                    static_cast<long long>(alive), static_cast<long long>(formed),
+                    static_cast<long long>(freed), static_cast<long long>(tribute),
+                    static_cast<long long>(max_dist));
+        std::printf("  %s\n", (subjects > 0 && subjects < alive)
+            ? "some polities hold subjects, most do not — asymmetry measured."
+            : "no asymmetry measured on this spread — report to Ben (subjection_reach_q / "
+              "subjection_treasury_margin_q may sit wrong for this seed spread).");
+    }
+
+    // -----------------------------------------------------------------------
+    // READING 6 — SUBJECT FRICTION (BL-934), OPERATIONALIZED.
+    // -----------------------------------------------------------------------
+    //
+    // No live want table is maintained during the span (§ file header); a
+    // subject's CONTACT graph diverging from its overlord's is read as the
+    // proxy, since contact is the want table's own precondition
+    // (CIVILISATION.md sec The directed want: "a want requires contact").
+    // Flagged exactly as readings 1-2's own operationalization is.
+    std::printf("\n--- reading 6: subject friction (operationalized as contact-graph divergence) ---\n");
+    {
+        int64_t friction = 0;
+        for (const exploration_row& r : rows) if (r.ok) friction += r.subjects_with_friction;
+        std::printf("  subjects whose contact graph names a polity their overlord never met: %lld\n",
+                    static_cast<long long>(friction));
+        std::printf("  %s\n", friction > 0
+            ? "at least one subject's own graph points somewhere its overlord's does not."
+            : "no friction measured on this spread — NOT MEASURED, do not read as a failure "
+              "without more seeds (this reading depends on subjects existing at all).");
+    }
+
+    // -----------------------------------------------------------------------
+    // READING 7 — FLEETS (BL-935).
+    // -----------------------------------------------------------------------
+    std::printf("\n--- reading 7: fleets ---\n");
+    {
+        int64_t navy_holders = 0, spent_navies = 0, spent_ports = 0, spent_armies = 0;
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok) continue;
+            navy_holders += r.navy_holders;
+            spent_navies += r.treasury_spent_on_navies;
+            spent_ports  += r.treasury_spent_on_ports;
+            spent_armies += r.treasury_spent_on_standing_armies;
+        }
+        std::printf("  polities holding a navy at 1660: %lld  treasury spent -- ports=%lld "
+                    "navies=%lld standing armies=%lld\n",
+                    static_cast<long long>(navy_holders), static_cast<long long>(spent_ports),
+                    static_cast<long long>(spent_navies), static_cast<long long>(spent_armies));
+        std::printf("  %s\n", spent_navies > 0
+            ? "at least one polity funded a navy on this spread (decay itself is confirmed by "
+              "exploration_sim_harness R5.8/R5.9, not by this aggregate sweep)."
+            : "no polity ever funded a navy on this spread — report to Ben rather than "
+              "re-tuning navy_build_cost_q/navy_min_port_stock_q silently.");
+    }
+
+    // -----------------------------------------------------------------------
+    // READINGS 3, 10 — STILL SCAFFOLDING. No mechanism yet this wave.
+    // -----------------------------------------------------------------------
+    std::printf("\n--- readings 3, 10 (scaffolding — mechanism lands in a later wave) ---\n");
     struct owed_reading { const char* name; const char* owner; };
     const owed_reading owed[] = {
         {"3. Both strategies pay (consolidator/expansionist, by creed)", "BL-942"},
-        {"4. Treaty depth (standing at 1660, years left to run)",         "BL-933"},
-        {"5. Colonial asymmetry (some hold subjects, most don't)",        "BL-934"},
-        {"6. Subject friction (a subject's wants diverge from overlord)", "BL-934"},
-        {"7. Fleets (uneven, at least one built-then-decayed)",           "BL-935"},
         {"10. Preference (goods wanted differently by culture, by route)","BL-936"},
     };
     for (const owed_reading& o : owed)

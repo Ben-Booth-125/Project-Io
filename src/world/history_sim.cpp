@@ -551,6 +551,13 @@ int market_scarcity_q(const std::vector<region>& regions, const history_sim_stat
     const int gi = scarcity_good_index(good);
     if (gi < 0) return 0;
     if (r.nation == viewer_polity) return r.scarcity_q[gi]; // a polity always knows its own market
+    // BL-933 -- A SECOND LEGIBILITY PATH: a bound `trade_access` clause makes
+    // the holder's market legible even to a viewer with no contact record at
+    // all (EXPLORATION.md sec What a treaty is: "one party's market is
+    // legible and reachable to the other"). Checked before the omniscience
+    // guard, deliberately -- a treaty is a stronger fact than mere contact.
+    if (has_treaty_clause(s, viewer_polity, r.nation, treaty_clause::trade_access))
+        return r.scarcity_q[gi];
     if (!has_contact(s, viewer_polity, r.nation)) return 0; // the omniscience guard
     return r.scarcity_q[gi];
 }
@@ -560,7 +567,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                             const std::vector<history_corridor>& corridors,
                             const history_sim_params&             params,
                             int64_t                                year,
-                            int                                    step_years)
+                            int                                    step_years,
+                            exploration_upkeep_spend*              spend)
 {
     // BL-939 -- the demand half, refreshed on the same round-level cadence
     // the treasury's own earn runs on: a market's signal is a fact about
@@ -630,6 +638,82 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         seat.treasury = clampi64(
             seat.treasury + endowment_income + corridor_income + market_income + tribute_income,
             0, 1LL << 48);
+
+        // ---- BL-935 -- PAY, then INVEST: ports, navies, standing armies. --
+        //
+        // Same all-or-nothing SHAPE `try_build_post_road` already uses: one
+        // step per funded round, or a decay when the round could not be
+        // funded, never a fractional trickle. All three spend the CAPITAL'S
+        // treasury, never `material_stock` (EXPLORATION.md sec Force
+        // persists now: "spending capital on ports").
+        const int64_t years_q = std::max(step_years, 1);
+
+        // PORT -- only ground carrying the endowment WINDOW can host one at
+        // all; `port_q` is that window and is never itself spent.
+        if (seat.port_q > 0)
+        {
+            if (params.port_build_cost_q > 0 && seat.port_stock_q < 1000
+             && seat.treasury >= params.port_build_cost_q)
+            {
+                seat.treasury -= params.port_build_cost_q;
+                seat.port_stock_q = clampi(
+                    seat.port_stock_q + params.port_build_step_q, 0, 1000);
+                if (spend) spend->ports += params.port_build_cost_q;
+            }
+            else if (seat.port_stock_q > 0)
+            {
+                const int decay = static_cast<int>(
+                    (static_cast<int64_t>(seat.port_stock_q)
+                     * params.port_decay_per_mille_year_q * years_q) / 1000);
+                seat.port_stock_q = clampi(seat.port_stock_q - std::max(decay, 1), 0, 1000);
+            }
+        }
+        else
+        {
+            seat.port_stock_q = 0; // no window, no port, ever.
+        }
+
+        // NAVY -- decays EVERY round, unconditionally ("a running cost, not
+        // a purchase"), then grows if the round affords it and the capital's
+        // own port is built up enough to stage one from.
+        if (q.navy_stock > 0)
+        {
+            const int64_t decay = (q.navy_stock * params.navy_decay_per_mille_year_q * years_q) / 1000;
+            q.navy_stock = clampi64(q.navy_stock - std::max<int64_t>(decay, 1), 0, 1LL << 48);
+        }
+        if (params.navy_build_cost_q > 0
+         && seat.port_stock_q >= params.navy_min_port_stock_q
+         && seat.treasury >= params.navy_build_cost_q)
+        {
+            seat.treasury -= params.navy_build_cost_q;
+            q.navy_stock = clampi64(q.navy_stock + params.navy_build_step_q, 0, 1LL << 48);
+            if (spend) spend->navies += params.navy_build_cost_q;
+        }
+
+        // STANDING ARMY -- adds to `region::army_stock` directly (the same
+        // pool `gather_army`/`resolve_battle` already read, so a funded
+        // standing army fights exactly like any other garrison); underfunded,
+        // it falls back toward the muster-alone baseline (`garrison_target`),
+        // never below it -- ordinary muster is untouched by this decay.
+        if (params.standing_army_build_cost_q > 0 && seat.treasury >= params.standing_army_build_cost_q)
+        {
+            seat.treasury -= params.standing_army_build_cost_q;
+            seat.army_stock = clampi64(
+                seat.army_stock + params.standing_army_build_step_q, 0, 1LL << 48);
+            if (spend) spend->standing_armies += params.standing_army_build_cost_q;
+        }
+        else
+        {
+            const int64_t baseline = garrison_target(seat, params.garrison_fraction_q);
+            if (seat.army_stock > baseline)
+            {
+                const int64_t excess = seat.army_stock - baseline;
+                const int64_t decay =
+                    (excess * params.standing_army_decay_per_mille_year_q * years_q) / 1000;
+                seat.army_stock = clampi64(
+                    seat.army_stock - std::max<int64_t>(decay, 1), baseline, seat.army_stock);
+            }
+        }
     }
 }
 
@@ -2380,8 +2464,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
         expire_dated_objects(out.dated_objects, y);
         if (params.exploration_upkeep_enabled)
         {
+            exploration_upkeep_spend upkeep_spend;
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
-                                   params, y, step_years);
+                                   params, y, step_years, &upkeep_spend);
+            out.treasury_spent_on_ports           += upkeep_spend.ports;
+            out.treasury_spent_on_navies          += upkeep_spend.navies;
+            out.treasury_spent_on_standing_armies += upkeep_spend.standing_armies;
 
             // ---- BL-940: THE ROAD LADDER'S THIRD RUNG, BOUGHT WITH CAPITAL.
             //
@@ -2437,6 +2525,271 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     }
                     if (found_a >= 0)
                         try_build_post_road(found_a, found_b, q.capital);
+                }
+            }
+
+            // ---- BL-933: TREATY FORMATION, "nobody negotiates" ------------
+            //
+            // Walk `out.contacts` in its own sorted (from, to) order, taking
+            // the canonical `from < to` row of each mutual pair once (contact
+            // is recorded in both directions, EXPLORATION.md sec What a
+            // treaty is table). Both parties score the binding INDEPENDENTLY,
+            // against the SAME grudge/aggression/distrust facts this round
+            // already holds -- no bargaining loop, no mutation between the two
+            // reads. The walk order is the table's own order, so the result
+            // does not depend on anything but the integers already in it.
+            for (const contact& c : out.contacts)
+            {
+                if (c.from >= c.to) continue; // the pair's OTHER row; skip
+                const int a = c.from, b = c.to;
+                if (a >= static_cast<int>(out.polities.size())
+                 || b >= static_cast<int>(out.polities.size())) continue;
+                if (!out.polities[static_cast<std::size_t>(a)].alive
+                 || !out.polities[static_cast<std::size_t>(b)].alive) continue;
+                // Already bound: non-aggression is the anchor clause every
+                // formed treaty carries, so its presence stands for the pair.
+                if (has_treaty_clause(out, a, b, treaty_clause::non_aggression)) continue;
+
+                const int ga = grudge_between(out, a, b), gb = grudge_between(out, b, a);
+                const polity& pa = out.polities[static_cast<std::size_t>(a)];
+                const polity& pb = out.polities[static_cast<std::size_t>(b)];
+                const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q);
+                const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q);
+                if (value_a < params.treaty_formation_threshold_q
+                 || value_b < params.treaty_formation_threshold_q) continue;
+
+                // FORMED: the four MUTUAL clauses bind together this cut --
+                // tribute is directed and is instead added by the subjection
+                // block below, at the moment an overlord link actually exists
+                // to pay one (§ A colony is a subject). One `dated_object`
+                // per clause, sharing (a, b, expires_year) -- the seam
+                // `history_sim_state::dated_objects` was built for.
+                const int64_t expires = y + std::max<int64_t>(params.treaty_term_years, 1);
+                const uint16_t lo = static_cast<uint16_t>(a), hi_ = static_cast<uint16_t>(b);
+                const treaty_clause mutual[4] = {
+                    treaty_clause::non_aggression, treaty_clause::trade_access,
+                    treaty_clause::sphere_of_claim, treaty_clause::mutual_defence,
+                };
+                for (treaty_clause tc : mutual)
+                    out.dated_objects.push_back(dated_object{
+                        expires, static_cast<int32_t>(tc), lo, hi_});
+                note_event(lapse_event_kind::treaty_formed, pa.capital, a, b);
+                ++out.treaties_formed;
+            }
+
+            // ---- BL-933: BREAKING A TREATY, "legal and costly" ------------
+            //
+            // Re-scored every round against the SAME `treaty_value_q`
+            // formation used. A pair whose value has fallen under HALF the
+            // formation bar for one side is the hysteresis that keeps a
+            // treaty sitting exactly on the line from flickering on and off
+            // every round. Deduped pairs, sorted, so a tie between two
+            // simultaneously-failing sides breaks on the LOWER id.
+            {
+                std::vector<std::pair<uint16_t, uint16_t>> active;
+                for (const dated_object& o : out.dated_objects)
+                    if (o.kind == static_cast<int32_t>(treaty_clause::non_aggression))
+                        active.push_back({o.a, o.b});
+                std::sort(active.begin(), active.end());
+                active.erase(std::unique(active.begin(), active.end()), active.end());
+
+                const int break_bar = params.treaty_formation_threshold_q / 2;
+                for (const auto& pr : active)
+                {
+                    const int a = pr.first, b = pr.second;
+                    if (a >= static_cast<int>(out.polities.size())
+                     || b >= static_cast<int>(out.polities.size())) continue;
+                    polity& pa = out.polities[static_cast<std::size_t>(a)];
+                    polity& pb = out.polities[static_cast<std::size_t>(b)];
+                    if (!pa.alive || !pb.alive) continue;
+
+                    const int ga = grudge_between(out, a, b), gb = grudge_between(out, b, a);
+                    const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q);
+                    const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q);
+
+                    int defector = -1, wronged = -1;
+                    if (value_a < break_bar && value_a <= value_b) { defector = a; wronged = b; }
+                    else if (value_b < break_bar)                  { defector = b; wronged = a; }
+                    if (defector < 0) continue;
+
+                    const uint16_t du = static_cast<uint16_t>(defector);
+                    const uint16_t wu = static_cast<uint16_t>(wronged);
+                    out.dated_objects.erase(
+                        std::remove_if(out.dated_objects.begin(), out.dated_objects.end(),
+                            [&](const dated_object& o) {
+                                return (o.a == du && o.b == wu) || (o.a == wu && o.b == du);
+                            }),
+                        out.dated_objects.end());
+
+                    polity& pdef = out.polities[static_cast<std::size_t>(defector)];
+                    ++pdef.treaties_broken;
+                    // WRITES INTO THE EXISTING GRUDGE TABLE, never a second
+                    // ledger (EXPLORATION.md sec What a treaty is).
+                    raise_grudge(wronged, defector, grudge_kind::treaty_broken,
+                                 out.polities[static_cast<std::size_t>(wronged)].capital,
+                                 y, params.grudge_treaty_broken_q);
+                    note_event(lapse_event_kind::treaty_broken,
+                               out.polities[static_cast<std::size_t>(defector)].capital,
+                               defector, wronged);
+                    ++out.treaties_broken;
+                }
+            }
+
+            // ---- BL-934: SUBJECTION -- trade provinces and subjected polities
+            //
+            // Snapshot the count: a polity subjected THIS round is not itself
+            // an arriving power or a native target again in the same round
+            // (no chained subjection within one round, and none across
+            // rounds either -- § open question, declined for this wave).
+            {
+                const std::size_t pc = out.polities.size();
+                for (std::size_t ai = 0; ai < pc; ++ai)
+                {
+                    polity& arriving = out.polities[ai];
+                    if (!arriving.alive || arriving.overlord >= 0) continue;
+                    if (!polity_holds_exploration_sea_legs(arriving)) continue; // THE NODE, never a rank
+                    if (arriving.capital < 0
+                     || static_cast<std::size_t>(arriving.capital) >= ss.regions.size()) continue;
+
+                    for (std::size_t ni = 0; ni < pc; ++ni)
+                    {
+                        if (ni == ai) continue;
+                        polity& native = out.polities[ni];
+                        if (!native.alive || native.overlord >= 0) continue;
+                        if (native.capital < 0
+                         || static_cast<std::size_t>(native.capital) >= ss.regions.size()) continue;
+                        if (!has_contact(out, arriving.id, native.id)) continue;
+
+                        // SPHERE OF CLAIM: non-interference over a native
+                        // polity's ground BETWEEN THE TWO TREATY PARTIES --
+                        // never actually-empty land (EXPLORATION.md sec What
+                        // a treaty is / no terra nullius). A treaty partner of
+                        // `arriving` who has already met `native` holds
+                        // priority; `arriving` stands off.
+                        bool sphere_blocked = false;
+                        for (std::size_t oi = 0; oi < pc && !sphere_blocked; ++oi)
+                        {
+                            if (oi == ai) continue;
+                            if (!out.polities[oi].alive) continue;
+                            if (!has_treaty_clause(out, arriving.id, static_cast<int>(oi),
+                                                    treaty_clause::sphere_of_claim)) continue;
+                            if (has_contact(out, static_cast<int>(oi), native.id))
+                                sphere_blocked = true;
+                        }
+                        if (sphere_blocked) continue;
+
+                        const int dist = region_distance(
+                            ss.regions[static_cast<std::size_t>(arriving.capital)],
+                            ss.regions[static_cast<std::size_t>(native.capital)], gw);
+                        if (dist > params.subjection_reach_q) continue;
+
+                        const int64_t arriving_treasury =
+                            ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
+                        const int64_t native_treasury =
+                            ss.regions[static_cast<std::size_t>(native.capital)].treasury;
+                        if (arriving_treasury < native_treasury + params.subjection_treasury_margin_q)
+                            continue;
+
+                        // ONE OF TWO PATHS, derived from the native seat's own
+                        // coast (§ scope note on `polity::subject_kind`): a
+                        // coastal seat is a foothold planted beside it; an
+                        // interior seat has no coast to plant one on.
+                        native.overlord = arriving.id;
+                        native.subject_kind =
+                            ss.regions[static_cast<std::size_t>(native.capital)].port_q > 0 ? 0 : 1;
+
+                        const int64_t tribute_expires =
+                            y + std::max<int64_t>(params.treaty_term_years, 1);
+                        out.dated_objects.push_back(dated_object{
+                            tribute_expires, static_cast<int32_t>(treaty_clause::tribute),
+                            static_cast<uint16_t>(native.id), static_cast<uint16_t>(arriving.id)});
+
+                        raise_grudge(native.id, arriving.id, grudge_kind::ground_taken,
+                                     native.capital, y, params.grudge_ground_taken / 2);
+                        note_event(lapse_event_kind::subject_bound,
+                                   native.capital, native.id, arriving.id);
+                        ++out.subjections_formed;
+                        break; // one overlord per native per round
+                    }
+                }
+            }
+
+            // ---- BL-934: TRIBUTE REMITTANCE AND REFUSED RENEWAL -----------
+            //
+            // Reads the SAME quantities the Empire phase's own secession
+            // check reads -- cohesion, distance, and whether the overlord is
+            // reachable at all (`secession_supply_floor_q`'s land-empire
+            // shape, restated for an overseas link).
+            for (polity& subj : out.polities)
+            {
+                if (!subj.alive || subj.overlord < 0) continue;
+                if (static_cast<std::size_t>(subj.overlord) >= out.polities.size()
+                 || !out.polities[static_cast<std::size_t>(subj.overlord)].alive)
+                {
+                    // The overlord is gone; the link dissolves with it --
+                    // never a rank, never a decision, just a fact that ceased
+                    // to have a holder.
+                    subj.overlord = -1;
+                    subj.subject_kind = -1;
+                    continue;
+                }
+                polity& lord = out.polities[static_cast<std::size_t>(subj.overlord)];
+                const bool reachable = has_contact(out, subj.id, lord.id);
+                int dist = INT32_MAX;
+                if (subj.capital >= 0 && lord.capital >= 0
+                 && static_cast<std::size_t>(subj.capital) < ss.regions.size()
+                 && static_cast<std::size_t>(lord.capital) < ss.regions.size())
+                    dist = region_distance(ss.regions[static_cast<std::size_t>(subj.capital)],
+                                           ss.regions[static_cast<std::size_t>(lord.capital)], gw);
+
+                const bool outrun = !reachable
+                                  || dist > params.subject_secession_distance_q
+                                  || subj.cohesion_q <= params.subject_secession_cohesion_q;
+                if (outrun)
+                {
+                    out.dated_objects.erase(
+                        std::remove_if(out.dated_objects.begin(), out.dated_objects.end(),
+                            [&](const dated_object& o) {
+                                return o.kind == static_cast<int32_t>(treaty_clause::tribute)
+                                    && o.a == static_cast<uint16_t>(subj.id)
+                                    && o.b == static_cast<uint16_t>(lord.id);
+                            }),
+                        out.dated_objects.end());
+                    note_event(lapse_event_kind::subject_freed, subj.capital, subj.id, lord.id);
+                    raise_grudge(subj.id, lord.id, grudge_kind::border_raided,
+                                 subj.capital, y, params.grudge_border_raided);
+                    subj.overlord = -1;
+                    subj.subject_kind = -1;
+                    ++out.subjections_freed;
+                    continue;
+                }
+
+                // RENEWAL: the tribute clause's term may have lapsed this
+                // round (`expire_dated_objects`, above the whole decision
+                // gate). The subject just cleared every quantity secession
+                // would have read, so the clause renews for another term
+                // rather than silently going quiet -- "refusing renewal IS
+                // the secession mechanism" implies a subject that does NOT
+                // refuse renews.
+                if (!has_treaty_clause(out, subj.id, lord.id, treaty_clause::tribute))
+                    out.dated_objects.push_back(dated_object{
+                        y + std::max<int64_t>(params.treaty_term_years, 1),
+                        static_cast<int32_t>(treaty_clause::tribute),
+                        static_cast<uint16_t>(subj.id), static_cast<uint16_t>(lord.id)});
+
+                if (params.treaty_tribute_rate_q > 0 && subj.capital >= 0 && lord.capital >= 0
+                 && static_cast<std::size_t>(subj.capital) < ss.regions.size()
+                 && static_cast<std::size_t>(lord.capital) < ss.regions.size())
+                {
+                    region& sseat = ss.regions[static_cast<std::size_t>(subj.capital)];
+                    region& lseat = ss.regions[static_cast<std::size_t>(lord.capital)];
+                    const int64_t amount = (sseat.treasury * params.treaty_tribute_rate_q) / 1000;
+                    if (amount > 0)
+                    {
+                        sseat.treasury -= amount;
+                        lseat.treasury = clampi64(lseat.treasury + amount, 0, 1LL << 48);
+                        out.tribute_remitted += amount;
+                    }
                 }
             }
         }
@@ -2874,7 +3227,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
                 const int legs = clampi(weighted / 1000, 0, 1000);
                 if (legs < params.sea_legs_floor_q) return 0;
-                return clampi((params.sea_legs_ration_q * legs) / 1000, 0, 1000);
+                const int base_ration = clampi((params.sea_legs_ration_q * legs) / 1000, 0, 1000);
+
+                // BL-935 -- A BUILT PORT (region::port_stock_q, an ASSET the
+                // treasury paid for -- never the bare endowment window
+                // `port_q` above) and this polity's standing navy lower the
+                // cost of a crossing staged from it (EXPLORATION.md sec Force
+                // persists now: "enables cheaper overseas skirmishes").
+                // Multiplicative on the ration a seafaring people already
+                // earned -- a people with no tradition at all (`legs` under
+                // the floor, refused above) gets nothing from the best port
+                // in the world. Widened past the bare ration's [0, 1000]
+                // ceiling: this is the price gap reading 1 (displacement)
+                // depends on.
+                const int port_bonus_q = port_crossing_ration_bonus_q(h.port_stock_q, q.navy_stock);
+                return clampi((base_ration * port_bonus_q) / 1000, 0, 2000);
             };
 
             // ---- BL-778 / BL-779: the water gate on a campaign edge -------
@@ -3099,6 +3466,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const std::size_t ti = static_cast<std::size_t>(tn);
                     const int to = owner[ti];
                     if (to == q.id || to < 0) continue;
+                    // BL-933 -- A BOUND NON-AGGRESSION CLAUSE MAKES A
+                    // CAMPAIGN ILLEGAL, not merely costly, exactly like the
+                    // water gate just below (EXPLORATION.md sec What a
+                    // treaty is: "neither party campaigns against the other
+                    // while the term runs"). This is the direct, countable
+                    // cause of the displacement reading's neighbour-war half.
+                    if (has_treaty_clause(out, q.id, to, treaty_clause::non_aggression))
+                    {
+                        ++out.treaty_blocked_campaigns;
+                        continue;
+                    }
                     if (params.trace_battles) ++out.campaign_contacts;
 
                     // THE WATER GATE, applied before anything is scored — an
@@ -3199,6 +3577,30 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                 ++coastal_held;
                         const int ring_closure_q = clampi(coastal_held * 250, 0, 1000);
                         value += (params.w_ring * ring_closure_q) / 1000;
+                    }
+
+                    // BL-933 -- MUTUAL DEFENCE: "makes a small polity
+                    // expensive to eat" (EXPLORATION.md sec What a treaty
+                    // is), read as a value discount rather than a second
+                    // legality gate -- attacking a defended target stays
+                    // legal, it just prices worse. Read ANY living ally bound
+                    // to the target by the clause; the discount scales with
+                    // the strongest ally's own cohesion, which is the only
+                    // "how seriously would they actually fight" reading this
+                    // file has cheaply available (the same term the odds
+                    // calculation below reads for the primary combatants).
+                    {
+                        int ally_deterrence_q = 0;
+                        for (const polity& ally : out.polities)
+                        {
+                            if (!ally.alive || ally.id == to || ally.id == q.id) continue;
+                            if (!has_treaty_clause(out, to, ally.id, treaty_clause::mutual_defence))
+                                continue;
+                            ally_deterrence_q = std::max(ally_deterrence_q,
+                                                          clampi(ally.cohesion_q, 0, 1000));
+                        }
+                        if (ally_deterrence_q > 0)
+                            value -= (value * ally_deterrence_q) / 2000; // up to -50% at full cohesion
                     }
 
                     // In the currency: expected value TAKEN, discounted by the
@@ -4810,10 +5212,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                 supply_sum_q += ss.regions[static_cast<std::size_t>(hi)].network_supply_q;
                             const int throughput_bound_q = clampi(
                                 1000 - static_cast<int>(supply_sum_q / n_held), 0, 1000);
+                            // BL-934 -- SUBJECT_HELD, now real: does this
+                            // polity hold at least one live subject? Read off
+                            // ANOTHER polity's `overlord` field, never this
+                            // one's -- a boolean-as-1000, same shape as
+                            // `coastal_holdings`/`ground_port` above.
+                            int subject_held_q = 0;
+                            for (const polity& other : out.polities)
+                                if (other.alive && other.overlord == q.id) { subject_held_q = 1000; break; }
                             q.exploration_investing = static_cast<int16_t>(choose_exploration_node(
                                 q.exploration_mask, stores_low_q, reach_bound_q,
                                 ground_port_q, ground_farm_q, surplus_q,
-                                purse_low_q, wants_unmet_q, throughput_bound_q));
+                                purse_low_q, wants_unmet_q, throughput_bound_q,
+                                subject_held_q));
                             q.exploration_progress_q = 0;
                         }
 
@@ -5864,7 +6275,8 @@ bool exploration_node_available(uint64_t mask, int node_idx)
 
 int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
                              int ground_port_q, int ground_farm_q, int surplus_q,
-                             int purse_low_q, int wants_unmet_q, int throughput_bound_q)
+                             int purse_low_q, int wants_unmet_q, int throughput_bound_q,
+                             int subject_held_q)
 {
     using namespace io::exploration_tree;
 
@@ -5873,19 +6285,21 @@ int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
     // `scorer_term`, 12 distinct terms across the 31 nodes).
     //
     // `purse_low`/`wants_unmet`/`throughput_bound` are now real, threaded-
-    // through arguments (BL-932/BL-939/BL-940). `subject_held` STAYS STUBBED
-    // AT A PINNED 0 (BL-930, per EXPLORATION_TREE.md sec The scorer): the
-    // overlord/subject link (BL-933/934) does not exist yet. A 0 term never
-    // wins the argmax on its own account (it can still lose to one), which is
-    // honest rather than wrong -- exactly the discipline `choose_empire_node`
-    // already applies to `threatened`/`plague_struck`/`many_peoples`.
-    // `threatened` and `known` are ALSO 0 here for the same reason
+    // through arguments (BL-932/BL-939/BL-940). `subject_held` is now real
+    // too (BL-934): the caller passes 1000 where the polity holds at least
+    // one subject, 0 otherwise (`polity::overlord >= 0` read on ANOTHER
+    // polity, never on this one) — a bare boolean rather than a count,
+    // exactly as `coastal_holdings`/`ground_port` are booleans-as-1000
+    // already. `threatened` and `known` are STILL 0 here for the same reason
     // `choose_empire_node` leaves `threatened` at 0: this slice has no cheap
-    // "visible capability" or "foreign agent" signal to read yet.
+    // "visible capability" or "foreign agent" signal to read yet. A 0 term
+    // never wins the argmax on its own account (it can still lose to one),
+    // which is honest rather than wrong.
     //
-    // A HARNESS PINS THE REMAINING STUB (`subject_held`) AT 0, so the day it
-    // stops being a constant is visible as a diff rather than a silent
-    // change.
+    // EVERY HARNESS CALL SITE FROM BEFORE THIS ITEM PASSES 0 FOR
+    // `subject_held_q` (the parameter's own default), so BL-934 landing is
+    // visible as a diff only where a caller actually threads a live value
+    // through, never as a silent change to an existing fixture.
     const int term_value[term_count] = {
         /* stores_low       */ stores_low_q,
         /* spire            */ 1000,
@@ -5896,7 +6310,7 @@ int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
         /* wants_unmet      */ wants_unmet_q,     // BL-939
         /* threatened       */ 0,
         /* ground_port      */ ground_port_q,
-        /* subject_held     */ 0, // BL-933/934
+        /* subject_held     */ clampi(subject_held_q, 0, 1000), // BL-934
         /* throughput_bound */ throughput_bound_q, // BL-940
         /* known            */ 0,
     };
@@ -5969,6 +6383,62 @@ bool has_contact(const history_sim_state& s, int from, int to)
             return c.to < k.second;
         });
     return it != s.contacts.end() && it->from == f && it->to == t;
+}
+
+// ---------------------------------------------------------------------------
+// Treaty reads and scoring (BL-933)
+// ---------------------------------------------------------------------------
+
+bool has_treaty_clause(const history_sim_state& s, int x, int y, treaty_clause clause)
+{
+    if (x < 0 || y < 0) return false;
+    const uint8_t k = static_cast<uint8_t>(clause);
+    const uint16_t xu = static_cast<uint16_t>(x), yu = static_cast<uint16_t>(y);
+    if (clause == treaty_clause::tribute)
+    {
+        // Directed: a == subject, b == overlord. The caller passes the
+        // subject as x for "does x owe y tribute".
+        for (const dated_object& o : s.dated_objects)
+            if (o.kind == k && o.a == xu && o.b == yu) return true;
+        return false;
+    }
+    // The four mutual clauses are stored canonically (a < b) but a reader
+    // asks in either order — same convention `contact` borrows from `grudge`
+    // for a mutual fact stored as a directed pair, restated here for a pair
+    // stored in canonical order instead of two independent rows.
+    for (const dated_object& o : s.dated_objects)
+        if (o.kind == k
+         && ((o.a == xu && o.b == yu) || (o.a == yu && o.b == xu)))
+            return true;
+    return false;
+}
+
+int treaty_value_q(const history_sim_params& p,
+                    int grudge_against_other_q, int grudge_from_other_q,
+                    int counterpart_treaties_broken, int decider_aggression_q)
+{
+    // BASE: a treaty is worth more the less either side already resents the
+    // other -- a biting mutual history makes a promise of peace both less
+    // needed as a distinct commitment (an active war reads as a war, not a
+    // broken treaty) and less credible from a partner who has raised the
+    // grudge in the first place. Both directions of `grudge_between` count,
+    // read both ways per EXPLORATION.md sec What a treaty is.
+    int value = 1000 - clampi((grudge_against_other_q + grudge_from_other_q) / 4, 0, 900);
+
+    // COST: freedom given up, priced by the decider's OWN doctrine. A highly
+    // aggressive culture prices a non-aggression clause's lost freedom higher,
+    // so the same peace-value clears a lower net score for it -- the doctrine
+    // is read, never a term inside the actor deciding FOR it (the aggression
+    // lean is a recorded fact about the culture, same as everywhere else this
+    // file reads `aggression_q`).
+    value -= clampi(decider_aggression_q, 0, 1000) / 4;
+
+    // DISTRUST: "the cost lands on every OTHER party's willingness to bind
+    // with the defector" -- read the COUNTERPART's own broken-treaty count,
+    // never the decider's.
+    value -= counterpart_treaties_broken * clampi(p.treaty_defector_distrust_q, 0, 1000) / 100;
+
+    return clampi(value, 0, 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -6157,6 +6627,7 @@ std::string grudge_event_line(const grudge_event& e, const settlement_state& ss)
     case grudge_kind::seat_sacked:   what = "the seat sacked";   break;
     case grudge_kind::border_raided: what = "the border raided"; break;
     case grudge_kind::realm_ended:   what = "a realm ended";     break;
+    case grudge_kind::treaty_broken: what = "a treaty broken";   break;
     }
 
     std::string where = "somewhere";

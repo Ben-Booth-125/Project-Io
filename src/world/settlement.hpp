@@ -406,6 +406,21 @@ struct region
     /// same footing as `treasury`/`material_stock` above.
     int32_t scarcity_q[4] = {0, 0, 0, 0};
 
+    // --- BL-935: a built port, navy and standing army ------------------------
+    // EXPLORATION.md sec Force persists now, and persistence has a bill.
+    // `port_q` ABOVE is ENDOWMENT -- the ground's own window, surveyed once and
+    // never spent. This is the ASSET a polity's treasury actually builds on
+    // that window, and the two must never be conflated (the doc's own words:
+    // "otherwise every coastal polity begins with the thing the phase is
+    // about acquiring").
+
+    /// 0-1000, built by `run_exploration_upkeep` out of `treasury` while this
+    /// region carries a `port_q` endowment window; silts back toward 0 when
+    /// the treasury cannot maintain it. Zero and permanently unused on ground
+    /// with no port window at all. GENERATION SCRATCH, NOT SAVED, same footing
+    /// as `treasury`/`scarcity_q` above.
+    int32_t port_stock_q = 0;
+
     // --- Civilisations (BL-869) ---------------------------------------------
     // CIVILISATION.md § A civilisation is what mixing makes, and it is not a
     // creed. "A region carrying two peoples in quantity, for a long time" is
