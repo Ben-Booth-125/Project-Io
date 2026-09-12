@@ -631,10 +631,39 @@ struct history_sim_params
     /// a founding party that never returns, four is repeat traffic).
     int road_tier1_uses = 4;
     /// Uses before a Track becomes a Road (tier 2), the ancient network's
-    /// busiest lines. No tier 3 in the sim itself — Highway-grade promotion
-    /// wants a built work at both ends (`road_generation.cpp::ancient_tier`),
-    /// which is campaign-era-only bookkeeping this pass does not carry.
+    /// busiest lines. NO TIER EARNED BY TRAFFIC BEYOND THIS ONE — Highway-
+    /// grade promotion wants a built work at both ends
+    /// (`road_generation.cpp::ancient_tier`), which is campaign-era-only
+    /// bookkeeping this pass does not carry. BL-940 adds a THIRD rung below
+    /// (`road_tier3_uses`), but it is bought, never walked into existence —
+    /// see that field's own comment.
     int road_tier2_uses = 12;
+
+    // --- BL-940: the road ladder's third rung, bought with capital --------
+    // EXPLORATION.md sec Goods move as throughput: "The road ladder gets its
+    // third rung here... bought with capital rather than earned by traffic"
+    // (tree node EX-WY-1a, Post Roads).
+
+    /// THE THRESHOLD ORDINARY TRAFFIC IS NOT MEANT TO REACH. `road_tier_for_
+    /// uses` still reads a plain use count, so a purchase and enough
+    /// centuries of ordinary walking are not formally distinguishable in the
+    /// data — this is set well above what `road_tier2_uses` traffic could
+    /// plausibly accumulate across one 460-year span, so in PRACTICE the rung
+    /// is reached only by `try_build_post_road`'s direct set. A FIRST CUT,
+    /// not a measurement: raise it further if a sweep ever shows ordinary
+    /// traffic crossing it unpurchased.
+    int road_tier3_uses = 200;
+
+    /// Treasury spent (BL-932's `region::treasury`, NEVER `material_stock`)
+    /// to promote one corridor from Road (tier 2) to Post Road (tier 3), once
+    /// the spending polity holds EX-WY-1a. A FIRST CUT on the same footing as
+    /// the treasury income weights above — a measurement owed from
+    /// `exploration_sweep`, not a guess dressed up as one. Read only when
+    /// `exploration_upkeep_enabled` is set (BL-931's own default-off
+    /// discipline), so the Empire span and every fixture that never opts in
+    /// is untouched regardless of this field's value; zero disables the
+    /// purchase even where upkeep runs.
+    int64_t post_road_treasury_cost = 3000;
 
     /// SUSTAINABLE-REACH FLOOR FOR LAUNCHING A CAMPAIGN, in the same 0..1000
     /// supply currency `campaign_supply` already prices. At or below this,
@@ -2598,6 +2627,13 @@ struct history_sim_state
     int64_t supply_sites_upgraded_regions   = 0;
     int64_t supply_sites_upgraded_corridors = 0;
     int64_t materials_spent_on_supply_sites = 0;
+
+    /// BL-940 -- corridors promoted to the road ladder's third rung (Post
+    /// Road), and the treasury actually spent on them. The observable that
+    /// separates "the mechanism never fires" from "no polity ever holds
+    /// EX-WY-1a in this seed", the same split `supply_sites_upgraded` makes.
+    int64_t post_roads_built           = 0;
+    int64_t treasury_spent_on_roads    = 0;
 
     /// BL-896 -- how many successor realms the dark age produced, and how much
     /// ground walked away with them. The pair is the item's "done when": an

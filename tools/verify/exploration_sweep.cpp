@@ -362,18 +362,14 @@ int main(int argc, char** argv)
                     "a pre-existing ambiguity in the struct, not introduced here).\n", ambiguous_total);
 
     // -----------------------------------------------------------------------
-    // BL-932 DIAGNOSTIC — treasury spread vs. inherited corridor touch.
-    // NOT reading 8's formal row (that is BL-940's, once throughput also
-    // exists — the doc credits reading 8 to "BL-932 / BL-940" jointly); this
-    // is BL-932's own "measurement, not a guess" (EXPLORATION.md sec Capital
-    // arrives), taken here rather than off one eyeballed seed.
+    // READING 8 — TREASURY SPREAD VS. INHERITED CORRIDOR TOUCH (BL-932/940).
     // -----------------------------------------------------------------------
     {
         std::vector<std::pair<int64_t, int64_t>> pairs; // (treasury, corridor_touch)
         for (const exploration_row& r : rows)
             for (const auto& tc : r.polity_treasury_corridor) pairs.push_back(tc);
 
-        std::printf("\n--- BL-932 diagnostic: treasury vs. inherited corridor touch ---\n");
+        std::printf("\n--- reading 8: treasury vs. inherited corridor touch ---\n");
         if (pairs.size() < 2)
         {
             std::printf("  fewer than two living polities across the spread — no spread to read.\n");
@@ -409,11 +405,68 @@ int main(int argc, char** argv)
     }
 
     // -----------------------------------------------------------------------
-    // READINGS 3-10 — SCAFFOLDING. Each has no mechanism yet; the slot is
+    // READING 9 — THROUGHPUT: corridors carrying materially different
+    // volumes, with the road ladder visible in the difference (BL-940).
+    // Read off each seed's own (untraced, real) exploration run —
+    // `fx.exploration_state.supply_corridors`, finalised at that run's own
+    // close, and the two road-ladder counters BL-940 added.
+    // -----------------------------------------------------------------------
+    {
+        std::vector<int32_t> uses;
+        int64_t total_post_roads_built = 0, total_treasury_spent = 0;
+        int seeds_with_post_road = 0;
+        for (int i = 0; i < seed_count; ++i)
+        {
+            // Re-derive nothing: `rows` does not keep the fixture, so this
+            // reading re-runs generation once more per seed, same cost class
+            // as the main loop above and paid once, at report time.
+            world_params wp2;
+            wp2.seed = static_cast<uint32_t>(i);
+            wp2.exploration_sim_enabled = true;
+            generation_report     rep2;
+            era_minus_one_fixture fx2;
+            const world w2 = make_hard_coded_world(wp2, &rep2, world_gen_config{},
+                                                   nullptr, nullptr, &fx2);
+            (void)w2;
+            if (!fx2.ran || !fx2.exploration_ran) continue;
+            for (const history_corridor& c : fx2.exploration_state.supply_corridors)
+                uses.push_back(c.uses);
+            if (fx2.exploration_state.post_roads_built > 0) ++seeds_with_post_road;
+            total_post_roads_built += fx2.exploration_state.post_roads_built;
+            total_treasury_spent   += fx2.exploration_state.treasury_spent_on_roads;
+        }
+
+        std::printf("\n--- reading 9: corridor throughput and the road ladder's third rung ---\n");
+        if (uses.empty())
+        {
+            std::printf("  no seed in this spread produced a single corridor — no spread to read.\n");
+        }
+        else
+        {
+            std::sort(uses.begin(), uses.end());
+            const int32_t min_u = uses.front(), max_u = uses.back();
+            const int32_t med_u = uses[uses.size() / 2];
+            std::printf("  %zu corridors across the spread: uses min=%d median=%d max=%d\n",
+                        uses.size(), min_u, med_u, max_u);
+            std::printf("  %s\n", (max_u > min_u)
+                ? "corridors carry materially different volumes on this spread."
+                : "every corridor carries the same volume — no spread measured.");
+            std::printf("  post_roads_built total=%lld (in %d/%d seeds) treasury_spent_on_roads total=%lld\n",
+                        static_cast<long long>(total_post_roads_built), seeds_with_post_road, seed_count,
+                        static_cast<long long>(total_treasury_spent));
+            std::printf("  %s\n", total_post_roads_built > 0
+                ? "the road ladder's third rung fired at least once on this spread."
+                : "the third rung never fired on this spread — report to Ben rather than "
+                  "re-tuning post_road_treasury_cost silently.");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // READINGS 3-7, 10 — SCAFFOLDING. Each has no mechanism yet; the slot is
     // real, the number is not, and the report says so rather than omitting
     // the row.
     // -----------------------------------------------------------------------
-    std::printf("\n--- readings 3-10 (scaffolding — mechanism lands in a later wave) ---\n");
+    std::printf("\n--- readings 3-7, 10 (scaffolding — mechanism lands in a later wave) ---\n");
     struct owed_reading { const char* name; const char* owner; };
     const owed_reading owed[] = {
         {"3. Both strategies pay (consolidator/expansionist, by creed)", "BL-942"},
@@ -421,8 +474,6 @@ int main(int argc, char** argv)
         {"5. Colonial asymmetry (some hold subjects, most don't)",        "BL-934"},
         {"6. Subject friction (a subject's wants diverge from overlord)", "BL-934"},
         {"7. Fleets (uneven, at least one built-then-decayed)",           "BL-935"},
-        {"8. Treasury spread (wide, tracks corridor network not size)",   "BL-932 / BL-940"},
-        {"9. Throughput (corridors carry different volumes, road ladder)","BL-940"},
         {"10. Preference (goods wanted differently by culture, by route)","BL-936"},
     };
     for (const owed_reading& o : owed)

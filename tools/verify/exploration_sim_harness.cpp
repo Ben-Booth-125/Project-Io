@@ -186,6 +186,34 @@ int main()
     }
 
     // -----------------------------------------------------------------
+    // T4b: BL-940 -- throughput_bound, live at EX-WY-2a
+    // -----------------------------------------------------------------
+    {
+        const int wy1a = find_node("EX-WY-1a");
+        const int wy2a = find_node("EX-WY-2a"); // throughput_bound
+        const int sp1m = find_node("EX-SP-1m");
+        const uint64_t mask = (1ULL << sp1m) | (1ULL << wy1a);
+
+        check(exploration_node_available(mask, wy2a),
+              "T4b.0  EX-WY-2a (throughput_bound) is a legal target once Post Roads is held");
+
+        const int chosen_unbound = choose_exploration_node(
+            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
+            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
+            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
+        check(chosen_unbound != wy2a,
+              "T4b.1  throughput_bound at 0 (a free-flowing network) does not single out EX-WY-2a");
+
+        const int chosen_bound = choose_exploration_node(
+            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
+            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
+            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/1000);
+        check(chosen_bound == wy2a,
+              "T4b.2  throughput_bound at 1000 wins EX-WY-2a when nothing else competes -- "
+              "BL-940 wired it live");
+    }
+
+    // -----------------------------------------------------------------
     // T5: BL-939 -- the scarcity signal itself (refresh + the contact gate)
     // -----------------------------------------------------------------
     {
@@ -300,6 +328,15 @@ int main()
                     static_cast<long long>(ex1.years), static_cast<long long>(ex1.battles),
                     static_cast<long long>(ex1.conquests), static_cast<long long>(ex1.foundings),
                     static_cast<int>(p1.polities.size()), static_cast<int>(ex1.polities.size()));
+
+        // BL-940 -- REPORTED, not gated: whether any polity in THIS seed ever
+        // held EX-WY-1a and had a treasury to spend is a fact about the seed,
+        // same discipline `unsustained_attrition_events` and the naval
+        // counters already hold to elsewhere in this codebase.
+        std::printf("      exploration road ladder: post_roads_built=%lld  "
+                    "treasury_spent_on_roads=%lld\n",
+                    static_cast<long long>(ex1.post_roads_built),
+                    static_cast<long long>(ex1.treasury_spent_on_roads));
 
         // BL-930, folded into a real run: at least the tree's own root can
         // fire once the empire rim is available to SOME polity, or none do

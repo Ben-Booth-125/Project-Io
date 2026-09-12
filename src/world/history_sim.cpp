@@ -7,6 +7,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <queue>
 #include <unordered_map>
 
@@ -996,6 +997,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
         return (static_cast<uint64_t>(lo) << 32) | static_cast<uint64_t>(hi);
     };
     const auto road_tier_for_uses = [&](int uses) {
+        // BL-940: the third rung. ORDINARY TRAFFIC is not meant to reach
+        // `road_tier3_uses` (see that field's own comment) — it is bought,
+        // by `try_build_post_road` below, which sets the live count straight
+        // to the threshold rather than incrementing toward it.
+        if (uses >= params.road_tier3_uses) return 3;
         if (uses >= params.road_tier2_uses) return 2;
         if (uses >= params.road_tier1_uses) return 1;
         return 0;
@@ -1184,6 +1190,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // appear there or it renders as if it had never been walked at all.
         corridor_uses.push_back({lo, hi});
         note_event(lapse_event_kind::road_promoted, lo, road_tier_for_uses(need), hi);
+        return true;
+    };
+
+    // BL-940 -- THE ROAD LADDER'S THIRD RUNG, BOUGHT WITH CAPITAL
+    // (EXPLORATION.md sec Goods move as throughput: EX-WY-1a, Post Roads).
+    // SAME SHAPE AS `try_upgrade_corridor` ABOVE, deliberately not folded
+    // into it: that function spends `material_stock` and stops at tier 2 by
+    // construction (`cur_tier >= 2` refuses); this one spends the TREASURY
+    // (BL-932, `region::treasury`) and is the only path that can ever reach
+    // `road_tier3_uses`. Gated on `params.exploration_upkeep_enabled` at the
+    // call site, not here, exactly like `try_upgrade_corridor`'s own
+    // material-cost gate — a zero cost disables it unconditionally.
+    const auto try_build_post_road = [&](int a, int b, int payer_capital) -> bool {
+        if (a < 0 || b < 0 || a == b) return false;
+        if (a >= static_cast<int>(owner_index_limit)
+         || b >= static_cast<int>(owner_index_limit)) return false;
+        if (params.post_road_treasury_cost <= 0) return false;
+        if (road_tier_between(a, b) != 2) return false; // only a Road may become a Post Road
+        if (payer_capital < 0 || static_cast<std::size_t>(payer_capital) >= ss.regions.size())
+            return false;
+        region& seat = ss.regions[static_cast<std::size_t>(payer_capital)];
+        if (seat.treasury < params.post_road_treasury_cost) return false;
+
+        seat.treasury -= params.post_road_treasury_cost;
+        road_uses_live[edge_key(a, b)] = params.road_tier3_uses;
+        ++roads_version;
+        ++out.post_roads_built;
+        out.treasury_spent_on_roads += params.post_road_treasury_cost;
+
+        const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
+        const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
+        corridor_uses.push_back({lo, hi}); // same reasoning as try_upgrade_corridor's own push.
+        note_event(lapse_event_kind::road_promoted, lo, 3, hi);
         return true;
     };
 
@@ -2340,8 +2379,67 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // Empire span — every caller before this item — never takes it.
         expire_dated_objects(out.dated_objects, y);
         if (params.exploration_upkeep_enabled)
+        {
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
                                    params, y, step_years);
+
+            // ---- BL-940: THE ROAD LADDER'S THIRD RUNG, BOUGHT WITH CAPITAL.
+            //
+            // A polity holding EX-WY-1a (Post Roads) may promote AT MOST ONE
+            // of its own Road-tier (2) corridors to a Post Road (3) per
+            // round, if its treasury covers `post_road_treasury_cost` — the
+            // treasury decides which frontier earns it, not traffic
+            // (`try_build_post_road` above refuses anything not already at
+            // tier 2). Bounded to one purchase per polity per round so this
+            // addition's cost cannot scale with corridor count.
+            //
+            // THE PICK IS DETERMINISTIC: the polity's own held regions,
+            // walked in ascending region-index order (owner[] order, not a
+            // hash), each one's neighbour list read in its own stored
+            // (insertion) order — the same discipline `rebuild_reach`'s own
+            // walks already hold to.
+            // NOT a function-local `static`: `run_history_sim` is called
+            // repeatedly within one process (every determinism harness does
+            // this), and while the looked-up index cannot itself change
+            // between calls, a cached local defeats any inspection tool that
+            // assumes this function carries no state across invocations.
+            // The tree is ~31 nodes; the lookup costs nothing measurable.
+            int post_roads_node = -1;
+            for (int i = 0; i < io::exploration_tree::node_count; ++i)
+                if (std::strcmp(io::exploration_tree::nodes[i].id, "EX-WY-1a") == 0)
+                { post_roads_node = i; break; }
+            if (post_roads_node >= 0 && params.post_road_treasury_cost > 0)
+            {
+                for (polity& q : out.polities)
+                {
+                    if (!q.alive) continue;
+                    if (!(q.exploration_mask & (1ULL << post_roads_node))) continue;
+                    if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= ss.regions.size())
+                        continue;
+                    if (ss.regions[static_cast<std::size_t>(q.capital)].treasury
+                        < params.post_road_treasury_cost)
+                        continue;
+
+                    int found_a = -1, found_b = -1;
+                    for (std::size_t hi = 0; hi < ss.regions.size() && found_a < 0; ++hi)
+                    {
+                        if (ss.regions[hi].nation != q.id) continue;
+                        if (hi >= neighbours.size()) continue;
+                        for (int nb : neighbours[hi])
+                        {
+                            if (nb < 0 || static_cast<std::size_t>(nb) >= ss.regions.size()) continue;
+                            if (ss.regions[static_cast<std::size_t>(nb)].nation != q.id) continue;
+                            if (road_tier_between(static_cast<int>(hi), nb) != 2) continue;
+                            found_a = static_cast<int>(hi);
+                            found_b = nb;
+                            break;
+                        }
+                    }
+                    if (found_a >= 0)
+                        try_build_post_road(found_a, found_b, q.capital);
+                }
+            }
+        }
 
         // ---- GRUDGE DECAY (BL-827) ---------------------------------------
         //
@@ -4696,10 +4794,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                 for (int g = 0; g < 4; ++g) sum_q += seat.scarcity_q[g];
                                 wants_unmet_q = clampi(sum_q / 4, 0, 1000);
                             }
-                            // BL-940 lands next; 0 until then, named here
-                            // rather than hidden inside the callee so its
-                            // arrival is a one-line diff at this call.
-                            const int throughput_bound_q = 0; // BL-940
+                            // BL-940 -- THROUGHPUT_BOUND: how constrained the
+                            // polity's own network currently runs, read off
+                            // `region::network_supply_q` (already 0-1000,
+                            // terrain-and-road-priced reach from the capital
+                            // over held ground -- EXPLORATION.md sec Goods
+                            // move as throughput: "throughput in everything
+                            // but name") over the SAME `held` set the ground
+                            // means above already walk. Mean supply, inverted:
+                            // a realm whose own roads run thin scores high
+                            // here, which is what makes Post Roads (EX-WY-1a)
+                            // and its ring-2 siblings worth investing in.
+                            int64_t supply_sum_q = 0;
+                            for (int hi : held)
+                                supply_sum_q += ss.regions[static_cast<std::size_t>(hi)].network_supply_q;
+                            const int throughput_bound_q = clampi(
+                                1000 - static_cast<int>(supply_sum_q / n_held), 0, 1000);
                             q.exploration_investing = static_cast<int16_t>(choose_exploration_node(
                                 q.exploration_mask, stores_low_q, reach_bound_q,
                                 ground_port_q, ground_farm_q, surplus_q,
