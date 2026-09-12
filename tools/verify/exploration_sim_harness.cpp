@@ -29,6 +29,7 @@
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -154,6 +155,71 @@ int main()
         check(chosen_empty_purse == sp2a,
               "T3.2  purse_low at 1000 (an empty treasury) wins EX-SP-2a when nothing else "
               "competes -- BL-932 wired it live");
+    }
+
+    // -----------------------------------------------------------------
+    // T4: BL-939 -- wants_unmet, live at EX-GD-2a (Quayside Market)
+    // -----------------------------------------------------------------
+    {
+        const int gd1a = find_node("EX-GD-1a");
+        const int gd2a = find_node("EX-GD-2a"); // wants_unmet
+        const int sp1m = find_node("EX-SP-1m");
+        const uint64_t mask = (1ULL << sp1m) | (1ULL << gd1a);
+
+        check(exploration_node_available(mask, gd2a),
+              "T4.0  EX-GD-2a (wants_unmet) is a legal target once its ring-1 neighbour is held");
+
+        const int chosen_no_want = choose_exploration_node(
+            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
+            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
+            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
+        check(chosen_no_want != gd2a,
+              "T4.1  wants_unmet at 0 (every want already met) does not single out EX-GD-2a");
+
+        const int chosen_high_want = choose_exploration_node(
+            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
+            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
+            /*purse_low_q=*/0, /*wants_unmet_q=*/1000, /*throughput_bound_q=*/0);
+        check(chosen_high_want == gd2a,
+              "T4.2  wants_unmet at 1000 wins EX-GD-2a when nothing else competes -- BL-939 "
+              "wired it live");
+    }
+
+    // -----------------------------------------------------------------
+    // T5: BL-939 -- the scarcity signal itself (refresh + the contact gate)
+    // -----------------------------------------------------------------
+    {
+        std::vector<region> regions(2);
+        regions[0].nation = 0; regions[0].has_market = true;
+        regions[0].dominant = region_class::none; // wants everything, dominates nothing
+        regions[1].nation = 1; regions[1].dominant = region_class::farm; // no market
+
+        std::vector<polity> qs(2);
+        qs[0].id = 0; qs[0].alive = true;
+        qs[1].id = 1; qs[1].alive = true;
+
+        refresh_market_scarcity(regions, qs);
+        check(regions[0].scarcity_q[scarcity_good_index(region_class::farm)] > 0,
+              "T5.1  a market on ground its own polity holds nowhere carries a live scarcity signal");
+        check(regions[1].scarcity_q[0] == 0 && regions[1].scarcity_q[1] == 0
+           && regions[1].scarcity_q[2] == 0 && regions[1].scarcity_q[3] == 0,
+              "T5.2  a region with no market carries no scarcity signal at all");
+
+        history_sim_state s;
+        check(market_scarcity_q(regions, s, /*viewer=*/0, /*market_region=*/0, region_class::farm)
+                  == regions[0].scarcity_q[scarcity_good_index(region_class::farm)],
+              "T5.3  a polity reads its OWN market's signal unconditionally");
+        check(market_scarcity_q(regions, s, /*viewer=*/1, /*market_region=*/0, region_class::farm) == 0,
+              "T5.4  a polity that has never met the market's holder reads 0 (the omniscience guard)");
+
+        s.contacts.push_back(contact{1, 0}); // viewer 1 reading holder 0's market
+        std::sort(s.contacts.begin(), s.contacts.end(),
+                  [](const contact& a, const contact& b) {
+                      return a.from != b.from ? a.from < b.from : a.to < b.to;
+                  });
+        check(market_scarcity_q(regions, s, /*viewer=*/1, /*market_region=*/0, region_class::farm)
+                  == regions[0].scarcity_q[scarcity_good_index(region_class::farm)],
+              "T5.5  once contact is recorded, a foreign viewer reads the same signal the holder does");
     }
 
     // -----------------------------------------------------------------

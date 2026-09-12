@@ -466,6 +466,94 @@ void expire_dated_objects(std::vector<dated_object>& objects, int64_t year)
         objects.end());
 }
 
+// ---------------------------------------------------------------------------
+// BL-939 — the scarcity signal
+// ---------------------------------------------------------------------------
+
+int scarcity_good_index(region_class good)
+{
+    switch (good)
+    {
+    case region_class::farm:   return 0;
+    case region_class::ore:    return 1;
+    case region_class::energy: return 2;
+    case region_class::port:   return 3;
+    case region_class::none:   return -1;
+    }
+    return -1;
+}
+
+void refresh_market_scarcity(std::vector<region>& regions, const std::vector<polity>& polities)
+{
+    constexpr int             good_count = 4;
+    const region_class goods[good_count] =
+        { region_class::farm, region_class::ore, region_class::energy, region_class::port };
+
+    // Per-polity, per-good: does it hold AT LEAST ONE region dominant in the
+    // good, anywhere on its ground? Independently derived here rather than
+    // read off `derive_wants`'s own private table -- that function runs once,
+    // at the pass 1 -> pass 2 handoff; this one runs every decision round of
+    // the Exploration span, on ground that is still changing hands.
+    std::vector<std::array<bool, good_count>> holds(polities.size());
+    for (auto& row : holds) row.fill(false);
+    std::vector<int64_t> polity_population(polities.size(), 0);
+    for (const region& r : regions)
+    {
+        if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size()) continue;
+        const std::size_t n = static_cast<std::size_t>(r.nation);
+        polity_population[n] += r.population;
+        for (int g = 0; g < good_count; ++g)
+            if (r.dominant == goods[static_cast<std::size_t>(g)])
+                holds[n][static_cast<std::size_t>(g)] = true;
+    }
+
+    for (region& r : regions)
+    {
+        if (!r.has_market)
+        {
+            for (int g = 0; g < good_count; ++g) r.scarcity_q[g] = 0;
+            continue;
+        }
+        if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size())
+        {
+            for (int g = 0; g < good_count; ++g) r.scarcity_q[g] = 0;
+            continue;
+        }
+        const std::size_t n = static_cast<std::size_t>(r.nation);
+
+        // A DEMAND-PRESSURE TERM FROM THE POLITY'S OWN POPULATION. A
+        // placeholder scale (same footing as the treasury income weights,
+        // BL-932) -- a measurement owed, not a guess dressed up as one.
+        const int pop_term_q = clampi(static_cast<int>(polity_population[n] / 5000), 0, 1000);
+
+        for (int g = 0; g < good_count; ++g)
+        {
+            // The market's OWN ground already carries this good -- nothing
+            // to want locally, regardless of what the rest of the realm
+            // holds.
+            if (r.dominant == goods[static_cast<std::size_t>(g)]) { r.scarcity_q[g] = 0; continue; }
+
+            // A good the polity holds NOWHERE is a sharper want than one it
+            // merely lacks at this particular market.
+            const int base_q = holds[n][static_cast<std::size_t>(g)] ? 300 : 700;
+            r.scarcity_q[g] = clampi(base_q + pop_term_q / 4, 0, 1000);
+        }
+    }
+}
+
+int market_scarcity_q(const std::vector<region>& regions, const history_sim_state& s,
+                       int viewer_polity, int market_region, region_class good)
+{
+    if (market_region < 0 || static_cast<std::size_t>(market_region) >= regions.size()) return 0;
+    const region& r = regions[static_cast<std::size_t>(market_region)];
+    if (!r.has_market) return 0;
+    const int gi = scarcity_good_index(good);
+    if (gi < 0) return 0;
+    if (r.nation == viewer_polity) return r.scarcity_q[gi]; // a polity always knows its own market
+    if (!has_contact(s, viewer_polity, r.nation)) return 0; // the omniscience guard
+    return r.scarcity_q[gi];
+}
+
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
@@ -473,6 +561,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                             int64_t                                year,
                             int                                    step_years)
 {
+    // BL-939 -- the demand half, refreshed on the same round-level cadence
+    // the treasury's own earn runs on: a market's signal is a fact about
+    // ground that is still changing hands, exactly like the treasury's own
+    // endowment/network/market terms below.
+    refresh_market_scarcity(regions, polities);
+
     // BL-932 -- EARN, the first of "earn, then pay stocks, then invest"
     // (EXPLORATION.md sec The engine is shared). PAY and INVEST beyond the
     // ordinary verb are still owed to a later item (BL-933's stocks).
@@ -4589,10 +4683,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             const int purse_low_q = clampi(
                                 1000 - static_cast<int>(clampi64(seat.treasury / 4, 0, 1000)),
                                 0, 1000);
-                            // BL-939/BL-940 land these two next; 0 until then,
-                            // named here rather than hidden inside the callee
-                            // so their arrival is a one-line diff at this call.
-                            const int wants_unmet_q      = 0; // BL-939
+                            // BL-939 -- WANTS_UNMET, read off the capital's
+                            // OWN market (a polity always knows its own
+                            // want, so no contact gate applies here -- that
+                            // gate is `market_scarcity_q`'s, for reading a
+                            // FOREIGN market). Mean over the four goods;
+                            // zero where the capital never stood a market.
+                            int wants_unmet_q = 0;
+                            if (seat.has_market)
+                            {
+                                int sum_q = 0;
+                                for (int g = 0; g < 4; ++g) sum_q += seat.scarcity_q[g];
+                                wants_unmet_q = clampi(sum_q / 4, 0, 1000);
+                            }
+                            // BL-940 lands next; 0 until then, named here
+                            // rather than hidden inside the callee so its
+                            // arrival is a one-line diff at this call.
                             const int throughput_bound_q = 0; // BL-940
                             q.exploration_investing = static_cast<int16_t>(choose_exploration_node(
                                 q.exploration_mask, stores_low_q, reach_bound_q,

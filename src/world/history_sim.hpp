@@ -1692,8 +1692,12 @@ void expire_dated_objects(std::vector<dated_object>& objects, int64_t year);
 /// and — ONCE, on the round at @p year == @p params.start_year, the phase's
 /// visible opening act — the seat's accumulated `material_stock` is folded
 /// into it (EXPLORATION.md sec Capital arrives: "material becomes capital").
-/// PAY (ports/navies/standing armies decaying, BL-933's stocks) and INVEST
-/// beyond the ordinary verb are still owed to a later item.
+/// Also refreshes every market's scarcity signal (`refresh_market_scarcity`,
+/// BL-939) — the demand half runs on the same round-level cadence the
+/// treasury's own earn does, for the same reason: both are facts that go
+/// stale the moment ground changes hands. PAY (ports/navies/standing armies
+/// decaying, BL-933's stocks) and INVEST beyond the ordinary verb are still
+/// owed to a later item.
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
@@ -2901,6 +2905,35 @@ struct want
 std::vector<want> derive_wants(const std::vector<region>& regions,
                                 const std::vector<contact>& contacts,
                                 const std::vector<polity>&  polities);
+
+// ---------------------------------------------------------------------------
+// The scarcity signal (BL-939) — EXPLORATION.md sec There is no price here,
+// only a scarcity signal.
+// ---------------------------------------------------------------------------
+
+/// Index into `region::scarcity_q`/the fixed 4-good order, or -1 for
+/// `region_class::none` (never scored). farm=0, ore=1, energy=2, port=3.
+int scarcity_good_index(region_class good);
+
+/// Refreshes every market region's `scarcity_q`, in place, for one decision
+/// round (BL-939). NO PRICE, NO CLEARING — a market's signal for a good is 0
+/// where its OWN ground is dominant in it (nothing to want locally), and
+/// otherwise a function of whether its HOLDING POLITY lacks the good
+/// anywhere on its ground at all, plus that polity's own population as a
+/// demand-pressure term. Called from `run_exploration_upkeep`, never on its
+/// own — see that function for when in the round it runs.
+void refresh_market_scarcity(std::vector<region>& regions, const std::vector<polity>& polities);
+
+/// Read @p market_region's scarcity signal for @p good, AS VISIBLE TO
+/// @p viewer_polity — the omniscience guard every want-shaped read in this
+/// file applies (CIVILISATION.md sec The directed want): a polity reads its
+/// OWN market's signal unconditionally, a foreign market's once
+/// `has_contact` says the pair has met, and 0 otherwise (never a market at
+/// all, or a stranger who has not met the holder — EXPLORATION_TREE.md's
+/// EX-GD-2a, Quayside Market, is what widens the latter case for a polity
+/// that holds it; that node's own consumer is not built by this item).
+int market_scarcity_q(const std::vector<region>& regions, const history_sim_state& s,
+                       int viewer_polity, int market_region, region_class good);
 
 // ---------------------------------------------------------------------------
 // The turbulence lean, resolved (BL-839)

@@ -392,6 +392,20 @@ struct region
     /// `material_stock`/`network_supply_q` above.
     int64_t treasury = 0;
 
+    // --- BL-939: the scarcity signal -----------------------------------------
+    // EXPLORATION.md sec There is no price here, only a scarcity signal.
+    // ONE INTEGER PER GOOD PER MARKET, 0-1000, valid only where `has_market`
+    // is true. NO PRICE, NO CLEARING, NO ORDER BOOK, NO FIRM -- "how badly
+    // this market wants this good", nothing more. Indexed in `region_class`
+    // order, offset by one to skip `region_class::none` (farm=0, ore=1,
+    // energy=2, port=3) — see `history_sim.cpp`'s `scarcity_good_index`.
+
+    /// Refreshed every decision round by `refresh_market_scarcity` (BL-939)
+    /// while `history_sim_params::exploration_upkeep_enabled` is set. Zero
+    /// and unused on every non-market region. GENERATION SCRATCH, NOT SAVED,
+    /// same footing as `treasury`/`material_stock` above.
+    int32_t scarcity_q[4] = {0, 0, 0, 0};
+
     // --- Civilisations (BL-869) ---------------------------------------------
     // CIVILISATION.md § A civilisation is what mixing makes, and it is not a
     // creed. "A region carrying two peoples in quantity, for a long time" is
