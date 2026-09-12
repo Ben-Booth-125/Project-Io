@@ -224,3 +224,23 @@ battle_outcome resolve_battle(const std::vector<army_stack_entry>& attacker,
 
     return out;
 }
+
+// ---------------------------------------------------------------------------
+// BL-935 — the crossing-cost half of the naval domain (see combat.hpp).
+// ---------------------------------------------------------------------------
+
+int port_crossing_ration_bonus_q(int port_stock_q, std::int64_t navy_stock)
+{
+    const int port_term = clamp_permille(port_stock_q); // 0..1000, the built asset only
+
+    // Saturating navy term: a first-cut scale, unmeasured (combat.hpp's own
+    // comment). 20000 heads is "a large standing fleet" on the scale
+    // `history_sim.cpp`'s other headcount stocks already use.
+    constexpr std::int64_t navy_saturation = 20000;
+    std::int64_t navy_term = navy_stock <= 0 ? 0 : (navy_stock * 400) / navy_saturation;
+    if (navy_term > 400) navy_term = 400;
+
+    std::int64_t extra = static_cast<std::int64_t>(port_term) + navy_term;
+    if (extra > 1000) extra = 1000; // capped combined bonus: at most 2x, this cut
+    return 1000 + static_cast<int>(extra);
+}

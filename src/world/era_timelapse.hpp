@@ -185,6 +185,10 @@ enum class lapse_event_kind : uint8_t
     supply_site_upgraded = 9, ///< BL-929: a region bought its own reach relief outright; `polity` = the buyer.
     trade_link_opened   = 10, ///< BL-925: a cross-border corridor turned amicable; `region`/`other` = its ends.
     trade_link_closed   = 11, ///< BL-925: a grudge shut a cross-border corridor; `region`/`other` = its ends.
+    treaty_formed       = 12, ///< BL-933: a bound pair took a term; `polity`/`other` = the two parties.
+    treaty_broken       = 13, ///< BL-933: a treaty was broken; `polity` = the defector, `other` = the wronged party.
+    subject_bound       = 14, ///< BL-934: `polity` = the native subject, `other` = its new overlord.
+    subject_freed       = 15, ///< BL-934: a subject refused renewal; `polity` = the subject, `other` = the former overlord.
     count
 };
 

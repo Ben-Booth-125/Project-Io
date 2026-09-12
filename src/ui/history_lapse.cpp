@@ -1394,6 +1394,22 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "A grudge closes the trade route between %s and %s.",
                       R, region_name_of(h, e.other));
         break;
+    case lapse_event_kind::treaty_formed:
+        std::snprintf(buf, sizeof buf, "%s binds a treaty with %s.",
+                      polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    case lapse_event_kind::treaty_broken:
+        std::snprintf(buf, sizeof buf, "%s breaks its treaty with %s.",
+                      polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    case lapse_event_kind::subject_bound:
+        std::snprintf(buf, sizeof buf, "%s falls under the overlordship of %s.",
+                      polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    case lapse_event_kind::subject_freed:
+        std::snprintf(buf, sizeof buf, "%s refuses renewal and breaks from %s.",
+                      polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
     default:
         std::snprintf(buf, sizeof buf, "Something happens at %s.", R);
         break;

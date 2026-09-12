@@ -201,3 +201,26 @@ battle_outcome resolve_battle(const std::vector<army_stack_entry>& attacker,
                                season                               battle_season,
                                int                                  attacker_supply,
                                int                                  defender_supply);
+
+// ---------------------------------------------------------------------------
+// BL-935 — a funded port and a standing navy lower the cost of a crossing
+// (docs/generation/EXPLORATION.md sec Force persists now, and persistence has
+// a bill). This engine owns the naval DOMAIN (file header, BL-779); this is
+// that domain's crossing-cost half, priced here rather than duplicated at
+// every caller that stages one.
+// ---------------------------------------------------------------------------
+
+/// Pure per-mille multiplier, >= 1000 (neutral at zero investment), that a
+/// crossing's sea-legs ration should be scaled by. `port_stock_q` is the
+/// BUILT asset (0..1000, `region::port_stock_q`) — never the bare endowment
+/// window a region's `port_q` records, which this takes no argument for and
+/// which alone buys no discount at all. `navy_stock` is the staging polity's
+/// `polity::navy_stock`, an unbounded headcount-like scalar that saturates.
+///
+/// FIRST-CUT COEFFICIENTS, UNMEASURED, same discipline as this file's own
+/// doctrine constants: a fully-built port alone can double the ordinary
+/// ration; a saturated navy on top does not widen that ceiling further in
+/// this cut (the combined bonus is capped at +1000, i.e. 2x) — a richer
+/// naval-contest model is left to a later item, not invented here to fill
+/// the cap.
+int port_crossing_ration_bonus_q(int port_stock_q, std::int64_t navy_stock);

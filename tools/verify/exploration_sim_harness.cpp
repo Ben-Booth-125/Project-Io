@@ -401,12 +401,58 @@ int main()
               "R5.3  upkeep does not disturb fields it has no business touching");
 
         // R5.4: the ONE-TIME consolidation, at year == start_year only.
+        // BL-935's PAY/INVEST now spends from this same treasury the very
+        // same call, so this test isolates EARN's own consolidation act by
+        // switching every BL-935 cost off -- R5.5/R5.6 below cover spend.
+        history_sim_params ep_consolidate_only = ep2;
+        ep_consolidate_only.port_build_cost_q = 0;
+        ep_consolidate_only.navy_build_cost_q = 0;
+        ep_consolidate_only.standing_army_build_cost_q = 0;
         regions[0].material_stock = 500;
         const int64_t before_treasury = regions[0].treasury;
-        run_exploration_upkeep(regions, qs, {}, ep2, /*year=*/1200, /*step_years=*/4);
+        run_exploration_upkeep(regions, qs, {}, ep_consolidate_only, /*year=*/1200, /*step_years=*/4);
         check(regions[0].treasury >= before_treasury + 500 && regions[0].material_stock == 0,
               "R5.4  consolidation folds material_stock into treasury once, at the span's own "
               "start year, and empties the seat's material_stock");
+    }
+
+    // -----------------------------------------------------------------
+    // R5b: BL-935 -- ports, navies and standing armies, PAY then INVEST
+    // -----------------------------------------------------------------
+    {
+        std::vector<region> regions(1);
+        regions[0].nation = 0;
+        regions[0].port_q = 1000; // the endowment WINDOW -- never spent itself
+        regions[0].port_stock_q = 500; // already partly built: clears `navy_min_port_stock_q`
+                                       // and still leaves room for R5.5's own build step to fire
+        regions[0].treasury = 100000;
+        std::vector<polity> qs(1);
+        qs[0].capital = 0;
+
+        history_sim_params ep;
+        ep.start_year = 9999; // never this call's `year` -- no consolidation noise
+
+        exploration_upkeep_spend spend;
+        run_exploration_upkeep(regions, qs, /*corridors=*/{}, ep, /*year=*/1234,
+                               /*step_years=*/1, &spend);
+        check(regions[0].port_stock_q > 0 && spend.ports == ep.port_build_cost_q,
+              "R5.5  a funded port raises `port_stock_q` and spends the treasury doing it");
+        check(qs[0].navy_stock > 0 && spend.navies == ep.navy_build_cost_q,
+              "R5.6  a funded, port-staged navy grows and spends the treasury doing it");
+        check(regions[0].army_stock > 0 && spend.standing_armies == ep.standing_army_build_cost_q,
+              "R5.7  a funded standing army adds to `army_stock` and spends the treasury doing it");
+
+        // R5.8: underfunded, a built port silts and the navy still decays --
+        // a fleet is a running cost, never a one-time purchase.
+        regions[0].treasury = 0;
+        const int port_before = regions[0].port_stock_q;
+        const int64_t navy_before = qs[0].navy_stock;
+        run_exploration_upkeep(regions, qs, /*corridors=*/{}, ep, /*year=*/1235,
+                               /*step_years=*/1);
+        check(regions[0].port_stock_q < port_before,
+              "R5.8  an underfunded port silts toward nothing");
+        check(qs[0].navy_stock < navy_before,
+              "R5.9  a navy decays every round regardless of funding");
     }
 
     std::printf("\n%s (%d failure%s)\n",

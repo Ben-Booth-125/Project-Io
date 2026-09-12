@@ -240,6 +240,11 @@ struct history_sim_params
     int grudge_seat_sacked      = 700; ///< And it was the loser's capital.
     int grudge_border_raided    = 60;  ///< A battle that transferred nothing.
     int grudge_realm_ended      = 900; ///< The kin of an extinguished realm.
+    /// BL-933 — a bound clause broken before its term ran out. Sized between
+    /// a border raid and ground actually taken: a treaty broken cost the
+    /// wronged party nothing physical, but the record is a clearer promise
+    /// kept-or-not than either.
+    int grudge_treaty_broken_q  = 250;
 
     /// Per-mille of the standing score shed PER YEAR. A rate, so the stepped
     /// clock multiplies it by the step.
@@ -1683,6 +1688,98 @@ struct history_sim_params
     /// carries a market (`region::has_market`, BL-910). A rate, scaled by
     /// the step; zero for a polity whose seat never stood a market.
     int treasury_market_income_q = 50;
+
+    // --- BL-933: treaties ---------------------------------------------------
+    // EXPLORATION.md sec Diplomacy becomes real.
+
+    /// The shared term every clause bound in one round's treaty formation
+    /// gets. "A term of years is what makes it lengthy rather than a stance."
+    int64_t treaty_term_years = 80;
+
+    /// THE FORMATION THRESHOLD, EXPLICITLY OPEN (EXPLORATION.md sec Open
+    /// questions: "too low and the map freezes; too high and the displacement
+    /// never happens"). Both parties must independently score the binding at
+    /// or above this before it forms. FIRST CUT, UNMEASURED — lean on this
+    /// wave's own sweep (reading 4, treaty depth), never re-guess a round
+    /// number (NR item owed: report this as unmeasured).
+    int treaty_formation_threshold_q = 400;
+
+    /// Per-mille penalty subtracted from `treaty_value_q` for every treaty the
+    /// OTHER party has broken (`polity::treaties_broken`) — "the cost lands on
+    /// every other party's willingness to bind with the defector." First cut,
+    /// same discipline as the threshold above.
+    int treaty_defector_distrust_q = 300;
+
+    /// Per-mille of a subject's CAPITAL TREASURY BALANCE remitted to its
+    /// overlord every decision round while a `tribute` clause binds (BL-934's
+    /// hook, landed here so BL-933 need not be revisited when that item gives
+    /// it a payer). A stock tax rather than an income-share tax — simpler,
+    /// still real, still a cost the subject can be starved out of.
+    int treaty_tribute_rate_q = 150;
+
+    // --- BL-934: colonies ----------------------------------------------------
+    // EXPLORATION.md sec A colony is a subject, and it wants things of its own.
+
+    /// The arriving power's capital treasury must clear the native's own by
+    /// at least this many units before subjection is scored as viable — the
+    /// economic half of "technologically dominant" (treasury already folds
+    /// endowment, network and market together). FIRST CUT, UNMEASURED.
+    int64_t subjection_treasury_margin_q = 200;
+
+    /// Chebyshev capital-to-capital distance beyond which even a sea-legs
+    /// power will not attempt subjection this round — a first-cut reach bound
+    /// standing in for a real overseas logistics model (§ Force persists now
+    /// owns that model's actual mechanism; this is a gate, not a cost).
+    int subjection_reach_q = 400;
+
+    /// Chebyshev capital-to-capital distance beyond which a subject refuses
+    /// tribute renewal outright, reading the SAME "outran its network" idea
+    /// the Empire phase's own secession check reads for a land empire.
+    int subject_secession_distance_q = 500;
+
+    /// Cohesion floor: a subject at or below this refuses renewal regardless
+    /// of distance or reachability — the same `cohesion_floor_q`-shaped idea
+    /// `secession_supply_floor_q` already applies to a land empire's own
+    /// provinces, read here for an overseas one.
+    int subject_secession_cohesion_q = 260;
+
+    // --- BL-935: ports, navies and standing armies ---------------------------
+    // EXPLORATION.md sec Force persists now, and persistence has a bill. Every
+    // cost below is spent from the CAPITAL'S `region::treasury`
+    // (`region::material_stock` never — same discipline `post_road_treasury_
+    // cost` already holds itself to). Same SHAPE as `try_build_post_road`:
+    // an all-or-nothing spend per round rather than a fractional trickle, so
+    // a purchase always moves the stock by exactly one step or not at all.
+
+    /// Treasury cost to raise `region::port_stock_q` by `port_build_step_q`,
+    /// one decision round's worth. Zero disables ports outright.
+    int64_t port_build_cost_q = 400;
+    int     port_build_step_q = 120; ///< Per-mille gain per funded round.
+    /// Per-mille of `port_stock_q` LOST per YEAR when the round's build was
+    /// refused for want of treasury — "silts toward nothing if underfunded."
+    int     port_decay_per_mille_year_q = 40;
+
+    /// Treasury cost to grow `polity::navy_stock` by `navy_build_step_q`, one
+    /// decision round's worth. Gated on the CAPITAL'S OWN `port_stock_q`
+    /// clearing `navy_min_port_stock_q` — a fleet is staged from a port, not
+    /// conjured beside a bare coastline.
+    int64_t navy_build_cost_q      = 600;
+    int64_t navy_build_step_q      = 400;
+    int     navy_min_port_stock_q  = 200;
+    /// Per-mille of standing `navy_stock` lost per YEAR, UNCONDITIONALLY —
+    /// "a fleet is a running cost, not a purchase," so this fires whether or
+    /// not the round also funded growth.
+    int     navy_decay_per_mille_year_q = 30;
+
+    /// Treasury cost to add `standing_army_build_step_q` heads to the
+    /// capital's `region::army_stock`, on top of whatever muster alone holds
+    /// there, one decision round's worth.
+    int64_t standing_army_build_cost_q = 500;
+    int64_t standing_army_build_step_q = 300;
+    /// Per-mille of the EXCESS over `garrison_target(seat, ...)` (never the
+    /// muster baseline itself) lost per YEAR when the round's build was
+    /// refused — "falls back toward what muster alone provides," not below it.
+    int     standing_army_decay_per_mille_year_q = 60;
 };
 
 // ---------------------------------------------------------------------------
@@ -1727,12 +1824,24 @@ void expire_dated_objects(std::vector<dated_object>& objects, int64_t year);
 /// stale the moment ground changes hands. PAY (ports/navies/standing armies
 /// decaying, BL-933's stocks) and INVEST beyond the ordinary verb are still
 /// owed to a later item.
+/// BL-935 — PAY then INVEST for ports, navies and standing armies (out
+/// parameters rather than a returned struct, so the one call site can
+/// accumulate straight into `history_sim_state`'s own counters without a
+/// second copy): treasury actually spent building each stock, this call.
+struct exploration_upkeep_spend
+{
+    int64_t ports           = 0;
+    int64_t navies          = 0;
+    int64_t standing_armies = 0;
+};
+
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
                             const history_sim_params&             params,
                             int64_t                                year,
-                            int                                    step_years);
+                            int                                    step_years,
+                            exploration_upkeep_spend*              spend = nullptr);
 
 // ---------------------------------------------------------------------------
 // Actors
@@ -1995,6 +2104,49 @@ struct polity
     /// Progress accumulated toward `exploration_investing`'s cost. Same
     /// currency as `empire_progress_q`.
     int32_t exploration_progress_q = 0;
+
+    // -----------------------------------------------------------------------
+    // BL-934 — THE OVERLORD LINK. A colony is a LIVE POLITY with one field
+    // pointing at somebody else, never a region annotation and never a new
+    // actor class (EXPLORATION.md sec A colony is a subject).
+    // -----------------------------------------------------------------------
+
+    /// Index into `history_sim_state::polities`, or -1 for no subjection.
+    /// DELIBERATELY NOT `parent` (BL-926, lineage: who this polity broke away
+    /// FROM). Subjection is a LIVE relation that begins, ends and transfers;
+    /// `parent` never changes once written and this field does, on both ends,
+    /// which is exactly the distinction the design draws. NOT SERIALISED,
+    /// same footing as `parent` — this struct does not cross the save seam.
+    int32_t overlord = -1;
+
+    /// 0 = trade province (a foothold; the native polity survives beside it),
+    /// 1 = subjected polity (the native realm itself, brought under the link,
+    /// whole), -1 = not a subject (`overlord < 0`). Derived once, at the round
+    /// `overlord` is first set, from whether the native seat itself carries a
+    /// port endowment (`region::port_q`) — a coastal seat is a foothold an
+    /// arriving sea power plants beside; an interior seat has no coast to
+    /// plant one on, so the whole realm is what changes hands. A DERIVED
+    /// READING, not a decision the loop makes twice — see run_history_sim's
+    /// subjection block for where it is set and why this is the honest proxy
+    /// available without a second, region-spawning placement pass (§ Where
+    /// subjects come from names both paths; this data model does not yet
+    /// carry a trade seat as a distinct region — a scope note, not a design
+    /// claim).
+    int8_t subject_kind = -1;
+
+    /// BL-935 — THE NAVY, NEW AND ZERO EVERYWHERE AT 1200 CE (EXPLORATION.md
+    /// sec Force persists now: unlike `army_stock`, no polity inherits a
+    /// fleet). A headcount-like scalar, built from a funded port's treasury
+    /// spend and decaying every round regardless — "a fleet is a running
+    /// cost, not a purchase." NOT SERIALISED, same footing as `overlord`.
+    int64_t navy_stock = 0;
+
+    /// BL-933 — HOW MANY TREATIES THIS POLITY HAS BROKEN, ever. The smallest
+    /// quantity that makes "the cost lands on every OTHER party's willingness
+    /// to bind with the defector" (EXPLORATION.md sec Diplomacy becomes real)
+    /// readable by a third party without a second ledger: `treaty_value_q`
+    /// reads the COUNTERPART's copy of this field, never the decider's own.
+    int32_t treaties_broken = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -2061,7 +2213,8 @@ bool exploration_node_available(uint64_t mask, int node_idx);
 /// stub's value so BL-933/934 landing shows as a diff.
 int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
                              int ground_port_q, int ground_farm_q, int surplus_q,
-                             int purse_low_q, int wants_unmet_q, int throughput_bound_q);
+                             int purse_low_q, int wants_unmet_q, int throughput_bound_q,
+                             int subject_held_q = 0);
 
 /// THE RIM (BL-930): has this polity crossed EX-SP-3m, "The Long Reckoning"?
 /// A per-polity boolean, read straight off the mask — this is the fact
@@ -2071,6 +2224,18 @@ int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
 inline bool polity_holds_exploration_rim(const polity& q)
 {
     return (q.exploration_mask & (1ULL << io::exploration_tree::rim_node_index)) != 0;
+}
+
+/// BL-934 — THE ASYMMETRY THAT PERMITS SUBJECTION, AS A NODE, NEVER A RANK
+/// (EXPLORATION.md sec Where subjects come from: "nothing reads size"). Index
+/// 11, `EX-HL-3a` "Oceanic Navigation": "a crossing to unmet ground no longer
+/// requires an adjacent shore" — the exact capability a far, unmet continent's
+/// contact requires, read straight off `exploration_mask` exactly as
+/// `polity_holds_exploration_rim` reads its own bit.
+inline constexpr int exploration_sea_legs_node_index = 11;
+inline bool polity_holds_exploration_sea_legs(const polity& q)
+{
+    return (q.exploration_mask & (1ULL << exploration_sea_legs_node_index)) != 0;
 }
 
 /// What the scorer chose for one polity in one year — kept for the harness and
@@ -2208,8 +2373,9 @@ enum class grudge_kind : uint8_t
     seat_sacked,       ///< And it was the loser's capital.
     border_raided,     ///< A battle was fought that transferred nothing.
     realm_ended,       ///< An extinguished realm's kin resent its killer.
+    treaty_broken,     ///< BL-933: a bound clause was broken before its term ran out.
 };
-inline constexpr int grudge_kind_count = 4;
+inline constexpr int grudge_kind_count = 5;
 
 /// Contributing events kept per pair. Fixed and small: the rest falls into the
 /// scalar, which is the sparse/bounded half of the design.
@@ -2284,6 +2450,41 @@ struct contact
     uint16_t      to   = 0;
     contact_event first;         ///< The event that established the pair.
 };
+
+// ---------------------------------------------------------------------------
+// Treaties (BL-933) — EXPLORATION.md sec Diplomacy becomes real
+// ---------------------------------------------------------------------------
+//
+// "SAME FAMILY as `grudge` and `contact` — a named pair plus what joined
+// them — with two additions: it EXPIRES and it BINDS." A treaty is RECORDED
+// as `dated_object` entries in `history_sim_state::dated_objects` — the exact
+// seam that struct's own comment names ("this is the seam BL-933's treaty
+// objects land in"): `kind` is a `treaty_clause`, `a`/`b` the bound pair
+// (canonical `a < b` for the four mutual clauses; `a` = the paying SUBJECT
+// and `b` = the OVERLORD for `tribute`, which is directed), `expires_year`
+// the shared term. A treaty binding several clauses is several dated_objects
+// sharing (a, b, expires_year) — one object per clause rather than a bitmask
+// on one, so `expire_dated_objects`'s existing pass needs no change at all to
+// expire a treaty clause by clause.
+enum class treaty_clause : uint8_t
+{
+    non_aggression  = 0, ///< Neither campaigns against the other while the term runs.
+    trade_access    = 1, ///< One party's market is legible/reachable to the other.
+    sphere_of_claim = 2, ///< Non-interference over a native polity's ground, between the two.
+    tribute         = 3, ///< A remittance from subject (`a`) to overlord (`b`).
+    mutual_defence  = 4, ///< An attack on one draws the other in.
+};
+inline constexpr int treaty_clause_count = 5;
+
+/// True where a treaty binds @p clause between @p x and @p y (either order
+/// for the four mutual clauses; `tribute` reads `a==subject, b==overlord`
+/// specifically — pass the subject as @p x for a tribute check). Linear scan
+/// over `s.dated_objects`: the table is small (bounded by treaty count x 5
+/// clauses, not by region or year count), so a binary search buys nothing a
+/// sorted-by-(a,b,kind) discipline would not also have to police on every
+/// insert — see `history_sim.cpp` for the read/write sites.
+struct history_sim_state; // forward declaration: defined immediately below.
+bool has_treaty_clause(const history_sim_state& s, int x, int y, treaty_clause clause);
 
 struct history_sim_state
 {
@@ -2635,6 +2836,30 @@ struct history_sim_state
     int64_t post_roads_built           = 0;
     int64_t treasury_spent_on_roads    = 0;
 
+    // --- BL-933/934/935 sweep counters --------------------------------------
+
+    /// Treaties formed / broken, this run. `treaties_broken` here is EVENT
+    /// count (how many times a defection happened), never the per-polity
+    /// ledger `polity::treaties_broken` reads — same split every other
+    /// _count/_regions pair above makes.
+    int64_t treaties_formed  = 0;
+    int64_t treaties_broken  = 0;
+    /// Campaign candidates skipped outright because a non-aggression clause
+    /// bound the pair — the direct, countable cause of the displacement
+    /// reading's "neighbour-war rate falls" half.
+    int64_t treaty_blocked_campaigns = 0;
+
+    int64_t subjections_formed = 0; ///< BL-934: new overlord links this run.
+    int64_t subjections_freed  = 0; ///< BL-934: refused-renewal secessions this run.
+    int64_t tribute_remitted   = 0; ///< BL-934: total treasury moved subject -> overlord.
+
+    /// BL-935: treasury actually spent building each stock, this run — the
+    /// observable that separates "the mechanism never fires" from "no polity
+    /// ever affords it in this seed."
+    int64_t treasury_spent_on_ports          = 0;
+    int64_t treasury_spent_on_navies         = 0;
+    int64_t treasury_spent_on_standing_armies = 0;
+
     /// BL-896 -- how many successor realms the dark age produced, and how much
     /// ground walked away with them. The pair is the item's "done when": an
     /// empire that forms and then fragments shows both non-zero, and a world
@@ -2904,6 +3129,31 @@ std::string grudge_event_line(const grudge_event& e, const settlement_state& ss)
 /// contact table. Binary search over the sorted table, same shape as
 /// `grudge_between`.
 bool has_contact(const history_sim_state& s, int from, int to);
+
+// ---------------------------------------------------------------------------
+// Treaty scoring (BL-933) — EXPLORATION.md sec Diplomacy becomes real:
+// "nobody negotiates... evaluated against the same seeded world state."
+// ---------------------------------------------------------------------------
+
+/// ONE PARTY'S OWN VALUE FOR BINDING WITH ANOTHER, in the same currency as
+/// `fear_of_next_q` and for the same reason it is a free function: a claim
+/// about a formation threshold has to be put to THIS function directly. Pure,
+/// integer, seedless — a deterministic consequence of the two grudge readings
+/// between the pair, the counterpart's own defection record, and how much
+/// freedom the decider's own doctrine prices a binding at.
+///
+/// `grudge_against_other_q`/`grudge_from_other_q` are `grudge_between`'s two
+/// directions (the decider's grudge against the counterpart, and the
+/// counterpart's grudge against the decider) — a biting mutual history lowers
+/// the value of promising peace with exactly the realm the promise is least
+/// credible toward. `counterpart_treaties_broken` is the counterpart's OWN
+/// `polity::treaties_broken` — never the decider's. `decider_aggression_q` is
+/// the decider's own doctrine lean (0-1000): a high-aggression culture prices
+/// the freedom a non-aggression clause costs it higher, so it takes more
+/// peace-value to clear the same threshold.
+int treaty_value_q(const history_sim_params& p,
+                    int grudge_against_other_q, int grudge_from_other_q,
+                    int counterpart_treaties_broken, int decider_aggression_q);
 
 // ---------------------------------------------------------------------------
 // The directed want table (BL-909)
