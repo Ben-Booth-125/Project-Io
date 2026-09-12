@@ -13413,6 +13413,51 @@
         "requires",
         "resolution"
       ]
+    },
+    "BL-937": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-937",
+      "short_name": "EXPLORATION_SWEEP_READINGS",
+      "priority": "S",
+      "difficulty": 4,
+      "title": "Instrument the ten Exploration readings, taken at 1660 over a seed spread",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "tools/verify/history_sweep.cpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "EXPLORATION.md sec What the phase is judged on names TEN readings, all taken at 1660 CE and all over a SEED SPREAD, never per world.\n\n=== LAND THIS FIRST, BEFORE ANY MECHANISM. Not last. ===\nBL-905/BL-906 showed the Empire span's instrumentation was the thing that turned a guessed constant into a measured one, and the sprint's named risk -- the frozen map -- is INVISIBLE without it. A phase that damps conflict everywhere looks identical to a phase that displaces it until somebody measures the ratio.\n\nTHE FIRST TWO ARE ONE TEST AND MUST BE READ TOGETHER.\n1. DISPLACEMENT, A RATIO (Ben, 2026-09-11): neighbour-war rate falls RELATIVE TO frontier-skirmish rate. A FALL IN BOTH IS A FAILURE, not a success. This replaced an earlier one-way reading that a world which simply stopped fighting would have passed.\n2. CONFLICT PERSISTS: total conflict at 1660 below Empires' but not near zero. CIVILISATION.md's handoff requires FRAGMENTATION, not peace.\n\nTHE OTHER EIGHT. Both strategies pay: consolidators and expansionists both among the strongest realms, each traceable to its creed (BL-942). Treaty depth: standing at 1660 with years still to run, not a churn of one-round bindings. Colonial asymmetry: some hold subjects, most hold none, at least one subject under a distant overlord. Subject friction: at least one subject's wants point where its overlord's do not. Fleets: navies exist unevenly, and at least one realm built one and let it decay. Treasury spread: wide, correlated with the inherited corridor network rather than size. Throughput: corridors carrying materially different volumes with the road ladder visible in the difference. Preference: goods wanted differently by different cultures, traceable to route.\n\nA READING IS A REQUIREMENT, NOT A TARGET. A seed that refuses one is a legitimate world; a SPREAD that refuses one is a phase that did not do its job. No number is set ahead of the measured spread.",
+      "requires": [
+        "BL-931"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit 50bc60e7). tools/verify/exploration_sweep.cpp: readings 1-2 (displacement, conflict-persists) computed for real over a seed spread by extending era_minus_one_fixture to capture the Exploration spans own state and pre-sim inputs. Readings 3-10 land as explicit scaffolding rows (NOT YET MEASURABLE, naming the owning future item) rather than faked numbers or silent omission, per the items own reading-is-a-requirement-not-a-target rule. Verbatim 16-seed run: median displacement ratio 0.16 (<=1, no displacement measured yet -- expected, since the deterrence/arms-race mechanism this reading targets is a later wave); conflict persists PASSES (median Empires 418.38 battles/century vs median Exploration 210.87/century, below and not near zero). Independently rebuilt and rerun in the main session (8-seed spread reproduced the same per-seed numbers exactly). world_determinism ALL PASS, history_sim_harness at the pre-existing 2-failure baseline (R3a2/R3a3) only -- no regression. NR-848 flags the neighbour-vs-frontier operationalisation (contact-table-at-1200 vs first-met-during-the-span) for Ben to confirm or overturn.",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
     }
   }
 }

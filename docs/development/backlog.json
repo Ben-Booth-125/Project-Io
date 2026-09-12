@@ -137,30 +137,6 @@
    ]
   },
   {
-   "glyph": "✓",
-   "sprint": 40,
-   "written": "2026-09-11",
-   "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "status": "designed",
-   "id": "BL-937",
-   "short_name": "EXPLORATION_SWEEP_READINGS",
-   "priority": "S",
-   "difficulty": 4,
-   "title": "Instrument the ten Exploration readings, taken at 1660 over a seed spread",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "tools/verify/history_sweep.cpp",
-    "src/world/history_sim.cpp"
-   ],
-   "design": "EXPLORATION.md sec What the phase is judged on names TEN readings, all taken at 1660 CE and all over a SEED SPREAD, never per world.\n\n=== LAND THIS FIRST, BEFORE ANY MECHANISM. Not last. ===\nBL-905/BL-906 showed the Empire span's instrumentation was the thing that turned a guessed constant into a measured one, and the sprint's named risk -- the frozen map -- is INVISIBLE without it. A phase that damps conflict everywhere looks identical to a phase that displaces it until somebody measures the ratio.\n\nTHE FIRST TWO ARE ONE TEST AND MUST BE READ TOGETHER.\n1. DISPLACEMENT, A RATIO (Ben, 2026-09-11): neighbour-war rate falls RELATIVE TO frontier-skirmish rate. A FALL IN BOTH IS A FAILURE, not a success. This replaced an earlier one-way reading that a world which simply stopped fighting would have passed.\n2. CONFLICT PERSISTS: total conflict at 1660 below Empires' but not near zero. CIVILISATION.md's handoff requires FRAGMENTATION, not peace.\n\nTHE OTHER EIGHT. Both strategies pay: consolidators and expansionists both among the strongest realms, each traceable to its creed (BL-942). Treaty depth: standing at 1660 with years still to run, not a churn of one-round bindings. Colonial asymmetry: some hold subjects, most hold none, at least one subject under a distant overlord. Subject friction: at least one subject's wants point where its overlord's do not. Fleets: navies exist unevenly, and at least one realm built one and let it decay. Treasury spread: wide, correlated with the inherited corridor network rather than size. Throughput: corridors carrying materially different volumes with the road ladder visible in the difference. Preference: goods wanted differently by different cultures, traceable to route.\n\nA READING IS A REQUIREMENT, NOT A TARGET. A seed that refuses one is a legitimate world; a SPREAD that refuses one is a phase that did not do its job. No number is set ahead of the measured spread.",
-   "requires": [
-    "BL-931"
-   ]
-  },
-  {
    "status": "designed",
    "glyph": "✓",
    "sprint": 40,
