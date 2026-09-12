@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*28 entries — 25 open, 3 resolved.*
+*29 entries — 25 open, 4 resolved.*
 
 ---
 
@@ -424,4 +424,11 @@ TREES.md's sizing rule is that a tree is sized to the rounds its phase gives a l
 RELATED, AND NOT FIXED: the INDUSTRY tree is authored at 62 nodes across 4 rings for a 400-year span, and the split leaves it 300 years. By the same rule it is now oversized. The size row in TREES.md was left stating what the tree IS (4 rings, ~60) rather than what the rule wants, with a paragraph saying so - reshaping an authored 62-node tree is real work, not a row edit, and it was not in this session's scope.
 
 === RESOLVED (Ben, 2026-09-11): "we should shrink the industry tree." BOTH HALVES ANSWERED, and the second differently than expected. (1) The Exploration tree is authored at 31 nodes over 3 rings -- under the ~34 target, reported rather than padded. (2) The Industry shrink is NOT a trim: measurement showed ring 4 is the twentieth century (electrification, oil, flight, broadcast, antibiotics) and must survive, while RING 1 IS THE EXPLORATION AGE and duplicates newly-authored Exploration nodes. The shrink is a migration of ring 1 with every ring shifting down, landing at ~44 nodes. BL-938 owns it. ===
+
+### NR-846 — DECISION TAKEN: build order is BL-930 -> BL-931 -> BL-937, not the NEXT_SESSION.md wave table's BL-937-first
+*decision taken on your behalf · raised 2026-09-12 · from Sprint 40 batch delivery, opening session.*
+
+NEXT_SESSION.md's wave table puts BL-937 (the ten readings) in Wave 0, ahead of Wave 1's BL-931/BL-930, with the framing 'lands first, not last'. But BL-937's own requires field names BL-931, and BL-931's requires BL-930 -- there is nothing for the readings to measure until the engine runs, and no tree for it to run against until the tree is wired. Read literally, the wave table asks for an impossible build order.
+
+RESOLUTION: build BL-930 (wire the tree) then BL-931 (the span runs) then BL-937 (instrument the readings), immediately, before any of waves 2-5. This preserves the intent the wave table was protecting -- instrumentation lands before any of the thirteen mechanism items, not deferred to the sprint's close -- while respecting the actual dependency graph. Nothing in EXPLORATION.md or the four rulings is touched by this; it is a sequencing correction, not a design change.
 

@@ -609,6 +609,16 @@
    "source": "Exploration design session; trees/TREES.md sec Sizes, BL-930.",
    "what": "TREES.md's sizing rule is that a tree is sized to the rounds its phase gives a leading polity, asserted by the sweep rather than picked. The Exploration tree has no sweep yet, so its row was set by SPAN RATIO: 460 years against the Empire phase's 1,600, so three rings rather than four, four branches, three milestones, ~34 nodes of the 64 cap. That is a guess wearing the rule's clothes, and it is recorded as a target.\n\nRELATED, AND NOT FIXED: the INDUSTRY tree is authored at 62 nodes across 4 rings for a 400-year span, and the split leaves it 300 years. By the same rule it is now oversized. The size row in TREES.md was left stating what the tree IS (4 rings, ~60) rather than what the rule wants, with a paragraph saying so - reshaping an authored 62-node tree is real work, not a row edit, and it was not in this session's scope.\n\n=== RESOLVED (Ben, 2026-09-11): \"we should shrink the industry tree.\" BOTH HALVES ANSWERED, and the second differently than expected. (1) The Exploration tree is authored at 31 nodes over 3 rings -- under the ~34 target, reported rather than padded. (2) The Industry shrink is NOT a trim: measurement showed ring 4 is the twentieth century (electrification, oil, flight, broadcast, antibiotics) and must survive, while RING 1 IS THE EXPLORATION AGE and duplicates newly-authored Exploration nodes. The shrink is a migration of ring 1 with every ring shifting down, landing at ~44 nodes. BL-938 owns it. ===",
    "ask": "Two calls. Is ~34 nodes over three rings the right shape for a 460-year phase, or should the Exploration tree be deeper? And does the Industry tree get re-sized for its shorter span, or does a leading polity simply no longer finish it - which is a legitimate answer and changes the 1960 spread."
+  },
+  {
+   "id": "NR-846",
+   "title": "DECISION TAKEN: build order is BL-930 -> BL-931 -> BL-937, not the NEXT_SESSION.md wave table's BL-937-first",
+   "raised": "2026-09-12",
+   "kind": "decision-taken",
+   "status": "resolved",
+   "source": "Sprint 40 batch delivery, opening session.",
+   "what": "NEXT_SESSION.md's wave table puts BL-937 (the ten readings) in Wave 0, ahead of Wave 1's BL-931/BL-930, with the framing 'lands first, not last'. But BL-937's own requires field names BL-931, and BL-931's requires BL-930 -- there is nothing for the readings to measure until the engine runs, and no tree for it to run against until the tree is wired. Read literally, the wave table asks for an impossible build order.\n\nRESOLUTION: build BL-930 (wire the tree) then BL-931 (the span runs) then BL-937 (instrument the readings), immediately, before any of waves 2-5. This preserves the intent the wave table was protecting -- instrumentation lands before any of the thirteen mechanism items, not deferred to the sprint's close -- while respecting the actual dependency graph. Nothing in EXPLORATION.md or the four rulings is touched by this; it is a sequencing correction, not a design change.",
+   "ask": "Confirm BL-930 -> BL-931 -> BL-937 as the opening sequence, or say if the wave table meant something this reading missed."
   }
  ]
 }
