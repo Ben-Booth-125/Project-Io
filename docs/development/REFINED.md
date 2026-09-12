@@ -38,22 +38,33 @@ BL-931 -> BL-937 opens the sprint, ahead of the NEXT_SESSION.md wave table's lit
       reverified — `exploration_sim_harness` 39/39 PASS, `world_determinism` ALL PASS (digests
       unmoved), `history_sim_harness` at the pre-existing 2-failure baseline. Archived.
 
-## Wave 3 — the mechanisms that spend and bind
+## Wave 3 — the mechanisms that spend and bind — LANDED 2026-09-12
 
-- [ ] **BL-933** (TREATIES_WITH_A_TERM) — directed/mutual pair, term of years, five clause kinds
-      (non-aggression, trade access, sphere of claim, tribute, mutual defence). Breaking one writes
-      a grudge (reuses Empire-phase machinery).
-- [ ] **BL-934** (COLONIES_ARE_SUBJECTS) — a colony is a live polity with an overlord link (its own
-      field, NOT `polity::parent`), its own wants, trade provinces vs subjected polities.
-- [ ] **BL-935** (PORTS_NAVIES_AND_UPKEEP) — three treasury-maintained stocks (port/navy/standing
-      army), each decays if underfunded.
+- [x] **BL-933** (TREATIES_WITH_A_TERM), **BL-934** (COLONIES_ARE_SUBJECTS), **BL-935**
+      (PORTS_NAVIES_AND_UPKEEP) — commit `46eabedd` (one commit for all three, NR-853). Treaties
+      form/break deterministically (sweep: 1660 formed, 21 broken, 301 standing at 1660); colonies
+      are live polities with an `overlord` field (24 subjects, 20 overlords measured); ports/navies/
+      armies are treasury-funded and decay (192 polities holding a navy at 1660). Independently
+      rebuilt (full app BUILD_OK — the sub-agent's worktree couldn't run the full build, this
+      session's rebuild was the first), `exploration_sim_harness` 43/43 PASS, `world_determinism`
+      ALL PASS, `history_sim_harness` at the pre-existing baseline. NR-851 (displacement still
+      hasn't moved — expected, deterrence is a later wave), NR-852 (treaty/colony mechanics lack
+      direct harness assertions, verified by sweep + code read instead), NR-854 (subject_kind is a
+      coastal/interior proxy, not the doc's literal two-seat model) flagged for Ben. Archived.
 
-These three are the biggest wave: treaties and subjects both touch the polity table's shape, and
-BL-935 needs BL-932's treasury upkeep cadence already landed. Read EXPLORATION.md §§ "Diplomacy
-becomes real", "A colony is a subject", "Force persists now" before briefing.
+## Wave 4 — the phase's claims (need wave 3 to exist)
 
-## Waves 4-5 — not yet promoted
+- [ ] **BL-941** (THE_ARMS_RACE_IS_DETERRENCE) — Ceiling/Alarm at polity grain (ERAS.md's shape),
+      visible capability read by neighbours. This is the mechanism NR-851 flags as the likely fix
+      for displacement's continued non-movement.
+- [ ] **BL-942** (TWO_WAYS_TO_BE_STRONG) — consolidator/expansionist disposition derived from
+      `zeal`/`dominion`/`sea_legs_q`, never a flag.
+- [ ] **BL-936** (CULTURAL_GOOD_PREFERENCE) — preference attaches to culture, derived from what
+      ground never held and route exposure, weights a want rather than setting a price.
 
-BL-941/942/936 (deterrence/two-strategies/preference), BL-943/938 (exemplars/tree migration).
-`BL-944` gated on a Ben decision (NEXT_SESSION.md § One decision owed). `BL-945` parked for
-Digitisation, not this sprint. Promoted wave by wave as the prior wave lands and verifies.
+## Wave 5 — not yet promoted
+
+BL-943 (fleet/caravan exemplars — visual only, a filter on the throughput number), BL-938
+(Industry ring-1 migration, NOT a trim — see NEXT_SESSION.md's "traps" section). `BL-944` gated on
+a Ben decision (NEXT_SESSION.md § One decision owed — reassertion fired zero times in the earlier
+16-world sweep; ask before building). `BL-945` parked for Digitisation, not this sprint.

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*33 entries — 29 open, 4 resolved.*
+*37 entries — 32 open, 5 resolved.*
 
 ---
 
@@ -409,6 +409,21 @@ post_roads_built totalled 0 across all 8 seeds in tools/verify/exploration_sweep
 
 EXPLORATION.md names the one-time material_stock->treasury consolidation as the phase's visible opening act, and separately says the treasury is 'fed by' four sources (endowment, corridor network, markets, tribute) without saying whether that feeding is a single event or continuous. Read as CONTINUOUS (three of the four sources feed it every round; tribute is a hook, zero, until BL-934 subjects exist) because 'the treasury earns, then pays its stocks, then invests' in EXPLORATION.md sec The engine is shared reads as a recurring round-level cadence, not a one-time transfer. The three income-rate constants (treasury_endowment_income_q, treasury_corridor_income_q, treasury_market_income_q) are first-cut, not measured -- sweep shows a 4,048 to 625M spread correlating 0.33 with corridor touch, which meets BL-932's own done-when bar, but the constants themselves are mine to defend, not Ben's settled numbers.
 
+### NR-851 — OBSERVATION: reading 1 (displacement) still hasn't moved despite BL-935's port discount and BL-933's non-aggression block
+*observation · raised 2026-09-12 · from BL-933/934/935, wave 3 of sprint 40.*
+
+Non-aggression treaties blocked ~1.3M campaign candidates across the 8-seed sweep and a funded port+navy now measurably cheapens a staged crossing (up to 2x), yet median displacement ratio moved from 0.16 (wave 2) to 0.01 (wave 3) -- WORSE, not better, on the raw ratio (though both neighbour-war and frontier rates fell in absolute terms: expl.battl/century dropped from a median ~227 to ~77). Read against reading 2 (conflict persists, still passing: 76.96/century median, well below Empires' 375), this looks like the treaty block is suppressing NEIGHBOUR war harder than the port discount is enabling FRONTIER war -- the two mechanisms landed together but pull in the same direction (less war overall) rather than the displacement the phase claims (war moving from home to frontier). The doc's own deterrence/arms-race mechanism (Ceiling/Alarm at polity grain, EXPLORATION.md sec The arms race) is explicitly NOT built yet -- it is a later wave, not BL-933/934/935's scope -- so this may resolve once that lands, but it is worth surfacing now rather than assuming a later wave will fix it silently.
+
+### NR-852 — OBSERVATION: BL-933/934/935's mechanics are verified by the aggregate sweep and a code review, not by direct per-mechanism harness assertions
+*observation · raised 2026-09-12 · from Wave 3 of sprint 40, main-session verification.*
+
+exploration_sim_harness gained direct assertions for BL-935 (R5.5-R5.9: port/navy/army funding and decay) but none for BL-933 (treaty formation, breaking, clause enforcement) or BL-934 (overlord link, subject wants, secession). Those two are exercised only through the aggregate exploration_sweep (readings 4-6: treaties form/break, subjects/overlords exist, tribute flows, contact-graph friction exists) and a manual code read in the main session (treaty_value_q's independent-scoring/no-bargaining shape, the sorted walk and tie-break, the non-aggression campaign-block site) -- both of which look sound, but neither is a repeatable, named assertion the way T5.x pins the scarcity signal's contact gate. A future change to treaty/colony logic could regress silently until the next full sweep, rather than failing a specific test.
+
+### NR-854 — OBSERVATION: BL-934's trade-province-vs-subjected-polity split is a proxy, not the doc's literal two-object model
+*observation · raised 2026-09-12 · from BL-934, wave 3 of sprint 40.*
+
+EXPLORATION.md describes a trade province as a NEW seat planted on a native polity's coast (the native survives beside it) versus a subjected polity being the native polity itself, whole. The data model has no mechanism to spawn a new region/seat mid-sim, so `subject_kind` is instead DERIVED from whether the native's own capital seat already carries a port_q endowment (coastal -> trade-province reading, interior -> subjected-polity reading) -- the native polity itself is what gets the overlord link either way, never a literal new seat. This is called out in-code as 'the honest proxy available without a second, region-spawning placement pass', not presented as the literal model.
+
 ---
 
 ## Resolved
@@ -455,4 +470,9 @@ RELATED, AND NOT FIXED: the INDUSTRY tree is authored at 62 nodes across 4 rings
 NEXT_SESSION.md's wave table puts BL-937 (the ten readings) in Wave 0, ahead of Wave 1's BL-931/BL-930, with the framing 'lands first, not last'. But BL-937's own requires field names BL-931, and BL-931's requires BL-930 -- there is nothing for the readings to measure until the engine runs, and no tree for it to run against until the tree is wired. Read literally, the wave table asks for an impossible build order.
 
 RESOLUTION: build BL-930 (wire the tree) then BL-931 (the span runs) then BL-937 (instrument the readings), immediately, before any of waves 2-5. This preserves the intent the wave table was protecting -- instrumentation lands before any of the thirteen mechanism items, not deferred to the sprint's close -- while respecting the actual dependency graph. Nothing in EXPLORATION.md or the four rulings is touched by this; it is a sequencing correction, not a design change.
+
+### NR-853 — DECISION TAKEN: wave 3's three items landed as one commit, not three, after the fact
+*decision taken on your behalf · raised 2026-09-12 · from Wave 3 of sprint 40 (BL-933/934/935).*
+
+CLAUDE.md sec The Full lifecycle calls for one commit per item. The sub-agent building this wave found BL-933/934/935's code interleaved within the same shared functions (run_exploration_upkeep, the round loop's upkeep block) and judged that splitting after the fact risked committing an intermediate state that doesn't build -- so it landed one commit covering all three, clearly itemising each in the message body. Accepted as-is: the resolution field for each of the three backlog rows below points at the shared commit and names which parts are that item's own, which preserves the audit trail without a risky post-hoc split.
 

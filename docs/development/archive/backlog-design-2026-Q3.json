@@ -13594,6 +13594,145 @@
         "requires",
         "resolution"
       ]
+    },
+    "BL-933": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-933",
+      "short_name": "TREATIES_WITH_A_TERM",
+      "priority": "A",
+      "difficulty": 6,
+      "title": "Treaties: a bound pair with an end date, and five clause kinds",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "BEN, 2026-09-11: \"We should move away from the rapid claim and grudge system. We should be creating lengthy treaties and pushing slowly towards gaining territory.\"\n\nTHIS OVERTURNS CIVILISATION.md's THIRD EXCLUSION, FORWARD ONLY. That doc's sec Fear of being next declines treaties, negotiation and alliance objects - correctly, for Empires, and nothing here relaxes it backwards. Exploration has real treaty objects; Empires still does not.\n\nTHE SHAPE. Same family as grudge and contact - a named pair plus what joined them - with two additions: it EXPIRES (a term of years) and it BINDS rather than records.\n\nFIVE CLAUSE KINDS, all five settled by Ben 2026-09-11: non-aggression for a term; trade access to a market; a sphere of claim over unclaimed ground; tribute from subject to overlord; mutual defence.\n\nNOBODY NEGOTIATES. A treaty forms when both parties independently score the binding as worth more than the freedom it costs, against the same seeded state - which keeps determinism and keeps a bargaining layer out.\n\nBREAKING ONE IS LEGAL AND COSTLY. Defection writes into the EXISTING grudge table, and the cost lands on every other party's willingness to bind with the defector. Nothing reads the defector's own ledger to pick a target - that is revenge and stays declined.\n\nOPEN: where the formation threshold sits. Too low and the map freezes; too high and the conflict displacement never happens. Same discipline as the opposition bar.",
+      "requires": [
+        "BL-931",
+        "BL-932"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit 46eabedd, shared with BL-934/BL-935 -- NR-853 explains the single commit). treaty_clause enum (non_aggression/trade_access/sphere_of_claim/tribute/mutual_defence) recorded as dated_object entries. Formation: sorted walk over out.contacts canonical rows, both parties independently score treaty_value_q against treaty_formation_threshold_q=400 (first-cut, unmeasured) -- no bargaining loop. non_aggression blocks Campaign candidates outright (out.treaty_blocked_campaigns, ~1.3M across the 8-seed sweep); mutual_defence discounts an attack on a defended ally; trade_access is a second market-legibility path beside contact. Breaking: re-scored every round with hysteresis (break bar = threshold/2), writes grudge_kind::treaty_broken into the EXISTING grudge table, increments polity::treaties_broken (read only by others, never the defector). Sweep reading 4: 1660 formed, 21 broken, 301 standing at 1660 (years-left median 20) -- depth without a frozen map, the done-when bar. Verified: main-session code read of the formation/break logic (sorted, deterministic, explicit tie-break) plus the aggregate sweep; NR-852 flags the absence of direct per-mechanism harness assertions (T6.x) as a follow-up worth considering. world_determinism ALL PASS, history_sim_harness at the pre-existing 2-failure baseline, full app BUILD_OK.",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
+    },
+    "BL-934": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-934",
+      "short_name": "COLONIES_ARE_SUBJECTS",
+      "priority": "A",
+      "difficulty": 6,
+      "title": "A colony is a live polity with an overlord link, and it wants things of its own",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "SETTLED (Ben, 2026-09-11, elicitation): a colony is a LIVE POLITY WITH AN OVERLORD LINK - not a region annotation, not a new actor class. And (Ben, same day) colonies are \"subject with their own desires.\"\n\npolity::parent IS NOT THAT FIELD. parent records lineage - who this polity broke away from. Subjection is a LIVE relation that begins, ends and transfers; overloading lineage onto it makes a colony indistinguishable from a secession the moment either changes. The overlord link is its own field.\n\nOWN DESIRES IS THE LOAD-BEARING HALF. A colony keeps its own rows in the want table, pointed at what ITS ground lacks and its neighbours hold. Two consequences, both wanted: a colony can want what its overlord does not, and a colony's wants can point at a rival's colony across a frontier the metropoles have treatied over.\n\nWHERE SUBJECTS COME FROM. There is NO TERRA NULLIUS: CIVILISATION.md sec Contact is polity to polity fixes that a far continent at 1200 CE is settled and unmet. So either a TRADE PROVINCE (a seat with a market and an overlord on a native polity's coast, the native polity surviving beside it) or a SUBJECTED POLITY (the native polity itself, brought under the link, whole). Ben, 2026-09-11: \"the most technologically dominant nations are able to lay claim to polities they have no direct control over - beginning to sprout trade provinces, and steal land from natives.\"\n\nTHE ASYMMETRY IS A NODE, NEVER A RANK. Nothing reads size; what decides who can arrive is what the arriving polity holds.\n\nREFUSAL IS SECESSION. Tribute is a treaty clause and a clause comes up for renewal; a subject refusing renewal should read the same quantities the Empire phase's secession reads, so a colonial empire outrunning its network fails the same way a land empire does.\n\nOPEN: whether a colony may itself hold a colony - the link permits a chain, and the answer decides whether a subject is an actor or a leaf.",
+      "requires": [
+        "BL-931",
+        "BL-933"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit 46eabedd, shared with BL-934/BL-935 -- NR-853 explains the single commit). polity::overlord (new field, never parent) plus derived subject_kind (trade province vs subjected polity, proxied off the native seat's own port_q endowment -- NR-854 flags this as a proxy for the doc's literal two-object model, since the data model cannot spawn a new region mid-sim). Gated on tree node EX-HL-3a (Oceanic Navigation) plus a treasury-margin and reach-distance check, never a rank. Tribute is BL-933's directed clause, remitted from the subject's capital treasury each round. Refusal-to-renew (secession) reads cohesion/distance/has_contact-reachability -- the same quantities the Empire phase's own secession reads, re-evaluated continuously rather than only at clause expiry (a documented simplification of renewal-as-a-discrete-decision). subject_held_q wired live into choose_exploration_node. Colony-holds-colony explicitly refused per the doc's own open question. Sweep reading 5: 24 subjects, 20 overlords, 335 alive polities, max subject-overlord distance 252, tribute remitted total ~956M. Reading 6 (subject friction) operationalised as contact-graph divergence (16 subjects point at a polity their overlord never met) since no live per-round want table exists to diverge on directly. world_determinism ALL PASS, history_sim_harness at baseline.",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
+    },
+    "BL-935": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-935",
+      "short_name": "PORTS_NAVIES_AND_UPKEEP",
+      "priority": "A",
+      "difficulty": 5,
+      "title": "Ports, navies and standing armies: built from capital, and they decay",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp",
+        "src/world/combat.cpp"
+      ],
+      "design": "BEN, 2026-09-11: \"Spending capital on ports within the Exploration round enables cheaper overseas skirmishes. So building a navy and standing army that persists is important - these degrade over time if insufficient capital is provided.\"\n\nCARRY RULE, settled by Ben 2026-09-11 (elicitation): army_stock CARRIES across the 1200 handoff; the NAVY IS NEW AND STARTS AT ZERO everywhere. So the first ocean-capable power in a world built its fleet inside this phase, and the sweep can see when.\n\nTHREE STOCKS, each maintained by the treasury. PORT: built on a region with a port window, lowers the cost of every crossing staged from it, silts toward nothing when underfunded. NAVY: staged from a port, gives crossing capacity and contest of a crossing, decays - a fleet is a running cost, not a purchase. STANDING ARMY: on top of inherited army_stock, force already raised when a skirmish opens; falls back toward what muster alone provides.\n\nport_q IS ENDOWMENT, NOT A PORT. The region field says the ground could take a harbour. Building one is an act of this phase and is paid for; conflating the two gives every coastal polity the thing the phase is about acquiring.\n\nWHY IT MATTERS TO THE PHASE'S CLAIM. A neighbour war is fought where treaties bind and no port discount applies; a frontier skirmish is staged from a port the polity paid for. That price gap IS the displacement of conflict, and it is a cost in the world rather than a handicap in the scorer.",
+      "requires": [
+        "BL-931",
+        "BL-932"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit 46eabedd, shared with BL-934/BL-935 -- NR-853 explains the single commit). region::port_stock_q (the BUILT asset) kept strictly separate from port_q (the endowment window). polity::navy_stock new, zero everywhere at 1200 (army_stock confirmed to still carry via the existing resume path, untouched). run_exploration_upkeep grew a PAY/INVEST step after EARN: port build/silt, navy build/unconditional-decay, standing-army build/decay-toward-muster-baseline, all treasury-spent on the same all-or-nothing shape try_build_post_road uses. combat.hpp gained port_crossing_ration_bonus_q, wired into the sea-legs ration so a funded port+navy measurably cheapens a staged crossing (capped combined at 2x, stated as a first-cut ceiling, a richer naval-contest model left to a later item). Sweep reading 7: 192 polities holding a navy at 1660 across the spread; decay confirmed directly by exploration_sim_harness R5.8/R5.9 (port silts when underfunded, navy decays unconditionally). All build costs/steps/decay rates first-cut, unmeasured. exploration_sim_harness R5.5-R5.9 (5 new direct assertions) all PASS. world_determinism ALL PASS, history_sim_harness at baseline, full app BUILD_OK (independently rebuilt in the main session -- the sub-agent worktree could not run cmd to build the full app, so this was the first full-app build since the merge; it compiled clean including the touched src/ui/history_lapse.cpp).",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
     }
   }
 }
