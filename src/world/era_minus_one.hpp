@@ -110,6 +110,38 @@ history_sim_params era_minus_one_sim_params(const world_params& params);
 /// the same shape as every other pass in `make_hard_coded_world`.
 uint32_t era_minus_one_sim_seed(const world_params& params);
 
+// ---------------------------------------------------------------------------
+// BL-931 — the Exploration span's own derivations, on the same footing as the
+// three above. A SECOND CALL to `run_history_sim`, over the same engine, with
+// `history_sim_params::resume_polities`/`resume_grudges`/`resume_contacts`/
+// `resume_corridors` set by the caller from the closing `pass_one_output` —
+// this file derives the SPAN and the SEED only, exactly as it does for the
+// Empires round; the resume pointers are per-call state this file has no
+// business holding.
+// ---------------------------------------------------------------------------
+
+/// Does generation run the Exploration span for these params? Requires the
+/// Empires round itself to be enabled and single-span
+/// (`!era_minus_one_has_industrial_span`) — see `world_params::
+/// exploration_sim_enabled`'s comment for why a two-span epoch is out of
+/// scope here — plus the opt-in flag itself.
+bool exploration_sim_enabled(const world_params& params);
+
+/// The `history_sim_params` the Exploration span runs on: `start_year =
+/// params.empires_stop_year` (1200 by default, wherever the Empires round
+/// actually closed), `stop_year = params.exploration_stop_year` (1660 by
+/// default). A single tick band at 4 years, the same cadence the Empires
+/// round's own single-span closes on. `exploration_upkeep_enabled` is set —
+/// this is the one caller that wants the (still-empty) upkeep hook running.
+/// The resume pointers are NOT set here; the caller fills them in from its
+/// own `pass_one_output` immediately before calling `run_history_sim`.
+history_sim_params exploration_sim_params(const world_params& params);
+
+/// The seed generation hands the Exploration span. Folded off the same
+/// master seed with its own constant, so it is neither the Empires round's
+/// seed nor a caller-invented one.
+uint32_t exploration_sim_seed(const world_params& params);
+
 /// EXACTLY what generation handed `run_history_sim`, captured at its own call
 /// site — the arguments, and the three counts the run produced.
 ///

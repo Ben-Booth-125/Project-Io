@@ -1025,6 +1025,50 @@ world make_hard_coded_world(world_params params, generation_report* report,
             kepler_settlement.history.insert(kepler_settlement.history.end(),
                                              hs.history.begin(), hs.history.end());
 
+            // ------------------------------------------------------------
+            // BL-931 — THE EXPLORATION SPAN, 1200 -> exploration_stop_year,
+            // on the SAME engine, immediately after the Empires round
+            // closes above. OPT-IN ONLY (world_params::
+            // exploration_sim_enabled, default false) — see that field's
+            // comment for why this does not run by default: it would move
+            // `region::nation` (read a few hundred lines below by
+            // `derive_national_character`) from the 1200 CE political map
+            // to whatever this span leaves at its own close, which is a
+            // downstream-consequences question this item does not answer.
+            //
+            // WHAT DOES NOT HAPPEN HERE, AND WHY. `kepler_corridors` /
+            // `kepler_grudges` above stay the EMPIRES round's own — this
+            // span's grudges/corridors are folded into
+            // `kepler_exploration_hs` alone, not re-derived into a second
+            // pass-1-style handoff. Building that handoff (a
+            // `pass_one_output`-shaped record at 1660, with its own
+            // surviving-network filter over THIS span's dead) is real work
+            // BL-931 does not scope: this item's job is that the span RUNS,
+            // on the shared engine, with the two honest additions
+            // (EXPLORATION.md sec The engine is shared) — not that
+            // everything downstream of the Empires handoff now reads a
+            // second one.
+            if (exploration_sim_enabled(params) && !kepler_pass_one.polities.empty())
+            {
+                history_sim_params ep = exploration_sim_params(params);
+                ep.resume_polities  = &kepler_pass_one.polities;
+                ep.resume_grudges   = &kepler_pass_one.grudges;
+                ep.resume_contacts  = &kepler_pass_one.contacts;
+                ep.resume_corridors = &kepler_pass_one.surviving_corridors;
+
+                const history_sim_state kepler_exploration_hs = run_history_sim(
+                    kepler_settlement, &kepler_creeds, terr.view(),
+                    home_grid_width, home_grid_height, ep,
+                    exploration_sim_seed(params),
+                    /*year_progress=*/nullptr, // No loading-screen sub-bar for this opt-in span yet.
+                    works,
+                    /*tap=*/nullptr); // No time-lapse tap for this opt-in span yet.
+
+                kepler_settlement.history.insert(kepler_settlement.history.end(),
+                                                 kepler_exploration_hs.history.begin(),
+                                                 kepler_exploration_hs.history.end());
+            }
+
             // Report what the era actually produced, into the generation record
             // rather than to stdout. The acceptance test for this block is
             // behavioural ("turmoil... losing / winning bodies"), and a block

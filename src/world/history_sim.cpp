@@ -454,6 +454,29 @@ struct scoped_ns
 };
 } // namespace
 
+// ---------------------------------------------------------------------------
+// BL-931 — objects with a term, and the (still empty) upkeep step
+// ---------------------------------------------------------------------------
+
+void expire_dated_objects(std::vector<dated_object>& objects, int64_t year)
+{
+    objects.erase(
+        std::remove_if(objects.begin(), objects.end(),
+                        [year](const dated_object& o) { return o.expires_year <= year; }),
+        objects.end());
+}
+
+void run_exploration_upkeep(std::vector<polity>& /*polities*/, int64_t /*year*/)
+{
+    // A DOCUMENTED NO-OP (BL-931/BL-932). "The treasury earns, then pays its
+    // stocks, then invests" (EXPLORATION.md sec The engine is shared) needs a
+    // treasury to earn into and stocks to pay upkeep from, and neither exists
+    // yet — the capital arrives at BL-932. This function is the call site the
+    // round loop already reaches every decision round
+    // (`history_sim_params::exploration_upkeep_enabled`), so BL-932 fills in
+    // a body here rather than threading a new hook through the loop.
+}
+
 history_sim_state run_history_sim(settlement_state&         ss,
                                   const creed_state*        cs,
                                   const sim_terrain_view&   terrain,
@@ -495,6 +518,34 @@ history_sim_state run_history_sim(settlement_state&         ss,
         tap->publish_regions(tap_region_col, tap_region_row, tap_region_name);
     }
 
+    // Region -> owning polity, -1 for unorganised or unowned ground.
+    std::vector<int> owner(ss.regions.size(), -1);
+
+    // -----------------------------------------------------------------------
+    // BL-931 — RESUMING A PRIOR SPAN'S CLOSE, rather than seeding a fresh
+    // opening. See `history_sim_params::resume_polities`: null is every
+    // caller before this item, unconditionally, so the whole `else` branch
+    // below reproduces the pre-BL-931 opening line for line.
+    // -----------------------------------------------------------------------
+    if (params.resume_polities != nullptr)
+    {
+        // THE CALLER ALREADY SET `ss.regions` TO THE CLOSING STATE (typically
+        // `pass_one_output::regions`): population, `army_stock`,
+        // `is_seat`/`seat_region` and `nation` are all live, so none of the
+        // seeding, polity-construction, great-power or seat-placement work
+        // below runs again. `nation` is read straight into `owner`, which is
+        // the one working copy the rest of this function actually consults —
+        // BL-769's own comment on the field is exactly this reuse.
+        out.polities = *params.resume_polities;
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+            owner[i] = ss.regions[i].nation;
+        if (params.resume_grudges  != nullptr) out.grudges  = *params.resume_grudges;
+        if (params.resume_contacts != nullptr) out.contacts = *params.resume_contacts;
+        if (params.resume_corridors != nullptr)
+            out.supply_corridors = *params.resume_corridors;
+    }
+    else
+    {
     // Population and manpower are seeded for EVERY region either way — the
     // city-state test (BL-920) and the old plurality seed (BL-826) both need
     // a headcount to read or to grow from.
@@ -514,9 +565,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
         p.army_stock = garrison_target(p, params.garrison_fraction_q);
         p.manpower_stock = clampi64(p.manpower_stock - p.army_stock, 0, p.manpower_stock);
     }
-
-    // Region -> owning polity, -1 for unorganised or unowned ground.
-    std::vector<int> owner(ss.regions.size(), -1);
 
     // BL-920 -- FALSE BY DEFAULT (struct default), TRUE ON GENERATION'S OWN
     // ROUND (`era_minus_one_sim_params`). See the field comment on
@@ -733,6 +781,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             p.seat_region = out.polities[static_cast<std::size_t>(p.nation)].capital;
         }
     }
+    } // BL-931: end of the non-resumed opening (`params.resume_polities == nullptr`).
 
     // --- THE ANCIENT ROAD RECORD (BL-768) ---------------------------------
     //
@@ -2122,6 +2171,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
             continue;
         step_years    = step_for_year(params, y);
         next_decision = y + step_years;
+
+        // ---- BL-931: OBJECTS WITH A TERM, AND THE UPKEEP STEP -------------
+        //
+        // Both run once per decision round, ahead of grudge decay and every
+        // polity's own turn — "earn, then pay stocks, then invest"
+        // (EXPLORATION.md sec The engine is shared) has to happen before a
+        // polity spends this round's Invest choice, and a treaty due to
+        // expire this round should already be gone before anything reads it.
+        // `expire_dated_objects` runs UNCONDITIONALLY (an empty vector costs
+        // nothing and nothing populates it outside this item's scope yet);
+        // the upkeep call is gated on `exploration_upkeep_enabled` so the
+        // Empire span — every caller before this item — never takes it.
+        expire_dated_objects(out.dated_objects, y);
+        if (params.exploration_upkeep_enabled)
+            run_exploration_upkeep(out.polities, y);
 
         // ---- GRUDGE DECAY (BL-827) ---------------------------------------
         //
