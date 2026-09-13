@@ -672,16 +672,140 @@ int main(int argc, char** argv)
     }
 
     // -----------------------------------------------------------------------
-    // READINGS 3, 10 — STILL SCAFFOLDING. No mechanism yet this wave.
+    // READING 3 — BOTH STRATEGIES PAY (BL-942). Consolidators AND
+    // expansionists both among a seed's strongest realms, each traceable to
+    // its creed's recorded deeds (`zeal`/`dominion`/`sea_legs_q`).
+    // "Strongest" is read off HELD REGION COUNT at 1660 -- the same ground-
+    // holding fact `polity_holdings` already carries, never a second ranking
+    // invented for this reading.
     // -----------------------------------------------------------------------
-    std::printf("\n--- readings 3, 10 (scaffolding — mechanism lands in a later wave) ---\n");
-    struct owed_reading { const char* name; const char* owner; };
-    const owed_reading owed[] = {
-        {"3. Both strategies pay (consolidator/expansionist, by creed)", "BL-942"},
-        {"10. Preference (goods wanted differently by culture, by route)","BL-936"},
-    };
-    for (const owed_reading& o : owed)
-        std::printf("  %-58s NOT YET MEASURABLE — mechanism lands in %s\n", o.name, o.owner);
+    std::printf("\n--- reading 3: both strategies pay (consolidator/expansionist, by creed) ---\n");
+    {
+        int64_t seeds_measured = 0, seeds_with_consolidator_top = 0,
+                seeds_with_expansionist_top = 0, seeds_with_both = 0;
+        for (int i = 0; i < seed_count; ++i)
+        {
+            world_params wp3;
+            wp3.seed = static_cast<uint32_t>(i);
+            wp3.exploration_sim_enabled = true;
+            generation_report     rep3;
+            era_minus_one_fixture fx3;
+            const world w3 = make_hard_coded_world(wp3, &rep3, world_gen_config{},
+                                                   nullptr, nullptr, &fx3);
+            (void)w3;
+            if (!fx3.ran || !fx3.exploration_ran) continue;
+
+            history_sim_params ep3 = fx3.exploration_params;
+            ep3.resume_polities  = &fx3.pre_exploration_polities;
+            ep3.resume_grudges   = &fx3.pre_exploration_grudges;
+            ep3.resume_contacts  = &fx3.pre_exploration_contacts;
+            ep3.resume_corridors = &fx3.pre_exploration_corridors;
+            settlement_state ss3 = fx3.pre_exploration_settlement;
+            creed_state       cs3 = fx3.pre_exploration_creeds;
+            const history_sim_state traced3 = run_history_sim(
+                ss3, &cs3, fx3.terrain.view(), fx3.gw, fx3.gh, ep3,
+                fx3.exploration_seed, /*year_progress=*/nullptr, fx3.works, /*tap=*/nullptr);
+
+            std::vector<int64_t> region_count(traced3.polities.size(), 0);
+            for (const region& r : ss3.regions)
+                if (r.nation >= 0 && static_cast<std::size_t>(r.nation) < region_count.size())
+                    ++region_count[static_cast<std::size_t>(r.nation)];
+
+            std::vector<int> alive_ids;
+            for (std::size_t p = 0; p < traced3.polities.size(); ++p)
+                if (traced3.polities[p].alive) alive_ids.push_back(static_cast<int>(p));
+            if (alive_ids.size() < 2) continue;
+            std::sort(alive_ids.begin(), alive_ids.end(), [&](int a, int b) {
+                if (region_count[static_cast<std::size_t>(a)] != region_count[static_cast<std::size_t>(b)])
+                    return region_count[static_cast<std::size_t>(a)] > region_count[static_cast<std::size_t>(b)];
+                return a < b; // explicit tie-break
+            });
+            const std::size_t top_n = std::min<std::size_t>(3, alive_ids.size());
+
+            bool has_cons = false, has_expn = false;
+            for (std::size_t k = 0; k < top_n; ++k)
+            {
+                const polity& p = traced3.polities[static_cast<std::size_t>(alive_ids[k])];
+                if (p.culture < 0 || static_cast<std::size_t>(p.culture) >= cs3.cultures.size()) continue;
+                const culture& cu = cs3.cultures[static_cast<std::size_t>(p.culture)];
+                const int cons = consolidator_lean_q(cu), expn = expansion_lean_q(cu);
+                if (cons > expn) has_cons = true;
+                else if (expn > cons) has_expn = true;
+            }
+            ++seeds_measured;
+            if (has_cons) ++seeds_with_consolidator_top;
+            if (has_expn) ++seeds_with_expansionist_top;
+            if (has_cons && has_expn) ++seeds_with_both;
+        }
+        std::printf("  seeds measured=%lld  top-3-by-regions include a consolidator-leaning "
+                    "creed=%lld  include an expansionist-leaning creed=%lld  BOTH present=%lld\n",
+                    static_cast<long long>(seeds_measured), static_cast<long long>(seeds_with_consolidator_top),
+                    static_cast<long long>(seeds_with_expansionist_top), static_cast<long long>(seeds_with_both));
+        std::printf("  %s\n", seeds_with_both > 0
+            ? "at least one seed's strongest realms include both a consolidator and an "
+              "expansionist, each traceable to its own creed."
+            : "no seed on this spread shows both strategies among its strongest realms -- "
+              "report to Ben rather than forcing the mapping (EXPLORATION.md sec Two ways to be "
+              "strong: if the creed axes do not separate them, the fix is upstream, not a flag here).");
+    }
+
+    // -----------------------------------------------------------------------
+    // READING 10 — PREFERENCE (BL-936). Goods wanted differently by
+    // different cultures, with the difference traceable to route. Read off
+    // the PRE-EXPLORATION handoff state directly (`derive_culture_preference`
+    // is pure and needs no traced re-run of its own — it takes the same
+    // regions/contacts/polities `derive_wants` already reads at 1200 CE).
+    // -----------------------------------------------------------------------
+    std::printf("\n--- reading 10: preference (goods wanted differently by culture, by route) ---\n");
+    {
+        int64_t total_entries = 0, seeds_with_spread = 0, seeds_measured = 0;
+        std::vector<int16_t> weights;
+        for (int i = 0; i < seed_count; ++i)
+        {
+            world_params wp4;
+            wp4.seed = static_cast<uint32_t>(i);
+            wp4.exploration_sim_enabled = true;
+            generation_report     rep4;
+            era_minus_one_fixture fx4;
+            const world w4 = make_hard_coded_world(wp4, &rep4, world_gen_config{},
+                                                   nullptr, nullptr, &fx4);
+            (void)w4;
+            if (!fx4.ran || !fx4.exploration_ran) continue;
+            ++seeds_measured;
+
+            const auto prefs = derive_culture_preference(
+                fx4.pre_exploration_settlement.regions, fx4.pre_exploration_contacts,
+                fx4.pre_exploration_polities, static_cast<int>(fx4.pre_exploration_creeds.cultures.size()));
+
+            total_entries += static_cast<int64_t>(prefs.size());
+            std::vector<int16_t> seed_weights;
+            for (const auto& p : prefs) seed_weights.push_back(p.weight_q);
+            if (!seed_weights.empty())
+            {
+                const auto mm = std::minmax_element(seed_weights.begin(), seed_weights.end());
+                if (*mm.second > *mm.first) ++seeds_with_spread;
+            }
+            weights.insert(weights.end(), seed_weights.begin(), seed_weights.end());
+        }
+        std::printf("  seeds measured=%lld  total (culture, good) preference entries=%lld  "
+                    "seeds with a non-uniform weight spread=%lld\n",
+                    static_cast<long long>(seeds_measured), static_cast<long long>(total_entries),
+                    static_cast<long long>(seeds_with_spread));
+        if (weights.empty())
+        {
+            std::printf("  no (culture, good) preference entry derived on this spread -- NOT "
+                        "MEASURED (no contact-exposed absence existed at 1200 CE on any seed).\n");
+        }
+        else
+        {
+            std::sort(weights.begin(), weights.end());
+            std::printf("  weight_q across the spread: min=%d median=%d max=%d\n",
+                        weights.front(), weights[weights.size() / 2], weights.back());
+            std::printf("  %s\n", (weights.back() > weights.front())
+                ? "goods are weighted differently by different cultures on this spread."
+                : "every derived preference weighs the same -- no spread measured.");
+        }
+    }
 
     std::printf("\n%d failure(s) in structural checks.\n", g_failures);
     return g_failures == 0 ? 0 : 1;

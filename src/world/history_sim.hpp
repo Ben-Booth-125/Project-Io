@@ -670,6 +670,17 @@ struct history_sim_params
     /// purchase even where upkeep runs.
     int64_t post_road_treasury_cost = 3000;
 
+    /// BL-942 — TWO WAYS TO BE STRONG. Per-mille weight applied to the creed-
+    /// derived lean (`consolidator_lean_q`/`expansion_lean_q`, history_sim.cpp)
+    /// when it boosts `choose_exploration_node`'s `throughput_bound` term (for
+    /// a consolidator) or its `coastal_holdings`/`ground_port`/`subject_held`
+    /// terms (for an expansionist) — EXPLORATION.md sec Two ways to be strong:
+    /// "neither is a flag, neither is chosen." A WEIGHTING of existing scorer
+    /// terms, not a new one; 0 makes every polity's tree choice creed-blind,
+    /// which is the falsifiable case the doc's own open question names. FIRST
+    /// CUT, UNMEASURED.
+    int exploration_creed_lean_weight_q = 400;
+
     /// SUSTAINABLE-REACH FLOOR FOR LAUNCHING A CAMPAIGN, in the same 0..1000
     /// supply currency `campaign_supply` already prices. At or below this,
     /// the target is not scored at all — GATED, not merely priced down — so
@@ -1717,6 +1728,36 @@ struct history_sim_params
     /// still real, still a cost the subject can be starved out of.
     int treaty_tribute_rate_q = 150;
 
+    // --- BL-941: the arms race is deterrence ---------------------------------
+    // EXPLORATION.md sec The arms race reinforces peace near home and
+    // conflict far from it. Reuses ERAS.md sec The two scalars' Ceiling/Alarm
+    // pair at POLITY grain rather than inventing a third quantity: the
+    // existing `decider_aggression_q` cost term in `treaty_value_q` already
+    // plays Ceiling's part (how much restraint a doctrine carries); these two
+    // are what add Alarm.
+
+    /// Reference scale for `visible_capability_q` — a polity's capital
+    /// `army_stock` plus its own `navy_stock`, divided by this, is what a
+    /// NEIGHBOUR reads (0-1000). Same "plain integer over a reference
+    /// constant" shape `fear_reference` already uses. FIRST CUT, UNMEASURED.
+    int64_t visible_capability_reference = 5000;
+
+    /// Per-mille of the OTHER side's visible capability added to
+    /// `treaty_value_q`, NEAR HOME ONLY — "a neighbour that reads high
+    /// visible capability should be more likely to form/maintain a
+    /// non-aggression treaty with that polity." FIRST CUT, UNMEASURED.
+    int deterrence_alarm_weight_q = 400;
+
+    /// Flat penalty on `treaty_value_q` for a pair that met only DURING this
+    /// span (a frontier contact, `contact::first.year >= start_year`) — the
+    /// other half of the same mechanism: a fleet pointed at ground with no
+    /// visible defender meets no deterrent, so a frontier pair should not
+    /// bind a non-aggression clause as readily as a long-known neighbour.
+    /// Named directly by NR-851: without this every contacted pair, near or
+    /// far, scored identically and a funded port's cheap crossing got
+    /// treatied over before it was ever used. FIRST CUT, UNMEASURED.
+    int treaty_far_penalty_q = 350;
+
     // --- BL-934: colonies ----------------------------------------------------
     // EXPLORATION.md sec A colony is a subject, and it wants things of its own.
 
@@ -2211,10 +2252,28 @@ bool exploration_node_available(uint64_t mask, int node_idx);
 /// `many_peoples` at 0 — a 0 term never wins the argmax on its own account,
 /// which is honest rather than wrong, and a harness pins the remaining
 /// stub's value so BL-933/934 landing shows as a diff.
+/// BL-942 -- `consolidator_lean_q`/`expansion_lean_q` (0-1000, see the two
+/// free functions of the same name below) weight the terms EXPLORATION.md
+/// sec Two ways to be strong names for each strategy; `creed_lean_weight_q`
+/// scales how hard that weighting bites, 0 reducing it to a no-op so every
+/// pre-existing call site (default arguments below) is unchanged.
 int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
                              int ground_port_q, int ground_farm_q, int surplus_q,
                              int purse_low_q, int wants_unmet_q, int throughput_bound_q,
-                             int subject_held_q = 0);
+                             int subject_held_q = 0, int consolidator_lean_q = 0,
+                             int expansion_lean_q = 0, int creed_lean_weight_q = 0);
+
+/// BL-942 -- CONSOLIDATOR LEAN, 0-1000: "high dominion with no sea legs is
+/// the continental consolidator" (EXPLORATION.md sec Two ways to be strong).
+/// Reads the culture's war god (`pantheon[1]`, the same slot
+/// `culture_opposition_q` reads) `dominion` and its OWN `sea_legs_q`
+/// (creeds.hpp), never rolled. 0 for a culture with no war-god slot.
+int consolidator_lean_q(const culture& c);
+
+/// BL-942 -- EXPANSION LEAN, 0-1000: "deep sea legs with a universalising
+/// creed is the coloniser." Reads `sea_legs_q` and the war god's `zeal` (the
+/// same temperament axis `culture_opposition_q` reads), never rolled.
+int expansion_lean_q(const culture& c);
 
 /// THE RIM (BL-930): has this polity crossed EX-SP-3m, "The Long Reckoning"?
 /// A per-polity boolean, read straight off the mask — this is the fact
@@ -3130,6 +3189,14 @@ std::string grudge_event_line(const grudge_event& e, const settlement_state& ss)
 /// `grudge_between`.
 bool has_contact(const history_sim_state& s, int from, int to);
 
+/// BL-941 — the calendar year @p from and @p to FIRST met, or `INT64_MAX`
+/// where the pair has no contact entry. Used to tell a long-known neighbour
+/// (contact predates the span) from a frontier pair (met during it) — see
+/// `treaty_value_q`'s `near_home` argument. `INT64_MAX` (never "far" nor
+/// "near" by accident) rather than a sentinel year, since a pair with no
+/// recorded contact should never reach a caller that treats it as either.
+int64_t contact_first_year(const history_sim_state& s, int from, int to);
+
 // ---------------------------------------------------------------------------
 // Treaty scoring (BL-933) — EXPLORATION.md sec Diplomacy becomes real:
 // "nobody negotiates... evaluated against the same seeded world state."
@@ -3139,8 +3206,9 @@ bool has_contact(const history_sim_state& s, int from, int to);
 /// `fear_of_next_q` and for the same reason it is a free function: a claim
 /// about a formation threshold has to be put to THIS function directly. Pure,
 /// integer, seedless — a deterministic consequence of the two grudge readings
-/// between the pair, the counterpart's own defection record, and how much
-/// freedom the decider's own doctrine prices a binding at.
+/// between the pair, the counterpart's own defection record, how much freedom
+/// the decider's own doctrine prices a binding at, and (BL-941) the
+/// counterpart's visible capability, gated on whether the pair sits near home.
 ///
 /// `grudge_against_other_q`/`grudge_from_other_q` are `grudge_between`'s two
 /// directions (the decider's grudge against the counterpart, and the
@@ -3150,10 +3218,44 @@ bool has_contact(const history_sim_state& s, int from, int to);
 /// `polity::treaties_broken` — never the decider's. `decider_aggression_q` is
 /// the decider's own doctrine lean (0-1000): a high-aggression culture prices
 /// the freedom a non-aggression clause costs it higher, so it takes more
-/// peace-value to clear the same threshold.
+/// peace-value to clear the same threshold. This is the pair's CEILING term
+/// (ERAS.md sec The two scalars): restraint priced by the decider's own
+/// doctrine, already present before BL-941.
+///
+/// BL-941 ADDS ALARM. `alarm_from_other_q` is the decider's own reading of the
+/// counterpart's VISIBLE capability (`deterrence_alarm_q`, 0-1000) — a fleet
+/// or standing army read by a neighbour, whether or not it is ever used.
+/// `near_home` is whether the pair's contact predates this span (a long-known
+/// neighbour) rather than being met during it (a frontier pair,
+/// EXPLORATION.md sec The arms race reinforces peace near home...). Near
+/// home, Alarm RAISES the value — visible capability buys quiet. Far from
+/// home, Alarm earns nothing and a flat `treaty_far_penalty_q` applies
+/// instead — the same purchase meets no deterrent and should not bind as
+/// readily, which is what keeps a funded port's cheap crossing from being
+/// treatied away before it is ever used (NR-851).
 int treaty_value_q(const history_sim_params& p,
                     int grudge_against_other_q, int grudge_from_other_q,
-                    int counterpart_treaties_broken, int decider_aggression_q);
+                    int counterpart_treaties_broken, int decider_aggression_q,
+                    int alarm_from_other_q, bool near_home);
+
+/// BL-941 — VISIBLE CAPABILITY, 0-1000. What a neighbour reads of
+/// `polity_id`'s capital `region::army_stock` plus its own `polity::navy_stock`,
+/// scaled by `history_sim_params::visible_capability_reference` — the same
+/// "plain integer over a reference constant" shape `fear_of_next_q` already
+/// uses for `fear_reference`. Reads the CAPITAL region only: a standing force
+/// is raised and paid for at the seat (EXPLORATION.md sec Force persists
+/// now), so the seat is where it stands and where a neighbour would see it.
+/// 0 for a dead polity, an out-of-range id, or a capital out of `regions`'s
+/// bounds.
+int visible_capability_q(const std::vector<region>& regions, const history_sim_state& s,
+                          const history_sim_params& p, int polity_id);
+
+/// BL-941 — ALARM: how threatened `self` feels by `other`'s visible
+/// capability, gated on contact (the omniscience guard every want-shaped read
+/// in this file applies — a stranger's arsenal is not visible to a polity
+/// that has never met it). 0 where the two have not met.
+int deterrence_alarm_q(const std::vector<region>& regions, const history_sim_state& s,
+                        const history_sim_params& p, int self, int other);
 
 // ---------------------------------------------------------------------------
 // The directed want table (BL-909)
@@ -3191,6 +3293,47 @@ struct want
 std::vector<want> derive_wants(const std::vector<region>& regions,
                                 const std::vector<contact>& contacts,
                                 const std::vector<polity>&  polities);
+
+// ---------------------------------------------------------------------------
+// Cultural good preference (BL-936) — EXPLORATION.md sec A good acquires a
+// cultural preference: "preference attaches to a CULTURE, not a polity."
+// ---------------------------------------------------------------------------
+
+/// ONE CULTURE'S WEIGHT ON ONE GOOD IT LACKS, 0-1000. A SEPARATE TABLE FROM
+/// `want`, deliberately: `want`'s own doc comment is "NO PRICE, NO
+/// MAGNITUDE", so a weight belongs beside it, not inside it. A consumer that
+/// wants to rank a polity's own wants reads this table by the polity's
+/// FOUNDING culture (`polity::culture`) or by whichever culture holds a
+/// region's plurality share, per its own need — this struct does not decide
+/// that for it.
+struct culture_good_preference
+{
+    int16_t      culture  = -1;             ///< Index into `creed_state::cultures`.
+    region_class good     = region_class::none; ///< Never `none` in a stored entry.
+
+    /// 0-1000 — how strongly this culture prefers this good, derived from how
+    /// widely its route has exposed it to holders of a good its own ground
+    /// never reaches. NOT a price (Digitisation's job); enough to RANK which
+    /// directed want a fleet answers first.
+    int16_t weight_q = 0;
+};
+
+/// Derives `culture_good_preference` at CULTURE GRAIN — the same two facts
+/// `derive_wants` reads (a known absence, a known holder reached by contact),
+/// regrouped by `region::culture`'s plurality share (`culture.id[0]`) instead
+/// of by `region::nation`, so a preference spreads with people rather than
+/// stopping at a border. NEVER ROLLED: a pure, deterministic fold over
+/// @p regions/@p contacts/@p polities, no RNG of its own — same discipline
+/// `derive_wants` holds itself to. @p culture_count bounds which culture
+/// indices are read, same convention `pass_one_output::culture_count` sets.
+///
+/// A culture with no plurality-held ground and no contacted polity holding a
+/// good it lacks contributes nothing for that good — an absence with no
+/// route yet is not a preference (EXPLORATION.md sec A good acquires a
+/// cultural preference: "derived... from what its route exposed it to").
+std::vector<culture_good_preference> derive_culture_preference(
+    const std::vector<region>& regions, const std::vector<contact>& contacts,
+    const std::vector<polity>& polities, int culture_count);
 
 // ---------------------------------------------------------------------------
 // The scarcity signal (BL-939) — EXPLORATION.md sec There is no price here,
