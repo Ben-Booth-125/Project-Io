@@ -10,6 +10,64 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-12 — Sprint 40 (Exploration) closes in full: six waves, fifteen items, one new phase
+
+**Runtime:** long session, Full / Batch Delivery. Opened on a stale `NEXT_SESSION.md` (still
+describing sprint 39, already fully closed) and a design branch (`claude/exploration-era-design-
+e0f6d7`) sitting unmerged with sprint 40's full decomposition already on it.
+
+**The merge.** The design branch predated main's sprint-39 close-out by one commit, conflicting
+only in `backlog.json`; resolved as main's dropped-BL-928 state plus the branch's sixteen new
+items. A parallel independent merge of the same conflict (by Ben, in the design branch's own
+worktree) landed on GitHub moments later with the identical resolution — confirmed by diff, not
+assumed.
+
+**The six waves**, each built by a `generation-dev`/`ui-dev` sub-agent in its own worktree, then
+independently rebuilt and reverified in this session (full app build, `exploration_sim_harness`,
+`exploration_sweep`, `world_determinism`, `history_sim_harness`) before merging — no wave was taken
+on a sub-agent's self-report alone:
+
+| Wave | Items | What landed |
+|---|---|---|
+| 1 | BL-930, BL-931 | Exploration tree wired; the 1200→1660 span runs on the shared engine, opt-in (`exploration_sim_enabled`, default false) |
+| 1.5 | BL-937 | The ten readings instrumented; 1-2 measured for real, 3-10 honestly scaffolded |
+| 2 | BL-932, BL-939, BL-940 | Treasury, scarcity signal, corridor throughput — BL-930's stubbed scorer terms go live |
+| 3 | BL-933, BL-934, BL-935 | Treaties with a term, colonies as subjects, ports/navies/armies with decay |
+| 4 | BL-941, BL-942, BL-936 | Deterrence, creed-weighted strategy, cultural preference |
+| 5 | BL-938, BL-943 | Industry tree ring-1 migration (not a trim — ring 4 survives whole); lapse-map fleet/caravan exemplars |
+| 6 | BL-944 | The schism verb; the reassertion floor raised per Ben's call |
+
+**The displacement reading's arc is the sprint's clearest signal.** BL-937's ratio moved
+0.16 (wave 1.5, no mechanism) → 0.01 (wave 3, treaties suppressed both sides evenly, briefly
+*worse*) → 0.88 (wave 4, deterrence finally split near-home cost from far-away cost) — exactly the
+shape a phase-wide claim should take across a sprint that builds its cause incrementally: invisible,
+then briefly wrong, then genuinely better once the real mechanism exists. Still not over the
+harness's own bar (median > 1) — real progress, not a closed reading (NR-855).
+
+**Fourteen NR entries filed** (NR-846 through NR-859) as things arose, not batched at the close:
+a build-order bug in the handover's own wave table; an opt-in-default flag; a road-ladder rung that
+never fired in any sweep across the whole sprint (NR-849); a treasury income-cadence reading;
+displacement's non-movement then partial recovery (NR-851, NR-855); the creed axes not yet
+separating consolidator/expansionist strategies on a small sweep (NR-856); a trade-province proxy
+(NR-854); a one-commit-for-three-items deviation, twice (NR-853, and wave 4's equivalent); a
+novel-work flag — the Exploration span's own events don't reach the lapse-map surface yet (NR-857);
+a live-click-denied-so-verified-by-capture resolution (NR-858); and the Empire-span digest movement
+BL-944's floor-raise caused, the first sprint-40 change not gated behind `exploration_sim_enabled`
+(NR-859).
+
+**One correction worth naming plainly.** BL-944's own backlog text claimed reassertion fired ZERO
+times in 16 worlds. Re-measured before touching anything: it was already a thin but non-zero 90
+fires/16 worlds, because sprint 39's unrelated changes had moved it. The floor was raised anyway
+per Ben's explicit instruction, and the result (426 fires, 14/14 creed-worlds) was the right outcome
+regardless of the stale diagnosis — recorded so nobody re-diagnoses the same "zero" claim from the
+old text.
+
+**Session close.** All fifteen designed items built, verified, archived. `BL-945` (depletion
+retrofit) stays parked for Digitisation. Sprint 40 closed to
+`archive/sprints-2026-Q3.json`. Backlog is empty but for the one parked row.
+
+---
+
 ## 2026-09-11 — Sprint 39's session concludes: the full-tree reading, BL-928 dropped, levers accepted for sprint 40
 
 **Runtime:** closing entry for the same session as the two below. Full / Batch Delivery close-out,

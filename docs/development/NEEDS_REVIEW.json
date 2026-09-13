@@ -741,6 +741,16 @@
    "source": "BL-943, wave 5 of sprint 40, main-session verification.",
    "what": "The standing rule requires a live click for a UI requirement, not only a capture. request_access(['ProjectIo']) was denied by Ben. Ben's own instruction mid-session ('just use captures') supersedes the standing rule for this item: history_lapse_press.lua ran clean (0 failures) with real corridor data (375 road, 100 trade corridors) and a 4x crop of the capture shows small marks on corridor lines, matching the sub-agent's own zoomed-screenshot confirmation. This is real evidence the mechanism renders without crashing, but it is a capture, not a live press -- genuine legibility at native 1920x1080 scale (mark size/contrast, whether the road-rung distinction reads at a glance) is still an open judgement call for whoever next looks at it live.",
    "ask": null
+  },
+  {
+   "id": "NR-859",
+   "title": "OBSERVATION: BL-944's raised floor moved the Empire-span world_determinism digest (seedA/on 215542A35F26BAB8 -> 2F6FCCF705B49951)",
+   "raised": "2026-09-12",
+   "kind": "observation",
+   "status": "resolved",
+   "source": "BL-944, wave 6 of sprint 40, main-session verification.",
+   "what": "universal_creed_alien_penalty_q (200 -> 450) lives in the Empire-span creed-resolution code, not gated behind world_params::exploration_sim_enabled -- unlike every prior wave-2-through-5 change, so this is the first sprint-40 item to move the ordinary (non-Exploration) generated world at all. world_determinism still reports ALL PASS (0 failures): the harness checks same-seed determinism, not a fixed golden digest, so this is a reported movement, not a failure. seedA/on report also moved (battles 5890->5782, conquests 5209->5202, foundings 1062->1120). No golden file pins these specific digest strings, so nothing needs a --bless; this is purely a record for whoever next reads a world_determinism run and wonders why the number changed from an earlier session's notes.",
+   "ask": null
   }
  ]
 }

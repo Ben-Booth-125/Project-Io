@@ -80,10 +80,19 @@ BL-931 -> BL-937 opens the sprint, ahead of the NEXT_SESSION.md wave table's lit
       as the new ring 3. Industry is now 3 rings / 5 branches / 3 milestones / 45 nodes. All four
       trees pass `tree_lint.js`.
 
-## Wave 6 — the last item
+## Wave 6 — LANDED 2026-09-12 — SPRINT 40 CLOSES
 
-- [ ] **BL-944** (THE_SCHISM_VERB) — Ben's call (2026-09-12): **raise the floor** (not a second
-      binding term). Adjust `universal_creed_convert_supply_q`/`universal_creed_alien_penalty_q` so
-      reassertion can fire in some worlds, then build the schism verb on top, distinguishable from
-      an ordinary network-failure secession in the readings. `BL-945` stays parked for Digitisation,
-      not this sprint — the backlog is otherwise empty once BL-944 lands.
+- [x] **BL-944** (THE_SCHISM_VERB) — commit `3d58001d`. Raised `universal_creed_alien_penalty_q`
+      200→450 per Ben's call; reassertion moved from a thin 90/16-worlds (already non-zero,
+      correcting the item's stale diagnosis) to 426/16-worlds, 14/14 creed-worlds firing. Schism
+      verb groups reasserted alien ground by residue culture, distinct from BL-896's secession
+      (12/16 worlds, median 10 schisms vs. median 164 secessions — an order of magnitude apart,
+      confirmed distinct). NR-859 records the Empire-span digest movement (expected — this is the
+      first sprint-40 item not gated behind `exploration_sim_enabled`). Independently rebuilt and
+      reverified: full app BUILD_OK, `exploration_sim_harness` 43/43 PASS, `world_determinism` ALL
+      PASS, `history_sim_harness` at the pre-existing baseline, sweep numbers reproduced exactly.
+      Archived.
+
+Sprint 40 ("Exploration") is closed: all sixteen designed items (BL-930..945 except BL-945 itself,
+which is parked for Digitisation) built, independently verified, and archived across six waves.
+Nothing is promoted. The backlog holds only `BL-945` (parked, not sprint-40 work).

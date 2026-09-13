@@ -13965,6 +13965,52 @@
         "requires",
         "resolution"
       ]
+    },
+    "BL-944": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-944",
+      "short_name": "THE_SCHISM_VERB",
+      "priority": "B",
+      "difficulty": 6,
+      "title": "Faith fractures an empire — the schism verb, and the reassertion that never fires",
+      "authority_doc": "docs/lore/CREEDS.md",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/settlement.hpp",
+        "docs/lore/CREEDS.md"
+      ],
+      "design": "BEN, 2026-09-11: \"faith is another strong lever for conflict in this phase - we could even model a schism.\" THE REFERENCE IS A MECHANISM AND THE NAME IS NEVER CONTENT (standing rule): the creed is generated and named by the phoneme banks like every other.\n\nTHE SUBSTRATE IS BUILT AND WAS LEFT DELIBERATELY OPEN. The universalising creed landed 2026-09-11: a `universal_creed` record belonging to nobody, `polity::universal_creed` as the INSTITUTION, `region::creed_hold` (none / dual-hold / converted / reasserted) as the PEOPLE, and `region::creed_residue_culture` recorded at contact and kept whichever way the pair resolves -- which is precisely the line a schism cuts along. CREEDS.md sec The four calls, settled owns it. The schism VERB was named as a later slice; this is that slice.\n\n=== READ THIS BEFORE BUILDING: REASSERTION FIRED ZERO TIMES IN 16 WORLDS. ===\nMeasured on delivery. The branch is live and correct but unexercised: held ground under an adopting realm sits well above the binding floor, because BL-896's secession floor has ALREADY removed the badly-reached ground. So the TURMOIL half of the creed design currently does nothing, and A SCHISM BUILT ON TOP OF IT WOULD ALSO FIRE ZERO TIMES. `universal_creed_convert_supply_q` and `universal_creed_alien_penalty_q` are the dials; the honest reading recorded on delivery is that it needs a higher floor or a SECOND BINDING TERM. THAT IS BEN'S CALL AND IT GATES THIS ITEM -- fix the substrate first, or this builds a verb nothing reaches.\n\nWHY THE PHASE WANTS IT. CREEDS.md already argues a universalising creed gives a motive to expand toward PEOPLE rather than toward GROUND, and gives a SECOND, INDEPENDENT WAY TO FALL -- one that has nothing to do with distance. Exploration needs exactly that: a source of conflict that is not the arms race and not a want, and one a NON-COLONISING realm can be torn apart by (BL-942).\n\nTHE FAULT LINE IS ALREADY NAMED: the gap between a polity's adopted institution and its peoples' uneven conversion. An empire whose institution is universal and whose subject peoples are not is exactly the empire that splits over faith rather than over distance.\n\nDONE WHEN: reassertion fires in some worlds and not others as a consequence of upstream scalars; a schism fractures at least one realm in a sweep along the residue line; and the fracture is distinguishable in the readings from a network-failure collapse.",
+      "requires": [
+        "BL-931"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit 3d58001d). Ben's call: raise the floor, not a second binding term. universal_creed_alien_penalty_q raised 200 -> 450 (universal_creed_convert_supply_q left untouched, so native/kindred conversion is unchanged -- this sharpens specifically the culture axis a schism needs). RE-MEASURED FIRST: the item's own diagnosis (reassertion fires ZERO times in 16 worlds) was already stale by the time this landed -- sprint 39's unrelated changes had moved it to a thin but non-zero 90 fires/16 worlds (median 5/world, 13/14 creed-worlds) before this item touched anything. After raising the floor: 426 total reassertions across 16 worlds, 14/14 creed-worlds firing, median 15/world -- a real, deliberate strengthening, not a fix of a genuinely-zero rate. THE SCHISM VERB: reasserted alien ground (creed_hold==3, residue culture != own) is grouped by residue culture (never by seat or reach, which is what keeps it from reading as a BL-896 network-failure secession) and breaks away once a group clears schism_min_regions=3, tagged with its own grudge_kind::faith_sundered and lapse_event_kind::schism, counted separately (schisms/regions_sundered, never blended into secessions/regions_seceded). Measured (16 seeds, --epoch 0, independently reproduced in the main session): 12/16 worlds show a schism, median 10 schisms (300 total), median 30 regions sundered (1223 total) -- an order of magnitude below BL-896's secessions (median 164/world), confirming the two are genuinely distinct events, not one cause counted twice. world_determinism ALL PASS (0 failures) -- NR-859 records that the digest DID move on the ordinary Empire span (this is the first sprint-40 item not gated behind exploration_sim_enabled), which is expected and not a golden failure since no file pins that digest string. history_sim_harness at the pre-existing 2-failure baseline (R3a2/R3a3). exploration_sim_harness 43/43 PASS. Full app BUILD_OK, independently rebuilt in the main session. This is the last item of sprint 40 -- only BL-945 (parked for Digitisation) remains in the backlog.",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
     }
   }
 }
