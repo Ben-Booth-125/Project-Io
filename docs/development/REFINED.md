@@ -20,11 +20,12 @@ same pattern as sprint 40's waves 2-4.
 
 ## Wave B — the wizard restructure (bigger, UI + generation, sequenced internally)
 
-- [ ] **BL-946** (EXPLORATION_ROUND_WIRED_INTO_WIZARD) — flip `exploration_sim_enabled` default to
-      true (golden re-baseline, authorised); insert an Exploration round between Empires and the
-      renamed Digitisation placeholder; build a real tap so the Exploration span's own events
-      reach the lapse map (closes NR-857's gap, which is also why BL-943's exemplars are currently
-      inert on this span).
+- [x] **BL-946** (EXPLORATION_ROUND_WIRED_INTO_WIZARD) — commit `e18ab370`. LANDED 2026-09-14. The
+      wizard walks 6 rounds now (System, Life, Culture, Empires, Exploration, Digitisation); round
+      5 runs its own pass and shows a real populated time-lapse (treaties forming, non-zero
+      battles/conquests/foundings, its own 1200-1660 CE span stated on screen — confirmed by a
+      live click, not just harnesses). Golden flip's digests reproduced exactly independently.
+      save_roundtrip/save_envelope_roundtrip clean despite the version bump (13→14). Archived.
 - [x] **BL-947** (CULTURE_ROUND_COASTS_TO_400BCE) — commit `fdc445fb`. LANDED 2026-09-13. Displayed
       span now `max(true migration end, Empires opening year)`, never clamped backward — an
       overrun (measured at 6/60 seeds, 10%) shows honestly instead of being papered over.

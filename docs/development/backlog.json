@@ -43,36 +43,6 @@
    "sprint": null,
    "written": "2026-09-13",
    "author": "Ben (2026-09-13, live review); Claude (itemised)",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "id": "BL-946",
-   "short_name": "EXPLORATION_ROUND_WIRED_INTO_WIZARD",
-   "priority": "A",
-   "difficulty": 7,
-   "title": "Wire the Exploration span into the wizard as its own round, and add a Digitisation placeholder",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "files": [
-    "src/core/app.hpp",
-    "src/ui/startup_screens.cpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/hard_coded_world.hpp",
-    "src/world/era_timelapse.hpp",
-    "src/world/era_timelapse.cpp",
-    "src/core/verify_api.cpp",
-    "docs/ai/ACTIONS.json",
-    "docs/ui/question_log.json",
-    "scripts/verify/history_lapse_press.lua"
-   ],
-   "design": "BEN, 2026-09-13 (live review, resolving NR-847 and NR-857): flip world_params::exploration_sim_enabled to default TRUE, and wire the Exploration span into the wizard as its own round -- and add the Digitisation placeholder round in the same pass.\n\nTHE ROUND LAYOUT. The wizard's pass rounds today are Culture, Empires, Industrialisation (`wizard_pass_round_count = 3`, `wizard_round_count = 5` = 2 planetology + 3 pass, src/core/app.hpp). \"Industrialisation\" is the acknowledged stand-in for everything after 1200 CE, and NR-843 already named the fact that there are now FOUR phases after Culture (Empires, Exploration, Digitisation) where the wizard has one placeholder. THE FIX: insert a new \"Exploration\" round between Empires and the renamed \"Digitisation\" placeholder -- wizard_pass_round_count 3 -> 4, wizard_round_count 5 -> 6. \"Industrialisation\" becomes \"Digitisation\" in name and header text only; it stays the honest empty placeholder it already is (BL-914's pattern) -- Digitisation itself is not this item's scope.\n\nTHE GOLDEN FLIP. exploration_sim_enabled default false -> true (NR-847). This moves region::nation from the 1200 CE map to the 1660 CE one for every generated world, which re-baselines world_determinism's digests and any other pinned generation output. AUTHORISED (Ben, 2026-09-13) -- this is not a silent re-bless: rerun world_determinism and history_sim_harness, record old and new digests in the DEVLOG, and confirm no assertion beyond the digest VALUES itself breaks (determinism -- same seed, same result twice -- must still hold).\n\nTHE MISSING TAP (NR-857's core finding). hard_coded_world.cpp currently writes `be.prehistory_timelapse = as_timelapse(hs)` using `hs` (the EMPIRES state) and passes `/*tap=*/nullptr` for the Exploration call -- so even with the span running, nothing reaches the wizard's lapse-map renderer. Build a REAL era_timelapse for the Exploration span the same way `build_migration_timelapse` does for Culture (BL-919's function is the precedent: it rebuilds the culture/settlement record into the shared `era_timelapse` shape) -- call it something like `build_exploration_timelapse`, fed by `kepler_exploration_hs` and the polity/culture state at 1200 CE. Wire this round's tap through the same `progress->lapse_tap` publish path round 3 (Culture) and round 4 (Empires) already use, so BL-943's corridor/consolidation exemplars finally have real Exploration events to draw (NR-857's exact gap).\n\nGENERALISE THE LAPSE MACHINERY FROM TWO ROUNDS TO THREE. `wizard_lapse_round_count = 2` (Culture, Empires) becomes 3 (Culture, Empires, Exploration) -- the Industrialisation/Digitisation placeholder stays NOT a lapse round, same as today. `verify_api.cpp`'s `history_run(which)` (0=Culture? check the actual mapping -- the comment says \"0 = round 4 the migration, 1 = round 5 the history\" so recheck against current round numbering after the Culture/Empires split) needs a third index. Any code keyed on `wizard_lapse_round_count` (loop bounds, per-round record storage) generalises the same way.\n\nDONE WHEN: the wizard walks six rounds (System, Life, Culture, Empires, Exploration, Digitisation); the Exploration round runs its own pass on arrival and shows a real, populated time-lapse map (not an empty placeholder); BL-943's exemplars draw on real Exploration-span events; `docs/ai/ACTIONS.json` and `docs/ui/question_log.json` are updated for the new round; `scripts/verify/history_lapse_press.lua` (or a new sibling script) exercises the new round the way it exercises rounds 3 and 4 today; world_determinism and history_sim_harness are rerun and their movement recorded in the DEVLOG, not silently absorbed.\n\nSEQUENCING NOTE: BL-948 (the lapse speed control) should land in the SAME pass or immediately after, since it touches the same round-rendering code and should apply uniformly to all three lapse rounds including this new one."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": null,
-   "written": "2026-09-13",
-   "author": "Ben (2026-09-13, live review); Claude (itemised)",
    "requires": [
     "BL-946"
    ],
