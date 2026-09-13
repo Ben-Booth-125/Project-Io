@@ -14011,6 +14011,51 @@
         "requires",
         "resolution"
       ]
+    },
+    "BL-947": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": null,
+      "written": "2026-09-13",
+      "author": "Ben (2026-09-13, live review); Claude (diagnosed and itemised)",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "id": "BL-947",
+      "short_name": "CULTURE_ROUND_COASTS_TO_400BCE",
+      "priority": "B",
+      "difficulty": 4,
+      "title": "The Culture round always concludes at 400 BCE, coasting past the migration's own derived end",
+      "authority_doc": "docs/generation/CIVILISATION.md",
+      "files": [
+        "src/world/settlement.cpp",
+        "src/world/settlement.hpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/colonisation.hpp"
+      ],
+      "design": "DIAGNOSED 2026-09-13 (Ben asked why the Culture round ends at different years per seed, and for a fix).\n\nTHE CAUSE. The migration's terminating condition is DERIVED, not a fixed year: `colonisation_field::last_arrival_year` (colonisation.hpp) is set when the diffusion's frontier exhausts itself -- \"every habitable landmass carries some culture\" -- and this varies by seed because different worlds fill at different rates. `settlement_state::migration_end_year` (settlement.cpp:811) takes this value directly, and the wizard's round 3 (Culture) displays exactly that span (`colonisation_start_year` to `migration_end_year`, hard_coded_world.cpp:847-863) with NO further processing. CIVILISATION.md sec \"The span is 400 BCE to 1200 CE\" already SETTLED the intended behaviour (Ben, 2026-09-09): \"the Culture round ends when the filling ends, and the world then COASTS to 400 BCE holding what migration left it -- the same device the design already uses for 1200 -> 1560.\" That coast was written into the doc but NEVER IMPLEMENTED -- the wizard round simply shows the raw derived year today, which is the bug Ben is seeing.\n\nTHE FIX. Extend the displayed round-3 span so it always runs through -400 (400 BCE), holding the migration's final ownership/culture state static for any years between `migration_end_year` and -400 -- a coast, not additional simulation (no new diffusion steps, no new events past the true end). If `migration_end_year` is already at or past -400 on some seed (a migration that ran long), that is explicitly named in the doc as \"a defect in the migration, not in this boundary\" -- MEASURE whether this ever actually happens on a sweep before deciding how to handle it; if it never happens in practice, the fix is a pure coast-forward and this edge case is moot; if it does happen on some seeds, report the frequency rather than silently clamping or extending backward.\n\nDONE WHEN: a sweep across many seeds shows round 3's displayed end year is -400 EVERY TIME (or the item names an honest exception with numbers), and the coast segment is visibly static on the time-lapse (no ownership churn after the true migration end) rather than a jump-cut.",
+      "resolution": "BUILT 2026-09-13 (commit fdc445fb). culture_round_end_year = sim_start != INT64_MAX ? max(migration_end_year, sim_start) : migration_end_year, reusing the ALREADY-COMPUTED Empires-round opening year (sim_start, -400 at defaults) rather than a new literal, so the two boundaries can never drift apart. All three downstream reads (build_migration_timelapse, the lapse_tap publish end-year, report->prehistory_years) use this coasted year instead of the raw derived one. settlement_state::migration_end_year itself is untouched -- only the wizard's DISPLAYED round-3 span changes. std::max means an overrun is shown honestly, never clamped backward, per CIVILISATION.md's own framing ('a defect in the migration, not in this boundary'). MEASURED FIRST (60 seeds, tools/verify/culture_round_coast_measure.cpp): 54/60 (90%) ended comfortably before -400; 6/60 (10%) overran by 46-343 years -- filed as NR-860 (observation, with a recommendation to leave it, not gated on this item). Verified with a new harness (tools/verify/culture_round_coast_verify.cpp, 121/121 checks): displayed end year matches max(true end, boundary) on every seed, the coast segment is provably static (identical ownership/culture record whether folded at the raw or coasted end), and same-seed determinism holds. Independently rebuilt and reproduced exactly in the main session (121/121). world_determinism ALL PASS, digest seedA/on unchanged from the BL-944 baseline (2F6FCCF705B49951) -- confirms this is a display-only change with zero effect on the generated world itself. SCOPE NOTE: a second site with the identical raw-migration_end_year read exists at src/ui/startup_screens.cpp's lapse_from_report adopted branch (the --verify/golden-dir reuse path) -- flagged, not fixed, since it needed a UI-build verify this agent's worktree couldn't run; worth a follow-on if Ben wants it closed too.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "blocked_on",
+        "parked",
+        "category",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolution"
+      ]
     }
   }
 }

@@ -72,30 +72,6 @@
    "glyph": "✓",
    "sprint": null,
    "written": "2026-09-13",
-   "author": "Ben (2026-09-13, live review); Claude (diagnosed and itemised)",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "id": "BL-947",
-   "short_name": "CULTURE_ROUND_COASTS_TO_400BCE",
-   "priority": "B",
-   "difficulty": 4,
-   "title": "The Culture round always concludes at 400 BCE, coasting past the migration's own derived end",
-   "authority_doc": "docs/generation/CIVILISATION.md",
-   "files": [
-    "src/world/settlement.cpp",
-    "src/world/settlement.hpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/colonisation.hpp"
-   ],
-   "design": "DIAGNOSED 2026-09-13 (Ben asked why the Culture round ends at different years per seed, and for a fix).\n\nTHE CAUSE. The migration's terminating condition is DERIVED, not a fixed year: `colonisation_field::last_arrival_year` (colonisation.hpp) is set when the diffusion's frontier exhausts itself -- \"every habitable landmass carries some culture\" -- and this varies by seed because different worlds fill at different rates. `settlement_state::migration_end_year` (settlement.cpp:811) takes this value directly, and the wizard's round 3 (Culture) displays exactly that span (`colonisation_start_year` to `migration_end_year`, hard_coded_world.cpp:847-863) with NO further processing. CIVILISATION.md sec \"The span is 400 BCE to 1200 CE\" already SETTLED the intended behaviour (Ben, 2026-09-09): \"the Culture round ends when the filling ends, and the world then COASTS to 400 BCE holding what migration left it -- the same device the design already uses for 1200 -> 1560.\" That coast was written into the doc but NEVER IMPLEMENTED -- the wizard round simply shows the raw derived year today, which is the bug Ben is seeing.\n\nTHE FIX. Extend the displayed round-3 span so it always runs through -400 (400 BCE), holding the migration's final ownership/culture state static for any years between `migration_end_year` and -400 -- a coast, not additional simulation (no new diffusion steps, no new events past the true end). If `migration_end_year` is already at or past -400 on some seed (a migration that ran long), that is explicitly named in the doc as \"a defect in the migration, not in this boundary\" -- MEASURE whether this ever actually happens on a sweep before deciding how to handle it; if it never happens in practice, the fix is a pure coast-forward and this edge case is moot; if it does happen on some seeds, report the frequency rather than silently clamping or extending backward.\n\nDONE WHEN: a sweep across many seeds shows round 3's displayed end year is -400 EVERY TIME (or the item names an honest exception with numbers), and the coast segment is visibly static on the time-lapse (no ownership churn after the true migration end) rather than a jump-cut."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": null,
-   "written": "2026-09-13",
    "author": "Ben (2026-09-13, live review); Claude (itemised)",
    "requires": [
     "BL-946"

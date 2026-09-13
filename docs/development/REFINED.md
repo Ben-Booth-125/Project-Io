@@ -25,9 +25,13 @@ same pattern as sprint 40's waves 2-4.
       renamed Digitisation placeholder; build a real tap so the Exploration span's own events
       reach the lapse map (closes NR-857's gap, which is also why BL-943's exemplars are currently
       inert on this span).
-- [ ] **BL-947** (CULTURE_ROUND_COASTS_TO_400BCE) — diagnosed: the migration's terminating
-      condition is derived per-seed, and CIVILISATION.md's "coast to 400 BCE" design was never
-      implemented at the wizard-round level. Independent of BL-946 (round 3's index doesn't move).
+- [x] **BL-947** (CULTURE_ROUND_COASTS_TO_400BCE) — commit `fdc445fb`. LANDED 2026-09-13. Displayed
+      span now `max(true migration end, Empires opening year)`, never clamped backward — an
+      overrun (measured at 6/60 seeds, 10%) shows honestly instead of being papered over.
+      Independently rebuilt and reverified (121/121 on the new harness, `world_determinism`
+      digest unchanged from the BL-944 baseline — a pure display fix). NR-860 records the 10%
+      overrun rate for Ben; a second identical bug site in `startup_screens.cpp`'s golden-dir
+      reuse path was found but not fixed (flagged, needs a UI build to verify). Archived.
 - [ ] **BL-948** (LAPSE_TIMELAPSE_SPEED_CONTROL) — 45s/90s/180s control on every lapse round,
       default 90s. Requires BL-946 (must cover the new Exploration round too, not just Culture/
       Empires) — land last in this wave.
