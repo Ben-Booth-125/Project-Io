@@ -69,70 +69,12 @@
   "nodes": [
     {
       "id": "IN-SP-1a",
-      "name": "Deep Mining & Drainage",
+      "name": "Atmospheric & Rotative Steam",
       "kind": "major",
       "ring": 1,
       "branch": "SP",
       "links": [
         "IN-SP-1m"
-      ],
-      "gate": "fuel",
-      "diffusion": "capacity",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "access",
-          "target": "deposits below the shallow band"
-        },
-        {
-          "kind": "modifier",
-          "target": "industrial",
-          "per_mille": 80
-        }
-      ],
-      "pursued_when": {
-        "term": "ground_fuel",
-        "situation": "coal or ore lies under held ground and the shallow pits are worked out; the pit floods faster than buckets clear it"
-      },
-      "earth_ref": "the pump problem that asks for steam; deep pits are dug because the seat burns the fuel"
-    },
-    {
-      "id": "IN-SP-1m",
-      "name": "The Unwearied Fire",
-      "kind": "milestone",
-      "ring": 1,
-      "branch": "SP",
-      "links": [
-        "IN-SP-2a"
-      ],
-      "gate": null,
-      "diffusion": "capacity",
-      "excludes": null,
-      "requires": [
-        "IN-MT-1a",
-        "IN-MV-1a"
-      ],
-      "effects": [
-        {
-          "kind": "open",
-          "target": "ring 2"
-        }
-      ],
-      "pursued_when": {
-        "term": "spire",
-        "situation": "the pit, the toolroom and the fuel trade are all held; nothing else at ring 1 relieves anything"
-      },
-      "earth_ref": "heat becomes motion that never tires and does not care where the river runs"
-    },
-    {
-      "id": "IN-SP-2a",
-      "name": "Atmospheric & Rotative Steam",
-      "kind": "major",
-      "ring": 2,
-      "branch": "SP",
-      "links": [
-        "IN-SP-2m"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
@@ -156,19 +98,19 @@
       "earth_ref": "1712 → 1780s; the master node"
     },
     {
-      "id": "IN-SP-2m",
+      "id": "IN-SP-1m",
       "name": "The Cheap Ton",
       "kind": "milestone",
-      "ring": 2,
+      "ring": 1,
       "branch": "SP",
       "links": [
-        "IN-SP-3a"
+        "IN-SP-2a"
       ],
       "gate": null,
       "diffusion": "capacity",
       "excludes": null,
       "requires": [
-        "IN-MV-2a"
+        "IN-MV-1a"
       ],
       "effects": [
         {
@@ -182,18 +124,18 @@
       },
       "earth_ref": "metal stops being counted by the piece and starts being weighed by the ton",
       "requires_fork": [
-        "IN-MT-2a",
-        "IN-MT-2b"
+        "IN-MT-1a",
+        "IN-MT-1b"
       ]
     },
     {
-      "id": "IN-SP-3a",
+      "id": "IN-SP-2a",
       "name": "High-Pressure & Compound Engines",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "SP",
       "links": [
-        "IN-SP-3m"
+        "IN-SP-2m"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
@@ -218,20 +160,20 @@
       "earth_ref": "power leaves the engine house; rail and ships become possible"
     },
     {
-      "id": "IN-SP-3m",
+      "id": "IN-SP-2m",
       "name": "The Scheduled World",
       "kind": "milestone",
-      "ring": 3,
+      "ring": 2,
       "branch": "SP",
       "links": [
-        "IN-SP-4a"
+        "IN-SP-3a"
       ],
       "gate": null,
       "diffusion": "capacity",
       "excludes": null,
       "requires": [
-        "IN-MV-3a",
-        "IN-MV-3b"
+        "IN-MV-2a",
+        "IN-MV-2b"
       ],
       "effects": [
         {
@@ -245,18 +187,18 @@
       },
       "earth_ref": "arrival stops being a matter of season and wind and becomes a printed promise",
       "requires_fork": [
-        "IN-CH-3d",
-        "IN-CH-3e"
+        "IN-CH-2d",
+        "IN-CH-2e"
       ]
     },
     {
-      "id": "IN-SP-4a",
+      "id": "IN-SP-3a",
       "name": "Electrification",
       "kind": "major",
-      "ring": 4,
+      "ring": 3,
       "branch": "SP",
       "links": [
-        "IN-SP-4m"
+        "IN-SP-3m"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
@@ -281,19 +223,19 @@
       "earth_ref": "grid power; the second prime-mover shift"
     },
     {
-      "id": "IN-SP-4m",
+      "id": "IN-SP-3m",
       "name": "The Renewed Line",
       "kind": "milestone",
-      "ring": 4,
+      "ring": 3,
       "branch": "SP",
       "links": [],
       "gate": null,
       "diffusion": "capacity",
       "excludes": null,
       "requires": [
-        "IN-MT-4a",
-        "IN-MV-4a",
-        "IN-HL-4a"
+        "IN-MT-3a",
+        "IN-MV-3a",
+        "IN-HL-3a"
       ],
       "effects": [
         {
@@ -308,80 +250,14 @@
       "earth_ref": "a nation that can replace what it fields, from its own works, not by purchase abroad"
     },
     {
-      "id": "IN-MT-1a",
-      "name": "Precision Instruments",
-      "kind": "major",
-      "ring": 1,
-      "branch": "MT",
-      "links": [
-        "IN-MT-1b",
-        "IN-MT-1c",
-        "IN-MT-2c",
-        "IN-MV-1d",
-        "IN-SP-1a"
-      ],
-      "gate": null,
-      "diffusion": "capacity",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "modifier",
-          "target": "research",
-          "per_mille": 60
-        },
-        {
-          "kind": "modifier",
-          "target": "industrial",
-          "per_mille": 40
-        }
-      ],
-      "pursued_when": {
-        "term": "spire",
-        "situation": "the ring-1 milestone wants it and nothing binds; the toolroom is bought for what it opens"
-      },
-      "earth_ref": "lenses, gauges, screw threads — the toolroom the engine is built in"
-    },
-    {
-      "id": "IN-MT-1b",
-      "name": "Cast Ordnance",
-      "kind": "major",
-      "ring": 1,
-      "branch": "MT",
-      "links": [],
-      "gate": "ore_q",
-      "diffusion": "capacity",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "unlock",
-          "target": "Powder Mill"
-        },
-        {
-          "kind": "unlock",
-          "target": "Bastion Fort"
-        },
-        {
-          "kind": "unlock",
-          "target": "unit roster: gunpowder"
-        }
-      ],
-      "pursued_when": {
-        "term": "threatened",
-        "situation": "a neighbour with a grudge fields gunpowder rows and the polity's walls are the old circuit"
-      },
-      "earth_ref": "foundry cannon; the roster turns over at the band boundary, the works come with the node"
-    },
-    {
-      "id": "IN-MT-1c",
+      "id": "IN-MT-1e",
       "name": "Furnace Practice",
       "kind": "minor",
       "ring": 1,
       "branch": "MT",
       "links": [
-        "IN-MT-2a",
-        "IN-MT-2b"
+        "IN-MT-1a",
+        "IN-MT-1b"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -401,18 +277,18 @@
       "earth_ref": null
     },
     {
-      "id": "IN-MT-2a",
+      "id": "IN-MT-1a",
       "name": "Coke Smelting",
       "kind": "major",
-      "ring": 2,
+      "ring": 1,
       "branch": "MT",
       "links": [
-        "IN-MT-3a",
-        "IN-MV-2b"
+        "IN-MT-2a",
+        "IN-MV-1b"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
-      "excludes": "IN-MT-2b",
+      "excludes": "IN-MT-1b",
       "requires": [],
       "effects": [
         {
@@ -436,15 +312,15 @@
       "earth_ref": "breaks the charcoal ceiling — scale, wants coalfields"
     },
     {
-      "id": "IN-MT-2b",
+      "id": "IN-MT-1b",
       "name": "Charcoal Iron",
       "kind": "major",
-      "ring": 2,
+      "ring": 1,
       "branch": "MT",
       "links": [],
       "gate": null,
       "diffusion": "capacity",
-      "excludes": "IN-MT-2a",
+      "excludes": "IN-MT-1a",
       "requires": [],
       "effects": [
         {
@@ -469,14 +345,14 @@
       "earth_ref": "quality, wants forest — the charcoal niche held for a century after coke took the scale"
     },
     {
-      "id": "IN-MT-2c",
+      "id": "IN-MT-1c",
       "name": "Machine Tools",
       "kind": "major",
-      "ring": 2,
+      "ring": 1,
       "branch": "MT",
       "links": [
-        "IN-MT-2d",
-        "IN-SP-2a"
+        "IN-MT-1d",
+        "IN-SP-1a"
       ],
       "gate": "ore_q",
       "diffusion": "capacity",
@@ -501,13 +377,13 @@
       "earth_ref": "interchangeable parts; capacity that builds capacity"
     },
     {
-      "id": "IN-MT-2d",
+      "id": "IN-MT-1d",
       "name": "Interchangeable Parts",
       "kind": "minor",
-      "ring": 2,
+      "ring": 1,
       "branch": "MT",
       "links": [
-        "IN-MT-3a"
+        "IN-MT-2a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -527,15 +403,15 @@
       "earth_ref": null
     },
     {
-      "id": "IN-MT-3a",
+      "id": "IN-MT-2a",
       "name": "Converter Steel",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "MT",
       "links": [
-        "IN-MT-3b",
-        "IN-MT-4a",
-        "IN-SP-3a"
+        "IN-MT-2b",
+        "IN-MT-3a",
+        "IN-SP-2a"
       ],
       "gate": "ore_q",
       "diffusion": "capacity",
@@ -563,10 +439,10 @@
       "earth_ref": "1856; cheap steel"
     },
     {
-      "id": "IN-MT-3b",
+      "id": "IN-MT-2b",
       "name": "Framed Construction & Cement",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "MT",
       "links": [],
       "gate": null,
@@ -591,14 +467,14 @@
       "earth_ref": "iron-framed mills to the steel frame; the industrial city"
     },
     {
-      "id": "IN-MT-4a",
+      "id": "IN-MT-3a",
       "name": "Synthetic Chemistry",
       "kind": "major",
-      "ring": 4,
+      "ring": 3,
       "branch": "MT",
       "links": [
-        "IN-MT-4b",
-        "IN-MT-4c"
+        "IN-MT-3b",
+        "IN-MT-3c"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
@@ -623,10 +499,10 @@
       "earth_ref": "dyes → polymers → explosives"
     },
     {
-      "id": "IN-MT-4b",
+      "id": "IN-MT-3b",
       "name": "Fixed-Nitrogen Synthesis",
       "kind": "major",
-      "ring": 4,
+      "ring": 3,
       "branch": "MT",
       "links": [],
       "gate": "fuel",
@@ -651,10 +527,10 @@
       "earth_ref": "1913; the food ceiling lifts"
     },
     {
-      "id": "IN-MT-4c",
+      "id": "IN-MT-3c",
       "name": "Coal-Tar Distillates",
       "kind": "minor",
-      "ring": 4,
+      "ring": 3,
       "branch": "MT",
       "links": [],
       "gate": null,
@@ -676,142 +552,14 @@
     },
     {
       "id": "IN-MV-1a",
-      "name": "Coal Haulage",
+      "name": "Railway",
       "kind": "major",
       "ring": 1,
       "branch": "MV",
       "links": [
         "IN-MV-1b",
-        "IN-MV-2a",
-        "IN-SP-1a"
-      ],
-      "gate": "fuel",
-      "diffusion": "capacity",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "resource",
-          "target": "coal as a bulk traded good"
-        },
-        {
-          "kind": "reach",
-          "target": "coastal bulk haulage"
-        },
-        {
-          "kind": "unlock",
-          "target": "Cut Canal"
-        }
-      ],
-      "pursued_when": {
-        "term": "fuel_bound",
-        "situation": "a coalfield near a coast or river and a seat burning wood it must haul further every year"
-      },
-      "earth_ref": "the coastal coal trade; urban fuel demand precedes the engine"
-    },
-    {
-      "id": "IN-MV-1b",
-      "name": "Full-Rigged Ship",
-      "kind": "major",
-      "ring": 1,
-      "branch": "MV",
-      "links": [
-        "IN-MV-1c",
-        "IN-MV-2c"
-      ],
-      "gate": "coastal",
-      "diffusion": "capacity",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "access",
-          "target": "ocean sea leg"
-        },
-        {
-          "kind": "unlock",
-          "target": "Naval Yard"
-        },
-        {
-          "kind": "modifier",
-          "target": "reach",
-          "per_mille": 60
-        }
-      ],
-      "pursued_when": {
-        "term": "ground_port",
-        "situation": "the seat is a port, the coast is held, and every near sea leg is already taken"
-      },
-      "earth_ref": "global range; the hull that carries a colony"
-    },
-    {
-      "id": "IN-MV-1c",
-      "name": "Celestial Navigation",
-      "kind": "major",
-      "ring": 1,
-      "branch": "MV",
-      "links": [
-        "IN-MV-1d"
-      ],
-      "gate": "coastal",
-      "diffusion": "practice",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "access",
-          "target": "open-ocean legs"
-        },
-        {
-          "kind": "intel",
-          "target": "route reliability"
-        },
-        {
-          "kind": "modifier",
-          "target": "reach",
-          "per_mille": 40
-        }
-      ],
-      "pursued_when": {
-        "term": "colonial_reach",
-        "situation": "ground is held across water and a third of the hulls sent to it do not arrive"
-      },
-      "earth_ref": "longitude closes the ocean"
-    },
-    {
-      "id": "IN-MV-1d",
-      "name": "Chronometer",
-      "kind": "minor",
-      "ring": 1,
-      "branch": "MV",
-      "links": [],
-      "gate": null,
-      "diffusion": "practice",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "modifier",
-          "target": "reach",
-          "per_mille": 20
-        }
-      ],
-      "pursued_when": {
-        "term": "coastal_holdings",
-        "situation": "an instrument maker and a port in the same polity"
-      },
-      "earth_ref": null
-    },
-    {
-      "id": "IN-MV-2a",
-      "name": "Railway",
-      "kind": "major",
-      "ring": 2,
-      "branch": "MV",
-      "links": [
         "IN-MV-2b",
-        "IN-MV-3b",
-        "IN-SP-2a"
+        "IN-SP-1a"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
@@ -839,10 +587,10 @@
       "earth_ref": "interior distance collapses"
     },
     {
-      "id": "IN-MV-2b",
+      "id": "IN-MV-1b",
       "name": "Iron Rails",
       "kind": "minor",
-      "ring": 2,
+      "ring": 1,
       "branch": "MV",
       "links": [],
       "gate": null,
@@ -863,13 +611,13 @@
       "earth_ref": null
     },
     {
-      "id": "IN-MV-2c",
+      "id": "IN-MV-1c",
       "name": "Packet Service",
       "kind": "minor",
-      "ring": 2,
+      "ring": 1,
       "branch": "MV",
       "links": [
-        "IN-MV-3a"
+        "IN-MV-2a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -889,14 +637,14 @@
       "earth_ref": null
     },
     {
-      "id": "IN-MV-3a",
+      "id": "IN-MV-2a",
       "name": "Steamship",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "MV",
       "links": [
-        "IN-MV-4a",
-        "IN-SP-3a"
+        "IN-MV-3a",
+        "IN-SP-2a"
       ],
       "gate": "coastal",
       "diffusion": "capacity",
@@ -924,10 +672,10 @@
       "earth_ref": "schedule replaces season"
     },
     {
-      "id": "IN-MV-3b",
+      "id": "IN-MV-2b",
       "name": "Telegraph",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "MV",
       "links": [],
       "gate": null,
@@ -956,15 +704,15 @@
       "earth_ref": "information detaches from transport; rail signalling drives the net"
     },
     {
-      "id": "IN-MV-4a",
+      "id": "IN-MV-3a",
       "name": "Internal Combustion & Oil",
       "kind": "major",
-      "ring": 4,
+      "ring": 3,
       "branch": "MV",
       "links": [
-        "IN-MV-4b",
-        "IN-MV-4c",
-        "IN-SP-4a"
+        "IN-MV-3b",
+        "IN-MV-3c",
+        "IN-SP-3a"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
@@ -988,10 +736,10 @@
       "earth_ref": "oil displaces coal at the margin"
     },
     {
-      "id": "IN-MV-4b",
+      "id": "IN-MV-3b",
       "name": "Automotive Transport",
       "kind": "major",
-      "ring": 4,
+      "ring": 3,
       "branch": "MV",
       "links": [],
       "gate": null,
@@ -1017,10 +765,10 @@
       "earth_ref": "road freight; the artifact form diffuses at once"
     },
     {
-      "id": "IN-MV-4c",
+      "id": "IN-MV-3c",
       "name": "Flight",
       "kind": "major",
-      "ring": 4,
+      "ring": 3,
       "branch": "MV",
       "links": [],
       "gate": null,
@@ -1050,76 +798,14 @@
     },
     {
       "id": "IN-LD-1a",
-      "name": "Convertible Husbandry",
-      "kind": "major",
+      "name": "Field Survey",
+      "kind": "minor",
       "ring": 1,
       "branch": "LD",
       "links": [
         "IN-LD-1b",
-        "IN-LD-2a",
-        "IN-LD-2d",
-        "IN-SP-1a"
-      ],
-      "gate": "arable",
-      "diffusion": "practice",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "modifier",
-          "target": "carrying_capacity",
-          "per_mille": 60
-        },
-        {
-          "kind": "modifier",
-          "target": "stores",
-          "per_mille": 40
-        }
-      ],
-      "pursued_when": {
-        "term": "ground_grass",
-        "situation": "grass and arable on the same held ground and fallow still a third of the fields"
-      },
-      "earth_ref": "fodder rotation; feeds the workforce release"
-    },
-    {
-      "id": "IN-LD-1b",
-      "name": "Crop-Package Exchange",
-      "kind": "major",
-      "ring": 1,
-      "branch": "LD",
-      "links": [],
-      "gate": null,
-      "diffusion": "practice",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "modifier",
-          "target": "carrying_capacity",
-          "per_mille": 80
-        },
-        {
-          "kind": "modifier",
-          "target": "forage",
-          "per_mille": 30
-        }
-      ],
-      "pursued_when": {
-        "term": "colonial_reach",
-        "situation": "a sea leg to ground with a different crop package; what grows there grows here"
-      },
-      "earth_ref": "inter-continental crop transfer"
-    },
-    {
-      "id": "IN-LD-2a",
-      "name": "Field Survey",
-      "kind": "minor",
-      "ring": 2,
-      "branch": "LD",
-      "links": [
-        "IN-LD-2b",
-        "IN-LD-2c"
+        "IN-LD-1c",
+        "IN-LD-1d"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1139,15 +825,15 @@
       "earth_ref": null
     },
     {
-      "id": "IN-LD-2b",
+      "id": "IN-LD-1b",
       "name": "Cleared Holdings",
       "kind": "major",
-      "ring": 2,
+      "ring": 1,
       "branch": "LD",
       "links": [],
       "gate": "arable",
       "diffusion": "practice",
-      "excludes": "IN-LD-2c",
+      "excludes": "IN-LD-1c",
       "requires": [],
       "effects": [
         {
@@ -1173,15 +859,15 @@
       "earth_ref": "consolidation; an urban workforce in a generation, at the cost of unrest and a hollowed countryside"
     },
     {
-      "id": "IN-LD-2c",
+      "id": "IN-LD-1c",
       "name": "Smallholder Tenure",
       "kind": "major",
-      "ring": 2,
+      "ring": 1,
       "branch": "LD",
       "links": [],
       "gate": "arable",
       "diffusion": "practice",
-      "excludes": "IN-LD-2b",
+      "excludes": "IN-LD-1b",
       "requires": [],
       "effects": [
         {
@@ -1207,14 +893,14 @@
       "earth_ref": "the land stays divided; a late start, a deeper domestic market, rural demography survives"
     },
     {
-      "id": "IN-LD-2d",
+      "id": "IN-LD-1d",
       "name": "Farm Mechanisation",
       "kind": "major",
-      "ring": 2,
+      "ring": 1,
       "branch": "LD",
       "links": [
-        "IN-LD-2e",
-        "IN-LD-3a"
+        "IN-LD-1e",
+        "IN-LD-2a"
       ],
       "gate": "arable",
       "diffusion": "capacity",
@@ -1239,13 +925,13 @@
       "earth_ref": "the reaper line; releases workforce to industry"
     },
     {
-      "id": "IN-LD-2e",
+      "id": "IN-LD-1e",
       "name": "Iron Implements",
       "kind": "minor",
-      "ring": 2,
+      "ring": 1,
       "branch": "LD",
       "links": [
-        "IN-MT-2c"
+        "IN-MT-1c"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1265,14 +951,14 @@
       "earth_ref": null
     },
     {
-      "id": "IN-LD-3a",
+      "id": "IN-LD-2a",
       "name": "Soil Chemistry & Fertiliser Trade",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "LD",
       "links": [
-        "IN-LD-3b",
-        "IN-LD-4a"
+        "IN-LD-2b",
+        "IN-LD-3a"
       ],
       "gate": null,
       "diffusion": "artifact",
@@ -1296,13 +982,13 @@
       "earth_ref": "1840s; yield stops being bounded by the local nitrogen cycle"
     },
     {
-      "id": "IN-LD-3b",
+      "id": "IN-LD-2b",
       "name": "Fertiliser Cargo",
       "kind": "minor",
-      "ring": 3,
+      "ring": 2,
       "branch": "LD",
       "links": [
-        "IN-MV-3a"
+        "IN-MV-2a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1322,13 +1008,13 @@
       "earth_ref": null
     },
     {
-      "id": "IN-LD-4a",
+      "id": "IN-LD-3a",
       "name": "Tractor & Fertiliser Package",
       "kind": "major",
-      "ring": 4,
+      "ring": 3,
       "branch": "LD",
       "links": [
-        "IN-LD-4b"
+        "IN-LD-3b"
       ],
       "gate": "arable",
       "diffusion": "capacity",
@@ -1353,14 +1039,14 @@
       "earth_ref": "a single-digit share of the workforce on the farm"
     },
     {
-      "id": "IN-LD-4b",
+      "id": "IN-LD-3b",
       "name": "Fuel & Fertiliser Depot",
       "kind": "minor",
-      "ring": 4,
+      "ring": 3,
       "branch": "LD",
       "links": [
-        "IN-MT-4b",
-        "IN-MV-4a"
+        "IN-MT-3b",
+        "IN-MV-3a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1381,204 +1067,14 @@
     },
     {
       "id": "IN-CH-1a",
-      "name": "Movable-Type Press",
-      "kind": "major",
-      "ring": 1,
-      "branch": "CH",
-      "links": [
-        "IN-CH-1f",
-        "IN-SP-1a"
-      ],
-      "gate": null,
-      "diffusion": "capacity",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "modifier",
-          "target": "research",
-          "per_mille": 80
-        },
-        {
-          "kind": "modifier",
-          "target": "assimilation",
-          "per_mille": 40
-        }
-      ],
-      "pursued_when": {
-        "term": "many_peoples",
-        "situation": "several peoples under one seat and the law copied by hand; the press is one text everywhere"
-      },
-      "earth_ref": "information cost collapses"
-    },
-    {
-      "id": "IN-CH-1b",
-      "name": "Joint-Stock & Public Credit",
-      "kind": "major",
-      "ring": 1,
-      "branch": "CH",
-      "links": [
-        "IN-CH-1c",
-        "IN-CH-2c",
-        "IN-SP-1a"
-      ],
-      "gate": null,
-      "diffusion": "practice",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "institution",
-          "target": "public credit; debt on the sovereign's promise"
-        },
-        {
-          "kind": "unlock",
-          "target": "Counting House"
-        },
-        {
-          "kind": "modifier",
-          "target": "stores",
-          "per_mille": 60
-        }
-      ],
-      "pursued_when": {
-        "term": "credit_bound",
-        "situation": "the deep pit or the fleet costs more than a round's surplus; the venture is pooled and the sovereign borrows"
-      },
-      "earth_ref": "capital disciplines the sovereign"
-    },
-    {
-      "id": "IN-CH-1c",
-      "name": "Treasury Audit",
-      "kind": "minor",
-      "ring": 1,
-      "branch": "CH",
-      "links": [
-        "IN-CH-1d",
-        "IN-CH-1e"
-      ],
-      "gate": null,
-      "diffusion": "practice",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "modifier",
-          "target": "cohesion",
-          "per_mille": 20
-        }
-      ],
-      "pursued_when": {
-        "term": "stores_low",
-        "situation": "the seat's stores are counted against its promises for the first time"
-      },
-      "earth_ref": null
-    },
-    {
-      "id": "IN-CH-1d",
-      "name": "Chartered Capital",
-      "kind": "major",
-      "ring": 1,
-      "branch": "CH",
-      "links": [
-        "IN-CH-2b"
-      ],
-      "gate": null,
-      "diffusion": "practice",
-      "excludes": "IN-CH-1e",
-      "requires": [],
-      "effects": [
-        {
-          "kind": "institution",
-          "target": "courts bind the sovereign; cheaper state credit, seizure carries a lasting credit cost"
-        },
-        {
-          "kind": "modifier",
-          "target": "stores",
-          "per_mille": 60
-        },
-        {
-          "kind": "modifier",
-          "target": "research",
-          "per_mille": 40
-        }
-      ],
-      "pursued_when": {
-        "term": "surplus",
-        "situation": "stores are comfortable and the lenders are the seat's own merchants; the sovereign binds itself to borrow cheaper"
-      },
-      "earth_ref": "courts bind the sovereign"
-    },
-    {
-      "id": "IN-CH-1e",
-      "name": "Command Estate",
-      "kind": "major",
-      "ring": 1,
-      "branch": "CH",
-      "links": [],
-      "gate": null,
-      "diffusion": "practice",
-      "excludes": "IN-CH-1d",
-      "requires": [],
-      "effects": [
-        {
-          "kind": "institution",
-          "target": "crown monopolies and confiscation rights; immediate revenue, chronic credit penalty"
-        },
-        {
-          "kind": "modifier",
-          "target": "stores",
-          "per_mille": 100
-        },
-        {
-          "kind": "modifier",
-          "target": "cohesion",
-          "per_mille": -40
-        }
-      ],
-      "pursued_when": {
-        "term": "stores_low",
-        "situation": "stores are low, a war is on, and the merchants' silver is nearer than any lender's"
-      },
-      "earth_ref": "monopoly and confiscation; immediate revenue, a chronic credit penalty"
-    },
-    {
-      "id": "IN-CH-1f",
-      "name": "Learned Correspondence",
-      "kind": "minor",
-      "ring": 1,
-      "branch": "CH",
-      "links": [
-        "IN-CH-2a",
-        "IN-HL-1a"
-      ],
-      "gate": null,
-      "diffusion": "practice",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "modifier",
-          "target": "research",
-          "per_mille": 20
-        }
-      ],
-      "pursued_when": {
-        "term": "known",
-        "situation": "a neighbour's presses are running and letters cross the border"
-      },
-      "earth_ref": null
-    },
-    {
-      "id": "IN-CH-2a",
       "name": "Empirical Method",
       "kind": "major",
-      "ring": 2,
+      "ring": 1,
       "branch": "CH",
       "links": [
+        "IN-CH-1b",
         "IN-CH-2b",
-        "IN-CH-3b",
-        "IN-HL-2a"
+        "IN-HL-1a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1598,10 +1094,10 @@
       "earth_ref": "knowledge compounds openly"
     },
     {
-      "id": "IN-CH-2b",
+      "id": "IN-CH-1b",
       "name": "Patent Grants",
       "kind": "major",
-      "ring": 2,
+      "ring": 1,
       "branch": "CH",
       "links": [],
       "gate": null,
@@ -1626,14 +1122,14 @@
       "earth_ref": "invention becomes property"
     },
     {
-      "id": "IN-CH-2c",
+      "id": "IN-CH-1c",
       "name": "Bond Market",
       "kind": "minor",
-      "ring": 2,
+      "ring": 1,
       "branch": "CH",
       "links": [
-        "IN-CH-3a",
-        "IN-MV-2a"
+        "IN-CH-2a",
+        "IN-MV-1a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1653,13 +1149,13 @@
       "earth_ref": null
     },
     {
-      "id": "IN-CH-3a",
+      "id": "IN-CH-2a",
       "name": "General Incorporation",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "CH",
       "links": [
-        "IN-CH-3c"
+        "IN-CH-2c"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1678,13 +1174,13 @@
       "earth_ref": "chartering by registration, not by grant — the campaign's premise"
     },
     {
-      "id": "IN-CH-3b",
+      "id": "IN-CH-2b",
       "name": "Mass Schooling",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "CH",
       "links": [
-        "IN-CH-4a"
+        "IN-CH-3a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1714,15 +1210,15 @@
       "earth_ref": "a literate workforce — the floor of the machine age"
     },
     {
-      "id": "IN-CH-3c",
+      "id": "IN-CH-2c",
       "name": "Plant Registry",
       "kind": "minor",
-      "ring": 3,
+      "ring": 2,
       "branch": "CH",
       "links": [
-        "IN-CH-3d",
-        "IN-CH-3e",
-        "IN-MT-3a"
+        "IN-CH-2d",
+        "IN-CH-2e",
+        "IN-MT-2a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1742,15 +1238,15 @@
       "earth_ref": null
     },
     {
-      "id": "IN-CH-3d",
+      "id": "IN-CH-2d",
       "name": "State Arsenal",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "CH",
       "links": [],
       "gate": null,
       "diffusion": "capacity",
-      "excludes": "IN-CH-3e",
+      "excludes": "IN-CH-2e",
       "requires": [],
       "effects": [
         {
@@ -1775,15 +1271,15 @@
       "earth_ref": "the heavy plant is the sovereign's; capacity arrives fast and stays under command"
     },
     {
-      "id": "IN-CH-3e",
+      "id": "IN-CH-2e",
       "name": "Private Works",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "CH",
       "links": [],
       "gate": null,
       "diffusion": "capacity",
-      "excludes": "IN-CH-3d",
+      "excludes": "IN-CH-2d",
       "requires": [],
       "effects": [
         {
@@ -1813,13 +1309,13 @@
       "earth_ref": "the heavy plant is chartered and owned; a slower start, compounding reinvestment"
     },
     {
-      "id": "IN-CH-4a",
+      "id": "IN-CH-3a",
       "name": "Broadcast",
       "kind": "major",
-      "ring": 4,
+      "ring": 3,
       "branch": "CH",
       "links": [
-        "IN-SP-4a"
+        "IN-SP-3a"
       ],
       "gate": null,
       "diffusion": "capacity",
@@ -1845,38 +1341,12 @@
     },
     {
       "id": "IN-HL-1a",
-      "name": "Preventive Inoculation",
-      "kind": "major",
+      "name": "Microscopy",
+      "kind": "minor",
       "ring": 1,
       "branch": "HL",
       "links": [
         "IN-HL-2a"
-      ],
-      "gate": null,
-      "diffusion": "practice",
-      "excludes": null,
-      "requires": [],
-      "effects": [
-        {
-          "kind": "modifier",
-          "target": "plague",
-          "per_mille": 60
-        }
-      ],
-      "pursued_when": {
-        "term": "plague_struck",
-        "situation": "a drawdown running in the seat and a neighbour whose towns are spared"
-      },
-      "earth_ref": "mortality falls before the theory explains it"
-    },
-    {
-      "id": "IN-HL-2a",
-      "name": "Microscopy",
-      "kind": "minor",
-      "ring": 2,
-      "branch": "HL",
-      "links": [
-        "IN-HL-3a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1896,13 +1366,13 @@
       "earth_ref": null
     },
     {
-      "id": "IN-HL-3a",
+      "id": "IN-HL-2a",
       "name": "Germ Theory & Sanitation",
       "kind": "major",
-      "ring": 3,
+      "ring": 2,
       "branch": "HL",
       "links": [
-        "IN-HL-4a"
+        "IN-HL-3a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1927,13 +1397,13 @@
       "earth_ref": "mortality falls ahead of wealth"
     },
     {
-      "id": "IN-HL-4a",
+      "id": "IN-HL-3a",
       "name": "Antibiotics & Mass Vaccination",
       "kind": "major",
-      "ring": 4,
+      "ring": 3,
       "branch": "HL",
       "links": [
-        "IN-MT-4c"
+        "IN-MT-3c"
       ],
       "gate": null,
       "diffusion": "artifact",

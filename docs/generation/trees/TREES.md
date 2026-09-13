@@ -254,23 +254,21 @@ is an assertion the sweep makes, not a number anyone picks.
 | Colonisation | 3 | 4, one per origin farm class | 3 | ~28 | 64 |
 | Empire | 4 | 4 | 4 | ~48 | 64 |
 | Exploration | 3 | 4 | 3 | 31 | 64 |
-| Industry | 4 | 5 | 4 | ~60 | 64 |
+| Industry | 3 | 5 | 3 | ~44 | 64 |
 
 One milestone per ring follows from the spire's shape (one major and one milestone per ring); the
 node targets follow from the branch × ring × (one major + one-and-a-half minors) arithmetic plus
 the spire. Where a tree comes in under target, that is a sparse branch doing what the ladder's
 sparse-sector rule was adopted for.
 
-**The Industry tree is oversized, and the cause is not arithmetic (2026-09-11).** Its span fell
-from 400 years to 300, but the real finding is that **its ring 1 is the exploration age** —
-*Full-Rigged Ship*, *Celestial Navigation*, *Chronometer*, *Joint-Stock & Public Credit*,
-*Chartered Capital*. Those subjects now have a tree of their own, and two of them duplicate
-`EXPLORATION_TREE.md` nodes outright.
-
-**So the shrink is a MIGRATION, not a trim, and it must not touch ring 4** — which carries
-electrification, oil, flight, broadcast and antibiotics, the things that make 1960 look like
-1960. Ring 1 moves out, every ring shifts down one, and Industry becomes 3 rings of ~44 nodes.
-`BL-938` owns it; the row above states what the tree IS until then.
+**Industry's old ring 1 was the exploration age wearing this tree's costume (Ben, 2026-09-11,
+BL-938).** *Full-Rigged Ship*, *Celestial Navigation*, *Joint-Stock & Public Credit*, *Chartered
+Capital* and the rest of that ring existed here only because no Exploration tree existed when this
+one was first authored; two of them duplicated `EXPLORATION_TREE.md` nodes outright. The ring was
+removed rather than trimmed, every remaining ring shifted down one, and **ring 4's content survives
+whole as the new ring 3** — electrification, oil, flight, broadcast and antibiotics, the things
+that make 1960 look like 1960. Industry is now 3 rings of 45 nodes; `INDUSTRY_TREE.md` carries the
+detail of what moved, what duplicated Exploration, and what did not survive the ring's removal.
 
 ---
 
