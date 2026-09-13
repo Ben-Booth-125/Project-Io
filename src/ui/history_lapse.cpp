@@ -1010,11 +1010,13 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    into the capital as the phase's visible opening act, and Ben called
     //    it out by name as something the lapse should show. Gated on the
     //    record actually reaching past the Empire era's own 1200 CE close: a
-    //    world that never ran the Exploration span (`exploration_sim_enabled`
-    //    default false, or its span not yet wired into this record — see the
-    //    header comment) reads no ground past that year, so this block draws
-    //    nothing on it rather than firing on the Empire close it shares the
-    //    date with. ──
+    //    world that opted OUT of the Exploration span (`exploration_sim_enabled`
+    //    default true since BL-946, but still a caller's field to clear) reads
+    //    no ground past that year, so this block draws nothing on it rather
+    //    than firing on the Empire close it shares the date with. The
+    //    wizard's own Exploration round (BL-946) is exactly the record this
+    //    was written for: its `h.lapse` IS the Exploration span (1200 ->
+    //    1660), so this fires on every arrival at that round. ──
     if (h.lapse.start_year + h.lapse.years > lapse_exploration_epoch_year)
     {
         const int window = lapse_marker_window_years(h);

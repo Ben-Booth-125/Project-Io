@@ -857,10 +857,41 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // `generation_report` and must discard the half-built `world`.
         if (gen_cfg.stop_after_migration)
         {
+            // THE COAST TO 400 BCE (BL-947; docs/generation/CIVILISATION.md §
+            // "The span is 400 BCE to 1200 CE" — "the Culture round ends when
+            // the filling ends, and the world then coasts to 400 BCE holding
+            // what migration left it"). `migration_end_year` is DERIVED per
+            // seed (the diffusion frontier's own exhaustion year) and varies
+            // seed to seed; round 3's DISPLAYED span always closes at the
+            // Empires round's own opening year instead — `sim_start` above,
+            // already the exact year `run_settlement` was told to stop
+            // founding new regions at (BL-846) and the year
+            // `era_minus_one_sim_params` opens the Empires sim on. Reusing
+            // that value rather than a bare -400 literal means round 3's
+            // coast target and round 4's own opening year can never drift
+            // apart from each other.
+            //
+            // NEVER CLAMPED EARLIER than the true migration end (`std::max`):
+            // a migration that overruns the boundary is measured (BL-947
+            // sweep: 6/60 seeds, up to 343 years over on the tested set) and
+            // is "a defect in the migration, not in this boundary" per the
+            // same doc section, so the true (later) year is kept and shown
+            // rather than cut short or hidden.
+            //
+            // Only applied when the era sim is actually configured to run
+            // (`sim_start` is a real year, not the INT64_MAX sentinel a
+            // `prehistory_years == 0` caller gets) — a caller with no
+            // Empires round has no coast target to hold the map still until,
+            // and keeps seeing the migration's own raw end exactly as before.
+            const int64_t culture_round_end_year =
+                sim_start != INT64_MAX
+                    ? std::max(kepler_settlement.migration_end_year, sim_start)
+                    : kepler_settlement.migration_end_year;
+
             const era_timelapse migration_lapse =
                 build_migration_timelapse(kepler_settlement, kepler_creeds,
                                           colonisation_start_year,
-                                          kepler_settlement.migration_end_year);
+                                          culture_round_end_year);
 
             // BL-914: round 3 gets the same tap round 4 does. `run_settlement`
             // itself is not instrumented (out of this item's files), so this is
@@ -893,12 +924,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 progress->lapse_tap->publish(
                     migration_lapse.changes, migration_lapse.culture_changes,
                     migration_lapse.events,
-                    static_cast<int32_t>(kepler_settlement.migration_end_year));
+                    static_cast<int32_t>(culture_round_end_year));
             }
 
             if (report)
             {
-                report->prehistory_years     = kepler_settlement.migration_end_year
+                report->prehistory_years     = culture_round_end_year
                                               - colonisation_start_year;
                 report->prehistory_battles   = 0;   // The migration is a diffusion, not a
                 report->prehistory_conquests = 0;   // contest — COLONISATION.md owns why
@@ -1026,15 +1057,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                              hs.history.begin(), hs.history.end());
 
             // ------------------------------------------------------------
-            // BL-931 — THE EXPLORATION SPAN, 1200 -> exploration_stop_year,
+            // BL-931/BL-946 — THE EXPLORATION SPAN, 1200 -> exploration_stop_year,
             // on the SAME engine, immediately after the Empires round
-            // closes above. OPT-IN ONLY (world_params::
-            // exploration_sim_enabled, default false) — see that field's
-            // comment for why this does not run by default: it would move
-            // `region::nation` (read a few hundred lines below by
-            // `derive_national_character`) from the 1200 CE political map
-            // to whatever this span leaves at its own close, which is a
-            // downstream-consequences question this item does not answer.
+            // closes above. Gated on `exploration_sim_enabled(params)`
+            // (default TRUE since BL-946) so a caller can still opt out, and
+            // additionally skipped whenever this call is the wizard's OWN
+            // Empires-round launch (`gen_cfg.stop_after_ancient_era`) — that
+            // round wants only the Empires history and must not pay for a
+            // span it discards a few lines below.
             //
             // WHAT DOES NOT HAPPEN HERE, AND WHY. `kepler_corridors` /
             // `kepler_grudges` above stay the EMPIRES round's own — this
@@ -1048,7 +1078,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
             // (EXPLORATION.md sec The engine is shared) — not that
             // everything downstream of the Empires handoff now reads a
             // second one.
-            if (exploration_sim_enabled(params) && !kepler_pass_one.polities.empty())
+            if (exploration_sim_enabled(params) && !kepler_pass_one.polities.empty()
+                && !gen_cfg.stop_after_ancient_era)
             {
                 history_sim_params ep = exploration_sim_params(params);
                 ep.resume_polities  = &kepler_pass_one.polities;
@@ -1069,13 +1100,29 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     fixture->pre_exploration_corridors  = kepler_pass_one.surviving_corridors;
                 }
 
+                // BL-946: the loading screen's sub-bar AND the live lapse tap,
+                // same `progress` pointer the Empires call above already
+                // reads — so the wizard's new Exploration round gets the same
+                // "wait is the round" live map the Empires round has, rather
+                // than a silent hang followed by a populated map on landing.
+                if (progress != nullptr)
+                {
+                    progress->sub_progress.store(0, std::memory_order_relaxed);
+                    progress->sub_total.store(
+                        static_cast<int>(ep.stop_year - ep.start_year),
+                        std::memory_order_relaxed);
+                }
+
                 const history_sim_state kepler_exploration_hs = run_history_sim(
                     kepler_settlement, &kepler_creeds, terr.view(),
                     home_grid_width, home_grid_height, ep,
                     exploration_sim_seed(params),
-                    /*year_progress=*/nullptr, // No loading-screen sub-bar for this opt-in span yet.
+                    progress != nullptr ? &progress->sub_progress : nullptr,
                     works,
-                    /*tap=*/nullptr); // No time-lapse tap for this opt-in span yet.
+                    progress != nullptr ? progress->lapse_tap : nullptr); // BL-946: wired.
+
+                if (progress != nullptr)
+                    progress->sub_total.store(0, std::memory_order_relaxed);
 
                 kepler_settlement.history.insert(kepler_settlement.history.end(),
                                                  kepler_exploration_hs.history.begin(),
@@ -1092,6 +1139,20 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     fixture->exploration_seed   = exploration_sim_seed(params);
                     fixture->pre_exploration_contacts = kepler_pass_one.contacts;
                     fixture->exploration_state        = kepler_exploration_hs;
+                }
+
+                // BL-946: THE RECORDED RECORD, same discipline as `hs` a few
+                // lines below -- recorded once, here, at the one call site
+                // that ran it, rather than re-derived by a consumer.
+                if (report != nullptr)
+                {
+                    report->exploration_years     = kepler_exploration_hs.years;
+                    report->exploration_battles   = kepler_exploration_hs.battles;
+                    report->exploration_conquests = kepler_exploration_hs.conquests;
+                    report->exploration_foundings = kepler_exploration_hs.foundings;
+                    for (generation_report::body_entry& be : report->bodies)
+                        if (be.id == kepler)
+                            be.exploration_timelapse = as_timelapse(kepler_exploration_hs);
                 }
             }
 
@@ -1242,6 +1303,16 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // about the branch. Caught by driving the built app, which is what the
     // live-click rule is for.
     if (gen_cfg.stop_after_ancient_era)
+    {
+        if (report)
+            for (generation_report::body_entry& be : report->bodies)
+                if (be.id == kepler) { be.settlement = kepler_settlement; break; }
+        return w;
+    }
+
+    // BL-946: the wizard's new Exploration round's own stop point, one round
+    // later than the Empires round's above -- same contract, same reason.
+    if (gen_cfg.stop_after_exploration)
     {
         if (report)
             for (generation_report::body_entry& be : report->bodies)

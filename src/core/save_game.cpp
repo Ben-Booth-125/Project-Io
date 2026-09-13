@@ -560,6 +560,7 @@ void w_body_entry(std::ostream& o, const generation_report::body_entry& b)
     w_int(o, b.tiles.gh);
     w_bool(o, b.tiles.used_convergent);
     w_timelapse(o, b.prehistory_timelapse); // save_game_version 3 (NR-733)
+    w_timelapse(o, b.exploration_timelapse); // save_game_version 14 (BL-946)
 }
 
 bool r_body_entry(std::istream& i, generation_report::body_entry& b)
@@ -570,7 +571,8 @@ bool r_body_entry(std::istream& i, generation_report::body_entry& b)
         && r_bool(i, b.tiles.valid) && r_u32(i, b.tiles.seed)
         && r_f32(i, b.tiles.deposit_scalar) && r_int(i, b.tiles.gw) && r_int(i, b.tiles.gh)
         && r_bool(i, b.tiles.used_convergent)
-        && r_timelapse(i, b.prehistory_timelapse); // save_game_version 3 (NR-733)
+        && r_timelapse(i, b.prehistory_timelapse) // save_game_version 3 (NR-733)
+        && r_timelapse(i, b.exploration_timelapse); // save_game_version 14 (BL-946)
 }
 
 void w_report(std::ostream& o, const generation_report& g)
@@ -589,6 +591,11 @@ void w_report(std::ostream& o, const generation_report& g)
     w_i64(o, g.prehistory_corridors);
     w_i64(o, g.prehistory_junctions);
     w_i64(o, g.markets_from_trade);
+    // save_game_version 14 (BL-946, the Exploration span's own counters) -- keep r_report in step.
+    w_i64(o, g.exploration_years);
+    w_i64(o, g.exploration_battles);
+    w_i64(o, g.exploration_conquests);
+    w_i64(o, g.exploration_foundings);
 }
 
 bool r_report(std::istream& i, generation_report& g)
@@ -601,7 +608,10 @@ bool r_report(std::istream& i, generation_report& g)
         && r_i64(i, g.prehistory_conquests) && r_i64(i, g.prehistory_foundings)
         // save_game_version 8 (BL-768) -- keep w_report in step.
         && r_i64(i, g.prehistory_corridors) && r_i64(i, g.prehistory_junctions)
-        && r_i64(i, g.markets_from_trade);
+        && r_i64(i, g.markets_from_trade)
+        // save_game_version 14 (BL-946) -- keep w_report in step.
+        && r_i64(i, g.exploration_years) && r_i64(i, g.exploration_battles)
+        && r_i64(i, g.exploration_conquests) && r_i64(i, g.exploration_foundings);
 }
 
 // ---------------------------------------------------------------------------

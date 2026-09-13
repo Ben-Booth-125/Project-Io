@@ -1,5 +1,6 @@
 -- The lapse rounds' presses, made for real (BL-829; split into two rounds by
--- BL-860, 2026-09-09).
+-- BL-860, 2026-09-09; a third lapse round -- Exploration -- added by BL-946,
+-- 2026-09-13).
 --
 --   ProjectIo --verify scripts/verify/history_lapse_press.lua
 --
@@ -16,6 +17,12 @@
 -- longer exists, so three assertions failed on a healthy round -- the script was
 -- wrong, not the code. Restoring the button to keep a check green would have
 -- been the wrong repair.
+--
+-- BL-946 ADDS A THIRD LAPSE ROUND, Exploration, between Empires and the
+-- renamed Digitisation placeholder: the wizard now walks SIX rounds --
+-- System, Life, Culture, Empires, Exploration, Digitisation -- and
+-- Culture/Empires/Exploration all replay a real, recorded span on the same
+-- shared engine (EXPLORATION.md sec The engine is shared).
 --
 -- A1 IS NOW THE INTERESTING ONE, and it is why this script walks rather than
 -- parks. The auto-start hangs off the round-3 NEXT press, so a script that jumps
@@ -35,9 +42,10 @@ verify.window(1920, 1080)
 -- TWO FOOTER ROWS, NOT ONE. Round 3's footer sits under its Drawdown preference
 -- block; the PASS rounds have no preference block at all, so theirs sits lower.
 -- Both were read off captures rather than derived, and a pass round's footer is
--- the same on every one of them because the decision block is empty on all three.
+-- the same on every one of them because the decision block is empty on all
+-- four (Culture carries its own Drawdown row, the other three carry none).
 local NEXT3_X,  NEXT3_Y  = 603, 975   -- the last planetology round's Next
--- BL-914 (2026-09-11): Restart is retired on both lapse rounds -- a scrubber
+-- BL-914 (2026-09-11): Restart is retired on every lapse round -- a scrubber
 -- makes it redundant and its row went to the ranking board. The SAME slot is
 -- now the Pause/Play toggle; a landed round is parked (paused) under --verify
 -- (m_golden_dir set), so this button reads "Play", and pressing it both
@@ -54,9 +62,9 @@ local NEXTP_X,  NEXTP_Y  = 603, 995   -- a pass round's Next
 verify.generation_stage(1)
 verify.frames(4)
 local round, rounds = verify.wizard_round()
-verify.expect(rounds == 5,
-              "the wizard walks FIVE rounds -- System, Life, Culture, Empires, "
-              .. "Industrialisation (got " .. rounds .. ")")
+verify.expect(rounds == 6,
+              "the wizard walks SIX rounds -- System, Life, Culture, Empires, "
+              .. "Exploration, Digitisation (got " .. rounds .. ")")
 verify.expect(round == 1, "parked on round 2, Life (0-based " .. round .. ")")
 verify.expect(verify.history_powers() == 0,
               "round 2 carries no history record (the case is not pre-loaded)")
@@ -120,16 +128,11 @@ verify.capture("press_03_after_reroll")
 
 -- ── BL-860: THE HISTORY IS ITS OWN ROUND ──────────────────────────────────
 --
--- A5 -- ROUND 5 RUNS ITS OWN PASS ON ARRIVAL. The auto-start is generic now
--- rather than round 4's special case, so the Next press that moves onto round 5
--- starts round 5's pass exactly as round 3's started round 4's. `history_powers`
--- reads the round the wizard is ON, so a record here is round 5's own record and
--- not round 4's showing through.
---
--- What this does NOT claim: that the two rounds replay DIFFERENT spans. They do
--- not yet -- generation still emits one recorded age, and the rounds say so on
--- screen. The generation-side split is BL-858/BL-861, and asserting a difference
--- here would be asserting a design the code has not delivered.
+-- A5 -- ROUND 4 (EMPIRES) RUNS ITS OWN PASS ON ARRIVAL. The auto-start is
+-- generic now rather than round 3's special case, so the Next press that
+-- moves onto round 4 starts round 4's pass exactly as round 3's started
+-- round 3's. `history_powers` reads the round the wizard is ON, so a record
+-- here is round 4's own record and not round 3's showing through.
 verify.click(NEXTP_X, NEXTP_Y)
 verify.frames(6)
 round = select(1, verify.wizard_round())
@@ -175,46 +178,79 @@ verify.history_year(park)
 verify.frames(2)
 verify.capture("press_04c_round4_break_away")
 
--- A6 -- ROUND 5's REROLL IS ITS OWN. Same slot, different round: it must leave a
--- record on round 5 rather than clearing it or acting on round 4's.
+-- A6 -- ROUND 4's REROLL IS ITS OWN. Same slot, different round: it must leave a
+-- record on round 4 rather than clearing it or acting on round 3's.
 verify.click(REROLL_X, REROLL_Y)
 verify.frames(6)
 verify.expect(verify.history_powers() > 0,
               "Reroll re-runs round 4's pass and leaves a record on the round")
 verify.capture("press_05_round5_after_reroll")
 
--- A7 -- NEXT FROM 5 LANDS ON 6, THE SUBSTRATE. The last round, so its press is
--- "Begin" and this script does not touch it -- pressing it would generate a world
--- and leave the wizard entirely.
+-- ── BL-946: EXPLORATION IS THE THIRD LAPSE ROUND ──────────────────────────
+--
+-- A7 -- NEXT FROM 4 (EMPIRES) LANDS ON 5, EXPLORATION -- the round runs its
+-- own span (1200 -> 1660 CE) on arrival, on the SAME auto-start every other
+-- lapse round uses, and its record is its OWN (`exploration_timelapse`), not
+-- the Empires round's showing through.
+verify.click(NEXTP_X, NEXTP_Y)
+verify.frames(6)
+round = select(1, verify.wizard_round())
+verify.expect(round == 4, "NEXT on round 4 lands on round 5, EXPLORATION (0-based "
+                          .. round .. ")")
+local r6 = verify.history_powers()
+verify.expect(r6 > 0,
+              "round 5 (Exploration) runs its OWN pass on arrival (" .. r6 .. " powers)")
+local exp_first, exp_last = verify.history_span()
+verify.expect(exp_last > exp_first,
+              "Exploration's own record spans years (" .. exp_first .. " -> "
+              .. exp_last .. ")")
+verify.capture("press_06_round6_exploration")
+
+-- A11 -- EXPLORATION'S OWN REROLL, same slot, same contract as A4/A6: it must
+-- leave a record on THIS round, not clear it or touch Empires' above it.
+verify.click(REROLL_X, REROLL_Y)
+verify.frames(6)
+verify.expect(verify.history_powers() > 0,
+              "Reroll re-runs round 5's (Exploration) pass and leaves a record "
+              .. "on the round")
+verify.capture("press_07_round6_after_reroll")
+
+-- A12 -- NEXT FROM 5 (EXPLORATION) LANDS ON 6, DIGITISATION -- the last round,
+-- still the honest empty placeholder BL-914 built (renamed from
+-- Industrialisation; BL-946 does not build its content). Its own press is
+-- "Begin" and this script does not touch it -- pressing it would generate a
+-- world and leave the wizard entirely.
 verify.click(NEXTP_X, NEXTP_Y)
 verify.frames(4)
 round = select(1, verify.wizard_round())
-verify.expect(round == 4, "NEXT on round 4 lands on round 5, INDUSTRIALISATION (0-based "
+verify.expect(round == 5, "NEXT on round 5 lands on round 6, DIGITISATION (0-based "
                           .. round .. ")")
-verify.capture("press_06_round6_substrate")
+verify.capture("press_08_round7_digitisation")
 
 -- A8 -- BACK WALKS THE LADDER DOWN ONE RUNG AT A TIME, and a finished record is
 -- NOT discarded and re-run on the way past. That guard is the reason the
 -- auto-start is conditioned on the arriving round being empty.
--- These two checks were off by one round (BL-904): BL-863 dropped
--- planetology_rounds from 3 to 2, so the wizard shrank from six rounds to
--- five and INDUSTRIALISATION became the LAST round (0-based 4), not a "round
--- 6" past it. Back from round 4 lands on round 3, and Back from round 3 lands
--- on round 2 -- the navigation was always correct; only these two expected
--- values were stale.
 verify.click(BACKP_X, BACKP_Y)
 verify.frames(4)
 round = select(1, verify.wizard_round())
-verify.expect(round == 3, "Back from round 4 lands on round 3, EMPIRES (0-based "
+verify.expect(round == 4, "Back from round 6 lands on round 5, EXPLORATION (0-based "
                           .. round .. ")")
 verify.expect(verify.history_powers() > 0,
-              "round 3's record survived the trip to round 4 and back")
+              "round 5's (Exploration) record survived the trip to round 6 and back")
 
 verify.click(BACKP_X, BACKP_Y)
 verify.frames(4)
 round = select(1, verify.wizard_round())
-verify.expect(round == 2, "Back from round 3 lands on round 2, CULTURE (0-based "
+verify.expect(round == 3, "Back from round 5 lands on round 4, EMPIRES (0-based "
                           .. round .. ")")
 verify.expect(verify.history_powers() > 0,
-              "round 2's record survived the walk up to round 4 and back")
-verify.capture("press_07_back_on_round4")
+              "round 4's record survived the walk up to round 6 and back")
+
+verify.click(BACKP_X, BACKP_Y)
+verify.frames(4)
+round = select(1, verify.wizard_round())
+verify.expect(round == 2, "Back from round 4 lands on round 3, CULTURE (0-based "
+                          .. round .. ")")
+verify.expect(verify.history_powers() > 0,
+              "round 3's record survived the walk up to round 6 and back")
+verify.capture("press_09_back_on_round4")

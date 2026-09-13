@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**54 surfaces** — 8 settled, 46 awaiting Ben's wording.
+**55 surfaces** — 8 settled, 47 awaiting Ben's wording.
 
 ---
 
@@ -382,6 +382,14 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 *Demanded by BL-785 · `src/ui/selection_panel.cpp` · id `water_tile_selection`*
 
+### New World wizard - round 6, Exploration
+
+**Answers:** Who reaches beyond this ground, and what do they bring back?
+
+**Because:** BL-946 (Ben, 2026-09-13, resolving NR-847/NR-857): the Exploration span (1200 -> 1660 CE, EXPLORATION.md) was running opt-in behind `exploration_sim_enabled` and invisible to the player - a real generation pass with no wizard round to show it. The default flips to TRUE and this round replays it on the same shared engine and the same lapse map as Culture and Empires, stopped at its own close (`world_gen_config::stop_after_exploration`) before borders, roads and companies are built. ITS OWN RECORD, NOT A REUSE OF THE EMPIRES ONE: `generation_report::body_entry::exploration_timelapse` is recorded at the one call site that runs the span (as_timelapse(kepler_exploration_hs)) and wired through the SAME `progress->lapse_tap` publish path Culture and Empires already use, so the round shows a real, growing map rather than a silent hang followed by an empty pane - this is also what gives BL-943's fleet/caravan exemplars and BL-932's capital-consolidation burst real Exploration-span events to draw, closing the exact gap NR-857 named. Its own battle/conquest/founding counters (`exploration_*` on `generation_report`) are shown rather than the Empires round's, because the two spans are not the same age.
+
+*Demanded by BL-816, BL-829, BL-860, BL-931, BL-937, BL-943, BL-946 · `src/ui/startup_screens.cpp`, `src/ui/history_lapse.cpp`, `src/world/hard_coded_world.cpp`, `src/world/hard_coded_world.hpp`, `src/core/app.hpp` · id `wizard_round_exploration`*
+
 ### New World wizard - round 5, The History
 
 **Answers:** Who claimed this ground, and who lost it, in the age before the epoch?
@@ -390,13 +398,13 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 *Demanded by BL-816, BL-829, BL-860, BL-916, BL-915, BL-943 · `src/ui/startup_screens.cpp`, `src/ui/history_lapse.cpp`, `src/core/app.hpp` · id `wizard_round_history`*
 
-### New World wizard - round 6, The Substrate
+### New World wizard - round 7, Digitisation
 
 **Answers:** What does that ground produce, and who trades it?
 
-**Because:** Rounds 4 and 5 settle who reached this ground and who then held it; what that ground PRODUCES is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Currently an honest labelled placeholder.
+**Because:** Rounds 4, 5 and 6 settle who reached this ground, who then held it, and who reached beyond it; what that ground PRODUCES is a separate question with its own expensive pass, so it is its own page with its own run and reroll (Ben, 2026-09-08) rather than a coda. It also carries the wizard's one generating press. Renamed from Industrialisation to Digitisation (BL-946, Ben 2026-09-13) as the honest label for everything after 1660 CE; still the same labelled placeholder BL-914 built, and Digitisation's own content is out of BL-946's scope.
 
-*Demanded by BL-816, BL-819, BL-824, BL-860 · `src/ui/startup_screens.cpp` · id `wizard_round_substrate`*
+*Demanded by BL-816, BL-819, BL-824, BL-860, BL-946 · `src/ui/startup_screens.cpp` · id `wizard_round_substrate`*
 
 ---
 
@@ -454,9 +462,9 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 **Answers:** Which powers are rising and which are falling as the centuries pass?
 
-**Because:** Ordered and capped is the design, not a display convenience: sixteen rows re-ranking is the surface that shows RISE AND FALL, and an uncapped list of everything would show none of it. It orders by SHARE OF LAND - the honest default for rounds about ground, and the one metric the ownership record alone can answer. Rows are POLITIES, not settlements, because a settlement cannot rise and fall against a rival. Drawn on BOTH lapse rounds (4 and 5) from that round's own record, rather than once on a fused round. Population and Might (the military capacity band, 1-6) are drawn from BL-817's per-polity sample series at the recorded step at or before the playhead, so the board and the map show one instant; the order stays share of land, the two columns qualify a row rather than rank it. A RESEARCH column is refused outright, because research points accrue from population under BL-822 and the column would show a correlation it never measured - on the board Ben is judging the research levers with.
+**Because:** Ordered and capped is the design, not a display convenience: sixteen rows re-ranking is the surface that shows RISE AND FALL, and an uncapped list of everything would show none of it. It orders by SHARE OF LAND - the honest default for rounds about ground, and the one metric the ownership record alone can answer. Rows are POLITIES, not settlements, because a settlement cannot rise and fall against a rival. Drawn on ALL THREE lapse rounds (4, 5 and 6, BL-946 added the third) from that round's own record, rather than once on a fused round. Population and Might (the military capacity band, 1-6) are drawn from BL-817's per-polity sample series at the recorded step at or before the playhead, so the board and the map show one instant; the order stays share of land, the two columns qualify a row rather than rank it. A RESEARCH column is refused outright, because research points accrue from population under BL-822 and the column would show a correlation it never measured - on the board Ben is judging the research levers with.
 
-*Demanded by BL-830, BL-860, BL-916 · `src/ui/history_lapse.cpp` · id `wizard_round_history_board`*
+*Demanded by BL-830, BL-860, BL-916, BL-946 · `src/ui/history_lapse.cpp` · id `wizard_round_history_board`*
 
 ### New World wizard - round 4, The Migration
 

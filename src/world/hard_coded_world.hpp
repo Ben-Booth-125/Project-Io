@@ -143,7 +143,12 @@ struct world_params
     /// _span(params)`) — a two-span (>= 1700) epoch's own industrial arc
     /// already plays past 1660 on a different calendar mapping, and stacking
     /// this on top of it is a question this item does not answer.
-    bool exploration_sim_enabled = false;
+    /// DEFAULT FLIPPED TO TRUE (Ben, 2026-09-13, BL-946, resolving NR-847):
+    /// the wizard now shows an Exploration round and it must have something
+    /// real to run. This re-baselines `region::nation` to the 1660 CE map for
+    /// every generated world -- authorised, not a silent re-bless; see
+    /// world_determinism's re-recorded digest in the DEVLOG.
+    bool exploration_sim_enabled = true;
 
     /// The calendar year the Exploration span closes. Default 1660 is
     /// EXPLORATION.md's own span end; exposed as a field on the same footing
@@ -487,6 +492,13 @@ struct generation_report
         /// moved `save_game_version` to 3.
         era_timelapse prehistory_timelapse;
 
+        /// THE EXPLORATION SPAN'S OWN RECORD (BL-946), same shape and same
+        /// discipline as `prehistory_timelapse` above -- recorded, never
+        /// re-simulated. Empty wherever `exploration_sim_enabled(params)` did
+        /// not run (an opted-out world, or any body but the cradle). This is
+        /// what the wizard's new Exploration round replays.
+        era_timelapse exploration_timelapse;
+
         /// Exactly what `generate_body_tiles` was called with for this body — the
         /// arguments that are NOT recoverable from anything else the report or the
         /// world holds (the seed above all: Kepler's is chosen by the BL-276
@@ -537,6 +549,15 @@ struct generation_report
     int64_t prehistory_battles   = 0; ///< Battles fought in that span.
     int64_t prehistory_conquests = 0; ///< Regions that changed hands.
     int64_t prehistory_foundings = 0; ///< Regions founded by the sim.
+
+    // --- The Exploration span's own counters (BL-946), same discipline as
+    // the four above -- zero wherever `exploration_sim_enabled(params)` did
+    // not run (an opted-out world, or a report stopped before it, e.g. the
+    // wizard's Empires round).
+    int64_t exploration_years     = 0; ///< Years simulated in the Exploration span.
+    int64_t exploration_battles   = 0; ///< Battles fought in that span.
+    int64_t exploration_conquests = 0; ///< Regions that changed hands.
+    int64_t exploration_foundings = 0; ///< Regions founded (trade provinces) in that span.
 
     // --- What the grudge record seeded (BL-898) -----------------------------
     //

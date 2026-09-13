@@ -36,6 +36,98 @@
    "requires": [
     "BL-940"
    ]
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-13",
+   "author": "Ben (2026-09-13, live review); Claude (itemised)",
+   "requires": [
+    "BL-946"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "id": "BL-948",
+   "short_name": "LAPSE_TIMELAPSE_SPEED_CONTROL",
+   "priority": "B",
+   "difficulty": 4,
+   "title": "A speed control (45s / 90s / 180s) on every lapse round's time-lapse, default 90 seconds",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/history_lapse.cpp",
+    "src/ui/history_lapse.hpp",
+    "src/ui/startup_screens.cpp",
+    "docs/ai/ACTIONS.json",
+    "docs/ui/question_log.json"
+   ],
+   "design": "BEN, 2026-09-13: time-lapses currently run too fast to observe what is happening. Target the FULL playback (start year to end year, unskipped) at 90 seconds by default, and add a speed-control element present in EVERY lapse round (Culture, Empires, and the new Exploration round from BL-946) offering three settings: 45 seconds, 90 seconds, 180 seconds -- the user can also already skip ahead or scrub via the existing playhead/scrubber, this control is about the AUTOPLAY rate, not a replacement for scrubbing.\n\nWHERE THE RATE LIVES TODAY. Find whatever currently drives year-per-frame or year-per-second in `history_lapse.cpp`'s playback (a fixed constant, most likely) and make it a function of (span length in years) / (chosen duration in seconds), recomputed whenever the round's span or the chosen duration changes -- a round with a longer span at the same duration setting must move faster per frame, not take longer wall-clock time, since the target is WALL-CLOCK duration, not years-per-second.\n\nTHE CONTROL ITSELF. Three-way selector (45s / 90s / 180s), same visual language as other wizard toggles (Sparse/Lean/Standard on the main menu is the nearest precedent for a three-way radio-style control). Persisted per-session is fine; it does not need to survive a restart unless that's trivial. Update `docs/ai/ACTIONS.json` for the new control and `docs/ui/question_log.json` for the surface it lives on.\n\nDONE WHEN: all three lapse rounds (Culture, Empires, Exploration) expose the same speed control; selecting 45s/90s/180s visibly changes the playback rate; the default is 90s; a live click confirms the control is reachable and does what it says."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-13",
+   "author": "Ben (2026-09-13, live review); Claude (itemised from NR-849)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-949",
+   "short_name": "POST_ROAD_RUNG_ACTUALLY_FIRES",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "Tune the road ladder's third rung so Post Roads actually fires on a sweep",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-13, resolving NR-849: tune it now rather than wait for later waves. `post_roads_built` totalled 0 across every sweep run this sprint (8+ seeds) -- the third rung (Post Roads, EX-WY-1a) needs a polity to hold the tree node, sit on a tier-2 corridor, AND have enough treasury simultaneously, and that conjunction never occurred. Lower `post_road_treasury_cost` (find the exact constant name in history_sim.cpp, landed with BL-940) and/or the tier-2-corridor-uses threshold that gates eligibility, and re-sweep (`exploration_sweep`) to confirm the rung fires in a meaningful share of worlds without becoming trivial (every corridor promoting immediately would be as uninformative as none ever doing so). Measure before and after, report both.\n\nDONE WHEN: a sweep shows `post_roads_built` > 0 in a clear majority of seeds (not 0/N, not automatically N/N), and `treasury_spent_on_roads` correlates sensibly with the polities that built one."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-13",
+   "author": "Ben (2026-09-13, live review); Claude (itemised from NR-855)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-950",
+   "short_name": "DISPLACEMENT_CLEARS_THE_BAR",
+   "priority": "A",
+   "difficulty": 5,
+   "title": "Push the near/far cost split further so the displacement reading reliably clears its own bar",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-13, resolving NR-855: push further rather than accept 0.88 as the resting state. BL-941's deterrence (Ceiling/Alarm at polity grain, wired into `treaty_value_q`'s near-home Alarm bonus and a flat `treaty_far_penalty_q` for distant pairs) moved the median displacement ratio from 0.01/0.16 up to 0.88 across a 3-seed sweep -- real progress, one seed already cleared 1.0, but the median has not. Strengthen the SAME mechanism rather than inventing a second one: widen the gap between the near-home Alarm bonus and the far-away penalty (both already exist in history_sim.cpp from BL-941), and/or extend Alarm's read of visible capability (standing army + navy) to weight more heavily on a longer-held border. Re-sweep at a WIDER seed count (16, not 3, per NR-855's own note that 3 seeds was chosen for runtime, not confidence) before judging the reading settled either way.\n\nDo not touch the non-aggression block itself (BL-933) or the ratio's own definition (BL-948's operationalisation, confirmed correct by Ben 2026-09-13) -- this item is about the deterrence STRENGTH, not the measurement or the blocking mechanism.\n\nDONE WHEN: a 16-seed sweep shows the median displacement ratio clears 1.0, conflict still persists (reading 2 stays green -- total conflict well above zero), and the change is a measured strengthening of BL-941's existing mechanism, not a new one bolted on."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-13",
+   "author": "Ben (2026-09-13, live review); Claude (itemised from NR-856)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-951",
+   "short_name": "STRENGTH_METRIC_READS_STRATEGY_FAIRLY",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "Reading 3's \"strongest realms\" metric moves from region count to treasury/throughput rank",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-13, resolving NR-856: change the ranking metric before concluding the creed mapping itself needs revisiting. Reading 3 (\"both strategies pay\") ranked a world's \"strongest realms\" by region count, which structurally favours EXPANSION over consolidation -- a consolidator by definition holds the SAME ground worked harder, so it can never outrank an expansionist on a region-count axis regardless of how strong its creed-derived disposition actually is. Change the ranking to something consolidation-sensitive: treasury (BL-932) and/or corridor throughput (BL-940) rank, or a composite, rather than region count alone. Re-sweep (wider than 3 seeds -- NR-856 flagged the sample as too small either way) and report whether a consolidator now appears among the strongest realms on some seeds.\n\nDo NOT touch the Empire-phase creed axes (zeal/dominion/sea_legs_q) themselves in this item -- if the new metric STILL shows no consolidator ever qualifying, that is the evidence needed to justify BL-942's own named upstream fix as a SEPARATE, later item, not something to force here.\n\nDONE WHEN: reading 3 ranks realms by treasury/throughput instead of region count, and the sweep's reported finding (consolidators appear now, or they genuinely still do not even on a fair metric) is stated plainly either way."
   }
  ]
 }

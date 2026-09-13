@@ -146,18 +146,24 @@ namespace {
 /// three era counters. Nothing is re-simulated and nothing is re-derived — see
 /// `app::launch_wizard_history_run` for why that matters more than it looks.
 ///
-/// @param migration  True for the Culture round (lapse_index 0), whose owners
-///                   are CULTURES and which therefore carries the lineage
-///                   palette (BL-919). The Empires round's owners are polities
-///                   and it carries none.
+/// @param lapse_index Which lapse round this is: 0 = Culture (the migration),
+///                   1 = Empires, 2 = Exploration (BL-946). Culture's owners
+///                   are CULTURES and it therefore carries the lineage
+///                   palette (BL-919); Empires and Exploration's owners are
+///                   polities and carry none. Exploration reads its own
+///                   recorded span (`exploration_timelapse`) rather than the
+///                   Empires round's `prehistory_timelapse`.
 /// @param adopted    True when the report is the harness's own finished world
 ///                   rather than a run stopped at this round's end. A finished
 ///                   report's record is the Empires sim's, so the Culture round
 ///                   folds the migration's own out of the settlement instead —
 ///                   the same fold generation makes, on the same regions.
-ui::history_lapse lapse_from_report(const generation_report& rep, bool migration,
+ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_index,
                                     bool adopted)
 {
+    const bool migration   = lapse_index == 0;
+    const bool exploration = lapse_index == 2;
+
     ui::history_lapse h;
 
     // The homeworld by its authored flag, not by name or position: names are
@@ -167,7 +173,7 @@ ui::history_lapse lapse_from_report(const generation_report& rep, bool migration
         if (b.is_homeworld) { home = &b; break; }
     if (home == nullptr) return h;
 
-    h.lapse  = home->prehistory_timelapse;
+    h.lapse  = exploration ? home->exploration_timelapse : home->prehistory_timelapse;
     h.grid_w = home_grid_width;
     h.grid_h = home_grid_height;
 
@@ -219,9 +225,12 @@ ui::history_lapse lapse_from_report(const generation_report& rep, bool migration
 
     if (!(migration && adopted))
     {
-        h.battles   = rep.prehistory_battles;
-        h.conquests = rep.prehistory_conquests;
-        h.foundings = rep.prehistory_foundings;
+        // BL-946: Exploration reads its OWN counters -- the Empires round's
+        // battles/conquests/foundings describe a different span entirely, and
+        // showing them on this round would misreport what it actually ran.
+        h.battles   = exploration ? rep.exploration_battles   : rep.prehistory_battles;
+        h.conquests = exploration ? rep.exploration_conquests : rep.prehistory_conquests;
+        h.foundings = exploration ? rep.exploration_foundings : rep.prehistory_foundings;
     }
     return h;
 }
@@ -274,7 +283,7 @@ void app::launch_wizard_history_run(int lapse_index)
     if (!m_golden_dir.empty())
     {
         ui::history_lapse adopted = lapse_from_report(m_generation_report,
-                                                      /*migration=*/lapse_index == 0,
+                                                      lapse_index,
                                                       /*adopted=*/true);
         if (!adopted.empty())
         {
@@ -291,21 +300,26 @@ void app::launch_wizard_history_run(int lapse_index)
     cfg.load_from_lua(m_lua);
     ensure_works_loaded();
 
-    // STOP WHERE THIS ROUND'S OWN SPAN ENDS, AND NO FURTHER (BL-871). The two
-    // rounds are no longer one fused pass replayed twice: round 3 (Culture,
-    // lapse_index 0) wants the migration's own record and must stop BEFORE
-    // the Empires round's history sim ever starts, while round 4 (Empires,
-    // lapse_index 1) wants that sim's record and stops once IT has run, before
-    // borders, roads and companies — stages 9-12 — are computed and thrown
-    // away (measured 10,805 ms of 11,316, about 95% of the wait, and why the
-    // round visibly hung on "Laying roads", Ben, 2026-09-09).
+    // STOP WHERE THIS ROUND'S OWN SPAN ENDS, AND NO FURTHER (BL-871, extended
+    // to a third span by BL-946). The three lapse rounds are no longer one
+    // fused pass replayed thrice: round 3 (Culture, lapse_index 0) wants the
+    // migration's own record and must stop BEFORE the Empires round's history
+    // sim ever starts; round 4 (Empires, lapse_index 1) wants that sim's
+    // record and stops once IT has run, before the Exploration span or
+    // borders/roads/companies are computed and thrown away; round 5
+    // (Exploration, lapse_index 2) wants ITS OWN span's record and stops once
+    // it has run, before borders, roads and companies — stages 9-12 — are
+    // computed and thrown away (measured 10,805 ms of 11,316, about 95% of
+    // the wait, and why the round visibly hung on "Laying roads", Ben,
+    // 2026-09-09).
     //
     // Note this is set on the COPY the worker takes, never on the campaign's:
     // `begin_new_game` builds a whole world from its own config, and a world
-    // stopped at either point has no nations, roads or corporations in it.
+    // stopped at any of these points has no nations, roads or corporations in it.
     world_gen_config hist_cfg = cfg;
-    if (lapse_index == 0) hist_cfg.stop_after_migration   = true;
-    else                  hist_cfg.stop_after_ancient_era = true;
+    if (lapse_index == 0)      hist_cfg.stop_after_migration   = true;
+    else if (lapse_index == 1) hist_cfg.stop_after_ancient_era = true;
+    else                       hist_cfg.stop_after_exploration = true;
 
     auto run = [this, hist_cfg, lapse_index, params = m_pending_world_params]() {
         generation_report rep;
@@ -314,7 +328,7 @@ void app::launch_wizard_history_run(int lapse_index)
         // copy of the campaign's own.
         (void)make_hard_coded_world(params, &rep, hist_cfg,
                                     &m_wiz_history_progress[lapse_index], &m_works);
-        return lapse_from_report(rep, /*migration=*/lapse_index == 0, /*adopted=*/false);
+        return lapse_from_report(rep, lapse_index, /*adopted=*/false);
     };
 
     if (!m_golden_dir.empty())
@@ -640,8 +654,8 @@ namespace {
 /// helpers are free functions. draw_generation_screen static_asserts the pair against
 /// the real constants, so a drift here is a compile error, not a wrong layout.
 constexpr int planetology_rounds = 2;  // System, Life (BL-863)
-constexpr int pass_rounds        = 3;  // Culture, Empires, Industrialisation
-constexpr int lapse_rounds       = 2;
+constexpr int pass_rounds        = 4;  // Culture, Empires, Exploration, Digitisation (BL-946)
+constexpr int lapse_rounds       = 3;  // Culture, Empires, Exploration all replay a real record
 
 /// Empires' historical-turbulence caption, shared between the layout-height
 /// estimate below and the actual draw call in the round switch, so the two
@@ -716,7 +730,16 @@ wizard_round_head wizard_round_head_at(int r)
           // Titled to what it plays rather than left aspirational, on the rule
           // that a surface must not assert something the code has not delivered.
           "Who claimed this ground, and who lost it, in the age before the epoch?" },
-        { "Industrialisation",
+        { "Exploration",
+          // BL-946: the fourth pre-game round, on the same shared engine as
+          // Empires (EXPLORATION.md sec The engine is shared) -- 1200 to 1660
+          // CE, where conflict moves off the home coast and a treasury, a
+          // fleet and a treaty become real.
+          "Who reaches beyond this ground, and what do they bring back?" },
+        { "Digitisation",
+          // Renamed from "Industrialisation" (BL-946); still the honest empty
+          // placeholder BL-914 built -- Digitisation's own content is out of
+          // this item's scope.
           "What does that ground produce, and who trades it?" },
     };
     int i = r - planetology_rounds;
@@ -729,8 +752,9 @@ wizard_round_head wizard_round_head_at(int r)
 /// a placeholder in as many words: an unlabelled empty pane reads as a finished
 /// surface, and the next session believes it.
 ///
-/// Only round 6 reaches this now — rounds 4 and 5 both play a real record — so it
-/// no longer branches on which pass round asked.
+/// Only the Digitisation round reaches this now — Culture, Empires and
+/// Exploration all play a real record (BL-946) — so it no longer branches on
+/// which pass round asked.
 void draw_pass_round_placeholder()
 {
     constexpr ImU32 col_dim   = IM_COL32(120, 128, 145, 255);
@@ -743,7 +767,7 @@ void draw_pass_round_placeholder()
 
     ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
     ImGui::TextWrapped(
-        "Round 6 will run the economy pass: 1560 to 1960, then the substrate carve - "
+        "Digitisation will run the economy pass: 1660 to 1960, then the substrate carve - "
         "metros, colonial reach, firms and their charters, and the market carve. "
         "Nothing runs yet; the globe beside this is still the planetology globe.");
     ImGui::Spacing();
@@ -881,7 +905,7 @@ void app::draw_generation_screen()
     // wizard round the code hands to ui::chain_round_at has a chart-round entry
     // behind it. It was written as an equality only because the two numbers happened
     // to be the same when the wizard was planetology and nothing else. They are not
-    // the same number any more — the wizard walks five rounds, the chart chain still
+    // the same number any more — the wizard walks six rounds, the chart chain still
     // covers three — so the equality is re-expressed as the two facts it stood for:
     // the chart chain covers exactly the planetology rounds, and the planetology
     // rounds are a strict prefix of the wizard. Every chain_round_at call below is
@@ -910,8 +934,9 @@ void app::draw_generation_screen()
 
     // ── A LAPSE ROUND'S playback, advanced once per frame and read TWICE — the
     //    board on the left and the map on the right must show the same instant, so
-    //    the slice is materialised here rather than in each of them. Rounds 4 and 5
-    //    are both lapse rounds and each owns its own record slot. ──
+    //    the slice is materialised here rather than in each of them. Rounds 3, 4
+    //    and 5 (Culture, Empires, Exploration) are all lapse rounds and each owns
+    //    its own record slot (BL-946). ──
     const bool lapse_round =
         (!planetology_round && pass_index < wizard_lapse_round_count);
     const int  lapse_index = lapse_round ? pass_index : 0;
@@ -1153,7 +1178,8 @@ void app::draw_generation_screen()
         }
         else if (lapse_round)
         {
-            // ── Rounds 4 and 5: the wait, then the board (BL-829 / BL-830 / BL-860) ──
+            // ── Rounds 3, 4 and 5: the wait, then the board (BL-829 / BL-830 /
+            //    BL-860 / BL-946) ──
             //
             // THE TRANSPORT IS DELIBERATELY PLAIN. The wizard's standing premise —
             // *you set conditions here, you do not steer* — and the globe's own
@@ -1170,7 +1196,8 @@ void app::draw_generation_screen()
                 // reports its own year counter while it runs.
                 ImGui::BeginDisabled();
                 ImGui::Button(lapse_index == 0 ? "Running the migration..."
-                                               : "Running the history...",
+                              : lapse_index == 1 ? "Running the history..."
+                                                 : "Running the exploration...",
                               {ImGui::GetContentRegionAvail().x, 30.0f});
                 ImGui::EndDisabled();
                 ImGui::Spacing();
@@ -1210,10 +1237,15 @@ void app::draw_generation_screen()
                       "the pass behind it is the most expensive in the project, and it "
                       "cannot be re-rolled on every keystroke the way the planetology "
                       "rounds are."
-                    : "Claim and counter-claim from 400 BCE, run here rather than "
+                    : lapse_index == 1
+                    ? "Claim and counter-claim from 400 BCE, run here rather than "
                       "previewed: the history is the most expensive pass in the "
                       "project, and it cannot be re-rolled on every keystroke the way "
-                      "the planetology rounds are.");
+                      "the planetology rounds are."
+                    : "Treasuries, treaties and fleets from 1200 CE, run here rather "
+                      "than previewed: conflict moves off the home coast in this span, "
+                      "and it cannot be re-rolled on every keystroke the way the "
+                      "planetology rounds are.");
             }
             else
             {
@@ -1281,18 +1313,20 @@ void app::draw_generation_screen()
                 ui::draw_lapse_arc(rec);
 
                 ImGui::Spacing();
-                // WHAT THIS ROUND IS AND IS NOT (BL-871, then BL-906). The two
-                // rounds stop at different points — the migration at its own
-                // derived end year, the Empires sim at 1200 CE — so they do
+                // WHAT THIS ROUND IS AND IS NOT (BL-871, then BL-906, then
+                // BL-946). The three lapse rounds stop at different points —
+                // the migration at its own derived end year, the Empires sim
+                // at 1200 CE, the Exploration span at 1660 CE — so they do
                 // not replay the same recorded age. BL-906 (2026-09-11) closed
                 // the gap this note used to name: the Empires round now runs
                 // its full 400 BCE -> 1200 CE span, decoupled from the epoch
-                // (`CIVILISATION.md` § The span is 400 BCE to 1200 CE). Round
-                // 5 / Industrialisation is still a placeholder, but that no
-                // longer bears on this round's own span.
+                // (`CIVILISATION.md` § The span is 400 BCE to 1200 CE).
                 if (lapse_index == 1)
                     dim_text("This round's own span, separate from round 3's migration — "
                              "the full 400 BCE to 1200 CE the design asks for.");
+                else if (lapse_index == 2)
+                    dim_text("This round's own span, 1200 to 1660 CE — where conflict "
+                             "moves off the home coast (docs/generation/EXPLORATION.md).");
             }
         }
         else
@@ -1509,10 +1543,14 @@ void app::draw_generation_screen()
                     ImGui::TextWrapped(running
                         ? "  The migration is starting."
                         : "  The migration has not been run for this world yet.");
-                else
+                else if (lapse_index == 1)
                     ImGui::TextWrapped(running
                         ? "  The history is starting."
                         : "  The history has not been run for this world yet.");
+                else
+                    ImGui::TextWrapped(running
+                        ? "  The exploration is starting."
+                        : "  The exploration has not been run for this world yet.");
                 ImGui::PopStyleColor();
             }
             else
