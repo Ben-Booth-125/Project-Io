@@ -1240,6 +1240,18 @@ struct history_sim_params
     /// Zero makes conversion purely a question of distance.
     int universal_creed_alien_penalty_q = 0;
 
+    /// BL-944 — THE SCHISM VERB. A realm's REASSERTED ground (`region::
+    /// creed_hold == 3`) that is also ALIEN to the realm's own culture — its
+    /// `creed_residue_culture` differs from `polity::culture` — is exactly
+    /// CREEDS.md's fault line: an institution the realm adopted standing over
+    /// a people who answered with their own pantheon instead. This many held
+    /// regions of the SAME residue culture reasserting is what it takes for
+    /// that people to break away as their own polity, culture-grouped rather
+    /// than reach-grouped so the break can never be the same event as
+    /// BL-896/BL-923's network-failure secession. Zero disables the verb
+    /// entirely (reassertion still happens; it just never fractures a realm).
+    int schism_min_regions = 0;
+
     /// A CREED'S APPETITE FOR WAR, LEANING THE CAMPAIGN SCORE (BL-868;
     /// CIVILISATION.md sec Armies come from creeds, and only some peoples raise
     /// them). Per-mille pull, applied proportionally and SYMMETRICALLY around a
@@ -2433,8 +2445,9 @@ enum class grudge_kind : uint8_t
     border_raided,     ///< A battle was fought that transferred nothing.
     realm_ended,       ///< An extinguished realm's kin resent its killer.
     treaty_broken,     ///< BL-933: a bound clause was broken before its term ran out.
+    faith_sundered,    ///< BL-944: a schism broke away over creed, not reach.
 };
-inline constexpr int grudge_kind_count = 5;
+inline constexpr int grudge_kind_count = 6;
 
 /// Contributing events kept per pair. Fixed and small: the rest falls into the
 /// scalar, which is the sparse/bounded half of the design.
@@ -2966,6 +2979,17 @@ struct history_sim_state
     int64_t peoples_converted       = 0;
     int64_t peoples_reasserted      = 0;
     int64_t civilisations_formed = 0;
+
+    /// BL-944 — THE SCHISM: a realm fractures along the gap between its
+    /// adopted institution and a REASSERTED people's own pantheon, never
+    /// along reach. Counted separately from `secessions`/`regions_seceded`
+    /// on purpose — the two are read side by side so a schism can never
+    /// silently blend into a network-failure collapse in the reading. A
+    /// world where `peoples_reasserted` is non-zero but `schisms` is zero
+    /// is a legitimate world: reassertion alone is not yet a large enough
+    /// break to fracture a realm.
+    int64_t schisms         = 0;
+    int64_t regions_sundered = 0;
 
     // --- BL-926 — THE INSTRUMENT SEES THE ARC. Pure counters, decision-free.
     //

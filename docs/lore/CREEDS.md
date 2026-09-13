@@ -248,6 +248,27 @@ mechanically possible rather than merely motivated.
 
 ---
 
+## The schism verb (BL-944)
+
+**RAISE THE FLOOR, NOT A SECOND BINDING TERM (Ben, 2026-09-13).** Reassertion measured zero at
+delivery because BL-896/BL-923's secession floor had already stripped the badly-reached ground
+before the conversion test ever ran on it. The fix widens the ALIEN penalty specifically, not the
+shared convert floor — near, kindred ground still converts exactly as before; only ground whose
+people are not the realm's own culture needs a materially better-supplied realm to hold it. That
+keeps the widening on the one axis a schism is made of (kinship), not on distance in general.
+
+**A SCHISM IS GROUPED BY RESIDUE CULTURE, NEVER BY SEAT OR REACH.** This is the one choice that
+keeps a schism from ever being the same event as a network-failure secession read twice. BL-896's
+own block groups a realm's cut-off ground by its seat — a geographic test. A schism instead
+gathers every region a realm still holds that has REASSERTED (`region::creed_hold == 3`) and
+whose `creed_residue_culture` is not the realm's own, and groups THOSE by the residue culture they
+share, regardless of where they sit on the map. Enough of one people's ground answering together is
+what breaks a realm along faith; a single region dipping below the bind floor for a round is not.
+The break is recorded under its own cause (a `faith_sundered` grudge, a `schism` timelapse event,
+its own `schisms`/`regions_sundered` counters) precisely so the two readings never blend.
+
+---
+
 ## Globalisation and the common tongue
 
 For a modern-era epoch, generation closes with one fixed event (1951): the

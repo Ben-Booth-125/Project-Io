@@ -5932,6 +5932,152 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ++out.peoples_reasserted;
                 }
             }
+
+            // ---- (d) THE SCHISM -- A FAULT LINE, NOT A NETWORK FAILURE ----
+            //
+            // BL-944. CREEDS.md's fault line, made mechanical: an institution
+            // the realm adopted (`polity::universal_creed`) standing over
+            // ground whose people ANSWERED WITH THEIR OWN PANTHEON instead
+            // (`region::creed_hold == 3`, REASSERTED) and who are not the
+            // realm's own kin (`creed_residue_culture != culture`). Enough
+            // such ground of the SAME residue culture is what it takes for
+            // that people to walk away as its own polity.
+            //
+            // GROUPED BY CULTURE, NOT BY SEAT OR REACH -- the one choice that
+            // keeps this event from ever blending into BL-896/BL-923's
+            // network-failure secession above. That block groups a realm's
+            // CUT-OFF ground by its seat, a geographic, reach-driven test;
+            // this one groups a realm's REASSERTED ground by its RESIDUE
+            // CULTURE regardless of where it sits on the map, because a
+            // schism is a people answering together, not a hinterland losing
+            // its road. It is counted into `out.schisms`/`regions_sundered`
+            // and raises a `grudge_kind::faith_sundered` grudge -- never the
+            // `secessions`/`ground_taken` pair BL-896 uses -- so the two
+            // causes can never be read as one in `history_sweep`.
+            //
+            // AFTER THE LOOP, NEVER INSIDE IT, for the same reason BL-896
+            // gives above: a schism is a `push_back` onto `out.polities`,
+            // which would invalidate a `polity&` held across it. Everything
+            // below indexes rather than references.
+            //
+            // DETERMINISM: polities walked in id order, a realm's reasserted-
+            // and-alien ground collected in region-index order, then sorted
+            // by (residue culture, region index) so every culture's group is
+            // both contiguous and internally ordered with no container whose
+            // order is undefined; a group's seat is its LOWEST region index.
+            if (params.schism_min_regions > 0)
+            {
+                const std::size_t pol_count_schism = out.polities.size();
+                for (std::size_t pi = 0; pi < pol_count_schism; ++pi)
+                {
+                    if (!out.polities[pi].alive) continue;
+                    if (out.polities[pi].universal_creed < 0) continue;
+                    const int qid          = out.polities[pi].id;
+                    const int qcap         = out.polities[pi].capital;
+                    const int own_culture  = out.polities[pi].culture;
+
+                    // The reasserted, alien ground this realm still holds,
+                    // as (residue culture, region index) pairs -- sorting
+                    // this list is what turns it into contiguous groups.
+                    std::vector<std::pair<int, int>> alien_reasserted;
+                    for (std::size_t i = 0; i < n_reg_creed; ++i)
+                    {
+                        if (owner[i] != qid) continue;
+                        if (static_cast<int>(i) == qcap) continue; // a seat cannot secede from itself
+                        const region& rg2 = ss.regions[i];
+                        if (rg2.creed_hold != 3) continue;
+                        const int rc = rg2.creed_residue_culture;
+                        if (rc < 0 || rc == own_culture) continue;
+                        alien_reasserted.push_back({rc, static_cast<int>(i)});
+                    }
+                    if (alien_reasserted.empty()) continue;
+                    std::sort(alien_reasserted.begin(), alien_reasserted.end());
+
+                    for (std::size_t k = 0; k < alien_reasserted.size(); )
+                    {
+                        std::size_t j = k;
+                        while (j < alien_reasserted.size()
+                            && alien_reasserted[j].first == alien_reasserted[k].first)
+                            ++j;
+
+                        const int group_culture = alien_reasserted[k].first;
+                        std::vector<int> block;
+                        for (std::size_t m = k; m < j; ++m)
+                            block.push_back(alien_reasserted[m].second); // already index-ascending
+                        k = j;
+
+                        if (static_cast<int>(block.size()) < params.schism_min_regions) continue;
+                        if (out.polities.size() >= owner_index_limit) break;
+
+                        const int this_culture = group_culture;
+                        const int seat          = block.front(); // already the lowest index
+
+                        polity np;
+                        np.id      = static_cast<int>(out.polities.size());
+                        np.culture = this_culture;
+                        np.capital = seat;
+                        np.aggression_q =
+                            (cs && this_culture >= 0
+                             && this_culture < static_cast<int>(cs->cultures.size()))
+                                ? leaned_aggression_q(
+                                      params, cs->cultures[static_cast<std::size_t>(this_culture)].aggression_q)
+                                : 500; // BL-839: same lean the founding/secession reads above use.
+                        // INSTITUTIONS AND STANDING ARE INHERITED, exactly as
+                        // BL-896's secession inherits them above -- a people
+                        // that walks away over faith knows what its former
+                        // realm knew, and this invents no new dial for it.
+                        for (int d = 0; d < sim_domain_count; ++d)
+                        {
+                            np.capacity[d]   = out.polities[pi].capacity[d];
+                            np.progress_q[d] = out.polities[pi].progress_q[d];
+                        }
+                        np.cohesion_q      = out.polities[pi].cohesion_q;
+                        np.industrial_year = out.polities[pi].industrial_year;
+                        np.parent          = qid; // the lineage hook, same field BL-896/926 write.
+                        // `np.universal_creed` stays -1 (the struct default):
+                        // the whole point of a schism is a people that left
+                        // the institution its former realm still holds.
+                        out.polities.push_back(np);
+                        note_event(lapse_event_kind::schism, seat, np.id, qid);
+
+                        for (int r : block)
+                        {
+                            const std::size_t ri = static_cast<std::size_t>(r);
+                            owner[ri]             = np.id;
+                            ss.regions[ri].nation = np.id;
+                            touch_owner(qid);
+                            touch_owner(np.id);
+                            ss.regions[ri].seat_region = seat;
+                            ss.regions[ri].is_seat     = (r == seat);
+                            out.owner_changes.push_back(owner_change{
+                                static_cast<int32_t>(y),
+                                static_cast<uint16_t>(r),
+                                static_cast<uint16_t>(np.id)});
+                        }
+
+                        // A SCHISM IS A DEFEAT FOR THE PARENT TOO, through the
+                        // same cohesion channel every other loss uses.
+                        out.polities[pi].cohesion_q = clampi(
+                            out.polities[pi].cohesion_q - params.cohesion_loss_on_defeat_q,
+                            params.cohesion_floor_q, 1000);
+
+                        // THE DISTINCT GRUDGE: `faith_sundered`, never
+                        // `ground_taken` -- the readable cause is that a
+                        // people answered its own pantheon, not that a road
+                        // failed to reach them.
+                        raise_grudge(qid, np.id, grudge_kind::faith_sundered,
+                                     seat, y, params.grudge_ground_taken);
+
+                        ++out.schisms;
+                        out.regions_sundered += static_cast<int64_t>(block.size());
+                        out.history.push_back(history_event{
+                            years_from_calendar_year(y), chain_stage::legacy,
+                            ss.regions[static_cast<std::size_t>(seat)].name
+                                + " breaks away, its own pantheon reasserted against the creed",
+                            std::string{}});
+                    }
+                }
+            }
         }
 
         // Ownership changes are appended where they happen (conquest, founding),

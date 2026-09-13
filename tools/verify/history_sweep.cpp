@@ -220,6 +220,8 @@ struct sweep_row
     int64_t creed_adoptions   = 0; ///< ...realms that adopted one as an institution.
     int64_t creed_converted   = 0; ///< ...peoples whose pantheon faded to residue.
     int64_t creed_reasserted  = 0; ///< ...and peoples whose pantheon won instead.
+    int64_t schisms           = 0; ///< BL-944: reasserted realms that fractured over creed.
+    int64_t regions_sundered  = 0; ///< ...and the ground that walked away with THEM -- distinct from `regions_seceded`.
     int64_t reach_denied      = 0; ///< Refused by the BL-837 reach gate.
     // BL-922 -- the supply distribution over HELD ground at the epoch, read
     // off `region::network_supply_q` (the last decision round's reading) for
@@ -1234,6 +1236,8 @@ int main(int argc, char** argv)
         row.creed_adoptions   = sim.polities_adopted_creed;
         row.creed_converted   = sim.peoples_converted;
         row.creed_reasserted  = sim.peoples_reasserted;
+        row.schisms           = sim.schisms;
+        row.regions_sundered  = sim.regions_sundered;
         row.campaign_contacts = sim.campaign_contacts;
         row.campaign_scored   = sim.campaign_scored;
         row.campaign_cleared  = sim.campaign_cleared;
@@ -2503,6 +2507,41 @@ int main(int argc, char** argv)
                             "   that arises nowhere is a gate nothing clears. REPORTED, not gated.)\n");
             }
 
+            // BL-944 -- DID FAITH FRACTURE A REALM, AND IS IT DISTINCT FROM
+            // A NETWORK-FAILURE SECESSION? Printed right beside BL-896's own
+            // reading so the two causes can be checked against each other by
+            // eye: a schism total that tracks `secessions` one-for-one would
+            // say the two mechanisms are firing on the same ground, which
+            // they must not -- one is grouped by SEAT/REACH, the other by
+            // RESIDUE CULTURE, and the pair below is the reasserted supply
+            // this fracture is cut from. REPORTED, never gated: a world with
+            // reassertion but no schism (the group never reached
+            // `schism_min_regions`) is a legitimate world, per CREEDS.md's
+            // own "reading is a requirement, not a target" discipline.
+            {
+                std::vector<int64_t> sc, rs;
+                int worlds_with_schism = 0;
+                for (const sweep_row& r : rows)
+                {
+                    sc.push_back(r.schisms); rs.push_back(r.regions_sundered);
+                    if (r.schisms > 0) ++worlds_with_schism;
+                }
+                const auto tot = [](const std::vector<int64_t>& v) {
+                    int64_t t = 0; for (int64_t x : v) t += x; return t; };
+                std::printf("\n--- BL-944  DID FAITH FRACTURE A REALM (a SCHISM, not a network failure)? ---\n");
+                std::printf("  worlds with a schism   %d of %d\n",
+                            worlds_with_schism, static_cast<int>(rows.size()));
+                std::printf("  SCHISMS                median %lld, %lld total   (a reasserted people breaking away over creed)\n",
+                            static_cast<long long>(median_of(sc)), static_cast<long long>(tot(sc)));
+                std::printf("  regions SUNDERED       median %lld, %lld total   (walked away with them -- distinct from regions_seceded)\n",
+                            static_cast<long long>(median_of(rs)), static_cast<long long>(tot(rs)));
+                std::printf("  (Read this against BL-896's SECESSIONS line above. The two should\n"
+                            "   NOT move together -- a schism groups a realm's REASSERTED ground by\n"
+                            "   its residue CULTURE, never by seat or reach, so a world can show\n"
+                            "   either, both or neither without the two ever being one cause read\n"
+                            "   twice. REPORTED, not gated.)\n");
+            }
+
             // BL-838 -- DID FEAR OF BEING NEXT MOVE ANY CAMPAIGN?
             // REPORTED, NOT GATED, and the two numbers must be read together.
             // A large lean count against ONE polity is the coalition this item
@@ -3057,7 +3096,8 @@ int main(int argc, char** argv)
                 "\"max_flips\": %d,\n"
                 "   \"creeds_arisen\": %lld, \"creed_adoptions\": %lld, "
                 "\"creed_converted\": %lld, \"creed_reasserted\": %lld, "
-                "\"fear_leaned\": %lld, \"fear_targets\": %lld,\n"
+                "\"schisms\": %lld, \"regions_sundered\": %lld,\n"
+                "   \"fear_leaned\": %lld, \"fear_targets\": %lld,\n"
                 "   \"polities\": [",
                 r.shape_rose, r.shape_fell, r.shape_rpf, r.shape_top_peak_q,
                 static_cast<long long>(r.campaign_contacts), static_cast<long long>(r.campaign_scored),
@@ -3067,6 +3107,7 @@ int main(int argc, char** argv)
                 r.regions_touched, r.regions_once, r.regions_thrice, r.max_flips,
                 static_cast<long long>(r.creeds_arisen), static_cast<long long>(r.creed_adoptions),
                 static_cast<long long>(r.creed_converted), static_cast<long long>(r.creed_reasserted),
+                static_cast<long long>(r.schisms), static_cast<long long>(r.regions_sundered),
                 static_cast<long long>(r.fear_leaned), static_cast<long long>(r.fear_targets));
             for (std::size_t k = 0; k < r.arcs.size() && k < static_cast<std::size_t>(arc_table_n); ++k)
             {
