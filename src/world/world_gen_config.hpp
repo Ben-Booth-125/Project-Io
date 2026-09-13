@@ -69,6 +69,20 @@ struct world_gen_config
     /// balance value, and it is the one field here that is not.
     bool stop_after_ancient_era = false;
 
+    /// STOP GENERATION ONCE THE EXPLORATION SPAN HAS RUN, before borders,
+    /// roads and companies are built (BL-946) -- the Exploration round's own
+    /// sibling to `stop_after_ancient_era` above, same contract, one round
+    /// later. Also gates the Exploration span ITSELF off whenever
+    /// `stop_after_ancient_era` is set, so the Empires round's own launch
+    /// (which stops right after the ancient era) never pays for a span it
+    /// will discard.
+    ///
+    /// THE WORLD IS NOT USABLE WHEN THIS IS SET, for the same reason
+    /// `stop_after_ancient_era` is not.
+    ///
+    /// Default false: every existing caller is unaffected.
+    bool stop_after_exploration = false;
+
     /// STOP GENERATION ONCE THE MIGRATION HAS RUN, before the Empires round's
     /// history sim ever starts (BL-871).
     ///

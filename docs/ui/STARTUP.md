@@ -115,16 +115,25 @@ subdivided in latitude, every cell a quad — not a per-pixel inverse projection
 into a texture. Both avoid projecting ~7,500 hexes as polygons against ImGui's
 16-bit draw indices; the slice path gets there with less machinery.
 
-## Rounds — System, Life, Culture, Empires, Industrialisation (Ben, 2026-09-08; reframed and renamed 2026-09-09)
+## Rounds — System, Life, Culture, Empires, Exploration, Digitisation (Ben, 2026-09-08; reframed and renamed 2026-09-09; a fourth pass round added 2026-09-13, BL-946)
 
 **FIVE ROUNDS, AND THE SPENDING ROUND RETIRED (Ben, 2026-09-09).** The third planetology round —
 *Inheritance*, which asked what the era before you already took and carried the **drawdown** lean —
-is no longer a round of its own: its subject belongs with industrialisation, which is what draws a
-world down in the first place. The chart chain keeps all three of its groups, because the in-game
+is no longer a round of its own: its subject belongs with the last pass round, which is what draws
+a world down in the first place. The chart chain keeps all three of its groups, because the in-game
 History ledger reads the same table; only the wizard stops walking the third. **Owed, and recorded
-rather than dropped: the drawdown lean is editable nowhere until round 5 is built.**
+rather than dropped: the drawdown lean is editable nowhere until the substrate pass is built.**
 
-The wizard does not stop at planetology. Three further rounds carry the generation
+**SIX ROUNDS AS OF BL-946 (Ben, 2026-09-13, resolving NR-847/NR-857).** The Exploration span
+(1200 → 1660 CE, [`EXPLORATION.md`](../generation/EXPLORATION.md)) used to run opt-in behind
+`world_params::exploration_sim_enabled` (default false) with no round to show it — a real
+generation pass, invisible to the player. The default flips to **true** and a new round —
+**Exploration** — is inserted between Empires and the placeholder, which is renamed
+**Digitisation** (still the same honest empty placeholder BL-914 built; its own content is a
+separate item). `wizard_round_count` 5 → 6, `wizard_pass_round_count` 3 → 4,
+`wizard_lapse_round_count` 2 → 3.
+
+The wizard does not stop at planetology. Four further rounds carry the generation
 phases — [`GENERATION_STRATEGY.md`](../generation/GENERATION_STRATEGY.md) § The eight
 phases — into the same idiom the planetology rounds established: a primary view filling
 the pane, charts as the extras on top, and **preferences, not parameters**.
@@ -177,11 +186,26 @@ On the left, where the planetology rounds stack their charts, round 4 keeps a
 **research speed**, **population**, and **share of the world owned**. It is the round's
 chart surface, and it moves with the map.
 
-**Round 5 — Industrialisation.** The same globe, at the epoch, gaining four things in
+**Round 5 — Exploration (BL-946, Ben 2026-09-13).** The span **1200 → 1660 CE**, four
+hundred and sixty years, on the same shared engine as round 4 — its authority is
+[`EXPLORATION.md`](../generation/EXPLORATION.md). Where Empires asks who holds this
+ground, Exploration asks who wants what someone else holds: conflict moves off the home
+coast, treasuries consolidate at every capital, treaties bind, colonies and trade
+provinces appear across water, and ports/navies/standing armies persist and decay. Its
+own record (`generation_report::body_entry::exploration_timelapse`) is recorded once, at
+the one call site that runs the span, and drawn on the same 2D map as rounds 3 and 4 —
+same terrain base, same seat dots, same frontier — with its own battle/conquest/founding
+counters rather than round 4's. `world_params::exploration_sim_enabled` defaults **true**
+(BL-946; it was opt-in and invisible to the player before).
+
+**Round 6 — Digitisation.** The same globe, at the epoch, gaining four things in
 order: **metros growing** out of the population centres the history sacked and grew,
 **colonial reach across water**, **firm markers with their charters**, and the
 **market carve with its price field**. This is phase 6's search made watchable — the
 player sees the landscape that was selected, not every candidate that was scored.
+Renamed from Industrialisation (BL-946, Ben 2026-09-13) as the honest label for
+everything after 1660 CE; still the same labelled placeholder BL-914 built — its own
+content is not BL-946's scope.
 
 **Each pass round is rerollable, and rerolling re-runs the pass** rather than re-drawing
 a cached one (Ben, 2026-09-08) — which is the whole reason § The wait is the round has to
@@ -236,9 +260,9 @@ has landed, the record stays: the round can be paused and scrubbed at the player
 
 **The pass rounds draw the ground, not only the fill (Ben, 2026-09-11).** Rivers and the
 landform relief — mountains, highlands, the barriers the walk and the campaign both price — are
-drawn beneath the culture or polity fill on rounds 3 and 4, and the fill is a tint over that
-ground rather than a flat colour that hides it. A frontier, a road and a bridge are legible only
-against the terrain they cross.
+drawn beneath the culture or polity fill on rounds 3, 4 and 5 (Exploration added by BL-946), and
+the fill is a tint over that ground rather than a flat colour that hides it. A frontier, a road
+and a bridge are legible only against the terrain they cross.
 
 ## Handoff — `start_new_game`
 
