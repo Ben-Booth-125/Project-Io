@@ -451,6 +451,13 @@ Consequences:
   it. The brief must then ask for the **conclusion**, not the excerpts: a report that pastes back
   what it read has compressed nothing and has spent the context twice. Pairs with the rule above
   that an agent stops once it has a decision.
+- **Prune a worktree once its branch merges (2026-09-13).** A merged worktree is not
+  self-cleaning — `.claude/worktrees/` was found holding 39 entries / 19 GB, most days old with
+  branches long since landed, which slows every full-repo scan (Explore, `git status`, `find`)
+  that has to walk them. Run `node tools/session/worktree_prune.js` after a merge batch (report
+  mode by default; `--remove` deletes every worktree whose branch is a merge-ancestor of `main`,
+  is unlocked, and isn't still running an agent). It never touches a locked worktree, one with
+  unmerged commits, or a detached-HEAD one it can't check.
 
 ### Parallel worktree coherence (keeping N sessions consistent)
 
