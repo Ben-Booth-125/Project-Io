@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*42 entries — 25 open, 17 resolved.*
+*43 entries — 26 open, 17 resolved.*
 
 ---
 
@@ -384,6 +384,21 @@ Before BL-919, `lapse_from_report` built BOTH wizard lapse rounds (Culture and E
 > **Recommendation:** No action needed; confirmed live in the round-3 click-through (lineage-palette hue families visible, ticker text is migration-flavoured, not battle-flavoured).
 
 *Files: `src/ui/startup_screens.cpp`, `src/world/hard_coded_world.cpp`, `docs/ui/STARTUP.md`*
+
+### NR-860 — OBSERVATION: the migration overruns the 400 BCE boundary on 10% of a 60-seed sweep, up to 343 years over
+*observation · raised 2026-09-13 · from BL-947 (CULTURE_ROUND_COASTS_TO_400BCE), pre-fix measurement sweep, generation-dev sub-agent.*
+
+CIVILISATION.md names the case where settlement_state::migration_end_year (the diffusion's own derived terminating year, 'every habitable landmass carries some culture') runs later than the Empires round's own opening year (-400 at the wizard's defaults) a defect in the migration, not in this boundary, and asks that the frequency be measured rather than assumed. A 60-seed sweep (tools/verify/culture_round_coast_measure.cpp, seeds 0xC001D00D + i*0x9E3779B9) found 6/60 (10%) overran, from 46 years over (seed 954185457, end -108) to 343 years over (seed 3665124156, end -57); the other 54/60 ended between -1652 and -411, comfortably inside the span. BL-947's fix keeps the true (later) end year and shows it honestly on an overrun rather than clamping to -400, per the doc's own instruction, so the wizard's Culture round is never wrong on these seeds -- it is just longer than 2,000 years, cutting into the Empires round's own 1,600-year budget for that world.
+
+**Why it matters.** 10% is not the '~1-in-10 worlds without an arena' kind of rare tail CIVILISATION.md is used to living with elsewhere in this pass (BL-276's own 90%-likely acceptance gate) -- it is the same order of magnitude, but nothing today rerolls or flags a slow-filling seed the way the arena gate does for a small homeworld. Whether that is fine (a diffusion is allowed to sometimes run long, and the doc already says so) or whether it wants its own gate/reroll is a design call BL-947 was not asked to make.
+
+- Leave it: an overrun is rare enough (1 in 10, and none of the 60 seeds moved the boundary by more than a fifth of the Empires round's own span) that showing it honestly is sufficient.
+- Add a BL-276-style reject-and-reroll on the migration's own seed when it fails to finish inside the 2,000-year budget, so an overrun becomes a hard tail rather than a routine one.
+- Widen the Culture round's own budget (currently 2400 BCE -> 400 BCE) if 10% overrunning suggests 2,000 years is undersized for the map scale in general.
+
+> **Recommendation:** Leave it for now -- BL-947's fix already makes the overrun visible and honest rather than silently wrong, which was the actual bug Ben saw live; a reroll or budget change is tuning work against a sweep this item's 60 seeds is too small to calibrate from.
+
+*Files: `src/world/colonisation.hpp`, `src/world/settlement.cpp`, `docs/generation/CIVILISATION.md`*
 
 ---
 

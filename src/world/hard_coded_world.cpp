@@ -857,10 +857,41 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // `generation_report` and must discard the half-built `world`.
         if (gen_cfg.stop_after_migration)
         {
+            // THE COAST TO 400 BCE (BL-947; docs/generation/CIVILISATION.md §
+            // "The span is 400 BCE to 1200 CE" — "the Culture round ends when
+            // the filling ends, and the world then coasts to 400 BCE holding
+            // what migration left it"). `migration_end_year` is DERIVED per
+            // seed (the diffusion frontier's own exhaustion year) and varies
+            // seed to seed; round 3's DISPLAYED span always closes at the
+            // Empires round's own opening year instead — `sim_start` above,
+            // already the exact year `run_settlement` was told to stop
+            // founding new regions at (BL-846) and the year
+            // `era_minus_one_sim_params` opens the Empires sim on. Reusing
+            // that value rather than a bare -400 literal means round 3's
+            // coast target and round 4's own opening year can never drift
+            // apart from each other.
+            //
+            // NEVER CLAMPED EARLIER than the true migration end (`std::max`):
+            // a migration that overruns the boundary is measured (BL-947
+            // sweep: 6/60 seeds, up to 343 years over on the tested set) and
+            // is "a defect in the migration, not in this boundary" per the
+            // same doc section, so the true (later) year is kept and shown
+            // rather than cut short or hidden.
+            //
+            // Only applied when the era sim is actually configured to run
+            // (`sim_start` is a real year, not the INT64_MAX sentinel a
+            // `prehistory_years == 0` caller gets) — a caller with no
+            // Empires round has no coast target to hold the map still until,
+            // and keeps seeing the migration's own raw end exactly as before.
+            const int64_t culture_round_end_year =
+                sim_start != INT64_MAX
+                    ? std::max(kepler_settlement.migration_end_year, sim_start)
+                    : kepler_settlement.migration_end_year;
+
             const era_timelapse migration_lapse =
                 build_migration_timelapse(kepler_settlement, kepler_creeds,
                                           colonisation_start_year,
-                                          kepler_settlement.migration_end_year);
+                                          culture_round_end_year);
 
             // BL-914: round 3 gets the same tap round 4 does. `run_settlement`
             // itself is not instrumented (out of this item's files), so this is
@@ -893,12 +924,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 progress->lapse_tap->publish(
                     migration_lapse.changes, migration_lapse.culture_changes,
                     migration_lapse.events,
-                    static_cast<int32_t>(kepler_settlement.migration_end_year));
+                    static_cast<int32_t>(culture_round_end_year));
             }
 
             if (report)
             {
-                report->prehistory_years     = kepler_settlement.migration_end_year
+                report->prehistory_years     = culture_round_end_year
                                               - colonisation_start_year;
                 report->prehistory_battles   = 0;   // The migration is a diffusion, not a
                 report->prehistory_conquests = 0;   // contest — COLONISATION.md owns why
