@@ -36,6 +36,152 @@
    "requires": [
     "BL-940"
    ]
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-13",
+   "author": "Ben (2026-09-13, live review); Claude (itemised)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-946",
+   "short_name": "EXPLORATION_ROUND_WIRED_INTO_WIZARD",
+   "priority": "A",
+   "difficulty": 7,
+   "title": "Wire the Exploration span into the wizard as its own round, and add a Digitisation placeholder",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/core/app.hpp",
+    "src/ui/startup_screens.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/hard_coded_world.hpp",
+    "src/world/era_timelapse.hpp",
+    "src/world/era_timelapse.cpp",
+    "src/core/verify_api.cpp",
+    "docs/ai/ACTIONS.json",
+    "docs/ui/question_log.json",
+    "scripts/verify/history_lapse_press.lua"
+   ],
+   "design": "BEN, 2026-09-13 (live review, resolving NR-847 and NR-857): flip world_params::exploration_sim_enabled to default TRUE, and wire the Exploration span into the wizard as its own round -- and add the Digitisation placeholder round in the same pass.\n\nTHE ROUND LAYOUT. The wizard's pass rounds today are Culture, Empires, Industrialisation (`wizard_pass_round_count = 3`, `wizard_round_count = 5` = 2 planetology + 3 pass, src/core/app.hpp). \"Industrialisation\" is the acknowledged stand-in for everything after 1200 CE, and NR-843 already named the fact that there are now FOUR phases after Culture (Empires, Exploration, Digitisation) where the wizard has one placeholder. THE FIX: insert a new \"Exploration\" round between Empires and the renamed \"Digitisation\" placeholder -- wizard_pass_round_count 3 -> 4, wizard_round_count 5 -> 6. \"Industrialisation\" becomes \"Digitisation\" in name and header text only; it stays the honest empty placeholder it already is (BL-914's pattern) -- Digitisation itself is not this item's scope.\n\nTHE GOLDEN FLIP. exploration_sim_enabled default false -> true (NR-847). This moves region::nation from the 1200 CE map to the 1660 CE one for every generated world, which re-baselines world_determinism's digests and any other pinned generation output. AUTHORISED (Ben, 2026-09-13) -- this is not a silent re-bless: rerun world_determinism and history_sim_harness, record old and new digests in the DEVLOG, and confirm no assertion beyond the digest VALUES itself breaks (determinism -- same seed, same result twice -- must still hold).\n\nTHE MISSING TAP (NR-857's core finding). hard_coded_world.cpp currently writes `be.prehistory_timelapse = as_timelapse(hs)` using `hs` (the EMPIRES state) and passes `/*tap=*/nullptr` for the Exploration call -- so even with the span running, nothing reaches the wizard's lapse-map renderer. Build a REAL era_timelapse for the Exploration span the same way `build_migration_timelapse` does for Culture (BL-919's function is the precedent: it rebuilds the culture/settlement record into the shared `era_timelapse` shape) -- call it something like `build_exploration_timelapse`, fed by `kepler_exploration_hs` and the polity/culture state at 1200 CE. Wire this round's tap through the same `progress->lapse_tap` publish path round 3 (Culture) and round 4 (Empires) already use, so BL-943's corridor/consolidation exemplars finally have real Exploration events to draw (NR-857's exact gap).\n\nGENERALISE THE LAPSE MACHINERY FROM TWO ROUNDS TO THREE. `wizard_lapse_round_count = 2` (Culture, Empires) becomes 3 (Culture, Empires, Exploration) -- the Industrialisation/Digitisation placeholder stays NOT a lapse round, same as today. `verify_api.cpp`'s `history_run(which)` (0=Culture? check the actual mapping -- the comment says \"0 = round 4 the migration, 1 = round 5 the history\" so recheck against current round numbering after the Culture/Empires split) needs a third index. Any code keyed on `wizard_lapse_round_count` (loop bounds, per-round record storage) generalises the same way.\n\nDONE WHEN: the wizard walks six rounds (System, Life, Culture, Empires, Exploration, Digitisation); the Exploration round runs its own pass on arrival and shows a real, populated time-lapse map (not an empty placeholder); BL-943's exemplars draw on real Exploration-span events; `docs/ai/ACTIONS.json` and `docs/ui/question_log.json` are updated for the new round; `scripts/verify/history_lapse_press.lua` (or a new sibling script) exercises the new round the way it exercises rounds 3 and 4 today; world_determinism and history_sim_harness are rerun and their movement recorded in the DEVLOG, not silently absorbed.\n\nSEQUENCING NOTE: BL-948 (the lapse speed control) should land in the SAME pass or immediately after, since it touches the same round-rendering code and should apply uniformly to all three lapse rounds including this new one."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-13",
+   "author": "Ben (2026-09-13, live review); Claude (diagnosed and itemised)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-947",
+   "short_name": "CULTURE_ROUND_COASTS_TO_400BCE",
+   "priority": "B",
+   "difficulty": 4,
+   "title": "The Culture round always concludes at 400 BCE, coasting past the migration's own derived end",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/settlement.cpp",
+    "src/world/settlement.hpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/colonisation.hpp"
+   ],
+   "design": "DIAGNOSED 2026-09-13 (Ben asked why the Culture round ends at different years per seed, and for a fix).\n\nTHE CAUSE. The migration's terminating condition is DERIVED, not a fixed year: `colonisation_field::last_arrival_year` (colonisation.hpp) is set when the diffusion's frontier exhausts itself -- \"every habitable landmass carries some culture\" -- and this varies by seed because different worlds fill at different rates. `settlement_state::migration_end_year` (settlement.cpp:811) takes this value directly, and the wizard's round 3 (Culture) displays exactly that span (`colonisation_start_year` to `migration_end_year`, hard_coded_world.cpp:847-863) with NO further processing. CIVILISATION.md sec \"The span is 400 BCE to 1200 CE\" already SETTLED the intended behaviour (Ben, 2026-09-09): \"the Culture round ends when the filling ends, and the world then COASTS to 400 BCE holding what migration left it -- the same device the design already uses for 1200 -> 1560.\" That coast was written into the doc but NEVER IMPLEMENTED -- the wizard round simply shows the raw derived year today, which is the bug Ben is seeing.\n\nTHE FIX. Extend the displayed round-3 span so it always runs through -400 (400 BCE), holding the migration's final ownership/culture state static for any years between `migration_end_year` and -400 -- a coast, not additional simulation (no new diffusion steps, no new events past the true end). If `migration_end_year` is already at or past -400 on some seed (a migration that ran long), that is explicitly named in the doc as \"a defect in the migration, not in this boundary\" -- MEASURE whether this ever actually happens on a sweep before deciding how to handle it; if it never happens in practice, the fix is a pure coast-forward and this edge case is moot; if it does happen on some seeds, report the frequency rather than silently clamping or extending backward.\n\nDONE WHEN: a sweep across many seeds shows round 3's displayed end year is -400 EVERY TIME (or the item names an honest exception with numbers), and the coast segment is visibly static on the time-lapse (no ownership churn after the true migration end) rather than a jump-cut."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-13",
+   "author": "Ben (2026-09-13, live review); Claude (itemised)",
+   "requires": [
+    "BL-946"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "id": "BL-948",
+   "short_name": "LAPSE_TIMELAPSE_SPEED_CONTROL",
+   "priority": "B",
+   "difficulty": 4,
+   "title": "A speed control (45s / 90s / 180s) on every lapse round's time-lapse, default 90 seconds",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/history_lapse.cpp",
+    "src/ui/history_lapse.hpp",
+    "src/ui/startup_screens.cpp",
+    "docs/ai/ACTIONS.json",
+    "docs/ui/question_log.json"
+   ],
+   "design": "BEN, 2026-09-13: time-lapses currently run too fast to observe what is happening. Target the FULL playback (start year to end year, unskipped) at 90 seconds by default, and add a speed-control element present in EVERY lapse round (Culture, Empires, and the new Exploration round from BL-946) offering three settings: 45 seconds, 90 seconds, 180 seconds -- the user can also already skip ahead or scrub via the existing playhead/scrubber, this control is about the AUTOPLAY rate, not a replacement for scrubbing.\n\nWHERE THE RATE LIVES TODAY. Find whatever currently drives year-per-frame or year-per-second in `history_lapse.cpp`'s playback (a fixed constant, most likely) and make it a function of (span length in years) / (chosen duration in seconds), recomputed whenever the round's span or the chosen duration changes -- a round with a longer span at the same duration setting must move faster per frame, not take longer wall-clock time, since the target is WALL-CLOCK duration, not years-per-second.\n\nTHE CONTROL ITSELF. Three-way selector (45s / 90s / 180s), same visual language as other wizard toggles (Sparse/Lean/Standard on the main menu is the nearest precedent for a three-way radio-style control). Persisted per-session is fine; it does not need to survive a restart unless that's trivial. Update `docs/ai/ACTIONS.json` for the new control and `docs/ui/question_log.json` for the surface it lives on.\n\nDONE WHEN: all three lapse rounds (Culture, Empires, Exploration) expose the same speed control; selecting 45s/90s/180s visibly changes the playback rate; the default is 90s; a live click confirms the control is reachable and does what it says."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-13",
+   "author": "Ben (2026-09-13, live review); Claude (itemised from NR-849)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-949",
+   "short_name": "POST_ROAD_RUNG_ACTUALLY_FIRES",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "Tune the road ladder's third rung so Post Roads actually fires on a sweep",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-13, resolving NR-849: tune it now rather than wait for later waves. `post_roads_built` totalled 0 across every sweep run this sprint (8+ seeds) -- the third rung (Post Roads, EX-WY-1a) needs a polity to hold the tree node, sit on a tier-2 corridor, AND have enough treasury simultaneously, and that conjunction never occurred. Lower `post_road_treasury_cost` (find the exact constant name in history_sim.cpp, landed with BL-940) and/or the tier-2-corridor-uses threshold that gates eligibility, and re-sweep (`exploration_sweep`) to confirm the rung fires in a meaningful share of worlds without becoming trivial (every corridor promoting immediately would be as uninformative as none ever doing so). Measure before and after, report both.\n\nDONE WHEN: a sweep shows `post_roads_built` > 0 in a clear majority of seeds (not 0/N, not automatically N/N), and `treasury_spent_on_roads` correlates sensibly with the polities that built one."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-13",
+   "author": "Ben (2026-09-13, live review); Claude (itemised from NR-855)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-950",
+   "short_name": "DISPLACEMENT_CLEARS_THE_BAR",
+   "priority": "A",
+   "difficulty": 5,
+   "title": "Push the near/far cost split further so the displacement reading reliably clears its own bar",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-13, resolving NR-855: push further rather than accept 0.88 as the resting state. BL-941's deterrence (Ceiling/Alarm at polity grain, wired into `treaty_value_q`'s near-home Alarm bonus and a flat `treaty_far_penalty_q` for distant pairs) moved the median displacement ratio from 0.01/0.16 up to 0.88 across a 3-seed sweep -- real progress, one seed already cleared 1.0, but the median has not. Strengthen the SAME mechanism rather than inventing a second one: widen the gap between the near-home Alarm bonus and the far-away penalty (both already exist in history_sim.cpp from BL-941), and/or extend Alarm's read of visible capability (standing army + navy) to weight more heavily on a longer-held border. Re-sweep at a WIDER seed count (16, not 3, per NR-855's own note that 3 seeds was chosen for runtime, not confidence) before judging the reading settled either way.\n\nDo not touch the non-aggression block itself (BL-933) or the ratio's own definition (BL-948's operationalisation, confirmed correct by Ben 2026-09-13) -- this item is about the deterrence STRENGTH, not the measurement or the blocking mechanism.\n\nDONE WHEN: a 16-seed sweep shows the median displacement ratio clears 1.0, conflict still persists (reading 2 stays green -- total conflict well above zero), and the change is a measured strengthening of BL-941's existing mechanism, not a new one bolted on."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-13",
+   "author": "Ben (2026-09-13, live review); Claude (itemised from NR-856)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-951",
+   "short_name": "STRENGTH_METRIC_READS_STRATEGY_FAIRLY",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "Reading 3's \"strongest realms\" metric moves from region count to treasury/throughput rank",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "BEN, 2026-09-13, resolving NR-856: change the ranking metric before concluding the creed mapping itself needs revisiting. Reading 3 (\"both strategies pay\") ranked a world's \"strongest realms\" by region count, which structurally favours EXPANSION over consolidation -- a consolidator by definition holds the SAME ground worked harder, so it can never outrank an expansionist on a region-count axis regardless of how strong its creed-derived disposition actually is. Change the ranking to something consolidation-sensitive: treasury (BL-932) and/or corridor throughput (BL-940) rank, or a composite, rather than region count alone. Re-sweep (wider than 3 seeds -- NR-856 flagged the sample as too small either way) and report whether a consolidator now appears among the strongest realms on some seeds.\n\nDo NOT touch the Empire-phase creed axes (zeal/dominion/sea_legs_q) themselves in this item -- if the new metric STILL shows no consolidator ever qualifying, that is the evidence needed to justify BL-942's own named upstream fix as a SEPARATE, later item, not something to force here.\n\nDONE WHEN: reading 3 ranks realms by treasury/throughput instead of region count, and the sweep's reported finding (consolidators appear now, or they genuinely still do not even on a fair metric) is stated plainly either way."
   }
  ]
 }
