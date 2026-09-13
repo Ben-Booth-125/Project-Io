@@ -126,6 +126,82 @@ uint8_t base_kind(terrain_landform lf)
     }
 }
 
+/// BL-943 — the Empire era's own close (`hard_coded_world.cpp`'s
+/// `epoch_year`, EXPLORATION.md's "1200 -> 1660"), where the Exploration
+/// span's treasury consolidation fires once (BL-932 sec Capital arrives:
+/// "material becomes capital"). A plain constant rather than a pull from
+/// `world_params`, because this file keeps zero dependency on
+/// hard_coded_world.hpp/history_sim.hpp by design (see the header's own "A
+/// REPLAY, NEVER A RE-RUN" note) — a drift between the two would show in
+/// `exploration_sim_harness`, not here.
+constexpr int32_t lapse_exploration_epoch_year = 1200;
+
+/// BL-943 — sample a corridor's straight line (TILE units) against the
+/// water/land band `finish_history_lapse` bakes for the terrain base, so a
+/// fleet/caravan exemplar reads the same ground fact a bridge glyph does
+/// rather than assuming every corridor is land. Majority-water along a
+/// handful of even samples, not "any water", because a bridge crossing one
+/// river tile is not a sea corridor.
+bool lapse_corridor_over_water(const std::vector<uint8_t>& band, int gw, int gh,
+                               float c0, float r0, float c1, float r1)
+{
+    if (band.empty() || gw <= 0 || gh <= 0) return false;
+    constexpr int samples = 7;
+    int water = 0, total = 0;
+    for (int i = 0; i <= samples; ++i)
+    {
+        const float t = static_cast<float>(i) / static_cast<float>(samples);
+        int c = static_cast<int>(std::lround(c0 + (c1 - c0) * t));
+        int r = static_cast<int>(std::lround(r0 + (r1 - r0) * t));
+        if (r < 0 || r >= gh) continue;
+        if (c < 0) c += gw;
+        if (c >= gw) c -= gw;
+        ++total;
+        if (band[static_cast<std::size_t>(r * gw + c)] == 0xFFu) ++water;
+    }
+    return total > 0 && water * 2 > total;
+}
+
+/// BL-943 — one fleet or caravan exemplar, at a corridor's midpoint. `tier`
+/// (1 Track, 2 Road, 3 Post Road) grows the mark and rings it, so the road
+/// ladder's three rungs never draw the same mark; a trade corridor carries no
+/// ladder and is always drawn at the base rung with no ring, in the trade
+/// network's own cool hue rather than the road network's warm one, so the two
+/// kinds of corridor never read as one repainted idiom.
+void draw_lapse_exemplar(ImDrawList* dl, ImVec2 at, float scale, bool over_water,
+                         int tier, bool is_trade, int alpha)
+{
+    tier = std::clamp(tier, 1, 3);
+    const float base = std::clamp(scale * 0.55f, 1.6f, 3.2f);
+    const float r = base * (0.7f + 0.3f * static_cast<float>(tier));
+    const ImU32 hue  = is_trade ? col_trade_link : (tier == 1 ? col_road_track : col_road);
+    const ImU32 fill = with_alpha(hue, alpha);
+    const ImU32 ring = with_alpha(col_bright, alpha);
+
+    if (over_water)
+    {
+        // A SAIL: one triangle, apex up — the smallest legible mark that
+        // reads as a hull rather than a dot.
+        dl->AddTriangleFilled({at.x, at.y - r * 1.2f},
+                              {at.x - r * 0.85f, at.y + r * 0.7f},
+                              {at.x + r * 0.85f, at.y + r * 0.7f}, fill);
+    }
+    else
+    {
+        // A CARAVAN: one diamond — distinct from the sail's triangle and from
+        // the round seat/event marks drawn elsewhere on this map.
+        dl->AddQuadFilled({at.x, at.y - r}, {at.x + r, at.y},
+                          {at.x, at.y + r}, {at.x - r, at.y}, fill);
+    }
+
+    // THE ROAD RUNG, AS RINGS: Track draws none, Road draws one, Post Road
+    // draws two — concentric on the mark rather than a bigger blob alone, so
+    // the tier reads even where two similarly-sized marks sit close together.
+    if (!is_trade)
+        for (int k = 0; k < tier - 1; ++k)
+            dl->AddCircle(at, r * (1.6f + 0.5f * static_cast<float>(k)), ring, 12, 1.2f);
+}
+
 /// The colour one OWNER index is drawn in on this surface, whichever round it
 /// is. On the Culture round the owner is a culture and the record carries a
 /// lineage palette (BL-919); on the Empires round it is a polity and the palette
@@ -423,7 +499,9 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
             seg.c1 = static_cast<float>(h.region_col[b]) + 0.5f;
             seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
             seg.year_track = e.year;
-            if (e.polity >= 2) seg.year_road = e.year; // robust to a corridor's first event already being Road
+            if (e.polity >= 2) seg.year_road      = e.year; // robust to a corridor's first event already being Road
+            if (e.polity >= 3) seg.year_post_road = e.year; // ...or already Post Road (BL-940/BL-943)
+            seg.over_water = lapse_corridor_over_water(band, gw, gh, seg.c0, seg.r0, seg.c1, seg.r1);
             // Bridges: where this corridor's straight line crosses a river
             // edge — a pure geometric fact, tested once against every river
             // segment already baked above.
@@ -437,6 +515,10 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
                     seg.bridges.push_back({ix, iy});
             }
             h.road_segs.push_back(std::move(seg));
+        }
+        else if (e.polity >= 3)
+        {
+            it->year_post_road = e.year; // BL-940/BL-943: a later crossing to Post Road
         }
         else if (e.polity >= 2)
         {
@@ -475,6 +557,7 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
             seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
             seg.c1 = static_cast<float>(h.region_col[b]) + 0.5f;
             seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
+            seg.over_water = lapse_corridor_over_water(band, gw, gh, seg.c0, seg.r0, seg.c1, seg.r1);
             h.trade_segs.push_back(std::move(seg));
             it = std::prev(h.trade_segs.end());
         }
@@ -850,6 +933,57 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         ++prims;
     }
 
+    // ── 3d. FLEET AND CARAVAN EXEMPLARS (BL-943, EXPLORATION.md sec Goods move
+    //    as throughput, never as cargo: "the visual is a filter on that
+    //    number, not a second simulation"). A `road_promoted`
+    //    event already IS a corridor's throughput crossing a threshold — the
+    //    road ladder promotes exactly on usage clearing one — and a
+    //    `trade_link_opened` event is the same fact for a cross-border link, so
+    //    reading those two event kinds inside the marker window is the whole
+    //    filter; nothing here re-derives a number. One exemplar per crossing,
+    //    fading exactly like the event ring below, never a mark per cargo unit
+    //    and never a continuous animation. ──
+    {
+        const int window = lapse_marker_window_years(h);
+        for (const lapse_event& e : h.lapse.events)
+        {
+            if (e.year > year) break; // ascending by year
+            if (year - e.year >= window) continue;
+            const bool is_road  = e.kind == static_cast<uint8_t>(lapse_event_kind::road_promoted);
+            const bool is_trade = e.kind == static_cast<uint8_t>(lapse_event_kind::trade_link_opened);
+            if (!is_road && !is_trade) continue;
+            if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
+
+            float mx, my;
+            bool  over_water;
+            int   tier = 1; // a trade corridor has no ladder; drawn at the base rung
+            if (is_road)
+            {
+                auto it = std::find_if(h.road_segs.begin(), h.road_segs.end(),
+                    [&](const lapse_road_seg& s) { return s.region_a == e.region && s.region_b == e.other; });
+                if (it == h.road_segs.end()) continue;
+                mx = (it->c0 + it->c1) * 0.5f;
+                my = (it->r0 + it->r1) * 0.5f;
+                over_water = it->over_water;
+                tier = static_cast<int>(e.polity); // note_event's own tier: 1/2/3
+            }
+            else
+            {
+                auto it = std::find_if(h.trade_segs.begin(), h.trade_segs.end(),
+                    [&](const lapse_trade_seg& s) { return s.region_a == e.region && s.region_b == e.other; });
+                if (it == h.trade_segs.end()) continue;
+                mx = (it->c0 + it->c1) * 0.5f;
+                my = (it->r0 + it->r1) * 0.5f;
+                over_water = it->over_water;
+            }
+
+            const float t = static_cast<float>(year - e.year) / static_cast<float>(window);
+            const int   a = static_cast<int>(255.0f * (1.0f - t));
+            draw_lapse_exemplar(dl, {px(mx), py(my)}, scale, over_water, tier, is_trade, a);
+            ++prims;
+        }
+    }
+
     // ── 4. SEATS: one dot per polity HOLDING GROUND in this slice, at the
     //    region it first held. Seats only, not every region — the in-game Ages
     //    view draws a dot per region, and at blob granularity that is a rash;
@@ -867,6 +1001,50 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             dl->AddCircleFilled(at, rad, owner_colour(h, static_cast<uint16_t>(o)), 10);
             dl->AddCircle(at, rad, col_seat_ring, 10, 1.0f);
             prims += 2;
+        }
+    }
+
+    // ── 5. THE CONSOLIDATION (BL-932/BL-943): a ONE-TIME beat at 1200 CE,
+    //    distinct from every ongoing corridor exemplar above — EXPLORATION.md
+    //    sec Capital arrives names the one-time flow of every seat's stores
+    //    into the capital as the phase's visible opening act, and Ben called
+    //    it out by name as something the lapse should show. Gated on the
+    //    record actually reaching past the Empire era's own 1200 CE close: a
+    //    world that never ran the Exploration span (`exploration_sim_enabled`
+    //    default false, or its span not yet wired into this record — see the
+    //    header comment) reads no ground past that year, so this block draws
+    //    nothing on it rather than firing on the Empire close it shares the
+    //    date with. ──
+    if (h.lapse.start_year + h.lapse.years > lapse_exploration_epoch_year)
+    {
+        const int window = lapse_marker_window_years(h);
+        if (year >= lapse_exploration_epoch_year
+         && year - lapse_exploration_epoch_year < window)
+        {
+            const float t = static_cast<float>(year - lapse_exploration_epoch_year)
+                          / static_cast<float>(window);
+            const int   a = static_cast<int>(255.0f * (1.0f - t));
+            const float r = std::clamp(scale * 1.1f, 3.5f, 7.0f);
+            const ImU32 gold = with_alpha(IM_COL32(230, 190, 90, 255), a);
+            for (std::size_t o = 0; o < present.size() && o < h.polity_seat.size(); ++o)
+            {
+                if (!present[o]) continue;
+                const int32_t seat = h.polity_seat[o];
+                if (seat < 0 || static_cast<std::size_t>(seat) >= h.region_col.size()) continue;
+                const ImVec2 at{px(static_cast<float>(h.region_col[static_cast<std::size_t>(seat)]) + 0.5f),
+                                py(static_cast<float>(h.region_row[static_cast<std::size_t>(seat)]) + 0.5f)};
+                // A BURST, not a dot: eight short rays around the seat, so a
+                // one-time inflow reads differently from an ongoing corridor
+                // exemplar or the seat's own steady ring.
+                for (int k = 0; k < 8; ++k)
+                {
+                    const float ang = static_cast<float>(k) * (3.14159265f / 4.0f);
+                    const ImVec2 p0{at.x + std::cos(ang) * r * 0.6f, at.y + std::sin(ang) * r * 0.6f};
+                    const ImVec2 p1{at.x + std::cos(ang) * r,        at.y + std::sin(ang) * r};
+                    dl->AddLine(p0, p1, gold, 1.5f);
+                }
+                ++prims;
+            }
         }
     }
 

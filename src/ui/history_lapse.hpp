@@ -46,6 +46,25 @@
 // board's Population and Might columns come from the sample series the record
 // already carried (BL-817).
 //
+// FLEET AND CARAVAN EXEMPLARS (BL-943, EXPLORATION.md sec Goods move as
+// throughput: "the visual is a filter on that number, not a second
+// simulation"). A `road_promoted` or
+// `trade_link_opened` event IS a corridor's throughput crossing a threshold —
+// that is the whole reason the road ladder promotes on usage — so drawing an
+// exemplar there is reading an existing filter, never a second one. One sail
+// or one caravan per crossing, fading over the same marker window the event
+// ring does; never a mark per unit of cargo and never an animation of
+// continuous traffic. Sea vs. land is read off the corridor's own baked
+// `over_water`; the road rung (Track/Road/Post Road) is read off the event's
+// own tier and drawn as size, colour and ring count so the three rungs never
+// look alike. The one-time treasury consolidation (BL-932, "material becomes
+// capital" at 1200 CE) draws as a separate gold burst at every capital, gated
+// on the record actually reaching past 1200 CE — which, until the Exploration
+// span's own tap is wired into `prehistory_timelapse` (still `tap=nullptr` in
+// `hard_coded_world.cpp` as of BL-943), it never does, so this beat is
+// correctly and silently inert today rather than firing on the Empire era's
+// own close.
+//
 // DRAW COST. ImGui carries 16-bit draw indices, which is why the wizard's globe
 // is 48 meridian slices rather than ~7,500 projected hexes. The map is drawn at
 // TILE resolution but RUN-MERGED along each row: a political map is long runs of
@@ -150,10 +169,20 @@ struct lapse_road_seg
 
     /// The year this corridor first crossed into Track — always set, since a
     /// segment with no promotion event is never created. `INT32_MAX` never
-    /// appears here; it is the sentinel for `year_road` below, which is
-    /// legitimately unset on a corridor that never went past Track.
+    /// appears here; it is the sentinel for `year_road`/`year_post_road`
+    /// below, which are legitimately unset on a corridor that never reached
+    /// that rung.
     int32_t year_track = 0;
-    int32_t year_road   = 0x7FFFFFFF; ///< The year it reached Road, or unset.
+    int32_t year_road      = 0x7FFFFFFF; ///< The year it reached Road, or unset.
+    int32_t year_post_road = 0x7FFFFFFF; ///< BL-940/BL-943: the year it reached Post Road, or unset.
+
+    /// BL-943 — this corridor's straight line samples as majority water
+    /// against the terrain band baked in `finish_history_lapse`. A road
+    /// corridor is land by construction (the settle tree it is promoted off
+    /// never crosses open water), but this is measured rather than assumed,
+    /// so the fleet/caravan exemplar always reads the same fact a bridge
+    /// glyph would.
+    bool over_water = false;
 
     /// Where this corridor's straight line crosses a river edge — a pure
     /// geometric fact, computed once against `history_lapse::river_segs`.
@@ -181,6 +210,12 @@ struct lapse_trade_seg
     uint16_t region_b = 0;
     float c0 = 0.0f, r0 = 0.0f; ///< Region A's anchor tile centre.
     float c1 = 0.0f, r1 = 0.0f; ///< Region B's anchor tile centre.
+
+    /// BL-943 — see `lapse_road_seg::over_water`; the same measured fact,
+    /// baked once. A cross-border trade corridor is the one link here that
+    /// can legitimately cross a strait, which is exactly why the fleet/
+    /// caravan exemplar reads this per corridor rather than assuming land.
+    bool over_water = false;
 
     std::vector<lapse_trade_span> spans; ///< Ascending by `year_open`.
 };
