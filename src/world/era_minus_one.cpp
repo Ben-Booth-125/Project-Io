@@ -170,12 +170,41 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // A PEOPLE HOLDS BOTH, THEN IT RESOLVES. 200 years is a span a world of
     // 4000 years can show several times over, and long enough that conversion
     // reads as a generation rather than a flip. The pair then settles on the
-    // ground's own binding: 400 of reach, less 200 where the people is not its
-    // realm's own culture -- so near, kindred ground converts and far, alien
-    // ground reasserts, which is the fault line stated as two numbers.
+    // ground's own binding: 400 of reach, less an alien penalty where the
+    // people is not its realm's own culture -- so near, kindred ground
+    // converts and far, alien ground reasserts, which is the fault line
+    // stated as two numbers.
+    //
+    // BL-944, RAISED (Ben, 2026-09-13: "raise the floor", not a second
+    // binding term). Measured at delivery: reassertion fired ZERO times in
+    // 16 worlds at a 200 penalty, because BL-896/BL-923's secession floor
+    // (60) had already stripped the badly-reached ground before this test
+    // ever ran on it -- held ground under an adopting realm sat at p10
+    // 720-840 out of 1000, comfortably above a 400 (native) or 600 (alien)
+    // bind floor. Sprint 39's other changes have since moved that floor:
+    // swept fresh at 200 the alien floor already clears in 13/14
+    // creed-worlds (90 reassertions across the sweep) rather than zero, so
+    // the diagnosis this dial was set against is stale -- but the signal was
+    // still thin (median 5 a world) and asymmetric only by accident. Raising
+    // the ALIEN penalty specifically (not the shared convert floor) sharpens
+    // exactly the axis a schism needs: alien ground is the residue-culture
+    // ground CREEDS.md names as the fault line, so widening its bind gap is
+    // what makes reassertion read as a consequence of KINSHIP, not of reach
+    // alone. Swept at 450: 443 reassertions across the sweep (90 -> 443,
+    // 4.9x), firing in all 14 creed-worlds, spread median 19 (range 7-91) --
+    // a real per-world gradient rather than a uniform trickle, and the
+    // shared convert floor is untouched so near, kindred ground still
+    // converts exactly as before.
     hp.universal_creed_hold_years        = 200;
     hp.universal_creed_convert_supply_q  = 400;
-    hp.universal_creed_alien_penalty_q   = 200;
+    hp.universal_creed_alien_penalty_q   = 450;
+
+    // BL-944 — THE SCHISM VERB ITSELF. 3 held regions of the same alien
+    // residue culture reasserting together: enough that a realm's break can
+    // read as a real people rather than one stray region's supply dipping
+    // for a round, and low enough that it actually clears against the fresh
+    // reassertion counts above (median 19 a creed-world, range 7-91).
+    hp.schism_min_regions = 3;
     // BL-887: reach propagates through a chain of population centres, not out
     // of one capital (Ben, 2026-09-10). ON for generation's own round, which
     // is the round that has a real centre map to chain through -- BL-872

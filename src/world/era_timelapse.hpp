@@ -189,6 +189,7 @@ enum class lapse_event_kind : uint8_t
     treaty_broken       = 13, ///< BL-933: a treaty was broken; `polity` = the defector, `other` = the wronged party.
     subject_bound       = 14, ///< BL-934: `polity` = the native subject, `other` = its new overlord.
     subject_freed       = 15, ///< BL-934: a subject refused renewal; `polity` = the subject, `other` = the former overlord.
+    schism              = 16, ///< BL-944: a reasserted people broke away over creed, not reach; `other` = the parent polity.
     count
 };
 
