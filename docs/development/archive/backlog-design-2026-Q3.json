@@ -13733,6 +13733,145 @@
         "requires",
         "resolution"
       ]
+    },
+    "BL-936": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-936",
+      "short_name": "CULTURAL_GOOD_PREFERENCE",
+      "priority": "B",
+      "difficulty": 4,
+      "title": "A good is wanted differently by different peoples, and the difference is traceable to route",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "BEN, 2026-09-11: Exploration \"gives us cultural preference to goods, markets that trade named goods in a simplified form.\"\n\nPREFERENCE ATTACHES TO A CULTURE, NOT A POLITY. Cultures already cross borders as shares on every region, so a preference carried by culture spreads with people and survives conquest - which makes a market's demand a fact about who LIVES there rather than who RULES there.\n\nDERIVED, NEVER ROLLED (the standing rule: consequences, not dice). It follows from what the culture's ground never held and what its route exposed it to - the same two inputs derive_wants already uses, read at culture grain instead of polity grain. A people that walked past a good and never held it pays most for it.\n\nIT WEIGHTS A WANT, IT DOES NOT SET A PRICE. The want table is directed and unpriced; preference makes some directed wants stronger, which is enough to rank where a fleet goes first. Turning a weight into a price is Digitisation's.\n\nOPEN: how preference interacts with assimilation - whether an absorbed culture's preferences blend, persist or lapse is unowned.",
+      "requires": [
+        "BL-931"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit 7ebad1c9, shared with the other two wave-4 items -- same one-commit-for-interleaved-work pattern as NR-853). culture_good_preference/derive_culture_preference: a new table (kept separate from want, whose own comment says NO PRICE NO MAGNITUDE), grouped by region::culture plurality share rather than ownership -- reuses the same two inputs derive_wants already reads (what the culture's ground never held, its route exposure), just at culture grain. Weights a want, never sets a price. Sweep reading 10: 52 (culture, good) preference entries across 3 seeds, weight_q 250-1000, non-uniform on every seed -- real numbers, was NOT YET MEASURABLE before this item. Assimilation interaction left explicitly open per the doc. world_determinism ALL PASS, history_sim_harness at baseline. NOTE: the backlog row named tools/verify/history_sweep.cpp as a file; the actual measurement landed in the sibling tools/verify/exploration_sweep.cpp instead (that file's own header names it as the Exploration-phase sweep) -- a file-list correction, not a scope change.",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
+    },
+    "BL-941": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-941",
+      "short_name": "THE_ARMS_RACE_IS_DETERRENCE",
+      "priority": "A",
+      "difficulty": 5,
+      "title": "Visible force buys quiet at home and opportunity abroad — Ceiling and Alarm at polity grain",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "BEN, 2026-09-11: \"military arms races which serve to reinforce peace near to home, and conflict far from home.\"\n\nTHE PROJECT ALREADY HAS THE SHAPE, AND IT IS NOT A NEW OBJECT. ../economy/ERAS.md sec The two scalars carries a per-nation CEILING (restraint carried) against a per-nation ALARM (how threatened this nation feels by others' VISIBLE capability), with the explicit discipline that neither is a new world entity -- the same discipline BL-223 set for the deterrence ceiling. Reuse that pair at POLITY grain; do not invent a third quantity.\n\nVISIBILITY IS THE WHOLE MECHANISM. A standing army and a fleet are read by neighbours whether or not they are used (tree node EX-PT-2a Standing Garrison is the first thing in the Exploration tree that is visible at rest). A neighbour that reads them BINDS A TREATY (BL-933) rather than testing them. The same fleet pointed at ground whose holder has none meets no deterrent at all. ONE PURCHASE, TWO OPPOSITE EFFECTS -- that is the displacement, priced in the only currency the phase has.\n\nIT IS A FORCE IN THE WORLD, NOT A TERM IN THE ACTOR. The standing rule against agent handicaps binds: nothing reads a scorer's own disposition to become peaceful. The scorer is untouched; what changed is that a neighbour war got expensive and a distant one did not.\n\nTHE FAILURE MODE THIS ITEM OWNS. Deterrence that works everywhere produces a FROZEN MAP, which fails CIVILISATION.md's fragmentation handoff as surely as a hegemon does. BL-937's displacement RATIO is the check, and this item is not done until that reading moves in the right direction with total conflict still well above zero.\n\nOPEN: where the thresholds sit -- what makes a neighbour bind rather than test. Unmeasured, and a measurement rather than a judgement.",
+      "requires": [
+        "BL-933",
+        "BL-935",
+        "BL-937"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit 7ebad1c9, shared with the other two wave-4 items -- same one-commit-for-interleaved-work pattern as NR-853). Reused ERAS.md's Ceiling/Alarm pair at polity grain (no third quantity invented): Ceiling maps to the existing decider_aggression_q cost term, Alarm is new (visible_capability_q/deterrence_alarm_q) and reads a neighbour's standing army+navy. Wired into treaty_value_q: near-home (contact predates the span) Alarm raises binding value, far-from-home gets a flat treaty_far_penalty_q instead -- the near/far split is the mechanism, not a blanket suppression. Answers NR-851 (wave 3's displacement non-movement): 3-seed median displacement ratio moved 0.01 -> 0.88 (one seed crossed 1.0 at 1.11, genuine displacement). Still <=1 on the median -- NR-855 records this as real but incomplete movement, not a closed reading. world_determinism ALL PASS, history_sim_harness at the pre-existing 2-failure baseline, full app BUILD_OK (independently rebuilt in the main session).",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
+    },
+    "BL-942": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "status": "complete",
+      "id": "BL-942",
+      "short_name": "TWO_WAYS_TO_BE_STRONG",
+      "priority": "A",
+      "difficulty": 5,
+      "title": "Consolidation and expansion both pay, and a creed decides which a realm reaches for",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/creeds.hpp",
+        "tools/verify/history_sweep.cpp"
+      ],
+      "design": "THE PROBLEM, NAMED BY ITS AUTHOR (Ben, 2026-09-11): \"so much of this is my euro-centric view as an author, I want to consider how we can also strengthen larger empires which do not have an interest in colonization / spreading faith.\"\n\nTHE RISK IS IN THE SCOREBOARD, NOT THE MECHANICS. If the phase's readings only measure colonies and fleets, a continental realm has no way to succeed at it, every world converges on one strategy, and the flat map GENERATION_STRATEGY.md sec Asymmetry is the deliverable exists to prevent is exactly what generation produces.\n\nTWO STRATEGIES, BOTH PAYING. EXPANSION buys ports, hulls, subjects and trade provinces; wants goods it lacks from strangers; grows outward; fails by outrunning its network. CONSOLIDATION buys the road ladder, dense internal throughput and its own ground worked harder; wants reach and yield it already owns; grows inward; fails by stagnating. EXPLORATION.md sec Two ways to be strong carries the table.\n\nNEITHER IS A FLAG AND NEITHER IS CHOSEN (Ben, 2026-09-11): \"Ideally we can let candidates work on either consolidation or expansion depending on their historical creed.\"\n\nTHE MATERIAL IS ALREADY RECORDED AND NOTHING NEW NEEDS INVENTING. A pantheon's gods carry `zeal` (relishes battle) and `dominion` (expects to prevail), 0-10 (`culture_god`, creeds.hpp); `sea_legs_q` is earned from a coastal cradle, a migration crossing, and a sea or storm god. HIGH DOMINION WITH NO SEA LEGS IS THE CONTINENTAL CONSOLIDATOR, already derivable. Deep sea legs with a universalising creed is the coloniser.\n\nTHE SCORER TERM THAT MAKES IT LEGIBLE is `throughput_bound` (BL-930, BL-940) -- the only pressure a realm with no coast and no subjects can ever be under. Without it the scorer has nothing to say to a consolidator and this item is decoration.\n\nIF THE MAPPING DOES NOT SEPARATE THEM, THE FIX IS UPSTREAM (Ben, 2026-09-11: \"if we have to force this outcome, then we should be looking back at the Empire phase to ensure creeds map well to our phase\"). Forcing a disposition the creeds do not support would be a term inside an actor and stays declined.\n\nDONE WHEN: BL-937's \"both strategies pay\" reading is green across a sweep -- consolidators and expansionists both among the strongest realms, each traceable to its creed's recorded deeds.",
+      "requires": [
+        "BL-940",
+        "BL-937"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit 7ebad1c9, shared with the other two wave-4 items -- same one-commit-for-interleaved-work pattern as NR-853). No new derived scalar: consolidator_lean_q/expansion_lean_q read existing zeal/dominion (culture_god, creeds.hpp) and sea_legs_q, threaded into choose_exploration_node as a weighting on throughput_bound vs coastal_holdings/ground_port/subject_held (a weighting, never a hard-coded branch). Reading 3 (both strategies pay) does NOT show separation on a 3-seed sweep -- 3/3 seeds had an expansionist-leaning creed among the top-3-by-region realms, 0/3 a consolidator-leaning one. NOT forced per the item's own explicit instruction; NR-856 records two live explanations (the strength metric may itself favour expansion, or the Empire-phase creed mapping genuinely doesn't separate them) and asks for a wider sweep with a consolidation-sensitive metric before concluding either way. world_determinism ALL PASS, history_sim_harness at baseline.",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
     }
   }
 }

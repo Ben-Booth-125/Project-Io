@@ -52,19 +52,33 @@ BL-931 -> BL-937 opens the sprint, ahead of the NEXT_SESSION.md wave table's lit
       direct harness assertions, verified by sweep + code read instead), NR-854 (subject_kind is a
       coastal/interior proxy, not the doc's literal two-seat model) flagged for Ben. Archived.
 
-## Wave 4 — the phase's claims (need wave 3 to exist)
+## Wave 4 — the phase's claims — LANDED 2026-09-12
 
-- [ ] **BL-941** (THE_ARMS_RACE_IS_DETERRENCE) — Ceiling/Alarm at polity grain (ERAS.md's shape),
-      visible capability read by neighbours. This is the mechanism NR-851 flags as the likely fix
-      for displacement's continued non-movement.
-- [ ] **BL-942** (TWO_WAYS_TO_BE_STRONG) — consolidator/expansionist disposition derived from
-      `zeal`/`dominion`/`sea_legs_q`, never a flag.
-- [ ] **BL-936** (CULTURAL_GOOD_PREFERENCE) — preference attaches to culture, derived from what
-      ground never held and route exposure, weights a want rather than setting a price.
+- [x] **BL-941** (THE_ARMS_RACE_IS_DETERRENCE), **BL-942** (TWO_WAYS_TO_BE_STRONG), **BL-936**
+      (CULTURAL_GOOD_PREFERENCE) — commit `7ebad1c9` (one commit, same interleaved-work pattern as
+      wave 3). Deterrence moved the median displacement ratio 0.01 -> 0.88 across 3 seeds (one seed
+      crossed 1.0) — real progress, not yet over the bar on the median (NR-855). Two-strategies
+      does NOT show separation on this 3-seed sweep — 3/3 expansionist-leaning, 0/3 consolidator-
+      leaning among top-3-by-region realms, NOT forced per the item's own instruction (NR-856).
+      Cultural preference produces real numbers (52 entries, non-uniform weight 250-1000), was
+      previously scaffolding. Independently rebuilt (full app BUILD_OK), `exploration_sim_harness`
+      43/43 PASS, `world_determinism` ALL PASS, `history_sim_harness` at the pre-existing baseline.
+      One agent stall recovered mid-wave (its uncommitted work was checked and was complete, not
+      broken, before continuing). Archived.
 
-## Wave 5 — not yet promoted
+## Wave 5 — the last four items
 
-BL-943 (fleet/caravan exemplars — visual only, a filter on the throughput number), BL-938
-(Industry ring-1 migration, NOT a trim — see NEXT_SESSION.md's "traps" section). `BL-944` gated on
-a Ben decision (NEXT_SESSION.md § One decision owed — reassertion fired zero times in the earlier
-16-world sweep; ask before building). `BL-945` parked for Digitisation, not this sprint.
+- [ ] **BL-943** (FLEET_AND_CARAVAN_EXEMPLARS) — visual only, a filter on BL-940's corridor number
+      (now live). UI item: needs a live click in the built app, not just a capture.
+- [ ] **BL-938** (INDUSTRY_TREE_RING_ONE_MIGRATES) — Industry's ring 1 duplicates the newly-authored
+      Exploration tree; this is a migration (ring 1 out, rings 2-4 shift down), NOT a trim — ring 4
+      is the 20th century and the 1960 epoch needs it. Doc-and-store work, `tree_lint.js` is the gate.
+- [ ] **BL-944** (THE_SCHISM_VERB) — GATED on a Ben decision: reassertion fired zero times in an
+      earlier 16-world sweep (the secession floor already removes badly-reached ground), so a
+      schism verb built on the same substrate would also fire zero times. Ask before building —
+      do not pick a fix (higher floor or a second binding term) silently.
+- [ ] **BL-945** (DEPLETION_RETROFIT_FORMULA) — PARKED for Digitisation, not sprint 40 work.
+
+BL-943 and BL-938 can run together (disjoint files: UI vs. tree stores). BL-944 blocks on Ben's
+call in NEEDS_REVIEW (search "schism" / the wave-4-era entry in NEXT_SESSION.md § One decision
+owed) before any code is written for it.

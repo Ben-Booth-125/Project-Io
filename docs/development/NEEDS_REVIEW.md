@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*37 entries — 32 open, 5 resolved.*
+*39 entries — 34 open, 5 resolved.*
 
 ---
 
@@ -423,6 +423,16 @@ exploration_sim_harness gained direct assertions for BL-935 (R5.5-R5.9: port/nav
 *observation · raised 2026-09-12 · from BL-934, wave 3 of sprint 40.*
 
 EXPLORATION.md describes a trade province as a NEW seat planted on a native polity's coast (the native survives beside it) versus a subjected polity being the native polity itself, whole. The data model has no mechanism to spawn a new region/seat mid-sim, so `subject_kind` is instead DERIVED from whether the native's own capital seat already carries a port_q endowment (coastal -> trade-province reading, interior -> subjected-polity reading) -- the native polity itself is what gets the overlord link either way, never a literal new seat. This is called out in-code as 'the honest proxy available without a second, region-spawning placement pass', not presented as the literal model.
+
+### NR-855 — OBSERVATION: BL-941's deterrence moved displacement from 0.01/0.16 to a median 0.88 -- real movement, still not over 1
+*observation · raised 2026-09-12 · from BL-941, wave 4 of sprint 40. Answers NR-851.*
+
+The Ceiling/Alarm pair, reused at polity grain and wired into treaty_value_q (near-home Alarm raises binding value; far-from-home gets a flat penalty instead), moved the 3-seed median displacement ratio from wave 3's 0.01 to 0.88 -- one seed alone (seed 1) crossed 1.0 (1.11, genuine displacement: frontier war rate exceeded neighbour war rate). This is the intended mechanism working, not a coincidence -- non-aggression-blocked campaigns stayed high (748,086 across 3 seeds) while the far/near cost gap this item was built to create is what moved the ratio, unlike wave 3's block alone which suppressed both sides evenly. Still <=1 on the spread median, so the harness's own bar (median must exceed 1 for the reading to pass) is not yet met -- this is closer, not done, and a wider seed sample (the 3-seed sweep was chosen for runtime, not statistical confidence) may show a different median.
+
+### NR-856 — OBSERVATION: BL-942's creed axes do not separate consolidator/expansionist strategies on a 3-seed sweep (0/3, per the doc's own instruction not to force it)
+*observation · raised 2026-09-12 · from BL-942, wave 4 of sprint 40.*
+
+Reading 3 ('both strategies pay'): across 3 seeds, the top-3-by-region-count realms included an expansionist-leaning creed in all 3 seeds and a consolidator-leaning creed in 0. EXPLORATION.md is explicit that if the creed axes (zeal/dominion/sea_legs_q) do not separate the two strategies, 'the fix is upstream [in the Empire phase], never a flag here' -- so this was NOT forced or re-weighted to produce a green reading. Two candidate explanations, neither ruled out: (1) 'top-3 by region count' as the strength metric may itself favour expansion-shaped growth regardless of creed, so a consolidator could be strong by another measure (treasury, throughput) and simply not show up in a region-count ranking; (2) the creed axes genuinely don't separate the strategies in the Empire phase's own output, which would be the doc's own named upstream-fix scenario. 3 seeds is also a small sample for this particular reading.
 
 ---
 
