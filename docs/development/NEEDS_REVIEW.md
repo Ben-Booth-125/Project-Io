@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*39 entries — 34 open, 5 resolved.*
+*41 entries — 35 open, 6 resolved.*
 
 ---
 
@@ -434,6 +434,11 @@ The Ceiling/Alarm pair, reused at polity grain and wired into treaty_value_q (ne
 
 Reading 3 ('both strategies pay'): across 3 seeds, the top-3-by-region-count realms included an expansionist-leaning creed in all 3 seeds and a consolidator-leaning creed in 0. EXPLORATION.md is explicit that if the creed axes (zeal/dominion/sea_legs_q) do not separate the two strategies, 'the fix is upstream [in the Empire phase], never a flag here' -- so this was NOT forced or re-weighted to produce a green reading. Two candidate explanations, neither ruled out: (1) 'top-3 by region count' as the strength metric may itself favour expansion-shaped growth regardless of creed, so a consolidator could be strong by another measure (treasury, throughput) and simply not show up in a region-count ranking; (2) the creed axes genuinely don't separate the strategies in the Empire phase's own output, which would be the doc's own named upstream-fix scenario. 3 seeds is also a small sample for this particular reading.
 
+### NR-857 — NOVEL WORK: BL-943's exemplars are wired but the Exploration span's own events never reach the lapse-map surface at all
+*novel-work · raised 2026-09-12 · from BL-943, wave 5 of sprint 40.*
+
+hard_coded_world.cpp's Exploration-span call (world_params::exploration_sim_enabled, still default false) never folds its result (kepler_exploration_hs) into prehistory_timelapse, which stays as_timelapse(hs) -- the EMPIRE-round state only. So today, no matter how BL-943's rendering is wired, the Exploration span's own events (Post Road promotions past tier 2, treaty formation/breaking, subject binding, the 1200 CE treasury consolidation) never reach the lapse map at all -- BL-943's consolidation-burst gate is correct code but permanently inert until this plumbing lands. The corridor-exemplar HALF of BL-943 is live and verified today regardless, because Track/Road promotions and cross-border trade-link opens already fire during the EMPIRE era (before Exploration even starts) -- confirmed by capture (history_lapse_press.lua, 0 failures, 375 road + 100 trade corridors baked, small diamond/dot marks visible on corridor lines under a 4x crop).
+
 ---
 
 ## Resolved
@@ -485,4 +490,9 @@ RESOLUTION: build BL-930 (wire the tree) then BL-931 (the span runs) then BL-937
 *decision taken on your behalf · raised 2026-09-12 · from Wave 3 of sprint 40 (BL-933/934/935).*
 
 CLAUDE.md sec The Full lifecycle calls for one commit per item. The sub-agent building this wave found BL-933/934/935's code interleaved within the same shared functions (run_exploration_upkeep, the round loop's upkeep block) and judged that splitting after the fact risked committing an intermediate state that doesn't build -- so it landed one commit covering all three, clearly itemising each in the message body. Accepted as-is: the resolution field for each of the three backlog rows below points at the shared commit and names which parts are that item's own, which preserves the audit trail without a risky post-hoc split.
+
+### NR-858 — OBSERVATION: BL-943's live click was not performed -- computer-use access to ProjectIo was denied; verified by capture instead, on Ben's own instruction
+*observation · raised 2026-09-12 · from BL-943, wave 5 of sprint 40, main-session verification.*
+
+The standing rule requires a live click for a UI requirement, not only a capture. request_access(['ProjectIo']) was denied by Ben. Ben's own instruction mid-session ('just use captures') supersedes the standing rule for this item: history_lapse_press.lua ran clean (0 failures) with real corridor data (375 road, 100 trade corridors) and a 4x crop of the capture shows small marks on corridor lines, matching the sub-agent's own zoomed-screenshot confirmation. This is real evidence the mechanism renders without crashing, but it is a capture, not a live press -- genuine legibility at native 1920x1080 scale (mark size/contrast, whether the road-rung distinction reads at a glance) is still an open judgement call for whoever next looks at it live.
 

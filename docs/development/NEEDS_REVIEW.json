@@ -721,6 +721,26 @@
    "source": "BL-942, wave 4 of sprint 40.",
    "what": "Reading 3 ('both strategies pay'): across 3 seeds, the top-3-by-region-count realms included an expansionist-leaning creed in all 3 seeds and a consolidator-leaning creed in 0. EXPLORATION.md is explicit that if the creed axes (zeal/dominion/sea_legs_q) do not separate the two strategies, 'the fix is upstream [in the Empire phase], never a flag here' -- so this was NOT forced or re-weighted to produce a green reading. Two candidate explanations, neither ruled out: (1) 'top-3 by region count' as the strength metric may itself favour expansion-shaped growth regardless of creed, so a consolidator could be strong by another measure (treasury, throughput) and simply not show up in a region-count ranking; (2) the creed axes genuinely don't separate the strategies in the Empire phase's own output, which would be the doc's own named upstream-fix scenario. 3 seeds is also a small sample for this particular reading.",
    "ask": "Before treating this as evidence the Empire phase's creeds need revisiting: should reading 3's 'strongest realms' metric be changed to something consolidation-sensitive (e.g. treasury or throughput rank, not region count) before concluding the creed mapping itself is the problem? This is worth settling on a wider sweep, not this 3-seed one."
+  },
+  {
+   "id": "NR-857",
+   "title": "NOVEL WORK: BL-943's exemplars are wired but the Exploration span's own events never reach the lapse-map surface at all",
+   "raised": "2026-09-12",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "BL-943, wave 5 of sprint 40.",
+   "what": "hard_coded_world.cpp's Exploration-span call (world_params::exploration_sim_enabled, still default false) never folds its result (kepler_exploration_hs) into prehistory_timelapse, which stays as_timelapse(hs) -- the EMPIRE-round state only. So today, no matter how BL-943's rendering is wired, the Exploration span's own events (Post Road promotions past tier 2, treaty formation/breaking, subject binding, the 1200 CE treasury consolidation) never reach the lapse map at all -- BL-943's consolidation-burst gate is correct code but permanently inert until this plumbing lands. The corridor-exemplar HALF of BL-943 is live and verified today regardless, because Track/Road promotions and cross-border trade-link opens already fire during the EMPIRE era (before Exploration even starts) -- confirmed by capture (history_lapse_press.lua, 0 failures, 375 road + 100 trade corridors baked, small diamond/dot marks visible on corridor lines under a 4x crop).",
+   "ask": "Is folding the Exploration span's own record into the lapse-map timelapse (and flipping exploration_sim_enabled's default, which re-baselines generation goldens per NR-847) worth its own item now, or does it wait until Digitisation gives a reason to actually look at the 1200-1660 span in the wizard?"
+  },
+  {
+   "id": "NR-858",
+   "title": "OBSERVATION: BL-943's live click was not performed -- computer-use access to ProjectIo was denied; verified by capture instead, on Ben's own instruction",
+   "raised": "2026-09-12",
+   "kind": "observation",
+   "status": "resolved",
+   "source": "BL-943, wave 5 of sprint 40, main-session verification.",
+   "what": "The standing rule requires a live click for a UI requirement, not only a capture. request_access(['ProjectIo']) was denied by Ben. Ben's own instruction mid-session ('just use captures') supersedes the standing rule for this item: history_lapse_press.lua ran clean (0 failures) with real corridor data (375 road, 100 trade corridors) and a 4x crop of the capture shows small marks on corridor lines, matching the sub-agent's own zoomed-screenshot confirmation. This is real evidence the mechanism renders without crashing, but it is a capture, not a live press -- genuine legibility at native 1920x1080 scale (mark size/contrast, whether the road-rung distinction reads at a glance) is still an open judgement call for whoever next looks at it live.",
+   "ask": null
   }
  ]
 }

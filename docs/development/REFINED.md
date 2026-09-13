@@ -66,19 +66,24 @@ BL-931 -> BL-937 opens the sprint, ahead of the NEXT_SESSION.md wave table's lit
       One agent stall recovered mid-wave (its uncommitted work was checked and was complete, not
       broken, before continuing). Archived.
 
-## Wave 5 — the last four items
+## Wave 5 — LANDED 2026-09-12
 
-- [ ] **BL-943** (FLEET_AND_CARAVAN_EXEMPLARS) — visual only, a filter on BL-940's corridor number
-      (now live). UI item: needs a live click in the built app, not just a capture.
-- [ ] **BL-938** (INDUSTRY_TREE_RING_ONE_MIGRATES) — Industry's ring 1 duplicates the newly-authored
-      Exploration tree; this is a migration (ring 1 out, rings 2-4 shift down), NOT a trim — ring 4
-      is the 20th century and the 1960 epoch needs it. Doc-and-store work, `tree_lint.js` is the gate.
-- [ ] **BL-944** (THE_SCHISM_VERB) — GATED on a Ben decision: reassertion fired zero times in an
-      earlier 16-world sweep (the secession floor already removes badly-reached ground), so a
-      schism verb built on the same substrate would also fire zero times. Ask before building —
-      do not pick a fix (higher floor or a second binding term) silently.
-- [ ] **BL-945** (DEPLETION_RETROFIT_FORMULA) — PARKED for Digitisation, not sprint 40 work.
+- [x] **BL-943** (FLEET_AND_CARAVAN_EXEMPLARS) — commit `b61acf3f`. Corridor exemplars (diamond/
+      caravan, triangle/sail) read the existing road/trade-link promotion events; the road rung is
+      legible (mark size/rings key off Track/Road/Post Road). Verified by capture, not a live click
+      — access was denied, Ben said use captures instead (NR-858, resolved). NR-857 (novel-work):
+      the Exploration span's own events never reach this surface yet (a plumbing gap outside this
+      item's scope) — only Empire-era road/trade promotions are visible today.
+- [x] **BL-938** (INDUSTRY_TREE_RING_ONE_MIGRATES) — commit `5941cfca`. Ring 1 (18 nodes) migrated
+      out: 4 dropped as Exploration duplicates, 13 more dropped as fitting neither tree, 1 kept and
+      renumbered for a fork's structural requirement. Ring 4's 20th-century content survives whole
+      as the new ring 3. Industry is now 3 rings / 5 branches / 3 milestones / 45 nodes. All four
+      trees pass `tree_lint.js`.
 
-BL-943 and BL-938 can run together (disjoint files: UI vs. tree stores). BL-944 blocks on Ben's
-call in NEEDS_REVIEW (search "schism" / the wave-4-era entry in NEXT_SESSION.md § One decision
-owed) before any code is written for it.
+## Wave 6 — the last item
+
+- [ ] **BL-944** (THE_SCHISM_VERB) — Ben's call (2026-09-12): **raise the floor** (not a second
+      binding term). Adjust `universal_creed_convert_supply_q`/`universal_creed_alien_penalty_q` so
+      reassertion can fire in some worlds, then build the schism verb on top, distinguishable from
+      an ordinary network-failure secession in the readings. `BL-945` stays parked for Digitisation,
+      not this sprint — the backlog is otherwise empty once BL-944 lands.

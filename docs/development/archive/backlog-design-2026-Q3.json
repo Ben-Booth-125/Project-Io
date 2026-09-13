@@ -13872,6 +13872,99 @@
         "requires",
         "resolution"
       ]
+    },
+    "BL-938": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, \"we should shrink the industry tree\"); Claude (found the cause while building the Exploration tree)",
+      "requires": [
+        "BL-930"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "id": "BL-938",
+      "short_name": "INDUSTRY_TREE_RING_ONE_MIGRATES",
+      "priority": "A",
+      "difficulty": 5,
+      "title": "Industry's ring 1 is the exploration age: migrate it out and shift every ring down",
+      "authority_doc": "docs/generation/trees/INDUSTRY_TREE.md",
+      "files": [
+        "docs/generation/trees/INDUSTRY_TREE.md",
+        "docs/generation/trees/industry_tree.json",
+        "docs/generation/trees/EXPLORATION_TREE.md",
+        "docs/generation/trees/exploration_tree.json",
+        "docs/generation/trees/TREES.md"
+      ],
+      "design": "BEN, 2026-09-11: \"we should shrink the industry tree\" (resolving NR-844, which reported it oversized after the span fell 400 -> 300 years).\n\nTHE NAIVE SHRINK IS WRONG AND MUST NOT BE DONE. Dropping the outer ring is the obvious cut and it removes RING 4: Electrification, Internal Combustion & Oil, Flight, Automotive Transport, Broadcast, Antibiotics & Mass Vaccination, Synthetic Chemistry, Fixed-Nitrogen Synthesis, Tractor & Fertiliser. That is the twentieth century, and the campaign epoch is 1960. Ring 4 stays.\n\nTHE REAL FINDING: RING 1 IS THE EXPLORATION AGE. Measured 2026-09-11 while authoring EXPLORATION_TREE.md. Ring 1 holds Full-Rigged Ship, Celestial Navigation, Chronometer, Joint-Stock & Public Credit, Chartered Capital, Movable-Type Press, Crop-Package Exchange. Those are 1200-1660 subjects, and they sat in the Industry tree only because no Exploration tree existed to hold them. TWO ARE OUTRIGHT DUPLICATES of nodes now authored: IN-MV-1b Full-Rigged Ship and IN-MV-1c Celestial Navigation against EX-HL-2a Ocean Carrack and EX-HL-3a Oceanic Navigation; IN-CH-1b/IN-CH-1d against EX-SP-2a The Chartered Company.\n\nTHE WORK. Ring 1 (18 nodes) migrates out: some subjects are already covered by the Exploration tree and are simply dropped, others may earn a place in it. Rings 2/3/4 shift down to 1/2/3. Industry becomes 3 rings, 5 branches, 3 milestones, ~44 nodes -- which is also the proportional target (62 x 300/400 = 46), reached by MEANING rather than by arithmetic, which is why it is believable.\n\nEVERY NODE ID CHANGES, because an id carries its ring. That is the bulk of the work and it is mechanical: renumber, rewrite links/requires/excludes, rewrite the doc's tables, re-run tree_lint.js industry. THE RIM MILESTONE'S MEANING IS UNCHANGED -- it still opens nothing and ends the chain; only its id moves.\n\nWATCH FOR: rule 4 breakage. Each milestone requires majors at ITS OWN ring from two branches; after a shift the old ring-2 milestone's requires are still ring-2 ids that are now ring 1, so they travel together, but any milestone whose requires named a ring-1 major that got DROPPED needs a new requirement. The lint catches this; do not hand-wave it.\n\nDONE WHEN: tree_lint.js passes on both industry and exploration, no subject appears in both trees, ring 4's contents survive as ring 3, and TREES.md's size row states the new shape.",
+      "resolution": "BUILT 2026-09-12 (commit 5941cfca). Dropped 17 old ring-1 nodes outright: 4 duplicates of Exploration content (IN-MV-1b/1c vs EX-HL-2a/3a, IN-CH-1b/1d vs EX-SP-2a), 13 more with no clean fit in either tree (the Sovereign Doctrine fork's milestone/partner among them, retired entirely). None moved into Exploration -- Chronometer and Crop-Package Exchange were checked against Exploration's actual branches and rejected as not earning a natural slot, a considered-and-rejected call, not an oversight. Kept IN-MT-1c (Furnace Practice) renumbered to preserve the Fuel Doctrine fork's shared minor (a tree_lint.js structural requirement). Old rings 2/3/4 shifted to 1/2/3, every id/link/requires/excludes remapped; one connectivity patch added (Field Survey <-> Farm Mechanisation) after Convertible Husbandry's drop orphaned the Labour Doctrine fork. Ring 4's twentieth-century content (Electrification, Internal Combustion & Oil, Flight, Automotive Transport, Broadcast, Antibiotics & Mass Vaccination, Synthetic Chemistry, Fixed-Nitrogen Synthesis, Tractor & Fertiliser) survives WHOLE as the new ring 3 -- the trap the item explicitly warned against. Result: Industry is 3 rings, 5 branches, 3 milestones, 3 forks, 45 nodes (30 major/12 minor/3 milestone). node tools/session/tree_lint.js: all four trees OK (colonisation 29, empire 52, exploration 31 unchanged, industry 45). No C++ header reads industry_tree.json's shape yet, so no rebuild was needed for this item. Flagged in INDUSTRY_TREE.md: three dropped nodes (Cast Ordnance's gunpowder-roster unlock, Preventive Inoculation's Health root, Learned Correspondence's research trickle) were dropped in one pass rather than argued against consumers that don't exist yet -- worth a second look if a future sweep finds a roster gate or research curve wanting.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "blocked_on",
+        "parked",
+        "category",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolution"
+      ]
+    },
+    "BL-943": {
+      "glyph": "✓",
+      "sprint": 40,
+      "written": "2026-09-11",
+      "author": "Ben (2026-09-11, Exploration design session); Claude (written into EXPLORATION.md)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "UI",
+      "status": "complete",
+      "id": "BL-943",
+      "short_name": "FLEET_AND_CARAVAN_EXEMPLARS",
+      "priority": "B",
+      "difficulty": 4,
+      "title": "Draw a fleet or a caravan when a corridor's throughput crosses a threshold",
+      "authority_doc": "docs/ui/STARTUP.md",
+      "files": [
+        "src/ui/history_lapse.cpp",
+        "src/ui/history_lapse.hpp"
+      ],
+      "design": "BEN, 2026-09-11: \"We also want to visualise fleets and caravans moving, this can be heavily abstracted since the pace of our time-lapse is too fast, so we will just render examples when a threshold supply is reached.\"\n\nAN EXEMPLAR STANDS FOR THE FLOW; IT DOES NOT DEPICT IT. One sail, one caravan, drawn on a corridor whose throughput crosses a threshold. Not one mark per cargo, not an animation of traffic -- the time-lapse runs centuries per second and a faithful depiction would be noise.\n\nTHIS COSTS A COMPARISON, AND ONLY BECAUSE BL-940 EXISTS. The flow is already one number per corridor, so the visual is a FILTER ON THAT NUMBER rather than a second simulation. If this item is reached before BL-940, it has nothing to read -- that dependency is the whole reason the corridor number was kept when per-good routing was cut.\n\nWHERE IT DRAWS. The Exploration span's round in the wizard, beside the existing era time-lapse surface (BL-916's typed event layer, BL-919's lineage palette, BL-915's terrain underlay). Sea exemplars on water corridors, land exemplars on road corridors, and the ROAD RUNG should be legible in the mark -- a Highway corridor and a Track corridor must not draw the same.\n\nALSO DRAW THE CONSOLIDATION (BL-932). The one-time flow of seat stores into the capital at 1200 is the phase's opening act and Ben called it out as something the lapse can show.\n\nA VISUAL REQUIREMENT NEEDS A LIVE CLICK, not only a capture (standing rules). Arrive on the Exploration round in the built app and watch it.",
+      "requires": [
+        "BL-940"
+      ],
+      "resolution": "BUILT 2026-09-12 (commit b61acf3f). Reads two EXISTING event kinds (road_promoted, trade_link_opened) rather than a new mechanism -- a corridor's throughput crossing a promotion threshold already IS the trigger EXPLORATION.md names. Draws one exemplar per crossing at the corridor's midpoint inside the existing lapse_marker_window_years fade: diamond (caravan, land) or triangle (sail, water), water/land decided once at bake time by majority-sampling the terrain band already built. The road rung is legible: added year_post_road (previously folded indistinguishably into year_road) so the exemplar's size/ring-count keys off the promotion tier (1 Track / 2 Road / 3 Post Road) and the three rungs never draw the same mark. A gold consolidation-burst glyph marks every capital at 1200 CE (BL-932's opening act). REAL GAP FOUND, NOT FIXED (NR-857): hard_coded_world.cpp never folds the Exploration span's own record into prehistory_timelapse, so none of this item's marks can ever show the ACTUAL 1200-1660 Exploration events (Post Road promotions past tier 2, treaties, subject binding, consolidation) -- only the Empire era's own road/trade promotions, which already fire before Exploration starts, are currently reachable on this surface. The corridor-exemplar mechanism is nonetheless verified live in the main session: history_lapse_press.lua ran clean (0 failures, 375 road + 100 trade corridors baked), and a 4x crop of the capture shows real marks on corridor lines. LIVE CLICK NOT PERFORMED (NR-858, resolved): computer-use access to ProjectIo was denied; verified by capture instead per Ben's own instruction ('just use captures'), which supersedes the standing live-click rule for this item -- native-scale legibility remains a live judgement call for whoever next opens the app. docs/ui/question_log.json extended for this surface; docs/ai/ACTIONS.json untouched (the lapse map takes no mouse input by design).",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "status",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "requires",
+        "resolution"
+      ]
     }
   }
 }
