@@ -133,7 +133,16 @@ inline constexpr uint32_t save_game_magic =
 /// strict-equality contract; there is no "older saves read an empty list" path
 /// because there is no partial read at all — an unversioned tail would be read
 /// as the NEXT body entry's name length.
-inline constexpr uint32_t save_game_version = 13; // BL-916, the EVENT LAYER on era_timelapse
+/// LAYOUT 14 = LAYOUT 13 PLUS ONE `era_timelapse` PER BODY ENTRY, PLUS FOUR
+/// REPORT-LEVEL COUNTERS (BL-946): the Exploration span's own record,
+/// `generation_report::body_entry::exploration_timelapse`, written by
+/// `w_body_entry` right after `prehistory_timelapse` and read back the same
+/// way by `r_body_entry`; and `exploration_years/battles/conquests/foundings`
+/// on `generation_report` itself, written by `w_report` right after the
+/// prehistory counters. Same strict-equality refusal as every prior bump — a
+/// v13 stream has no bytes there at all, so partial-reading it would misparse
+/// the next field.
+inline constexpr uint32_t save_game_version = 14; // BL-946, the EXPLORATION span's own time-lapse
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

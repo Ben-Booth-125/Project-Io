@@ -1046,7 +1046,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_wiz_dirty = true;
     });
 
-    // Park the wizard on a specific ROUND (0-5) so a visual check can capture each
+    // Park the wizard on a specific ROUND (0-5, BL-946: System, Life, Culture,
+    // Empires, Exploration, Digitisation) so a visual check can capture each
     // one. Clamped by draw_generation_screen, so an out-of-range index is harmless —
     // the name is kept for the scripts that already call it. Every round is a stable
     // capture: the wizard is driven by the preferences and the seed, not by
@@ -1069,14 +1070,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
 
     // A LAPSE ROUND'S pass, run from the same call site arriving on the round
-    // uses (BL-829, generalised to both lapse rounds by BL-860). Under --verify
-    // the run is SYNCHRONOUS — it adopts the record the harness's own world
-    // already carries, or resolves a deferred run in place — so the call returns
-    // with the record in hand and a capture can never race it.
+    // uses (BL-829, generalised to two lapse rounds by BL-860, to three by
+    // BL-946). Under --verify the run is SYNCHRONOUS — it adopts the record
+    // the harness's own world already carries, or resolves a deferred run in
+    // place — so the call returns with the record in hand and a capture can
+    // never race it.
     //
-    // @param which  0 = round 4 (the migration), 1 = round 5 (the history).
-    //               Omitted means round 4, which is what every existing script
-    //               asked for when there was only one lapse round.
+    // @param which  0 = round 3 (Culture, the migration), 1 = round 4
+    //               (Empires, the history to 1200 CE), 2 = round 5
+    //               (Exploration, the span to 1660 CE, BL-946). Omitted means
+    //               0, which is what every existing script asked for when
+    //               there was only one lapse round.
     v.set_function("history_run", [this](sol::optional<int> which) {
         const int i = std::clamp(which.value_or(0), 0, wizard_lapse_round_count - 1);
         m_screen    = app_screen::generating;

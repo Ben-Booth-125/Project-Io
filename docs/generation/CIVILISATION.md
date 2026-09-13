@@ -23,7 +23,7 @@ whom*.
 into empires, expanding ancient logistics networks, and abstracting the use of natural resources
 for conquest."*
 
-**THE PHASES ARE NOT CONTINUOUS** (`../ui/STARTUP.md` § Rounds — System, Life, Culture, Empires, Industrialisation). Migration and empire have
+**THE PHASES ARE NOT CONTINUOUS** (`../ui/STARTUP.md` § Rounds — System, Life, Culture, Empires, Exploration, Digitisation). Migration and empire have
 different subjects, different rules and different terminating conditions. What crosses between
 them is a **stated handoff** — see § What the Culture phase must hand forward — and not an
 assumption that whatever happens to be in memory will do.
@@ -62,7 +62,7 @@ property is that little changes is not worth simulating.
 
 **A migration unfinished at 400 BCE is a defect in the migration, not in this boundary.**
 Unsettled ground is the exception marking hostile country (`../ui/STARTUP.md`
-§ Rounds — System, Life, Culture, Empires, Industrialisation), so a world still filling after two
+§ Rounds — System, Life, Culture, Empires, Exploration, Digitisation), so a world still filling after two
 thousand years has a colonisation problem to fix rather than a boundary to move.
 
 **Sixteen hundred years, not four thousand, is the constraint on everything below.** The arc —
