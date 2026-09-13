@@ -2553,8 +2553,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int ga = grudge_between(out, a, b), gb = grudge_between(out, b, a);
                 const polity& pa = out.polities[static_cast<std::size_t>(a)];
                 const polity& pb = out.polities[static_cast<std::size_t>(b)];
-                const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q);
-                const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q);
+                // BL-941 -- NEAR HOME is whether this pair's own contact
+                // predates the span (a long-known neighbour) rather than
+                // being formed during it (a frontier pair). `c` is already
+                // this pair's canonical contact row, so its own `first.year`
+                // is the fact, not a second lookup.
+                const bool near_home = c.first.year < params.start_year;
+                const int alarm_a = deterrence_alarm_q(ss.regions, out, params, a, b);
+                const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
+                const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
+                                                    alarm_a, near_home);
+                const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
+                                                    alarm_b, near_home);
                 if (value_a < params.treaty_formation_threshold_q
                  || value_b < params.treaty_formation_threshold_q) continue;
 
@@ -2604,8 +2614,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (!pa.alive || !pb.alive) continue;
 
                     const int ga = grudge_between(out, a, b), gb = grudge_between(out, b, a);
-                    const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q);
-                    const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q);
+                    // BL-941 -- same near-home read as formation, off the
+                    // pair's own recorded first contact (not `c`, since this
+                    // loop walks bound pairs rather than the contact table).
+                    const bool near_home = contact_first_year(out, a, b) < params.start_year;
+                    const int alarm_a = deterrence_alarm_q(ss.regions, out, params, a, b);
+                    const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
+                    const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
+                                                        alarm_a, near_home);
+                    const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
+                                                        alarm_b, near_home);
 
                     int defector = -1, wronged = -1;
                     if (value_a < break_bar && value_a <= value_b) { defector = a; wronged = b; }
@@ -5220,11 +5238,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             int subject_held_q = 0;
                             for (const polity& other : out.polities)
                                 if (other.alive && other.overlord == q.id) { subject_held_q = 1000; break; }
+                            // BL-942 -- TWO WAYS TO BE STRONG. `cs == nullptr`
+                            // (a fixture isolating a different mechanism, same
+                            // guard every other creed read in this file uses)
+                            // reads as no lean either way, which is exactly
+                            // `creed_lean_weight_q`'s own no-op case.
+                            int cons_lean_q = 0, expn_lean_q = 0;
+                            if (cs != nullptr && q.culture >= 0
+                             && static_cast<std::size_t>(q.culture) < cs->cultures.size())
+                            {
+                                const culture& own = cs->cultures[static_cast<std::size_t>(q.culture)];
+                                cons_lean_q = consolidator_lean_q(own);
+                                expn_lean_q = expansion_lean_q(own);
+                            }
                             q.exploration_investing = static_cast<int16_t>(choose_exploration_node(
                                 q.exploration_mask, stores_low_q, reach_bound_q,
                                 ground_port_q, ground_farm_q, surplus_q,
                                 purse_low_q, wants_unmet_q, throughput_bound_q,
-                                subject_held_q));
+                                subject_held_q, cons_lean_q, expn_lean_q,
+                                params.exploration_creed_lean_weight_q));
                             q.exploration_progress_q = 0;
                         }
 
@@ -6273,10 +6305,38 @@ bool exploration_node_available(uint64_t mask, int node_idx)
     return true;
 }
 
+int consolidator_lean_q(const culture& c)
+{
+    if (c.pantheon.size() < 2) return 0; // no war-god slot -> no lean either way.
+    const int dominion_q = clampi(c.pantheon[1].dominion, 0, 10) * 100; // 0-1000
+    const int sea_q      = clampi(c.sea_legs_q, 0, 1000);
+    // "High dominion WITH NO SEA LEGS" -- the product form so both facts must
+    // hold at once: high dominion alone (a proud but coastal people) is not
+    // yet a consolidator, and no sea legs alone (a landlocked but timid one)
+    // is not either.
+    return clampi((dominion_q * (1000 - sea_q)) / 1000, 0, 1000);
+}
+
+int expansion_lean_q(const culture& c)
+{
+    const int sea_q = clampi(c.sea_legs_q, 0, 1000);
+    if (c.pantheon.size() < 2) return sea_q; // sea legs alone still says something.
+    const int zeal_q = clampi(c.pantheon[1].zeal, 0, 10) * 100; // 0-1000
+    // "Deep sea legs WITH a universalising creed" -- zeal stands in for the
+    // creed's own missionary push, the same axis `culture_opposition_q`
+    // reads for temperament. Averaged rather than multiplied: unlike the
+    // consolidator case, EXPLORATION.md does not require BOTH facts at their
+    // extreme for the reading to matter, and a product would zero out a
+    // strong-sea-legs, middling-zeal culture that should still read as an
+    // expansionist by the doc's own "deep sea legs" framing.
+    return clampi((sea_q + zeal_q) / 2, 0, 1000);
+}
+
 int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
                              int ground_port_q, int ground_farm_q, int surplus_q,
                              int purse_low_q, int wants_unmet_q, int throughput_bound_q,
-                             int subject_held_q)
+                             int subject_held_q, int consolidator_lean_q, int expansion_lean_q,
+                             int creed_lean_weight_q)
 {
     using namespace io::exploration_tree;
 
@@ -6300,18 +6360,35 @@ int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
     // `subject_held_q` (the parameter's own default), so BL-934 landing is
     // visible as a diff only where a caller actually threads a live value
     // through, never as a silent change to an existing fixture.
+    //
+    // BL-942 -- TWO WAYS TO BE STRONG. `consolidator_lean_q`/
+    // `expansion_lean_q` (0-1000, `consolidator_lean_q`/`expansion_lean_q`
+    // free functions below, derived from the polity's own culture) WEIGHT
+    // the terms EXPLORATION.md sec Two ways to be strong names for each
+    // strategy -- `throughput_bound` for the consolidator (the road ladder,
+    // dense internal throughput: WY branch's own term already, per
+    // exploration_tree_data.hpp), `coastal_holdings`/`ground_port`/
+    // `subject_held` for the expansionist (ports, hulls, subjects: the HL/PT
+    // branches' own terms). This is a WEIGHTING of terms the scorer already
+    // has, never a flag or a branch on which one a polity "is" -- a lean of
+    // 0 on both axes reduces exactly to the pre-BL-942 scorer, and
+    // `creed_lean_weight_q == 0` does the same for every polity at once.
+    const int cons_bonus = clampi(consolidator_lean_q, 0, 1000)
+                          * clampi(creed_lean_weight_q, 0, 1000) / 1000;
+    const int expn_bonus = clampi(expansion_lean_q, 0, 1000)
+                          * clampi(creed_lean_weight_q, 0, 1000) / 1000;
     const int term_value[term_count] = {
         /* stores_low       */ stores_low_q,
         /* spire            */ 1000,
         /* purse_low        */ purse_low_q,       // BL-932
         /* surplus          */ surplus_q,
-        /* coastal_holdings */ ground_port_q,
+        /* coastal_holdings */ clampi(ground_port_q + expn_bonus, 0, 1000),      // BL-942
         /* reach_bound      */ reach_bound_q,
         /* wants_unmet      */ wants_unmet_q,     // BL-939
         /* threatened       */ 0,
-        /* ground_port      */ ground_port_q,
-        /* subject_held     */ clampi(subject_held_q, 0, 1000), // BL-934
-        /* throughput_bound */ throughput_bound_q, // BL-940
+        /* ground_port      */ clampi(ground_port_q + expn_bonus, 0, 1000),      // BL-942
+        /* subject_held     */ clampi(clampi(subject_held_q, 0, 1000) + expn_bonus, 0, 1000), // BL-934/942
+        /* throughput_bound */ clampi(throughput_bound_q + cons_bonus, 0, 1000), // BL-940/942
         /* known            */ 0,
     };
 
@@ -6385,6 +6462,20 @@ bool has_contact(const history_sim_state& s, int from, int to)
     return it != s.contacts.end() && it->from == f && it->to == t;
 }
 
+int64_t contact_first_year(const history_sim_state& s, int from, int to)
+{
+    if (from < 0 || to < 0 || from > 0xFFFE || to > 0xFFFE) return INT64_MAX;
+    const uint16_t f = static_cast<uint16_t>(from), t = static_cast<uint16_t>(to);
+    const auto it = std::lower_bound(
+        s.contacts.begin(), s.contacts.end(), std::pair<uint16_t, uint16_t>{f, t},
+        [](const contact& c, const std::pair<uint16_t, uint16_t>& k) {
+            if (c.from != k.first) return c.from < k.first;
+            return c.to < k.second;
+        });
+    if (it != s.contacts.end() && it->from == f && it->to == t) return it->first.year;
+    return INT64_MAX;
+}
+
 // ---------------------------------------------------------------------------
 // Treaty reads and scoring (BL-933)
 // ---------------------------------------------------------------------------
@@ -6415,7 +6506,8 @@ bool has_treaty_clause(const history_sim_state& s, int x, int y, treaty_clause c
 
 int treaty_value_q(const history_sim_params& p,
                     int grudge_against_other_q, int grudge_from_other_q,
-                    int counterpart_treaties_broken, int decider_aggression_q)
+                    int counterpart_treaties_broken, int decider_aggression_q,
+                    int alarm_from_other_q, bool near_home)
 {
     // BASE: a treaty is worth more the less either side already resents the
     // other -- a biting mutual history makes a promise of peace both less
@@ -6425,12 +6517,12 @@ int treaty_value_q(const history_sim_params& p,
     // read both ways per EXPLORATION.md sec What a treaty is.
     int value = 1000 - clampi((grudge_against_other_q + grudge_from_other_q) / 4, 0, 900);
 
-    // COST: freedom given up, priced by the decider's OWN doctrine. A highly
-    // aggressive culture prices a non-aggression clause's lost freedom higher,
-    // so the same peace-value clears a lower net score for it -- the doctrine
-    // is read, never a term inside the actor deciding FOR it (the aggression
-    // lean is a recorded fact about the culture, same as everywhere else this
-    // file reads `aggression_q`).
+    // COST (CEILING): freedom given up, priced by the decider's OWN doctrine.
+    // A highly aggressive culture prices a non-aggression clause's lost
+    // freedom higher, so the same peace-value clears a lower net score for it
+    // -- the doctrine is read, never a term inside the actor deciding FOR it
+    // (the aggression lean is a recorded fact about the culture, same as
+    // everywhere else this file reads `aggression_q`).
     value -= clampi(decider_aggression_q, 0, 1000) / 4;
 
     // DISTRUST: "the cost lands on every OTHER party's willingness to bind
@@ -6438,7 +6530,42 @@ int treaty_value_q(const history_sim_params& p,
     // never the decider's.
     value -= counterpart_treaties_broken * clampi(p.treaty_defector_distrust_q, 0, 1000) / 100;
 
+    // BL-941 -- ALARM, GATED ON PROXIMITY. Near home, the counterpart's own
+    // visible capability raises the value of a promise of peace with it --
+    // "a neighbour that reads high visible capability should be MORE likely
+    // to form/maintain a non-aggression treaty." Far from home the same
+    // fleet meets no deterrent (EXPLORATION.md sec The arms race...), so
+    // Alarm earns nothing there and a flat penalty applies instead: a pair
+    // that has only just met should not bind as readily as a long-known
+    // neighbour, which is the direct fix for NR-851's "every contacted pair
+    // scored identically" finding.
+    if (near_home)
+        value += clampi(alarm_from_other_q, 0, 1000)
+               * clampi(p.deterrence_alarm_weight_q, 0, 1000) / 1000;
+    else
+        value -= clampi(p.treaty_far_penalty_q, 0, 1000);
+
     return clampi(value, 0, 1000);
+}
+
+int visible_capability_q(const std::vector<region>& regions, const history_sim_state& s,
+                          const history_sim_params& p, int polity_id)
+{
+    if (polity_id < 0 || polity_id >= static_cast<int>(s.polities.size())) return 0;
+    const polity& q = s.polities[static_cast<std::size_t>(polity_id)];
+    if (!q.alive || q.capital < 0 || static_cast<std::size_t>(q.capital) >= regions.size())
+        return 0;
+    const int64_t capability = regions[static_cast<std::size_t>(q.capital)].army_stock + q.navy_stock;
+    return static_cast<int>(clampi64((capability * 1000) / std::max<int64_t>(1, p.visible_capability_reference),
+                                      0, 1000));
+}
+
+int deterrence_alarm_q(const std::vector<region>& regions, const history_sim_state& s,
+                        const history_sim_params& p, int self, int other)
+{
+    if (self < 0 || other < 0 || self == other) return 0;
+    if (!has_contact(s, self, other)) return 0; // the omniscience guard: unmet is unseen.
+    return visible_capability_q(regions, s, p, other);
 }
 
 // ---------------------------------------------------------------------------
@@ -6522,6 +6649,112 @@ std::vector<want> derive_wants(const std::vector<region>& regions,
                 w.via_market = shows_market.at(b).at(gi);
                 out.push_back(w);
             }
+        }
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// Cultural good preference (BL-936)
+// ---------------------------------------------------------------------------
+
+std::vector<culture_good_preference> derive_culture_preference(
+    const std::vector<region>& regions, const std::vector<contact>& contacts,
+    const std::vector<polity>& polities, int culture_count)
+{
+    // THE SAME FOUR WINDOWS `derive_wants` reads, in the same order — no new
+    // threshold invented for a culture-grain reading of the same facts.
+    constexpr int good_count = 4;
+    const region_class goods[good_count] =
+        { region_class::farm, region_class::ore, region_class::energy, region_class::port };
+
+    if (culture_count <= 0) return {};
+
+    // CULTURE-GRAIN HOLDS: does at least one region where this culture is the
+    // PLURALITY (`region::culture.id[0]`) sit dominant in this good? The same
+    // "ground never held" reading `derive_wants` takes at polity grain,
+    // regrouped by the culture-share table CIVILISATION.md's mixing already
+    // maintains rather than by ownership — a preference is a fact about who
+    // LIVES there, not who rules it (EXPLORATION.md sec A good acquires a
+    // cultural preference).
+    std::vector<std::array<bool, good_count>> holds(static_cast<std::size_t>(culture_count));
+    for (auto& row : holds) row.fill(false);
+
+    // POLITY-GRAIN HOLDS: reused for the exposure walk below, same shape
+    // `derive_wants` builds for itself (kept separate rather than shared,
+    // since the two functions are pure and independent by design).
+    std::vector<std::array<bool, good_count>> polity_holds(polities.size());
+    for (auto& row : polity_holds) row.fill(false);
+
+    // WHICH POLITIES A CULTURE HAS A PLURALITY STAKE IN — a culture
+    // straddling several realms counts each once. Built as a sorted set so
+    // the exposure walk below is a property of the integers in it, not of
+    // region iteration order.
+    std::vector<std::vector<int>> culture_polities(static_cast<std::size_t>(culture_count));
+
+    for (const region& r : regions)
+    {
+        const int pc = r.culture.id[0];
+        const bool has_pc = pc >= 0 && static_cast<std::size_t>(pc) < holds.size();
+        if (r.nation >= 0 && static_cast<std::size_t>(r.nation) < polity_holds.size())
+            for (int g = 0; g < good_count; ++g)
+                if (r.dominant == goods[g])
+                    polity_holds[static_cast<std::size_t>(r.nation)][static_cast<std::size_t>(g)] = true;
+        if (!has_pc) continue;
+        for (int g = 0; g < good_count; ++g)
+            if (r.dominant == goods[g])
+                holds[static_cast<std::size_t>(pc)][static_cast<std::size_t>(g)] = true;
+        if (r.nation >= 0)
+        {
+            auto& v = culture_polities[static_cast<std::size_t>(pc)];
+            if (std::find(v.begin(), v.end(), r.nation) == v.end()) v.push_back(r.nation);
+        }
+    }
+    for (auto& v : culture_polities) std::sort(v.begin(), v.end());
+
+    // ROUTE EXPOSURE: for a good this culture lacks, how many DISTINCT
+    // foreign polities has any of its own plurality-holding realms met that
+    // themselves hold the good? "What its route exposed it to" — the same
+    // contact-gated read `derive_wants` takes, tallied rather than stopped at
+    // one bit, so the weight below can RANK rather than merely flag.
+    //
+    // Produced in ascending (culture, good) order: the outer walk is
+    // ascending culture id, the inner walk the fixed `goods` array order, so
+    // no separate sort is needed — same discipline `derive_wants` holds.
+    std::vector<culture_good_preference> out;
+    for (int c = 0; c < culture_count; ++c)
+    {
+        const auto& stake = culture_polities[static_cast<std::size_t>(c)];
+        for (int g = 0; g < good_count; ++g)
+        {
+            const std::size_t gi = static_cast<std::size_t>(g);
+            if (holds[static_cast<std::size_t>(c)][gi]) continue; // already holds it -- nothing to want.
+
+            int exposure = 0;
+            for (int from_polity : stake)
+            {
+                if (from_polity < 0 || !polities[static_cast<std::size_t>(from_polity)].alive) continue;
+                for (std::size_t to = 0; to < polities.size(); ++to)
+                {
+                    if (static_cast<int>(to) == from_polity || !polities[to].alive) continue;
+                    if (!polity_holds[to][gi]) continue;
+                    if (!contact_between(contacts, static_cast<uint16_t>(from_polity),
+                                          static_cast<uint16_t>(to))) continue;
+                    ++exposure;
+                }
+            }
+            if (exposure == 0) continue; // a known absence with no route yet -- not a preference.
+
+            culture_good_preference p;
+            p.culture  = static_cast<int16_t>(c);
+            p.good     = goods[gi];
+            // MAGNITUDE, NOT JUST A BIT: breadth of exposure is what "ranks
+            // where a fleet goes first" (EXPLORATION.md sec A good acquires
+            // a cultural preference). Capped at 4 contacted holders so one
+            // culture that has met everyone does not swamp the scale a
+            // sparser world reads on.
+            p.weight_q = static_cast<int16_t>(clampi(exposure * 250, 0, 1000));
+            out.push_back(p);
         }
     }
     return out;
