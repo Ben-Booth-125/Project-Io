@@ -1813,11 +1813,13 @@ struct history_sim_params
     /// 35.2 / 297 / 331 -- which is the failure the doc names. With the far
     /// penalty at 700: 500 0.84 / 44.4 / 391 / 466; 525 1.33 / 43.5 / 312 /
     /// 492; 550 1.33 / 43.5 / 314 / 473; 575 1.34 / 44.8 / 298 / 536; 600
-    /// 1.59 / 35.0 / 245 / 499; 1000 1.72 / 18.7 / 117 / 463. 575 is the
-    /// setting inside the 525-575 plateau with the most frontier war and the
-    /// most total conflict; above it neighbour war keeps collapsing and
-    /// total conflict falls with it.
-    int deterrence_alarm_weight_q = 575;
+    /// 1.59 / 35.0 / 245 / 499; 1000 1.72 / 18.7 / 117 / 463.
+    ///
+    /// 525, AUTHORISED (Ben, 2026-09-14, NR-867): 575 had the most frontier war
+    /// in the 525-575 plateau but left four of sixteen seeds under five battles
+    /// a century; 525 halves that for ~9% less frontier war. A frozen map is
+    /// the failure EXPLORATION.md names, so the gentler end of the plateau wins.
+    int deterrence_alarm_weight_q = 525;
 
     /// Flat penalty on `treaty_value_q` for a pair that met only DURING this
     /// span (a frontier contact, `contact::first.year >= start_year`) — the

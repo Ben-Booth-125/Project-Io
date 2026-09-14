@@ -550,6 +550,11 @@ int main()
         // was battles 554, conquests 496, foundings 445, subjections 5,
         // freed 1, tribute 134354043, treaties 283, broken 2, owner changes
         // 2280.
+        //
+        // RE-PINNED 2026-09-14 by Ben`s authorisation (NR-867):
+        // deterrence_alarm_weight_q 575 -> 525 -- was battles 258, conquests 257,
+        // foundings 579, subjections 5, freed 1, tribute 134353672, treaties 307,
+        // broken 4, owner changes 2154.
         std::printf("      pinned-read: subjections=%lld freed=%lld tribute=%lld treaties=%lld "
                     "broken=%lld owner_changes=%zu\n",
                     static_cast<long long>(ex1.subjections_formed),
@@ -557,10 +562,10 @@ int main()
                     static_cast<long long>(ex1.tribute_remitted),
                     static_cast<long long>(ex1.treaties_formed),
                     static_cast<long long>(ex1.treaties_broken), ex1.owner_changes.size());
-        check(ex1.battles == 258 && ex1.conquests == 257 && ex1.foundings == 579
+        check(ex1.battles == 306 && ex1.conquests == 304 && ex1.foundings == 522
            && ex1.subjections_formed == 5 && ex1.subjections_freed == 1
-           && ex1.tribute_remitted == 134353672 && ex1.treaties_formed == 307
-           && ex1.treaties_broken == 4 && ex1.owner_changes.size() == 2154,
+           && ex1.tribute_remitted == 134358620 && ex1.treaties_formed == 293
+           && ex1.treaties_broken == 2 && ex1.owner_changes.size() == 2174,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
