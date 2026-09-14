@@ -967,6 +967,39 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
                                            static_cast<uint8_t>(g), static_cast<int32_t>(v)});
             }
     }
+
+    // ONE WANT, SHARED ACROSS SELLERS. Each flow above is bounded by the
+    // buyer's whole raw want, so a buyer bound to three holders would import
+    // three wants' worth. The want is the bound on what ARRIVES
+    // (EXPLORATION.md sec Trade is a want met by throughput), so it is spent
+    // down per (buyer, good): the fattest line first, ties to the lower seller.
+    std::sort(flows.begin(), flows.end(), [](const trade_flow& x, const trade_flow& y) {
+        if (x.buyer != y.buyer) return x.buyer < y.buyer;
+        if (x.good != y.good) return x.good < y.good;
+        if (x.volume_q != y.volume_q) return x.volume_q > y.volume_q;
+        return x.seller < y.seller;
+    });
+    {
+        std::size_t i = 0;
+        while (i < flows.size())
+        {
+            const uint16_t buyer = flows[i].buyer;
+            const uint8_t  good  = flows[i].good;
+            const region& seat = regions[static_cast<std::size_t>(
+                polities[static_cast<std::size_t>(buyer)].capital)];
+            int remaining = std::max(0, seat.scarcity_raw_q[good]);
+            for (; i < flows.size() && flows[i].buyer == buyer && flows[i].good == good; ++i)
+            {
+                const int take = std::min(flows[i].volume_q, remaining);
+                flows[i].volume_q = take;
+                remaining -= take;
+            }
+        }
+    }
+    flows.erase(std::remove_if(flows.begin(), flows.end(),
+                               [](const trade_flow& f) { return f.volume_q <= 0; }),
+                flows.end());
+
     std::sort(flows.begin(), flows.end(), [](const trade_flow& x, const trade_flow& y) {
         if (x.seller != y.seller) return x.seller < y.seller;
         if (x.buyer != y.buyer) return x.buyer < y.buyer;

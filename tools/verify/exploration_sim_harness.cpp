@@ -24,6 +24,9 @@
 //   R6   BL-956: the Exploration handoff (`exploration_output`) passes its
 //        validator on a real world, fails it when corrupted, and is what
 //        world setup seeds sentiment and stamps roads from
+//   R7   BL-954: trade flows -- opened only by trade_access, bounded by want,
+//        holding and line, one want shared across sellers, income at both
+//        ends, no flat market income, trade value in treaty value
 //
 // Headless: world/* logic only, no SDL and no Lua.
 // ---------------------------------------------------------------------------
@@ -405,6 +408,13 @@ int main()
         // Exploration span's upkeep/scarcity (not the want lean) moves these
         // too, and is re-pinned by that change with its cause stated -- the
         // claim here is only that BL-953 at `w_want_q` 0 moves nothing.
+        //
+        // RE-PINNED 2026-09-14 at sprint-41 integration: BL-954 (trade flows
+        // replace the flat market income, trade value enters treaty value, one
+        // want shared across sellers) moves the lean-off span -- was battles 426,
+        // conquests 423, foundings 451, tribute 134254916, treaties 287, owner
+        // changes 2453. The pre-BL-953 equivalence itself was proven on BL-953`s
+        // own branch (59768711) before trade existed.
         std::printf("      pinned-read: subjections=%lld freed=%lld tribute=%lld treaties=%lld "
                     "broken=%lld owner_changes=%zu\n",
                     static_cast<long long>(ex1.subjections_formed),
@@ -412,11 +422,11 @@ int main()
                     static_cast<long long>(ex1.tribute_remitted),
                     static_cast<long long>(ex1.treaties_formed),
                     static_cast<long long>(ex1.treaties_broken), ex1.owner_changes.size());
-        check(ex1.battles == 426 && ex1.conquests == 423 && ex1.foundings == 451
+        check(ex1.battles == 483 && ex1.conquests == 425 && ex1.foundings == 497
            && ex1.subjections_formed == 5 && ex1.subjections_freed == 1
-           && ex1.tribute_remitted == 134254916 && ex1.treaties_formed == 287
-           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2453,
-              "R3b  with w_want_q = 0 the Exploration span reproduces the pre-BL-953 counters "
+           && ex1.tribute_remitted == 134235484 && ex1.treaties_formed == 295
+           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2501,
+              "R3b  with w_want_q = 0 the Exploration span reproduces the pinned lean-off counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
         // R3c (BL-953): the same span with the lean ON -- deterministic, and
@@ -665,7 +675,7 @@ int main()
     }
 
     // -----------------------------------------------------------------
-    // R6: BL-954 -- trade is a want met by throughput
+    // R7: BL-954 -- trade is a want met by throughput
     // -----------------------------------------------------------------
     {
         const int farm = scarcity_good_index(region_class::farm);
@@ -699,30 +709,30 @@ int main()
             dated_object{2000, static_cast<int32_t>(treaty_clause::non_aggression), 0, 1},
             dated_object{2000, static_cast<int32_t>(treaty_clause::trade_access), 0, 1} };
 
-        // R6.1 -- no flow without the clause, even with want, holder and line.
+        // R7.1 -- no flow without the clause, even with want, holder and line.
         {
             std::vector<region> regions = base_regions;
             std::vector<polity> qs = base_qs;
             std::vector<trade_flow> flows = { trade_flow{9, 9, 0, 1} }; // must be overwritten
             run_exploration_upkeep(regions, qs, corridors, ep, 1234, 4, nullptr, &no_trade, &flows);
             check(flows.empty(),
-                  "R6.1  no flow forms without a trade_access clause (non-aggression alone opens none)");
+                  "R7.1  no flow forms without a trade_access clause (non-aggression alone opens none)");
         }
 
-        // R6.2-R6.6 -- the clause opens exactly the one flow the ground supports.
+        // R7.2-R7.6 -- the clause opens exactly the one flow the ground supports.
         std::vector<region> regions = base_regions;
         std::vector<polity> qs = base_qs;
         std::vector<trade_flow> flows;
         run_exploration_upkeep(regions, qs, corridors, ep, 1234, 4, nullptr, &with_trade, &flows);
         const bool one_flow = flows.size() == 1 && flows[0].seller == 1 && flows[0].buyer == 0
                            && flows[0].good == farm;
-        check(one_flow, "R6.2  a trade_access clause opens the seller->buyer farm flow, and only it");
+        check(one_flow, "R7.2  a trade_access clause opens the seller->buyer farm flow, and only it");
         const int raw_want = regions[0].scarcity_raw_q[farm];
         check(one_flow && raw_want == 700 && flows[0].volume_q == 500,
-              "R6.3  volume is bounded by the seller's holding (min of want 700, holding 500, line 600)");
+              "R7.3  volume is bounded by the seller's holding (min of want 700, holding 500, line 600)");
         check(one_flow && regions[0].scarcity_q[farm] == raw_want - flows[0].volume_q
            && regions[0].scarcity_raw_q[farm] == 700,
-              "R6.4  a met want relieves the buyer's signal (raw kept, unmet = raw - inbound)");
+              "R7.4  a met want relieves the buyer's signal (raw kept, unmet = raw - inbound)");
 
         {
             std::vector<region> r_none = base_regions;
@@ -732,7 +742,7 @@ int main()
             check(expected > 0
                && regions[0].treasury - r_none[0].treasury == expected
                && regions[1].treasury - r_none[1].treasury == expected,
-                  "R6.5  the flow credits BOTH capitals, volume x treasury_trade_income_q x step / 1000");
+                  "R7.5  the flow credits BOTH capitals, volume x treasury_trade_income_q x step / 1000");
         }
 
         // Want, holding and line each bound the volume on their own.
@@ -741,14 +751,14 @@ int main()
             rw[0].scarcity_raw_q[farm] = 120;
             const trade_context ctx = build_trade_context(rw, qs, corridors);
             check(trade_flow_volume_q(ctx, rw, qs, 1, 0, farm) == 120,
-                  "R6.6  volume is bounded by the buyer's raw want");
+                  "R7.6  volume is bounded by the buyer's raw want");
         }
         {
             std::vector<region> rl = regions;
             rl[2].network_supply_q = 80;
             const trade_context ctx = build_trade_context(rl, qs, corridors);
             check(trade_flow_volume_q(ctx, rl, qs, 1, 0, farm) == 80,
-                  "R6.7  volume is bounded by the land line (the weaker side's reach to the border)");
+                  "R7.7  volume is bounded by the land line (the weaker side's reach to the border)");
         }
         {
             // No corridor: the line is the sea, and only the SELLER's navy carries it.
@@ -757,13 +767,13 @@ int main()
             rs[0].port_stock_q = 800; rs[1].port_stock_q = 300;
             const trade_context ctx = build_trade_context(rs, qn, /*corridors=*/{});
             check(trade_flow_volume_q(ctx, rs, qn, 1, 0, farm) == 0,
-                  "R6.8  no corridor and no seller navy -> no line, no volume");
+                  "R7.8  no corridor and no seller navy -> no line, no volume");
             qn[0].navy_stock = 500; // the BUYER's navy does not carry the seller's goods
             check(trade_flow_volume_q(ctx, rs, qn, 1, 0, farm) == 0,
-                  "R6.9  a buyer's navy alone opens no sea line");
+                  "R7.9  a buyer's navy alone opens no sea line");
             qn[1].navy_stock = 500;
             check(trade_flow_volume_q(ctx, rs, qn, 1, 0, farm) == 300,
-                  "R6.10 the seller's navy opens the sea line, bounded by the smaller built port");
+                  "R7.10 the seller's navy opens the sea line, bounded by the smaller built port");
         }
 
         // No flat market income remains: a market capital with no endowment,
@@ -775,7 +785,7 @@ int main()
             qm[0].id = 0; qm[0].alive = true; qm[0].capital = 0;
             run_exploration_upkeep(rm, qm, {}, ep, 1234, 4);
             check(rm[0].treasury == 0,
-                  "R6.11 a market capital with no endowment, corridor or trade earns nothing (no flat market income)");
+                  "R7.11 a market capital with no endowment, corridor or trade earns nothing (no flat market income)");
         }
 
         // A pair with trade to open is worth more to bind than the same pair without.
@@ -783,16 +793,40 @@ int main()
             const trade_context ctx = build_trade_context(regions, qs, corridors);
             const int trade_value = pair_trade_value_q(ctx, regions, qs, 0, 1);
             check(trade_value == 500,
-                  "R6.12 pair_trade_value_q reads the flow the clause WOULD open, before any binding");
+                  "R7.12 pair_trade_value_q reads the flow the clause WOULD open, before any binding");
             for (const bool near : {true, false})
             {
                 const int without = treaty_value_q(ep, 0, 0, 0, /*aggression=*/400, /*alarm=*/0, near, 0);
                 const int with_tr = treaty_value_q(ep, 0, 0, 0, /*aggression=*/400, /*alarm=*/0, near,
                                                     trade_value);
                 check(with_tr > without,
-                      near ? "R6.13 trade to open raises treaty value near home"
-                           : "R6.14 trade to open raises treaty value far from home too");
+                      near ? "R7.13 trade to open raises treaty value near home"
+                           : "R7.14 trade to open raises treaty value far from home too");
             }
+        }
+
+        // One want, shared: a buyer bound to TWO holders imports its want once,
+        // not once per seller. Polity 2 mirrors polity 1 (market seat + one farm
+        // region at reach 600), so each seller alone would carry 500 of the 700.
+        {
+            std::vector<region> r2 = base_regions;
+            r2.resize(5);
+            r2[3].nation = 2; r2[3].has_market = true; r2[3].dominant = region_class::none;
+            r2[4].nation = 2; r2[4].dominant = region_class::farm; r2[4].network_supply_q = 600;
+            std::vector<polity> q2 = base_qs;
+            q2.resize(3);
+            q2[2].id = 2; q2[2].alive = true; q2[2].capital = 3;
+            const std::vector<history_corridor> c2 = { history_corridor{0, 2, 5}, history_corridor{0, 4, 5} };
+            const std::vector<dated_object> two_partners = {
+                dated_object{2000, static_cast<int32_t>(treaty_clause::trade_access), 0, 1},
+                dated_object{2000, static_cast<int32_t>(treaty_clause::trade_access), 0, 2} };
+            std::vector<trade_flow> f2;
+            run_exploration_upkeep(r2, q2, c2, ep, 1234, 4, nullptr, &two_partners, &f2);
+            int64_t inbound = 0;
+            for (const trade_flow& f : f2) if (f.buyer == 0 && f.good == farm) inbound += f.volume_q;
+            check(f2.size() == 2 && inbound == r2[0].scarcity_raw_q[farm] && r2[0].scarcity_q[farm] == 0
+               && f2[0].volume_q == 500 && f2[1].volume_q == 200,
+                  "R7.15 one want is shared across sellers: 700 wanted from two 500-lines arrives as 500 + 200");
         }
     }
 
