@@ -6117,17 +6117,55 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // ancient tier rule reads, so the count has to survive the fold.
     {
         std::sort(corridor_uses.begin(), corridor_uses.end());
-        out.supply_corridors.reserve(corridor_uses.size());
+        std::vector<history_corridor> fresh;
+        fresh.reserve(corridor_uses.size());
         for (const auto& e : corridor_uses)
         {
-            if (!out.supply_corridors.empty()
-                && out.supply_corridors.back().a == e.first
-                && out.supply_corridors.back().b == e.second)
+            if (!fresh.empty() && fresh.back().a == e.first && fresh.back().b == e.second)
             {
-                ++out.supply_corridors.back().uses;
+                ++fresh.back().uses;
                 continue;
             }
-            out.supply_corridors.push_back(history_corridor{e.first, e.second, 1});
+            fresh.push_back(history_corridor{e.first, e.second, 1});
+        }
+
+        // BL-956: A RESUMED RUN ALREADY HOLDS A RECORD (`resume_corridors`),
+        // and appending this span's fold after it broke the (a, b) order and
+        // split one edge's traffic across two rows — the Exploration handoff's
+        // validator caught it. Merge instead: both lists are sorted by (a, b),
+        // so one linear merge keeps the order and sums `uses` on a shared
+        // edge. A non-resumed run starts empty, so this is the plain fold.
+        if (out.supply_corridors.empty())
+        {
+            out.supply_corridors = std::move(fresh);
+        }
+        else
+        {
+            std::vector<history_corridor> inherited = std::move(out.supply_corridors);
+            std::sort(inherited.begin(), inherited.end(),
+                      [](const history_corridor& x, const history_corridor& y) {
+                          return x.a != y.a ? x.a < y.a : x.b < y.b;
+                      });
+            out.supply_corridors.clear();
+            out.supply_corridors.reserve(inherited.size() + fresh.size());
+            const auto push = [&](const history_corridor& c) {
+                if (!out.supply_corridors.empty()
+                    && out.supply_corridors.back().a == c.a
+                    && out.supply_corridors.back().b == c.b)
+                    out.supply_corridors.back().uses += c.uses;
+                else
+                    out.supply_corridors.push_back(c);
+            };
+            std::size_t i = 0, j = 0;
+            while (i < inherited.size() || j < fresh.size())
+            {
+                const bool take_inherited =
+                    j >= fresh.size()
+                    || (i < inherited.size()
+                        && (inherited[i].a != fresh[j].a ? inherited[i].a < fresh[j].a
+                                                         : inherited[i].b <= fresh[j].b));
+                push(take_inherited ? inherited[i++] : fresh[j++]);
+            }
         }
     }
 
@@ -7025,6 +7063,58 @@ std::string grudge_event_line(const grudge_event& e, const settlement_state& ss)
 // The pass 1 -> pass 2 handoff (BL-828)
 // ---------------------------------------------------------------------------
 
+namespace
+{
+    // THE PROVINCES EACH POLITY HOLDS — shared by both handoffs (BL-828,
+    // BL-956) so the two cannot derive the political map two ways.
+    std::vector<polity_holdings> derive_holdings(const std::vector<region>& regions,
+                                                 const std::vector<polity>& polities)
+    {
+        std::vector<std::vector<int>> by_polity(polities.size());
+        for (std::size_t i = 0; i < regions.size(); ++i)
+        {
+            const int n = regions[i].nation;
+            if (n >= 0 && n < static_cast<int>(by_polity.size()))
+                by_polity[static_cast<std::size_t>(n)].push_back(static_cast<int>(i));
+        }
+        std::vector<polity_holdings> out;
+        for (std::size_t pi = 0; pi < polities.size(); ++pi)
+        {
+            if (by_polity[pi].empty()) continue; // A realm holding nothing crosses as nothing.
+            polity_holdings h;
+            h.polity  = static_cast<int>(pi);
+            h.regions = by_polity[pi];
+            out.push_back(std::move(h));
+        }
+        return out;
+    }
+
+    // THE SURVIVING-NETWORK RULE (BL-911), shared by both handoffs so the
+    // Exploration filter is "exactly as the Empire handoff filters its own"
+    // by construction rather than by a second copy of the test.
+    bool corridor_region_survives(const std::vector<region>& regions,
+                                  const std::vector<polity>& polities, uint16_t region_idx)
+    {
+        if (region_idx >= regions.size()) return false;
+        const int n = regions[static_cast<std::size_t>(region_idx)].nation;
+        if (n < 0 || n >= static_cast<int>(polities.size())) return false;
+        return polities[static_cast<std::size_t>(n)].alive;
+    }
+
+    std::vector<history_corridor> filter_surviving_corridors(
+        const std::vector<history_corridor>& corridors,
+        const std::vector<region>& regions, const std::vector<polity>& polities)
+    {
+        std::vector<history_corridor> out;
+        out.reserve(corridors.size());
+        for (const history_corridor& c : corridors)
+            if (corridor_region_survives(regions, polities, c.a)
+             || corridor_region_survives(regions, polities, c.b))
+                out.push_back(c);
+        return out;
+    }
+} // namespace
+
 pass_one_output make_pass_one_output(const settlement_state&  ss,
                                      const history_sim_state& hs,
                                      int                      culture_count)
@@ -7056,21 +7146,7 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
     // the outer order (ascending polity id) and the inner order (ascending
     // region index) are properties of the data. A map keyed on polity id would
     // have been the shorter spelling and the wrong one.
-    std::vector<std::vector<int>> by_polity(o.polities.size());
-    for (std::size_t i = 0; i < o.regions.size(); ++i)
-    {
-        const int n = o.regions[i].nation;
-        if (n >= 0 && n < static_cast<int>(by_polity.size()))
-            by_polity[static_cast<std::size_t>(n)].push_back(static_cast<int>(i));
-    }
-    for (std::size_t pi = 0; pi < o.polities.size(); ++pi)
-    {
-        if (by_polity[pi].empty()) continue; // A realm holding nothing crosses as nothing.
-        polity_holdings h;
-        h.polity  = static_cast<int>(pi);
-        h.regions = by_polity[pi];
-        o.holdings.push_back(std::move(h));
-    }
+    o.holdings = derive_holdings(o.regions, o.polities);
 
     // THE SURVIVING NETWORK CROSSES THE HANDOFF, UNEVENLY (BL-911). A corridor
     // (already sorted ascending by (a, b) at the source, BL-768) survives when
@@ -7079,18 +7155,7 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
     // so a segment on ground held by nobody living is dropped rather than
     // carried on the strength of the OTHER end alone... unless that other end
     // is itself held by a survivor, which is exactly the "at least one" test.
-    const auto region_survives = [&](uint16_t region_idx) {
-        if (region_idx >= o.regions.size()) return false;
-        const int n = o.regions[static_cast<std::size_t>(region_idx)].nation;
-        if (n < 0 || n >= static_cast<int>(o.polities.size())) return false;
-        return o.polities[static_cast<std::size_t>(n)].alive;
-    };
-    o.surviving_corridors.reserve(hs.supply_corridors.size());
-    for (const history_corridor& c : hs.supply_corridors)
-    {
-        if (region_survives(c.a) || region_survives(c.b))
-            o.surviving_corridors.push_back(c);
-    }
+    o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
     return o;
 }
 
@@ -7284,6 +7349,235 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why)
         if (holds.at(w.from).at(static_cast<std::size_t>(gi)))
             return fail("a want names a good the wanting polity already holds");
     }
+
+    if (why) why->clear();
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// The Exploration -> Digitisation handoff (BL-956)
+// ---------------------------------------------------------------------------
+
+exploration_output make_exploration_output(const settlement_state&  ss,
+                                           const history_sim_state& hs,
+                                           int                      culture_count)
+{
+    exploration_output o;
+    o.regions       = ss.regions;
+    o.polities      = hs.polities;
+    o.culture_count = culture_count;
+    o.contacts      = hs.contacts;
+    o.grudges       = hs.grudges;
+    o.start_year    = hs.start_year;
+    o.stop_year     = hs.start_year + hs.years;
+
+    // STANDING TREATIES AT THE CLOSE. The sim expires objects at the top of
+    // each decision round, so a term that ran out between the last round and
+    // `stop_year` can still sit in `hs.dated_objects`; the same expiry rule,
+    // applied at `stop_year`, is what "standing at 1660" means. Then sorted,
+    // because the sim's own vector is in insertion order and a handoff's
+    // order must be a property of its integers.
+    o.dated_objects = hs.dated_objects;
+    expire_dated_objects(o.dated_objects, o.stop_year);
+    std::sort(o.dated_objects.begin(), o.dated_objects.end(),
+              [](const dated_object& x, const dated_object& y) {
+                  if (x.a != y.a) return x.a < y.a;
+                  if (x.b != y.b) return x.b < y.b;
+                  if (x.kind != y.kind) return x.kind < y.kind;
+                  return x.expires_year < y.expires_year;
+              });
+
+    // Both derived tables are pure folds over the 1660 state just copied —
+    // the same derivations the Empire handoff and the sim itself use.
+    o.wants              = derive_wants(o.regions, o.contacts, o.polities);
+    o.culture_preference = derive_culture_preference(o.regions, o.contacts, o.polities,
+                                                     culture_count);
+
+    o.holdings            = derive_holdings(o.regions, o.polities);
+    o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
+    return o;
+}
+
+bool exploration_output_valid(const exploration_output& o, std::string* why)
+{
+    const auto fail = [&](const std::string& msg) {
+        if (why) *why = msg;
+        return false;
+    };
+    const int np = static_cast<int>(o.polities.size());
+    const int nr = static_cast<int>(o.regions.size());
+
+    // 1. The region table: shares sum to 1000 and name cultures in range, and
+    //    every owner id is a real polity or none.
+    for (int i = 0; i < nr; ++i)
+    {
+        const region& r = o.regions[static_cast<std::size_t>(i)];
+        if (r.culture.total_q() != 1000)
+            return fail("region " + std::to_string(i) + " culture shares sum to "
+                        + std::to_string(r.culture.total_q()) + ", not 1000");
+        for (int k = 0; k < culture_share_slots; ++k)
+            if (o.culture_count > 0 && r.culture.id[k] >= o.culture_count)
+                return fail("region " + std::to_string(i) + " names culture "
+                            + std::to_string(r.culture.id[k]) + " out of range");
+        if (r.nation >= np)
+            return fail("region " + std::to_string(i) + " is owned by polity "
+                        + std::to_string(r.nation) + " out of range");
+    }
+
+    // 2. The overlord graph. An overlord is a real polity and never the
+    //    subject itself; `subject_kind` is set exactly when an overlord is.
+    for (int i = 0; i < np; ++i)
+    {
+        const polity& q = o.polities[static_cast<std::size_t>(i)];
+        if (q.overlord < -1 || q.overlord >= np)
+            return fail("polity " + std::to_string(i) + " names overlord "
+                        + std::to_string(q.overlord) + " out of range");
+        if (q.overlord == i)
+            return fail("polity " + std::to_string(i) + " is its own overlord");
+        if (q.subject_kind < -1 || q.subject_kind > 1)
+            return fail("polity " + std::to_string(i) + " carries an out-of-range subject_kind");
+        if ((q.overlord < 0) != (q.subject_kind < 0))
+            return fail("polity " + std::to_string(i)
+                        + " has an overlord and a subject_kind that disagree");
+    }
+
+    // 3. The holdings. Ascending, in range, held by the living, each region
+    //    held once and matching its own `nation` — and every owned region
+    //    held, so the set and the map are the same map.
+    std::vector<char> claimed(o.regions.size(), 0);
+    int last_polity = -1;
+    for (const polity_holdings& h : o.holdings)
+    {
+        if (h.polity <= last_polity)
+            return fail("holdings are not in ascending polity order");
+        last_polity = h.polity;
+        if (h.polity < 0 || h.polity >= np)
+            return fail("holdings name polity " + std::to_string(h.polity) + " out of range");
+        if (!o.polities[static_cast<std::size_t>(h.polity)].alive)
+            return fail("polity " + std::to_string(h.polity) + " holds ground but is not alive");
+        int last_region = -1;
+        for (int r : h.regions)
+        {
+            if (r <= last_region) return fail("holdings are not in ascending region order");
+            last_region = r;
+            if (r < 0 || r >= nr)
+                return fail("holdings name region " + std::to_string(r) + " out of range");
+            if (claimed[static_cast<std::size_t>(r)])
+                return fail("region " + std::to_string(r) + " is held twice");
+            claimed[static_cast<std::size_t>(r)] = 1;
+            if (o.regions[static_cast<std::size_t>(r)].nation != h.polity)
+                return fail("region " + std::to_string(r) + " holdings disagree with its nation");
+        }
+    }
+    for (int i = 0; i < nr; ++i)
+        if (o.regions[static_cast<std::size_t>(i)].nation >= 0 && !claimed[static_cast<std::size_t>(i)])
+            return fail("region " + std::to_string(i) + " is owned but appears in no holding");
+
+    // 4. The grudges. Sorted, directed, in range, carrying their cause.
+    std::pair<int, int> last_grudge{-1, -1};
+    for (const grudge& g : o.grudges)
+    {
+        const std::pair<int, int> key{g.from, g.to};
+        if (!(last_grudge < key)) return fail("grudges are not sorted by (from, to)");
+        last_grudge = key;
+        if (g.from == g.to) return fail("a polity holds a grudge against itself");
+        if (g.from >= o.polities.size() || g.to >= o.polities.size())
+            return fail("a grudge names a polity out of range");
+        if (g.score < 0 || g.peak < g.score)
+            return fail("a grudge's peak is below its standing score");
+        if (g.event_count <= 0 || g.events_kept <= 0)
+            return fail("a grudge carries a score with no cause");
+    }
+
+    // 5. The contacts. Sorted, directed, in range, never a self-pair.
+    std::pair<int, int> last_contact{-1, -1};
+    for (const contact& c : o.contacts)
+    {
+        const std::pair<int, int> key{c.from, c.to};
+        if (!(last_contact < key)) return fail("contacts are not sorted by (from, to)");
+        last_contact = key;
+        if (c.from == c.to) return fail("a polity is recorded in contact with itself");
+        if (c.from >= o.polities.size() || c.to >= o.polities.size())
+            return fail("a contact names a polity out of range");
+    }
+
+    // 6. The wants. Sorted by pair, in range, never a self-want, gated on
+    //    contact.
+    std::pair<int, int> last_want{-1, -1};
+    for (const want& w : o.wants)
+    {
+        if (w.from == w.to) return fail("a polity wants a good from itself");
+        if (w.from >= o.polities.size() || w.to >= o.polities.size())
+            return fail("a want names a polity out of range");
+        if (w.good == region_class::none) return fail("a want names no good");
+        const std::pair<int, int> key{w.from, w.to};
+        if (key < last_want) return fail("wants are not sorted by (from, to)");
+        last_want = key;
+        if (!contact_between(o.contacts, w.from, w.to))
+            return fail("a want crosses a pair with no contact");
+    }
+
+    // 7. Cultural good preference. Strictly ascending (culture, good index),
+    //    in range, weight on the 0-1000 scale.
+    std::pair<int, int> last_pref{-1, -1};
+    for (const culture_good_preference& p : o.culture_preference)
+    {
+        const int gi = scarcity_good_index(p.good);
+        if (gi < 0) return fail("a culture preference names no good");
+        if (p.culture < 0 || (o.culture_count > 0 && p.culture >= o.culture_count))
+            return fail("a culture preference names a culture out of range");
+        const std::pair<int, int> key{p.culture, gi};
+        if (!(last_pref < key)) return fail("culture preferences are not sorted by (culture, good)");
+        last_pref = key;
+        if (p.weight_q < 0 || p.weight_q > 1000)
+            return fail("a culture preference weight is off the 0-1000 scale");
+    }
+
+    // 8. Standing treaties and tribute. Sorted, in range, never a self-pair,
+    //    a known clause, mutual clauses in canonical (a < b) order, and still
+    //    inside their term at the close — a remaining term is never <= 0.
+    for (std::size_t i = 0; i < o.dated_objects.size(); ++i)
+    {
+        const dated_object& d = o.dated_objects[i];
+        if (i > 0)
+        {
+            const dated_object& p = o.dated_objects[i - 1];
+            const bool out_of_order =
+                  d.a != p.a ? d.a < p.a
+                : d.b != p.b ? d.b < p.b
+                : d.kind != p.kind ? d.kind < p.kind
+                : d.expires_year < p.expires_year;
+            if (out_of_order)
+                return fail("dated objects are not sorted by (a, b, kind, expires_year)");
+        }
+        if (d.a < 0 || d.a >= np || d.b < 0 || d.b >= np)
+            return fail("a dated object names a polity out of range");
+        if (d.a == d.b) return fail("a dated object binds a polity to itself");
+        if (d.kind < 0 || d.kind >= treaty_clause_count)
+            return fail("a dated object names an out-of-range treaty clause");
+        if (d.kind != static_cast<int32_t>(treaty_clause::tribute) && d.a > d.b)
+            return fail("a mutual treaty clause is not in canonical (a < b) order");
+        if (d.expires_year <= o.stop_year)
+            return fail("a dated object's term has already ended at the close");
+    }
+
+    // 9. The surviving network. Sorted, endpoints in range and distinct, and
+    //    every corridor with a living holder at one end.
+    std::pair<int, int> last_corridor{-1, -1};
+    for (const history_corridor& c : o.surviving_corridors)
+    {
+        const std::pair<int, int> key{c.a, c.b};
+        if (!(last_corridor < key)) return fail("surviving corridors are not sorted by (a, b)");
+        last_corridor = key;
+        if (c.a == c.b) return fail("a surviving corridor joins a region to itself");
+        if (c.a >= o.regions.size() || c.b >= o.regions.size())
+            return fail("a surviving corridor names a region out of range");
+        if (!corridor_region_survives(o.regions, o.polities, c.a)
+         && !corridor_region_survives(o.regions, o.polities, c.b))
+            return fail("a surviving corridor has no living holder at either end");
+    }
+
+    if (o.start_year > o.stop_year) return fail("the span closes before it opens");
 
     if (why) why->clear();
     return true;
