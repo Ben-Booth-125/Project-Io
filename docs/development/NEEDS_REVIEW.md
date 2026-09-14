@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*46 entries — 29 open, 17 resolved.*
+*48 entries — 31 open, 17 resolved.*
 
 ---
 
@@ -443,6 +443,36 @@ Two things the form did not ask were written into the authority doc. (1) Outward
 > **Recommendation:** Keep both as written; revisit (2) from reading 8 (treasury spread) once BL-954 lands.
 
 *Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`*
+
+### NR-864 — OBSERVATION: reading 3 classifies a creed by comparing a PRODUCT lean to an AVERAGE lean, which structurally makes consolidators rare
+*observation · raised 2026-09-14 · from Sprint 41 T1 (BL-951, fair strength metric) -- main-session review of the agent diff and report.*
+
+BL-951 moved reading 3 to a treasury ranking; on seeds 0-2 all 18 top-3 entries (by treasury AND by region count) still classify expansionist, with consolidator lean 104-190 against expansion lean 610-860. The classifier (exploration_sweep.cpp, sprint-40 origin, kept by BL-951) calls a culture a consolidator when consolidator_lean_q > expansion_lean_q. But consolidator_lean_q = dominion x (1000 - sea_legs) / 1000 (a product, at most the smaller factor) while expansion_lean_q = (sea_legs + zeal) / 2 (a mean, at least the smaller input). For a middling culture (sea 300, zeal 500, dominion 500) the leans are 350 vs 400: expansionist, though nothing about it is seafaring. The two leans are on incommensurable scales -- BL-318 incommensurability again -- so comparing them answers a question about arithmetic, not about creeds.
+
+**Why it matters.** EXPLORATION.md sec Two ways to be strong says: if the creed axes do not separate the strategies, the fix is upstream in the Empire phase. That conclusion should not be drawn from a comparison that could not have come out the other way. The sim itself uses the two leans independently as weights in choose_exploration_node, so the defect may be in the reading only -- or the same scale mismatch may also bias the node choice and BL-955 (spend is scored), which will read both leans.
+
+- Classify by rank within the world: a culture is a consolidator if its consolidator lean is in the top third of cultures by that lean, and likewise for expansion (can be both or neither).
+- Put both leans on one form (both products, or both means) in src/ so they are commensurable everywhere they are read, including BL-955.
+- Leave the classifier and accept the reading as upstream evidence.
+
+> **Recommendation:** Option 2 for BL-955 before it reads the leans, plus option 1 for the reading. Measure the lean distribution over ALL living polities on the 16-seed integrated sweep first (T6), so the call is made on the population, not the top 3.
+
+*Files: `tools/verify/exploration_sweep.cpp`, `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
+
+### NR-865 — OBSERVATION: outward wants alone do not point conflict outward -- the doc claim needs the trade flows beside it, measured on the integrated tree
+*observation · raised 2026-09-14 · from Sprint 41 T3 (BL-953, wants point outward), generation-dev agent, worktree branch 59768711.*
+
+BL-953 built as designed. w_want_q swept at 0/250/500/1000/2000 on 3 seeds: 0 reproduces the baseline exactly; 250-500 move about one battle; 1000 (chosen) moves the displacement median 0.04 -> 0.06 with the battle rate holding (18.91 -> 21.09 per century); 2000 swings whole seeds (neighbour wars +45% on seed 0, -60% on seed 2), which is the want deciding wars rather than ranking them. The lean raises neighbour wars about as much as frontier skirmishes. Two causes the agent named: frontier battles are rare for reach/supply reasons (seeds 0 and 2 fight ~1 frontier battle in 460 years), which a prize lean cannot fix; and at four goods a long-contacted neighbour lacks-and-holds the same goods as often as a newly met people, so EXPLORATION.md sec A want points a campaign outward -- "the want lands on the frontier because that is where the unmet goods are" -- does not follow at this grain on its own.
+
+**Why it matters.** The paragraph was written today as a consequence, and the first measurement contradicts it. It may still hold once BL-954 lands: trade flows relieve the signal wherever a treaty partner supplies a good, so the residual UNMET want should point at goods only unbound (mostly newly met) peoples hold. That is a testable claim, not an assumption.
+
+- Measure on the integrated tree (wave 1 merged) before changing anything: if displacement moves once flows relieve bound neighbours wants, the doc paragraph is right but incomplete -- amend it to name trade as the half that makes it true.
+- If it does not move, weaken the doc claim: wants rank winnable campaigns and nothing more, and outward displacement is owned by reach, ports and deterrence (BL-950).
+- Widen the goods grain beyond four so preference carries more information -- a larger change, likely out of this sprint.
+
+> **Recommendation:** Option 1 now (it costs one sweep at integration); option 2 if it fails. Keep w_want_q at 1000 -- the measured point where the lean ranks without deciding.
+
+*Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`, `tools/verify/exploration_sweep.cpp`*
 
 ---
 

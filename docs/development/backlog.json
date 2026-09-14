@@ -248,6 +248,27 @@
     "tools/verify/exploration_sim_harness.cpp"
    ],
    "design": "THE GAP (16-seed review, 2026-09-14). EXPLORATION.md sec What this phase hands digitisation lists nine things and DIGITISATION.md calls that list \"a struct, not a promise\". No such struct exists. `kepler_exploration_hs` reaches only four report counters, the time-lapse and the harness fixture (hard_coded_world.cpp ~1116-1155); treaties, the overlord graph, navies, contacts and wants are discarded.\n\nWORSE, A LIVE INCONSISTENCY: since BL-946 flipped the span on, `region::nation` is the 1660 map, but world setup still seeds sentiment from the 1200 CE grudges (`kepler_grudges`, hard_coded_world.cpp:1395) and stamps roads from the 1200 CE corridors (`kepler_corridors`, :1562). 460 years of grudges, and every corridor the span built or promoted, never reach the campaign. The code comment at :1069-1080 names this as deferred work.\n\nTHE SHAPE, mirroring `pass_one_output` / `make_pass_one_output` / `pass_one_output_valid` (BL-828): an `exploration_output` value struct whose fields ARE the doc's list -- treasuries (per polity, at the capital), scarcity signals (per market), corridor throughput and road tier, cultural good preference, the overlord graph with tribute terms, standing treaties with remaining years, ports/navies/standing armies, contacts and wants, exploration tree masks -- plus the surviving-network filter over THIS span's dead, and a validator. World setup then reads grudges and surviving corridors from it whenever the span ran, and from `pass_one_output` otherwise. Trade flows (BL-954) join the struct when that item lands.\n\nWORLD-MOVING: sentiment seeds and stamped roads change on every generated world. Report the digest movement; do not re-bless (DELIVERY.md sec The digest re-bless is one act per WAVE).\n\nDONE WHEN: the struct exists with a validator that exploration_sim_harness exercises; sentiment and road stamping read 1660 state when the span ran; world_determinism still holds same-seed-same-world; the movement is recorded in world SHAPE.\n\nAMENDED 2026-09-14: BL-954's `trade_flow` table joins the struct in the same batch; the doc list now names trade flows, grudges and the surviving network explicitly (EXPLORATION.md sec What this phase hands digitisation)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-14",
+   "author": "Claude (sprint 41 T2 finding, BL-956)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Harness truth",
+   "id": "BL-957",
+   "short_name": "WORLD_DIGEST_SEES_SENTIMENT_AND_ROADS",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "world_determinism digest covers seeded sentiment and stamped road tiers",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/world_determinism.cpp"
+   ],
+   "design": "FOUND 2026-09-14 by sprint 41 T2 (BL-956, Exploration handoff crosses). BL-956 moved world setup from 1200 CE grudges and corridors to 1660 ones: on seed ABCDEF01 sentiment seeding went from the 1200 grudge set to 76 rows off 225 grudges, and stamped corridors from 1664 to 2276 (612 new). Every world_determinism digest stayed digit-identical, because the digest reads neither `world::sentiment` nor road tiers. A contract that cannot see a change of that size is the same defect memory records for trade (goldens cannot see convoy traffic): the determinism check proves same-seed-same-world only for the parts it hashes.\n\nWORK: fold seeded sentiment (sorted pairs and values) and the road tier per tile (or a per-tier tile count per body) into the deep digest. This moves every digest once: per DELIVERY.md sec The digest re-bless is one act per WAVE it is an authorised re-bless with the movement described (what the digest now covers), in its own commit, never folded into a world-moving item.\n\nDONE WHEN: world_determinism fails when sentiment seeding or road stamping changes (demonstrate by a deliberate one-row perturbation run locally, not committed), and the re-bless is authorised by Ben."
   }
  ]
 }
