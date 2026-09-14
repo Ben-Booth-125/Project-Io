@@ -180,8 +180,8 @@
   {
    "id": "41",
    "theme": "Exploration trade",
-   "state": "open",
-   "status_line": "OPEN 2026-09-14. A 16-seed exploration_sweep review found the phase busy but not trading: the trade-access clause, the foreign scarcity reader and cultural preference had no caller; spend was bought whenever affordable; nothing crossed the handoff. Five items filed, five design forks answered on the form the same day, three sprint-40 tuning items folded in.",
+   "state": "gated",
+   "status_line": "GATED 2026-09-14 on Ben's authorisation of the wave's world shape (NR-867). Eight of nine items built, verified and merged (41e2f5c7); BL-950 closes when the authorisation lands.",
    "opened_date": "2026-09-14",
    "closed_date": null,
    "author": "Ben (2026-09-14: \"polish off the exploration phase\"; \"go for A then B ... build in a batch delivery\")",
@@ -199,7 +199,9 @@
    ],
    "risk": "Five world-moving mechanisms in one file (history_sim.cpp) interacting through treaty value and the scarcity signal; displacement already regressed once, silently, when an upstream verb changed the 1200 world (NR-862). The tuning items must measure on the integrated tree or they tune a world that no longer exists.",
    "done_when": "All eight items terminal; a 16-seed sweep on the integrated tree reports all eleven readings; the wave digest movement is described in world shape for Ben to authorise.",
-   "notes": []
+   "notes": [
+    "RETRO 2026-09-14. What went well: the design form settled five forks in one pass before any code; four wave-1 agents ran in parallel; every wave got a cold review, and the reviews caught real defects each time (over-import, a squared loss formula, a scorer/battle mismatch, flows outliving their clause). What cost the most: the sweep -- 65 minutes for 16 seeds at the start -- until BL-958 cut it to 99 s; and design arithmetic left implicit (what bounds a flow, whether a cap can bind), which reviews found after build instead of before. The bisect showed a 3-seed median (0.88) had stood as a tuning premise; the 16-seed rule now holds. Pacing: mechanism waves fanned out well; the tuning wave was quick only because the instrument had been fixed first."
+   ]
   }
  ],
  "next_up": "SPRINT 40 (EXPLORATION) CLOSED 2026-09-12. All fifteen planned items (BL-930..BL-944) built and independently verified; see archive/sprints-2026-Q3.json for the full retro. BL-945 stays parked for Digitisation. Sprints 38 and 39 are also closed in DEVLOG.md but their hot rows have not yet been archived -- a pre-existing bookkeeping gap this session did not create and did not fix, flagged here rather than left silent. No sprint is currently open; the next one is Ben's to define.",

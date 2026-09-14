@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*49 entries — 32 open, 17 resolved.*
+*50 entries — 33 open, 17 resolved.*
 
 ---
 
@@ -490,6 +490,21 @@ BL-955's allocation scores a navy step 0 once the fleet exceeds 400 per held reg
 > **Recommendation:** Option 2: it is what the doc already says, and it fixes the free-manpower problem at the same stroke if paid heads also draw from manpower. It moves the world again, so it would be its own item after this sprint rather than folded into the tuning wave.
 
 *Files: `src/world/history_sim.cpp`, `src/world/settlement.hpp`, `docs/generation/EXPLORATION.md`*
+
+### NR-867 — AUTHORISE: sprint 41 moves every Exploration-on world -- the shape of the change, for the wave re-bless (BL-950 R3)
+*question · raised 2026-09-14 · from Sprint 41 close-out; exploration_sweep 16 seeds (0-15) at 643ebf79 (before) and 41e2f5c7 (after), both run in this session.*
+
+DIGESTS (world_determinism; asserts same-seed determinism, reports digests): seedA/on 584D731FC7E5DDD0 -> CC34FD59D4E79580; seedB/on 1BFB3594DB6A319A -> 728607C66CE6A4BE; seedA/off F9BF05466A631FF9 and 1960/two-span 851FE345B2E37618 UNCHANGED (the Empires span and the 1960 arc are untouched). THE SHAPE, 16 seeds before -> after: displacement median 0.08 -> 1.34 (frontier war now leads neighbour war on the median seed); Exploration battle rate median 50.0 -> 44.8 per century (Empires 404.9); trade flows none -> 710 flows, 7.1% of volume crossing landmasses, top-decile pairs 73%, 61% of bound pairs carry none, every flow on a trade-access clause; treaties formed 5161 -> 6140, broken 4 -> 5, standing at 1660 930 -> 1008; subjects 33 -> 27 (overlords 27 -> 26), 13 of 27 subjects want a different good first; navies at 1660 454 -> 189, 27 polities let a fleet decay to zero; spend steps bought port 7914 / navy 8363 / army 52232; post roads 0/16 -> 12/16 seeds (31 roads); treasury correlation with the corridor network 0.261 -> 0.254; living polities 792 -> 808; world setup now seeds sentiment from 1660 grudges and stamps 1660 roads (BL-956; invisible to the digest, BL-957). PER-WAVE ATTRIBUTION (16-seed displacement median): trade flows + outward wants + handoff 0.08 -> 0.10; scored spend + persistent standing armies 0.10 -> 0.17; road record seeding (reach) 0.17 -> 0.06 with battle rate 57 -> 98; deterrence widening (Alarm 575, far penalty 700) 0.06 -> 1.34 with battle rate 98 -> 45. THE COST: four seeds (0, 3, 9, 14) now fight under 5 battles per century across 460 years; the lowest seed before the sprint fought 11.5. With those four removed the median is still 1.34, so the reading is not produced by quiet maps -- but a frozen map is the failure EXPLORATION.md names for reading 2.
+
+**Why it matters.** DELIVERY.md sec The digest re-bless is one act per WAVE: Ben authorises against the shape, not the hash. Three calls ride on it. (1) Four near-frozen seeds of sixteen: acceptable spread, or a sign the deterrence widening calms rather than displaces on some worlds? Alarm 525 (with the same far penalty) leaves two quiet seeds for about 9% less frontier war and a median of 1.33. (2) The displacement median drops seeds with no neighbour war at all (seed 4: 7.6 frontier battles per century, 0 neighbour) and counts near-silent seeds with ratios like 3.0 off eight battles; the reading could weight by conflict volume instead. (3) EXPLORATION.md carries a `> what changed` note for this batch that should be reviewed and then removed.
+
+- Authorise as landed (Alarm 575 / far penalty 700); record the digests in the DEVLOG as the new baseline.
+- Authorise at Alarm 525 (two quiet seeds, median 1.33, ~9% less frontier war) -- a one-constant change and a re-run.
+- Do not authorise: investigate the four quiet seeds first (seed 0 already diagnosed: 851 frontier campaign scores cleared the bar but known neighbours always outscored them).
+
+> **Recommendation:** Option 2: it keeps the reading over the bar with half the frozen seeds, and a frozen map is the named failure. Pair it with a later item to weight the displacement reading by conflict volume.
+
+*Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sweep.cpp`, `tools/verify/world_determinism.cpp`, `docs/generation/EXPLORATION.md`*
 
 ---
 

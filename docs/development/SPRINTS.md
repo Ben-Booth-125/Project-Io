@@ -189,7 +189,7 @@ SUPERSEDES the sprint-39 id sprint 38's own handoff previously reserved for 'the
 THE FIVE CALLS, TAKEN 2026-09-11 (Ben, form): city states spawn in regions above a threshold population, the number left to the builder's judgement (NR-835); force is a POOLED LEVY along the supplied network (NR-836); a breakdown produces CITY STATES, one per cut-off seat, reversing NR-826 call 2 (NR-837); supply is priced in the polity's CAPITAL, which is the strategic headquarters where every material gain is stockpiled (NR-838); the isolation split runs in the Culture round only (NR-839). Further detail the same message: a polity upgrades supply sites by spending its stockpile -- BL-929 filed. Traversal domain of supply (held ground only) taken on Ben's behalf and recorded on NR-838.
 
 ### Sprint 41 — Exploration trade
-*Open · opened 2026-09-14 · Ben (2026-09-14: "polish off the exploration phase"; "go for A then B ... build in a batch delivery")*
+*Gated · opened 2026-09-14 · Ben (2026-09-14: "polish off the exploration phase"; "go for A then B ... build in a batch delivery")*
 
 **Goal.** Make the Exploration round do what EXPLORATION.md claims: goods flow between bound polities and that flow is what markets earn; wants point campaigns and subjection outward; spend is a choice that says something about the creed; the 1660 world crosses into world setup whole. Then tune the road rung and displacement against the integrated world, not the pre-trade one.
 
@@ -207,6 +207,8 @@ THE FIVE CALLS, TAKEN 2026-09-11 (Ben, form): city states spawn in regions above
 **Done when.** All eight items terminal; a 16-seed sweep on the integrated tree reports all eleven readings; the wave digest movement is described in world shape for Ben to authorise.
 
 **Risk.** Five world-moving mechanisms in one file (history_sim.cpp) interacting through treaty value and the scarcity signal; displacement already regressed once, silently, when an upstream verb changed the 1200 world (NR-862). The tuning items must measure on the integrated tree or they tune a world that no longer exists.
+
+RETRO 2026-09-14. What went well: the design form settled five forks in one pass before any code; four wave-1 agents ran in parallel; every wave got a cold review, and the reviews caught real defects each time (over-import, a squared loss formula, a scorer/battle mismatch, flows outliving their clause). What cost the most: the sweep -- 65 minutes for 16 seeds at the start -- until BL-958 cut it to 99 s; and design arithmetic left implicit (what bounds a flow, whether a cap can bind), which reviews found after build instead of before. The bisect showed a 3-seed median (0.88) had stood as a tuning premise; the 16-seed rule now holds. Pacing: mechanism waves fanned out well; the tuning wave was quick only because the instrument had been fixed first.
 
 ## Where things stand
 
@@ -271,7 +273,7 @@ THE FIVE CALLS, TAKEN 2026-09-11 (Ben, form): city states spawn in regions above
 | 40 | exploration | CLOSED 2026-09-12. All fifteen planned items (BL-930..BL-944) built, independently verified and archived across six waves -- BL-945 stays parked for Digitisation. Every item rebuilt and reverified in the main session, not taken on a sub-agent self-report. |
 | 38 | empire — the whole phase | 8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). REFRAMED 2026-09-10 on Ben's call (option B): the sprint no longer closes on BL-868's harness, but on a DISTRIBUTIONAL reading of history_sweep. The sweep was run and the reading is in: conflict is fixed, asymmetry and volatility are not. BL-889, BL-890, BL-891 and BL-892 were added to the sprint on that basis; BL-868 is now blocked on BL-889. |
 | 39 | the drama of the time-lapse | OPEN. Redefined 2026-09-11 (Ben) from "tighten the levers" to the DRAMA of generation: the political map is highly stable and empires never fragment back into city states, and the rounds render a computed record after the fact. Sixteen items filed off a holistic read of the generation layer (seven parallel readers, 67 stability claims adversarially checked); five design calls resolved on the form 2026-09-11 (NR-835..NR-839). Batch-delivered in one go. |
-| 41 | Exploration trade | OPEN 2026-09-14. A 16-seed exploration_sweep review found the phase busy but not trading: the trade-access clause, the foreign scarcity reader and cultural preference had no caller; spend was bought whenever affordable; nothing crossed the handoff. Five items filed, five design forks answered on the form the same day, three sprint-40 tuning items folded in. |
+| 41 | Exploration trade | GATED 2026-09-14 on Ben's authorisation of the wave's world shape (NR-867). Eight of nine items built, verified and merged (41e2f5c7); BL-950 closes when the authorisation lands. |
 
 **Next up.** SPRINT 40 (EXPLORATION) CLOSED 2026-09-12. All fifteen planned items (BL-930..BL-944) built and independently verified; see archive/sprints-2026-Q3.json for the full retro. BL-945 stays parked for Digitisation. Sprints 38 and 39 are also closed in DEVLOG.md but their hot rows have not yet been archived -- a pre-existing bookkeeping gap this session did not create and did not fix, flagged here rather than left silent. No sprint is currently open; the next one is Ben's to define.
 

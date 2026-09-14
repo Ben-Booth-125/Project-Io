@@ -55,10 +55,12 @@ Wave 1 merged to main as `f260d202` (2026-09-14) after a cold review and one fix
 
 ### Wave 3 — tune against the integrated world
 
-- [ ] **T6 · BL-949** (new road tier fires) **+ BL-950** (displacement clears the bar) — 16-seed
+- [x] **T6 · BL-949** (new road tier fires) **+ BL-950** (displacement clears the bar) — 16-seed
       baseline first (NR-862: the 0.88 premise was three seeds on a pre-schism world), then tune,
       then the wave's digest movement described in world shape for Ben. Satisfies BL-949 R1–R2,
       BL-950 R1–R3, BL-951 R2.
+
+Waves 2, 2b and 3 merged (`d7fb1636`, `460297aa`, `41e2f5c7`). **Gated:** BL-950 R3 waits on Ben's authorisation of the world shape (NR-867); everything else is terminal.
 
 ## Post-sprint-40 review block (opened 2026-09-13)
 

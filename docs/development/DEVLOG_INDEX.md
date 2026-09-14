@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 211 entries across 2 volume(s).
+One line per session, newest first — 212 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-09-14 | [Sprint 41 (Exploration trade): goods flow, spend is chosen, displacement clears 1.0 — gated on authorisation](DEVLOG.md) | BL-944 BL-949 BL-950 BL-951 BL-952 BL-953 BL-954 BL-955 BL-956 BL-957 BL-958 BL-959 | DEVLOG.md |
 | 2026-09-12 | [Sprint 40 (Exploration) closes in full: six waves, fifteen items, one new phase](DEVLOG.md) | BL-928 BL-930 BL-931 BL-932 BL-933 BL-934 BL-935 BL-936 BL-937 BL-938 BL-939 BL-940 BL-941 BL-942 BL-943 BL-944 BL-945 | DEVLOG.md |
 | 2026-09-11 | [Sprint 39's session concludes: the full-tree reading, BL-928 dropped, levers accepted for sprint 40](DEVLOG.md) | BL-920 BL-921 BL-923 BL-924 BL-928 | DEVLOG.md |
 | 2026-09-11 | [Sprint 39 closes in full: waves 2 and 3 land, eight items, one cross-item bug caught and fixed](DEVLOG.md) | BL-866 BL-896 BL-914 BL-915 BL-917 BL-919 BL-920 BL-921 BL-922 BL-923 BL-924 BL-925 BL-929 | DEVLOG.md |

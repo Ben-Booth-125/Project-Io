@@ -10,6 +10,69 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-14 — Sprint 41 (Exploration trade): goods flow, spend is chosen, displacement clears 1.0 — gated on authorisation
+
+**Runtime:** long session, Design → Review → Full / Batch Delivery. Opened as a design question
+("what levers ensure global trade, and what does Digitisation expect?"), became a 16-seed review of
+the Exploration round, then a nine-item batch across four waves.
+
+**The review that opened it.** `exploration_sweep` over 16 seeds showed the round busy but not
+trading: the trade-access clause, the foreign scarcity reader and cultural preference had no caller
+in the sim; ports, navies and armies were bought whenever affordable; nothing crossed the handoff,
+and world setup read 1200 CE grudges and corridors onto a 1660 map. Displacement median 0.08.
+
+**Design, settled on a form (Ben, 2026-09-14)** and written into `EXPLORATION.md` before any code:
+trade is a want met by throughput, opened ONLY by the trade-access clause; trade value counts toward
+a binding (the only thing that lets a distant pair bind); flow income replaces the flat market
+income; a met want relieves the signal; an eleventh reading (Trade); spend is a scored allocation
+inside upkeep (Ben chose this over new verbs). Three further calls taken on his behalf: NR-863.
+
+**The bisect (NR-862).** BL-950's 0.88 starting point was a 3-seed median resting on one seed; the
+wave-4 tree read 0.33 over 16 seeds, and the schism verb (BL-944, `3d58001d`) cut it to 0.08 by
+changing the Empires world Exploration opens on. No reading went red because the sweep reports.
+
+| Wave | Items | Landed | 16-seed displacement |
+|---|---|---|---|
+| 1 | BL-952, BL-951, BL-956, BL-953, BL-954 | sweep builds once; strength by treasury; `exploration_output` handoff + 1660 sentiment/roads; outward wants; trade flows | 0.08 → 0.10 |
+| 2 | BL-955 | scored spend; paid standing armies persist (the muster had disbanded them every year — a sprint-40 defect) | 0.10 → 0.17 |
+| 2b | BL-958 | sweep stops at the Exploration close: 16 seeds ~25 min → 99 s (Ben: build it before tuning) | — |
+| 3 | BL-949, BL-950 | road rung recoverable (`history_corridor::tier`, resumed spans seed live uses) and bought (30M); deterrence Alarm 575 / far penalty 700 | 0.17 → 0.06 → **1.34** |
+
+**Every wave was independently rebuilt and reverified here, and every wave had a cold review that
+found real defects:** one want imported once per seller (shared); a holding sold to every buyer
+(shared); treaty value double-counting the shared want (marginal); flows outliving their clause; a
+squared proportional-loss formula; the campaign scorer pricing a levy the muster no longer raises;
+an army cap reading only the capital. A `generation-dev` agent labelled two check blocks both "R6"
+and one report named the wrong branch — both caught by checking, not trusting.
+
+**Final state (16 seeds, `41e2f5c7`):** displacement 1.34 (1.34 also without the quiet seeds);
+battle rate 44.8/century (Empires 404.9); 710 flows, 7.1% crossing landmasses, top-decile pairs
+73%, every flow on a clause; post roads in 12/16 seeds; navies 454 → 189; consolidators in the top 3
+still 0/16. **Cost:** seeds 0, 3, 9, 14 fight under 5 battles/century (lowest before: 11.5).
+
+**Digests (not re-blessed):** seedA/on 584D731FC7E5DDD0 → CC34FD59D4E79580, seedB/on
+1BFB3594DB6A319A → 728607C66CE6A4BE; seedA/off F9BF05466A631FF9 and 1960 851FE345B2E37618
+unchanged. Harnesses: `exploration_sim_harness` 43 → 109, all pass; `history_sim_harness` at its
+2-failure baseline (R3a2/R3a3); `save_roundtrip` OK. `story_check`'s 55 failures are pre-existing
+dead traces to long-archived ids.
+
+**Status:** 8 of 9 items complete and archived. **BL-950 (displacement clears the bar) is gated on
+NR-867** — Ben authorises the world shape at Alarm 575, at the gentler 525, or not yet.
+
+**Design-direction Q&A for Ben** (all in the queue, none blocking the merged code):
+- NR-867 — authorise the world shape; four near-frozen seeds.
+- NR-865 — wants plus trade did not point conflict outward (0.08 → 0.10); weaken the doc claim?
+- NR-866 — spend saturation is a scorer brake; replace with a per-head upkeep bill?
+- NR-864 — creed leans are on incommensurable scales; reading 3's 0/16 cannot yet indict the creeds.
+- NR-863 — flow income at both ends; shared holding; holding as a share not a quantity.
+- NR-862 — accept the schism verb's cut to displacement as a real force?
+- NR-861 — treaties almost never break (5 in 6140).
+
+**Filed for later:** BL-957 (world digest sees sentiment and roads), BL-959 (Empires corridor
+upgrade records its uses).
+
+---
+
 ## 2026-09-12 — Sprint 40 (Exploration) closes in full: six waves, fifteen items, one new phase
 
 **Runtime:** long session, Full / Batch Delivery. Opened on a stale `NEXT_SESSION.md` (still
