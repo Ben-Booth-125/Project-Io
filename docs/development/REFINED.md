@@ -51,7 +51,7 @@ Wave 1 merged to main as `f260d202` (2026-09-14) after a cold review and one fix
 
 ### Wave 2b — make the sweep cheap before tuning (Ben, 2026-09-14)
 
-- [ ] **T5b · BL-958** (sweep stops at the Exploration close) — `stop_after_exploration` on the sweep's one generation call; readings identical, time measured. Satisfies R1–R2.
+- [x] **T5b · BL-958** (sweep stops at the Exploration close) — `stop_after_exploration` on the sweep's one generation call; readings identical, time measured. Satisfies R1–R2.
 
 ### Wave 3 — tune against the integrated world
 
