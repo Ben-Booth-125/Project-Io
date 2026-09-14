@@ -42,6 +42,10 @@
 //                 4-7 then describe the overridden run; the traced-vs-untraced
 //                 structural check is skipped (it compares against a run made
 //                 with different params by construction).
+//   --set NAME=N  BL-949/BL-950 TUNING ONLY: same footing as --w_want_q, for
+//                 post_road_treasury_cost, deterrence_alarm_weight_q,
+//                 treaty_far_penalty_q, visible_capability_reference. Reading 9
+//                 then reads the traced run too.
 // ---------------------------------------------------------------------------
 
 #include "world/era_minus_one.hpp"
@@ -218,6 +222,11 @@ struct exploration_row
     std::vector<int32_t> corridor_uses;
     int64_t post_roads_built        = 0;
     int64_t treasury_spent_on_roads = 0;
+    /// BL-949: corridors at each carried rung (`history_corridor::tier`, 0-3)
+    /// at the close, and inherited corridors whose 1200 traffic alone already
+    /// reaches `road_tier3_uses` (a third rung NOT bought).
+    int64_t tier_count[4] = {0, 0, 0, 0};
+    int64_t inherited_traffic_tier3 = 0;
 
     // --- Reading 10: preference, off the 1200 CE handoff state --------------
     std::vector<int16_t> preference_weights;
@@ -284,8 +293,17 @@ int main(int argc, char** argv)
     int seed_count = 8;
     bool want_override = false;
     int  want_override_q = 0;
+    std::vector<std::pair<std::string, long long>> param_sets;
     for (int a = 1; a < argc; ++a)
     {
+        if (std::strcmp(argv[a], "--set") == 0 && a + 1 < argc)
+        {
+            const std::string kv = argv[++a];
+            const std::size_t eq = kv.find('=');
+            if (eq != std::string::npos)
+                param_sets.push_back({kv.substr(0, eq), std::atoll(kv.c_str() + eq + 1)});
+            continue;
+        }
         if (std::strncmp(argv[a], "--w_want_q=", 11) == 0)
         {
             want_override   = true;
@@ -295,7 +313,21 @@ int main(int argc, char** argv)
         const int n = std::atoi(argv[a]);
         if (n > 0) seed_count = n;
     }
-    if (want_override)
+    const auto apply_sets = [&](history_sim_params& hp) {
+        for (const auto& kv : param_sets)
+        {
+            if      (kv.first == "post_road_treasury_cost")      hp.post_road_treasury_cost = kv.second;
+            else if (kv.first == "deterrence_alarm_weight_q")    hp.deterrence_alarm_weight_q = static_cast<int>(kv.second);
+            else if (kv.first == "treaty_far_penalty_q")         hp.treaty_far_penalty_q = static_cast<int>(kv.second);
+            else if (kv.first == "visible_capability_reference") hp.visible_capability_reference = kv.second;
+            else { std::printf("unknown --set %s\n", kv.first.c_str()); std::exit(2); }
+        }
+    };
+    for (const auto& kv : param_sets)
+        std::printf("NOTE: --set %s=%lld overrides the traced re-run (tuning only).\n",
+                    kv.first.c_str(), kv.second);
+    if (!param_sets.empty()) { want_override = true; want_override_q = -1; }
+    if (want_override && want_override_q >= 0)
         std::printf("NOTE: --w_want_q=%d overrides the traced re-run's want lean (tuning only).\n",
                     want_override_q);
 
@@ -356,7 +388,15 @@ int main(int argc, char** argv)
         // `fx.exploration_state.supply_corridors`, finalised at that run's own
         // close, and the two road-ladder counters BL-940 added.
         for (const history_corridor& c : fx.exploration_state.supply_corridors)
+        {
             row.corridor_uses.push_back(c.uses);
+            ++row.tier_count[c.tier < 4 ? c.tier : 3];
+        }
+        {
+            const int t3 = history_sim_params{}.road_tier3_uses;
+            for (const history_corridor& c : fx.pre_exploration_corridors)
+                if (c.uses >= t3) ++row.inherited_traffic_tier3;
+        }
         row.post_roads_built        = fx.exploration_state.post_roads_built;
         row.treasury_spent_on_roads = fx.exploration_state.treasury_spent_on_roads;
 
@@ -384,7 +424,8 @@ int main(int argc, char** argv)
         ep2.resume_grudges   = &fx.pre_exploration_grudges;
         ep2.resume_contacts  = &fx.pre_exploration_contacts;
         ep2.resume_corridors = &fx.pre_exploration_corridors;
-        if (want_override) ep2.w_want_q = want_override_q;
+        if (want_override && want_override_q >= 0) ep2.w_want_q = want_override_q;
+        apply_sets(ep2);
 
         settlement_state ss_copy = fx.pre_exploration_settlement;
         creed_state       cs_copy = fx.pre_exploration_creeds;
@@ -401,6 +442,87 @@ int main(int argc, char** argv)
         const history_sim_state traced = run_history_sim(
             ss_copy, &cs_copy, fx.terrain.view(), fx.gw, fx.gh, ep2,
             fx.exploration_seed, /*year_progress=*/nullptr, fx.works, /*tap=*/nullptr);
+
+        if (!param_sets.empty())
+        {
+            row.corridor_uses.clear();
+            for (int t = 0; t < 4; ++t) row.tier_count[t] = 0;
+            for (const history_corridor& c : traced.supply_corridors)
+            {
+                row.corridor_uses.push_back(c.uses);
+                ++row.tier_count[c.tier < 4 ? c.tier : 3];
+            }
+            row.post_roads_built        = traced.post_roads_built;
+            row.treasury_spent_on_roads = traced.treasury_spent_on_roads;
+        }
+
+        // BL-949: does the road spend track the polities that built? Capital
+        // treasury at the close for builders, for EX-WY-1a holders that never
+        // built, and for every living polity; plus the builders' share of the
+        // EX-WY-1a holders.
+        {
+            int node = -1;
+            for (int n = 0; n < io::exploration_tree::node_count; ++n)
+                if (std::strcmp(io::exploration_tree::nodes[n].id, "EX-WY-1a") == 0) { node = n; break; }
+            std::vector<int64_t> t_build, t_hold, t_all;
+            for (const polity& q : traced.polities)
+            {
+                if (!q.alive || q.capital < 0
+                 || static_cast<std::size_t>(q.capital) >= ss_copy.regions.size()) continue;
+                const int64_t t = ss_copy.regions[static_cast<std::size_t>(q.capital)].treasury;
+                t_all.push_back(t);
+                const bool built = static_cast<std::size_t>(q.id) < traced.post_roads_by_polity.size()
+                                && traced.post_roads_by_polity[static_cast<std::size_t>(q.id)] > 0;
+                const bool holds = node >= 0 && (q.exploration_mask & (1ULL << node));
+                if (built) t_build.push_back(t);
+                else if (holds) t_hold.push_back(t);
+            }
+            const auto med = [](std::vector<int64_t> v) -> long long {
+                if (v.empty()) return -1;
+                std::sort(v.begin(), v.end());
+                return static_cast<long long>(v[v.size() / 2]);
+            };
+            int64_t builders_total = 0;
+            for (int32_t n : traced.post_roads_by_polity) if (n > 0) ++builders_total;
+            std::printf("  roads seed %d: built=%lld builders=%lld (alive at close %zu) EX-WY-1a holders not building=%zu"
+                        "  median capital treasury: builders=%lld holders-not-building=%lld all=%lld\n",
+                        i, static_cast<long long>(traced.post_roads_built),
+                        static_cast<long long>(builders_total), t_build.size(), t_hold.size(),
+                        med(t_build), med(t_hold), med(t_all));
+        }
+
+        // BL-950 DIAGNOSTIC: why is frontier war absent on a seed? Candidate
+        // gates by the target owner's contact class, and the pairs bound at close.
+        {
+            const auto& ct = traced.campaign_class_trace;
+            int64_t far_met = 0, far_bound = 0, near_pairs = 0, near_bound = 0;
+            for (const contact& c : traced.contacts)
+            {
+                if (c.from >= c.to) continue;
+                bool bound = false;
+                for (const dated_object& o : traced.dated_objects)
+                    if (o.kind == static_cast<int32_t>(treaty_clause::non_aggression)
+                     && ((o.a == c.from && o.b == c.to) || (o.a == c.to && o.b == c.from)))
+                    { bound = true; break; }
+                if (c.first.year >= ep2.start_year) { ++far_met; if (bound) ++far_bound; }
+                else                                 { ++near_pairs; if (bound) ++near_bound; }
+            }
+            int64_t navies = 0, ports = 0;
+            for (const polity& q : traced.polities) if (q.alive && q.navy_stock > 0) ++navies;
+            for (const region& r : ss_copy.regions) if (r.port_stock_q > 0) ++ports;
+            std::printf("  diag seed %d: cand[near ex=%lld blk=%lld wet=%lld rch=%lld clr=%lld ch=%lld]"
+                        " [met-in-span ex=%lld blk=%lld wet=%lld rch=%lld clr=%lld ch=%lld]"
+                        " [unmet ex=%lld blk=%lld wet=%lld rch=%lld clr=%lld ch=%lld]"
+                        " pairs near=%lld(bound %lld) met-in-span=%lld(bound %lld) navies=%lld ports=%lld\n",
+                        i, (long long)ct[0][0], (long long)ct[0][1], (long long)ct[0][2], (long long)ct[0][3],
+                        (long long)ct[0][4], (long long)ct[0][5],
+                        (long long)ct[1][0], (long long)ct[1][1], (long long)ct[1][2], (long long)ct[1][3],
+                        (long long)ct[1][4], (long long)ct[1][5],
+                        (long long)ct[2][0], (long long)ct[2][1], (long long)ct[2][2], (long long)ct[2][3],
+                        (long long)ct[2][4], (long long)ct[2][5],
+                        (long long)near_pairs, (long long)near_bound, (long long)far_met, (long long)far_bound,
+                        (long long)navies, (long long)ports);
+        }
 
         row.traced_matches_untraced = want_override ||
             (traced.battles == fx.exploration_state.battles &&
@@ -843,9 +965,13 @@ int main(int argc, char** argv)
         std::vector<int32_t> uses;
         int64_t total_post_roads_built = 0, total_treasury_spent = 0;
         int seeds_with_post_road = 0;
+        int64_t tiers[4] = {0, 0, 0, 0};
+        int64_t inherited_t3 = 0;
         for (const exploration_row& r : rows)
         {
             if (!r.ok) continue;
+            for (int t = 0; t < 4; ++t) tiers[t] += r.tier_count[t];
+            inherited_t3 += r.inherited_traffic_tier3;
             uses.insert(uses.end(), r.corridor_uses.begin(), r.corridor_uses.end());
             if (r.post_roads_built > 0) ++seeds_with_post_road;
             total_post_roads_built += r.post_roads_built;
@@ -870,6 +996,15 @@ int main(int argc, char** argv)
             std::printf("  post_roads_built total=%lld (in %d/%d seeds) treasury_spent_on_roads total=%lld\n",
                         static_cast<long long>(total_post_roads_built), seeds_with_post_road, seed_count,
                         static_cast<long long>(total_treasury_spent));
+            std::printf("  carried rung at 1660 (history_corridor::tier): none=%lld track=%lld road=%lld post-road=%lld;"
+                        " inherited 1200 corridors whose traffic alone reaches road_tier3_uses=%lld\n",
+                        static_cast<long long>(tiers[0]), static_cast<long long>(tiers[1]),
+                        static_cast<long long>(tiers[2]), static_cast<long long>(tiers[3]),
+                        static_cast<long long>(inherited_t3));
+            std::printf("  per seed post_roads_built:");
+            for (const exploration_row& r : rows)
+                if (r.ok) std::printf(" %lld", static_cast<long long>(r.post_roads_built));
+            std::printf("\n");
             std::printf("  %s\n", total_post_roads_built > 0
                 ? "the road ladder's third rung fired at least once on this spread."
                 : "the third rung never fired on this spread — report to Ben rather than "

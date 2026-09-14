@@ -662,14 +662,22 @@ struct history_sim_params
 
     /// Treasury spent (BL-932's `region::treasury`, NEVER `material_stock`)
     /// to promote one corridor from Road (tier 2) to Post Road (tier 3), once
-    /// the spending polity holds EX-WY-1a. A FIRST CUT on the same footing as
-    /// the treasury income weights above — a measurement owed from
-    /// `exploration_sweep`, not a guess dressed up as one. Read only when
+    /// the spending polity holds EX-WY-1a. MEASURED (BL-949, exploration_sweep
+    /// 16 seeds, 2026-09-14, after a resumed span began seeding its live
+    /// corridor counts): seeds with a post road / total bought at 3,000 15/69,
+    /// 100,000 15/69, 1,000,000 15/67, 3,000,000 15/61, 10,000,000 15/46,
+    /// 30,000,000 12/28, 100,000,000 9/15, 300,000,000 3/3. Up to 10M the
+    /// treasury gates nothing -- the purchase is decided by holding EX-WY-1a
+    /// and an internal Road, and the price is noise against capital
+    /// treasuries in the tens of millions. 30M is the first swept value at
+    /// which the bill refuses a real share of would-be builders while a clear
+    /// majority of worlds still buy one (median living capital treasury at
+    /// the close is ~1-8M, so only a rich seat affords it). Read only when
     /// `exploration_upkeep_enabled` is set (BL-931's own default-off
     /// discipline), so the Empire span and every fixture that never opts in
     /// is untouched regardless of this field's value; zero disables the
     /// purchase even where upkeep runs.
-    int64_t post_road_treasury_cost = 3000;
+    int64_t post_road_treasury_cost = 30000000;
 
     /// BL-942 — TWO WAYS TO BE STRONG. Per-mille weight applied to the creed-
     /// derived lean (`consolidator_lean_q`/`expansion_lean_q`, history_sim.cpp)
@@ -1795,8 +1803,21 @@ struct history_sim_params
     /// Per-mille of the OTHER side's visible capability added to
     /// `treaty_value_q`, NEAR HOME ONLY — "a neighbour that reads high
     /// visible capability should be more likely to form/maintain a
-    /// non-aggression treaty with that polity." FIRST CUT, UNMEASURED.
-    int deterrence_alarm_weight_q = 400;
+    /// non-aggression treaty with that polity."
+    ///
+    /// MEASURED WITH `treaty_far_penalty_q` (BL-950, exploration_sweep 16
+    /// seeds, traced, 2026-09-14; displacement median / battle-rate median /
+    /// summed neighbour and frontier rates, per century). At 400/350: 0.06 /
+    /// 98.0 / 1339 / 366. Alarm alone makes BOTH halves fall -- 700/350 1.34 /
+    /// 18.7 / 180 / 296; 1000/350 1.00 / 14.4 / 117 / 291; 550/350 0.50 /
+    /// 35.2 / 297 / 331 -- which is the failure the doc names. With the far
+    /// penalty at 700: 500 0.84 / 44.4 / 391 / 466; 525 1.33 / 43.5 / 312 /
+    /// 492; 550 1.33 / 43.5 / 314 / 473; 575 1.34 / 44.8 / 298 / 536; 600
+    /// 1.59 / 35.0 / 245 / 499; 1000 1.72 / 18.7 / 117 / 463. 575 is the
+    /// setting inside the 525-575 plateau with the most frontier war and the
+    /// most total conflict; above it neighbour war keeps collapsing and
+    /// total conflict falls with it.
+    int deterrence_alarm_weight_q = 575;
 
     /// Flat penalty on `treaty_value_q` for a pair that met only DURING this
     /// span (a frontier contact, `contact::first.year >= start_year`) — the
@@ -1805,8 +1826,17 @@ struct history_sim_params
     /// bind a non-aggression clause as readily as a long-known neighbour.
     /// Named directly by NR-851: without this every contacted pair, near or
     /// far, scored identically and a funded port's cheap crossing got
-    /// treatied over before it was ever used. FIRST CUT, UNMEASURED.
-    int treaty_far_penalty_q = 350;
+    /// treatied over before it was ever used.
+    ///
+    /// MEASURED (BL-950, see `deterrence_alarm_weight_q` for the joint
+    /// table): at alarm 400, 350 -> 700 lifts the summed frontier rate 366 ->
+    /// 490 with neighbour war unmoved (1339 -> 1363), displacement 0.06 ->
+    /// 0.19. 700 and 1000 are byte-identical on 16 seeds: at 700 no frontier
+    /// pair clears the formation bar except on the trade a clause would open
+    /// (`treaty_trade_weight_q`), so the penalty is saturated there. It is the
+    /// half of the mechanism that GROWS frontier war; the alarm weight is the
+    /// half that quiets neighbours.
+    int treaty_far_penalty_q = 700;
 
     // --- BL-934: colonies ----------------------------------------------------
     // EXPLORATION.md sec A colony is a subject, and it wants things of its own.
@@ -2718,6 +2748,12 @@ struct history_sim_state
     ///   - scored > 0 but `campaign_chosen` 0 -> the scorer sees war and prefers
     ///     something else every time. That is a threshold/weighting question.
     int64_t campaign_contacts = 0; ///< (own region, foreign-owned neighbour) pairs examined.
+    /// BL-950 DIAGNOSTIC, trace only: campaign candidates by the target owner's
+    /// contact class -- [0] met before the span, [1] met during it, [2] unmet --
+    /// and by gate: [0] examined, [1] treaty-blocked, [2] water-illegal,
+    /// [3] reach-denied, [4] season scores clearing the threshold, [5] chosen.
+    /// Read by nothing in the sim.
+    int64_t campaign_class_trace[3][6] = {};
     int64_t campaign_scored   = 0; ///< Candidates that reached the score comparison.
     int64_t campaign_chosen   = 0; ///< Rounds where Campaign won the verb choice.
 
@@ -3057,6 +3093,10 @@ struct history_sim_state
     /// EX-WY-1a in this seed", the same split `supply_sites_upgraded` makes.
     int64_t post_roads_built           = 0;
     int64_t treasury_spent_on_roads    = 0;
+    /// BL-949: post roads bought per polity id (grown on demand, so a polity
+    /// past the end bought none). Lets a sweep ask whether the spend tracks
+    /// the polities that built rather than only the world total.
+    std::vector<int32_t> post_roads_by_polity;
 
     // --- BL-933/934/935 sweep counters --------------------------------------
 
@@ -3902,18 +3942,18 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why);
 ///   - Scarcity signals          -> `region::scarcity_q` on each market
 ///                                  region, in `regions`
 ///   - Trade flows               -> `trade_flows`
-///   - Corridor throughput       -> `surviving_corridors::uses`. THE ROAD
-///                                  LADDER RUNG IS NOT RECOVERABLE FROM THIS
-///                                  VALUE: it is not stored, and reading it
-///                                  off `uses` against `history_sim_params::
-///                                  road_tier{1,2,3}_uses` does NOT reproduce
-///                                  the sim's rung. A bought post road sets
-///                                  the sim's live use count to
-///                                  `road_tier3_uses` but adds only one row
-///                                  to the corridor record, and a resumed run
-///                                  never seeds its live counts from
-///                                  `resume_corridors`, so `uses` under-reads
-///                                  both. Carrying the rung forward is owed.
+///   - Corridor throughput       -> `surviving_corridors::uses` (traffic, the
+///                                  walks) and `surviving_corridors::tier`
+///                                  (the road ladder rung, 0-3, the sim's
+///                                  own live rung at the close). Read the
+///                                  rung off `tier`, NEVER off `uses` against
+///                                  `history_sim_params::road_tier{1,2,3}_uses`:
+///                                  a bought post road sets the live count to
+///                                  `road_tier3_uses` while adding one walk,
+///                                  so the two legitimately differ. A resumed
+///                                  span seeds its live counts from
+///                                  `resume_corridors` (BL-949), so an
+///                                  inherited Road opens the span as a Road.
 ///   - Cultural good preference  -> `culture_preference`
 ///   - The overlord graph        -> `polity::overlord` / `polity::subject_kind`
 ///                                  in `polities`; tribute terms in

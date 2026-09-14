@@ -471,6 +471,16 @@ struct history_corridor
     uint16_t a    = 0; ///< Lower region index.
     uint16_t b    = 0; ///< Higher region index.
     int32_t  uses = 0; ///< Times a polity moved supply or settlers along it.
+    /// BL-949 -- THE RUNG THE SIM ACTUALLY USED on this corridor when the record
+    /// was folded at the run's close: 0 none, 1 Track, 2 Road, 3 Post Road
+    /// (`history_sim_params::road_tier{1,2,3}_uses` read against the sim's
+    /// LIVE count, not against `uses`). Carried rather than re-derived because
+    /// the two differ by construction: `uses` is TRAFFIC — the walks — while
+    /// a purchase (`try_build_post_road`, `try_upgrade_corridor`) sets the live
+    /// count straight to its threshold without walking it, and a refused
+    /// promotion holds the live count one short of a walk the record still
+    /// counts. So the rung is read HERE, and `uses` stays throughput.
+    uint8_t  tier = 0;
 };
 
 /// Where one region stood, and what its own history invested in MOVING things.
