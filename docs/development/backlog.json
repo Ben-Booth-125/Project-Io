@@ -269,6 +269,27 @@
     "tools/verify/world_determinism.cpp"
    ],
    "design": "FOUND 2026-09-14 by sprint 41 T2 (BL-956, Exploration handoff crosses). BL-956 moved world setup from 1200 CE grudges and corridors to 1660 ones: on seed ABCDEF01 sentiment seeding went from the 1200 grudge set to 76 rows off 225 grudges, and stamped corridors from 1664 to 2276 (612 new). Every world_determinism digest stayed digit-identical, because the digest reads neither `world::sentiment` nor road tiers. A contract that cannot see a change of that size is the same defect memory records for trade (goldens cannot see convoy traffic): the determinism check proves same-seed-same-world only for the parts it hashes.\n\nWORK: fold seeded sentiment (sorted pairs and values) and the road tier per tile (or a per-tier tile count per body) into the deep digest. This moves every digest once: per DELIVERY.md sec The digest re-bless is one act per WAVE it is an authorised re-bless with the movement described (what the digest now covers), in its own commit, never folded into a world-moving item.\n\nDONE WHEN: world_determinism fails when sentiment seeding or road stamping changes (demonstrate by a deliberate one-row perturbation run locally, not committed), and the re-bless is authorised by Ben."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "41",
+   "written": "2026-09-14",
+   "author": "Ben (2026-09-14: \"B, build the sweep speedup before wave 3\"); Claude (itemised)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Harness truth",
+   "id": "BL-958",
+   "short_name": "EXPLORATION_SWEEP_STOPS_AT_THE_EXPLORATION_CLOSE",
+   "priority": "S",
+   "difficulty": 2,
+   "title": "exploration_sweep stops generation at the Exploration close instead of building the whole world",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "MEASURED 2026-09-14: every [gen budget] line in a sweep splits roughly 0.6 s pre-settlement, 1-8 s era (the Empires round AND the Exploration span, which closes before t_era_end), and 40-60 s post-era (nations, roads, corporations, markets). No sweep reading reads anything built post-era. A 16-seed sweep takes ~25 minutes after BL-952, and sprint 41's tuning wave (BL-949, BL-950) needs many of them.\n\nTHE FIX: pass world_gen_config with `stop_after_exploration = true` (world_gen_config.hpp; BL-946 added it for the wizard's Exploration round, same contract: the world is not usable, the report and fixture are) to the sweep's one make_hard_coded_world call. Confirm every fixture/report field the sweep reads is filled before that early return (hard_coded_world.cpp ~1318). The [gen budget] line prints only at the END of generation, so the early return drops it: BL-952 R1's check changes to counting generations some other way (a per-seed line the sweep prints itself).\n\nIF STILL SLOW: measure before adding threads (make_hard_coded_world has at least one static, history_sim_last_profile, so parallel seeds need a thread-safety read first) or a 1200 CE handoff cache.\n\nDONE WHEN: a 3-seed run before/after is identical on every reading line; wall time before and after reported; a 16-seed time reported."
   }
  ]
 }

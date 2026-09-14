@@ -5461,6 +5461,40 @@
      "evidence": null
     }
    ]
+  },
+  {
+   "brief": "exploration-sweep-stops-at-the-exploration-close",
+   "title": "BL-958 - exploration_sweep stops generation at the Exploration close instead of building the whole world",
+   "difficulty": 2,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-958 - Sprint 41, before wave 3",
+   "batch": "sprint-41-exploration-trade",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "exploration_sweep generates each seed only up to the Exploration close (stop_after_exploration), and every reading prints identically to a whole-world run on the same seeds.",
+     "verification": [
+      "headless: diff of a 3-seed run before/after, reading lines only"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Wall time before and after is reported, and a 16-seed run time is recorded for the tuning wave.",
+     "verification": [
+      "headless: timed runs"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
   }
  ]
 }
