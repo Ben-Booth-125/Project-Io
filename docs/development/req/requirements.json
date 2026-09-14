@@ -5071,33 +5071,33 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "exploration_sweep generates each seed's world exactly once; readings 3 and 10 read captured state.",
      "verification": [
       "headless: gen-budget line count equals seed count on a 3-seed run"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. [gen budget] lines 12 -> 3 on a 3-seed run; a fourth rebuild (reading 9) also removed. 3-seed wall time 951 s -> 289 s."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Output is identical before and after on the same seeds, apart from timing lines.",
      "verification": [
       "headless: diff of a 3-seed run at the parent commit vs this commit"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Timing-stripped diff of a 3-seed run before/after BL-952 empty (agent T1); main session reviewed the diff."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The banner states the current truth (all readings real; no NOT YET MEASURABLE claim).",
      "verification": [
       "code: exploration_sweep.cpp banner"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Banner states all readings are real and what each is read from."
     }
    ]
   },
@@ -5115,14 +5115,14 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Reading 3 ranks a world's strongest realms by treasury and throughput, not region count alone, and says which metric it used.",
      "verification": [
       "code: exploration_sweep.cpp reading 3",
       "headless: reading 3 prints on a 3-seed run"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Reading 3 ranks by capital treasury, tie-break mean held network_supply_q, then id; prints the metric and a region-count comparison."
     },
     {
      "id": "R2",
@@ -5150,44 +5150,44 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "ITEM-SPANNING: an exploration_output value struct exists whose fields are EXPLORATION.md's handoff list, built at the Exploration call site, with a validator exploration_sim_harness exercises and a surviving-network filter over the span's dead.",
      "verification": [
       "headless: exploration_sim_harness asserts exploration_output_valid on a real generated world and fails on a corrupted copy"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. exploration_output + make_/_valid; R6.x checks pass on a real world and fail on each corruption for the stated reason. Sprint 41 wave 1, verified on the merged tree f260d202 (main session, independently rebuilt): exploration_sim_harness 88/88, history_sim_harness 2-failure baseline (R3a2/R3a3), save_roundtrip OK, world_determinism ALL PASS."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Wherever the span ran, world setup seeds sentiment from the 1660 grudges and stamps roads from the 1660 surviving corridors; where it did not, from pass_one_output as before.",
      "verification": [
       "headless: a harness check that the grudges/corridors world setup reads equal exploration_output's when the span ran",
       "code: hard_coded_world.cpp sentiment and road call sites"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Setup grudges/corridors equal the handoff and differ from 1200 on the default seed (grudges 211 -> 219, corridors 1664 -> 2137); resumed corridors merged, not appended (validator caught the unsorted append)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "BL-954's trade flows are a field of the struct.",
      "verification": [
       "code: exploration_output::trade_flows (integration task)"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. exploration_output::trade_flows added in the cold-review fix round, validated against standing trade_access clauses and living parties."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Determinism holds; digest movement is described in world shape.",
      "verification": [
       "headless: world_determinism -- same seed gives the same world twice; digest movement REPORTED with its cause, never re-blessed by this item"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Same-seed determinism holds. Digest movement is the wave's, described at BL-950 (wave re-bless owner). NB: the digest reads neither sentiment nor road tiers, so BL-956's own change is invisible to it (filed BL-957)."
     }
    ]
   },
@@ -5205,53 +5205,53 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "ITEM-SPANNING: during the Exploration span a campaign prize leans up by the decider's unmet want for the target's good weighted by live cultural preference, and subjection ranks natives by the same want; the Empires span is unchanged.",
      "verification": [
       "headless: exploration_sim_harness -- a wanted good raises a prize; subjection order follows want; w_want_q = 0 reproduces the pre-change span"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. T6.x checks: a want raises a prize; subjection picks the higher-want native; T6.5b pins the lean as a no-op at w_want_q 0 across 8 prizes x 5 wants. Sprint 41 wave 1, verified on the merged tree f260d202 (main session, independently rebuilt): exploration_sim_harness 88/88, history_sim_harness 2-failure baseline (R3a2/R3a3), save_roundtrip OK, world_determinism ALL PASS."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Cultural preference is derived from the round's live state, at most once per decision round.",
      "verification": [
       "code: derive_culture_preference has a caller in history_sim.cpp"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. derive_culture_preference called once per decision round, only with upkeep on and w_want_q != 0."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Settlement is untouched by wants.",
      "verification": [
       "code: settle scoring does not read the want"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Settle scoring untouched (code review, cold reviewer confirmed)."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Reading 6 reports subjects whose top want differs from their overlord's.",
      "verification": [
       "headless: 3-seed sweep prints it"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Reading 6 prints top-want divergence: 22 of 34 subjects on the pre-fix 16-seed merged sweep."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Determinism holds; digest movement reported.",
      "verification": [
       "headless: world_determinism -- same seed gives the same world twice; digest movement REPORTED with its cause, never re-blessed by this item"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Determinism holds; movement reported at the wave re-bless (BL-950)."
     }
    ]
   },
@@ -5269,64 +5269,64 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "ITEM-SPANNING: goods flow per (seller, buyer, good) between polities bound by a trade-access clause, bounded by want, holding and line; flows are recorded on the sim state.",
      "verification": [
       "headless: exploration_sim_harness -- no flow without the clause; volume bounded by each of want, holding and line"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. R7.1-R7.12: no flow without the clause; volume bounded by want, holding and line. Integration fix: one want shared across sellers (R7.15); review fix: holding shared across buyers (R7.18). Sprint 41 wave 1, verified on the merged tree f260d202 (main session, independently rebuilt): exploration_sim_harness 88/88, history_sim_harness 2-failure baseline (R3a2/R3a3), save_roundtrip OK, world_determinism ALL PASS."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "A met want relieves the buyer's scarcity signal, and every consumer of the signal reads the post-flow value.",
      "verification": [
       "headless: exploration_sim_harness asserts relief"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. R7.4 relief; flows read raw, want lean and tech chooser read unmet (cold reviewer confirmed)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Flow income credits both capitals and the flat per-market income is gone.",
      "verification": [
       "headless: exploration_sim_harness",
       "code: treasury_market_income_q removed"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. R7.5 both capitals credited; R7.11 no flat market income; treasury_market_income_q removed."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "requirement": "treaty_value_q includes the trade the pair's clause would open, near or far.",
      "verification": [
       "headless: exploration_sim_harness -- a pair with trade to open scores higher than the same pair without"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. R7.13/R7.14 near and far; review fix: MARGINAL trade value against the round's flows (R7.16/R7.17)."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "requirement": "exploration_sweep prints reading 11 (Trade): total flow, share crossing landmasses, concentration, and that every flow stands on a clause.",
      "verification": [
       "headless: 3-seed sweep prints reading 11"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Reading 11 prints; pre-fix 16-seed merged sweep: 1343 flows, cross-landmass 8.0%, top-decile pairs 57%, 0 flows without a clause."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Determinism holds; digest movement reported.",
      "verification": [
       "headless: world_determinism -- same seed gives the same world twice; digest movement REPORTED with its cause, never re-blessed by this item"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Determinism holds; movement reported at the wave re-bless (BL-950)."
     }
    ]
   },

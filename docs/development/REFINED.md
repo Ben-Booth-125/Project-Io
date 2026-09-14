@@ -31,17 +31,19 @@ they do not settle it in code.
 
 ### Wave 1 — mechanisms and instruments (parallel)
 
-- [ ] **T1 · BL-952** (sweep builds each world once) **+ BL-951** (fair strength metric) — one
+- [x] **T1 · BL-952** (sweep builds each world once) **+ BL-951** (fair strength metric) — one
       agent, one file. Satisfies BL-952 R1–R3, BL-951 R1.
-- [ ] **T2 · BL-956** (Exploration handoff crosses) — struct, validator, world setup reads 1660
+- [x] **T2 · BL-956** (Exploration handoff crosses) — struct, validator, world setup reads 1660
       grudges and corridors. Satisfies R1, R2, R4.
-- [ ] **T3 · BL-953** (wants point outward) — campaign lean, subjection ranking, live preference.
+- [x] **T3 · BL-953** (wants point outward) — campaign lean, subjection ranking, live preference.
       Satisfies R1–R5.
-- [ ] **T4 · BL-954** (trade flows between polities) — flows, relief, income, treaty value,
+- [x] **T4 · BL-954** (trade flows between polities) — flows, relief, income, treaty value,
       reading 11. Satisfies R1–R6.
-- [ ] **I1** — merge T1–T4 in order T1, T2, T4, T3; add `trade_flows` to `exploration_output`
+- [x] **I1** — merge T1–T4 in order T1, T2, T4, T3; add `trade_flows` to `exploration_output`
       (BL-956 R3); `verifier-review` over the merged diff; build; `exploration_sim_harness`,
       `history_sim_harness`, `world_determinism`, 3-seed sweep.
+
+Wave 1 merged to main as `f260d202` (2026-09-14) after a cold review and one fix round.
 
 ### Wave 2 — spend becomes a choice
 
