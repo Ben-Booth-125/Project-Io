@@ -3527,3 +3527,111 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
 /// carries at least one event; every contact names polities in range and
 /// carries the event that joined it. Writes the first failure into @p why.
 bool pass_one_output_valid(const pass_one_output& o, std::string* why);
+
+// ---------------------------------------------------------------------------
+// The Exploration -> Digitisation handoff (BL-956)
+// ---------------------------------------------------------------------------
+
+/// THE WHOLE OF WHAT THE EXPLORATION SPAN HANDS FORWARD, AND NOTHING ELSE
+/// (BL-956). EXPLORATION.md § What this phase hands digitisation names the
+/// list and says "The list is a struct, and it has readers before
+/// Digitisation exists" — this is that struct, on exactly the footing of
+/// `pass_one_output` above: a VALUE (copies, never views of live sim state),
+/// folded by `make_exploration_output` and held to its list by
+/// `exploration_output_valid`.
+///
+/// ITS FIRST READER IS WORLD SETUP, not Digitisation: wherever the span ran,
+/// sentiment is seeded from `grudges` and roads are stamped from
+/// `surviving_corridors` here, so a campaign opening on the 1660 political
+/// map does not open on 1200's resentments and 1200's roads.
+///
+/// WHERE EACH ITEM ON THE DOC'S LIST LIVES, so the mapping is explicit rather
+/// than inferred:
+///   - Treasuries                -> `region::treasury` on each polity's
+///                                  capital seat, in `regions`
+///   - Scarcity signals          -> `region::scarcity_q` on each market
+///                                  region, in `regions`
+///   - Trade flows               -> NOT YET A FIELD: `trade_flows` joins this
+///                                  struct at integration (a parallel item)
+///   - Corridor throughput       -> `surviving_corridors::uses`; the road
+///                                  ladder rung is not stored, it is read
+///                                  off `uses` against the span's
+///                                  `history_sim_params::road_tier{1,2,3}_uses`
+///                                  exactly as the sim reads it
+///   - Cultural good preference  -> `culture_preference`
+///   - The overlord graph        -> `polity::overlord` / `polity::subject_kind`
+///                                  in `polities`; tribute terms in
+///                                  `dated_objects` (`treaty_clause::tribute`)
+///   - Standing treaties and their remaining terms
+///                               -> `dated_objects` (remaining years =
+///                                  `expires_year - stop_year`)
+///   - Ports, navies, standing armies
+///                               -> `region::port_stock_q` / `region::army_stock`
+///                                  in `regions`, `polity::navy_stock` in
+///                                  `polities`
+///   - The contact and want tables -> `contacts`, `wants`
+///   - Exploration tree masks    -> `polity::exploration_mask` in `polities`
+///   - The grudge table and the surviving network
+///                               -> `grudges`, `surviving_corridors`
+///   - (the political map, as a set) -> `holdings`
+struct exploration_output
+{
+    /// The region table at the span's close — carries treasury, scarcity_q,
+    /// port_stock_q, army_stock, culture shares and `nation` ownership.
+    std::vector<region> regions;
+
+    /// The polities at the span's close — carries navy_stock, overlord,
+    /// subject_kind and exploration_mask.
+    std::vector<polity> polities;
+
+    /// How many cultures the shares and `culture_preference` index into.
+    int culture_count = 0;
+
+    /// Treaty clauses (and tribute) STILL STANDING at `stop_year`: every
+    /// object whose term ended at or before `stop_year` is expired out by
+    /// `expire_dated_objects`, the same rule the sim's own rounds apply.
+    /// Sorted ascending by (a, b, kind, expires_year).
+    std::vector<dated_object> dated_objects;
+
+    /// The directed contact table (BL-908), grown across the span.
+    std::vector<contact> contacts;
+
+    /// The directed want table (BL-909), re-derived over the 1660 state by
+    /// `derive_wants`.
+    std::vector<want> wants;
+
+    /// Cultural good preference (BL-936), derived over the 1660 state by
+    /// `derive_culture_preference`. Ascending (culture, good index).
+    std::vector<culture_good_preference> culture_preference;
+
+    /// The directed grudge table (BL-827), grown across the span.
+    std::vector<grudge> grudges;
+
+    /// Which provinces each polity holds at `stop_year`, one entry per polity
+    /// holding ground, ascending polity id — same derivation as
+    /// `pass_one_output::holdings`.
+    std::vector<polity_holdings> holdings;
+
+    /// The span's corridor record filtered over THIS span's dead, by exactly
+    /// the rule `pass_one_output::surviving_corridors` applies: a corridor
+    /// survives when at least one endpoint region is held, at `stop_year`, by
+    /// a polity `alive` in `polities`. Sorted ascending by (a, b).
+    std::vector<history_corridor> surviving_corridors;
+
+    int64_t start_year = 0;
+    int64_t stop_year  = 0;
+};
+
+/// Fold the Exploration span's closing sim state and settlement state into
+/// the handoff value. @param culture_count Cultures the shares index into.
+exploration_output make_exploration_output(const settlement_state&  ss,
+                                           const history_sim_state& hs,
+                                           int                      culture_count);
+
+/// The enforcement half of `exploration_output`: every table sorted, every id
+/// in range, no self-pairs; every holding matches region ownership (and every
+/// owned region is held); every surviving corridor has a living holder at one
+/// end; every overlord id valid and never self, with `subject_kind` set iff an
+/// overlord is; every standing dated object still inside its term. Writes the
+/// first failure into @p why.
+bool exploration_output_valid(const exploration_output& o, std::string* why);

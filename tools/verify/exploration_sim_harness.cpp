@@ -18,6 +18,9 @@
 //   R4   objects with a term expire on schedule and not before
 //   R5   the round-level upkeep hook is callable and moves nothing (it is a
 //        documented no-op until BL-932)
+//   R6   BL-956: the Exploration handoff (`exploration_output`) passes its
+//        validator on a real world, fails it when corrupted, and is what
+//        world setup seeds sentiment and stamps roads from
 //
 // Headless: world/* logic only, no SDL and no Lua.
 // ---------------------------------------------------------------------------
@@ -32,6 +35,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <vector>
 
 namespace
@@ -351,6 +355,104 @@ int main()
         std::printf("      exploration tree: %d/%zu polities hold the rim at 1660, "
                     "%d hold at least one node\n",
                     rim_holders_1660, ex1.polities.size(), exploration_active);
+    }
+
+    // -----------------------------------------------------------------
+    // R6: BL-956 -- the Exploration handoff is a validated value, and
+    // world setup reads 1660 grudges and corridors from it
+    // -----------------------------------------------------------------
+    check(fixture.exploration_ran,
+          "R6.0  default params run the Exploration span during generation");
+    if (fixture.exploration_ran)
+    {
+        const exploration_output& eo = fixture.exploration_handoff;
+        std::string why;
+        const bool valid = exploration_output_valid(eo, &why);
+        if (!valid) std::printf("      exploration_output_valid: %s\n", why.c_str());
+        check(valid, "R6.1  the real generated world's exploration_output passes its validator");
+        check(eo.start_year == fixture.exploration_params.start_year
+           && eo.stop_year == fixture.exploration_params.stop_year,
+              "R6.2  the handoff's span is the span generation actually ran");
+
+        // R6.3-R6.5: the validator is not a rubber stamp -- a deliberately
+        // corrupted copy of the same value fails it.
+        if (!eo.polities.empty())
+        {
+            exploration_output bad = eo;
+            bad.polities[0].overlord = static_cast<int32_t>(bad.polities.size()) + 7;
+            bad.polities[0].subject_kind = 1;
+            check(!exploration_output_valid(bad, nullptr),
+                  "R6.3  an out-of-range overlord fails the validator");
+
+            exploration_output self_lord = eo;
+            self_lord.polities[0].overlord = 0;
+            self_lord.polities[0].subject_kind = 1;
+            check(!exploration_output_valid(self_lord, nullptr),
+                  "R6.4  a polity that is its own overlord fails the validator");
+        }
+        if (!eo.holdings.empty() && !eo.holdings[0].regions.empty())
+        {
+            exploration_output bad = eo;
+            const int r = bad.holdings[0].regions[0];
+            bad.regions[static_cast<std::size_t>(r)].nation = bad.holdings[0].polity == 0 ? 1 : 0;
+            check(!exploration_output_valid(bad, nullptr),
+                  "R6.5  a holding that disagrees with region ownership fails the validator");
+        }
+
+        // R6.6/R6.7: world setup consumed the handoff's own tables.
+        bool grudges_equal = fixture.setup_grudges.size() == eo.grudges.size();
+        for (std::size_t i = 0; grudges_equal && i < eo.grudges.size(); ++i)
+            grudges_equal = fixture.setup_grudges[i].from == eo.grudges[i].from
+                         && fixture.setup_grudges[i].to == eo.grudges[i].to
+                         && fixture.setup_grudges[i].score == eo.grudges[i].score;
+        check(grudges_equal,
+              "R6.6  sentiment was seeded from the 1660 handoff's grudge table");
+
+        bool corridors_equal = fixture.setup_corridors.size() == eo.surviving_corridors.size();
+        for (std::size_t i = 0; corridors_equal && i < eo.surviving_corridors.size(); ++i)
+            corridors_equal = fixture.setup_corridors[i].a == eo.surviving_corridors[i].a
+                           && fixture.setup_corridors[i].b == eo.surviving_corridors[i].b
+                           && fixture.setup_corridors[i].uses == eo.surviving_corridors[i].uses;
+        check(corridors_equal,
+              "R6.7  roads were stamped from the 1660 handoff's surviving network");
+
+        // REPORTED, not gated: how far 1660 moved from 1200 on this seed.
+        const auto pair_in = [](const std::vector<grudge>& v, int f, int t) {
+            for (const grudge& g : v) if (g.from == f && g.to == t) return true;
+            return false;
+        };
+        int g_only_1200 = 0, g_only_1660 = 0;
+        for (const grudge& g : fixture.pre_exploration_grudges)
+            if (!pair_in(eo.grudges, g.from, g.to)) ++g_only_1200;
+        for (const grudge& g : eo.grudges)
+            if (!pair_in(fixture.pre_exploration_grudges, g.from, g.to)) ++g_only_1660;
+        const auto corr_in = [](const std::vector<history_corridor>& v, int a, int b) {
+            for (const history_corridor& c : v) if (c.a == a && c.b == b) return true;
+            return false;
+        };
+        int c_only_1200 = 0, c_only_1660 = 0;
+        for (const history_corridor& c : fixture.pre_exploration_corridors)
+            if (!corr_in(eo.surviving_corridors, c.a, c.b)) ++c_only_1200;
+        for (const history_corridor& c : eo.surviving_corridors)
+            if (!corr_in(fixture.pre_exploration_corridors, c.a, c.b)) ++c_only_1660;
+        std::printf("      handoff 1200 -> 1660: grudges %zu -> %zu (%d dropped, %d new); "
+                    "corridors %zu -> %zu (%d dropped, %d new)\n",
+                    fixture.pre_exploration_grudges.size(), eo.grudges.size(),
+                    g_only_1200, g_only_1660,
+                    fixture.pre_exploration_corridors.size(), eo.surviving_corridors.size(),
+                    c_only_1200, c_only_1660);
+        std::printf("      world setup: grudge_sentiment_rows=%lld dropped=%lld "
+                    "stamped_corridors=%lld\n",
+                    static_cast<long long>(rep.grudge_sentiment_rows),
+                    static_cast<long long>(rep.grudge_sentiment_dropped),
+                    static_cast<long long>(rep.prehistory_corridors));
+        int subjects = 0;
+        for (const polity& q : eo.polities) if (q.alive && q.overlord >= 0) ++subjects;
+        std::printf("      handoff 1660: regions=%zu polities=%zu holdings=%zu subjects=%d "
+                    "standing_dated_objects=%zu contacts=%zu wants=%zu culture_prefs=%zu\n",
+                    eo.regions.size(), eo.polities.size(), eo.holdings.size(), subjects,
+                    eo.dated_objects.size(), eo.contacts.size(), eo.wants.size(),
+                    eo.culture_preference.size());
     }
 
     // -----------------------------------------------------------------

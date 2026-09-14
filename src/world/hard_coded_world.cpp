@@ -1066,18 +1066,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
             // round wants only the Empires history and must not pay for a
             // span it discards a few lines below.
             //
-            // WHAT DOES NOT HAPPEN HERE, AND WHY. `kepler_corridors` /
-            // `kepler_grudges` above stay the EMPIRES round's own — this
-            // span's grudges/corridors are folded into
-            // `kepler_exploration_hs` alone, not re-derived into a second
-            // pass-1-style handoff. Building that handoff (a
-            // `pass_one_output`-shaped record at 1660, with its own
-            // surviving-network filter over THIS span's dead) is real work
-            // BL-931 does not scope: this item's job is that the span RUNS,
-            // on the shared engine, with the two honest additions
-            // (EXPLORATION.md sec The engine is shared) — not that
-            // everything downstream of the Empires handoff now reads a
-            // second one.
+            // BL-956: WHEN THE SPAN RUNS, IT HANDS FORWARD ITS OWN VALUE.
+            // The span is folded into `exploration_output` right after it
+            // closes, and `kepler_corridors` / `kepler_grudges` above are
+            // REPLACED by that value's 1660 grudges and surviving network
+            // (filtered over THIS span's dead) — EXPLORATION.md § What this
+            // phase hands digitisation: "A campaign that opens on the 1660
+            // political map must not open on 1200's resentments and 1200's
+            // roads." When the span does not run, the Empires values stand.
             if (exploration_sim_enabled(params) && !kepler_pass_one.polities.empty()
                 && !gen_cfg.stop_after_ancient_era)
             {
@@ -1127,6 +1123,19 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 kepler_settlement.history.insert(kepler_settlement.history.end(),
                                                  kepler_exploration_hs.history.begin(),
                                                  kepler_exploration_hs.history.end());
+
+                // BL-956: fold the 1660 handoff while `kepler_exploration_hs`
+                // and the now-final `kepler_settlement` ownership are both
+                // live, then let world setup read ITS grudges and corridors.
+                const exploration_output kepler_exploration = make_exploration_output(
+                    kepler_settlement, kepler_exploration_hs,
+                    static_cast<int>(kepler_creeds.cultures.size()));
+                kepler_corridors  = kepler_exploration.surviving_corridors;
+                kepler_grudges    = kepler_exploration.grudges;
+                kepler_grudge_cap = static_cast<int32_t>(ep.grudge_cap);
+
+                if (fixture != nullptr)
+                    fixture->exploration_handoff = kepler_exploration;
 
                 // BL-937: hand the sweep harness the span's real input and
                 // output, on the same capture-not-re-derive footing as the
@@ -1353,6 +1362,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // is whichever nation holds the most of its regions, ties to the lowest
     // nation index — an ascending walk over a vector, so the answer cannot
     // depend on a container's layout.
+    //
+    // BL-956: the table read here is the 1660 one whenever the Exploration
+    // span ran (see the span's block above); the fixture records exactly what
+    // this site was handed.
+    if (fixture != nullptr) fixture->setup_grudges = kepler_grudges;
     if (!kepler_grudges.empty() && !kepler_nations.empty()
         && kepler_region_polity.size() == kepler_settlement.regions.size())
     {
@@ -1552,7 +1566,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // whole national MST off the ancient corridors' cheapened ground.
     //
     // No-op when the era did not run — `kepler_corridors` is empty, and every
-    // harness declaring `no_prehistory()` takes exactly that path.
+    // harness declaring `no_prehistory()` takes exactly that path. BL-956: the
+    // set is the Exploration span's 1660 surviving network whenever it ran.
+    if (fixture != nullptr) fixture->setup_corridors = kepler_corridors;
     if (!kepler_corridors.empty())
     {
         std::vector<history_road_node> road_nodes;
