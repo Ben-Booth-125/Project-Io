@@ -5056,6 +5056,411 @@
    "promoted_from": "backlog.json BL-923 - Sprint 39, the drama of the time-lapse",
    "batch": "sprint-39-drama",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "exploration-sweep-builds-each-world-once",
+   "title": "BL-952 - exploration_sweep builds each world once, not three times",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-952 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "exploration_sweep generates each seed's world exactly once; readings 3 and 10 read captured state.",
+     "verification": [
+      "headless: gen-budget line count equals seed count on a 3-seed run"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Output is identical before and after on the same seeds, apart from timing lines.",
+     "verification": [
+      "headless: diff of a 3-seed run at the parent commit vs this commit"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "The banner states the current truth (all readings real; no NOT YET MEASURABLE claim).",
+     "verification": [
+      "code: exploration_sweep.cpp banner"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "strength-metric-reads-strategy-fairly",
+   "title": "BL-951 - Reading 3's \"strongest realms\" metric moves from region count to treasury/throughput rank",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-951 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "Reading 3 ranks a world's strongest realms by treasury and throughput, not region count alone, and says which metric it used.",
+     "verification": [
+      "code: exploration_sweep.cpp reading 3",
+      "headless: reading 3 prints on a 3-seed run"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The finding is stated plainly either way: whether a consolidator now appears among the strongest realms.",
+     "verification": [
+      "headless: 16-seed integrated sweep, reported in the resolution"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "exploration-handoff-crosses",
+   "title": "BL-956 - The Exploration span hands a validated struct forward, and world setup reads 1660 grudges and corridors from it",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-956 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING: an exploration_output value struct exists whose fields are EXPLORATION.md's handoff list, built at the Exploration call site, with a validator exploration_sim_harness exercises and a surviving-network filter over the span's dead.",
+     "verification": [
+      "headless: exploration_sim_harness asserts exploration_output_valid on a real generated world and fails on a corrupted copy"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Wherever the span ran, world setup seeds sentiment from the 1660 grudges and stamps roads from the 1660 surviving corridors; where it did not, from pass_one_output as before.",
+     "verification": [
+      "headless: a harness check that the grudges/corridors world setup reads equal exploration_output's when the span ran",
+      "code: hard_coded_world.cpp sentiment and road call sites"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "BL-954's trade flows are a field of the struct.",
+     "verification": [
+      "code: exploration_output::trade_flows (integration task)"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Determinism holds; digest movement is described in world shape.",
+     "verification": [
+      "headless: world_determinism -- same seed gives the same world twice; digest movement REPORTED with its cause, never re-blessed by this item"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "wants-point-outward",
+   "title": "BL-953 - A polity's wants lean where it campaigns and whom it subjects, weighted by cultural preference",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-953 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING: during the Exploration span a campaign prize leans up by the decider's unmet want for the target's good weighted by live cultural preference, and subjection ranks natives by the same want; the Empires span is unchanged.",
+     "verification": [
+      "headless: exploration_sim_harness -- a wanted good raises a prize; subjection order follows want; w_want_q = 0 reproduces the pre-change span"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Cultural preference is derived from the round's live state, at most once per decision round.",
+     "verification": [
+      "code: derive_culture_preference has a caller in history_sim.cpp"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Settlement is untouched by wants.",
+     "verification": [
+      "code: settle scoring does not read the want"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Reading 6 reports subjects whose top want differs from their overlord's.",
+     "verification": [
+      "headless: 3-seed sweep prints it"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "Determinism holds; digest movement reported.",
+     "verification": [
+      "headless: world_determinism -- same seed gives the same world twice; digest movement REPORTED with its cause, never re-blessed by this item"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "trade-flows-between-polities",
+   "title": "BL-954 - Goods flow between polities as a want met by throughput, and the flow is what a market earns",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-954 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING: goods flow per (seller, buyer, good) between polities bound by a trade-access clause, bounded by want, holding and line; flows are recorded on the sim state.",
+     "verification": [
+      "headless: exploration_sim_harness -- no flow without the clause; volume bounded by each of want, holding and line"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "A met want relieves the buyer's scarcity signal, and every consumer of the signal reads the post-flow value.",
+     "verification": [
+      "headless: exploration_sim_harness asserts relief"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Flow income credits both capitals and the flat per-market income is gone.",
+     "verification": [
+      "headless: exploration_sim_harness",
+      "code: treasury_market_income_q removed"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "treaty_value_q includes the trade the pair's clause would open, near or far.",
+     "verification": [
+      "headless: exploration_sim_harness -- a pair with trade to open scores higher than the same pair without"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "exploration_sweep prints reading 11 (Trade): total flow, share crossing landmasses, concentration, and that every flow stands on a clause.",
+     "verification": [
+      "headless: 3-seed sweep prints reading 11"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "requirement": "Determinism holds; digest movement reported.",
+     "verification": [
+      "headless: world_determinism -- same seed gives the same world twice; digest movement REPORTED with its cause, never re-blessed by this item"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "exploration-spend-is-scored",
+   "title": "BL-955 - Ports, hulls and standing armies are scored against the other verbs, not bought whenever affordable",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-955 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING: upkeep makes one scored spend choice per round among port, navy, standing army and hold, from creed lean, unmet wants across water, neighbour Alarm, treasury cover and port gates; decay is untouched.",
+     "verification": [
+      "headless: exploration_sim_harness -- an expansionist builds a port or navy where a consolidator with the same purse does not; at most one stock bought per round; decay assertions R5.8/R5.9 still pass"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The choice is a deterministic argmax over a total order, hold winning ties.",
+     "verification": [
+      "code: run_exploration_upkeep"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Reading 7 reports navies by strategy lean and polities that let a navy decay.",
+     "verification": [
+      "headless: 3-seed sweep prints it"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Determinism holds; digest movement reported.",
+     "verification": [
+      "headless: world_determinism -- same seed gives the same world twice; digest movement REPORTED with its cause, never re-blessed by this item"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "post-road-rung-actually-fires",
+   "title": "BL-949 - Tune the road ladder's third rung so Post Roads actually fires on a sweep",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-949 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "On the integrated tree, post_roads_built is above zero in a clear majority of a 16-seed sweep, not 0/N and not N/N.",
+     "verification": [
+      "headless: 16-seed exploration_sweep, before and after values reported"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "treasury_spent_on_roads tracks the polities that built one.",
+     "verification": [
+      "headless: 16-seed exploration_sweep"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "displacement-clears-the-bar",
+   "title": "BL-950 - Push the near/far cost split further so the displacement reading reliably clears its own bar",
+   "difficulty": 5,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-950 - Sprint 41, Exploration trade",
+   "batch": "sprint-41-exploration-trade",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "On the integrated tree, the 16-seed median displacement ratio clears 1.0 while conflict persists, by strengthening existing mechanisms rather than bolting on a new one.",
+     "verification": [
+      "headless: 16-seed exploration_sweep, before and after"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The starting baseline is the measured 16-seed value on the integrated tree, not NR-855's 3-seed 0.88 (NR-862).",
+     "verification": [
+      "headless: 16-seed sweep recorded before any tuning"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "WAVE RE-BLESS OWNER: the wave's combined digest movement is described in world SHAPE with per-item attribution, for Ben to authorise; nothing is re-blessed without that authorisation.",
+     "verification": [
+      "manual: Ben authorises against the shape description"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
   }
  ]
 }

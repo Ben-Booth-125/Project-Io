@@ -1,48 +1,64 @@
 # REFINED — active worklist
 
-Post-sprint-40 review block opens 2026-09-13, Delivery — Full. Ben live-reviewed the sprint-40
-NEEDS_REVIEW queue and answered nine open calls (nine NR entries resolved), then asked for three
-more things while looking at the live build: a Culture-round bug diagnosed and fixed, the
-Exploration span wired into the wizard with a Digitisation placeholder, and a speed control on
-every lapse round's time-lapse.
+## Sprint 41 — Exploration trade (Batch Delivery, opened 2026-09-14)
 
-## Wave A — sim tuning (independent of the wizard work, disjoint files)
+A 16-seed `exploration_sweep` review found the round busy but not trading. Five items filed, the
+design forks answered on the form the same day and written into `docs/generation/EXPLORATION.md`;
+the three sprint-40 tuning items (formerly Wave A below) fold in as the final wave. Requirements:
+`requirements.json` batch `sprint-41-exploration-trade`.
 
-- [ ] **BL-949** (POST_ROAD_RUNG_ACTUALLY_FIRES) — lower the treasury cost/threshold so the road
-      ladder's third rung fires on a sweep.
-- [ ] **BL-950** (DISPLACEMENT_CLEARS_THE_BAR) — strengthen BL-941's near/far deterrence split so
-      the median displacement ratio clears 1.0 on a 16-seed sweep.
-- [ ] **BL-951** (STRENGTH_METRIC_READS_STRATEGY_FAIRLY) — reading 3's "strongest realms" metric
-      moves from region count to treasury/throughput rank.
+### Collision map
 
-All three live in `history_sim.cpp`/`exploration_sweep.cpp` only — bundle into one worktree agent,
-same pattern as sprint 40's waves 2-4.
+| Task | Writes | provides | consumes |
+|---|---|---|---|
+| T1 BL-952+BL-951 | `tools/verify/exploration_sweep.cpp` | `exploration_row` capture fields; reading 3 metric | — |
+| T2 BL-956 | `history_sim.hpp/.cpp` (handoff section), `hard_coded_world.cpp`, `era_minus_one.hpp`, `exploration_sim_harness.cpp` | `struct exploration_output`, `make_exploration_output`, `exploration_output_valid`, `era_minus_one_fixture::exploration_handoff` | `pass_one_output` (landed), `history_sim_state` (landed) |
+| T3 BL-953 | `history_sim.hpp/.cpp` (campaign scorer, subjection, preference), `exploration_sim_harness.cpp`, `exploration_sweep.cpp` (reading 6) | `polity_good_want_q(...)`, `history_sim_params::w_want_q` | `derive_culture_preference`, `region::scarcity_q` (landed) |
+| T4 BL-954 | `history_sim.hpp/.cpp` (upkeep, scarcity, treaty value), `settlement.hpp`, `exploration_sim_harness.cpp`, `exploration_sweep.cpp` (reading 11) | `struct trade_flow`, `history_sim_state::trade_flows`, `region::scarcity_raw_q`, `history_sim_params::treasury_trade_income_q`, `treaty_trade_weight_q`; removes `treasury_market_income_q` | `has_treaty_clause`, `network_supply_q`, `port_stock_q`, `navy_stock` (landed) |
+| I1 integrate wave 1 | main session | `exploration_output::trade_flows` | T2 `exploration_output`, T4 `trade_flows` |
+| T5 BL-955 | `history_sim.hpp/.cpp` (`run_exploration_upkeep` spend), `exploration_sim_harness.cpp`, `exploration_sweep.cpp` (reading 7) | spend allocation | T3 `polity_good_want_q`, T4 post-flow `scarcity_q` and upkeep signature |
+| T6 BL-949+BL-950 | `history_sim.cpp` constants/deterrence, `exploration_sweep.cpp` | wave digest shape description | everything above, integrated |
 
-## Wave B — the wizard restructure (bigger, UI + generation, sequenced internally)
+**Split call.** Wave 1 fans out to four `generation-dev` worktree agents: the tasks are
+slice-able and T2–T4 share `history_sim.cpp` only in disjoint sections, which worktrees absorb.
+T5 waits on T3 and T4 because it reads both. T6 is tuning and must measure the integrated world,
+so it runs last and owns the wave's digest description (DELIVERY.md § The digest re-bless is one
+act per WAVE). No item re-blesses anything.
 
-- [x] **BL-946** (EXPLORATION_ROUND_WIRED_INTO_WIZARD) — commit `e18ab370`. LANDED 2026-09-14. The
-      wizard walks 6 rounds now (System, Life, Culture, Empires, Exploration, Digitisation); round
-      5 runs its own pass and shows a real populated time-lapse (treaties forming, non-zero
-      battles/conquests/foundings, its own 1200-1660 CE span stated on screen — confirmed by a
-      live click, not just harnesses). Golden flip's digests reproduced exactly independently.
-      save_roundtrip/save_envelope_roundtrip clean despite the version bump (13→14). Archived.
-- [x] **BL-947** (CULTURE_ROUND_COASTS_TO_400BCE) — commit `fdc445fb`. LANDED 2026-09-13. Displayed
-      span now `max(true migration end, Empires opening year)`, never clamped backward — an
-      overrun (measured at 6/60 seeds, 10%) shows honestly instead of being papered over.
-      Independently rebuilt and reverified (121/121 on the new harness, `world_determinism`
-      digest unchanged from the BL-944 baseline — a pure display fix). NR-860 records the 10%
-      overrun rate for Ben; a second identical bug site in `startup_screens.cpp`'s golden-dir
-      reuse path was found but not fixed (flagged, needs a UI build to verify). Archived.
+**Doc coverage.** `EXPLORATION.md` and `DIGITISATION.md` already carry every design this batch
+builds (commit `89cc4d4e`, `> ⟳` note in EXPLORATION.md). Items that uncover a design gap file it;
+they do not settle it in code.
+
+### Wave 1 — mechanisms and instruments (parallel)
+
+- [ ] **T1 · BL-952** (sweep builds each world once) **+ BL-951** (fair strength metric) — one
+      agent, one file. Satisfies BL-952 R1–R3, BL-951 R1.
+- [ ] **T2 · BL-956** (Exploration handoff crosses) — struct, validator, world setup reads 1660
+      grudges and corridors. Satisfies R1, R2, R4.
+- [ ] **T3 · BL-953** (wants point outward) — campaign lean, subjection ranking, live preference.
+      Satisfies R1–R5.
+- [ ] **T4 · BL-954** (trade flows between polities) — flows, relief, income, treaty value,
+      reading 11. Satisfies R1–R6.
+- [ ] **I1** — merge T1–T4 in order T1, T2, T4, T3; add `trade_flows` to `exploration_output`
+      (BL-956 R3); `verifier-review` over the merged diff; build; `exploration_sim_harness`,
+      `history_sim_harness`, `world_determinism`, 3-seed sweep.
+
+### Wave 2 — spend becomes a choice
+
+- [ ] **T5 · BL-955** (spend is scored) — allocation inside upkeep. Satisfies R1–R4.
+
+### Wave 3 — tune against the integrated world
+
+- [ ] **T6 · BL-949** (new road tier fires) **+ BL-950** (displacement clears the bar) — 16-seed
+      baseline first (NR-862: the 0.88 premise was three seeds on a pre-schism world), then tune,
+      then the wave's digest movement described in world shape for Ben. Satisfies BL-949 R1–R2,
+      BL-950 R1–R3, BL-951 R2.
+
+## Post-sprint-40 review block (opened 2026-09-13)
+
+Ben live-reviewed the sprint-40 NEEDS_REVIEW queue and asked for a Culture-round fix, the
+Exploration round in the wizard, and a speed control on every lapse round. BL-946 and BL-947
+landed (`e18ab370`, `fdc445fb`) and are archived; the former Wave A moved into sprint 41 above.
+
 - [ ] **BL-948** (LAPSE_TIMELAPSE_SPEED_CONTROL) — 45s/90s/180s control on every lapse round,
-      default 90s. Requires BL-946 (must cover the new Exploration round too, not just Culture/
-      Empires) — land last in this wave.
-
-BL-947 can run in parallel with BL-946 (touches `settlement.cpp`/`hard_coded_world.cpp`'s round-3
-block, not the round-count/tap machinery BL-946 touches) but both land in `hard_coded_world.cpp`,
-so watch for a real merge on that file even though the sections shouldn't overlap.
-
-## Bookkeeping
-
-Nine NR entries resolved this pass (NR-847, 848, 849, 850, 852, 854, 855, 856, 857); NR-851
-superseded by NR-855. `docs/development/NEEDS_REVIEW.md` has the readable list of what remains
-(pre-existing debt from before sprint 40, not this session's to resolve).
+      default 90s. Covers the Exploration round too. Not in sprint 41.
