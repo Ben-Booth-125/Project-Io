@@ -31,6 +31,7 @@ markets that trade named goods in a simplified form."*
 |---|---|
 | Capital as a per-polity treasury | Capital as firm balance sheets |
 | Named goods, traded in simplified form | The price field, the order book, the market carve |
+| Trade flows between polities, unpriced, opened by treaty | Trade relationships a firm inherits and prices |
 | Cultural preference for a good | Demand resolved from population and preference |
 | Ports, navies, standing armies and their upkeep | Industrialisation and the furnace crossing |
 | Treaties, subjects, trade provinces | **Corporations as live-play actors** |

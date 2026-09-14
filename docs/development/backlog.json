@@ -128,6 +128,126 @@
     "tools/verify/exploration_sweep.cpp"
    ],
    "design": "BEN, 2026-09-13, resolving NR-856: change the ranking metric before concluding the creed mapping itself needs revisiting. Reading 3 (\"both strategies pay\") ranked a world's \"strongest realms\" by region count, which structurally favours EXPANSION over consolidation -- a consolidator by definition holds the SAME ground worked harder, so it can never outrank an expansionist on a region-count axis regardless of how strong its creed-derived disposition actually is. Change the ranking to something consolidation-sensitive: treasury (BL-932) and/or corridor throughput (BL-940) rank, or a composite, rather than region count alone. Re-sweep (wider than 3 seeds -- NR-856 flagged the sample as too small either way) and report whether a consolidator now appears among the strongest realms on some seeds.\n\nDo NOT touch the Empire-phase creed axes (zeal/dominion/sea_legs_q) themselves in this item -- if the new metric STILL shows no consolidator ever qualifying, that is the evidence needed to justify BL-942's own named upstream fix as a SEPARATE, later item, not something to force here.\n\nDONE WHEN: reading 3 ranks realms by treasury/throughput instead of region count, and the sweep's reported finding (consolidators appear now, or they genuinely still do not even on a fair metric) is stated plainly either way."
+  },
+  {
+   "sprint": null,
+   "written": "2026-09-14",
+   "author": "Ben (2026-09-14, \"go for A then B ... build in a batch delivery\"); Claude (itemised from the 16-seed exploration_sweep review)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "status": "designed",
+   "glyph": "✓",
+   "id": "BL-952",
+   "short_name": "EXPLORATION_SWEEP_BUILDS_EACH_WORLD_ONCE",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "exploration_sweep builds each world once, not three times",
+   "files": [
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "MEASURED 2026-09-14: a 16-seed `exploration_sweep` took ~65 minutes because it calls `make_hard_coded_world` THREE times per seed -- the main loop, reading 3 (strategies) and reading 10 (preference) each regenerate the same world (48 `[gen budget]` lines for 16 seeds). Every reading this batch is judged on is a 16-seed sweep (BL-950 already demands 16), so the harness is the batch's own bottleneck.\n\nTHE FIX: capture everything readings 3 and 10 need inside the first per-seed pass (the traced re-run, the pre-exploration settlement/creeds, the polities) onto `exploration_row`, and delete the two regeneration loops. Output must be identical line for line on the same seeds -- run the 3-seed sweep before and after and diff it.\n\nALSO: the banner comment still says readings 3-10 \"have no mechanism yet\" and print NOT YET MEASURABLE; both are false since sprint 40. Correct it.\n\nDONE WHEN: a before/after 3-seed diff is empty apart from timing, the gen-budget line count equals the seed count, and the banner states the current truth."
+  },
+  {
+   "sprint": null,
+   "written": "2026-09-14",
+   "author": "Ben (2026-09-14, \"go for A then B ... build in a batch delivery\"); Claude (itemised from the 16-seed exploration_sweep review)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "status": "designed",
+   "glyph": "✓",
+   "id": "BL-953",
+   "short_name": "WANTS_POINT_OUTWARD",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "A polity's wants lean where it campaigns and whom it subjects, weighted by cultural preference",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/exploration_sim_harness.cpp",
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "THE GAP (16-seed review, 2026-09-14). EXPLORATION.md says wants point OUTWARD \"because contact is what creates them\", and that preference \"weights a want ... enough to rank where a fleet goes first\". In code neither is true: the scarcity signal is read only at the polity's own capital, as `wants_unmet_q` into the tech-node choice (history_sim.cpp ~5210); the foreign reader `market_scarcity_q` (history_sim.cpp:545) and `derive_culture_preference` (history_sim.cpp:6807) have NO caller in src/ -- only harnesses call them, and the sweep derives preference from 1200 CE state. So no campaign, skirmish or subjection is ever aimed by what the target holds and the decider lacks.\n\nTHE SHAPE (same idiom as the fear and creed-appetite leans, history_sim.cpp ~3830-3860: one term reads a richer input, applied once outside the season loop). During the Exploration span only, the campaign prize leans up by the decider's want for the target region's dominant good: its own capital's scarcity for that good, weighted by its plurality culture's preference for it. Subjection ranks candidate natives by the same want rather than by polity id. Preference is derived live from the round's own state, never carried from 1200.\n\nMEASURED BY: readings 1 (displacement), 6 (subject friction, which should now be read as diverging WANTS rather than the contact-graph proxy) and 10 (preference, which becomes a live input rather than an offline derivation).\n\nSETTLED 2026-09-14 (Ben, design form). The design now lives in EXPLORATION.md sec A want points a campaign outward and sec A good acquires a cultural preference (\"Preference is read LIVE\"). Leans campaigns and subjection ONLY; settlement untouched (the form's default, unanswered, taken as recommended -- NR-863).\n\nWORK: (1) a live preference read -- `derive_culture_preference` called from the round's own regions/contacts/polities, cached once per decision round, never per candidate; (2) `w_want_q` (history_sim_params, default measured, 0 in the Empires span so that span is byte-identical) leaning the campaign `value` once, beside the fear and creed-appetite leans, by own-capital UNMET scarcity for `tgt.dominant` x (500 + preference_weight/2)/1000; (3) subjection walks candidate natives ranked by the same want (stable tie-break on id) instead of id order; (4) reading 6 in exploration_sweep additionally reports subjects whose top want differs from their overlord's.\n\nDONE WHEN: exploration_sim_harness gains assertions that a want raises a campaign prize and reorders subjection, and that the Empires span is unchanged with the lean at 0; a 3-seed sweep before/after is reported; world_determinism movement reported, not re-blessed."
+  },
+  {
+   "sprint": null,
+   "written": "2026-09-14",
+   "author": "Ben (2026-09-14, \"go for A then B ... build in a batch delivery\"); Claude (itemised from the 16-seed exploration_sweep review)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "status": "designed",
+   "glyph": "✓",
+   "id": "BL-954",
+   "short_name": "TRADE_FLOWS_BETWEEN_POLITIES",
+   "priority": "S",
+   "difficulty": 5,
+   "title": "Goods flow between polities as a want met by throughput, and the flow is what a market earns",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "src/world/settlement.hpp",
+    "tools/verify/exploration_sim_harness.cpp",
+    "tools/verify/exploration_sweep.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "design": "THE GAP (16-seed review, 2026-09-14). Ben opened the session asking which levers \"ensure there is some amount of global trade\". EXPLORATION.md's answer is a pair: \"Scarcity says what is wanted; throughput says how much arrives\", and the trade-access clause \"turns a want into a flow instead of a landing\". In code there is NO quantity anywhere for goods crossing between polities. The trade-access clause is formed with every treaty (history_sim.cpp ~2580) but its only effect is inside `market_scarcity_q`, which the sim never calls -- so it does nothing. Treasury market income is a flat constant per market seat (`treasury_market_income_q`, history_sim.cpp ~625): an allowance, which the doc forbids (\"the treasury is a consequence, never an allowance\").\n\nTHE SHAPE, as far as the doc already settles it: per decision round, a per-pair, per-good FLOW from a polity that holds the good to a market that signals scarcity for it, bounded by the throughput that can carry it (corridor supply on land, the built port and navy across water) and by legibility (contact, or the trade-access clause). No cargo, no route, no price -- one number per (seller, buyer, good), in the same family as grudge/contact. The flow is recorded as sim state so the time-lapse exemplars and the Digitisation handoff can read it.\n\nNOT HERE: prices, order books, firms (DIGITISATION.md's boundary); per-good routing (EXPLORATION.md forbids it).\n\nSETTLED 2026-09-14 (Ben, design form). All five forks answered; the design lives in EXPLORATION.md sec Trade is a want met by throughput (plus sec Capital arrives, sec There is no price here, sec What a treaty is, and the eleventh reading). Contact alone does NOT trade -- only the trade-access clause opens a flow. Trade value enters `treaty_value_q`. Flow income REPLACES `treasury_market_income_q` (remove the flat term). A met want relieves the buyer's signal. EXPLORATION.md gains a Trade reading. The flow earns BOTH ends (a call taken in writing the doc -- NR-863).\n\nWORK, first cut (constants are measured, not picked to pass): (1) `trade_flow { uint16_t seller, buyer; uint8_t good; int32_t volume_q; }` on history_sim_state, sorted (seller, buyer, good), rebuilt each decision round; (2) per bound pair with trade_access, per good: volume = min(buyer RAW scarcity, seller holding_q for the good, line_q), where holding_q is the per-mille share of the seller's held regions whose dominant is the good and line_q is the better of land reach (the buyer capital's network_supply_q as seen through the seller's held corridors; 0 if no held corridor joins them) and sea reach (min of the two seats' port_stock_q, zero unless the seller holds a navy); (3) refresh_market_scarcity computes raw, then the post-flow signal is raw minus inbound volume, floored at 0 -- the capital's `wants_unmet_q` and BL-953's want both read the post-flow signal; (4) income: each flow credits both capitals `volume_q * treasury_trade_income_q` per year; (5) `treaty_value_q` gains a `trade_value_q` input -- the volume the pair's clause WOULD open in both directions, times `treaty_trade_weight_q` -- added regardless of near_home; (6) `trade_flows` joins the lapse events (exemplar threshold) only if cheap, otherwise leave for a follow-up; (7) exploration_sweep reading 11: total flow, share crossing landmasses (different region::domain at the two capitals), top-decile share, and a check that every flow's pair holds a trade_access clause.\n\nDONE WHEN: exploration_sim_harness asserts no flow without the clause, flow bounded by each of the three inputs, signal relieved, both capitals credited, and no flat market income; reading 11 prints on a 3-seed sweep; world_determinism movement reported, not re-blessed."
+  },
+  {
+   "sprint": null,
+   "written": "2026-09-14",
+   "author": "Ben (2026-09-14, \"go for A then B ... build in a batch delivery\"); Claude (itemised from the 16-seed exploration_sweep review)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "status": "designed",
+   "glyph": "✓",
+   "id": "BL-955",
+   "short_name": "EXPLORATION_SPEND_IS_SCORED",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "Ports, hulls and standing armies are scored against the other verbs, not bought whenever affordable",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/exploration_sim_harness.cpp",
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "THE GAP (16-seed review, 2026-09-14). EXPLORATION.md sec The engine is shared: \"What this phase adds is the ability to spend on a port, a hull, or a binding -- and the scorer weighs those against the old four on one shape.\" In code, `run_exploration_upkeep` (history_sim.cpp ~650-720) buys a port step, then a navy step, then a standing-army step, in that fixed order, whenever the capital's treasury covers each cost. No polity chooses; every coastal polity that can afford a port builds one. 454 of 792 living polities held a navy at 1660 on the 16-seed sweep -- \"unevenly\" only in the weakest sense, and the two-strategies claim (a consolidator spends on roads and ground, an expansionist on ports and hulls) cannot show up in spend at all.\n\nTHE SHAPE: the spend becomes a choice whose inputs are ones the sim already reads -- the creed leans (`consolidator_lean_q` / `expansion_lean_q`), outward wants (BL-953), neighbour Alarm (BL-941), treasury, and the port window. Upkeep (decay when unfunded) stays exactly where it is.\n\nMEASURED BY: reading 7 (fleets -- navies uneven, and at least one allowed to decay) and reading 3 (both strategies pay).\n\nSETTLED 2026-09-14 (Ben, design form). Shape (b): a scored ALLOCATION inside the upkeep step, not new verbs (Ben chose the cheaper option over the recommendation). The design lives in EXPLORATION.md sec Force persists now (\"Spend is ALLOCATED\") and sec The engine is shared.\n\nWORK: in `run_exploration_upkeep`, keep every decay exactly where it is; replace the port-then-navy-then-army purchase chain with ONE choice per round among {port step, navy step, standing-army step, hold}: score each option from creed leans (expansion_lean_q favours port/navy; consolidator_lean_q favours army and hold), the polity's unmet wants across water (BL-953's want read against goods it cannot reach by land), max neighbour Alarm (deterrence_alarm_q over contacted near-home pairs, favours army), treasury cover of the cost, and port window/port_stock gates (navy requires navy_min_port_stock_q); pick by argmax over a total order with explicit tie-break (hold wins ties). Needs the history_sim_state (contacts, polities) and creeds passed into the upkeep call if they are not already. Reading 7 reports navies by strategy lean and counts polities that let a navy decay.\n\nDONE WHEN: exploration_sim_harness asserts a coastal expansionist builds a port/navy where a consolidator with the same purse does not, a fully funded polity still builds at most one stock per round, and decay is untouched; 3-seed sweep before/after reported; world_determinism movement reported, not re-blessed."
+  },
+  {
+   "sprint": null,
+   "written": "2026-09-14",
+   "author": "Ben (2026-09-14, \"go for A then B ... build in a batch delivery\"); Claude (itemised from the 16-seed exploration_sweep review)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "status": "designed",
+   "glyph": "✓",
+   "id": "BL-956",
+   "short_name": "EXPLORATION_HANDOFF_CROSSES",
+   "priority": "S",
+   "difficulty": 4,
+   "title": "The Exploration span hands a validated struct forward, and world setup reads 1660 grudges and corridors from it",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/era_minus_one.hpp",
+    "tools/verify/exploration_sim_harness.cpp"
+   ],
+   "design": "THE GAP (16-seed review, 2026-09-14). EXPLORATION.md sec What this phase hands digitisation lists nine things and DIGITISATION.md calls that list \"a struct, not a promise\". No such struct exists. `kepler_exploration_hs` reaches only four report counters, the time-lapse and the harness fixture (hard_coded_world.cpp ~1116-1155); treaties, the overlord graph, navies, contacts and wants are discarded.\n\nWORSE, A LIVE INCONSISTENCY: since BL-946 flipped the span on, `region::nation` is the 1660 map, but world setup still seeds sentiment from the 1200 CE grudges (`kepler_grudges`, hard_coded_world.cpp:1395) and stamps roads from the 1200 CE corridors (`kepler_corridors`, :1562). 460 years of grudges, and every corridor the span built or promoted, never reach the campaign. The code comment at :1069-1080 names this as deferred work.\n\nTHE SHAPE, mirroring `pass_one_output` / `make_pass_one_output` / `pass_one_output_valid` (BL-828): an `exploration_output` value struct whose fields ARE the doc's list -- treasuries (per polity, at the capital), scarcity signals (per market), corridor throughput and road tier, cultural good preference, the overlord graph with tribute terms, standing treaties with remaining years, ports/navies/standing armies, contacts and wants, exploration tree masks -- plus the surviving-network filter over THIS span's dead, and a validator. World setup then reads grudges and surviving corridors from it whenever the span ran, and from `pass_one_output` otherwise. Trade flows (BL-954) join the struct when that item lands.\n\nWORLD-MOVING: sentiment seeds and stamped roads change on every generated world. Report the digest movement; do not re-bless (DELIVERY.md sec The digest re-bless is one act per WAVE).\n\nDONE WHEN: the struct exists with a validator that exploration_sim_harness exercises; sentiment and road stamping read 1660 state when the span ran; world_determinism still holds same-seed-same-world; the movement is recorded in world SHAPE.\n\nAMENDED 2026-09-14: BL-954's `trade_flow` table joins the struct in the same batch; the doc list now names trade flows, grudges and the surviving network explicitly (EXPLORATION.md sec What this phase hands digitisation)."
   }
  ]
 }

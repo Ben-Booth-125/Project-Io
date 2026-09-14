@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*43 entries — 26 open, 17 resolved.*
+*46 entries — 29 open, 17 resolved.*
 
 ---
 
@@ -399,6 +399,50 @@ CIVILISATION.md names the case where settlement_state::migration_end_year (the d
 > **Recommendation:** Leave it for now -- BL-947's fix already makes the overrun visible and honest rather than silently wrong, which was the actual bug Ben saw live; a reroll or budget change is tuning work against a sweep this item's 60 seeds is too small to calibrate from.
 
 *Files: `src/world/colonisation.hpp`, `src/world/settlement.cpp`, `docs/generation/CIVILISATION.md`*
+
+### NR-861 — OBSERVATION: treaties almost never break -- 4 breaks against 5,161 formed across 16 seeds
+*observation · raised 2026-09-14 · from exploration_sweep, 16 seeds (0-15), main session review of the Exploration round.*
+
+Reading 4 printed treaties formed=5161, broken=4, non-aggression-blocked campaigns=3,853,341, with 930 standing at 1660 (median 20 years left). The break test in history_sim.cpp (~2592) re-scores a bound pair against the same treaty_value_q formation uses and breaks only below HALF the formation threshold, as hysteresis. At a 0.08% break rate the harness line "treaties both stand AND break" is technically true and substantively false.
+
+**Why it matters.** EXPLORATION.md: "A treaty that cannot be broken is a rule, not a promise, and a phase whose actors never defect produces a flat map." 3.85M blocked campaigns against 4 defections suggests the non-aggression block is the main reason neighbour war fell (reading 2 fell 8x), which is calming rather than displacement -- the failure mode the doc names. Treaties also expire on term, so standing treaties are not permanent; whether expiry-and-reform is enough churn, or defection itself should be commoner, is a judgement.
+
+- Leave it: expiry already churns treaties, and defection being rare is historically plausible.
+- Treat it as a measurement first: add a reading of expiries vs renewals vs defections so the churn is visible before any tuning.
+- Tune toward more defection by letting a want or an opportunity (a treatied neighbour whose ground holds a wanted good) lower treaty value -- which BL-953 (wants point outward) would make possible without a new term.
+
+> **Recommendation:** Option 2 now, inside BL-952 (sweep builds each world once), and revisit after BL-953/954 land, since outward wants and trade value both change treaty value.
+
+*Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sweep.cpp`, `docs/generation/EXPLORATION.md`*
+
+### NR-862 — OBSERVATION: displacement fell from NR-855's 0.88 median to 0.04 on the same three seeds -- bisect in progress
+*observation · raised 2026-09-14 · from exploration_sweep at HEAD 643ebf79 vs NR-855 (sprint 40 wave 4, ec335d2c).*
+
+NR-855 recorded a 3-seed median displacement ratio of 0.88 after BL-941 (deterrence), with seed 1 at 1.11. At HEAD the same seeds read 0.01, 1.42 and 0.04 (median 0.04); the 16-seed median is 0.08. The exploration_sweep harness is unchanged since ec335d2c. The only sim-touching commits since are 3d58001d (BL-944, schism verb), fdc445fb (BL-947, Culture round coast) and e18ab370 (BL-946, wizard wiring and the exploration_sim_enabled default flip). Bisect worktrees are built at ec335d2c and 4605a90d.
+
+**Why it matters.** BL-950 (displacement clears the bar) is designed to strengthen deterrence from a 0.88 starting point. If the true current baseline is 0.04, that item's premise is stale, and something merged after wave 4 undid most of wave 4's effect without any reading going red (the sweep reports, it does not gate).
+
+- Find the causing commit, then decide whether it is a defect to fix or a legitimate interaction BL-950 must now work against.
+- Make exploration_sweep gate on a floor for the displacement median, so a regression like this goes red at merge time.
+
+> **Recommendation:** Option 1 now (bisect running); option 2 is a separate call, since the harness deliberately reports rather than gates.
+
+*Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sweep.cpp`*
+
+### NR-863 — DECISION TAKEN: two calls made while writing the Exploration trade design into EXPLORATION.md
+*decision · raised 2026-09-14 · from Exploration trade batch, design-form follow-through (BL-953, BL-954).*
+
+Two things the form did not ask were written into the authority doc. (1) Outward wants lean campaigns and subjection ONLY, not settlement -- the form carried this question but it came back unanswered, so the recommended option was taken. (2) A trade flow earns BOTH ends (seller and buyer capitals), not the seller alone -- the form asked whether flow income replaces the flat market income (yes) but not who earns it.
+
+**Why it matters.** (2) decides whether being a buyer is ever profitable. Seller-only makes wealth flow to holders of scarce goods (a sharper resource asymmetry); both-ends makes any market on a busy line rich (a trading-hub asymmetry, and it keeps treasuries from collapsing for polities that hold little but sit on lines). Replacing the flat income with seller-only income would bankrupt most polities that hold no wanted good.
+
+- Keep both calls as written.
+- Seller-only income: a trade line enriches the holder, not the hub.
+- Let wants also lean settlement across water.
+
+> **Recommendation:** Keep both as written; revisit (2) from reading 8 (treasury spread) once BL-954 lands.
+
+*Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`*
 
 ---
 

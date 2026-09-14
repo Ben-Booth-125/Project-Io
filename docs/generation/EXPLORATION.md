@@ -2,7 +2,9 @@
 
 > **Settles:** what the exploration age is for and which question it answers · where the treasury
 > sits and what it buys · why this phase carries a scarcity signal and never a price · how goods
-> move without a cargo ever existing · what a treaty is as data and what it binds · what a colony
+> move without a cargo ever existing · how a want met by throughput becomes a flow between
+> polities, and why that flow is what a market earns · where a want points a campaign · how the
+> treasury allocates its spend · what a treaty is as data and what it binds · what a colony
 > is and why it wants things of its own · how ports, navies and standing armies are paid for and
 > how they decay · how an arms race buys quiet at home and opportunity abroad · the two ways to
 > be strong and how a creed decides which · how a good acquires a cultural preference · what the
@@ -14,6 +16,12 @@
 > (../economy/FINANCE) · the pass map and the calendar (GENERATION_STRATEGY § Pass 2).
 > **Confused with:** CIVILISATION.md, COLONISATION.md, DIGITISATION.md,
 > ../economy/MARKETS.md.
+
+> ⟳ **What changed (2026-09-14, the Exploration trade batch — remove once reviewed):** new § Trade
+> is a want met by throughput; § A want points a campaign outward; spend allocated in upkeep
+> (§ Force persists now, § The engine is shared); unmet-want signal; no flat market income; trade
+> value in a binding; an eleventh reading (Trade); trade flows, grudges and the surviving network
+> added to the handoff list, with world setup reading them.
 
 **Exploration is the third simulated span and the first with a price on anything.** It runs
 **1200 → 1660 CE, 460 years**, opening the instant the Empire phase closes — the 1200 → 1560
@@ -78,8 +86,13 @@ phase does not ask.
 
 **The treasury is a consequence, never an allowance.** It is fed by what the polity already holds
 and already reaches — endowment on held ground, the inherited `surviving_corridors` network, the
-markets standing on its seats, and what its subjects remit. Nothing tops it up: a polity that
-inherited little is poor, which is the asymmetry the handoff exists to produce.
+trade that flows through the markets on its seats, and what its subjects remit. Nothing tops it
+up: a polity that inherited little is poor, which is the asymmetry the handoff exists to produce.
+
+**A market earns by what flows through it, not by standing (Ben, 2026-09-14).** A flat income per
+market seat is an allowance under another name, so there is none: a market with no trade crossing
+it earns nothing, and a market on a busy line earns in proportion to the line
+(§ Trade is a want met by throughput).
 
 ---
 
@@ -96,6 +109,11 @@ information forward without becoming a market.
 
 **The signal is the DEMAND half, and it is not sufficient on its own** — § Goods move as
 throughput, never as cargo owns the other half.
+
+**The signal reads UNMET want (Ben, 2026-09-14).** A market's raw want is what its ground lacks
+and its people need; the signal a reader sees is that want less what trade already brought. A want
+that is being met stops pointing anywhere, which is what lets an appetite resolve rather than
+persist forever.
 
 ---
 
@@ -129,6 +147,47 @@ number, this costs a comparison.
 
 ---
 
+## Trade is a want met by throughput
+
+**SETTLED (Ben, 2026-09-14): goods FLOW between polities, as one number per seller, buyer and
+good.** Not a cargo, not a route and not a price. A flow is a fact in the same family as a grudge
+or a contact — a named, directed pair plus what joined them — and it is recorded, so the time-lapse
+and the handoff can read it.
+
+**A flow needs three things at once, and each is already in the world.**
+
+| Needs | Read from | If absent |
+|---|---|---|
+| A **want** | The buyer market's scarcity signal for the good | Nothing is wanted; no flow |
+| A **holder** | Ground the seller holds whose dominant class is the good | Nothing to sell; no flow |
+| A **line** | Throughput that can carry it — held corridors on land, a built port and a navy across water | The want never resolves |
+
+The volume is bounded by the smallest of the three. A rich want meeting a thin line moves little;
+a fat line with nothing wanted moves nothing.
+
+**ONLY THE TRADE-ACCESS CLAUSE OPENS A FLOW (Ben, 2026-09-14).** Contact makes a stranger's market
+*legible*; it does not make it *reachable*. Without the clause, a want pointed at a stranger's good
+resolves as a landing or a campaign — which is the doc's own phrase, "a flow instead of a landing",
+read literally. So trade and the treaty system are one mechanism, and a polity with no bindings
+trades with nobody.
+
+**A met want relieves the buyer's signal**, per § There is no price here. **The flow earns both
+ends**: the seller's market for what it sold, and the buyer's market for what passed through it.
+That is the whole of market income (§ Capital arrives).
+
+**THE TRADE A BINDING OPENS IS PART OF WHAT A BINDING IS WORTH (Ben, 2026-09-14).** A pair scores
+a treaty partly by the flow its trade-access clause would open between them. This is what lets a
+DISTANT pair bind: far from home, deterrence earns nothing and the far penalty applies
+(§ The arms race), so only trade can make a stranger worth a promise. And it is why the conflict
+the phase displaces goes to ground whose holder has **no** binding with the arriving power — the
+partner is worth more alive.
+
+**Why this is the global-trade lever.** Nothing in the phase targets a volume. Trade is as global as
+wants are uneven, lines are long and bindings cross water — three consequences of upstream
+scalars, which is the standing rule for every force here.
+
+---
+
 ## Diplomacy becomes real, and this phase is where the exclusion lifts
 
 **`CIVILISATION.md` § Fear of being next states three exclusions, and the third is that there are
@@ -152,7 +211,7 @@ Five clause kinds, all five settled (Ben, 2026-09-11):
 | Clause | What it binds | Why the phase needs it |
 |---|---|---|
 | **Non-aggression** | Neither party campaigns against the other while the term runs | The direct cause of the home-coast quiet |
-| **Trade access** | One party's market is legible and reachable to the other | Turns a want into a flow instead of a landing |
+| **Trade access** | One party's market is legible and reachable to the other | Turns a want into a flow instead of a landing — the only thing that opens one (§ Trade is a want met by throughput) |
 | **Sphere of claim** | Which unclaimed ground each party may claim | Two powers divide a frontier instead of fighting over it |
 | **Tribute** | A remittance from subject to overlord | The colonial actor's economic strengthening, made explicit |
 | **Mutual defence** | An attack on one draws the other | Makes a small polity expensive to eat |
@@ -168,7 +227,8 @@ lands on every *other* party's willingness to bind with the defector. Nothing re
 own ledger to choose a target; that remains revenge and remains declined.
 
 **Nobody negotiates.** A treaty forms when both parties independently score the binding as worth
-more than the freedom it costs, evaluated against the same seeded world state. This keeps the
+more than the freedom it costs, evaluated against the same seeded world state. What a binding is
+worth includes the trade its access clause would open. This keeps the
 determinism rule intact and keeps the phase free of a bargaining layer it cannot afford.
 
 ---
@@ -242,6 +302,14 @@ score; a stock with upkeep means a polity that over-builds is poorer every round
 polity that under-builds arrives late. That is the pressure the phase wants, and it is a cost in
 the world rather than a handicap in the scorer.
 
+**Spend is ALLOCATED, not bought whenever affordable (Ben, 2026-09-14).** Once a round's upkeep is
+paid, the treasury's investment is one scored choice among the port, the fleet, the standing army
+and holding the purse — made in the upkeep step, not as a verb competing with a campaign. Its
+inputs are ones the polity already has: its creed's lean toward expansion or consolidation
+(§ Two ways to be strong), its unmet wants across water, the Alarm its neighbours raise, and
+whether its seat even has a port window. A polity that can afford all three stocks still builds
+the one its situation asks for, so a navy says something about who built it.
+
 **`port_q` is endowment, not a port.** The region field the Empire phase carries says the ground
 *could* take a harbour. Building one is an act of this phase, paid for, and the two must not be
 conflated — otherwise every coastal polity begins with the thing the phase is about acquiring.
@@ -273,6 +341,29 @@ people that walked past a good and never held it is the people that pays most fo
 (`CIVILISATION.md` § The directed want) is directed and unpriced; preference makes some directed
 wants *stronger* than others, which is enough to rank where a fleet goes first. Turning a weight
 into a price is Digitisation's job.
+
+**Preference is read LIVE, round by round.** Ground changes hands and routes open across the span,
+so a preference derived once at 1200 would describe a world that no longer exists. It is derived
+from the round's own state, by the same rule.
+
+### A want points a campaign outward
+
+**SETTLED (Ben, 2026-09-14): a want leans WHERE a polity campaigns and WHOM it subjects — and
+nothing else.** A campaign's prize leans up by the decider's own unmet want for the good the
+target ground holds, weighted by its people's preference for that good. Subjection ranks the
+natives a power could bind by the same want. Settlement is untouched: a people settles where
+ground is empty and reachable, not where a good is.
+
+**It is a lean on the prize, in the scorer's established idiom** — the same shape as the fear of
+being next and the creed's appetite: one term reads a richer input rather than a second term being
+added beside the score. A want never makes an unwinnable campaign attractive; it ranks winnable
+ones.
+
+**This is what points conflict OUTWARD, and it needs no rule saying so.** A long-contacted
+neighbour mostly holds the goods one's own region already holds, and is often bound by treaty. A
+newly met people holds what one's ground never did — the very definition of preference
+(§ A good acquires a cultural preference). The want lands on the frontier because that is where
+the unmet goods are.
 
 ---
 
@@ -349,10 +440,12 @@ forks.** A **round-level upkeep step** — the treasury earns, then pays its sto
 because every mechanism above depends on a recurring bill. And **objects with a term** — treaties
 expire, which nothing in the Empire phase does.
 
-**The verbs are the Empire verbs plus what a treasury makes possible.** Settle, Invest,
+**The verbs are the Empire verbs, and a treasury spends beside them.** Settle, Invest,
 Consolidate and Campaign carry over unchanged. What this phase adds is the ability to spend on a
-port, a hull, or a binding — and the scorer weighs those against the old four on one shape
-(`trees/TREES.md` § The scorer).
+port, a hull or a garrison, and to bind. The first three are one scored allocation inside the
+upkeep step (§ Force persists now); a binding forms by the treaty test (§ What a treaty is). The
+tree node a polity invests in is still weighed on the scorer's one shape (`trees/TREES.md`
+§ The scorer).
 
 **If the shared engine turns out to be the wrong frame, the tell will be a reading it cannot
 move** (§ What the phase is judged on). Revising it then is Ben's call and is explicitly left
@@ -398,6 +491,7 @@ Empire handoff.
 | **Treasury spread** | Wide, and correlated with the inherited corridor network rather than with size alone |
 | **Throughput** | Corridors carrying materially different volumes, with the road ladder visible in the difference |
 | **Preference** | Goods wanted differently by different cultures, with the difference traceable to route |
+| **Trade** | Flow crosses between polities on different landmasses, unevenly — some pairs carry most of it, most carry none — and every flow stands on a trade-access clause (Ben, 2026-09-14) |
 
 **THE FIRST TWO ARE ONE TEST AND MUST BE READ TOGETHER.** Displacement alone can be satisfied by a
 world that simply stopped fighting, which is the failure mode Ben named on 2026-09-11 and the
@@ -419,6 +513,7 @@ and what preference different cultures develop for these goods."*
 
 - **Treasuries**, one per polity at its capital — the capital a firm will be chartered against.
 - **Scarcity signals**, per good per market — what Digitisation resolves into prices. Not prices.
+- **Trade flows**, per seller, buyer and good — the trade relationships a firm inherits.
 - **Corridor throughput** — which lines carry volume, and at which rung of the road ladder.
 - **Cultural good preference** — the demand shape a price field resolves against.
 - **The overlord graph** — who holds whom, and on what tribute terms.
@@ -426,6 +521,14 @@ and what preference different cultures develop for these goods."*
 - **Ports, navies and standing armies**, at whatever level upkeep left them.
 - **The contact and want tables**, grown: a world that has met itself, mostly.
 - **Exploration tree masks** — who enters the Industry tree early and who enters late.
+- **The grudge table and the surviving network**, grown across the span and filtered over this
+  span's dead, exactly as the Empire handoff filters its own.
+
+**The list is a struct, and it has readers before Digitisation exists.** Every item above is one
+field of the handoff value, checked by a validator, on the same footing as the Empire handoff
+(`GENERATION_STRATEGY.md` § What crosses each handoff). Wherever the span ran, world setup seeds
+sentiment from ITS grudges and stamps roads from ITS surviving corridors. A campaign that opens on
+the 1660 political map must not open on 1200's resentments and 1200's roads.
 
 ### Spend is estimated at the end, not accumulated throughout
 
