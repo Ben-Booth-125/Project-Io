@@ -32,7 +32,8 @@
 // cost of this harness, so it is called exactly once per seed, in the main
 // loop, and everything any reading needs is captured onto `exploration_row`
 // there. The report sections below read `rows` only; none regenerates a
-// world. The `[gen budget]` line count therefore equals the seed count.
+// world, and each generation stops at the Exploration close (BL-958), so
+// the `[sweep] seed N generated` line count equals the seed count.
 //
 // Usage:  exploration_sweep [seed_count] [--w_want_q=N]   (default 8)
 //
@@ -311,7 +312,13 @@ int main(int argc, char** argv)
 
         generation_report     rep;
         era_minus_one_fixture fx;
-        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
+        // BL-958: STOP AT THE EXPLORATION CLOSE. Every reading reads the era
+        // fixture, which is complete before this stop; nations, roads, firms and
+        // markets (~90% of a whole world) are never read here.
+        world_gen_config gen_cfg;
+        gen_cfg.stop_after_exploration = true;
+        std::fprintf(stderr, "[sweep] seed %d generated to the Exploration close\n", i);
+        const world w = make_hard_coded_world(wp, &rep, gen_cfg,
                                               /*progress=*/nullptr, /*works=*/nullptr, &fx);
         (void)w;
 

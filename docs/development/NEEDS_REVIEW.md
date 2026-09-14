@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*48 entries — 31 open, 17 resolved.*
+*49 entries — 32 open, 17 resolved.*
 
 ---
 
@@ -475,6 +475,21 @@ BL-953 built as designed. w_want_q swept at 0/250/500/1000/2000 on 3 seeds: 0 re
 > **Recommendation:** Option 2: weaken EXPLORATION.md sec A want points a campaign outward to what the measurement supports (a want ranks winnable campaigns; displacement is owned by reach, ports and deterrence, BL-950), unless you would rather widen the goods grain. BL-950 then carries displacement alone.
 
 *Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`, `tools/verify/exploration_sweep.cpp`*
+
+### NR-866 — CALL: the navy and army saturation in the spend scorer is a brake inside the scorer, where EXPLORATION.md wants a cost in the world
+*question · raised 2026-09-14 · from Sprint 41 wave 2 (BL-955, spend is scored), cold review finding 4.*
+
+BL-955's allocation scores a navy step 0 once the fleet exceeds 400 per held region and an army step 0 once paid heads exceed 300 per held region. Without the army cap, polities bought an army step every round (12,371 steps vs 800 ports on 3 seeds), starving fleets and sea trade. But EXPLORATION.md sec Force persists now says upkeep is 'a cost in the world rather than a handicap in the scorer', and the standing rule prefers systemic forces over agent terms. Separately, paid heads cost no manpower or population, and now that they persist, a 44-region realm at the cap holds 13,200 paid heads at no population cost, which saturates neighbours' Alarm against visible_capability_reference 5000 -- unmeasured.
+
+**Why it matters.** A cap in the scorer is the polity knowing it has enough. A per-head running cost is the world making more expensive to keep. They can produce similar spreads, but only the second is visible on the map as a cause (a treasury drained by its garrison), and only the second makes an over-built polity poorer every round, which is the pressure the doc names.
+
+- Keep the scorer saturation (diminishing value of more of what you hold is a reading of the world, not a handicap).
+- Replace it with an in-world bill: paid heads and hulls cost treasury per unit per year; unaffordable upkeep decays them. The scorer then sees a falling purse, not a cap.
+- Both: the bill as the force, a soft saturation only as tie-breaking.
+
+> **Recommendation:** Option 2: it is what the doc already says, and it fixes the free-manpower problem at the same stroke if paid heads also draw from manpower. It moves the world again, so it would be its own item after this sprint rather than folded into the tuning wave.
+
+*Files: `src/world/history_sim.cpp`, `src/world/settlement.hpp`, `docs/generation/EXPLORATION.md`*
 
 ---
 
