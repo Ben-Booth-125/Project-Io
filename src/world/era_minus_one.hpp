@@ -297,4 +297,20 @@ struct era_minus_one_fixture
     std::vector<polity>   pre_exploration_polities;   ///< `pass_one_output::polities` at 1200.
     std::vector<grudge>   pre_exploration_grudges;    ///< `pass_one_output::grudges` at 1200.
     std::vector<history_corridor> pre_exploration_corridors; ///< `pass_one_output::surviving_corridors` at 1200.
+
+    // --- BL-956: the Exploration handoff, and what world setup consumed ----
+
+    /// The Exploration -> Digitisation handoff value exactly as generation
+    /// folded it (`make_exploration_output`), default-constructed when
+    /// `exploration_ran` is false.
+    exploration_output exploration_handoff;
+
+    /// The grudge table world setup actually handed `seed_grudge_sentiment`,
+    /// and the corridor set it actually handed `stamp_history_roads`,
+    /// captured at those two consumption sites (populated whenever a fixture
+    /// was asked for, whichever span supplied them). A harness binds these
+    /// against `exploration_handoff` to prove the 1660 values were the ones
+    /// read, rather than the 1200 ones.
+    std::vector<grudge>           setup_grudges;
+    std::vector<history_corridor> setup_corridors;
 };

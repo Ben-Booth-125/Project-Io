@@ -386,8 +386,8 @@ struct region
     /// Capital standing at this region, valid only where this region is a
     /// living polity's `capital` (which is always its seat — BL-866). Zero
     /// and unused everywhere else. Fed by `run_exploration_upkeep` (BL-932):
-    /// endowment on held ground, the inherited corridor network, and a
-    /// standing market — nothing tops it up, so a polity that inherited
+    /// endowment on held ground, the inherited corridor network, and the
+    /// trade flowing through its market (BL-954) — nothing tops it up, so a polity that inherited
     /// little stays poor. GENERATION SCRATCH, NOT SAVED, same footing as
     /// `material_stock`/`network_supply_q` above.
     int64_t treasury = 0;
@@ -400,11 +400,22 @@ struct region
     // order, offset by one to skip `region_class::none` (farm=0, ore=1,
     // energy=2, port=3) — see `history_sim.cpp`'s `scarcity_good_index`.
 
-    /// Refreshed every decision round by `refresh_market_scarcity` (BL-939)
-    /// while `history_sim_params::exploration_upkeep_enabled` is set. Zero
-    /// and unused on every non-market region. GENERATION SCRATCH, NOT SAVED,
+    /// THE UNMET SIGNAL (BL-954; EXPLORATION.md sec There is no price here:
+    /// "the signal reads UNMET want"). `scarcity_raw_q` below less the volume
+    /// every inbound `trade_flow` brought this round, floored at 0 -- what
+    /// every reader (the tech chooser's `wants_unmet_q`, `market_scarcity_q`)
+    /// sees. Equal to the raw signal wherever nothing flowed in. Zero and
+    /// unused on every non-market region. GENERATION SCRATCH, NOT SAVED,
     /// same footing as `treasury`/`material_stock` above.
     int32_t scarcity_q[4] = {0, 0, 0, 0};
+
+    /// THE RAW WANT (BL-954): what the market's ground lacks and its people
+    /// need, before trade. Refreshed every decision round by
+    /// `refresh_market_scarcity` (BL-939) while
+    /// `history_sim_params::exploration_upkeep_enabled` is set; the ONE input
+    /// a trade flow's volume reads for its want bound, so a flow cannot
+    /// relieve the very signal that sized it. GENERATION SCRATCH, NOT SAVED.
+    int32_t scarcity_raw_q[4] = {0, 0, 0, 0};
 
     // --- BL-935: a built port, navy and standing army ------------------------
     // EXPLORATION.md sec Force persists now, and persistence has a bill.

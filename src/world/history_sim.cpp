@@ -510,14 +510,10 @@ void refresh_market_scarcity(std::vector<region>& regions, const std::vector<pol
 
     for (region& r : regions)
     {
-        if (!r.has_market)
+        if (!r.has_market
+         || r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size())
         {
-            for (int g = 0; g < good_count; ++g) r.scarcity_q[g] = 0;
-            continue;
-        }
-        if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size())
-        {
-            for (int g = 0; g < good_count; ++g) r.scarcity_q[g] = 0;
+            for (int g = 0; g < good_count; ++g) { r.scarcity_q[g] = 0; r.scarcity_raw_q[g] = 0; }
             continue;
         }
         const std::size_t n = static_cast<std::size_t>(r.nation);
@@ -532,12 +528,20 @@ void refresh_market_scarcity(std::vector<region>& regions, const std::vector<pol
             // The market's OWN ground already carries this good -- nothing
             // to want locally, regardless of what the rest of the realm
             // holds.
-            if (r.dominant == goods[static_cast<std::size_t>(g)]) { r.scarcity_q[g] = 0; continue; }
+            if (r.dominant == goods[static_cast<std::size_t>(g)])
+            {
+                r.scarcity_raw_q[g] = 0;
+                r.scarcity_q[g]     = 0;
+                continue;
+            }
 
             // A good the polity holds NOWHERE is a sharper want than one it
             // merely lacks at this particular market.
             const int base_q = holds[n][static_cast<std::size_t>(g)] ? 300 : 700;
-            r.scarcity_q[g] = clampi(base_q + pop_term_q / 4, 0, 1000);
+            r.scarcity_raw_q[g] = clampi(base_q + pop_term_q / 4, 0, 1000);
+            // BL-954: the unmet signal starts equal to the raw want; the
+            // upkeep step relieves it by inbound flow once flows are known.
+            r.scarcity_q[g] = r.scarcity_raw_q[g];
         }
     }
 }
@@ -562,19 +566,103 @@ int market_scarcity_q(const std::vector<region>& regions, const history_sim_stat
     return r.scarcity_q[gi];
 }
 
+// ---------------------------------------------------------------------------
+// BL-953 -- a want points a campaign outward
+// ---------------------------------------------------------------------------
+
+int polity_good_want_q(const std::vector<region>& regions, const std::vector<polity>& polities,
+                       const std::vector<culture_good_preference>& prefs,
+                       int polity_id, region_class good)
+{
+    if (polity_id < 0 || static_cast<std::size_t>(polity_id) >= polities.size()) return 0;
+    const polity& q = polities[static_cast<std::size_t>(polity_id)];
+    if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= regions.size()) return 0;
+    const region& seat = regions[static_cast<std::size_t>(q.capital)];
+    if (!seat.has_market) return 0;
+    const int gi = scarcity_good_index(good);
+    if (gi < 0) return 0;
+    const int scarcity = clampi(seat.scarcity_q[gi], 0, 1000);
+    if (scarcity == 0) return 0;
+
+    // THE PEOPLE AT THE SEAT, at the grain the preference table is keyed on
+    // (`region::culture`'s plurality) -- a preference is a fact about who
+    // lives there, not who rules (EXPLORATION.md sec A good acquires a
+    // cultural preference). The founding culture only where the seat carries
+    // no share at all.
+    int culture = seat.culture.plurality();
+    if (culture < 0) culture = q.culture;
+
+    int weight_q = 0;
+    if (culture >= 0)
+    {
+        // `prefs` is ascending by culture (then by the fixed good order), so
+        // a culture's own entries are one contiguous run of at most four.
+        auto it = std::lower_bound(prefs.begin(), prefs.end(), culture,
+            [](const culture_good_preference& p, int c) { return p.culture < c; });
+        for (; it != prefs.end() && it->culture == culture; ++it)
+            if (it->good == good) { weight_q = clampi(it->weight_q, 0, 1000); break; }
+    }
+    return clampi((scarcity * (500 + weight_q / 2)) / 1000, 0, 1000);
+}
+
+int want_leaned_campaign_value(int value, int w_want_q, int want_q)
+{
+    if (value <= 0 || w_want_q == 0 || want_q <= 0) return value;
+    const int64_t lean = static_cast<int64_t>(w_want_q) * clampi(want_q, 0, 1000);
+    const int64_t leaned = static_cast<int64_t>(value) + (static_cast<int64_t>(value) * lean) / 1000000;
+    return static_cast<int>(clampi64(leaned, 0, INT32_MAX));
+}
+
+int choose_subjection_native(const std::vector<std::pair<int, int>>& candidates)
+{
+    int best_id = -1, best_want = 0;
+    for (const auto& c : candidates)
+    {
+        if (best_id < 0 || c.second > best_want || (c.second == best_want && c.first < best_id))
+        {
+            best_id   = c.first;
+            best_want = c.second;
+        }
+    }
+    return best_id;
+}
+
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
                             const history_sim_params&             params,
                             int64_t                                year,
                             int                                    step_years,
-                            exploration_upkeep_spend*              spend)
+                            exploration_upkeep_spend*              spend,
+                            const std::vector<dated_object>*       treaties,
+                            std::vector<trade_flow>*               flows_out)
 {
     // BL-939 -- the demand half, refreshed on the same round-level cadence
     // the treasury's own earn runs on: a market's signal is a fact about
     // ground that is still changing hands, exactly like the treasury's own
-    // endowment/network/market terms below.
+    // endowment/network terms below. BL-954: this fills the RAW want; the
+    // unmet signal is relieved below once the round's flows are known.
     refresh_market_scarcity(regions, polities);
+
+    // ---- BL-954: TRADE IS A WANT MET BY THROUGHPUT. ------------------------
+    // Raw want -> flows -> relieve the signal -> earn (below) -> pay/invest.
+    // Flows are sized off the RAW signal only, so relief never feeds back
+    // into the volume that produced it.
+    std::vector<trade_flow> flows;
+    if (treaties != nullptr && !treaties->empty())
+    {
+        const trade_context ctx = build_trade_context(regions, polities, corridors);
+        flows = compute_trade_flows(ctx, regions, polities, *treaties);
+    }
+    std::vector<int64_t> trade_volume(polities.size(), 0); // both ends, per polity
+    for (const trade_flow& f : flows)
+    {
+        const polity& buyer = polities[f.buyer]; // in range: compute_trade_flows checked
+        region& market = regions[static_cast<std::size_t>(buyer.capital)];
+        market.scarcity_q[f.good] = std::max(0, market.scarcity_q[f.good] - f.volume_q);
+        trade_volume[f.seller] += f.volume_q;
+        trade_volume[f.buyer]  += f.volume_q;
+    }
 
     // BL-932 -- EARN, the first of "earn, then pay stocks, then invest"
     // (EXPLORATION.md sec The engine is shared). PAY and INVEST beyond the
@@ -625,10 +713,13 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 * std::max(step_years, 1);
         const int64_t corridor_income =
             corridor_touch * params.treasury_corridor_income_q * std::max(step_years, 1);
-        const int64_t market_income =
-            seat.has_market
-                ? static_cast<int64_t>(params.treasury_market_income_q) * std::max(step_years, 1)
-                : 0;
+        // BL-954 -- A MARKET EARNS BY WHAT FLOWS THROUGH IT, NOT BY STANDING.
+        // No flat per-market term: every flow credits both of its capitals.
+        const int64_t own_trade_volume =
+            (q.id >= 0 && static_cast<std::size_t>(q.id) < trade_volume.size())
+                ? trade_volume[static_cast<std::size_t>(q.id)] : 0;
+        const int64_t trade_income =
+            (own_trade_volume * params.treasury_trade_income_q * std::max(step_years, 1)) / 1000;
         // Subject tribute (EXPLORATION.md sec Capital arrives): a fourth
         // source named by the design, left at 0 -- subjects do not exist yet
         // (BL-933/934). A hook, not a guess: the design says four sources
@@ -636,7 +727,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         const int64_t tribute_income = 0;
 
         seat.treasury = clampi64(
-            seat.treasury + endowment_income + corridor_income + market_income + tribute_income,
+            seat.treasury + endowment_income + corridor_income + trade_income + tribute_income,
             0, 1LL << 48);
 
         // ---- BL-935 -- PAY, then INVEST: ports, navies, standing armies. --
@@ -715,6 +806,290 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             }
         }
     }
+
+    if (flows_out != nullptr) *flows_out = std::move(flows);
+}
+
+// ---------------------------------------------------------------------------
+// BL-954 — trade flows
+// ---------------------------------------------------------------------------
+
+trade_context build_trade_context(const std::vector<region>&           regions,
+                                  const std::vector<polity>&           polities,
+                                  const std::vector<history_corridor>& corridors)
+{
+    constexpr int good_count = 4;
+    const region_class goods[good_count] =
+        { region_class::farm, region_class::ore, region_class::energy, region_class::port };
+
+    trade_context ctx;
+    ctx.holding_q.assign(polities.size(), std::array<int32_t, 4>{0, 0, 0, 0});
+
+    std::vector<int64_t>                  held(polities.size(), 0);
+    std::vector<std::array<int64_t, 4>>   dominant(polities.size(), std::array<int64_t, 4>{0, 0, 0, 0});
+    for (const region& r : regions)
+    {
+        if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size()) continue;
+        const std::size_t n = static_cast<std::size_t>(r.nation);
+        ++held[n];
+        for (int g = 0; g < good_count; ++g)
+            if (r.dominant == goods[g]) ++dominant[n][static_cast<std::size_t>(g)];
+    }
+    for (std::size_t n = 0; n < polities.size(); ++n)
+        if (held[n] > 0)
+            for (int g = 0; g < good_count; ++g)
+                ctx.holding_q[n][static_cast<std::size_t>(g)] = static_cast<int32_t>(
+                    (dominant[n][static_cast<std::size_t>(g)] * 1000) / held[n]);
+
+    // LAND LINES. A corridor whose two endpoints are held by two different
+    // polities is a place their networks touch; the line it offers is the
+    // weaker of the two sides' own reach to it. Walked in the corridor
+    // vector's own sorted (a, b) order, then sorted by (lo, hi) and folded to
+    // the best line per pair -- the result is a property of the integers.
+    for (const history_corridor& c : corridors)
+    {
+        if (static_cast<std::size_t>(c.a) >= regions.size()
+         || static_cast<std::size_t>(c.b) >= regions.size()) continue;
+        const region& ra = regions[c.a];
+        const region& rb = regions[c.b];
+        if (ra.nation < 0 || rb.nation < 0 || ra.nation == rb.nation) continue;
+        if (static_cast<std::size_t>(ra.nation) >= polities.size()
+         || static_cast<std::size_t>(rb.nation) >= polities.size()) continue;
+        trade_context::land_line ln;
+        ln.lo     = static_cast<uint16_t>(std::min(ra.nation, rb.nation));
+        ln.hi     = static_cast<uint16_t>(std::max(ra.nation, rb.nation));
+        ln.line_q = clampi(std::min(ra.network_supply_q, rb.network_supply_q), 0, 1000);
+        ctx.land_lines.push_back(ln);
+    }
+    std::sort(ctx.land_lines.begin(), ctx.land_lines.end(),
+              [](const trade_context::land_line& x, const trade_context::land_line& y) {
+                  if (x.lo != y.lo) return x.lo < y.lo;
+                  if (x.hi != y.hi) return x.hi < y.hi;
+                  return x.line_q > y.line_q; // best line first within a pair
+              });
+    ctx.land_lines.erase(
+        std::unique(ctx.land_lines.begin(), ctx.land_lines.end(),
+                    [](const trade_context::land_line& x, const trade_context::land_line& y) {
+                        return x.lo == y.lo && x.hi == y.hi;
+                    }),
+        ctx.land_lines.end());
+    return ctx;
+}
+
+int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& regions,
+                        const std::vector<polity>& polities,
+                        int seller, int buyer, int good)
+{
+    if (good < 0 || good >= 4) return 0;
+    if (seller < 0 || buyer < 0 || seller == buyer) return 0;
+    if (static_cast<std::size_t>(seller) >= polities.size()
+     || static_cast<std::size_t>(buyer) >= polities.size()) return 0;
+    const polity& ps = polities[static_cast<std::size_t>(seller)];
+    const polity& pb = polities[static_cast<std::size_t>(buyer)];
+    if (!ps.alive || !pb.alive) return 0;
+    if (ps.capital < 0 || static_cast<std::size_t>(ps.capital) >= regions.size()) return 0;
+    if (pb.capital < 0 || static_cast<std::size_t>(pb.capital) >= regions.size()) return 0;
+    const region& seller_seat = regions[static_cast<std::size_t>(ps.capital)];
+    const region& buyer_seat  = regions[static_cast<std::size_t>(pb.capital)];
+
+    // WANT: the buyer capital market's RAW signal (0 where it stands no market).
+    const int want_q = buyer_seat.scarcity_raw_q[good];
+    if (want_q <= 0) return 0;
+
+    // HOLDER: the seller's share of held ground dominant in the good.
+    const int holding_q = static_cast<std::size_t>(seller) < ctx.holding_q.size()
+                        ? ctx.holding_q[static_cast<std::size_t>(seller)][static_cast<std::size_t>(good)]
+                        : 0;
+    if (holding_q <= 0) return 0;
+
+    // LINE: the better of land (a corridor joining the two realms) and sea
+    // (both seats' built ports, carried by the SELLER's navy).
+    int land_q = 0;
+    {
+        const uint16_t lo = static_cast<uint16_t>(std::min(seller, buyer));
+        const uint16_t hi = static_cast<uint16_t>(std::max(seller, buyer));
+        const auto it = std::lower_bound(
+            ctx.land_lines.begin(), ctx.land_lines.end(), std::pair<uint16_t, uint16_t>{lo, hi},
+            [](const trade_context::land_line& x, const std::pair<uint16_t, uint16_t>& k) {
+                if (x.lo != k.first) return x.lo < k.first;
+                return x.hi < k.second;
+            });
+        if (it != ctx.land_lines.end() && it->lo == lo && it->hi == hi) land_q = it->line_q;
+    }
+    const int sea_q = ps.navy_stock > 0
+                    ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
+                    : 0;
+    const int line_q = std::max(land_q, sea_q);
+
+    return std::max(0, std::min({want_q, holding_q, line_q}));
+}
+
+int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regions,
+                       const std::vector<polity>& polities, int a, int b,
+                       const std::vector<trade_flow>& flows)
+{
+    // THE MARGINAL TRADE THE PAIR'S CLAUSE OPENS. A buyer's want and a
+    // seller's holding are each ONE quantity shared across every partner
+    // (`compute_trade_flows`), so what binding THIS pair is worth is only
+    // what the other partners have not already taken: the unshared volume,
+    // capped by the buyer's raw want less what OTHER sellers already bring it,
+    // and by the seller's holding less what it already sends OTHER buyers.
+    // Flows between a and b themselves are excluded from both remainders, so
+    // re-scoring a bound pair reads the same quantity as scoring it unbound.
+    int64_t in_other[2][4]  = { {0, 0, 0, 0}, {0, 0, 0, 0} }; // [side][good]
+    int64_t out_other[2][4] = { {0, 0, 0, 0}, {0, 0, 0, 0} };
+    for (const trade_flow& f : flows)
+    {
+        if (f.good >= 4 || f.volume_q <= 0) continue;
+        for (int side = 0; side < 2; ++side)
+        {
+            const int me = side == 0 ? a : b, other = side == 0 ? b : a;
+            if (f.buyer == me && f.seller != other)  in_other[side][f.good]  += f.volume_q;
+            if (f.seller == me && f.buyer != other)  out_other[side][f.good] += f.volume_q;
+        }
+    }
+
+    int total = 0;
+    for (int g = 0; g < 4; ++g)
+        for (int dir = 0; dir < 2; ++dir)
+        {
+            const int seller_side = dir, buyer_side = 1 - dir;
+            const int seller = seller_side == 0 ? a : b;
+            const int buyer  = buyer_side == 0 ? a : b;
+            const int v = trade_flow_volume_q(ctx, regions, polities, seller, buyer, g);
+            if (v <= 0) continue; // also guarantees every id and capital read below is in range
+            const int want_q = regions[static_cast<std::size_t>(
+                polities[static_cast<std::size_t>(buyer)].capital)].scarcity_raw_q[g];
+            const int holding_q = ctx.holding_q[static_cast<std::size_t>(seller)][static_cast<std::size_t>(g)];
+            const int64_t want_room = std::max<int64_t>(0, want_q - in_other[buyer_side][g]);
+            const int64_t hold_room = std::max<int64_t>(0, holding_q - out_other[seller_side][g]);
+            total += static_cast<int>(std::min<int64_t>({static_cast<int64_t>(v), want_room, hold_room}));
+        }
+    return total; // bounded by 8 * 1000
+}
+
+/// Drop every flow whose (seller, buyer) pair holds no `trade_access` clause
+/// in @p objects. Order-preserving, so a sorted vector stays sorted.
+static void prune_flows_without_trade_access(std::vector<trade_flow>&         flows,
+                                             const std::vector<dated_object>& objects)
+{
+    std::vector<std::pair<int32_t, int32_t>> bound;
+    for (const dated_object& o : objects)
+    {
+        if (o.kind != static_cast<int32_t>(treaty_clause::trade_access)) continue;
+        bound.push_back({std::min(o.a, o.b), std::max(o.a, o.b)});
+    }
+    std::sort(bound.begin(), bound.end());
+    flows.erase(std::remove_if(flows.begin(), flows.end(),
+                    [&](const trade_flow& f) {
+                        const int32_t s = f.seller, u = f.buyer;
+                        const std::pair<int32_t, int32_t> key{std::min(s, u), std::max(s, u)};
+                        return !std::binary_search(bound.begin(), bound.end(), key);
+                    }),
+                flows.end());
+}
+
+std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx,
+                                            const std::vector<region>&       regions,
+                                            const std::vector<polity>&       polities,
+                                            const std::vector<dated_object>& treaties)
+{
+    // The bound pairs, canonical (lo, hi), deduplicated -- a pair holding two
+    // overlapping trade_access clauses trades once, not twice.
+    std::vector<std::pair<uint16_t, uint16_t>> pairs;
+    for (const dated_object& o : treaties)
+    {
+        if (o.kind != static_cast<int32_t>(treaty_clause::trade_access)) continue;
+        if (o.a < 0 || o.b < 0 || o.a == o.b || o.a > 0xFFFE || o.b > 0xFFFE) continue;
+        pairs.push_back({static_cast<uint16_t>(std::min(o.a, o.b)),
+                         static_cast<uint16_t>(std::max(o.a, o.b))});
+    }
+    std::sort(pairs.begin(), pairs.end());
+    pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+
+    std::vector<trade_flow> flows;
+    for (const auto& pr : pairs)
+    {
+        const int ends[2][2] = { { pr.first, pr.second }, { pr.second, pr.first } };
+        for (const auto& e : ends)
+            for (int g = 0; g < 4; ++g)
+            {
+                const int v = trade_flow_volume_q(ctx, regions, polities, e[0], e[1], g);
+                if (v <= 0) continue;
+                flows.push_back(trade_flow{static_cast<uint16_t>(e[0]), static_cast<uint16_t>(e[1]),
+                                           static_cast<uint8_t>(g), static_cast<int32_t>(v)});
+            }
+    }
+
+    // ONE WANT, SHARED ACROSS SELLERS. Each flow above is bounded by the
+    // buyer's whole raw want, so a buyer bound to three holders would import
+    // three wants' worth. The want is the bound on what ARRIVES
+    // (EXPLORATION.md sec Trade is a want met by throughput), so it is spent
+    // down per (buyer, good): the fattest line first, ties to the lower seller.
+    std::sort(flows.begin(), flows.end(), [](const trade_flow& x, const trade_flow& y) {
+        if (x.buyer != y.buyer) return x.buyer < y.buyer;
+        if (x.good != y.good) return x.good < y.good;
+        if (x.volume_q != y.volume_q) return x.volume_q > y.volume_q;
+        return x.seller < y.seller;
+    });
+    {
+        std::size_t i = 0;
+        while (i < flows.size())
+        {
+            const uint16_t buyer = flows[i].buyer;
+            const uint8_t  good  = flows[i].good;
+            const region& seat = regions[static_cast<std::size_t>(
+                polities[static_cast<std::size_t>(buyer)].capital)];
+            int remaining = std::max(0, seat.scarcity_raw_q[good]);
+            for (; i < flows.size() && flows[i].buyer == buyer && flows[i].good == good; ++i)
+            {
+                const int take = std::min(flows[i].volume_q, remaining);
+                flows[i].volume_q = take;
+                remaining -= take;
+            }
+        }
+    }
+    flows.erase(std::remove_if(flows.begin(), flows.end(),
+                               [](const trade_flow& f) { return f.volume_q <= 0; }),
+                flows.end());
+
+    // ONE HOLDING, SHARED ACROSS BUYERS -- the mirror of the want above. A
+    // seller's `holding_q` bounds each flow it sends, so a seller bound to two
+    // buyers would otherwise export its holding twice. Spent down per
+    // (seller, good) over what the want spend-down left: the fattest flow
+    // first, ties to the lower buyer.
+    std::sort(flows.begin(), flows.end(), [](const trade_flow& x, const trade_flow& y) {
+        if (x.seller != y.seller) return x.seller < y.seller;
+        if (x.good != y.good) return x.good < y.good;
+        if (x.volume_q != y.volume_q) return x.volume_q > y.volume_q;
+        return x.buyer < y.buyer;
+    });
+    {
+        std::size_t i = 0;
+        while (i < flows.size())
+        {
+            const uint16_t seller = flows[i].seller;
+            const uint8_t  good   = flows[i].good;
+            int remaining = static_cast<std::size_t>(seller) < ctx.holding_q.size()
+                          ? std::max(0, ctx.holding_q[seller][good]) : 0;
+            for (; i < flows.size() && flows[i].seller == seller && flows[i].good == good; ++i)
+            {
+                const int take = std::min(flows[i].volume_q, remaining);
+                flows[i].volume_q = take;
+                remaining -= take;
+            }
+        }
+    }
+    flows.erase(std::remove_if(flows.begin(), flows.end(),
+                               [](const trade_flow& f) { return f.volume_q <= 0; }),
+                flows.end());
+
+    std::sort(flows.begin(), flows.end(), [](const trade_flow& x, const trade_flow& y) {
+        if (x.seller != y.seller) return x.seller < y.seller;
+        if (x.buyer != y.buyer) return x.buyer < y.buyer;
+        return x.good < y.good;
+    });
+    return flows;
 }
 
 history_sim_state run_history_sim(settlement_state&         ss,
@@ -1965,6 +2340,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
     int64_t next_decision = params.start_year;
     int     step_years    = step_for_year(params, params.start_year);
 
+    // BL-953 -- THE ROUND'S LIVE CULTURAL PREFERENCE (EXPLORATION.md sec
+    // Preference is read LIVE). Derived AT MOST ONCE per decision round, from
+    // that round's own regions/contacts/polities, and read by every campaign
+    // candidate and subjection pick in the round -- never re-derived per
+    // candidate. Empty whenever the want lean is off (the Empires span, or
+    // `w_want_q` 0), which is what keeps those runs byte-identical.
+    const bool want_lean_on = params.exploration_upkeep_enabled && params.w_want_q != 0;
+    std::vector<culture_good_preference> round_prefs;
+    int want_culture_count = cs ? static_cast<int>(cs->cultures.size()) : 0;
+    if (want_lean_on && cs == nullptr)
+        for (const region& r : ss.regions)
+            want_culture_count = std::max(want_culture_count, r.culture.plurality() + 1);
+
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
         event_year = y; // BL-916: the recorder's clock, read by `note_event` alone.
@@ -2465,11 +2853,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (params.exploration_upkeep_enabled)
         {
             exploration_upkeep_spend upkeep_spend;
+            // BL-954: the state's treaties open this round's flows, rebuilt
+            // into `out.trade_flows` (never accumulated).
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
-                                   params, y, step_years, &upkeep_spend);
+                                   params, y, step_years, &upkeep_spend,
+                                   &out.dated_objects, &out.trade_flows);
             out.treasury_spent_on_ports           += upkeep_spend.ports;
             out.treasury_spent_on_navies          += upkeep_spend.navies;
             out.treasury_spent_on_standing_armies += upkeep_spend.standing_armies;
+
+            // BL-953 -- the round's preference, once, after the upkeep has
+            // refreshed the scarcity signal the want reads beside it.
+            if (want_lean_on)
+                round_prefs = derive_culture_preference(ss.regions, out.contacts,
+                                                        out.polities, want_culture_count);
 
             // ---- BL-940: THE ROAD LADDER'S THIRD RUNG, BOUGHT WITH CAPITAL.
             //
@@ -2538,6 +2935,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // already holds -- no bargaining loop, no mutation between the two
             // reads. The walk order is the table's own order, so the result
             // does not depend on anything but the integers already in it.
+            //
+            // BL-954: what a binding would OPEN in trade is part of what it
+            // is worth. One context for this round's formation AND break
+            // re-score: nothing between here and the end of the break walk
+            // changes who holds what, and the raw signal was refreshed by
+            // the upkeep step above.
+            const trade_context treaty_trade_ctx =
+                build_trade_context(ss.regions, out.polities, out.supply_corridors);
             for (const contact& c : out.contacts)
             {
                 if (c.from >= c.to) continue; // the pair's OTHER row; skip
@@ -2561,10 +2966,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const bool near_home = c.first.year < params.start_year;
                 const int alarm_a = deterrence_alarm_q(ss.regions, out, params, a, b);
                 const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
+                const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
+                                                             out.trade_flows);
                 const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
-                                                    alarm_a, near_home);
+                                                    alarm_a, near_home, trade_ab);
                 const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
-                                                    alarm_b, near_home);
+                                                    alarm_b, near_home, trade_ab);
                 if (value_a < params.treaty_formation_threshold_q
                  || value_b < params.treaty_formation_threshold_q) continue;
 
@@ -2620,10 +3027,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const bool near_home = contact_first_year(out, a, b) < params.start_year;
                     const int alarm_a = deterrence_alarm_q(ss.regions, out, params, a, b);
                     const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
+                    const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
+                                                             out.trade_flows);
                     const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
-                                                        alarm_a, near_home);
+                                                        alarm_a, near_home, trade_ab);
                     const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
-                                                        alarm_b, near_home);
+                                                        alarm_b, near_home, trade_ab);
 
                     int defector = -1, wronged = -1;
                     if (value_a < break_bar && value_a <= value_b) { defector = a; wronged = b; }
@@ -2653,6 +3062,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            // A FLOW NEVER OUTLIVES ITS CLAUSE. The round's flows were opened
+            // by the clauses standing at the upkeep step (after this round's
+            // expiry); a pair that broke above no longer holds trade_access,
+            // so its flows leave the record the round leaves behind. The
+            // pruning is order-preserving: the vector stays sorted.
+            prune_flows_without_trade_access(out.trade_flows, out.dated_objects);
+
             // ---- BL-934: SUBJECTION -- trade provinces and subjected polities
             //
             // Snapshot the count: a polity subjected THIS round is not itself
@@ -2669,6 +3085,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (arriving.capital < 0
                      || static_cast<std::size_t>(arriving.capital) >= ss.regions.size()) continue;
 
+                    // BL-953 -- COLLECT, THEN RANK. Every native passing the
+                    // same eligibility tests as before is gathered with the
+                    // arriving power's want for the native seat's dominant
+                    // good; the highest want is bound, ties to the lower id
+                    // (EXPLORATION.md sec A want points a campaign outward:
+                    // "subjection ranks the natives a power could bind by the
+                    // same want"). With the lean off every want is 0 and the
+                    // pick is the lowest eligible id -- the old id-order walk.
+                    std::vector<std::pair<int, int>> eligible_natives;
                     for (std::size_t ni = 0; ni < pc; ++ni)
                     {
                         if (ni == ai) continue;
@@ -2677,6 +3102,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (native.capital < 0
                          || static_cast<std::size_t>(native.capital) >= ss.regions.size()) continue;
                         if (!has_contact(out, arriving.id, native.id)) continue;
+
+                        // The two cheap scalar tests run BEFORE the O(P)
+                        // sphere-of-claim scan below. Every test here is a
+                        // side-effect-free `continue`, so their order changes
+                        // nothing but how much an ineligible native costs.
+                        const int dist = region_distance(
+                            ss.regions[static_cast<std::size_t>(arriving.capital)],
+                            ss.regions[static_cast<std::size_t>(native.capital)], gw);
+                        if (dist > params.subjection_reach_q) continue;
+
+                        const int64_t arriving_treasury =
+                            ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
+                        const int64_t native_treasury =
+                            ss.regions[static_cast<std::size_t>(native.capital)].treasury;
+                        if (arriving_treasury < native_treasury + params.subjection_treasury_margin_q)
+                            continue;
 
                         // SPHERE OF CLAIM: non-interference over a native
                         // polity's ground BETWEEN THE TWO TREATY PARTIES --
@@ -2696,17 +3137,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         }
                         if (sphere_blocked) continue;
 
-                        const int dist = region_distance(
-                            ss.regions[static_cast<std::size_t>(arriving.capital)],
-                            ss.regions[static_cast<std::size_t>(native.capital)], gw);
-                        if (dist > params.subjection_reach_q) continue;
+                        const int want_q = want_lean_on
+                            ? polity_good_want_q(ss.regions, out.polities, round_prefs, arriving.id,
+                                                 ss.regions[static_cast<std::size_t>(native.capital)].dominant)
+                            : 0;
+                        eligible_natives.push_back({static_cast<int>(ni), want_q});
+                    }
 
-                        const int64_t arriving_treasury =
-                            ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
-                        const int64_t native_treasury =
-                            ss.regions[static_cast<std::size_t>(native.capital)].treasury;
-                        if (arriving_treasury < native_treasury + params.subjection_treasury_margin_q)
-                            continue;
+                    const int chosen = choose_subjection_native(eligible_natives);
+                    if (chosen >= 0)
+                    {
+                        polity& native = out.polities[static_cast<std::size_t>(chosen)];
 
                         // ONE OF TWO PATHS, derived from the native seat's own
                         // coast (§ scope note on `polity::subject_kind`): a
@@ -2726,8 +3167,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                      native.capital, y, params.grudge_ground_taken / 2);
                         note_event(lapse_event_kind::subject_bound,
                                    native.capital, native.id, arriving.id);
-                        ++out.subjections_formed;
-                        break; // one overlord per native per round
+                        ++out.subjections_formed; // one native per arriving power per round
                     }
                 }
             }
@@ -3855,6 +4295,24 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         value = value + (value * lean) / 1000;
                         if (value < 0) value = 0;
                     }
+
+                    // BL-953 -- A WANT POINTS THE CAMPAIGN OUTWARD
+                    // (EXPLORATION.md sec A want points a campaign outward).
+                    // The decider's own want for the good this ground holds,
+                    // weighted by its people's LIVE preference (the round's
+                    // `round_prefs`, derived once above), leans the prize up.
+                    // Same idiom as the fear and appetite leans: one term
+                    // reads a richer input, applied ONCE, outside the season
+                    // loop, because the want is a property of the decider and
+                    // the ground, not of the weather. Only a positive prize
+                    // leans -- a want ranks winnable campaigns, it never
+                    // rescues an unwinnable one. Off (and byte-identical) in
+                    // the Empires span and at `w_want_q` 0.
+                    if (want_lean_on)
+                        value = want_leaned_campaign_value(
+                            value, params.w_want_q,
+                            polity_good_want_q(ss.regions, out.polities, round_prefs, q.id,
+                                               tgt.dominant));
 
                     // Season as an action axis: summer and winter are two
                     // candidates over the same objective, not two ticks.
@@ -6117,17 +6575,55 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // ancient tier rule reads, so the count has to survive the fold.
     {
         std::sort(corridor_uses.begin(), corridor_uses.end());
-        out.supply_corridors.reserve(corridor_uses.size());
+        std::vector<history_corridor> fresh;
+        fresh.reserve(corridor_uses.size());
         for (const auto& e : corridor_uses)
         {
-            if (!out.supply_corridors.empty()
-                && out.supply_corridors.back().a == e.first
-                && out.supply_corridors.back().b == e.second)
+            if (!fresh.empty() && fresh.back().a == e.first && fresh.back().b == e.second)
             {
-                ++out.supply_corridors.back().uses;
+                ++fresh.back().uses;
                 continue;
             }
-            out.supply_corridors.push_back(history_corridor{e.first, e.second, 1});
+            fresh.push_back(history_corridor{e.first, e.second, 1});
+        }
+
+        // BL-956: A RESUMED RUN ALREADY HOLDS A RECORD (`resume_corridors`),
+        // and appending this span's fold after it broke the (a, b) order and
+        // split one edge's traffic across two rows — the Exploration handoff's
+        // validator caught it. Merge instead: both lists are sorted by (a, b),
+        // so one linear merge keeps the order and sums `uses` on a shared
+        // edge. A non-resumed run starts empty, so this is the plain fold.
+        if (out.supply_corridors.empty())
+        {
+            out.supply_corridors = std::move(fresh);
+        }
+        else
+        {
+            std::vector<history_corridor> inherited = std::move(out.supply_corridors);
+            std::sort(inherited.begin(), inherited.end(),
+                      [](const history_corridor& x, const history_corridor& y) {
+                          return x.a != y.a ? x.a < y.a : x.b < y.b;
+                      });
+            out.supply_corridors.clear();
+            out.supply_corridors.reserve(inherited.size() + fresh.size());
+            const auto push = [&](const history_corridor& c) {
+                if (!out.supply_corridors.empty()
+                    && out.supply_corridors.back().a == c.a
+                    && out.supply_corridors.back().b == c.b)
+                    out.supply_corridors.back().uses += c.uses;
+                else
+                    out.supply_corridors.push_back(c);
+            };
+            std::size_t i = 0, j = 0;
+            while (i < inherited.size() || j < fresh.size())
+            {
+                const bool take_inherited =
+                    j >= fresh.size()
+                    || (i < inherited.size()
+                        && (inherited[i].a != fresh[j].a ? inherited[i].a < fresh[j].a
+                                                         : inherited[i].b <= fresh[j].b));
+                push(take_inherited ? inherited[i++] : fresh[j++]);
+            }
         }
     }
 
@@ -6653,7 +7149,8 @@ bool has_treaty_clause(const history_sim_state& s, int x, int y, treaty_clause c
 int treaty_value_q(const history_sim_params& p,
                     int grudge_against_other_q, int grudge_from_other_q,
                     int counterpart_treaties_broken, int decider_aggression_q,
-                    int alarm_from_other_q, bool near_home)
+                    int alarm_from_other_q, bool near_home,
+                    int trade_value_q)
 {
     // BASE: a treaty is worth more the less either side already resents the
     // other -- a biting mutual history makes a promise of peace both less
@@ -6690,6 +7187,13 @@ int treaty_value_q(const history_sim_params& p,
                * clampi(p.deterrence_alarm_weight_q, 0, 1000) / 1000;
     else
         value -= clampi(p.treaty_far_penalty_q, 0, 1000);
+
+    // BL-954 -- TRADE, NEAR AND FAR ALIKE. The flow the pair's trade-access
+    // clause would open (both directions, every good) is part of what the
+    // binding is worth: "only trade can make a stranger worth a promise."
+    value += static_cast<int>(
+        (static_cast<int64_t>(clampi(trade_value_q, 0, 8000))
+         * clampi(p.treaty_trade_weight_q, 0, 1000)) / 1000);
 
     return clampi(value, 0, 1000);
 }
@@ -7025,6 +7529,58 @@ std::string grudge_event_line(const grudge_event& e, const settlement_state& ss)
 // The pass 1 -> pass 2 handoff (BL-828)
 // ---------------------------------------------------------------------------
 
+namespace
+{
+    // THE PROVINCES EACH POLITY HOLDS — shared by both handoffs (BL-828,
+    // BL-956) so the two cannot derive the political map two ways.
+    std::vector<polity_holdings> derive_holdings(const std::vector<region>& regions,
+                                                 const std::vector<polity>& polities)
+    {
+        std::vector<std::vector<int>> by_polity(polities.size());
+        for (std::size_t i = 0; i < regions.size(); ++i)
+        {
+            const int n = regions[i].nation;
+            if (n >= 0 && n < static_cast<int>(by_polity.size()))
+                by_polity[static_cast<std::size_t>(n)].push_back(static_cast<int>(i));
+        }
+        std::vector<polity_holdings> out;
+        for (std::size_t pi = 0; pi < polities.size(); ++pi)
+        {
+            if (by_polity[pi].empty()) continue; // A realm holding nothing crosses as nothing.
+            polity_holdings h;
+            h.polity  = static_cast<int>(pi);
+            h.regions = by_polity[pi];
+            out.push_back(std::move(h));
+        }
+        return out;
+    }
+
+    // THE SURVIVING-NETWORK RULE (BL-911), shared by both handoffs so the
+    // Exploration filter is "exactly as the Empire handoff filters its own"
+    // by construction rather than by a second copy of the test.
+    bool corridor_region_survives(const std::vector<region>& regions,
+                                  const std::vector<polity>& polities, uint16_t region_idx)
+    {
+        if (region_idx >= regions.size()) return false;
+        const int n = regions[static_cast<std::size_t>(region_idx)].nation;
+        if (n < 0 || n >= static_cast<int>(polities.size())) return false;
+        return polities[static_cast<std::size_t>(n)].alive;
+    }
+
+    std::vector<history_corridor> filter_surviving_corridors(
+        const std::vector<history_corridor>& corridors,
+        const std::vector<region>& regions, const std::vector<polity>& polities)
+    {
+        std::vector<history_corridor> out;
+        out.reserve(corridors.size());
+        for (const history_corridor& c : corridors)
+            if (corridor_region_survives(regions, polities, c.a)
+             || corridor_region_survives(regions, polities, c.b))
+                out.push_back(c);
+        return out;
+    }
+} // namespace
+
 pass_one_output make_pass_one_output(const settlement_state&  ss,
                                      const history_sim_state& hs,
                                      int                      culture_count)
@@ -7056,21 +7612,7 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
     // the outer order (ascending polity id) and the inner order (ascending
     // region index) are properties of the data. A map keyed on polity id would
     // have been the shorter spelling and the wrong one.
-    std::vector<std::vector<int>> by_polity(o.polities.size());
-    for (std::size_t i = 0; i < o.regions.size(); ++i)
-    {
-        const int n = o.regions[i].nation;
-        if (n >= 0 && n < static_cast<int>(by_polity.size()))
-            by_polity[static_cast<std::size_t>(n)].push_back(static_cast<int>(i));
-    }
-    for (std::size_t pi = 0; pi < o.polities.size(); ++pi)
-    {
-        if (by_polity[pi].empty()) continue; // A realm holding nothing crosses as nothing.
-        polity_holdings h;
-        h.polity  = static_cast<int>(pi);
-        h.regions = by_polity[pi];
-        o.holdings.push_back(std::move(h));
-    }
+    o.holdings = derive_holdings(o.regions, o.polities);
 
     // THE SURVIVING NETWORK CROSSES THE HANDOFF, UNEVENLY (BL-911). A corridor
     // (already sorted ascending by (a, b) at the source, BL-768) survives when
@@ -7079,18 +7621,7 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
     // so a segment on ground held by nobody living is dropped rather than
     // carried on the strength of the OTHER end alone... unless that other end
     // is itself held by a survivor, which is exactly the "at least one" test.
-    const auto region_survives = [&](uint16_t region_idx) {
-        if (region_idx >= o.regions.size()) return false;
-        const int n = o.regions[static_cast<std::size_t>(region_idx)].nation;
-        if (n < 0 || n >= static_cast<int>(o.polities.size())) return false;
-        return o.polities[static_cast<std::size_t>(n)].alive;
-    };
-    o.surviving_corridors.reserve(hs.supply_corridors.size());
-    for (const history_corridor& c : hs.supply_corridors)
-    {
-        if (region_survives(c.a) || region_survives(c.b))
-            o.surviving_corridors.push_back(c);
-    }
+    o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
     return o;
 }
 
@@ -7284,6 +7815,298 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why)
         if (holds.at(w.from).at(static_cast<std::size_t>(gi)))
             return fail("a want names a good the wanting polity already holds");
     }
+
+    if (why) why->clear();
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// The Exploration -> Digitisation handoff (BL-956)
+// ---------------------------------------------------------------------------
+
+exploration_output make_exploration_output(const settlement_state&  ss,
+                                           const history_sim_state& hs,
+                                           int                      culture_count)
+{
+    exploration_output o;
+    o.regions       = ss.regions;
+    o.polities      = hs.polities;
+    o.culture_count = culture_count;
+    o.contacts      = hs.contacts;
+    o.grudges       = hs.grudges;
+    o.start_year    = hs.start_year;
+    o.stop_year     = hs.start_year + hs.years;
+
+    // STANDING TREATIES AT THE CLOSE. The sim expires objects at the top of
+    // each decision round, so a term that ran out between the last round and
+    // `stop_year` can still sit in `hs.dated_objects`; the same expiry rule,
+    // applied at `stop_year`, is what "standing at 1660" means. Then sorted,
+    // because the sim's own vector is in insertion order and a handoff's
+    // order must be a property of its integers.
+    o.dated_objects = hs.dated_objects;
+    expire_dated_objects(o.dated_objects, o.stop_year);
+    std::sort(o.dated_objects.begin(), o.dated_objects.end(),
+              [](const dated_object& x, const dated_object& y) {
+                  if (x.a != y.a) return x.a < y.a;
+                  if (x.b != y.b) return x.b < y.b;
+                  if (x.kind != y.kind) return x.kind < y.kind;
+                  return x.expires_year < y.expires_year;
+              });
+
+    // TRADE FLOWS AT THE CLOSE: the span's final decision round's flows, kept
+    // only where they still stand at `stop_year` -- the pair still holds a
+    // trade_access clause among the standing objects just folded (a clause
+    // that expired between the last round and the close takes its flows with
+    // it), and both parties are still alive (a polity conquered after the
+    // last round's upkeep cannot be trading at the close). Order-preserving:
+    // the sim's vector is already sorted by (seller, buyer, good).
+    o.trade_flows = hs.trade_flows;
+    prune_flows_without_trade_access(o.trade_flows, o.dated_objects);
+    o.trade_flows.erase(
+        std::remove_if(o.trade_flows.begin(), o.trade_flows.end(),
+            [&](const trade_flow& f) {
+                return f.seller >= o.polities.size() || f.buyer >= o.polities.size()
+                    || !o.polities[f.seller].alive || !o.polities[f.buyer].alive;
+            }),
+        o.trade_flows.end());
+
+    // Both derived tables are pure folds over the 1660 state just copied —
+    // the same derivations the Empire handoff and the sim itself use.
+    o.wants              = derive_wants(o.regions, o.contacts, o.polities);
+    o.culture_preference = derive_culture_preference(o.regions, o.contacts, o.polities,
+                                                     culture_count);
+
+    o.holdings            = derive_holdings(o.regions, o.polities);
+    o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
+    return o;
+}
+
+bool exploration_output_valid(const exploration_output& o, std::string* why)
+{
+    const auto fail = [&](const std::string& msg) {
+        if (why) *why = msg;
+        return false;
+    };
+    const int np = static_cast<int>(o.polities.size());
+    const int nr = static_cast<int>(o.regions.size());
+
+    // 1. The region table: shares sum to 1000 and name cultures in range, and
+    //    every owner id is a real polity or none.
+    for (int i = 0; i < nr; ++i)
+    {
+        const region& r = o.regions[static_cast<std::size_t>(i)];
+        if (r.culture.total_q() != 1000)
+            return fail("region " + std::to_string(i) + " culture shares sum to "
+                        + std::to_string(r.culture.total_q()) + ", not 1000");
+        for (int k = 0; k < culture_share_slots; ++k)
+            if (o.culture_count > 0 && r.culture.id[k] >= o.culture_count)
+                return fail("region " + std::to_string(i) + " names culture "
+                            + std::to_string(r.culture.id[k]) + " out of range");
+        if (r.nation < -1 || r.nation >= np)
+            return fail("region " + std::to_string(i) + " is owned by polity "
+                        + std::to_string(r.nation) + " out of range");
+        if (r.treasury < 0)
+            return fail("region " + std::to_string(i) + " carries a negative treasury");
+        if (r.port_stock_q < 0 || r.port_stock_q > 1000)
+            return fail("region " + std::to_string(i) + " carries a port_stock_q off the 0-1000 scale");
+        if (r.army_stock < 0)
+            return fail("region " + std::to_string(i) + " carries a negative army_stock");
+    }
+
+    // 2. The overlord graph. An overlord is a real polity and never the
+    //    subject itself; `subject_kind` is set exactly when an overlord is.
+    for (int i = 0; i < np; ++i)
+    {
+        const polity& q = o.polities[static_cast<std::size_t>(i)];
+        if (q.overlord < -1 || q.overlord >= np)
+            return fail("polity " + std::to_string(i) + " names overlord "
+                        + std::to_string(q.overlord) + " out of range");
+        if (q.overlord == i)
+            return fail("polity " + std::to_string(i) + " is its own overlord");
+        if (q.subject_kind < -1 || q.subject_kind > 1)
+            return fail("polity " + std::to_string(i) + " carries an out-of-range subject_kind");
+        if ((q.overlord < 0) != (q.subject_kind < 0))
+            return fail("polity " + std::to_string(i)
+                        + " has an overlord and a subject_kind that disagree");
+        if (q.navy_stock < 0)
+            return fail("polity " + std::to_string(i) + " carries a negative navy_stock");
+    }
+
+    // 3. The holdings. Ascending, in range, held by the living, each region
+    //    held once and matching its own `nation` — and every owned region
+    //    held, so the set and the map are the same map.
+    std::vector<char> claimed(o.regions.size(), 0);
+    int last_polity = -1;
+    for (const polity_holdings& h : o.holdings)
+    {
+        if (h.polity <= last_polity)
+            return fail("holdings are not in ascending polity order");
+        last_polity = h.polity;
+        if (h.polity < 0 || h.polity >= np)
+            return fail("holdings name polity " + std::to_string(h.polity) + " out of range");
+        if (!o.polities[static_cast<std::size_t>(h.polity)].alive)
+            return fail("polity " + std::to_string(h.polity) + " holds ground but is not alive");
+        int last_region = -1;
+        for (int r : h.regions)
+        {
+            if (r <= last_region) return fail("holdings are not in ascending region order");
+            last_region = r;
+            if (r < 0 || r >= nr)
+                return fail("holdings name region " + std::to_string(r) + " out of range");
+            if (claimed[static_cast<std::size_t>(r)])
+                return fail("region " + std::to_string(r) + " is held twice");
+            claimed[static_cast<std::size_t>(r)] = 1;
+            if (o.regions[static_cast<std::size_t>(r)].nation != h.polity)
+                return fail("region " + std::to_string(r) + " holdings disagree with its nation");
+        }
+    }
+    for (int i = 0; i < nr; ++i)
+        if (o.regions[static_cast<std::size_t>(i)].nation >= 0 && !claimed[static_cast<std::size_t>(i)])
+            return fail("region " + std::to_string(i) + " is owned but appears in no holding");
+
+    // 4. The grudges. Sorted, directed, in range, carrying their cause.
+    std::pair<int, int> last_grudge{-1, -1};
+    for (const grudge& g : o.grudges)
+    {
+        const std::pair<int, int> key{g.from, g.to};
+        if (!(last_grudge < key)) return fail("grudges are not sorted by (from, to)");
+        last_grudge = key;
+        if (g.from == g.to) return fail("a polity holds a grudge against itself");
+        if (g.from >= o.polities.size() || g.to >= o.polities.size())
+            return fail("a grudge names a polity out of range");
+        if (g.score < 0 || g.peak < g.score)
+            return fail("a grudge's peak is below its standing score");
+        if (g.event_count <= 0 || g.events_kept <= 0)
+            return fail("a grudge carries a score with no cause");
+    }
+
+    // 5. The contacts. Sorted, directed, in range, never a self-pair.
+    std::pair<int, int> last_contact{-1, -1};
+    for (const contact& c : o.contacts)
+    {
+        const std::pair<int, int> key{c.from, c.to};
+        if (!(last_contact < key)) return fail("contacts are not sorted by (from, to)");
+        last_contact = key;
+        if (c.from == c.to) return fail("a polity is recorded in contact with itself");
+        if (c.from >= o.polities.size() || c.to >= o.polities.size())
+            return fail("a contact names a polity out of range");
+    }
+
+    // 6. The wants. Sorted by pair, in range, never a self-want, gated on
+    //    contact.
+    std::pair<int, int> last_want{-1, -1};
+    for (const want& w : o.wants)
+    {
+        if (w.from == w.to) return fail("a polity wants a good from itself");
+        if (w.from >= o.polities.size() || w.to >= o.polities.size())
+            return fail("a want names a polity out of range");
+        if (w.good == region_class::none) return fail("a want names no good");
+        const std::pair<int, int> key{w.from, w.to};
+        if (key < last_want) return fail("wants are not sorted by (from, to)");
+        last_want = key;
+        if (!contact_between(o.contacts, w.from, w.to))
+            return fail("a want crosses a pair with no contact");
+    }
+
+    // 7. Cultural good preference. Strictly ascending (culture, good index),
+    //    in range, weight on the 0-1000 scale.
+    std::pair<int, int> last_pref{-1, -1};
+    for (const culture_good_preference& p : o.culture_preference)
+    {
+        const int gi = scarcity_good_index(p.good);
+        if (gi < 0) return fail("a culture preference names no good");
+        if (p.culture < 0 || (o.culture_count > 0 && p.culture >= o.culture_count))
+            return fail("a culture preference names a culture out of range");
+        const std::pair<int, int> key{p.culture, gi};
+        if (!(last_pref < key)) return fail("culture preferences are not sorted by (culture, good)");
+        last_pref = key;
+        if (p.weight_q < 0 || p.weight_q > 1000)
+            return fail("a culture preference weight is off the 0-1000 scale");
+    }
+
+    // 8. Standing treaties and tribute. Sorted, in range, never a self-pair,
+    //    a known clause, mutual clauses in canonical (a < b) order, and still
+    //    inside their term at the close — a remaining term is never <= 0.
+    for (std::size_t i = 0; i < o.dated_objects.size(); ++i)
+    {
+        const dated_object& d = o.dated_objects[i];
+        if (i > 0)
+        {
+            const dated_object& p = o.dated_objects[i - 1];
+            const bool out_of_order =
+                  d.a != p.a ? d.a < p.a
+                : d.b != p.b ? d.b < p.b
+                : d.kind != p.kind ? d.kind < p.kind
+                : d.expires_year < p.expires_year;
+            if (out_of_order)
+                return fail("dated objects are not sorted by (a, b, kind, expires_year)");
+        }
+        if (d.a < 0 || d.a >= np || d.b < 0 || d.b >= np)
+            return fail("a dated object names a polity out of range");
+        if (d.a == d.b) return fail("a dated object binds a polity to itself");
+        if (d.kind < 0 || d.kind >= treaty_clause_count)
+            return fail("a dated object names an out-of-range treaty clause");
+        if (d.kind != static_cast<int32_t>(treaty_clause::tribute) && d.a > d.b)
+            return fail("a mutual treaty clause is not in canonical (a < b) order");
+        if (d.expires_year <= o.stop_year)
+            return fail("a dated object's term has already ended at the close");
+    }
+
+    // 9. The surviving network. Sorted, endpoints in range and distinct, and
+    //    every corridor with a living holder at one end.
+    std::pair<int, int> last_corridor{-1, -1};
+    for (const history_corridor& c : o.surviving_corridors)
+    {
+        const std::pair<int, int> key{c.a, c.b};
+        if (!(last_corridor < key)) return fail("surviving corridors are not sorted by (a, b)");
+        last_corridor = key;
+        if (c.a == c.b) return fail("a surviving corridor joins a region to itself");
+        if (c.a >= o.regions.size() || c.b >= o.regions.size())
+            return fail("a surviving corridor names a region out of range");
+        if (!corridor_region_survives(o.regions, o.polities, c.a)
+         && !corridor_region_survives(o.regions, o.polities, c.b))
+            return fail("a surviving corridor has no living holder at either end");
+    }
+
+    // 10. Trade flows. Strictly ascending (seller, buyer, good), both parties
+    //     real, alive and distinct, a known good, a positive volume -- and
+    //     every flow's pair holding a trade_access clause among THIS value's
+    //     own standing objects, so no flow outlives the clause that opened it.
+    {
+        std::vector<std::pair<int32_t, int32_t>> bound;
+        for (const dated_object& d : o.dated_objects)
+            if (d.kind == static_cast<int32_t>(treaty_clause::trade_access))
+                bound.push_back({std::min(d.a, d.b), std::max(d.a, d.b)});
+        std::sort(bound.begin(), bound.end());
+
+        for (std::size_t i = 0; i < o.trade_flows.size(); ++i)
+        {
+            const trade_flow& f = o.trade_flows[i];
+            if (i > 0)
+            {
+                const trade_flow& p = o.trade_flows[i - 1];
+                const bool ascending =
+                      f.seller != p.seller ? f.seller > p.seller
+                    : f.buyer != p.buyer   ? f.buyer > p.buyer
+                    : f.good > p.good;
+                if (!ascending)
+                    return fail("trade flows are not strictly sorted by (seller, buyer, good)");
+            }
+            if (f.seller >= np || f.buyer >= np)
+                return fail("a trade flow names a polity out of range");
+            if (f.seller == f.buyer) return fail("a polity trades with itself");
+            if (!o.polities[f.seller].alive || !o.polities[f.buyer].alive)
+                return fail("a trade flow names a polity that is not alive");
+            if (f.good >= 4) return fail("a trade flow names an out-of-range good");
+            if (f.volume_q <= 0) return fail("a trade flow carries no volume");
+            const int32_t s = f.seller, u = f.buyer;
+            if (!std::binary_search(bound.begin(), bound.end(),
+                                    std::pair<int32_t, int32_t>{std::min(s, u), std::max(s, u)}))
+                return fail("a trade flow's pair holds no standing trade_access clause");
+        }
+    }
+
+    if (o.start_year > o.stop_year) return fail("the span closes before it opens");
 
     if (why) why->clear();
     return true;

@@ -61,6 +61,7 @@
 #include <atomic>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -1316,6 +1317,24 @@ struct history_sim_params
     /// a value that already exists, never a new term added beside the score.
     int w_fear_q = 0;
 
+    /// A WANT POINTS A CAMPAIGN OUTWARD (BL-953; EXPLORATION.md sec A want
+    /// points a campaign outward). Per-mille pull on the campaign prize by the
+    /// DECIDER's own want for the target region's dominant good
+    /// (`polity_good_want_q`): `value += value * w_want_q * want_q / 10^6`,
+    /// applied once, outside the season loop, only to a positive prize -- a
+    /// want RANKS winnable campaigns, it never makes an unwinnable one
+    /// attractive. The same want ranks which native a sea-legged power
+    /// subjects first (stable tie-break on the lower id).
+    ///
+    /// Read only while `exploration_upkeep_enabled` is set (the scarcity
+    /// signal it reads exists only then). ZERO IS THE STRUCT DEFAULT AND THE
+    /// IDENTITY: at 0 neither the scorer nor subjection moves, so the Empires
+    /// span is byte-identical; only `exploration_sim_params` sets it.
+    ///
+    /// NOT A NEW AI GRANT: it leans the existing campaign/subjection verbs'
+    /// scored utility with a richer input, same idiom as `w_fear_q`/`w_aggr_q`.
+    int w_want_q = 0;
+
     /// The grudge total, summed across D's aggrieved kin, that counts as FULL
     /// fear -- the denominator that turns an unbounded ledger sum into the
     /// 0-1000 currency every other lean in this file speaks.
@@ -1707,10 +1726,29 @@ struct history_sim_params
     /// to. A rate, scaled by the step.
     int treasury_corridor_income_q = 6;
 
-    /// Flat capital earned per decision round while the capital itself
-    /// carries a market (`region::has_market`, BL-910). A rate, scaled by
-    /// the step; zero for a polity whose seat never stood a market.
-    int treasury_market_income_q = 50;
+    /// BL-954 -- A MARKET EARNS BY WHAT FLOWS THROUGH IT, NOT BY STANDING
+    /// (EXPLORATION.md sec Capital arrives). There is no flat per-market
+    /// term: every `trade_flow` credits BOTH the seller's and the buyer's
+    /// capital `volume_q * this * step_years / 1000` (a rate, scaled by the
+    /// step). A market with no trade crossing it earns nothing from trade.
+    /// MEASURED (exploration_sweep, 3 seeds): at 100 the spread's summed
+    /// trade income per round (~36.5k volume x 2 ends x 100 x 4 / 1000 ~ 29k)
+    /// matches the summed flat market income it replaced (~139 market seats
+    /// x 50 x 4 ~ 28k), so removing the allowance redistributes capital to
+    /// busy lines rather than draining it. 20 was also measured (~5.7k per
+    /// round); neither moved reading 8, which consolidation dominates.
+    int treasury_trade_income_q = 100;
+
+    /// BL-954 -- per-mille of the TRADE VALUE a pair's trade-access clause
+    /// WOULD open (the marginal volume, both directions, every good --
+    /// `pair_trade_value_q`) added to `treaty_value_q`, near home and far
+    /// alike (EXPLORATION.md sec Trade is a want met by throughput: "only
+    /// trade can make a stranger worth a promise"). FIRST CUT, measured
+    /// against 0 (exploration_sweep, 3 seeds): at 100 a few more pairs bind
+    /// (1371 vs 1365 formed) and one seed's span battles fall 53 -> 9; at 0
+    /// that seed matches the pre-trade baseline. The effect is real, not
+    /// cosmetic -- tune from the sweep, never by re-guessing.
+    int treaty_trade_weight_q = 100;
 
     // --- BL-933: treaties ---------------------------------------------------
     // EXPLORATION.md sec Diplomacy becomes real.
@@ -1862,12 +1900,33 @@ struct dated_object
 /// never a roll.
 void expire_dated_objects(std::vector<dated_object>& objects, int64_t year);
 
+// ---------------------------------------------------------------------------
+// BL-954 — TRADE IS A WANT MET BY THROUGHPUT (EXPLORATION.md sec Trade is a
+// want met by throughput). Declared here, ahead of the upkeep step that
+// rebuilds them; the functions that size a flow sit beside the scarcity
+// signal further down, once `region`/`polity` are in scope.
+// ---------------------------------------------------------------------------
+
+/// ONE NUMBER PER SELLER, BUYER AND GOOD — not a cargo, not a route, not a
+/// price. A fact in the same family as `grudge`/`contact`: a named, directed
+/// pair plus what joined them. `good` is a `scarcity_good_index` (farm=0,
+/// ore=1, energy=2, port=3). `volume_q` is always > 0 in a stored entry.
+/// Rebuilt every decision round of the Exploration span; the vector is
+/// sorted ascending by (seller, buyer, good).
+struct trade_flow
+{
+    uint16_t seller   = 0;
+    uint16_t buyer    = 0;
+    uint8_t  good     = 0;
+    int32_t  volume_q = 0;
+};
+
 /// THE UPKEEP STEP ITSELF (BL-931/BL-932), called once per decision round
 /// when `history_sim_params::exploration_upkeep_enabled` is set. "Earn, then
 /// pay stocks, then invest" (EXPLORATION.md sec The engine is shared) — this
 /// item builds EARN: every living polity's capital seat (`region::treasury`)
 /// draws income from its held ground's endowment, the inherited corridor
-/// network, and a standing market (`history_sim_params::treasury_*_income_q`),
+/// network, and the trade flowing through its market (BL-954; `history_sim_params::treasury_*_income_q`),
 /// and — ONCE, on the round at @p year == @p params.start_year, the phase's
 /// visible opening act — the seat's accumulated `material_stock` is folded
 /// into it (EXPLORATION.md sec Capital arrives: "material becomes capital").
@@ -1888,13 +1947,23 @@ struct exploration_upkeep_spend
     int64_t standing_armies = 0;
 };
 
+///
+/// BL-954 — THE ROUND'S ORDER IS: refresh the raw signal, compute every
+/// trade flow a bound `trade_access` clause in @p treaties opens (written,
+/// sorted, into @p flows_out), relieve each buyer's signal by its inbound
+/// volume, EARN (endowment, corridor touch, and each flow crediting BOTH
+/// capitals — no flat market income), then pay and invest. @p treaties null
+/// means no clause binds anyone, so no flow forms; @p flows_out null discards
+/// the flows after they have relieved and earned.
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
                             const history_sim_params&             params,
                             int64_t                                year,
                             int                                    step_years,
-                            exploration_upkeep_spend*              spend = nullptr);
+                            exploration_upkeep_spend*              spend = nullptr,
+                            const std::vector<dated_object>*       treaties = nullptr,
+                            std::vector<trade_flow>*               flows_out = nullptr);
 
 // ---------------------------------------------------------------------------
 // Actors
@@ -2706,6 +2775,14 @@ struct history_sim_state
     /// treaty objects land in.
     std::vector<dated_object> dated_objects;
 
+    /// BL-954 — THE ROUND'S TRADE (EXPLORATION.md sec Trade is a want met by
+    /// throughput). Every flow a bound `trade_access` clause opened on the
+    /// most recent decision round, sorted ascending by (seller, buyer, good);
+    /// rebuilt, not accumulated, so at the span's close it is the 1660 state.
+    /// Empty throughout the Empire span. GENERATION SCRATCH, NOT SAVED, same
+    /// footing as `dated_objects` above.
+    std::vector<trade_flow> trade_flows;
+
     int      region_stride = 0; ///< Final region count (slice width for replay).
     int64_t  years           = 0; ///< Years simulated.
     int64_t  start_year      = 0; ///< First simulated year, for replay bounds.
@@ -3257,10 +3334,17 @@ int64_t contact_first_year(const history_sim_state& s, int from, int to);
 /// instead — the same purchase meets no deterrent and should not bind as
 /// readily, which is what keeps a funded port's cheap crossing from being
 /// treatied away before it is ever used (NR-851).
+///
+/// BL-954 ADDS TRADE. @p trade_value_q is the MARGINAL volume the pair's
+/// trade-access clause WOULD open beyond what other partners already carry,
+/// both directions, every good (`pair_trade_value_q`), weighted by `treaty_trade_weight_q` per mille and
+/// added NEAR HOME AND FAR ALIKE — the one term that can make a distant pair
+/// worth a promise. The partner is worth more alive.
 int treaty_value_q(const history_sim_params& p,
                     int grudge_against_other_q, int grudge_from_other_q,
                     int counterpart_treaties_broken, int decider_aggression_q,
-                    int alarm_from_other_q, bool near_home);
+                    int alarm_from_other_q, bool near_home,
+                    int trade_value_q);
 
 /// BL-941 — VISIBLE CAPABILITY, 0-1000. What a neighbour reads of
 /// `polity_id`'s capital `region::army_stock` plus its own `polity::navy_stock`,
@@ -3387,6 +3471,111 @@ void refresh_market_scarcity(std::vector<region>& regions, const std::vector<pol
 /// that holds it; that node's own consumer is not built by this item).
 int market_scarcity_q(const std::vector<region>& regions, const history_sim_state& s,
                        int viewer_polity, int market_region, region_class good);
+
+// ---------------------------------------------------------------------------
+// Trade flows (BL-954) — EXPLORATION.md sec Trade is a want met by throughput.
+// "A flow needs three things at once, and each is already in the world": a
+// WANT (the buyer market's raw signal), a HOLDER (the seller's ground dominant
+// in the good), a LINE (held corridors on land, a built port and a navy across
+// water). The volume is the smallest of the three.
+// ---------------------------------------------------------------------------
+
+/// The per-round reads every flow in a round shares, folded ONCE so sizing a
+/// flow costs a lookup rather than a walk of every region and corridor.
+/// Built by `build_trade_context` off the same round's regions, polities and
+/// corridors; stale the moment ground changes hands, so never kept across a
+/// round.
+struct trade_context
+{
+    /// Per polity (indexed by id), per good: per-mille share of the polity's
+    /// held regions whose `dominant` is the good. 0 for a polity holding
+    /// nothing.
+    std::vector<std::array<int32_t, 4>> holding_q;
+
+    /// LAND LINES, one per unordered polity pair a supply corridor joins
+    /// (one endpoint held by each): (lo, hi, line_q), sorted by (lo, hi).
+    /// `line_q` is the best such corridor's min(`network_supply_q`) over its
+    /// two endpoints — each side's own reach from its seat to the shared
+    /// border, which is where the goods change hands.
+    struct land_line
+    {
+        uint16_t lo = 0, hi = 0;
+        int32_t  line_q = 0;
+    };
+    std::vector<land_line> land_lines;
+};
+
+trade_context build_trade_context(const std::vector<region>&           regions,
+                                  const std::vector<polity>&           polities,
+                                  const std::vector<history_corridor>& corridors);
+
+/// THE VOLUME ONE DIRECTED (seller, buyer, good) FLOW WOULD CARRY, ignoring
+/// the clause gate: min(buyer capital's `scarcity_raw_q[good]`, seller's
+/// `holding_q[good]`, line_q), where line_q = max(land, sea); land is the
+/// pair's `land_line` (0 without one) and sea is min(seller seat
+/// `port_stock_q`, buyer seat `port_stock_q`) while the seller holds a navy
+/// (`navy_stock > 0`), else 0. 0 for a dead or out-of-range party, the same
+/// polity on both sides, a capital out of range, or @p good outside 0..3.
+int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& regions,
+                        const std::vector<polity>& polities,
+                        int seller, int buyer, int good);
+
+/// THE MARGINAL TRADE A BINDING WOULD OPEN, ignoring the clause gate —
+/// computable before the pair binds, which is what `treaty_value_q` needs.
+/// Summed over both directions (seller -> buyer) and all four goods:
+/// min(`trade_flow_volume_q`, max(0, buyer's raw want less the volume OTHER
+/// sellers already bring it in @p flows), max(0, seller's holding less the
+/// volume it already sends OTHER buyers in @p flows)). Flows between @p a
+/// and @p b themselves count against neither remainder. @p flows is the
+/// current round's (`compute_trade_flows`). Pure.
+int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regions,
+                       const std::vector<polity>& polities, int a, int b,
+                       const std::vector<trade_flow>& flows);
+
+/// Every flow the bound `trade_access` clauses in @p treaties open this
+/// round: per bound pair, both directions, every good with volume > 0.
+/// ONLY THE CLAUSE OPENS A FLOW — contact alone never does. One want is
+/// shared across a buyer's sellers (spent fattest line first, ties to the
+/// lower seller), then one holding across a seller's buyers (fattest flow
+/// first, ties to the lower buyer). Sorted ascending by (seller, buyer, good).
+/// Pure; reads the RAW signal, never the relieved one.
+std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx,
+                                            const std::vector<region>&       regions,
+                                            const std::vector<polity>&       polities,
+                                            const std::vector<dated_object>& treaties);
+
+// ---------------------------------------------------------------------------
+// A want points a campaign outward (BL-953) — EXPLORATION.md sec A want
+// points a campaign outward.
+// ---------------------------------------------------------------------------
+
+/// @p polity_id's WANT for @p good, 0-1000: its OWN capital's `scarcity_q`
+/// for the good (0 when the capital has no market, the good has no scarcity
+/// index, or the id/capital is out of range), weighted by its people's
+/// preference for it — `scarcity * (500 + weight_q / 2) / 1000`. "Its
+/// people" is the capital region's plurality culture (the grain
+/// `derive_culture_preference` keys on), falling back to the polity's
+/// founding culture where the capital carries no share. A good with no
+/// preference entry weighs at the 500 floor: an unmet want still counts,
+/// preference only sharpens it. @p prefs must be sorted ascending by culture,
+/// as `derive_culture_preference` produces it. Pure.
+int polity_good_want_q(const std::vector<region>& regions, const std::vector<polity>& polities,
+                       const std::vector<culture_good_preference>& prefs,
+                       int polity_id, region_class good);
+
+/// The campaign prize @p value leaned by a want: `value + value * w_want_q *
+/// want_q / 10^6`, integer arithmetic. A NON-POSITIVE prize is returned
+/// unchanged (a want ranks winnable campaigns, never rescues a loss), and the
+/// result is never below 0. Pure; the scorer's one call site and the harness
+/// both go through this.
+int want_leaned_campaign_value(int value, int w_want_q, int want_q);
+
+/// Subjection's pick among ELIGIBLE natives, each given as (native polity id,
+/// the arriving power's want for that native capital's dominant good): the
+/// highest want wins, ties to the LOWER id; -1 when @p candidates is empty.
+/// With every want 0 this is exactly "the lowest eligible id", the id-order
+/// walk it replaces. Pure and order-independent in its input.
+int choose_subjection_native(const std::vector<std::pair<int, int>>& candidates);
 
 // ---------------------------------------------------------------------------
 // The turbulence lean, resolved (BL-839)
@@ -3527,3 +3716,126 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
 /// carries at least one event; every contact names polities in range and
 /// carries the event that joined it. Writes the first failure into @p why.
 bool pass_one_output_valid(const pass_one_output& o, std::string* why);
+
+// ---------------------------------------------------------------------------
+// The Exploration -> Digitisation handoff (BL-956)
+// ---------------------------------------------------------------------------
+
+/// THE WHOLE OF WHAT THE EXPLORATION SPAN HANDS FORWARD, AND NOTHING ELSE
+/// (BL-956). EXPLORATION.md § What this phase hands digitisation names the
+/// list and says "The list is a struct, and it has readers before
+/// Digitisation exists" — this is that struct, on exactly the footing of
+/// `pass_one_output` above: a VALUE (copies, never views of live sim state),
+/// folded by `make_exploration_output` and held to its list by
+/// `exploration_output_valid`.
+///
+/// ITS FIRST READER IS WORLD SETUP, not Digitisation: wherever the span ran,
+/// sentiment is seeded from `grudges` and roads are stamped from
+/// `surviving_corridors` here, so a campaign opening on the 1660 political
+/// map does not open on 1200's resentments and 1200's roads.
+///
+/// WHERE EACH ITEM ON THE DOC'S LIST LIVES, so the mapping is explicit rather
+/// than inferred:
+///   - Treasuries                -> `region::treasury` on each polity's
+///                                  capital seat, in `regions`
+///   - Scarcity signals          -> `region::scarcity_q` on each market
+///                                  region, in `regions`
+///   - Trade flows               -> `trade_flows`
+///   - Corridor throughput       -> `surviving_corridors::uses`. THE ROAD
+///                                  LADDER RUNG IS NOT RECOVERABLE FROM THIS
+///                                  VALUE: it is not stored, and reading it
+///                                  off `uses` against `history_sim_params::
+///                                  road_tier{1,2,3}_uses` does NOT reproduce
+///                                  the sim's rung. A bought post road sets
+///                                  the sim's live use count to
+///                                  `road_tier3_uses` but adds only one row
+///                                  to the corridor record, and a resumed run
+///                                  never seeds its live counts from
+///                                  `resume_corridors`, so `uses` under-reads
+///                                  both. Carrying the rung forward is owed.
+///   - Cultural good preference  -> `culture_preference`
+///   - The overlord graph        -> `polity::overlord` / `polity::subject_kind`
+///                                  in `polities`; tribute terms in
+///                                  `dated_objects` (`treaty_clause::tribute`)
+///   - Standing treaties and their remaining terms
+///                               -> `dated_objects` (remaining years =
+///                                  `expires_year - stop_year`)
+///   - Ports, navies, standing armies
+///                               -> `region::port_stock_q` / `region::army_stock`
+///                                  in `regions`, `polity::navy_stock` in
+///                                  `polities`
+///   - The contact and want tables -> `contacts`, `wants`
+///   - Exploration tree masks    -> `polity::exploration_mask` in `polities`
+///   - The grudge table and the surviving network
+///                               -> `grudges`, `surviving_corridors`
+///   - (the political map, as a set) -> `holdings`
+struct exploration_output
+{
+    /// The region table at the span's close — carries treasury, scarcity_q,
+    /// port_stock_q, army_stock, culture shares and `nation` ownership.
+    std::vector<region> regions;
+
+    /// The polities at the span's close — carries navy_stock, overlord,
+    /// subject_kind and exploration_mask.
+    std::vector<polity> polities;
+
+    /// How many cultures the shares and `culture_preference` index into.
+    int culture_count = 0;
+
+    /// Treaty clauses (and tribute) STILL STANDING at `stop_year`: every
+    /// object whose term ended at or before `stop_year` is expired out by
+    /// `expire_dated_objects`, the same rule the sim's own rounds apply.
+    /// Sorted ascending by (a, b, kind, expires_year).
+    std::vector<dated_object> dated_objects;
+
+    /// The directed contact table (BL-908), grown across the span.
+    std::vector<contact> contacts;
+
+    /// The directed want table (BL-909), re-derived over the 1660 state by
+    /// `derive_wants`.
+    std::vector<want> wants;
+
+    /// Cultural good preference (BL-936), derived over the 1660 state by
+    /// `derive_culture_preference`. Ascending (culture, good index).
+    std::vector<culture_good_preference> culture_preference;
+
+    /// The directed grudge table (BL-827), grown across the span.
+    std::vector<grudge> grudges;
+
+    /// Which provinces each polity holds at `stop_year`, one entry per polity
+    /// holding ground, ascending polity id — same derivation as
+    /// `pass_one_output::holdings`.
+    std::vector<polity_holdings> holdings;
+
+    /// The span's corridor record filtered over THIS span's dead, by exactly
+    /// the rule `pass_one_output::surviving_corridors` applies: a corridor
+    /// survives when at least one endpoint region is held, at `stop_year`, by
+    /// a polity `alive` in `polities`. Sorted ascending by (a, b).
+    std::vector<history_corridor> surviving_corridors;
+
+    /// The span's final decision round's trade flows (BL-954) STILL STANDING
+    /// at `stop_year`: kept only where the pair holds a trade_access clause
+    /// among `dated_objects` above and both parties are alive in `polities`.
+    /// Sorted ascending by (seller, buyer, good).
+    std::vector<trade_flow> trade_flows;
+
+    int64_t start_year = 0;
+    int64_t stop_year  = 0;
+};
+
+/// Fold the Exploration span's closing sim state and settlement state into
+/// the handoff value. @param culture_count Cultures the shares index into.
+exploration_output make_exploration_output(const settlement_state&  ss,
+                                           const history_sim_state& hs,
+                                           int                      culture_count);
+
+/// The enforcement half of `exploration_output`: every table sorted, every id
+/// in range, no self-pairs; every holding matches region ownership (and every
+/// owned region is held); every surviving corridor has a living holder at one
+/// end; every overlord id valid and never self, with `subject_kind` set iff an
+/// overlord is; every standing dated object still inside its term; no
+/// negative treasury, army or navy stock and every `port_stock_q` on 0-1000;
+/// every trade flow sorted, between two distinct living polities, a known
+/// good at positive volume, on a pair holding a standing trade_access clause.
+/// Writes the first failure into @p why.
+bool exploration_output_valid(const exploration_output& o, std::string* why);
