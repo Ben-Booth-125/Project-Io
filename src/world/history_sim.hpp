@@ -61,6 +61,7 @@
 #include <atomic>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -1315,6 +1316,24 @@ struct history_sim_params
     /// SAME IDIOM AS `w_cult`, `w_dist` AND `w_aggr_q`: a proportional lean on
     /// a value that already exists, never a new term added beside the score.
     int w_fear_q = 0;
+
+    /// A WANT POINTS A CAMPAIGN OUTWARD (BL-953; EXPLORATION.md sec A want
+    /// points a campaign outward). Per-mille pull on the campaign prize by the
+    /// DECIDER's own want for the target region's dominant good
+    /// (`polity_good_want_q`): `value += value * w_want_q * want_q / 10^6`,
+    /// applied once, outside the season loop, only to a positive prize -- a
+    /// want RANKS winnable campaigns, it never makes an unwinnable one
+    /// attractive. The same want ranks which native a sea-legged power
+    /// subjects first (stable tie-break on the lower id).
+    ///
+    /// Read only while `exploration_upkeep_enabled` is set (the scarcity
+    /// signal it reads exists only then). ZERO IS THE STRUCT DEFAULT AND THE
+    /// IDENTITY: at 0 neither the scorer nor subjection moves, so the Empires
+    /// span is byte-identical; only `exploration_sim_params` sets it.
+    ///
+    /// NOT A NEW AI GRANT: it leans the existing campaign/subjection verbs'
+    /// scored utility with a richer input, same idiom as `w_fear_q`/`w_aggr_q`.
+    int w_want_q = 0;
 
     /// The grudge total, summed across D's aggrieved kin, that counts as FULL
     /// fear -- the denominator that turns an unbounded ledger sum into the
@@ -3515,6 +3534,39 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
                                             const std::vector<region>&       regions,
                                             const std::vector<polity>&       polities,
                                             const std::vector<dated_object>& treaties);
+
+// ---------------------------------------------------------------------------
+// A want points a campaign outward (BL-953) — EXPLORATION.md sec A want
+// points a campaign outward.
+// ---------------------------------------------------------------------------
+
+/// @p polity_id's WANT for @p good, 0-1000: its OWN capital's `scarcity_q`
+/// for the good (0 when the capital has no market, the good has no scarcity
+/// index, or the id/capital is out of range), weighted by its people's
+/// preference for it — `scarcity * (500 + weight_q / 2) / 1000`. "Its
+/// people" is the capital region's plurality culture (the grain
+/// `derive_culture_preference` keys on), falling back to the polity's
+/// founding culture where the capital carries no share. A good with no
+/// preference entry weighs at the 500 floor: an unmet want still counts,
+/// preference only sharpens it. @p prefs must be sorted ascending by culture,
+/// as `derive_culture_preference` produces it. Pure.
+int polity_good_want_q(const std::vector<region>& regions, const std::vector<polity>& polities,
+                       const std::vector<culture_good_preference>& prefs,
+                       int polity_id, region_class good);
+
+/// The campaign prize @p value leaned by a want: `value + value * w_want_q *
+/// want_q / 10^6`, integer arithmetic. A NON-POSITIVE prize is returned
+/// unchanged (a want ranks winnable campaigns, never rescues a loss), and the
+/// result is never below 0. Pure; the scorer's one call site and the harness
+/// both go through this.
+int want_leaned_campaign_value(int value, int w_want_q, int want_q);
+
+/// Subjection's pick among ELIGIBLE natives, each given as (native polity id,
+/// the arriving power's want for that native capital's dominant good): the
+/// highest want wins, ties to the LOWER id; -1 when @p candidates is empty.
+/// With every want 0 this is exactly "the lowest eligible id", the id-order
+/// walk it replaces. Pure and order-independent in its input.
+int choose_subjection_native(const std::vector<std::pair<int, int>>& candidates);
 
 // ---------------------------------------------------------------------------
 // The turbulence lean, resolved (BL-839)

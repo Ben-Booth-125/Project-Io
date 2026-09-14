@@ -380,6 +380,17 @@ history_sim_params exploration_sim_params(const world_params& params)
     // the one caller that wants it called at all.
     hp.exploration_upkeep_enabled = true;
 
+    // BL-953 — a want points a campaign outward, and ranks subjection. THIS
+    // span only; the struct default (0) keeps the Empires span byte-identical.
+    // MEASURED, 3-seed exploration_sweep --quick, 2026-09-14 (traced re-run,
+    // w = 0/250/500/1000/2000): 0-500 move nothing beyond one-battle noise;
+    // 1000 lets a maximal want double a prize (a typical 350-700 want: +35-70%,
+    // the same order as the creed-appetite lean) and moves the displacement
+    // median 0.04 -> 0.06 with the battle rate intact; 2000 starts swinging
+    // whole seeds' neighbour-war counts (+45% on one, -60% on another), which
+    // is the lean deciding rather than ranking.
+    hp.w_want_q = 1000;
+
     // Carried opening behaviour from the Empires round, unchanged: a founding
     // that arrives inside this span (there are none scheduled — the migration
     // ends long before 1200 — but the flag is a property of the WORLD's rule
