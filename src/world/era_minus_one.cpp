@@ -382,7 +382,7 @@ history_sim_params exploration_sim_params(const world_params& params)
 
     // BL-953 — a want points a campaign outward, and ranks subjection. THIS
     // span only; the struct default (0) keeps the Empires span byte-identical.
-    // MEASURED, 3-seed exploration_sweep --quick, 2026-09-14 (traced re-run,
+    // MEASURED, `exploration_sweep 3 --w_want_q=N`, 2026-09-14 (traced re-run,
     // w = 0/250/500/1000/2000): 0-500 move nothing beyond one-battle noise;
     // 1000 lets a maximal want double a prize (a typical 350-700 want: +35-70%,
     // the same order as the creed-appetite lean) and moves the displacement

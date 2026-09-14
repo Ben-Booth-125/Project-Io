@@ -16,7 +16,9 @@
 //   R3   the resumed run is deterministic: same seed, same fixture, twice
 //        -> byte-identical ownership record and counters
 //   T6   BL-953: a want leans the campaign prize and ranks subjection
-//   R3b  BL-953: at w_want_q 0 the resumed span reproduces pre-change counters
+//   R3b  REGRESSION PIN of the lean-off (w_want_q 0) resumed span's counters;
+//        not an equivalence proof -- T6.5/T6.5b/T6.9 carry "w_want_q 0 changes
+//        nothing"
 //   R3c  BL-953: with the lean on the span stays deterministic (reported)
 //   R4   objects with a term expire on schedule and not before
 //   R5   the round-level upkeep hook is callable and moves nothing (it is a
@@ -25,8 +27,9 @@
 //        validator on a real world, fails it when corrupted, and is what
 //        world setup seeds sentiment and stamps roads from
 //   R7   BL-954: trade flows -- opened only by trade_access, bounded by want,
-//        holding and line, one want shared across sellers, income at both
-//        ends, no flat market income, trade value in treaty value
+//        holding and line, one want shared across sellers, one holding
+//        shared across buyers, income at both ends, no flat market income,
+//        the MARGINAL trade a clause opens in treaty value
 //
 // Headless: world/* logic only, no SDL and no Lua.
 // ---------------------------------------------------------------------------
@@ -303,6 +306,16 @@ int main()
               "T6.4  a wanted good raises a campaign prize over the same target without the want");
         check(want_leaned_campaign_value(prize, 0, want_farm_pref) == prize,
               "T6.5  at w_want_q = 0 the lean is the identity");
+        {
+            // T6.5b -- the identity across a spread of prizes and wants, so
+            // "w_want_q 0 changes nothing" does not rest on one pair of numbers.
+            bool identity = true;
+            for (const int v : {-50, 0, 1, 137, 400, 999, 5000, 250000})
+                for (const int want : {0, 1, 350, 700, 1000})
+                    identity = identity && want_leaned_campaign_value(v, 0, want) == v;
+            check(identity,
+                  "T6.5b at w_want_q = 0 the lean is the identity for every prize and want tried");
+        }
         check(want_leaned_campaign_value(0, w, 1000) == 0 && want_leaned_campaign_value(-50, w, 1000) == -50,
               "T6.6  a non-positive prize is never rescued by a want");
 
@@ -401,13 +414,16 @@ int main()
                     static_cast<long long>(ex1.conquests), static_cast<long long>(ex1.foundings),
                     static_cast<int>(p1.polities.size()), static_cast<int>(ex1.polities.size()));
 
-        // R3b (BL-953): WITH THE WANT LEAN AT 0 THE SPAN IS THE PRE-CHANGE
-        // SPAN. These counters were read off this exact fixture and seed with
-        // the harness built BEFORE BL-953 touched the scorer or subjection
-        // (2026-09-14, main @ 9b342fc6). A change that legitimately moves the
-        // Exploration span's upkeep/scarcity (not the want lean) moves these
-        // too, and is re-pinned by that change with its cause stated -- the
-        // claim here is only that BL-953 at `w_want_q` 0 moves nothing.
+        // R3b: A REGRESSION PIN OF THE LEAN-OFF SPAN, NOT AN EQUIVALENCE
+        // PROOF. These are the resumed span's counters at `w_want_q` 0 on this
+        // exact fixture and seed. They were first read with the harness built
+        // BEFORE BL-953 touched the scorer or subjection (2026-09-14, main @
+        // 9b342fc6), when they did prove BL-953 at 0 moved nothing; since then
+        // other changes have legitimately moved the span, so today they only
+        // catch an UNEXPLAINED move. What carries "w_want_q 0 changes nothing"
+        // now is the unit pair T6.5/T6.5b (the lean is the identity at 0) and
+        // T6.9 (all-zero wants pick the lowest id). A change that moves these
+        // re-pins them with its cause stated.
         //
         // RE-PINNED 2026-09-14 at sprint-41 integration: BL-954 (trade flows
         // replace the flat market income, trade value enters treaty value, one
@@ -415,6 +431,12 @@ int main()
         // conquests 423, foundings 451, tribute 134254916, treaties 287, owner
         // changes 2453. The pre-BL-953 equivalence itself was proven on BL-953`s
         // own branch (59768711) before trade existed.
+        //
+        // RE-PINNED 2026-09-14 at the sprint-41 wave-1 review fixes: treaty
+        // value now reads the MARGINAL trade a clause opens (F3) and a seller's
+        // holding is shared across its buyers (F5) -- was tribute 134235484,
+        // treaties 295 (battles 483, conquests 425, foundings 497, subjections
+        // 5, freed 1, broken 0, owner changes 2501 unmoved).
         std::printf("      pinned-read: subjections=%lld freed=%lld tribute=%lld treaties=%lld "
                     "broken=%lld owner_changes=%zu\n",
                     static_cast<long long>(ex1.subjections_formed),
@@ -424,9 +446,9 @@ int main()
                     static_cast<long long>(ex1.treaties_broken), ex1.owner_changes.size());
         check(ex1.battles == 483 && ex1.conquests == 425 && ex1.foundings == 497
            && ex1.subjections_formed == 5 && ex1.subjections_freed == 1
-           && ex1.tribute_remitted == 134235484 && ex1.treaties_formed == 295
+           && ex1.tribute_remitted == 134235719 && ex1.treaties_formed == 294
            && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2501,
-              "R3b  with w_want_q = 0 the Exploration span reproduces the pinned lean-off counters "
+              "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
         // R3c (BL-953): the same span with the lean ON -- deterministic, and
@@ -504,31 +526,84 @@ int main()
             check(!exploration_output_valid(self_lord, nullptr),
                   "R6.4  a polity that is its own overlord fails the validator");
         }
-        if (!eo.holdings.empty() && !eo.holdings[0].regions.empty())
+        if (eo.polities.size() >= 2 && !eo.holdings.empty() && !eo.holdings[0].regions.empty())
         {
+            // Re-own a held region to ANOTHER polity that is in range, so the
+            // only thing wrong is the holding/ownership disagreement -- and
+            // prove the validator failed for exactly that reason.
             exploration_output bad = eo;
             const int r = bad.holdings[0].regions[0];
             bad.regions[static_cast<std::size_t>(r)].nation = bad.holdings[0].polity == 0 ? 1 : 0;
-            check(!exploration_output_valid(bad, nullptr),
-                  "R6.5  a holding that disagrees with region ownership fails the validator");
+            std::string bad_why;
+            const bool rejected = !exploration_output_valid(bad, &bad_why);
+            if (rejected) std::printf("      R6.5 rejected with: %s\n", bad_why.c_str());
+            check(rejected && bad_why.find("holdings disagree with its nation") != std::string::npos,
+                  "R6.5  a holding that disagrees with region ownership fails the validator, for that reason");
         }
 
-        // R6.6/R6.7: world setup consumed the handoff's own tables.
-        bool grudges_equal = fixture.setup_grudges.size() == eo.grudges.size();
-        for (std::size_t i = 0; grudges_equal && i < eo.grudges.size(); ++i)
-            grudges_equal = fixture.setup_grudges[i].from == eo.grudges[i].from
-                         && fixture.setup_grudges[i].to == eo.grudges[i].to
-                         && fixture.setup_grudges[i].score == eo.grudges[i].score;
-        check(grudges_equal,
-              "R6.6  sentiment was seeded from the 1660 handoff's grudge table");
+        // R6.8-R6.13: the value checks and the trade-flow checks reject too.
+        if (!eo.regions.empty() && !eo.polities.empty())
+        {
+            const auto rejects_with = [](const exploration_output& v, const char* needle) {
+                std::string w;
+                return !exploration_output_valid(v, &w) && w.find(needle) != std::string::npos;
+            };
+            exploration_output b1 = eo; b1.regions[0].nation = -2;
+            check(rejects_with(b1, "out of range"), "R6.8  a region owner below -1 fails the validator");
+            exploration_output b2 = eo; b2.regions[0].treasury = -1;
+            check(rejects_with(b2, "negative treasury"), "R6.9  a negative treasury fails the validator");
+            exploration_output b3 = eo; b3.regions[0].port_stock_q = 1001;
+            check(rejects_with(b3, "port_stock_q"), "R6.10 a port_stock_q above 1000 fails the validator");
+            exploration_output b4 = eo; b4.regions[0].army_stock = -1;
+            check(rejects_with(b4, "army_stock"), "R6.11 a negative army_stock fails the validator");
+            exploration_output b5 = eo; b5.polities[0].navy_stock = -1;
+            check(rejects_with(b5, "navy_stock"), "R6.12 a negative navy_stock fails the validator");
 
-        bool corridors_equal = fixture.setup_corridors.size() == eo.surviving_corridors.size();
-        for (std::size_t i = 0; corridors_equal && i < eo.surviving_corridors.size(); ++i)
-            corridors_equal = fixture.setup_corridors[i].a == eo.surviving_corridors[i].a
-                           && fixture.setup_corridors[i].b == eo.surviving_corridors[i].b
-                           && fixture.setup_corridors[i].uses == eo.surviving_corridors[i].uses;
-        check(corridors_equal,
-              "R6.7  roads were stamped from the 1660 handoff's surviving network");
+            // A flow on a pair of living polities that holds no trade_access.
+            int la = -1, lb = -1;
+            for (const polity& q : eo.polities)
+            {
+                if (!q.alive) continue;
+                if (la < 0) { la = q.id; continue; }
+                bool bound = false;
+                for (const dated_object& d : eo.dated_objects)
+                    if (d.kind == static_cast<int32_t>(treaty_clause::trade_access)
+                     && ((d.a == la && d.b == q.id) || (d.a == q.id && d.b == la)))
+                        bound = true;
+                if (!bound) { lb = q.id; break; }
+            }
+            if (la >= 0 && lb >= 0)
+            {
+                exploration_output b6 = eo;
+                b6.trade_flows = { trade_flow{static_cast<uint16_t>(la), static_cast<uint16_t>(lb), 0, 10} };
+                check(rejects_with(b6, "no standing trade_access"),
+                      "R6.13 a flow whose pair holds no standing trade_access clause fails the validator");
+            }
+        }
+        std::printf("      handoff trade_flows=%zu\n", eo.trade_flows.size());
+
+        // R6.6/R6.7: world setup consumed the handoff's own tables, and they
+        // are the 1660 set -- not the 1200 pass-one set, which on this seed
+        // differs (so an equality with the handoff cannot be a 1200 read).
+        const auto grudges_same = [](const std::vector<grudge>& x, const std::vector<grudge>& y) {
+            if (x.size() != y.size()) return false;
+            for (std::size_t i = 0; i < x.size(); ++i)
+                if (x[i].from != y[i].from || x[i].to != y[i].to || x[i].score != y[i].score) return false;
+            return true;
+        };
+        const auto corridors_same = [](const std::vector<history_corridor>& x,
+                                       const std::vector<history_corridor>& y) {
+            if (x.size() != y.size()) return false;
+            for (std::size_t i = 0; i < x.size(); ++i)
+                if (x[i].a != y[i].a || x[i].b != y[i].b || x[i].uses != y[i].uses) return false;
+            return true;
+        };
+        check(grudges_same(fixture.setup_grudges, eo.grudges)
+           && !grudges_same(fixture.setup_grudges, fixture.pre_exploration_grudges),
+              "R6.6  sentiment was seeded from the 1660 handoff's grudge table, not the 1200 one");
+        check(corridors_same(fixture.setup_corridors, eo.surviving_corridors)
+           && !corridors_same(fixture.setup_corridors, fixture.pre_exploration_corridors),
+              "R6.7  roads were stamped from the 1660 handoff's surviving network, not the 1200 one");
 
         // REPORTED, not gated: how far 1660 moved from 1200 on this seed.
         const auto pair_in = [](const std::vector<grudge>& v, int f, int t) {
@@ -791,7 +866,7 @@ int main()
         // A pair with trade to open is worth more to bind than the same pair without.
         {
             const trade_context ctx = build_trade_context(regions, qs, corridors);
-            const int trade_value = pair_trade_value_q(ctx, regions, qs, 0, 1);
+            const int trade_value = pair_trade_value_q(ctx, regions, qs, 0, 1, flows);
             check(trade_value == 500,
                   "R7.12 pair_trade_value_q reads the flow the clause WOULD open, before any binding");
             for (const bool near : {true, false})
@@ -827,6 +902,48 @@ int main()
             check(f2.size() == 2 && inbound == r2[0].scarcity_raw_q[farm] && r2[0].scarcity_q[farm] == 0
                && f2[0].volume_q == 500 && f2[1].volume_q == 200,
                   "R7.15 one want is shared across sellers: 700 wanted from two 500-lines arrives as 500 + 200");
+
+            // R7.16/R7.17 -- treaty value is the MARGINAL trade a clause opens.
+            // Seller 1 already brings buyer 0 500 of its 700, so binding
+            // seller 2 opens only the 200 left; seller 1's own clause is worth
+            // its 500 because seller 2's 200 leaves that much room.
+            const trade_context ctx2 = build_trade_context(r2, q2, c2);
+            const int v02 = pair_trade_value_q(ctx2, r2, q2, 0, 2, f2);
+            const int v01 = pair_trade_value_q(ctx2, r2, q2, 0, 1, f2);
+            std::printf("      marginal treaty trade: pair(0,2)=%d pair(0,1)=%d\n", v02, v01);
+            check(v02 == 200,
+                  "R7.16 pair_trade_value_q reads only the want other sellers leave (200, not the unshared 500)");
+            check(v01 == 500,
+                  "R7.17 a bound pair's own flows do not count against its re-scored value");
+        }
+
+        // R7.18 -- one holding, shared: a seller with ONE farm region (holding
+        // 500) bound to TWO buyers each wanting 700 exports its holding once.
+        // Buyer 0 is region 0; buyer 2 is region 3; the seller is polity 1
+        // (market seat region 1, farm region 2), reached by both over land.
+        {
+            std::vector<region> r3 = base_regions;
+            r3.resize(4);
+            r3[3].nation = 2; r3[3].has_market = true; r3[3].dominant = region_class::none;
+            r3[3].network_supply_q = 1000;
+            std::vector<polity> q3 = base_qs;
+            q3.resize(3);
+            q3[2].id = 2; q3[2].alive = true; q3[2].capital = 3;
+            const std::vector<history_corridor> c3 = { history_corridor{0, 2, 5}, history_corridor{2, 3, 5} };
+            const std::vector<dated_object> two_buyers = {
+                dated_object{2000, static_cast<int32_t>(treaty_clause::trade_access), 0, 1},
+                dated_object{2000, static_cast<int32_t>(treaty_clause::trade_access), 1, 2} };
+            std::vector<trade_flow> f3;
+            run_exploration_upkeep(r3, q3, c3, ep, 1234, 4, nullptr, &two_buyers, &f3);
+            int64_t outbound = 0;
+            for (const trade_flow& f : f3) if (f.seller == 1 && f.good == farm) outbound += f.volume_q;
+            std::printf("      shared holding: wants %d/%d, flows=%zu, outbound=%lld\n",
+                        r3[0].scarcity_raw_q[farm], r3[3].scarcity_raw_q[farm], f3.size(),
+                        static_cast<long long>(outbound));
+            check(r3[0].scarcity_raw_q[farm] == 700 && r3[3].scarcity_raw_q[farm] == 700
+               && outbound == 500 && f3.size() == 1 && f3[0].buyer == 0 && f3[0].volume_q == 500,
+                  "R7.18 one holding is shared across buyers: a 500 holding bound to two 700-wants exports 500 once, "
+                  "ties to the lower buyer");
         }
     }
 

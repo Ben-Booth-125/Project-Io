@@ -1740,7 +1740,7 @@ struct history_sim_params
     int treasury_trade_income_q = 100;
 
     /// BL-954 -- per-mille of the TRADE VALUE a pair's trade-access clause
-    /// WOULD open (the summed volume, both directions, every good --
+    /// WOULD open (the marginal volume, both directions, every good --
     /// `pair_trade_value_q`) added to `treaty_value_q`, near home and far
     /// alike (EXPLORATION.md sec Trade is a want met by throughput: "only
     /// trade can make a stranger worth a promise"). FIRST CUT, measured
@@ -3335,9 +3335,9 @@ int64_t contact_first_year(const history_sim_state& s, int from, int to);
 /// readily, which is what keeps a funded port's cheap crossing from being
 /// treatied away before it is ever used (NR-851).
 ///
-/// BL-954 ADDS TRADE. @p trade_value_q is the total volume the pair's
-/// trade-access clause WOULD open, both directions, every good
-/// (`pair_trade_value_q`), weighted by `treaty_trade_weight_q` per mille and
+/// BL-954 ADDS TRADE. @p trade_value_q is the MARGINAL volume the pair's
+/// trade-access clause WOULD open beyond what other partners already carry,
+/// both directions, every good (`pair_trade_value_q`), weighted by `treaty_trade_weight_q` per mille and
 /// added NEAR HOME AND FAR ALIKE — the one term that can make a distant pair
 /// worth a promise. The partner is worth more alive.
 int treaty_value_q(const history_sim_params& p,
@@ -3520,16 +3520,25 @@ int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& reg
                         const std::vector<polity>& polities,
                         int seller, int buyer, int good);
 
-/// THE TRADE A BINDING WOULD OPEN: `trade_flow_volume_q` summed over both
-/// directions and all four goods, ignoring the clause gate — computable
-/// before the pair binds, which is what `treaty_value_q` needs.
+/// THE MARGINAL TRADE A BINDING WOULD OPEN, ignoring the clause gate —
+/// computable before the pair binds, which is what `treaty_value_q` needs.
+/// Summed over both directions (seller -> buyer) and all four goods:
+/// min(`trade_flow_volume_q`, max(0, buyer's raw want less the volume OTHER
+/// sellers already bring it in @p flows), max(0, seller's holding less the
+/// volume it already sends OTHER buyers in @p flows)). Flows between @p a
+/// and @p b themselves count against neither remainder. @p flows is the
+/// current round's (`compute_trade_flows`). Pure.
 int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regions,
-                       const std::vector<polity>& polities, int a, int b);
+                       const std::vector<polity>& polities, int a, int b,
+                       const std::vector<trade_flow>& flows);
 
 /// Every flow the bound `trade_access` clauses in @p treaties open this
 /// round: per bound pair, both directions, every good with volume > 0.
-/// ONLY THE CLAUSE OPENS A FLOW — contact alone never does. Sorted ascending
-/// by (seller, buyer, good). Pure; reads the RAW signal, never the relieved one.
+/// ONLY THE CLAUSE OPENS A FLOW — contact alone never does. One want is
+/// shared across a buyer's sellers (spent fattest line first, ties to the
+/// lower seller), then one holding across a seller's buyers (fattest flow
+/// first, ties to the lower buyer). Sorted ascending by (seller, buyer, good).
+/// Pure; reads the RAW signal, never the relieved one.
 std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx,
                                             const std::vector<region>&       regions,
                                             const std::vector<polity>&       polities,
@@ -3731,13 +3740,19 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why);
 ///                                  capital seat, in `regions`
 ///   - Scarcity signals          -> `region::scarcity_q` on each market
 ///                                  region, in `regions`
-///   - Trade flows               -> NOT YET A FIELD: `trade_flows` joins this
-///                                  struct at integration (a parallel item)
-///   - Corridor throughput       -> `surviving_corridors::uses`; the road
-///                                  ladder rung is not stored, it is read
-///                                  off `uses` against the span's
-///                                  `history_sim_params::road_tier{1,2,3}_uses`
-///                                  exactly as the sim reads it
+///   - Trade flows               -> `trade_flows`
+///   - Corridor throughput       -> `surviving_corridors::uses`. THE ROAD
+///                                  LADDER RUNG IS NOT RECOVERABLE FROM THIS
+///                                  VALUE: it is not stored, and reading it
+///                                  off `uses` against `history_sim_params::
+///                                  road_tier{1,2,3}_uses` does NOT reproduce
+///                                  the sim's rung. A bought post road sets
+///                                  the sim's live use count to
+///                                  `road_tier3_uses` but adds only one row
+///                                  to the corridor record, and a resumed run
+///                                  never seeds its live counts from
+///                                  `resume_corridors`, so `uses` under-reads
+///                                  both. Carrying the rung forward is owed.
 ///   - Cultural good preference  -> `culture_preference`
 ///   - The overlord graph        -> `polity::overlord` / `polity::subject_kind`
 ///                                  in `polities`; tribute terms in
@@ -3798,6 +3813,12 @@ struct exploration_output
     /// a polity `alive` in `polities`. Sorted ascending by (a, b).
     std::vector<history_corridor> surviving_corridors;
 
+    /// The span's final decision round's trade flows (BL-954) STILL STANDING
+    /// at `stop_year`: kept only where the pair holds a trade_access clause
+    /// among `dated_objects` above and both parties are alive in `polities`.
+    /// Sorted ascending by (seller, buyer, good).
+    std::vector<trade_flow> trade_flows;
+
     int64_t start_year = 0;
     int64_t stop_year  = 0;
 };
@@ -3812,6 +3833,9 @@ exploration_output make_exploration_output(const settlement_state&  ss,
 /// in range, no self-pairs; every holding matches region ownership (and every
 /// owned region is held); every surviving corridor has a living holder at one
 /// end; every overlord id valid and never self, with `subject_kind` set iff an
-/// overlord is; every standing dated object still inside its term. Writes the
-/// first failure into @p why.
+/// overlord is; every standing dated object still inside its term; no
+/// negative treasury, army or navy stock and every `port_stock_q` on 0-1000;
+/// every trade flow sorted, between two distinct living polities, a known
+/// good at positive volume, on a pair holding a standing trade_access clause.
+/// Writes the first failure into @p why.
 bool exploration_output_valid(const exploration_output& o, std::string* why);

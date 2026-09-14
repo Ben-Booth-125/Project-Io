@@ -925,15 +925,68 @@ int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& reg
 }
 
 int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regions,
-                       const std::vector<polity>& polities, int a, int b)
+                       const std::vector<polity>& polities, int a, int b,
+                       const std::vector<trade_flow>& flows)
 {
+    // THE MARGINAL TRADE THE PAIR'S CLAUSE OPENS. A buyer's want and a
+    // seller's holding are each ONE quantity shared across every partner
+    // (`compute_trade_flows`), so what binding THIS pair is worth is only
+    // what the other partners have not already taken: the unshared volume,
+    // capped by the buyer's raw want less what OTHER sellers already bring it,
+    // and by the seller's holding less what it already sends OTHER buyers.
+    // Flows between a and b themselves are excluded from both remainders, so
+    // re-scoring a bound pair reads the same quantity as scoring it unbound.
+    int64_t in_other[2][4]  = { {0, 0, 0, 0}, {0, 0, 0, 0} }; // [side][good]
+    int64_t out_other[2][4] = { {0, 0, 0, 0}, {0, 0, 0, 0} };
+    for (const trade_flow& f : flows)
+    {
+        if (f.good >= 4 || f.volume_q <= 0) continue;
+        for (int side = 0; side < 2; ++side)
+        {
+            const int me = side == 0 ? a : b, other = side == 0 ? b : a;
+            if (f.buyer == me && f.seller != other)  in_other[side][f.good]  += f.volume_q;
+            if (f.seller == me && f.buyer != other)  out_other[side][f.good] += f.volume_q;
+        }
+    }
+
     int total = 0;
     for (int g = 0; g < 4; ++g)
-    {
-        total += trade_flow_volume_q(ctx, regions, polities, a, b, g);
-        total += trade_flow_volume_q(ctx, regions, polities, b, a, g);
-    }
+        for (int dir = 0; dir < 2; ++dir)
+        {
+            const int seller_side = dir, buyer_side = 1 - dir;
+            const int seller = seller_side == 0 ? a : b;
+            const int buyer  = buyer_side == 0 ? a : b;
+            const int v = trade_flow_volume_q(ctx, regions, polities, seller, buyer, g);
+            if (v <= 0) continue; // also guarantees every id and capital read below is in range
+            const int want_q = regions[static_cast<std::size_t>(
+                polities[static_cast<std::size_t>(buyer)].capital)].scarcity_raw_q[g];
+            const int holding_q = ctx.holding_q[static_cast<std::size_t>(seller)][static_cast<std::size_t>(g)];
+            const int64_t want_room = std::max<int64_t>(0, want_q - in_other[buyer_side][g]);
+            const int64_t hold_room = std::max<int64_t>(0, holding_q - out_other[seller_side][g]);
+            total += static_cast<int>(std::min<int64_t>({static_cast<int64_t>(v), want_room, hold_room}));
+        }
     return total; // bounded by 8 * 1000
+}
+
+/// Drop every flow whose (seller, buyer) pair holds no `trade_access` clause
+/// in @p objects. Order-preserving, so a sorted vector stays sorted.
+static void prune_flows_without_trade_access(std::vector<trade_flow>&         flows,
+                                             const std::vector<dated_object>& objects)
+{
+    std::vector<std::pair<int32_t, int32_t>> bound;
+    for (const dated_object& o : objects)
+    {
+        if (o.kind != static_cast<int32_t>(treaty_clause::trade_access)) continue;
+        bound.push_back({std::min(o.a, o.b), std::max(o.a, o.b)});
+    }
+    std::sort(bound.begin(), bound.end());
+    flows.erase(std::remove_if(flows.begin(), flows.end(),
+                    [&](const trade_flow& f) {
+                        const int32_t s = f.seller, u = f.buyer;
+                        const std::pair<int32_t, int32_t> key{std::min(s, u), std::max(s, u)};
+                        return !std::binary_search(bound.begin(), bound.end(), key);
+                    }),
+                flows.end());
 }
 
 std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx,
@@ -989,6 +1042,37 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
                 polities[static_cast<std::size_t>(buyer)].capital)];
             int remaining = std::max(0, seat.scarcity_raw_q[good]);
             for (; i < flows.size() && flows[i].buyer == buyer && flows[i].good == good; ++i)
+            {
+                const int take = std::min(flows[i].volume_q, remaining);
+                flows[i].volume_q = take;
+                remaining -= take;
+            }
+        }
+    }
+    flows.erase(std::remove_if(flows.begin(), flows.end(),
+                               [](const trade_flow& f) { return f.volume_q <= 0; }),
+                flows.end());
+
+    // ONE HOLDING, SHARED ACROSS BUYERS -- the mirror of the want above. A
+    // seller's `holding_q` bounds each flow it sends, so a seller bound to two
+    // buyers would otherwise export its holding twice. Spent down per
+    // (seller, good) over what the want spend-down left: the fattest flow
+    // first, ties to the lower buyer.
+    std::sort(flows.begin(), flows.end(), [](const trade_flow& x, const trade_flow& y) {
+        if (x.seller != y.seller) return x.seller < y.seller;
+        if (x.good != y.good) return x.good < y.good;
+        if (x.volume_q != y.volume_q) return x.volume_q > y.volume_q;
+        return x.buyer < y.buyer;
+    });
+    {
+        std::size_t i = 0;
+        while (i < flows.size())
+        {
+            const uint16_t seller = flows[i].seller;
+            const uint8_t  good   = flows[i].good;
+            int remaining = static_cast<std::size_t>(seller) < ctx.holding_q.size()
+                          ? std::max(0, ctx.holding_q[seller][good]) : 0;
+            for (; i < flows.size() && flows[i].seller == seller && flows[i].good == good; ++i)
             {
                 const int take = std::min(flows[i].volume_q, remaining);
                 flows[i].volume_q = take;
@@ -2882,7 +2966,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const bool near_home = c.first.year < params.start_year;
                 const int alarm_a = deterrence_alarm_q(ss.regions, out, params, a, b);
                 const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
-                const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b);
+                const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
+                                                             out.trade_flows);
                 const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
                                                     alarm_a, near_home, trade_ab);
                 const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
@@ -2942,7 +3027,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const bool near_home = contact_first_year(out, a, b) < params.start_year;
                     const int alarm_a = deterrence_alarm_q(ss.regions, out, params, a, b);
                     const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
-                    const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b);
+                    const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
+                                                             out.trade_flows);
                     const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
                                                         alarm_a, near_home, trade_ab);
                     const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
@@ -2975,6 +3061,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ++out.treaties_broken;
                 }
             }
+
+            // A FLOW NEVER OUTLIVES ITS CLAUSE. The round's flows were opened
+            // by the clauses standing at the upkeep step (after this round's
+            // expiry); a pair that broke above no longer holds trade_access,
+            // so its flows leave the record the round leaves behind. The
+            // pruning is order-preserving: the vector stays sorted.
+            prune_flows_without_trade_access(out.trade_flows, out.dated_objects);
 
             // ---- BL-934: SUBJECTION -- trade provinces and subjected polities
             //
@@ -3010,6 +3103,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                          || static_cast<std::size_t>(native.capital) >= ss.regions.size()) continue;
                         if (!has_contact(out, arriving.id, native.id)) continue;
 
+                        // The two cheap scalar tests run BEFORE the O(P)
+                        // sphere-of-claim scan below. Every test here is a
+                        // side-effect-free `continue`, so their order changes
+                        // nothing but how much an ineligible native costs.
+                        const int dist = region_distance(
+                            ss.regions[static_cast<std::size_t>(arriving.capital)],
+                            ss.regions[static_cast<std::size_t>(native.capital)], gw);
+                        if (dist > params.subjection_reach_q) continue;
+
+                        const int64_t arriving_treasury =
+                            ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
+                        const int64_t native_treasury =
+                            ss.regions[static_cast<std::size_t>(native.capital)].treasury;
+                        if (arriving_treasury < native_treasury + params.subjection_treasury_margin_q)
+                            continue;
+
                         // SPHERE OF CLAIM: non-interference over a native
                         // polity's ground BETWEEN THE TWO TREATY PARTIES --
                         // never actually-empty land (EXPLORATION.md sec What
@@ -3027,18 +3136,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                 sphere_blocked = true;
                         }
                         if (sphere_blocked) continue;
-
-                        const int dist = region_distance(
-                            ss.regions[static_cast<std::size_t>(arriving.capital)],
-                            ss.regions[static_cast<std::size_t>(native.capital)], gw);
-                        if (dist > params.subjection_reach_q) continue;
-
-                        const int64_t arriving_treasury =
-                            ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
-                        const int64_t native_treasury =
-                            ss.regions[static_cast<std::size_t>(native.capital)].treasury;
-                        if (arriving_treasury < native_treasury + params.subjection_treasury_margin_q)
-                            continue;
 
                         const int want_q = want_lean_on
                             ? polity_good_want_q(ss.regions, out.polities, round_prefs, arriving.id,
@@ -7756,6 +7853,23 @@ exploration_output make_exploration_output(const settlement_state&  ss,
                   return x.expires_year < y.expires_year;
               });
 
+    // TRADE FLOWS AT THE CLOSE: the span's final decision round's flows, kept
+    // only where they still stand at `stop_year` -- the pair still holds a
+    // trade_access clause among the standing objects just folded (a clause
+    // that expired between the last round and the close takes its flows with
+    // it), and both parties are still alive (a polity conquered after the
+    // last round's upkeep cannot be trading at the close). Order-preserving:
+    // the sim's vector is already sorted by (seller, buyer, good).
+    o.trade_flows = hs.trade_flows;
+    prune_flows_without_trade_access(o.trade_flows, o.dated_objects);
+    o.trade_flows.erase(
+        std::remove_if(o.trade_flows.begin(), o.trade_flows.end(),
+            [&](const trade_flow& f) {
+                return f.seller >= o.polities.size() || f.buyer >= o.polities.size()
+                    || !o.polities[f.seller].alive || !o.polities[f.buyer].alive;
+            }),
+        o.trade_flows.end());
+
     // Both derived tables are pure folds over the 1660 state just copied —
     // the same derivations the Empire handoff and the sim itself use.
     o.wants              = derive_wants(o.regions, o.contacts, o.polities);
@@ -7788,9 +7902,15 @@ bool exploration_output_valid(const exploration_output& o, std::string* why)
             if (o.culture_count > 0 && r.culture.id[k] >= o.culture_count)
                 return fail("region " + std::to_string(i) + " names culture "
                             + std::to_string(r.culture.id[k]) + " out of range");
-        if (r.nation >= np)
+        if (r.nation < -1 || r.nation >= np)
             return fail("region " + std::to_string(i) + " is owned by polity "
                         + std::to_string(r.nation) + " out of range");
+        if (r.treasury < 0)
+            return fail("region " + std::to_string(i) + " carries a negative treasury");
+        if (r.port_stock_q < 0 || r.port_stock_q > 1000)
+            return fail("region " + std::to_string(i) + " carries a port_stock_q off the 0-1000 scale");
+        if (r.army_stock < 0)
+            return fail("region " + std::to_string(i) + " carries a negative army_stock");
     }
 
     // 2. The overlord graph. An overlord is a real polity and never the
@@ -7808,6 +7928,8 @@ bool exploration_output_valid(const exploration_output& o, std::string* why)
         if ((q.overlord < 0) != (q.subject_kind < 0))
             return fail("polity " + std::to_string(i)
                         + " has an overlord and a subject_kind that disagree");
+        if (q.navy_stock < 0)
+            return fail("polity " + std::to_string(i) + " carries a negative navy_stock");
     }
 
     // 3. The holdings. Ascending, in range, held by the living, each region
@@ -7944,6 +8066,44 @@ bool exploration_output_valid(const exploration_output& o, std::string* why)
         if (!corridor_region_survives(o.regions, o.polities, c.a)
          && !corridor_region_survives(o.regions, o.polities, c.b))
             return fail("a surviving corridor has no living holder at either end");
+    }
+
+    // 10. Trade flows. Strictly ascending (seller, buyer, good), both parties
+    //     real, alive and distinct, a known good, a positive volume -- and
+    //     every flow's pair holding a trade_access clause among THIS value's
+    //     own standing objects, so no flow outlives the clause that opened it.
+    {
+        std::vector<std::pair<int32_t, int32_t>> bound;
+        for (const dated_object& d : o.dated_objects)
+            if (d.kind == static_cast<int32_t>(treaty_clause::trade_access))
+                bound.push_back({std::min(d.a, d.b), std::max(d.a, d.b)});
+        std::sort(bound.begin(), bound.end());
+
+        for (std::size_t i = 0; i < o.trade_flows.size(); ++i)
+        {
+            const trade_flow& f = o.trade_flows[i];
+            if (i > 0)
+            {
+                const trade_flow& p = o.trade_flows[i - 1];
+                const bool ascending =
+                      f.seller != p.seller ? f.seller > p.seller
+                    : f.buyer != p.buyer   ? f.buyer > p.buyer
+                    : f.good > p.good;
+                if (!ascending)
+                    return fail("trade flows are not strictly sorted by (seller, buyer, good)");
+            }
+            if (f.seller >= np || f.buyer >= np)
+                return fail("a trade flow names a polity out of range");
+            if (f.seller == f.buyer) return fail("a polity trades with itself");
+            if (!o.polities[f.seller].alive || !o.polities[f.buyer].alive)
+                return fail("a trade flow names a polity that is not alive");
+            if (f.good >= 4) return fail("a trade flow names an out-of-range good");
+            if (f.volume_q <= 0) return fail("a trade flow carries no volume");
+            const int32_t s = f.seller, u = f.buyer;
+            if (!std::binary_search(bound.begin(), bound.end(),
+                                    std::pair<int32_t, int32_t>{std::min(s, u), std::max(s, u)}))
+                return fail("a trade flow's pair holds no standing trade_access clause");
+        }
     }
 
     if (o.start_year > o.stop_year) return fail("the span closes before it opens");
