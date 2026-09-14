@@ -3902,18 +3902,18 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why);
 ///   - Scarcity signals          -> `region::scarcity_q` on each market
 ///                                  region, in `regions`
 ///   - Trade flows               -> `trade_flows`
-///   - Corridor throughput       -> `surviving_corridors::uses`. THE ROAD
-///                                  LADDER RUNG IS NOT RECOVERABLE FROM THIS
-///                                  VALUE: it is not stored, and reading it
-///                                  off `uses` against `history_sim_params::
-///                                  road_tier{1,2,3}_uses` does NOT reproduce
-///                                  the sim's rung. A bought post road sets
-///                                  the sim's live use count to
-///                                  `road_tier3_uses` but adds only one row
-///                                  to the corridor record, and a resumed run
-///                                  never seeds its live counts from
-///                                  `resume_corridors`, so `uses` under-reads
-///                                  both. Carrying the rung forward is owed.
+///   - Corridor throughput       -> `surviving_corridors::uses` (traffic, the
+///                                  walks) and `surviving_corridors::tier`
+///                                  (the road ladder rung, 0-3, the sim's
+///                                  own live rung at the close). Read the
+///                                  rung off `tier`, NEVER off `uses` against
+///                                  `history_sim_params::road_tier{1,2,3}_uses`:
+///                                  a bought post road sets the live count to
+///                                  `road_tier3_uses` while adding one walk,
+///                                  so the two legitimately differ. A resumed
+///                                  span seeds its live counts from
+///                                  `resume_corridors` (BL-949), so an
+///                                  inherited Road opens the span as a Road.
 ///   - Cultural good preference  -> `culture_preference`
 ///   - The overlord graph        -> `polity::overlord` / `polity::subject_kind`
 ///                                  in `polities`; tribute terms in

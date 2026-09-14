@@ -218,6 +218,11 @@ struct exploration_row
     std::vector<int32_t> corridor_uses;
     int64_t post_roads_built        = 0;
     int64_t treasury_spent_on_roads = 0;
+    /// BL-949: corridors at each carried rung (`history_corridor::tier`, 0-3)
+    /// at the close, and inherited corridors whose 1200 traffic alone already
+    /// reaches `road_tier3_uses` (a third rung NOT bought).
+    int64_t tier_count[4] = {0, 0, 0, 0};
+    int64_t inherited_traffic_tier3 = 0;
 
     // --- Reading 10: preference, off the 1200 CE handoff state --------------
     std::vector<int16_t> preference_weights;
@@ -356,7 +361,15 @@ int main(int argc, char** argv)
         // `fx.exploration_state.supply_corridors`, finalised at that run's own
         // close, and the two road-ladder counters BL-940 added.
         for (const history_corridor& c : fx.exploration_state.supply_corridors)
+        {
             row.corridor_uses.push_back(c.uses);
+            ++row.tier_count[c.tier < 4 ? c.tier : 3];
+        }
+        {
+            const int t3 = history_sim_params{}.road_tier3_uses;
+            for (const history_corridor& c : fx.pre_exploration_corridors)
+                if (c.uses >= t3) ++row.inherited_traffic_tier3;
+        }
         row.post_roads_built        = fx.exploration_state.post_roads_built;
         row.treasury_spent_on_roads = fx.exploration_state.treasury_spent_on_roads;
 
@@ -843,9 +856,13 @@ int main(int argc, char** argv)
         std::vector<int32_t> uses;
         int64_t total_post_roads_built = 0, total_treasury_spent = 0;
         int seeds_with_post_road = 0;
+        int64_t tiers[4] = {0, 0, 0, 0};
+        int64_t inherited_t3 = 0;
         for (const exploration_row& r : rows)
         {
             if (!r.ok) continue;
+            for (int t = 0; t < 4; ++t) tiers[t] += r.tier_count[t];
+            inherited_t3 += r.inherited_traffic_tier3;
             uses.insert(uses.end(), r.corridor_uses.begin(), r.corridor_uses.end());
             if (r.post_roads_built > 0) ++seeds_with_post_road;
             total_post_roads_built += r.post_roads_built;
@@ -870,6 +887,15 @@ int main(int argc, char** argv)
             std::printf("  post_roads_built total=%lld (in %d/%d seeds) treasury_spent_on_roads total=%lld\n",
                         static_cast<long long>(total_post_roads_built), seeds_with_post_road, seed_count,
                         static_cast<long long>(total_treasury_spent));
+            std::printf("  carried rung at 1660 (history_corridor::tier): none=%lld track=%lld road=%lld post-road=%lld;"
+                        " inherited 1200 corridors whose traffic alone reaches road_tier3_uses=%lld\n",
+                        static_cast<long long>(tiers[0]), static_cast<long long>(tiers[1]),
+                        static_cast<long long>(tiers[2]), static_cast<long long>(tiers[3]),
+                        static_cast<long long>(inherited_t3));
+            std::printf("  per seed post_roads_built:");
+            for (const exploration_row& r : rows)
+                if (r.ok) std::printf(" %lld", static_cast<long long>(r.post_roads_built));
+            std::printf("\n");
             std::printf("  %s\n", total_post_roads_built > 0
                 ? "the road ladder's third rung fired at least once on this spread."
                 : "the third rung never fired on this spread — report to Ben rather than "

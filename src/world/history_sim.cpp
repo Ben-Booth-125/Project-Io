@@ -1714,6 +1714,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
         return it != road_uses_live.end() ? road_tier_for_uses(it->second) : 0;
     };
 
+    // BL-949 (b) -- A RESUMED SPAN STARTS ON THE NETWORK IT INHERITED. The
+    // prior span's record is copied into `out.supply_corridors` at the top of
+    // this function, and the fold at the close SUMS this span's walks onto it
+    // -- so without this seed the record would say a corridor is a Road while
+    // the live count `rebuild_reach` reads starts it at tier 0, and a line the
+    // Empires round paved would cost the Exploration span as if nobody had
+    // ever walked it. Seeded from `uses` (the record's own traffic, the one
+    // number that crosses), walked in the record's own sorted order; the map
+    // is point-looked-up only, so the order cannot reach an output anyway.
+    if (params.resume_polities != nullptr && params.resume_corridors != nullptr)
+    {
+        for (const history_corridor& c : *params.resume_corridors)
+        {
+            if (c.a == c.b || c.uses <= 0) continue;
+            if (c.a >= owner_index_limit || c.b >= owner_index_limit) continue;
+            road_uses_live[edge_key(c.a, c.b)] += c.uses;
+        }
+    }
+
     // BL-922 -- SUPPLY IS PRICED FROM THE CAPITAL OVER HELD GROUND ONLY, so
     // reach depends on WHO HOLDS WHAT, and a cache built against one
     // ownership map is stale against the next. One counter per polity,
@@ -6911,6 +6930,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 push(take_inherited ? inherited[i++] : fresh[j++]);
             }
         }
+
+        // BL-949 (a) -- THE RUNG TRAVELS WITH THE RECORD. Every row takes the
+        // tier its LIVE count stands at now, which is the tier `rebuild_reach`
+        // last read -- a bought post road reads 3 here though it added one walk
+        // to `uses`, and an inherited Road the span never touched reads the
+        // rung its seeded count gives it. A row whose edge has no live entry
+        // (a record out of the owner index range) keeps tier 0.
+        for (history_corridor& c : out.supply_corridors)
+            c.tier = static_cast<uint8_t>(road_tier_between(c.a, c.b));
     }
 
     // --- The world median furnace year (BL-748) ---------------------------

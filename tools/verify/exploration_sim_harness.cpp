@@ -534,6 +534,13 @@ int main()
         // (F5a) -- was battles 414, conquests 357, foundings 420, tribute
         // 134357387, treaties 285, owner changes 2337 (subjections 5, freed 1,
         // broken 0 unmoved).
+        //
+        // RE-PINNED 2026-09-14 by BL-949 (b): a resumed span now seeds its live
+        // corridor use counts from `resume_corridors`, so a line the Empires round
+        // paved opens the Exploration span as a Track/Road for reach (and as walked
+        // ground for trade links) instead of tier 0 -- was battles 407,
+        // conquests 351, foundings 418, subjections 5, freed 1, tribute
+        // 134357387, treaties 291, broken 0, owner changes 2327.
         std::printf("      pinned-read: subjections=%lld freed=%lld tribute=%lld treaties=%lld "
                     "broken=%lld owner_changes=%zu\n",
                     static_cast<long long>(ex1.subjections_formed),
@@ -541,10 +548,10 @@ int main()
                     static_cast<long long>(ex1.tribute_remitted),
                     static_cast<long long>(ex1.treaties_formed),
                     static_cast<long long>(ex1.treaties_broken), ex1.owner_changes.size());
-        check(ex1.battles == 407 && ex1.conquests == 351 && ex1.foundings == 418
+        check(ex1.battles == 554 && ex1.conquests == 496 && ex1.foundings == 445
            && ex1.subjections_formed == 5 && ex1.subjections_freed == 1
-           && ex1.tribute_remitted == 134357387 && ex1.treaties_formed == 291
-           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2327,
+           && ex1.tribute_remitted == 134354043 && ex1.treaties_formed == 283
+           && ex1.treaties_broken == 2 && ex1.owner_changes.size() == 2280,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 

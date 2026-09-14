@@ -624,7 +624,13 @@ void stamp_history_roads(world& w, entity_id body,
         // every water tile, and the strait rule refuses a route that crosses
         // open ocean. Neither is special-cased here — the ancient network obeys
         // the same land rule the national lattice does.
-        stamp_edge(w, body, ta, tb, ancient_tier(c.uses, na.reach_mod, nb.reach_mod));
+        // BL-949: a corridor the sim carried at its THIRD rung (a Post Road,
+        // `history_corridor::tier` 3 -- bought with capital, not walked) stamps
+        // at the campaign ladder's top grade whatever its traffic reads. Read
+        // off the carried rung, never off `uses`: a purchase adds one walk.
+        std::uint8_t tier = ancient_tier(c.uses, na.reach_mod, nb.reach_mod);
+        if (c.tier >= 3) tier = kHighway;
+        stamp_edge(w, body, ta, tb, tier);
     }
 
     // Same contract as generate_roads' tail: road_level moved, so every cache
