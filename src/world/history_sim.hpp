@@ -1867,9 +1867,10 @@ struct history_sim_params
     /// there, one decision round's worth.
     int64_t standing_army_build_cost_q = 500;
     int64_t standing_army_build_step_q = 300;
-    /// Per-mille of the EXCESS over `garrison_target(seat, ...)` (never the
-    /// muster baseline itself) lost per YEAR when the round's build was
-    /// refused — "falls back toward what muster alone provides," not below it.
+    /// Per-mille of the PAID standing heads (`region::standing_army`) that
+    /// revert to ordinary men per YEAR on any round the army step was not
+    /// funded (BL-955) — "falls back toward what muster alone provides": the
+    /// reverted men are then the muster's to disband like any excess garrison.
     int     standing_army_decay_per_mille_year_q = 60;
 
     // --- BL-955: spend is ALLOCATED, not bought whenever affordable ----------
@@ -1899,10 +1900,9 @@ struct history_sim_params
     /// many units per held region.
     int64_t navy_saturation_per_region  = 400;
     /// A standing army SATURATES the same way: the army score is 0 once the
-    /// capital's STANDING army -- `region::army_stock` above its muster-alone
-    /// `garrison_target`, the excess the army step adds to and the fallback
-    /// decays -- exceeds this many heads per held region. Sized at one
-    /// `standing_army_build_step_q`, as the navy's reference is one navy step.
+    /// capital's PAID standing army (`standing_army_heads(seat)`, the heads
+    /// the army step adds and the muster never disbands) exceeds this many
+    /// heads per held region.
     int64_t army_saturation_per_region  = 300;
 };
 
@@ -3485,7 +3485,7 @@ struct exploration_spend_facts
     int     port_window_q       = 0; ///< the seat's `port_q` endowment window.
     int     port_stock_q        = 0; ///< the seat's built port, 0-1000.
     int64_t navy_stock          = 0;
-    /// The capital's standing army: `army_stock` above `garrison_target`, >= 0.
+    /// The capital's PAID standing army: `standing_army_heads(seat)`, >= 0.
     int64_t standing_army       = 0;
     int64_t held_regions        = 0;
 };

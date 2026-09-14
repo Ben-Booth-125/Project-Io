@@ -783,6 +783,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
     // pays or invests), so no polity's choice depends on the index order in
     // which the others bought.
     const std::size_t np = polities.size();
+    std::vector<uint8_t> army_funded(regions.size(), 0); // seats whose army step was bought
     std::vector<int> expn_rank, cons_rank;
     exploration_lean_ranks(polities, spend_ctx ? spend_ctx->creeds : nullptr, expn_rank, cons_rank);
     std::vector<int>     water_want(np, 0), near_alarm(np, 0);
@@ -937,8 +938,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         facts.port_window_q       = seat.port_q;
         facts.port_stock_q        = seat.port_stock_q;
         facts.navy_stock          = q.navy_stock;
-        facts.standing_army       = std::max<int64_t>(
-            0, seat.army_stock - garrison_target(seat, params.garrison_fraction_q));
+        facts.standing_army       = standing_army_heads(seat); // the PAID heads, persistent
         facts.held_regions        = held_regions[pi];
         const exploration_spend_option pick =
             choose_exploration_spend(score_exploration_spend(params, facts));
@@ -985,28 +985,40 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
 
         // STANDING ARMY -- adds to `region::army_stock` directly (the same
         // pool `gather_army`/`resolve_battle` already read, so a funded
-        // standing army fights exactly like any other garrison); not funded
-        // this round, it falls back toward the muster-alone baseline
-        // (`garrison_target`), never below it -- ordinary muster is untouched
-        // by this decay.
+        // standing army fights exactly like any other garrison), and records
+        // the heads as PAID (`region::standing_army`), which the yearly muster
+        // never disbands. Not funded this round, the paid status decays below.
         if (pick == exploration_spend_option::army_step)
         {
+            const int64_t paid = standing_army_heads(seat);
             seat.treasury -= params.standing_army_build_cost_q;
             seat.army_stock = clampi64(
                 seat.army_stock + params.standing_army_build_step_q, 0, 1LL << 48);
+            seat.standing_army       = paid + params.standing_army_build_step_q;
+            seat.standing_army_owner = q.id;
+            army_funded[static_cast<std::size_t>(q.capital)] = 1;
             if (spend) { spend->standing_armies += params.standing_army_build_cost_q; ++spend->army_steps; }
         }
-        else
+    }
+
+    // ---- BL-955: AN UNFUNDED STANDING ARMY DECAYS TOWARD ZERO. ------------
+    // Every region still carrying paid heads that this round did not fund --
+    // a seat whose polity chose otherwise, or ground a campaign's paid
+    // survivors garrisoned -- loses `standing_army_decay_per_mille_year_q`
+    // of them per year, never below zero. The heads are not killed: they
+    // revert to ORDINARY men, which the muster then treats as it treats any
+    // garrison above target. Muster-alone behaviour is untouched.
+    {
+        const int64_t years_q = std::max(step_years, 1);
+        for (std::size_t ri = 0; ri < regions.size(); ++ri)
         {
-            const int64_t baseline = garrison_target(seat, params.garrison_fraction_q);
-            if (seat.army_stock > baseline)
-            {
-                const int64_t excess = seat.army_stock - baseline;
-                const int64_t decay =
-                    (excess * params.standing_army_decay_per_mille_year_q * years_q) / 1000;
-                seat.army_stock = clampi64(
-                    seat.army_stock - std::max<int64_t>(decay, 1), baseline, seat.army_stock);
-            }
+            region& r = regions[ri];
+            const int64_t paid = standing_army_heads(r);
+            if (paid <= 0) { r.standing_army = 0; continue; }
+            r.standing_army = paid;
+            if (army_funded[ri]) continue;
+            const int64_t decay = (paid * params.standing_army_decay_per_mille_year_q * years_q) / 1000;
+            r.standing_army = std::max<int64_t>(0, paid - std::max<int64_t>(decay, 1));
         }
     }
 
@@ -2955,7 +2967,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     p.army_stock,
                     (unpaid_heads * params.unpaid_army_disband_q) / 1000);
                 if (gone <= 0) continue;
+                const int64_t stock_before = p.army_stock;
                 p.army_stock    -= gone;
+                scale_standing_army(p, stock_before); // BL-955: paid men walk off alike
                 p.manpower_stock += gone;
                 out.army_heads_unpaid_disbanded += gone;
             }
@@ -3748,7 +3762,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int64_t lost = (hp.army_stock
                                          * clampi(params.unsustained_army_attrition_q, 0, 1000)
                                          * step_years) / 1000;
+                    const int64_t stock_before = hp.army_stock;
                     hp.army_stock = std::max<int64_t>(0, hp.army_stock - lost);
+                    scale_standing_army(hp, stock_before); // BL-955
                 }
             }
 
@@ -3998,11 +4014,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // men. One rule, read twice, so a polity cannot be offered a force
             // it then fails to raise (this file's standing thesis — a cost
             // authored on one scale and spent on another is the bug).
+            // BL-955: the paid standing heads a COMMITTED gather carried out,
+            // so the survivors keep their paid status in proportion wherever
+            // they end the campaign. Always 0 in the Empire span.
+            int64_t committed_standing = 0;
             const auto gather_army = [&](int hub, bool commit) -> int64_t {
                 const std::size_t hs = static_cast<std::size_t>(hub);
                 int64_t total = ss.regions[hs].army_stock;
                 if (total <= 0) return 0; // BL-835: a hub with no army stages nothing.
-                if (commit) ss.regions[hs].army_stock = 0;
+                if (commit)
+                {
+                    committed_standing = standing_army_heads(ss.regions[hs]);
+                    ss.regions[hs].army_stock    = 0;
+                    ss.regions[hs].standing_army = 0;
+                }
 
                 for (int hi : held)
                 {
@@ -4015,7 +4040,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int64_t take = (stock * supply_q) / 1000;
                     if (take <= 0) continue;
                     total += take;
-                    if (commit) ss.regions[hii].army_stock -= take;
+                    if (commit)
+                    {
+                        const int64_t s = standing_army_heads(ss.regions[hii]);
+                        ss.regions[hii].army_stock -= take;
+                        scale_standing_army(ss.regions[hii], stock);
+                        committed_standing += s - ss.regions[hii].standing_army;
+                    }
                 }
                 return total;
             };
@@ -5231,6 +5262,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // it is standing where it fought.
                 const int64_t atk_survivors = clampi64(raised - atk_lost, 0, raised);
                 tgt.army_stock = clampi64(def_men - def_lost, 0, def_men);
+                scale_standing_army(tgt, def_men); // BL-955: paid defenders die alike
+                // BL-955: the attacker's paid heads that came through, in proportion.
+                const int64_t atk_standing_survivors =
+                    raised > 0 ? (committed_standing * atk_survivors) / raised : 0;
 
                 tgt.contest_q = clampi(tgt.contest_q + bo.decisiveness / 4, 0, 1000);
 
@@ -5328,6 +5363,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // is question A in the shape the item asks for — not "can I
                     // take this" but "can I keep an army there".
                     tgt.army_stock = atk_survivors;
+                    // BL-955: the defender's paid men are gone with the ground;
+                    // the conqueror's paid survivors garrison it as its own.
+                    tgt.standing_army       = atk_standing_survivors;
+                    tgt.standing_army_owner = q.id;
 
                     const int loser_id = dq ? dq->id : -1;
                     const bool was_seat =
@@ -5479,8 +5518,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // round's `gather_army` will redraw it from the realm's network
                 // (BL-921) if it marches again.
                 if (!takes_it)
+                {
                     home.army_stock = clampi64(home.army_stock + atk_survivors,
                                                0, 1LL << 40);
+                    // BL-955: paid survivors come home paid.
+                    if (atk_standing_survivors > 0)
+                    {
+                        home.standing_army       = standing_army_heads(home) + atk_standing_survivors;
+                        home.standing_army_owner = q.id;
+                    }
+                }
                 break;
             }
             case sim_verb::settle:

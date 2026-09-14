@@ -495,6 +495,13 @@ int main()
         // battles 483, conquests 425, foundings 497, tribute 134235719,
         // treaties 294, owner changes 2501 (subjections 5, freed 1, broken 0
         // unmoved).
+        //
+        // RE-PINNED 2026-09-14 by the BL-955 review fix: a PAID standing army
+        // (`region::standing_army`) now persists through the yearly muster's
+        // disband, decays only when unfunded, and saturates at
+        // army_saturation_per_region x held regions -- was battles 398,
+        // conquests 343, foundings 432, tribute 134335519, treaties 265, owner
+        // changes 2387 (subjections 5, freed 1, broken 0 unmoved).
         std::printf("      pinned-read: subjections=%lld freed=%lld tribute=%lld treaties=%lld "
                     "broken=%lld owner_changes=%zu\n",
                     static_cast<long long>(ex1.subjections_formed),
@@ -502,10 +509,10 @@ int main()
                     static_cast<long long>(ex1.tribute_remitted),
                     static_cast<long long>(ex1.treaties_formed),
                     static_cast<long long>(ex1.treaties_broken), ex1.owner_changes.size());
-        check(ex1.battles == 398 && ex1.conquests == 343 && ex1.foundings == 432
+        check(ex1.battles == 414 && ex1.conquests == 357 && ex1.foundings == 420
            && ex1.subjections_formed == 5 && ex1.subjections_freed == 1
-           && ex1.tribute_remitted == 134335519 && ex1.treaties_formed == 265
-           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2387,
+           && ex1.tribute_remitted == 134357387 && ex1.treaties_formed == 285
+           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2337,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
@@ -959,7 +966,9 @@ int main()
             const int64_t cap      = ep.army_saturation_per_region * 1; // one held region
             const auto run_with_standing = [&](int64_t standing) {
                 spend_fixture f2 = fx;
-                f2.regions[1].army_stock = garrison + standing;
+                f2.regions[1].army_stock          = garrison + standing;
+                f2.regions[1].standing_army       = standing; // the PAID heads
+                f2.regions[1].standing_army_owner = 1;
                 const exploration_spend_context ctx = spend_context(f2);
                 exploration_upkeep_spend spend;
                 run_exploration_upkeep(f2.regions, f2.state.polities, {}, ep, 1234, 4, &spend,
@@ -974,8 +983,75 @@ int main()
                         static_cast<long long>(heavy.navy_steps));
             check(light.army_steps == 1 && heavy.army_steps == 0,
                   "R8.8  a consolidator under near-home Alarm buys the army step, but once its standing army "
-                  "(army_stock above garrison_target) passes army_saturation_per_region x held regions it "
+                  "(its paid standing heads) passes army_saturation_per_region x held regions it "
                   "holds or builds something else (BL-955)");
+        }
+
+        // R8.9-R8.12 -- the PAID standing army persists through the muster,
+        // decays only when unfunded, dies with the pool, and saturates.
+        {
+            spend_fixture fx;
+            add_spend_polity(fx, consolidator, 100000, 0, 0);
+            add_spend_polity(fx, expansionist, 0, 0, 0); // a second realm, so the leans rank
+            fx.regions[0].population = 200000; // a real garrison target
+            const int64_t target = garrison_target(fx.regions[0], ep.garrison_fraction_q);
+            fx.regions[0].army_stock = target;  // the muster's own garrison, exactly at target
+            const exploration_spend_context ctx = spend_context(fx);
+            exploration_upkeep_spend spend;
+            run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
+                                   nullptr, nullptr, &ctx);
+            const int64_t paid = standing_army_heads(fx.regions[0]);
+            const int64_t stock_bought = fx.regions[0].army_stock;
+
+            // A year of the muster, disbanding HALF of any excess.
+            region mustered = fx.regions[0];
+            muster_garrison(mustered, ep.garrison_fraction_q, ep.garrison_muster_q, /*disband*/500);
+            region unpaid = fx.regions[0];
+            unpaid.standing_army = 0; // the same men, unpaid
+            muster_garrison(unpaid, ep.garrison_fraction_q, ep.garrison_muster_q, /*disband*/500);
+            std::printf("      R8.9: target=%lld bought stock=%lld paid=%lld | after muster: paid-stock=%lld "
+                        "unpaid-stock=%lld\n", static_cast<long long>(target),
+                        static_cast<long long>(stock_bought), static_cast<long long>(paid),
+                        static_cast<long long>(mustered.army_stock), static_cast<long long>(unpaid.army_stock));
+            check(spend.army_steps == 1 && paid == ep.standing_army_build_step_q
+               && mustered.army_stock == stock_bought && standing_army_heads(mustered) == paid
+               && unpaid.army_stock < stock_bought,
+                  "R8.9  a bought standing army survives a year of muster intact; the same heads unpaid "
+                  "are disbanded as excess (BL-955)");
+
+            // Unfunded next round (empty purse): the paid status decays, the men stay.
+            fx.regions[0].treasury = 0;
+            exploration_upkeep_spend spend2;
+            run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1238, 4, &spend2,
+                                   nullptr, nullptr, &ctx);
+            const int64_t expected = paid - (paid * ep.standing_army_decay_per_mille_year_q * 4) / 1000;
+            check(spend2.army_steps == 0 && standing_army_heads(fx.regions[0]) == expected
+               && fx.regions[0].army_stock == stock_bought,
+                  "R8.10 unfunded, the paid standing army decays toward zero at "
+                  "standing_army_decay_per_mille_year_q; the men revert to the muster's garrison (BL-955)");
+
+            // Lost in battle alike: a pool losing half loses half its paid heads;
+            // ground taken by another polity carries none of the loser's.
+            region battle = fx.regions[0];
+            battle.army_stock = 1000; battle.standing_army = 400; battle.standing_army_owner = battle.nation;
+            battle.army_stock = 500;
+            scale_standing_army(battle, 1000);
+            region taken = battle;
+            taken.nation = 7; // conquered: `tgt.nation` moves, the paid status does not
+            check(battle.standing_army == 200 && standing_army_heads(taken) == 0,
+                  "R8.11 a battle loss falls on paid heads in proportion (1000->500 pool, 400->200 paid), "
+                  "and ground that changes hands carries none of the loser's paid army (BL-955)");
+
+            // The cap on a real-sized realm: 120 held regions.
+            exploration_spend_facts f;
+            f.consolidator_rank_q = 1000; f.treasury = 100000; f.held_regions = 120;
+            f.standing_army = ep.army_saturation_per_region * 120;
+            const int at_cap = score_exploration_spend(ep, f).army_q;
+            f.standing_army += 1;
+            const int past_cap = score_exploration_spend(ep, f).army_q;
+            check(at_cap > 0 && past_cap == 0,
+                  "R8.12 the cap binds on a real-sized army: 120 regions x army_saturation_per_region "
+                  "still scores, one head more scores 0 (BL-955)");
         }
 
         // R8.4 -- the decays are untouched: BL-935's R5.8/R5.9 above run unchanged
