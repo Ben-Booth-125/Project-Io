@@ -1803,8 +1803,21 @@ struct history_sim_params
     /// Per-mille of the OTHER side's visible capability added to
     /// `treaty_value_q`, NEAR HOME ONLY — "a neighbour that reads high
     /// visible capability should be more likely to form/maintain a
-    /// non-aggression treaty with that polity." FIRST CUT, UNMEASURED.
-    int deterrence_alarm_weight_q = 400;
+    /// non-aggression treaty with that polity."
+    ///
+    /// MEASURED WITH `treaty_far_penalty_q` (BL-950, exploration_sweep 16
+    /// seeds, traced, 2026-09-14; displacement median / battle-rate median /
+    /// summed neighbour and frontier rates, per century). At 400/350: 0.06 /
+    /// 98.0 / 1339 / 366. Alarm alone makes BOTH halves fall -- 700/350 1.34 /
+    /// 18.7 / 180 / 296; 1000/350 1.00 / 14.4 / 117 / 291; 550/350 0.50 /
+    /// 35.2 / 297 / 331 -- which is the failure the doc names. With the far
+    /// penalty at 700: 500 0.84 / 44.4 / 391 / 466; 525 1.33 / 43.5 / 312 /
+    /// 492; 550 1.33 / 43.5 / 314 / 473; 575 1.34 / 44.8 / 298 / 536; 600
+    /// 1.59 / 35.0 / 245 / 499; 1000 1.72 / 18.7 / 117 / 463. 575 is the
+    /// setting inside the 525-575 plateau with the most frontier war and the
+    /// most total conflict; above it neighbour war keeps collapsing and
+    /// total conflict falls with it.
+    int deterrence_alarm_weight_q = 575;
 
     /// Flat penalty on `treaty_value_q` for a pair that met only DURING this
     /// span (a frontier contact, `contact::first.year >= start_year`) — the
@@ -1813,8 +1826,17 @@ struct history_sim_params
     /// bind a non-aggression clause as readily as a long-known neighbour.
     /// Named directly by NR-851: without this every contacted pair, near or
     /// far, scored identically and a funded port's cheap crossing got
-    /// treatied over before it was ever used. FIRST CUT, UNMEASURED.
-    int treaty_far_penalty_q = 350;
+    /// treatied over before it was ever used.
+    ///
+    /// MEASURED (BL-950, see `deterrence_alarm_weight_q` for the joint
+    /// table): at alarm 400, 350 -> 700 lifts the summed frontier rate 366 ->
+    /// 490 with neighbour war unmoved (1339 -> 1363), displacement 0.06 ->
+    /// 0.19. 700 and 1000 are byte-identical on 16 seeds: at 700 no frontier
+    /// pair clears the formation bar except on the trade a clause would open
+    /// (`treaty_trade_weight_q`), so the penalty is saturated there. It is the
+    /// half of the mechanism that GROWS frontier war; the alarm weight is the
+    /// half that quiets neighbours.
+    int treaty_far_penalty_q = 700;
 
     // --- BL-934: colonies ----------------------------------------------------
     // EXPLORATION.md sec A colony is a subject, and it wants things of its own.
