@@ -3092,6 +3092,10 @@ struct history_sim_state
     /// least one allowed to decay", reading 7). GENERATION SCRATCH, NOT SAVED,
     /// same footing as `trade_flows`.
     std::vector<uint8_t> navy_lapsed;
+    /// BL-955: regions found breaking the paid standing army's raw invariant
+    /// (`standing_army_invariant_holds`), summed over every decision round's
+    /// check and the close. Must be 0. Exploration span only; not saved.
+    int64_t standing_army_invariant_violations = 0;
 
     /// BL-896 -- how many successor realms the dark age produced, and how much
     /// ground walked away with them. The pair is the item's "done when": an
@@ -3463,6 +3467,14 @@ int deterrence_alarm_q(const std::vector<region>& regions, const history_sim_sta
 void exploration_lean_ranks(const std::vector<polity>& polities, const creed_state* cs,
                             std::vector<int>& expansion_rank_q,
                             std::vector<int>& consolidator_rank_q);
+
+/// The campaign scorer's estimate of the men a target will field: its
+/// `army_stock` plus the defence levy `muster_garrison` (called with
+/// `defence_levy_q`) would raise before the fight. The levy reads the ORDINARY
+/// men only, as the muster does, so paid standing heads never suppress it.
+/// Models the levy half only; the muster's disband of excess ordinary men is
+/// not priced, as before BL-955.
+int64_t defender_levy_estimate(const region& tgt, const history_sim_params& params);
 
 /// The four options, in TIE-BREAK order: an exact score tie goes to the
 /// lower enumerator (hold, then army, then port, then navy).

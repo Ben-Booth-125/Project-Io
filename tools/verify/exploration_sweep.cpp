@@ -189,7 +189,8 @@ struct exploration_row
     std::vector<int64_t> standing_per_region;
     std::vector<int64_t> garrison_per_region;
     int64_t standing_holders = 0; ///< living polities with any paid standing heads at 1660.
-    int64_t army_saturated   = 0; ///< of those, seat standing above the saturation cap.
+    int64_t army_saturated   = 0; ///< of those, realm paid heads above the saturation cap.
+    int64_t standing_invariant_violations = 0; ///< must be 0 (BL-955 F3).
 
     // --- Reading 3: both strategies pay -------------------------------------
     /// One realm in a seed's top 3, with every quantity either ranking reads.
@@ -556,11 +557,9 @@ int main(int argc, char** argv)
                 row.standing_per_region.push_back(standing[p] / held[p]);
                 row.garrison_per_region.push_back(garrison[p] / held[p]);
                 if (standing[p] > 0) ++row.standing_holders;
-                if (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss_copy.regions.size()
-                 && standing_army_heads(ss_copy.regions[static_cast<std::size_t>(q.capital)])
-                        > ep2.army_saturation_per_region * held[p])
-                    ++row.army_saturated;
+                if (standing[p] > ep2.army_saturation_per_region * held[p]) ++row.army_saturated;
             }
+            row.standing_invariant_violations = traced.standing_army_invariant_violations;
         }
 
         // --- Reading 3 capture, off the traced re-run's 1660 close ---------
@@ -999,7 +998,7 @@ int main(int argc, char** argv)
                     static_cast<long long>(lapsed));
         {
             std::vector<int64_t> st, ga;
-            int64_t holders = 0, saturated = 0, living = 0;
+            int64_t holders = 0, saturated = 0, living = 0, violations = 0;
             for (const exploration_row& r : rows)
             {
                 if (!r.ok) continue;
@@ -1007,6 +1006,7 @@ int main(int argc, char** argv)
                 ga.insert(ga.end(), r.garrison_per_region.begin(), r.garrison_per_region.end());
                 holders   += r.standing_holders;
                 saturated += r.army_saturated;
+                violations += r.standing_invariant_violations;
             }
             living = static_cast<int64_t>(st.size());
             const auto pct = [](std::vector<int64_t> v, int p) -> long long {
@@ -1015,9 +1015,11 @@ int main(int argc, char** argv)
                 return static_cast<long long>(v[(v.size() - 1) * static_cast<std::size_t>(p) / 100]);
             };
             std::printf("  paid standing army at 1660, heads per held region over %lld living polities: "
-                        "p50=%lld p75=%lld p90=%lld max=%lld  (holders=%lld, seat above cap=%lld)\n",
+                        "p50=%lld p75=%lld p90=%lld max=%lld  (holders=%lld, realm above cap=%lld)\n",
                         static_cast<long long>(living), pct(st, 50), pct(st, 75), pct(st, 90),
                         pct(st, 100), static_cast<long long>(holders), static_cast<long long>(saturated));
+            std::printf("  paid standing army invariant violations (every round + close): %lld\n",
+                        static_cast<long long>(violations));
             std::printf("  garrison_target per held region: p50=%lld p75=%lld p90=%lld max=%lld\n",
                         pct(ga, 50), pct(ga, 75), pct(ga, 90), pct(ga, 100));
         }
