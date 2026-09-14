@@ -158,9 +158,25 @@ struct exploration_row
     int64_t treasury_spent_on_standing_armies = 0;
 
     // --- Reading 3: both strategies pay -------------------------------------
+    /// One realm in a seed's top 3, with every quantity either ranking reads.
+    struct strength_entry
+    {
+        int     id            = -1;
+        int64_t treasury      = 0; ///< capital region's `treasury` at 1660.
+        int     mean_supply_q = 0; ///< mean `network_supply_q` over held regions.
+        int64_t regions       = 0; ///< held region count at 1660.
+        int     cons_q        = 0; ///< consolidator_lean_q of its culture.
+        int     expn_q        = 0; ///< expansion_lean_q of its culture.
+    };
     bool strength_measured = false; ///< >= 2 living polities at the traced re-run's close.
+    /// PRIMARY ranking (BL-951): capital treasury, tie-break mean supply.
+    std::vector<strength_entry> top_by_treasury;
     bool top_has_consolidator = false;
     bool top_has_expansionist = false;
+    /// COMPARISON ranking: held region count (the pre-BL-951 metric).
+    std::vector<strength_entry> top_by_regions;
+    bool regions_top_has_consolidator = false;
+    bool regions_top_has_expansionist = false;
 
     // --- Reading 9: throughput, off generation's own (untraced) run ---------
     std::vector<int32_t> corridor_uses;
@@ -397,34 +413,78 @@ int main(int argc, char** argv)
             if (q.alive && q.navy_stock > 0) ++row.navy_holders;
 
         // --- Reading 3 capture, off the traced re-run's 1660 close ---------
-        // (`ss_copy`/`cs_copy` as the re-run left them). "Strongest" is read
-        // off HELD REGION COUNT at 1660.
+        // (`ss_copy`/`cs_copy` as the re-run left them).
+        //
+        // BL-951 — WHICH REALMS ARE "STRONGEST". Held region count favours
+        // expansion by construction: a consolidator holds the same ground
+        // worked harder, so a count of ground cannot see it. The PRIMARY
+        // ranking is therefore the capital's `treasury` (EXPLORATION.md: the
+        // treasury sits at the capital seat and is fed by what the polity
+        // already holds and moves), tie-broken by mean `network_supply_q`
+        // over held ground (how well the network feeds what it holds), then
+        // by id. Region count is kept as a printed COMPARISON ranking.
         {
-            std::vector<int64_t> region_count(traced.polities.size(), 0);
+            const std::size_t np = traced.polities.size();
+            std::vector<int64_t> region_count(np, 0), supply_sum(np, 0);
             for (const region& r : ss_copy.regions)
-                if (r.nation >= 0 && static_cast<std::size_t>(r.nation) < region_count.size())
-                    ++region_count[static_cast<std::size_t>(r.nation)];
-
-            std::vector<int> alive_ids;
-            for (std::size_t p = 0; p < traced.polities.size(); ++p)
-                if (traced.polities[p].alive) alive_ids.push_back(static_cast<int>(p));
-            if (alive_ids.size() >= 2)
-            {
-                std::sort(alive_ids.begin(), alive_ids.end(), [&](int a, int b) {
-                    if (region_count[static_cast<std::size_t>(a)] != region_count[static_cast<std::size_t>(b)])
-                        return region_count[static_cast<std::size_t>(a)] > region_count[static_cast<std::size_t>(b)];
-                    return a < b; // explicit tie-break
-                });
-                const std::size_t top_n = std::min<std::size_t>(3, alive_ids.size());
-                for (std::size_t k = 0; k < top_n; ++k)
+                if (r.nation >= 0 && static_cast<std::size_t>(r.nation) < np)
                 {
-                    const polity& p = traced.polities[static_cast<std::size_t>(alive_ids[k])];
-                    if (p.culture < 0 || static_cast<std::size_t>(p.culture) >= cs_copy.cultures.size()) continue;
-                    const culture& cu = cs_copy.cultures[static_cast<std::size_t>(p.culture)];
-                    const int cons = consolidator_lean_q(cu), expn = expansion_lean_q(cu);
-                    if (cons > expn) row.top_has_consolidator = true;
-                    else if (expn > cons) row.top_has_expansionist = true;
+                    ++region_count[static_cast<std::size_t>(r.nation)];
+                    supply_sum[static_cast<std::size_t>(r.nation)] += r.network_supply_q;
                 }
+
+            std::vector<exploration_row::strength_entry> entries;
+            for (std::size_t p = 0; p < np; ++p)
+            {
+                const polity& q = traced.polities[p];
+                if (!q.alive) continue;
+                exploration_row::strength_entry e;
+                e.id      = static_cast<int>(p);
+                e.regions = region_count[p];
+                e.mean_supply_q = region_count[p] > 0
+                    ? static_cast<int>(supply_sum[p] / region_count[p]) : 0;
+                if (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss_copy.regions.size())
+                    e.treasury = ss_copy.regions[static_cast<std::size_t>(q.capital)].treasury;
+                if (q.culture >= 0 && static_cast<std::size_t>(q.culture) < cs_copy.cultures.size())
+                {
+                    const culture& cu = cs_copy.cultures[static_cast<std::size_t>(q.culture)];
+                    e.cons_q = consolidator_lean_q(cu);
+                    e.expn_q = expansion_lean_q(cu);
+                }
+                else
+                {
+                    e.cons_q = e.expn_q = -1; // no culture: neither lean, excluded below
+                }
+                entries.push_back(e);
+            }
+
+            if (entries.size() >= 2)
+            {
+                const std::size_t top_n = std::min<std::size_t>(3, entries.size());
+                auto take_top = [&](std::vector<exploration_row::strength_entry> v,
+                                    bool by_treasury,
+                                    std::vector<exploration_row::strength_entry>& out,
+                                    bool& has_cons, bool& has_expn) {
+                    std::sort(v.begin(), v.end(), [&](const auto& a, const auto& b) {
+                        if (by_treasury)
+                        {
+                            if (a.treasury != b.treasury) return a.treasury > b.treasury;
+                            if (a.mean_supply_q != b.mean_supply_q) return a.mean_supply_q > b.mean_supply_q;
+                        }
+                        else if (a.regions != b.regions) return a.regions > b.regions;
+                        return a.id < b.id; // explicit tie-break
+                    });
+                    for (std::size_t k = 0; k < top_n; ++k)
+                    {
+                        out.push_back(v[k]);
+                        if (v[k].cons_q > v[k].expn_q)      has_cons = true;
+                        else if (v[k].expn_q > v[k].cons_q) has_expn = true;
+                    }
+                };
+                take_top(entries, true,  row.top_by_treasury,
+                         row.top_has_consolidator, row.top_has_expansionist);
+                take_top(entries, false, row.top_by_regions,
+                         row.regions_top_has_consolidator, row.regions_top_has_expansionist);
                 row.strength_measured = true;
             }
         }
@@ -735,14 +795,31 @@ int main(int argc, char** argv)
     // READING 3 — BOTH STRATEGIES PAY (BL-942). Consolidators AND
     // expansionists both among a seed's strongest realms, each traceable to
     // its creed's recorded deeds (`zeal`/`dominion`/`sea_legs_q`).
-    // "Strongest" is read off HELD REGION COUNT at 1660 -- the same ground-
-    // holding fact `polity_holdings` already carries, never a second ranking
-    // invented for this reading.
+    // "Strongest" is ranked by CAPITAL TREASURY at 1660, tie-broken by mean
+    // held-region `network_supply_q` (BL-951 — see the capture's comment for
+    // why region count cannot see a consolidator). The region-count ranking
+    // is printed beside it for comparison; the verdict line reads the
+    // treasury ranking.
     // -----------------------------------------------------------------------
     std::printf("\n--- reading 3: both strategies pay (consolidator/expansionist, by creed) ---\n");
+    std::printf("  metric: top-3 realms per seed ranked by CAPITAL TREASURY at 1660, tie-break mean "
+                "held-region network_supply_q, then polity id (region-count ranking shown for comparison)\n");
     {
+        auto lean_tag = [](const exploration_row::strength_entry& e) {
+            return e.cons_q > e.expn_q ? "C" : (e.expn_q > e.cons_q ? "E" : "-");
+        };
+        auto print_top = [&](const char* label, const std::vector<exploration_row::strength_entry>& v) {
+            std::printf("    %-9s", label);
+            for (const auto& e : v)
+                std::printf("  [p%d %s trs=%lld sup=%d reg=%lld cons=%d expn=%d]", e.id, lean_tag(e),
+                            static_cast<long long>(e.treasury), e.mean_supply_q,
+                            static_cast<long long>(e.regions), e.cons_q, e.expn_q);
+            std::printf("\n");
+        };
+
         int64_t seeds_measured = 0, seeds_with_consolidator_top = 0,
                 seeds_with_expansionist_top = 0, seeds_with_both = 0;
+        int64_t reg_cons = 0, reg_expn = 0, reg_both = 0;
         for (const exploration_row& r : rows)
         {
             if (!r.ok || !r.strength_measured) continue;
@@ -750,11 +827,22 @@ int main(int argc, char** argv)
             if (r.top_has_consolidator) ++seeds_with_consolidator_top;
             if (r.top_has_expansionist) ++seeds_with_expansionist_top;
             if (r.top_has_consolidator && r.top_has_expansionist) ++seeds_with_both;
+            if (r.regions_top_has_consolidator) ++reg_cons;
+            if (r.regions_top_has_expansionist) ++reg_expn;
+            if (r.regions_top_has_consolidator && r.regions_top_has_expansionist) ++reg_both;
+
+            std::printf("  seed %u (C = consolidator-leaning creed, E = expansionist, - = neither):\n", r.seed);
+            print_top("treasury:", r.top_by_treasury);
+            print_top("regions:",  r.top_by_regions);
         }
-        std::printf("  seeds measured=%lld  top-3-by-regions include a consolidator-leaning "
+        std::printf("  seeds measured=%lld  top-3-by-TREASURY include a consolidator-leaning "
                     "creed=%lld  include an expansionist-leaning creed=%lld  BOTH present=%lld\n",
                     static_cast<long long>(seeds_measured), static_cast<long long>(seeds_with_consolidator_top),
                     static_cast<long long>(seeds_with_expansionist_top), static_cast<long long>(seeds_with_both));
+        std::printf("  (comparison) top-3-by-REGIONS include a consolidator-leaning creed=%lld  "
+                    "include an expansionist-leaning creed=%lld  BOTH present=%lld\n",
+                    static_cast<long long>(reg_cons), static_cast<long long>(reg_expn),
+                    static_cast<long long>(reg_both));
         std::printf("  %s\n", seeds_with_both > 0
             ? "at least one seed's strongest realms include both a consolidator and an "
               "expansionist, each traceable to its own creed."
