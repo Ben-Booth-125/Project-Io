@@ -416,7 +416,8 @@ int main()
 
         check(!p1.polities.empty(), "R2.0  the Empires close leaves at least one living polity");
 
-        const auto run_exploration = [&](uint32_t seed, int w_want_q = 0) {
+        const auto run_exploration = [&](uint32_t seed, int w_want_q = 0,
+                                         std::vector<region>* regions_out = nullptr) {
             settlement_state ss = ss_a; // Independent copy each call.
             history_sim_params ep;
             ep.start_year = fixture.params.stop_year; // 1200, wherever Empires closed.
@@ -431,12 +432,35 @@ int main()
             ep.resume_grudges   = &p1.grudges;
             ep.resume_contacts  = &p1.contacts;
             ep.resume_corridors = &p1.surviving_corridors;
-            return run_history_sim(ss, &fixture.creeds, fixture.terrain.view(),
-                                   fixture.gw, fixture.gh, ep, seed, nullptr,
-                                   fixture.works, nullptr);
+            history_sim_state st = run_history_sim(ss, &fixture.creeds, fixture.terrain.view(),
+                                                   fixture.gw, fixture.gh, ep, seed, nullptr,
+                                                   fixture.works, nullptr);
+            if (regions_out != nullptr) *regions_out = ss.regions; // the span's closing ground
+            return st;
         };
 
-        const history_sim_state ex1 = run_exploration(0x515C0E17u);
+        std::vector<region> ex1_regions;
+        const history_sim_state ex1 = run_exploration(0x515C0E17u, 0, &ex1_regions);
+
+        // R8.18 (BL-955 F3): the paid standing army's raw invariant on a REAL
+        // generated world -- at the close, region by region, and every round.
+        {
+            int64_t close_bad = 0, paid_regions = 0;
+            for (const region& r : ex1_regions)
+            {
+                if (!standing_army_invariant_holds(r)) ++close_bad;
+                if (r.standing_army > 0) ++paid_regions;
+            }
+            std::printf("      R8.18: regions=%zu carrying paid heads=%lld close violations=%lld "
+                        "per-round violations=%lld\n", ex1_regions.size(),
+                        static_cast<long long>(paid_regions), static_cast<long long>(close_bad),
+                        static_cast<long long>(ex1.standing_army_invariant_violations));
+            check(!ex1_regions.empty() && paid_regions > 0 && close_bad == 0
+               && ex1.standing_army_invariant_violations == 0,
+                  "R8.18 on a real generated world, every region at the span's close has standing_army <= "
+                  "army_stock and a paid count only on its payer's ground; the per-round check counts 0 "
+                  "(BL-955 F3)");
+        }
         const history_sim_state ex2 = run_exploration(0x515C0E17u);
 
         check(ex1.years == 460, "R2.1  the resumed span runs its full 460 years (1200 -> 1660)");
@@ -502,6 +526,14 @@ int main()
         // army_saturation_per_region x held regions -- was battles 398,
         // conquests 343, foundings 432, tribute 134335519, treaties 265, owner
         // changes 2387 (subjections 5, freed 1, broken 0 unmoved).
+        //
+        // RE-PINNED 2026-09-14 by the BL-955 cold-review fixes: paid heads are
+        // lost against the pool BEFORE a loss (F1), the scorer's defender levy
+        // reads ordinary men only (F2), saturation reads the realm's paid
+        // heads (F4), stale paid counts are voided on every ownership change
+        // (F5a) -- was battles 414, conquests 357, foundings 420, tribute
+        // 134357387, treaties 285, owner changes 2337 (subjections 5, freed 1,
+        // broken 0 unmoved).
         std::printf("      pinned-read: subjections=%lld freed=%lld tribute=%lld treaties=%lld "
                     "broken=%lld owner_changes=%zu\n",
                     static_cast<long long>(ex1.subjections_formed),
@@ -509,10 +541,10 @@ int main()
                     static_cast<long long>(ex1.tribute_remitted),
                     static_cast<long long>(ex1.treaties_formed),
                     static_cast<long long>(ex1.treaties_broken), ex1.owner_changes.size());
-        check(ex1.battles == 414 && ex1.conquests == 357 && ex1.foundings == 420
+        check(ex1.battles == 407 && ex1.conquests == 351 && ex1.foundings == 418
            && ex1.subjections_formed == 5 && ex1.subjections_freed == 1
-           && ex1.tribute_remitted == 134357387 && ex1.treaties_formed == 285
-           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2337,
+           && ex1.tribute_remitted == 134357387 && ex1.treaties_formed == 291
+           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2327,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
@@ -528,6 +560,9 @@ int main()
                && wa.foundings == wb.foundings && wa.subjections_formed == wb.subjections_formed
                && wa.owner_changes.size() == wb.owner_changes.size(),
                   "R3c.1  with the want lean on, the span is still deterministic (same seed twice)");
+            check(wa.standing_army_invariant_violations == 0,
+                  "R8.18b with generation's own want lean on, the per-round paid-army invariant check "
+                  "counts 0 (BL-955 F3)");
             std::printf("      want lean w_want_q=%d: battles=%lld conquests=%lld foundings=%lld "
                         "subjections=%lld owner_changes=%zu\n", want_w,
                         static_cast<long long>(wa.battles), static_cast<long long>(wa.conquests),
@@ -1052,6 +1087,90 @@ int main()
             check(at_cap > 0 && past_cap == 0,
                   "R8.12 the cap binds on a real-sized army: 120 regions x army_saturation_per_region "
                   "still scores, one head more scores 0 (BL-955)");
+        }
+
+        // R8.13-R8.17 -- the cold review's cases (F1, F2, F4, F5b).
+        {
+            // F1: paid men outnumber the survivors. 1000 heads, all paid, 60% lost.
+            region r;
+            r.nation = 0; r.standing_army_owner = 0;
+            r.army_stock = 1000; r.standing_army = 1000;
+            r.army_stock = 400;
+            scale_standing_army(r, 1000);
+            check(r.standing_army == 400 && standing_army_invariant_holds(r),
+                  "R8.13 a 60% loss on an all-paid 1000-head pool leaves 400 paid (not 160): the paid "
+                  "count is read against the pool before the loss (BL-955 F1)");
+
+            // F1: a march cannot carry more paid heads than men.
+            region g;
+            g.nation = 0; g.standing_army_owner = 0;
+            g.army_stock = 1000; g.standing_army = 1000;
+            const int64_t drawn_part = draw_army_with_standing(g, 600);
+            region h = g; // what is left: 400 all paid
+            const int64_t drawn_all = draw_army_with_standing(h, 10000);
+            region mixed;
+            mixed.nation = 0; mixed.standing_army_owner = 0;
+            mixed.army_stock = 1000; mixed.standing_army = 300;
+            const int64_t drawn_mixed = draw_army_with_standing(mixed, 500);
+            check(drawn_part == 600 && g.army_stock == 400 && g.standing_army == 400
+               && drawn_all == 400 && h.army_stock == 0 && h.standing_army == 0
+               && drawn_mixed == 150 && mixed.standing_army == 150
+               && standing_army_invariant_holds(g) && standing_army_invariant_holds(mixed),
+                  "R8.14 a gather draws paid heads in proportion and never more paid heads than men "
+                  "committed (600 of an all-paid 1000 -> 600; 500 of 1000 with 300 paid -> 150) (BL-955 F1)");
+
+            // F2: the scorer's defender estimate mirrors the battle-path muster.
+            region d;
+            d.nation = 0; d.standing_army_owner = 0;
+            d.population = 200000;
+            const int64_t d_target = garrison_target(d, ep.garrison_fraction_q);
+            d.army_stock = d_target / 2; d.standing_army = d_target / 2; // every man paid
+            d.manpower_stock = d_target * 4;
+            const int64_t estimate = defender_levy_estimate(d, ep);
+            region mustered = d;
+            muster_garrison(mustered, ep.garrison_fraction_q, ep.defence_levy_q, ep.garrison_disband_q);
+            std::printf("      R8.15: target=%lld stock=%lld (all paid) estimate=%lld battle-path muster=%lld\n",
+                        static_cast<long long>(d_target), static_cast<long long>(d.army_stock),
+                        static_cast<long long>(estimate), static_cast<long long>(mustered.army_stock));
+            check(estimate == mustered.army_stock && estimate > d.army_stock,
+                  "R8.15 for a region whose men are all paid, the scorer's defender estimate equals what "
+                  "the battle-path muster fields: the levy reads ordinary men only (BL-955 F2)");
+
+            // F4: the saturation reads the REALM's paid heads, not the seat's.
+            const auto realm_run = [&](int64_t paid_off_seat) {
+                spend_fixture fx;
+                add_spend_polity(fx, consolidator, 100000, 0, 0);
+                add_spend_polity(fx, expansionist, 0, 0, 0);
+                region held;
+                held.nation = 0; held.army_stock = paid_off_seat; held.standing_army = paid_off_seat;
+                held.standing_army_owner = 0;
+                fx.regions.push_back(held); // a second held region, not the seat
+                const exploration_spend_context ctx = spend_context(fx);
+                exploration_upkeep_spend spend;
+                run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
+                                       nullptr, nullptr, &ctx);
+                return spend.army_steps;
+            };
+            const int64_t cap2 = ep.army_saturation_per_region * 2;
+            check(realm_run(0) == 1 && realm_run(cap2 + 1) == 0,
+                  "R8.16 paid heads marched onto other held ground still count: past the realm's cap the "
+                  "seat buys no further army step (BL-955 F4)");
+
+            // F5b: a fleet rebuilt the round it hit zero is not a lapse.
+            {
+                spend_fixture fx;
+                add_spend_polity(fx, expansionist, 100000, 1000, /*port full*/1000);
+                add_spend_polity(fx, consolidator, 0, 0, 0);
+                fx.state.polities[0].navy_stock = 1; // decays to 0 this round
+                const exploration_spend_context ctx = spend_context(fx);
+                exploration_upkeep_spend spend;
+                run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
+                                       nullptr, nullptr, &ctx);
+                check(spend.navy_steps == 1 && fx.state.polities[0].navy_stock > 0
+                   && spend.navies_lapsed.empty(),
+                      "R8.17 a fleet that hits zero and is rebuilt the same round is not counted as lapsed "
+                      "(BL-955 F5b)");
+            }
         }
 
         // R8.4 -- the decays are untouched: BL-935's R5.8/R5.9 above run unchanged

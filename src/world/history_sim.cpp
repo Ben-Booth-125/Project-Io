@@ -723,6 +723,24 @@ exploration_spend_option choose_exploration_spend(const exploration_spend_scores
     return best;
 }
 
+int64_t defender_levy_estimate(const region& tgt, const history_sim_params& params)
+{
+    // `muster_garrison`'s LEVY arithmetic, asked as a question: the target
+    // and the shortfall are read on the ORDINARY men, never the paid
+    // standing heads (BL-955; 0 throughout the Empire span, where this is
+    // exactly the pre-BL-955 estimate).
+    const int64_t def_target = garrison_target(tgt, params.garrison_fraction_q);
+    const int64_t ordinary   = tgt.army_stock - standing_army_heads(tgt);
+    int64_t def_men = tgt.army_stock;
+    if (ordinary < def_target)
+    {
+        const int64_t gap  = def_target - ordinary;
+        const int64_t want = (gap * clampi(params.defence_levy_q, 0, 1000)) / 1000;
+        if (want > 0 && tgt.manpower_stock > 0) def_men += std::min(want, tgt.manpower_stock);
+    }
+    return def_men;
+}
+
 /// The best land line joining @p a and @p b in @p ctx (0 where none). The
 /// same lookup `trade_flow_volume_q` makes.
 static int trade_land_line_q(const trade_context& ctx, int a, int b)
@@ -788,6 +806,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
     exploration_lean_ranks(polities, spend_ctx ? spend_ctx->creeds : nullptr, expn_rank, cons_rank);
     std::vector<int>     water_want(np, 0), near_alarm(np, 0);
     std::vector<int64_t> held_regions(np, 0);
+    // The REALM's paid standing heads, wherever they stand -- a campaign that
+    // marches them onto conquered ground does not reset the saturation read.
+    std::vector<int64_t> realm_paid(np, 0);
     {
         constexpr int good_count = 4;
         const region_class goods[good_count] =
@@ -804,6 +825,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= np) continue;
             const std::size_t n = static_cast<std::size_t>(r.nation);
             ++held_regions[n];
+            realm_paid[n] += standing_army_heads(r); // 0 unless paid for by this holder
             const int gi = scarcity_good_index(r.dominant);
             if (gi >= 0) reachable[n][static_cast<std::size_t>(gi)] = true;
         }
@@ -938,7 +960,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         facts.port_window_q       = seat.port_q;
         facts.port_stock_q        = seat.port_stock_q;
         facts.navy_stock          = q.navy_stock;
-        facts.standing_army       = standing_army_heads(seat); // the PAID heads, persistent
+        facts.standing_army       = realm_paid[pi]; // the realm's PAID heads, persistent
         facts.held_regions        = held_regions[pi];
         const exploration_spend_option pick =
             choose_exploration_spend(score_exploration_spend(params, facts));
@@ -969,12 +991,11 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // NAVY -- decays EVERY round, unconditionally ("a running cost, not
         // a purchase"), then grows if the round affords it and the capital's
         // own port is built up enough to stage one from.
+        const bool had_navy = q.navy_stock > 0;
         if (q.navy_stock > 0)
         {
             const int64_t decay = (q.navy_stock * params.navy_decay_per_mille_year_q * years_q) / 1000;
             q.navy_stock = clampi64(q.navy_stock - std::max<int64_t>(decay, 1), 0, 1LL << 48);
-            if (q.navy_stock == 0 && spend && pi <= 0xFFFE)
-                spend->navies_lapsed.push_back(static_cast<uint16_t>(pi)); // BL-955 reading 7
         }
         if (pick == exploration_spend_option::navy_step)
         {
@@ -982,6 +1003,11 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             q.navy_stock = clampi64(q.navy_stock + params.navy_build_step_q, 0, 1LL << 48);
             if (spend) { spend->navies += params.navy_build_cost_q; ++spend->navy_steps; }
         }
+        // BL-955 reading 7: a lapse is a fleet that stood at the round's
+        // opening and stands at nothing after its step -- recorded AFTER the
+        // step, so a fleet rebuilt the round it hit zero is not counted.
+        if (had_navy && q.navy_stock == 0 && spend && pi <= 0xFFFE)
+            spend->navies_lapsed.push_back(static_cast<uint16_t>(pi));
 
         // STANDING ARMY -- adds to `region::army_stock` directly (the same
         // pool `gather_army`/`resolve_battle` already read, so a funded
@@ -994,7 +1020,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             seat.treasury -= params.standing_army_build_cost_q;
             seat.army_stock = clampi64(
                 seat.army_stock + params.standing_army_build_step_q, 0, 1LL << 48);
-            seat.standing_army       = paid + params.standing_army_build_step_q;
+            seat.standing_army       = std::min(paid + params.standing_army_build_step_q, seat.army_stock);
             seat.standing_army_owner = q.id;
             army_funded[static_cast<std::size_t>(q.capital)] = 1;
             if (spend) { spend->standing_armies += params.standing_army_build_cost_q; ++spend->army_steps; }
@@ -3017,6 +3043,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             q.capital = static_cast<int>(i);
 
             r.nation      = q.id;
+            void_stale_standing_army(r); // BL-955
             r.is_seat     = true;
             r.seat_region = static_cast<int>(i);
             owner[i]      = q.id;
@@ -3058,6 +3085,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
         expire_dated_objects(out.dated_objects, y);
         if (params.exploration_upkeep_enabled)
         {
+            // BL-955: the paid standing army's raw invariant, checked every
+            // decision round over everything the last round did. Read-only.
+            for (const region& r : ss.regions)
+                if (!standing_army_invariant_holds(r)) ++out.standing_army_invariant_violations;
+
             // BL-953 -- the round's preference, once. Derived AHEAD of the
             // upkeep since BL-955, whose allocation weights the across-water
             // want by it: `derive_culture_preference` reads ownership, culture
@@ -4023,11 +4055,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 int64_t total = ss.regions[hs].army_stock;
                 if (total <= 0) return 0; // BL-835: a hub with no army stages nothing.
                 if (commit)
-                {
-                    committed_standing = standing_army_heads(ss.regions[hs]);
-                    ss.regions[hs].army_stock    = 0;
-                    ss.regions[hs].standing_army = 0;
-                }
+                    committed_standing = draw_army_with_standing(ss.regions[hs], total); // the whole hub
 
                 for (int hi : held)
                 {
@@ -4041,13 +4069,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (take <= 0) continue;
                     total += take;
                     if (commit)
-                    {
-                        const int64_t s = standing_army_heads(ss.regions[hii]);
-                        ss.regions[hii].army_stock -= take;
-                        scale_standing_army(ss.regions[hii], stock);
-                        committed_standing += s - ss.regions[hii].standing_army;
-                    }
+                        committed_standing += draw_army_with_standing(ss.regions[hii], take);
                 }
+                // Paid heads marched can never exceed the men marched.
+                if (commit && committed_standing > total) committed_standing = total;
                 return total;
             };
 
@@ -4236,14 +4261,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // again, a cost authored on one scale and paid on another.
                     // The two lines below are `muster_garrison`'s arithmetic
                     // asked as a question instead of applied as a mutation.
-                    const int64_t def_target = garrison_target(tgt, params.garrison_fraction_q);
-                    int64_t def_men = tgt.army_stock;
-                    if (def_men < def_target)
-                    {
-                        const int64_t gap  = def_target - def_men;
-                        const int64_t want = (gap * clampi(params.defence_levy_q, 0, 1000)) / 1000;
-                        def_men += std::min(want, tgt.manpower_stock);
-                    }
+                    const int64_t def_men = defender_levy_estimate(tgt, params);
                     const int def_works   = clampi(tgt.work_defence_mod, 0, 1000);
                     const int def_scaled  = static_cast<int>(clampi64(
                         (def_men / 64) * (1000 + def_works) / 1000, 0, 1000));
@@ -5264,8 +5282,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 tgt.army_stock = clampi64(def_men - def_lost, 0, def_men);
                 scale_standing_army(tgt, def_men); // BL-955: paid defenders die alike
                 // BL-955: the attacker's paid heads that came through, in proportion.
-                const int64_t atk_standing_survivors =
-                    raised > 0 ? (committed_standing * atk_survivors) / raised : 0;
+                const int64_t atk_standing_survivors = std::min(atk_survivors,
+                    raised > 0 ? (std::min(committed_standing, raised) * atk_survivors) / raised : 0);
 
                 tgt.contest_q = clampi(tgt.contest_q + bo.decisiveness / 4, 0, 1000);
 
@@ -5365,7 +5383,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     tgt.army_stock = atk_survivors;
                     // BL-955: the defender's paid men are gone with the ground;
                     // the conqueror's paid survivors garrison it as its own.
-                    tgt.standing_army       = atk_standing_survivors;
+                    tgt.standing_army       = std::min(atk_standing_survivors, tgt.army_stock);
                     tgt.standing_army_owner = q.id;
 
                     const int loser_id = dq ? dq->id : -1;
@@ -5374,6 +5392,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
+                    void_stale_standing_army(tgt); // BL-955 (the conqueror's paid survivors set above)
                     touch_owner(loser_id); // BL-922: ground changed hands, both
                     touch_owner(q.id);     // realms' held-only reach is stale
 
@@ -5400,6 +5419,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             touch_owner(owner[hi]); // BL-922: whoever held it
                             owner[hi] = q.id;
                             h.nation  = q.id;
+                            void_stale_standing_army(h); // BL-955
                             // BL-922: RECORDED, like every other transfer.
                             // The seat's own change is pushed below; its
                             // hinterland's were not, so a replay of the
@@ -5524,7 +5544,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // BL-955: paid survivors come home paid.
                     if (atk_standing_survivors > 0)
                     {
-                        home.standing_army       = standing_army_heads(home) + atk_standing_survivors;
+                        const int64_t home_paid = standing_army_heads(home); // 0 if not q's
+                        home.standing_army       = std::min(home_paid + atk_standing_survivors,
+                                                            home.army_stock);
                         home.standing_army_owner = q.id;
                     }
                 }
@@ -6101,6 +6123,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 owner[ti]  = q.id;
                 tgt.nation = q.id;
+                void_stale_standing_army(tgt); // BL-955
                 touch_owner(q.id); // BL-922: this polity's held-only reach is now stale.
 
                 // A CENTRE ORGANISED ABOVE THE CITY-STATE THRESHOLD IS ITS
@@ -6397,6 +6420,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const std::size_t ri = static_cast<std::size_t>(r);
                         owner[ri]                  = np.id;
                         ss.regions[ri].nation      = np.id;
+                        void_stale_standing_army(ss.regions[ri]); // BL-955
                         touch_owner(out.polities[pi].id); // BL-922: the parent lost ground
                         touch_owner(np.id);              // and the successor gained it
                         ss.regions[ri].seat_region = seat;
@@ -6759,6 +6783,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             const std::size_t ri = static_cast<std::size_t>(r);
                             owner[ri]             = np.id;
                             ss.regions[ri].nation = np.id;
+                            void_stale_standing_army(ss.regions[ri]); // BL-955
                             touch_owner(qid);
                             touch_owner(np.id);
                             ss.regions[ri].seat_region = seat;
@@ -6818,6 +6843,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
     if (params.record_playback
         && (out.steps.empty() || out.steps.back().year != static_cast<int32_t>(params.stop_year)))
         record_step(params.stop_year);
+
+    // BL-955: the paid standing army's raw invariant, once more at the close.
+    if (params.exploration_upkeep_enabled)
+        for (const region& r : ss.regions)
+            if (!standing_army_invariant_holds(r)) ++out.standing_army_invariant_violations;
 
     out.region_stride = static_cast<int>(ss.regions.size());
     out.years           = years;
