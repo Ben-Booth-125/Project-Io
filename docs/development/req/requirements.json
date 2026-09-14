@@ -5344,43 +5344,43 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "ITEM-SPANNING: upkeep makes one scored spend choice per round among port, navy, standing army and hold, from creed lean, unmet wants across water, neighbour Alarm, treasury cover and port gates; decay is untouched.",
      "verification": [
       "headless: exploration_sim_harness -- an expansionist builds a port or navy where a consolidator with the same purse does not; at most one stock bought per round; decay assertions R5.8/R5.9 still pass"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. R8.0-R8.8 on hand-built fixtures (expansionist port/navy vs consolidator, one stock per round, Alarm-heavy army, tie order) and R8.9-R8.18b for the persistence fix (survives muster, decays unfunded, proportional loss incl. paid > survivors, gather cannot overdraw, scorer levy equals muster, realm-wide cap, invariant 0 on a real world). Decays unchanged (R5.8/R5.9). Two cold-review rounds. Merged tree: exploration_sim_harness 109/109."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The choice is a deterministic argmax over a total order, hold winning ties.",
      "verification": [
       "code: run_exploration_upkeep"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Argmax over a total order, ties hold > army > port > navy; ranks computed once per round over living cultured polities."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Reading 7 reports navies by strategy lean and polities that let a navy decay.",
      "verification": [
       "headless: 3-seed sweep prints it"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Reading 7 prints navies by expansion-rank half, steps bought (16 seeds: port 7805, navy 8667, army 51387), lapses, and the invariant count."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Determinism holds; digest movement reported.",
      "verification": [
       "headless: world_determinism -- same seed gives the same world twice; digest movement REPORTED with its cause, never re-blessed by this item"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE. Determinism holds (off and 1960 digests unchanged); movement reported at the wave re-bless (BL-950)."
     }
    ]
   },

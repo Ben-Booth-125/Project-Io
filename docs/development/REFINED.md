@@ -47,7 +47,7 @@ Wave 1 merged to main as `f260d202` (2026-09-14) after a cold review and one fix
 
 ### Wave 2 — spend becomes a choice
 
-- [ ] **T5 · BL-955** (spend is scored) — allocation inside upkeep. Satisfies R1–R4.
+- [x] **T5 · BL-955** (spend is scored) — allocation inside upkeep. Satisfies R1–R4.
 
 ### Wave 2b — make the sweep cheap before tuning (Ben, 2026-09-14)
 
