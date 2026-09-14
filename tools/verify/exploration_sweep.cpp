@@ -27,7 +27,15 @@
 // each still gets its row, printed as NOT YET MEASURABLE with the item that
 // owes it, so the gap is visible in the report rather than silently absent.
 //
-// Usage:  exploration_sweep [seed_count]      (default 8)
+// Usage:  exploration_sweep [seed_count] [--w_want_q=N] [--quick]   (default 8)
+//
+//   --w_want_q=N  BL-953 TUNING ONLY: re-runs the traced span with the want
+//                 lean at N instead of generation's own value. Readings 1, 2,
+//                 4-7 then describe the overridden run; the traced-vs-untraced
+//                 structural check is skipped (it compares against a run made
+//                 with different params by construction).
+//   --quick       skip readings 3, 9 and 10's 1200 CE derivation (each
+//                 regenerates every seed).
 // ---------------------------------------------------------------------------
 
 #include "world/era_minus_one.hpp"
@@ -43,6 +51,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <utility>
 #include <vector>
@@ -144,6 +153,16 @@ struct exploration_row
     // THIRD polity its overlord has never met.
     int64_t subjects_with_friction = 0;
 
+    /// BL-953: subjects whose TOP WANT (argmax good of `polity_good_want_q`,
+    /// off the LIVE preference derived from the traced run's own 1660 state)
+    /// differs from their overlord's -- the want graph itself rather than the
+    /// contact-graph proxy above. "No want at all" counts as its own value.
+    int64_t subjects_with_divergent_top_want = 0;
+
+    /// BL-953: (culture, good) preference entries derived LIVE from the traced
+    /// run's 1660 close, beside reading 10's 1200 CE derivation.
+    int64_t live_pref_entries_1660 = 0;
+
     // --- Reading 7: fleets ---------------------------------------------------
     int64_t navy_holders          = 0; ///< living polities with navy_stock > 0 at 1660.
     int64_t treasury_spent_on_navies = 0;
@@ -162,11 +181,23 @@ double per_century(int64_t count, int64_t years)
 int main(int argc, char** argv)
 {
     int seed_count = 8;
+    bool want_override = false, quick = false;
+    int  want_override_q = 0;
     for (int a = 1; a < argc; ++a)
     {
+        if (std::strncmp(argv[a], "--w_want_q=", 11) == 0)
+        {
+            want_override   = true;
+            want_override_q = std::atoi(argv[a] + 11);
+            continue;
+        }
+        if (std::strcmp(argv[a], "--quick") == 0) { quick = true; continue; }
         const int n = std::atoi(argv[a]);
         if (n > 0) seed_count = n;
     }
+    if (want_override)
+        std::printf("NOTE: --w_want_q=%d overrides the traced re-run's want lean (tuning only).\n",
+                    want_override_q);
 
     std::printf("=== exploration sweep (BL-937) - %d seeds, 1200 -> 1660 CE ===\n\n", seed_count);
 
@@ -227,6 +258,7 @@ int main(int argc, char** argv)
         ep2.resume_grudges   = &fx.pre_exploration_grudges;
         ep2.resume_contacts  = &fx.pre_exploration_contacts;
         ep2.resume_corridors = &fx.pre_exploration_corridors;
+        if (want_override) ep2.w_want_q = want_override_q;
 
         settlement_state ss_copy = fx.pre_exploration_settlement;
         creed_state       cs_copy = fx.pre_exploration_creeds;
@@ -244,10 +276,10 @@ int main(int argc, char** argv)
             ss_copy, &cs_copy, fx.terrain.view(), fx.gw, fx.gh, ep2,
             fx.exploration_seed, /*year_progress=*/nullptr, fx.works, /*tap=*/nullptr);
 
-        row.traced_matches_untraced =
-            traced.battles == fx.exploration_state.battles &&
-            traced.conquests == fx.exploration_state.conquests &&
-            traced.foundings == fx.exploration_state.foundings;
+        row.traced_matches_untraced = want_override ||
+            (traced.battles == fx.exploration_state.battles &&
+             traced.conquests == fx.exploration_state.conquests &&
+             traced.foundings == fx.exploration_state.foundings);
 
         for (const battle_trace& bt : traced.battle_traces)
         {
@@ -313,6 +345,25 @@ int main(int argc, char** argv)
             }
         }
 
+        // BL-953: the live preference at the traced run's own close, derived
+        // once, for reading 6's want-divergence count and reading 10's live line.
+        const std::vector<culture_good_preference> live_prefs = derive_culture_preference(
+            ss_copy.regions, traced.contacts, traced.polities,
+            static_cast<int>(cs_copy.cultures.size()));
+        row.live_pref_entries_1660 = static_cast<int64_t>(live_prefs.size());
+        const auto top_want = [&](int polity_id) {
+            const region_class goods[4] = { region_class::farm, region_class::ore,
+                                            region_class::energy, region_class::port };
+            int best = -1, best_q = 0;
+            for (int g = 0; g < 4; ++g)
+            {
+                const int w = polity_good_want_q(ss_copy.regions, traced.polities, live_prefs,
+                                                 polity_id, goods[g]);
+                if (w > best_q) { best_q = w; best = g; } // ties keep the lower good index
+            }
+            return best;
+        };
+
         for (const polity& q : traced.polities)
         {
             if (!q.alive) continue;
@@ -344,6 +395,7 @@ int main(int argc, char** argv)
                     if (!contact_exists(traced.contacts, q.overlord, c.to)) { friction = true; break; }
                 }
                 if (friction) ++row.subjects_with_friction;
+                if (top_want(q.id) != top_want(q.overlord)) ++row.subjects_with_divergent_top_want;
             }
         }
         {
@@ -512,6 +564,7 @@ int main(int argc, char** argv)
     // `fx.exploration_state.supply_corridors`, finalised at that run's own
     // close, and the two road-ladder counters BL-940 added.
     // -----------------------------------------------------------------------
+    if (!quick)
     {
         std::vector<int32_t> uses;
         int64_t total_post_roads_built = 0, total_treasury_spent = 0;
@@ -636,10 +689,19 @@ int main(int argc, char** argv)
     // Flagged exactly as readings 1-2's own operationalization is.
     std::printf("\n--- reading 6: subject friction (operationalized as contact-graph divergence) ---\n");
     {
-        int64_t friction = 0;
-        for (const exploration_row& r : rows) if (r.ok) friction += r.subjects_with_friction;
+        int64_t friction = 0, divergent = 0, subjects = 0;
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok) continue;
+            friction  += r.subjects_with_friction;
+            divergent += r.subjects_with_divergent_top_want;
+            subjects  += r.subjects_alive;
+        }
         std::printf("  subjects whose contact graph names a polity their overlord never met: %lld\n",
                     static_cast<long long>(friction));
+        std::printf("  subjects whose top want (argmax good, live 1660 preference) differs from "
+                    "their overlord's: %lld of %lld\n",
+                    static_cast<long long>(divergent), static_cast<long long>(subjects));
         std::printf("  %s\n", friction > 0
             ? "at least one subject's own graph points somewhere its overlord's does not."
             : "no friction measured on this spread — NOT MEASURED, do not read as a failure "
@@ -680,6 +742,8 @@ int main(int argc, char** argv)
     // invented for this reading.
     // -----------------------------------------------------------------------
     std::printf("\n--- reading 3: both strategies pay (consolidator/expansionist, by creed) ---\n");
+    if (quick) std::printf("  skipped (--quick)\n");
+    else
     {
         int64_t seeds_measured = 0, seeds_with_consolidator_top = 0,
                 seeds_with_expansionist_top = 0, seeds_with_both = 0;
@@ -757,6 +821,14 @@ int main(int argc, char** argv)
     // regions/contacts/polities `derive_wants` already reads at 1200 CE).
     // -----------------------------------------------------------------------
     std::printf("\n--- reading 10: preference (goods wanted differently by culture, by route) ---\n");
+    {
+        int64_t live_entries = 0;
+        for (const exploration_row& r : rows) if (r.ok) live_entries += r.live_pref_entries_1660;
+        std::printf("  LIVE at 1660 (the preference the span's scorer reads, off the traced run): "
+                    "total (culture, good) entries=%lld\n", static_cast<long long>(live_entries));
+    }
+    if (quick) std::printf("  1200 CE derivation skipped (--quick)\n");
+    else
     {
         int64_t total_entries = 0, seeds_with_spread = 0, seeds_measured = 0;
         std::vector<int16_t> weights;

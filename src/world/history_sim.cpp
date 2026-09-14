@@ -562,6 +562,67 @@ int market_scarcity_q(const std::vector<region>& regions, const history_sim_stat
     return r.scarcity_q[gi];
 }
 
+// ---------------------------------------------------------------------------
+// BL-953 -- a want points a campaign outward
+// ---------------------------------------------------------------------------
+
+int polity_good_want_q(const std::vector<region>& regions, const std::vector<polity>& polities,
+                       const std::vector<culture_good_preference>& prefs,
+                       int polity_id, region_class good)
+{
+    if (polity_id < 0 || static_cast<std::size_t>(polity_id) >= polities.size()) return 0;
+    const polity& q = polities[static_cast<std::size_t>(polity_id)];
+    if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= regions.size()) return 0;
+    const region& seat = regions[static_cast<std::size_t>(q.capital)];
+    if (!seat.has_market) return 0;
+    const int gi = scarcity_good_index(good);
+    if (gi < 0) return 0;
+    const int scarcity = clampi(seat.scarcity_q[gi], 0, 1000);
+    if (scarcity == 0) return 0;
+
+    // THE PEOPLE AT THE SEAT, at the grain the preference table is keyed on
+    // (`region::culture`'s plurality) -- a preference is a fact about who
+    // lives there, not who rules (EXPLORATION.md sec A good acquires a
+    // cultural preference). The founding culture only where the seat carries
+    // no share at all.
+    int culture = seat.culture.plurality();
+    if (culture < 0) culture = q.culture;
+
+    int weight_q = 0;
+    if (culture >= 0)
+    {
+        // `prefs` is ascending by culture (then by the fixed good order), so
+        // a culture's own entries are one contiguous run of at most four.
+        auto it = std::lower_bound(prefs.begin(), prefs.end(), culture,
+            [](const culture_good_preference& p, int c) { return p.culture < c; });
+        for (; it != prefs.end() && it->culture == culture; ++it)
+            if (it->good == good) { weight_q = clampi(it->weight_q, 0, 1000); break; }
+    }
+    return clampi((scarcity * (500 + weight_q / 2)) / 1000, 0, 1000);
+}
+
+int want_leaned_campaign_value(int value, int w_want_q, int want_q)
+{
+    if (value <= 0 || w_want_q == 0 || want_q <= 0) return value;
+    const int64_t lean = static_cast<int64_t>(w_want_q) * clampi(want_q, 0, 1000);
+    const int64_t leaned = static_cast<int64_t>(value) + (static_cast<int64_t>(value) * lean) / 1000000;
+    return static_cast<int>(clampi64(leaned, 0, INT32_MAX));
+}
+
+int choose_subjection_native(const std::vector<std::pair<int, int>>& candidates)
+{
+    int best_id = -1, best_want = 0;
+    for (const auto& c : candidates)
+    {
+        if (best_id < 0 || c.second > best_want || (c.second == best_want && c.first < best_id))
+        {
+            best_id   = c.first;
+            best_want = c.second;
+        }
+    }
+    return best_id;
+}
+
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
@@ -1965,6 +2026,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
     int64_t next_decision = params.start_year;
     int     step_years    = step_for_year(params, params.start_year);
 
+    // BL-953 -- THE ROUND'S LIVE CULTURAL PREFERENCE (EXPLORATION.md sec
+    // Preference is read LIVE). Derived AT MOST ONCE per decision round, from
+    // that round's own regions/contacts/polities, and read by every campaign
+    // candidate and subjection pick in the round -- never re-derived per
+    // candidate. Empty whenever the want lean is off (the Empires span, or
+    // `w_want_q` 0), which is what keeps those runs byte-identical.
+    const bool want_lean_on = params.exploration_upkeep_enabled && params.w_want_q != 0;
+    std::vector<culture_good_preference> round_prefs;
+    int want_culture_count = cs ? static_cast<int>(cs->cultures.size()) : 0;
+    if (want_lean_on && cs == nullptr)
+        for (const region& r : ss.regions)
+            want_culture_count = std::max(want_culture_count, r.culture.plurality() + 1);
+
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
         event_year = y; // BL-916: the recorder's clock, read by `note_event` alone.
@@ -2471,6 +2545,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.treasury_spent_on_navies          += upkeep_spend.navies;
             out.treasury_spent_on_standing_armies += upkeep_spend.standing_armies;
 
+            // BL-953 -- the round's preference, once, after the upkeep has
+            // refreshed the scarcity signal the want reads beside it.
+            if (want_lean_on)
+                round_prefs = derive_culture_preference(ss.regions, out.contacts,
+                                                        out.polities, want_culture_count);
+
             // ---- BL-940: THE ROAD LADDER'S THIRD RUNG, BOUGHT WITH CAPITAL.
             //
             // A polity holding EX-WY-1a (Post Roads) may promote AT MOST ONE
@@ -2669,6 +2749,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (arriving.capital < 0
                      || static_cast<std::size_t>(arriving.capital) >= ss.regions.size()) continue;
 
+                    // BL-953 -- COLLECT, THEN RANK. Every native passing the
+                    // same eligibility tests as before is gathered with the
+                    // arriving power's want for the native seat's dominant
+                    // good; the highest want is bound, ties to the lower id
+                    // (EXPLORATION.md sec A want points a campaign outward:
+                    // "subjection ranks the natives a power could bind by the
+                    // same want"). With the lean off every want is 0 and the
+                    // pick is the lowest eligible id -- the old id-order walk.
+                    std::vector<std::pair<int, int>> eligible_natives;
                     for (std::size_t ni = 0; ni < pc; ++ni)
                     {
                         if (ni == ai) continue;
@@ -2708,6 +2797,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (arriving_treasury < native_treasury + params.subjection_treasury_margin_q)
                             continue;
 
+                        const int want_q = want_lean_on
+                            ? polity_good_want_q(ss.regions, out.polities, round_prefs, arriving.id,
+                                                 ss.regions[static_cast<std::size_t>(native.capital)].dominant)
+                            : 0;
+                        eligible_natives.push_back({static_cast<int>(ni), want_q});
+                    }
+
+                    const int chosen = choose_subjection_native(eligible_natives);
+                    if (chosen >= 0)
+                    {
+                        polity& native = out.polities[static_cast<std::size_t>(chosen)];
+
                         // ONE OF TWO PATHS, derived from the native seat's own
                         // coast (§ scope note on `polity::subject_kind`): a
                         // coastal seat is a foothold planted beside it; an
@@ -2726,8 +2827,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                      native.capital, y, params.grudge_ground_taken / 2);
                         note_event(lapse_event_kind::subject_bound,
                                    native.capital, native.id, arriving.id);
-                        ++out.subjections_formed;
-                        break; // one overlord per native per round
+                        ++out.subjections_formed; // one native per arriving power per round
                     }
                 }
             }
@@ -3855,6 +3955,24 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         value = value + (value * lean) / 1000;
                         if (value < 0) value = 0;
                     }
+
+                    // BL-953 -- A WANT POINTS THE CAMPAIGN OUTWARD
+                    // (EXPLORATION.md sec A want points a campaign outward).
+                    // The decider's own want for the good this ground holds,
+                    // weighted by its people's LIVE preference (the round's
+                    // `round_prefs`, derived once above), leans the prize up.
+                    // Same idiom as the fear and appetite leans: one term
+                    // reads a richer input, applied ONCE, outside the season
+                    // loop, because the want is a property of the decider and
+                    // the ground, not of the weather. Only a positive prize
+                    // leans -- a want ranks winnable campaigns, it never
+                    // rescues an unwinnable one. Off (and byte-identical) in
+                    // the Empires span and at `w_want_q` 0.
+                    if (want_lean_on)
+                        value = want_leaned_campaign_value(
+                            value, params.w_want_q,
+                            polity_good_want_q(ss.regions, out.polities, round_prefs, q.id,
+                                               tgt.dominant));
 
                     // Season as an action axis: summer and winter are two
                     // candidates over the same objective, not two ticks.

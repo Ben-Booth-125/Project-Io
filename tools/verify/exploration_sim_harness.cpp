@@ -15,6 +15,9 @@
 //        span's own recorded outcome (BL-462's acceptance test, replayed)
 //   R3   the resumed run is deterministic: same seed, same fixture, twice
 //        -> byte-identical ownership record and counters
+//   T6   BL-953: a want leans the campaign prize and ranks subjection
+//   R3b  BL-953: at w_want_q 0 the resumed span reproduces pre-change counters
+//   R3c  BL-953: with the lean on the span stays deterministic (reported)
 //   R4   objects with a term expire on schedule and not before
 //   R5   the round-level upkeep hook is callable and moves nothing (it is a
 //        documented no-op until BL-932)
@@ -251,6 +254,67 @@ int main()
     }
 
     // -----------------------------------------------------------------
+    // T6: BL-953 -- a want points a campaign outward, and ranks subjection
+    // -----------------------------------------------------------------
+    {
+        // Polity 0's seat (region 0) is an ORE market that holds no farm and
+        // no energy anywhere; region 1 is farm ground, region 2 ore ground.
+        std::vector<region> regions(3);
+        regions[0].nation = 0; regions[0].has_market = true;
+        regions[0].dominant = region_class::ore;
+        regions[0].culture.id[0] = 0; // the seat's people: culture 0
+        regions[1].nation = 1; regions[1].dominant = region_class::farm;
+        regions[2].nation = 2; regions[2].dominant = region_class::ore;
+
+        std::vector<polity> qs(3);
+        for (int i = 0; i < 3; ++i) { qs[i].id = i; qs[i].alive = true; qs[i].capital = i; qs[i].culture = 0; }
+        refresh_market_scarcity(regions, qs);
+
+        const std::vector<culture_good_preference> no_prefs;
+        const int want_farm = polity_good_want_q(regions, qs, no_prefs, 0, region_class::farm);
+        const int want_ore  = polity_good_want_q(regions, qs, no_prefs, 0, region_class::ore);
+        check(want_farm > 0 && want_ore == 0,
+              "T6.1  a polity wants a good its seat lacks, and not the good its seat holds");
+
+        std::vector<culture_good_preference> prefs(1);
+        prefs[0].culture = 0; prefs[0].good = region_class::farm; prefs[0].weight_q = 1000;
+        const int want_farm_pref = polity_good_want_q(regions, qs, prefs, 0, region_class::farm);
+        check(want_farm_pref > want_farm
+           && want_farm_pref == (regions[0].scarcity_q[scarcity_good_index(region_class::farm)] * 1000) / 1000
+           && want_farm == (regions[0].scarcity_q[scarcity_good_index(region_class::farm)] * 500) / 1000,
+              "T6.2  the people's preference sharpens the want: scarcity x (500 + weight/2) / 1000");
+
+        check(polity_good_want_q(regions, qs, prefs, 1, region_class::ore) == 0,
+              "T6.3  a seat with no market carries no want at all");
+
+        // (a) The SAME prize, leaned by the want for what the target holds.
+        const int w = 1000;
+        const int prize = 400;
+        const int prize_wanted   = want_leaned_campaign_value(prize, w, want_farm_pref); // target: farm ground
+        const int prize_unwanted = want_leaned_campaign_value(prize, w, want_ore);       // target: ore ground
+        check(prize_wanted > prize && prize_unwanted == prize,
+              "T6.4  a wanted good raises a campaign prize over the same target without the want");
+        check(want_leaned_campaign_value(prize, 0, want_farm_pref) == prize,
+              "T6.5  at w_want_q = 0 the lean is the identity");
+        check(want_leaned_campaign_value(0, w, 1000) == 0 && want_leaned_campaign_value(-50, w, 1000) == -50,
+              "T6.6  a non-positive prize is never rescued by a want");
+
+        // (b) Subjection picks the higher-want native, ties to the lower id.
+        const std::vector<std::pair<int, int>> natives = {
+            {1, polity_good_want_q(regions, qs, prefs, 0, regions[1].dominant)},  // farm: wanted
+            {2, polity_good_want_q(regions, qs, prefs, 0, regions[2].dominant)},  // ore: held
+        };
+        check(choose_subjection_native(natives) == 1,
+              "T6.7  subjection binds the native whose seat holds the good the arriving power wants");
+        const std::vector<std::pair<int, int>> reversed = { {2, 900}, {5, 900}, {1, 100} };
+        check(choose_subjection_native(reversed) == 2,
+              "T6.8  equal wants tie-break on the LOWER native id, whatever the input order");
+        const std::vector<std::pair<int, int>> all_zero = { {7, 0}, {3, 0}, {9, 0} };
+        check(choose_subjection_native(all_zero) == 3 && choose_subjection_native({}) == -1,
+              "T6.9  with every want 0 the pick is the lowest eligible id (the old id-order walk)");
+    }
+
+    // -----------------------------------------------------------------
     // R1/R2/R3: the resumed span, over a REAL Empires close
     // -----------------------------------------------------------------
     era_minus_one_fixture fixture;
@@ -282,7 +346,7 @@ int main()
 
         check(!p1.polities.empty(), "R2.0  the Empires close leaves at least one living polity");
 
-        const auto run_exploration = [&](uint32_t seed) {
+        const auto run_exploration = [&](uint32_t seed, int w_want_q = 0) {
             settlement_state ss = ss_a; // Independent copy each call.
             history_sim_params ep;
             ep.start_year = fixture.params.stop_year; // 1200, wherever Empires closed.
@@ -292,6 +356,7 @@ int main()
             ep.exploration_upkeep_enabled          = true;
             ep.city_states_by_population_threshold = true;
             ep.settle_requires_razed_ground         = true;
+            ep.w_want_q                             = w_want_q; // BL-953; 0 = the pre-change span
             ep.resume_polities  = &p1.polities;
             ep.resume_grudges   = &p1.grudges;
             ep.resume_contacts  = &p1.contacts;
@@ -329,6 +394,45 @@ int main()
                     static_cast<long long>(ex1.conquests), static_cast<long long>(ex1.foundings),
                     static_cast<int>(p1.polities.size()), static_cast<int>(ex1.polities.size()));
 
+        // R3b (BL-953): WITH THE WANT LEAN AT 0 THE SPAN IS THE PRE-CHANGE
+        // SPAN. These counters were read off this exact fixture and seed with
+        // the harness built BEFORE BL-953 touched the scorer or subjection
+        // (2026-09-14, main @ 9b342fc6). A change that legitimately moves the
+        // Exploration span's upkeep/scarcity (not the want lean) moves these
+        // too, and is re-pinned by that change with its cause stated -- the
+        // claim here is only that BL-953 at `w_want_q` 0 moves nothing.
+        std::printf("      pinned-read: subjections=%lld freed=%lld tribute=%lld treaties=%lld "
+                    "broken=%lld owner_changes=%zu\n",
+                    static_cast<long long>(ex1.subjections_formed),
+                    static_cast<long long>(ex1.subjections_freed),
+                    static_cast<long long>(ex1.tribute_remitted),
+                    static_cast<long long>(ex1.treaties_formed),
+                    static_cast<long long>(ex1.treaties_broken), ex1.owner_changes.size());
+        check(ex1.battles == 426 && ex1.conquests == 423 && ex1.foundings == 451
+           && ex1.subjections_formed == 5 && ex1.subjections_freed == 1
+           && ex1.tribute_remitted == 134254916 && ex1.treaties_formed == 287
+           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2453,
+              "R3b  with w_want_q = 0 the Exploration span reproduces the pre-BL-953 counters "
+              "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
+
+        // R3c (BL-953): the same span with the lean ON -- deterministic, and
+        // REPORTED rather than gated on direction (a seed owes no outcome).
+        {
+            const int want_w = exploration_sim_params(world_params{}).w_want_q;
+            const history_sim_state wa = run_exploration(0x515C0E17u, want_w);
+            const history_sim_state wb = run_exploration(0x515C0E17u, want_w);
+            check(want_w != 0,
+                  "R3c.0  the Exploration span's own params carry a non-zero want lean");
+            check(wa.battles == wb.battles && wa.conquests == wb.conquests
+               && wa.foundings == wb.foundings && wa.subjections_formed == wb.subjections_formed
+               && wa.owner_changes.size() == wb.owner_changes.size(),
+                  "R3c.1  with the want lean on, the span is still deterministic (same seed twice)");
+            std::printf("      want lean w_want_q=%d: battles=%lld conquests=%lld foundings=%lld "
+                        "subjections=%lld owner_changes=%zu\n", want_w,
+                        static_cast<long long>(wa.battles), static_cast<long long>(wa.conquests),
+                        static_cast<long long>(wa.foundings),
+                        static_cast<long long>(wa.subjections_formed), wa.owner_changes.size());
+        }
         // BL-940 -- REPORTED, not gated: whether any polity in THIS seed ever
         // held EX-WY-1a and had a treasury to spend is a fact about the seed,
         // same discipline `unsustained_attrition_events` and the naval
