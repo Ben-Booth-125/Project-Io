@@ -487,9 +487,12 @@ int main()
         regions[0].has_market = true;
         regions[1].nation = 1; // a poor, unconnected polity's capital: no endowment set
 
+        // BL-954: ids set explicitly. With the default id (-1) no region read
+        // as held, so the endowment term earned nothing and R5.1 passed only
+        // on the flat market income BL-954 removed -- it now tests endowment.
         std::vector<polity> qs(2);
-        qs[0].capital = 0; qs[0].capacity[0] = 3;
-        qs[1].capital = 1; qs[1].cohesion_q = 700;
+        qs[0].id = 0; qs[0].capital = 0; qs[0].capacity[0] = 3;
+        qs[1].id = 1; qs[1].capital = 1; qs[1].cohesion_q = 700;
         history_sim_params ep2;
         ep2.start_year = 1200; // consolidation year: not this call's `year`
 
@@ -555,6 +558,138 @@ int main()
               "R5.8  an underfunded port silts toward nothing");
         check(qs[0].navy_stock < navy_before,
               "R5.9  a navy decays every round regardless of funding");
+    }
+
+    // -----------------------------------------------------------------
+    // R6: BL-954 -- trade is a want met by throughput
+    // -----------------------------------------------------------------
+    {
+        const int farm = scarcity_good_index(region_class::farm);
+
+        // Polity 0 (the BUYER): one market capital holding nothing, so it
+        // wants farm at the "held nowhere" level. Polity 1 (the SELLER): a
+        // market capital dominant in nothing plus one farm region --
+        // holding_q for farm is 500, and for every other good 0. A supply corridor joins buyer region 0 to seller
+        // region 2; its line is the weaker side's reach, 600.
+        std::vector<region> base_regions(3);
+        base_regions[0].nation = 0; base_regions[0].has_market = true;
+        base_regions[0].dominant = region_class::none; base_regions[0].network_supply_q = 1000;
+        base_regions[1].nation = 1; base_regions[1].has_market = true;
+        base_regions[1].dominant = region_class::none;
+        base_regions[2].nation = 1; base_regions[2].dominant = region_class::farm;
+        base_regions[2].network_supply_q = 600;
+
+        std::vector<polity> base_qs(2);
+        base_qs[0].id = 0; base_qs[0].alive = true; base_qs[0].capital = 0;
+        base_qs[1].id = 1; base_qs[1].alive = true; base_qs[1].capital = 1;
+
+        const std::vector<history_corridor> corridors = { history_corridor{0, 2, 5} };
+
+        history_sim_params ep;
+        ep.start_year = 9999; // no consolidation
+        ep.port_build_cost_q = 0; ep.navy_build_cost_q = 0; ep.standing_army_build_cost_q = 0;
+
+        const std::vector<dated_object> no_trade = {
+            dated_object{2000, static_cast<int32_t>(treaty_clause::non_aggression), 0, 1} };
+        const std::vector<dated_object> with_trade = {
+            dated_object{2000, static_cast<int32_t>(treaty_clause::non_aggression), 0, 1},
+            dated_object{2000, static_cast<int32_t>(treaty_clause::trade_access), 0, 1} };
+
+        // R6.1 -- no flow without the clause, even with want, holder and line.
+        {
+            std::vector<region> regions = base_regions;
+            std::vector<polity> qs = base_qs;
+            std::vector<trade_flow> flows = { trade_flow{9, 9, 0, 1} }; // must be overwritten
+            run_exploration_upkeep(regions, qs, corridors, ep, 1234, 4, nullptr, &no_trade, &flows);
+            check(flows.empty(),
+                  "R6.1  no flow forms without a trade_access clause (non-aggression alone opens none)");
+        }
+
+        // R6.2-R6.6 -- the clause opens exactly the one flow the ground supports.
+        std::vector<region> regions = base_regions;
+        std::vector<polity> qs = base_qs;
+        std::vector<trade_flow> flows;
+        run_exploration_upkeep(regions, qs, corridors, ep, 1234, 4, nullptr, &with_trade, &flows);
+        const bool one_flow = flows.size() == 1 && flows[0].seller == 1 && flows[0].buyer == 0
+                           && flows[0].good == farm;
+        check(one_flow, "R6.2  a trade_access clause opens the seller->buyer farm flow, and only it");
+        const int raw_want = regions[0].scarcity_raw_q[farm];
+        check(one_flow && raw_want == 700 && flows[0].volume_q == 500,
+              "R6.3  volume is bounded by the seller's holding (min of want 700, holding 500, line 600)");
+        check(one_flow && regions[0].scarcity_q[farm] == raw_want - flows[0].volume_q
+           && regions[0].scarcity_raw_q[farm] == 700,
+              "R6.4  a met want relieves the buyer's signal (raw kept, unmet = raw - inbound)");
+
+        {
+            std::vector<region> r_none = base_regions;
+            std::vector<polity> q_none = base_qs;
+            run_exploration_upkeep(r_none, q_none, corridors, ep, 1234, 4, nullptr, &no_trade, nullptr);
+            const int64_t expected = (500LL * ep.treasury_trade_income_q * 4) / 1000;
+            check(expected > 0
+               && regions[0].treasury - r_none[0].treasury == expected
+               && regions[1].treasury - r_none[1].treasury == expected,
+                  "R6.5  the flow credits BOTH capitals, volume x treasury_trade_income_q x step / 1000");
+        }
+
+        // Want, holding and line each bound the volume on their own.
+        {
+            std::vector<region> rw = regions;
+            rw[0].scarcity_raw_q[farm] = 120;
+            const trade_context ctx = build_trade_context(rw, qs, corridors);
+            check(trade_flow_volume_q(ctx, rw, qs, 1, 0, farm) == 120,
+                  "R6.6  volume is bounded by the buyer's raw want");
+        }
+        {
+            std::vector<region> rl = regions;
+            rl[2].network_supply_q = 80;
+            const trade_context ctx = build_trade_context(rl, qs, corridors);
+            check(trade_flow_volume_q(ctx, rl, qs, 1, 0, farm) == 80,
+                  "R6.7  volume is bounded by the land line (the weaker side's reach to the border)");
+        }
+        {
+            // No corridor: the line is the sea, and only the SELLER's navy carries it.
+            std::vector<region> rs = regions;
+            std::vector<polity> qn = qs;
+            rs[0].port_stock_q = 800; rs[1].port_stock_q = 300;
+            const trade_context ctx = build_trade_context(rs, qn, /*corridors=*/{});
+            check(trade_flow_volume_q(ctx, rs, qn, 1, 0, farm) == 0,
+                  "R6.8  no corridor and no seller navy -> no line, no volume");
+            qn[0].navy_stock = 500; // the BUYER's navy does not carry the seller's goods
+            check(trade_flow_volume_q(ctx, rs, qn, 1, 0, farm) == 0,
+                  "R6.9  a buyer's navy alone opens no sea line");
+            qn[1].navy_stock = 500;
+            check(trade_flow_volume_q(ctx, rs, qn, 1, 0, farm) == 300,
+                  "R6.10 the seller's navy opens the sea line, bounded by the smaller built port");
+        }
+
+        // No flat market income remains: a market capital with no endowment,
+        // no corridor and no trade earns nothing at all.
+        {
+            std::vector<region> rm(1);
+            rm[0].nation = 0; rm[0].has_market = true;
+            std::vector<polity> qm(1);
+            qm[0].id = 0; qm[0].alive = true; qm[0].capital = 0;
+            run_exploration_upkeep(rm, qm, {}, ep, 1234, 4);
+            check(rm[0].treasury == 0,
+                  "R6.11 a market capital with no endowment, corridor or trade earns nothing (no flat market income)");
+        }
+
+        // A pair with trade to open is worth more to bind than the same pair without.
+        {
+            const trade_context ctx = build_trade_context(regions, qs, corridors);
+            const int trade_value = pair_trade_value_q(ctx, regions, qs, 0, 1);
+            check(trade_value == 500,
+                  "R6.12 pair_trade_value_q reads the flow the clause WOULD open, before any binding");
+            for (const bool near : {true, false})
+            {
+                const int without = treaty_value_q(ep, 0, 0, 0, /*aggression=*/400, /*alarm=*/0, near, 0);
+                const int with_tr = treaty_value_q(ep, 0, 0, 0, /*aggression=*/400, /*alarm=*/0, near,
+                                                    trade_value);
+                check(with_tr > without,
+                      near ? "R6.13 trade to open raises treaty value near home"
+                           : "R6.14 trade to open raises treaty value far from home too");
+            }
+        }
     }
 
     std::printf("\n%s (%d failure%s)\n",
