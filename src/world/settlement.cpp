@@ -2140,10 +2140,15 @@ void muster_garrison(region& p, int garrison_fraction_q,
                      int muster_rate_q, int disband_rate_q)
 {
     const int64_t target = garrison_target(p, garrison_fraction_q);
+    // BL-955: the muster reads only the men it raised. A paid standing army
+    // (`standing_army_heads`, 0 throughout the Empire span) is neither
+    // counted toward the target nor disbanded as excess.
+    const int64_t standing = standing_army_heads(p);
+    const int64_t ordinary = p.army_stock - standing;
 
-    if (p.army_stock < target)
+    if (ordinary < target)
     {
-        const int64_t gap  = target - p.army_stock;
+        const int64_t gap  = target - ordinary;
         const int64_t want = (gap * clampi(muster_rate_q, 0, 1000)) / 1000;
         // THE COST, and the only place it is charged: bodies come out of the
         // recruitable pool. `raise_manpower` is self-limiting, so a region
@@ -2153,9 +2158,9 @@ void muster_garrison(region& p, int garrison_fraction_q,
         return;
     }
 
-    if (p.army_stock > target)
+    if (ordinary > target)
     {
-        const int64_t excess = p.army_stock - target;
+        const int64_t excess = ordinary - target;
         const int64_t home   = (excess * clampi(disband_rate_q, 0, 1000)) / 1000;
         p.army_stock -= home;
         // Discharged, back to the pool they were raised from — NOT to

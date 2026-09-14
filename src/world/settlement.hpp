@@ -432,6 +432,22 @@ struct region
     /// as `treasury`/`scarcity_q` above.
     int32_t port_stock_q = 0;
 
+    /// BL-955 — THE PAID STANDING ARMY: how many of `army_stock`'s heads are
+    /// men the treasury bought (`run_exploration_upkeep`'s army step) rather
+    /// than men the muster raised. They ARE garrison men — counted inside
+    /// `army_stock`, so they fight, march and die exactly as any other — and
+    /// the one difference is that `muster_garrison` never disbands them: its
+    /// target and its excess are read on the ORDINARY men
+    /// (`army_stock - standing_army_heads`). Lost in proportion to the pool on
+    /// every loss; unfunded, they decay back to ordinary men in the upkeep.
+    /// Valid only while `nation == standing_army_owner` (read through
+    /// `standing_army_heads`), so ground that changes hands loses its paid
+    /// status without every ownership site having to clear it. Zero
+    /// throughout the Empire span, where nothing buys it. GENERATION SCRATCH,
+    /// NOT SAVED: the men themselves persist in the saved `army_stock`.
+    int64_t standing_army       = 0;
+    int     standing_army_owner = -1; ///< the polity that paid for `standing_army`.
+
     // --- Civilisations (BL-869) ---------------------------------------------
     // CIVILISATION.md § A civilisation is what mixing makes, and it is not a
     // creed. "A region carrying two peoples in quantity, for a long time" is
@@ -1167,6 +1183,61 @@ int64_t raise_manpower(region& p, int64_t want);
 /// @param p                    The region; reads `population` and `work_manpower_mod`.
 /// @param garrison_fraction_q  Per-mille of the manpower ceiling to hold under arms.
 int64_t garrison_target(const region& p, int garrison_fraction_q);
+
+/// BL-955 — the paid standing heads inside `p.army_stock`: `standing_army`
+/// while the ground is still held by the polity that paid for it, clamped to
+/// the pool; 0 otherwise. Always 0 in the Empire span.
+inline int64_t standing_army_heads(const region& p)
+{
+    if (p.standing_army <= 0 || p.nation != p.standing_army_owner || p.army_stock <= 0) return 0;
+    return p.standing_army < p.army_stock ? p.standing_army : p.army_stock;
+}
+
+/// BL-955 — after `p.army_stock` fell from @p stock_before, lose the paid
+/// standing heads IN PROPORTION: a loss falls on paid and mustered men alike.
+/// The paid count is read against the pool as it stood BEFORE the loss
+/// (never the shrunken pool, which would destroy paid men twice), and the
+/// result is always <= `army_stock`. A no-op wherever there is no standing
+/// army (the whole Empire span).
+inline void scale_standing_army(region& p, int64_t stock_before)
+{
+    const int64_t raw = (p.standing_army > 0 && p.standing_army_owner == p.nation) ? p.standing_army : 0;
+    const int64_t s   = raw < stock_before ? raw : stock_before;
+    if (s <= 0 || stock_before <= 0 || p.army_stock <= 0) { p.standing_army = 0; return; }
+    if (p.army_stock >= stock_before) { p.standing_army = s < p.army_stock ? s : p.army_stock; return; }
+    p.standing_army = (s * p.army_stock) / stock_before; // s <= stock_before, so <= army_stock
+}
+
+/// BL-955 — draw @p take heads out of `p.army_stock` (clamped to the pool)
+/// for a march, losing the paid heads in proportion. Returns the PAID heads
+/// drawn, which never exceed the heads drawn.
+inline int64_t draw_army_with_standing(region& p, int64_t take)
+{
+    const int64_t stock_before = p.army_stock;
+    if (take <= 0 || stock_before <= 0) return 0;
+    if (take > stock_before) take = stock_before;
+    const int64_t paid_before = standing_army_heads(p);
+    p.army_stock -= take;
+    scale_standing_army(p, stock_before);
+    const int64_t drawn = paid_before - p.standing_army;
+    return drawn < 0 ? 0 : (drawn > take ? take : drawn);
+}
+
+/// BL-955 — call after writing `p.nation`: ground that changed hands keeps
+/// none of its previous holder's paid heads, so a region that is lost and
+/// retaken within one round cannot revive a stale paid count.
+inline void void_stale_standing_army(region& p)
+{
+    if (p.standing_army_owner != p.nation) p.standing_army = 0;
+}
+
+/// BL-955 — the raw invariant: paid heads never exceed the pool, and a paid
+/// count only stands on ground its payer holds.
+inline bool standing_army_invariant_holds(const region& p)
+{
+    return p.standing_army <= p.army_stock
+        && (p.standing_army <= 0 || p.standing_army_owner == p.nation);
+}
 
 /// ONE YEAR of the muster. Below target, close `muster_rate_q` per-mille of
 /// the shortfall by drawing from `manpower_stock` — which is what raising an

@@ -30,6 +30,9 @@
 //        holding and line, one want shared across sellers, one holding
 //        shared across buyers, income at both ends, no flat market income,
 //        the MARGINAL trade a clause opens in treaty value
+//   R8   BL-955: spend is ALLOCATED -- lean ranks, one scored choice per
+//        polity per round among port/navy/army/hold, the creed and Alarm
+//        deciding which, decays untouched, the argmax tie order
 //
 // Headless: world/* logic only, no SDL and no Lua.
 // ---------------------------------------------------------------------------
@@ -63,6 +66,53 @@ int find_node(const char* id)
     for (int i = 0; i < io::exploration_tree::node_count; ++i)
         if (std::strcmp(io::exploration_tree::nodes[i].id, id) == 0) return i;
     return -1;
+}
+
+// ---------------------------------------------------------------------------
+// BL-955 fixture: one capital seat per polity, each polity its own culture.
+// `state.polities` IS the vector the upkeep mutates (the contract
+// `exploration_spend_context::state` states), so the Alarm read and the
+// purchases see one table. Build the context at the use site, after the
+// fixture has stopped moving.
+// ---------------------------------------------------------------------------
+struct spend_fixture
+{
+    std::vector<region> regions;
+    history_sim_state   state;
+    creed_state         creeds;
+};
+
+/// A culture with the two lean inputs set: sea legs, and the war god's temper.
+culture lean_culture(int sea_legs_q, int zeal, int dominion)
+{
+    culture c;
+    c.sea_legs_q = sea_legs_q;
+    c.pantheon.resize(2);
+    c.pantheon[1].zeal     = zeal;
+    c.pantheon[1].dominion = dominion;
+    return c;
+}
+
+int add_spend_polity(spend_fixture& fx, const culture& c, int64_t treasury, int port_window_q,
+                     int port_stock_q)
+{
+    const int i = static_cast<int>(fx.state.polities.size());
+    region r;
+    r.nation = i; r.treasury = treasury; r.port_q = port_window_q; r.port_stock_q = port_stock_q;
+    fx.regions.push_back(r);
+    polity q;
+    q.id = i; q.alive = true; q.capital = i; q.culture = i;
+    fx.state.polities.push_back(q);
+    fx.creeds.cultures.push_back(c);
+    return i;
+}
+
+exploration_spend_context spend_context(spend_fixture& fx)
+{
+    exploration_spend_context ctx;
+    ctx.state  = &fx.state;
+    ctx.creeds = &fx.creeds;
+    return ctx;
 }
 
 } // namespace
@@ -366,7 +416,8 @@ int main()
 
         check(!p1.polities.empty(), "R2.0  the Empires close leaves at least one living polity");
 
-        const auto run_exploration = [&](uint32_t seed, int w_want_q = 0) {
+        const auto run_exploration = [&](uint32_t seed, int w_want_q = 0,
+                                         std::vector<region>* regions_out = nullptr) {
             settlement_state ss = ss_a; // Independent copy each call.
             history_sim_params ep;
             ep.start_year = fixture.params.stop_year; // 1200, wherever Empires closed.
@@ -381,12 +432,35 @@ int main()
             ep.resume_grudges   = &p1.grudges;
             ep.resume_contacts  = &p1.contacts;
             ep.resume_corridors = &p1.surviving_corridors;
-            return run_history_sim(ss, &fixture.creeds, fixture.terrain.view(),
-                                   fixture.gw, fixture.gh, ep, seed, nullptr,
-                                   fixture.works, nullptr);
+            history_sim_state st = run_history_sim(ss, &fixture.creeds, fixture.terrain.view(),
+                                                   fixture.gw, fixture.gh, ep, seed, nullptr,
+                                                   fixture.works, nullptr);
+            if (regions_out != nullptr) *regions_out = ss.regions; // the span's closing ground
+            return st;
         };
 
-        const history_sim_state ex1 = run_exploration(0x515C0E17u);
+        std::vector<region> ex1_regions;
+        const history_sim_state ex1 = run_exploration(0x515C0E17u, 0, &ex1_regions);
+
+        // R8.18 (BL-955 F3): the paid standing army's raw invariant on a REAL
+        // generated world -- at the close, region by region, and every round.
+        {
+            int64_t close_bad = 0, paid_regions = 0;
+            for (const region& r : ex1_regions)
+            {
+                if (!standing_army_invariant_holds(r)) ++close_bad;
+                if (r.standing_army > 0) ++paid_regions;
+            }
+            std::printf("      R8.18: regions=%zu carrying paid heads=%lld close violations=%lld "
+                        "per-round violations=%lld\n", ex1_regions.size(),
+                        static_cast<long long>(paid_regions), static_cast<long long>(close_bad),
+                        static_cast<long long>(ex1.standing_army_invariant_violations));
+            check(!ex1_regions.empty() && paid_regions > 0 && close_bad == 0
+               && ex1.standing_army_invariant_violations == 0,
+                  "R8.18 on a real generated world, every region at the span's close has standing_army <= "
+                  "army_stock and a paid count only on its payer's ground; the per-round check counts 0 "
+                  "(BL-955 F3)");
+        }
         const history_sim_state ex2 = run_exploration(0x515C0E17u);
 
         check(ex1.years == 460, "R2.1  the resumed span runs its full 460 years (1200 -> 1660)");
@@ -437,6 +511,29 @@ int main()
         // holding is shared across its buyers (F5) -- was tribute 134235484,
         // treaties 295 (battles 483, conquests 425, foundings 497, subjections
         // 5, freed 1, broken 0, owner changes 2501 unmoved).
+        //
+        // RE-PINNED 2026-09-14 by BL-955 (spend is ALLOCATED): ports, navies
+        // and standing armies are one scored choice per polity per round
+        // instead of all three bought whenever affordable, so far fewer
+        // fleets and standing armies stand and the span's wars move -- was
+        // battles 483, conquests 425, foundings 497, tribute 134235719,
+        // treaties 294, owner changes 2501 (subjections 5, freed 1, broken 0
+        // unmoved).
+        //
+        // RE-PINNED 2026-09-14 by the BL-955 review fix: a PAID standing army
+        // (`region::standing_army`) now persists through the yearly muster's
+        // disband, decays only when unfunded, and saturates at
+        // army_saturation_per_region x held regions -- was battles 398,
+        // conquests 343, foundings 432, tribute 134335519, treaties 265, owner
+        // changes 2387 (subjections 5, freed 1, broken 0 unmoved).
+        //
+        // RE-PINNED 2026-09-14 by the BL-955 cold-review fixes: paid heads are
+        // lost against the pool BEFORE a loss (F1), the scorer's defender levy
+        // reads ordinary men only (F2), saturation reads the realm's paid
+        // heads (F4), stale paid counts are voided on every ownership change
+        // (F5a) -- was battles 414, conquests 357, foundings 420, tribute
+        // 134357387, treaties 285, owner changes 2337 (subjections 5, freed 1,
+        // broken 0 unmoved).
         std::printf("      pinned-read: subjections=%lld freed=%lld tribute=%lld treaties=%lld "
                     "broken=%lld owner_changes=%zu\n",
                     static_cast<long long>(ex1.subjections_formed),
@@ -444,10 +541,10 @@ int main()
                     static_cast<long long>(ex1.tribute_remitted),
                     static_cast<long long>(ex1.treaties_formed),
                     static_cast<long long>(ex1.treaties_broken), ex1.owner_changes.size());
-        check(ex1.battles == 483 && ex1.conquests == 425 && ex1.foundings == 497
+        check(ex1.battles == 407 && ex1.conquests == 351 && ex1.foundings == 418
            && ex1.subjections_formed == 5 && ex1.subjections_freed == 1
-           && ex1.tribute_remitted == 134235719 && ex1.treaties_formed == 294
-           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2501,
+           && ex1.tribute_remitted == 134357387 && ex1.treaties_formed == 291
+           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2327,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
@@ -463,6 +560,9 @@ int main()
                && wa.foundings == wb.foundings && wa.subjections_formed == wb.subjections_formed
                && wa.owner_changes.size() == wb.owner_changes.size(),
                   "R3c.1  with the want lean on, the span is still deterministic (same seed twice)");
+            check(wa.standing_army_invariant_violations == 0,
+                  "R8.18b with generation's own want lean on, the per-round paid-army invariant check "
+                  "counts 0 (BL-955 F3)");
             std::printf("      want lean w_want_q=%d: battles=%lld conquests=%lld foundings=%lld "
                         "subjections=%lld owner_changes=%zu\n", want_w,
                         static_cast<long long>(wa.battles), static_cast<long long>(wa.conquests),
@@ -714,26 +814,38 @@ int main()
     // R5b: BL-935 -- ports, navies and standing armies, PAY then INVEST
     // -----------------------------------------------------------------
     {
-        std::vector<region> regions(1);
-        regions[0].nation = 0;
-        regions[0].port_q = 1000; // the endowment WINDOW -- never spent itself
-        regions[0].port_stock_q = 500; // already partly built: clears `navy_min_port_stock_q`
-                                       // and still leaves room for R5.5's own build step to fire
-        regions[0].treasury = 100000;
-        std::vector<polity> qs(1);
-        qs[0].capital = 0;
+        // BL-955: a purchase is now ONE scored choice per polity per round, so
+        // the three stocks can no longer all fire off one funded call. Each
+        // is driven by a situation that asks for it: an EXPANSIONIST seat with
+        // a port window (port, then navy once the port stands) beside a
+        // CONSOLIDATOR seat (standing army). Both purses are full.
+        spend_fixture fx;
+        add_spend_polity(fx, lean_culture(/*sea*/1000, /*zeal*/10, /*dominion*/0), 100000,
+                         /*port window*/1000, /*port stock*/0);
+        add_spend_polity(fx, lean_culture(/*sea*/0, /*zeal*/0, /*dominion*/10), 100000,
+                         /*port window*/1000, /*port stock*/0);
+        const exploration_spend_context ctx = spend_context(fx);
+        std::vector<region>& regions = fx.regions;
+        std::vector<polity>& qs      = fx.state.polities;
 
         history_sim_params ep;
         ep.start_year = 9999; // never this call's `year` -- no consolidation noise
 
         exploration_upkeep_spend spend;
         run_exploration_upkeep(regions, qs, /*corridors=*/{}, ep, /*year=*/1234,
-                               /*step_years=*/1, &spend);
+                               /*step_years=*/1, &spend, nullptr, nullptr, &ctx);
         check(regions[0].port_stock_q > 0 && spend.ports == ep.port_build_cost_q,
               "R5.5  a funded port raises `port_stock_q` and spends the treasury doing it");
-        check(qs[0].navy_stock > 0 && spend.navies == ep.navy_build_cost_q,
+        const bool army_funded = regions[1].army_stock > 0
+                              && spend.standing_armies == ep.standing_army_build_cost_q;
+
+        regions[0].port_stock_q = 500; // the port stands: clears `navy_min_port_stock_q`
+        exploration_upkeep_spend spend_navy;
+        run_exploration_upkeep(regions, qs, /*corridors=*/{}, ep, /*year=*/1235,
+                               /*step_years=*/1, &spend_navy, nullptr, nullptr, &ctx);
+        check(qs[0].navy_stock > 0 && spend_navy.navies == ep.navy_build_cost_q,
               "R5.6  a funded, port-staged navy grows and spends the treasury doing it");
-        check(regions[0].army_stock > 0 && spend.standing_armies == ep.standing_army_build_cost_q,
+        check(army_funded,
               "R5.7  a funded standing army adds to `army_stock` and spends the treasury doing it");
 
         // R5.8: underfunded, a built port silts and the navy still decays --
@@ -747,6 +859,373 @@ int main()
               "R5.8  an underfunded port silts toward nothing");
         check(qs[0].navy_stock < navy_before,
               "R5.9  a navy decays every round regardless of funding");
+    }
+
+    // -----------------------------------------------------------------
+    // R8: BL-955 -- spend is ALLOCATED, not bought whenever affordable
+    // -----------------------------------------------------------------
+    {
+        history_sim_params ep;
+        ep.start_year = 1200; // contacts before this are near home; no consolidation at 1234
+
+        const culture expansionist = lean_culture(/*sea*/1000, /*zeal*/10, /*dominion*/0);  // expn 1000, cons 0
+        const culture middling     = lean_culture(/*sea*/500,  /*zeal*/5,  /*dominion*/5);  // expn 500,  cons 250
+        const culture consolidator = lean_culture(/*sea*/0,    /*zeal*/0,  /*dominion*/10); // expn 0,    cons 1000
+
+        // R8.0 -- the ranks: per-mille over living, cultured polities; ties share.
+        {
+            spend_fixture fx;
+            add_spend_polity(fx, expansionist, 0, 0, 0);
+            add_spend_polity(fx, middling, 0, 0, 0);
+            add_spend_polity(fx, consolidator, 0, 0, 0);
+            add_spend_polity(fx, consolidator, 0, 0, 0); // ties polity 2 on both leans
+            add_spend_polity(fx, expansionist, 0, 0, 0);
+            fx.state.polities[4].alive = false;          // dead: out of the set, reads 0
+            std::vector<int> er, cr;
+            exploration_lean_ranks(fx.state.polities, &fx.creeds, er, cr);
+            std::printf("      ranks: expn=[%d %d %d %d %d] cons=[%d %d %d %d %d]\n",
+                        er[0], er[1], er[2], er[3], er[4], cr[0], cr[1], cr[2], cr[3], cr[4]);
+            check(er[0] == 1000 && er[1] == 666 && er[2] == 0 && er[3] == 0 && er[4] == 0
+               && cr[0] == 0 && cr[1] == 333 && cr[2] == 666 && cr[3] == 666 && cr[4] == 0,
+                  "R8.0  lean ranks: strictly-lower count x 1000 / (n-1) over living cultured polities; "
+                  "ties share a rank; the dead read 0 (BL-955)");
+            std::vector<int> er0, cr0;
+            exploration_lean_ranks(fx.state.polities, nullptr, er0, cr0);
+            check(er0.size() == 5 && cr0.size() == 5
+               && std::all_of(er0.begin(), er0.end(), [](int v) { return v == 0; })
+               && std::all_of(cr0.begin(), cr0.end(), [](int v) { return v == 0; }),
+                  "R8.0b with no creeds every polity ranks 0 on both leans (BL-955)");
+        }
+
+        // R8.1 -- the same full purse and the same coastal seat, two creeds.
+        {
+            spend_fixture fx;
+            add_spend_polity(fx, expansionist, 100000, 1000, 0);
+            add_spend_polity(fx, consolidator, 100000, 1000, 0);
+            const exploration_spend_context ctx = spend_context(fx);
+            exploration_upkeep_spend spend;
+            run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
+                                   nullptr, nullptr, &ctx);
+            const bool expn_outward = fx.regions[0].port_stock_q > 0 || fx.state.polities[0].navy_stock > 0;
+            const bool cons_outward = fx.regions[1].port_stock_q > 0 || fx.state.polities[1].navy_stock > 0;
+            std::printf("      R8.1: expansionist port=%d navy=%lld army=%lld | consolidator port=%d "
+                        "navy=%lld army=%lld\n",
+                        fx.regions[0].port_stock_q, static_cast<long long>(fx.state.polities[0].navy_stock),
+                        static_cast<long long>(fx.regions[0].army_stock), fx.regions[1].port_stock_q,
+                        static_cast<long long>(fx.state.polities[1].navy_stock),
+                        static_cast<long long>(fx.regions[1].army_stock));
+            check(expn_outward && !cons_outward,
+                  "R8.1  a coastal expansion-ranked polity with a full purse buys a port/navy step; a "
+                  "consolidator-ranked polity with the identical purse and seat does not (BL-955)");
+        }
+
+        // R8.2 -- a fully funded polity buys at most one stock per round, over many rounds.
+        {
+            spend_fixture fx;
+            add_spend_polity(fx, expansionist, 10000000, 1000, 0);
+            add_spend_polity(fx, middling, 10000000, 1000, 0);
+            add_spend_polity(fx, consolidator, 10000000, 1000, 0);
+            const exploration_spend_context ctx = spend_context(fx);
+            bool at_most_one = true, counters_agree = true;
+            int64_t steps_total = 0, navy_steps = 0;
+            for (int round = 0; round < 24; ++round)
+            {
+                std::vector<int>     port_before, navy_before, army_before;
+                for (std::size_t i = 0; i < fx.regions.size(); ++i)
+                {
+                    port_before.push_back(fx.regions[i].port_stock_q);
+                    navy_before.push_back(static_cast<int>(fx.state.polities[i].navy_stock));
+                    army_before.push_back(static_cast<int>(fx.regions[i].army_stock));
+                }
+                exploration_upkeep_spend spend;
+                run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234 + round * 4, 4,
+                                       &spend, nullptr, nullptr, &ctx);
+                int rises = 0;
+                for (std::size_t i = 0; i < fx.regions.size(); ++i)
+                {
+                    const int r = (fx.regions[i].port_stock_q > port_before[i] ? 1 : 0)
+                                + (fx.state.polities[i].navy_stock > navy_before[i] ? 1 : 0)
+                                + (fx.regions[i].army_stock > army_before[i] ? 1 : 0);
+                    if (r > 1) at_most_one = false;
+                    rises += r;
+                }
+                const int64_t steps = spend.port_steps + spend.navy_steps + spend.army_steps;
+                if (steps != rises) counters_agree = false;
+                steps_total += steps;
+                navy_steps  += spend.navy_steps;
+            }
+            std::printf("      R8.2: 24 rounds x 3 funded polities -> %lld steps bought (%lld navy)\n",
+                        static_cast<long long>(steps_total), static_cast<long long>(navy_steps));
+            check(at_most_one && counters_agree && steps_total > 0 && steps_total <= 24 * 3,
+                  "R8.2  a fully funded polity builds at most one stock per round (24 rounds, 3 polities; "
+                  "the step counters match the stocks that rose) (BL-955)");
+        }
+
+        // R8.3 -- Alarm from a long-known neighbour tips a middling consolidator to the army.
+        {
+            const auto run_middle = [&](int contact_year) {
+                spend_fixture fx;
+                add_spend_polity(fx, expansionist, 0, 0, 0);
+                add_spend_polity(fx, middling, 100000, /*no port window*/0, 0);
+                add_spend_polity(fx, consolidator, 0, 0, 0);
+                fx.regions[2].army_stock = 100000; // a visible, standing threat (>= the reference)
+                contact c12; c12.from = 1; c12.to = 2; c12.first.year = contact_year;
+                contact c21; c21.from = 2; c21.to = 1; c21.first.year = contact_year;
+                fx.state.contacts = { c12, c21 }; // sorted (from, to)
+                const exploration_spend_context ctx = spend_context(fx);
+                const int64_t army_before = fx.regions[1].army_stock;
+                exploration_upkeep_spend spend;
+                run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
+                                       nullptr, nullptr, &ctx);
+                return fx.regions[1].army_stock > army_before;
+            };
+            const bool near_home_buys = run_middle(/*contact_year=*/1000); // met before the span
+            const bool frontier_buys  = run_middle(/*contact_year=*/1210); // met during it
+            check(near_home_buys && !frontier_buys,
+                  "R8.3  a middling consolidator holds without Alarm and buys the army step once a "
+                  "long-known neighbour's standing force alarms it; a frontier contact does not (BL-955)");
+        }
+
+        // R8.8 -- a WELL-GARRISONED consolidator under the same near-home Alarm
+        // does not buy another army step: the standing army saturates.
+        {
+            spend_fixture fx;
+            add_spend_polity(fx, expansionist, 0, 0, 0);
+            add_spend_polity(fx, consolidator, 100000, /*port window*/1000, 0);
+            add_spend_polity(fx, consolidator, 0, 0, 0);
+            fx.regions[2].army_stock = 100000; // the alarming neighbour
+            contact c12; c12.from = 1; c12.to = 2; c12.first.year = 1000;
+            contact c21; c21.from = 2; c21.to = 1; c21.first.year = 1000;
+            fx.state.contacts = { c12, c21 };
+            const int64_t garrison = garrison_target(fx.regions[1], ep.garrison_fraction_q);
+            const int64_t cap      = ep.army_saturation_per_region * 1; // one held region
+            const auto run_with_standing = [&](int64_t standing) {
+                spend_fixture f2 = fx;
+                f2.regions[1].army_stock          = garrison + standing;
+                f2.regions[1].standing_army       = standing; // the PAID heads
+                f2.regions[1].standing_army_owner = 1;
+                const exploration_spend_context ctx = spend_context(f2);
+                exploration_upkeep_spend spend;
+                run_exploration_upkeep(f2.regions, f2.state.polities, {}, ep, 1234, 4, &spend,
+                                       nullptr, nullptr, &ctx);
+                return spend;
+            };
+            const exploration_upkeep_spend light = run_with_standing(0);
+            const exploration_upkeep_spend heavy = run_with_standing(cap + 1);
+            std::printf("      R8.8: standing 0 -> army steps %lld; standing %lld -> army %lld port %lld navy %lld\n",
+                        static_cast<long long>(light.army_steps), static_cast<long long>(cap + 1),
+                        static_cast<long long>(heavy.army_steps), static_cast<long long>(heavy.port_steps),
+                        static_cast<long long>(heavy.navy_steps));
+            check(light.army_steps == 1 && heavy.army_steps == 0,
+                  "R8.8  a consolidator under near-home Alarm buys the army step, but once its standing army "
+                  "(its paid standing heads) passes army_saturation_per_region x held regions it "
+                  "holds or builds something else (BL-955)");
+        }
+
+        // R8.9-R8.12 -- the PAID standing army persists through the muster,
+        // decays only when unfunded, dies with the pool, and saturates.
+        {
+            spend_fixture fx;
+            add_spend_polity(fx, consolidator, 100000, 0, 0);
+            add_spend_polity(fx, expansionist, 0, 0, 0); // a second realm, so the leans rank
+            fx.regions[0].population = 200000; // a real garrison target
+            const int64_t target = garrison_target(fx.regions[0], ep.garrison_fraction_q);
+            fx.regions[0].army_stock = target;  // the muster's own garrison, exactly at target
+            const exploration_spend_context ctx = spend_context(fx);
+            exploration_upkeep_spend spend;
+            run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
+                                   nullptr, nullptr, &ctx);
+            const int64_t paid = standing_army_heads(fx.regions[0]);
+            const int64_t stock_bought = fx.regions[0].army_stock;
+
+            // A year of the muster, disbanding HALF of any excess.
+            region mustered = fx.regions[0];
+            muster_garrison(mustered, ep.garrison_fraction_q, ep.garrison_muster_q, /*disband*/500);
+            region unpaid = fx.regions[0];
+            unpaid.standing_army = 0; // the same men, unpaid
+            muster_garrison(unpaid, ep.garrison_fraction_q, ep.garrison_muster_q, /*disband*/500);
+            std::printf("      R8.9: target=%lld bought stock=%lld paid=%lld | after muster: paid-stock=%lld "
+                        "unpaid-stock=%lld\n", static_cast<long long>(target),
+                        static_cast<long long>(stock_bought), static_cast<long long>(paid),
+                        static_cast<long long>(mustered.army_stock), static_cast<long long>(unpaid.army_stock));
+            check(spend.army_steps == 1 && paid == ep.standing_army_build_step_q
+               && mustered.army_stock == stock_bought && standing_army_heads(mustered) == paid
+               && unpaid.army_stock < stock_bought,
+                  "R8.9  a bought standing army survives a year of muster intact; the same heads unpaid "
+                  "are disbanded as excess (BL-955)");
+
+            // Unfunded next round (empty purse): the paid status decays, the men stay.
+            fx.regions[0].treasury = 0;
+            exploration_upkeep_spend spend2;
+            run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1238, 4, &spend2,
+                                   nullptr, nullptr, &ctx);
+            const int64_t expected = paid - (paid * ep.standing_army_decay_per_mille_year_q * 4) / 1000;
+            check(spend2.army_steps == 0 && standing_army_heads(fx.regions[0]) == expected
+               && fx.regions[0].army_stock == stock_bought,
+                  "R8.10 unfunded, the paid standing army decays toward zero at "
+                  "standing_army_decay_per_mille_year_q; the men revert to the muster's garrison (BL-955)");
+
+            // Lost in battle alike: a pool losing half loses half its paid heads;
+            // ground taken by another polity carries none of the loser's.
+            region battle = fx.regions[0];
+            battle.army_stock = 1000; battle.standing_army = 400; battle.standing_army_owner = battle.nation;
+            battle.army_stock = 500;
+            scale_standing_army(battle, 1000);
+            region taken = battle;
+            taken.nation = 7; // conquered: `tgt.nation` moves, the paid status does not
+            check(battle.standing_army == 200 && standing_army_heads(taken) == 0,
+                  "R8.11 a battle loss falls on paid heads in proportion (1000->500 pool, 400->200 paid), "
+                  "and ground that changes hands carries none of the loser's paid army (BL-955)");
+
+            // The cap on a real-sized realm: 120 held regions.
+            exploration_spend_facts f;
+            f.consolidator_rank_q = 1000; f.treasury = 100000; f.held_regions = 120;
+            f.standing_army = ep.army_saturation_per_region * 120;
+            const int at_cap = score_exploration_spend(ep, f).army_q;
+            f.standing_army += 1;
+            const int past_cap = score_exploration_spend(ep, f).army_q;
+            check(at_cap > 0 && past_cap == 0,
+                  "R8.12 the cap binds on a real-sized army: 120 regions x army_saturation_per_region "
+                  "still scores, one head more scores 0 (BL-955)");
+        }
+
+        // R8.13-R8.17 -- the cold review's cases (F1, F2, F4, F5b).
+        {
+            // F1: paid men outnumber the survivors. 1000 heads, all paid, 60% lost.
+            region r;
+            r.nation = 0; r.standing_army_owner = 0;
+            r.army_stock = 1000; r.standing_army = 1000;
+            r.army_stock = 400;
+            scale_standing_army(r, 1000);
+            check(r.standing_army == 400 && standing_army_invariant_holds(r),
+                  "R8.13 a 60% loss on an all-paid 1000-head pool leaves 400 paid (not 160): the paid "
+                  "count is read against the pool before the loss (BL-955 F1)");
+
+            // F1: a march cannot carry more paid heads than men.
+            region g;
+            g.nation = 0; g.standing_army_owner = 0;
+            g.army_stock = 1000; g.standing_army = 1000;
+            const int64_t drawn_part = draw_army_with_standing(g, 600);
+            region h = g; // what is left: 400 all paid
+            const int64_t drawn_all = draw_army_with_standing(h, 10000);
+            region mixed;
+            mixed.nation = 0; mixed.standing_army_owner = 0;
+            mixed.army_stock = 1000; mixed.standing_army = 300;
+            const int64_t drawn_mixed = draw_army_with_standing(mixed, 500);
+            check(drawn_part == 600 && g.army_stock == 400 && g.standing_army == 400
+               && drawn_all == 400 && h.army_stock == 0 && h.standing_army == 0
+               && drawn_mixed == 150 && mixed.standing_army == 150
+               && standing_army_invariant_holds(g) && standing_army_invariant_holds(mixed),
+                  "R8.14 a gather draws paid heads in proportion and never more paid heads than men "
+                  "committed (600 of an all-paid 1000 -> 600; 500 of 1000 with 300 paid -> 150) (BL-955 F1)");
+
+            // F2: the scorer's defender estimate mirrors the battle-path muster.
+            region d;
+            d.nation = 0; d.standing_army_owner = 0;
+            d.population = 200000;
+            const int64_t d_target = garrison_target(d, ep.garrison_fraction_q);
+            d.army_stock = d_target / 2; d.standing_army = d_target / 2; // every man paid
+            d.manpower_stock = d_target * 4;
+            const int64_t estimate = defender_levy_estimate(d, ep);
+            region mustered = d;
+            muster_garrison(mustered, ep.garrison_fraction_q, ep.defence_levy_q, ep.garrison_disband_q);
+            std::printf("      R8.15: target=%lld stock=%lld (all paid) estimate=%lld battle-path muster=%lld\n",
+                        static_cast<long long>(d_target), static_cast<long long>(d.army_stock),
+                        static_cast<long long>(estimate), static_cast<long long>(mustered.army_stock));
+            check(estimate == mustered.army_stock && estimate > d.army_stock,
+                  "R8.15 for a region whose men are all paid, the scorer's defender estimate equals what "
+                  "the battle-path muster fields: the levy reads ordinary men only (BL-955 F2)");
+
+            // F4: the saturation reads the REALM's paid heads, not the seat's.
+            const auto realm_run = [&](int64_t paid_off_seat) {
+                spend_fixture fx;
+                add_spend_polity(fx, consolidator, 100000, 0, 0);
+                add_spend_polity(fx, expansionist, 0, 0, 0);
+                region held;
+                held.nation = 0; held.army_stock = paid_off_seat; held.standing_army = paid_off_seat;
+                held.standing_army_owner = 0;
+                fx.regions.push_back(held); // a second held region, not the seat
+                const exploration_spend_context ctx = spend_context(fx);
+                exploration_upkeep_spend spend;
+                run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
+                                       nullptr, nullptr, &ctx);
+                return spend.army_steps;
+            };
+            const int64_t cap2 = ep.army_saturation_per_region * 2;
+            check(realm_run(0) == 1 && realm_run(cap2 + 1) == 0,
+                  "R8.16 paid heads marched onto other held ground still count: past the realm's cap the "
+                  "seat buys no further army step (BL-955 F4)");
+
+            // F5b: a fleet rebuilt the round it hit zero is not a lapse.
+            {
+                spend_fixture fx;
+                add_spend_polity(fx, expansionist, 100000, 1000, /*port full*/1000);
+                add_spend_polity(fx, consolidator, 0, 0, 0);
+                fx.state.polities[0].navy_stock = 1; // decays to 0 this round
+                const exploration_spend_context ctx = spend_context(fx);
+                exploration_upkeep_spend spend;
+                run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
+                                       nullptr, nullptr, &ctx);
+                check(spend.navy_steps == 1 && fx.state.polities[0].navy_stock > 0
+                   && spend.navies_lapsed.empty(),
+                      "R8.17 a fleet that hits zero and is rebuilt the same round is not counted as lapsed "
+                      "(BL-955 F5b)");
+            }
+        }
+
+        // R8.4 -- the decays are untouched: BL-935's R5.8/R5.9 above run unchanged
+        // on a round that buys nothing. Here: a navy bought and then held lapses.
+        {
+            spend_fixture fx;
+            add_spend_polity(fx, consolidator, 0, 0, 0);
+            fx.state.polities[0].navy_stock = 3;
+            const exploration_spend_context ctx = spend_context(fx);
+            exploration_upkeep_spend spend;
+            run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
+                                   nullptr, nullptr, &ctx);
+            run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1238, 4, &spend,
+                                   nullptr, nullptr, &ctx);
+            run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1242, 4, &spend,
+                                   nullptr, nullptr, &ctx);
+            check(fx.state.polities[0].navy_stock == 0 && spend.navies_lapsed.size() == 1
+               && spend.navies_lapsed[0] == 0,
+                  "R8.4  an unfunded navy still decays every round, and its lapse to zero is recorded "
+                  "once (BL-955)");
+        }
+
+        // R8.5 -- the argmax tie order: hold, then army, then port, then navy.
+        {
+            exploration_spend_scores s;
+            s.army_eligible = s.port_eligible = s.navy_eligible = true;
+            s.hold_q = s.army_q = s.port_q = s.navy_q = 500;
+            const bool all_tie_hold = choose_exploration_spend(s) == exploration_spend_option::hold;
+            s.hold_q = 250;
+            const bool tie_army = choose_exploration_spend(s) == exploration_spend_option::army_step;
+            s.army_q = 400;
+            const bool tie_port = choose_exploration_spend(s) == exploration_spend_option::port_step;
+            s.port_q = 400;
+            const bool navy_top = choose_exploration_spend(s) == exploration_spend_option::navy_step;
+            s.navy_eligible = false; s.navy_q = 900;
+            const bool ineligible_loses = choose_exploration_spend(s) == exploration_spend_option::army_step;
+            check(all_tie_hold && tie_army && tie_port && navy_top && ineligible_loses,
+                  "R8.5  argmax is a total order: an exact tie goes to hold, then army, then port, then "
+                  "navy; an ineligible option never wins (BL-955)");
+
+            // And scoring: an empty purse makes nothing eligible, so hold.
+            exploration_spend_facts f;
+            f.expansion_rank_q = 1000; f.port_window_q = 1000; f.treasury = 0;
+            check(choose_exploration_spend(score_exploration_spend(ep, f)) == exploration_spend_option::hold,
+                  "R8.6  a purse that covers no cost holds, whatever the leans ask for (BL-955)");
+            // A saturated fleet stops scoring.
+            f.treasury = 100000; f.port_stock_q = 1000; f.held_regions = 2;
+            f.navy_stock = ep.navy_saturation_per_region * 2 + 1;
+            const exploration_spend_scores sat = score_exploration_spend(ep, f);
+            f.navy_stock = 0;
+            const exploration_spend_scores fresh = score_exploration_spend(ep, f);
+            check(sat.navy_q == 0 && fresh.navy_q > 0 && !fresh.port_eligible,
+                  "R8.7  a fleet saturates past navy_saturation_per_region x held regions; a full port "
+                  "is not eligible for another step (BL-955)");
+        }
     }
 
     // -----------------------------------------------------------------

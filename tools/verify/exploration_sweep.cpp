@@ -175,6 +175,23 @@ struct exploration_row
     int64_t treasury_spent_on_navies = 0;
     int64_t treasury_spent_on_ports  = 0;
     int64_t treasury_spent_on_standing_armies = 0;
+    /// BL-955: navies at 1660 split by the holder's EXPANSION RANK at 1660
+    /// (`exploration_lean_ranks`): top half = rank >= 500.
+    int64_t navy_holders_expn_top    = 0;
+    int64_t navy_holders_expn_bottom = 0;
+    /// BL-955: stock steps bought over the span, by kind (one choice per round).
+    int64_t port_steps = 0, navy_steps = 0, army_steps = 0;
+    /// BL-955: polities whose navy decayed from a standing fleet to zero at
+    /// least once during the span.
+    int64_t navies_lapsed = 0;
+    /// BL-955: per living polity at 1660, its paid standing army (summed over
+    /// held ground) per held region, and its mean garrison_target per held
+    /// region -- the scale the saturation reference is read against.
+    std::vector<int64_t> standing_per_region;
+    std::vector<int64_t> garrison_per_region;
+    int64_t standing_holders = 0; ///< living polities with any paid standing heads at 1660.
+    int64_t army_saturated   = 0; ///< of those, realm paid heads above the saturation cap.
+    int64_t standing_invariant_violations = 0; ///< must be 0 (BL-955 F3).
 
     // --- Reading 3: both strategies pay -------------------------------------
     /// One realm in a seed's top 3, with every quantity either ranking reads.
@@ -514,8 +531,43 @@ int main(int argc, char** argv)
                     is_overlord[static_cast<std::size_t>(q.overlord)] = true;
             for (bool v : is_overlord) if (v) ++row.overlords_alive;
         }
-        for (const polity& q : traced.polities)
-            if (q.alive && q.navy_stock > 0) ++row.navy_holders;
+        {
+            std::vector<int> expn_rank, cons_rank;
+            exploration_lean_ranks(traced.polities, &cs_copy, expn_rank, cons_rank);
+            for (std::size_t p = 0; p < traced.polities.size(); ++p)
+            {
+                const polity& q = traced.polities[p];
+                if (!q.alive || q.navy_stock <= 0) continue;
+                ++row.navy_holders;
+                if (expn_rank[p] >= 500) ++row.navy_holders_expn_top;
+                else                     ++row.navy_holders_expn_bottom;
+            }
+            row.port_steps = traced.port_steps_bought;
+            row.navy_steps = traced.navy_steps_bought;
+            row.army_steps = traced.army_steps_bought;
+            for (uint8_t v : traced.navy_lapsed) if (v) ++row.navies_lapsed;
+
+            const std::size_t np = traced.polities.size();
+            std::vector<int64_t> held(np, 0), standing(np, 0), garrison(np, 0);
+            for (const region& r : ss_copy.regions)
+            {
+                if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= np) continue;
+                const std::size_t n = static_cast<std::size_t>(r.nation);
+                ++held[n];
+                standing[n] += standing_army_heads(r);
+                garrison[n] += garrison_target(r, ep2.garrison_fraction_q);
+            }
+            for (std::size_t p = 0; p < np; ++p)
+            {
+                const polity& q = traced.polities[p];
+                if (!q.alive || held[p] <= 0) continue;
+                row.standing_per_region.push_back(standing[p] / held[p]);
+                row.garrison_per_region.push_back(garrison[p] / held[p]);
+                if (standing[p] > 0) ++row.standing_holders;
+                if (standing[p] > ep2.army_saturation_per_region * held[p]) ++row.army_saturated;
+            }
+            row.standing_invariant_violations = traced.standing_army_invariant_violations;
+        }
 
         // --- Reading 3 capture, off the traced re-run's 1660 close ---------
         // (`ss_copy`/`cs_copy` as the re-run left them).
@@ -924,6 +976,7 @@ int main(int argc, char** argv)
     std::printf("\n--- reading 7: fleets ---\n");
     {
         int64_t navy_holders = 0, spent_navies = 0, spent_ports = 0, spent_armies = 0;
+        int64_t top = 0, bottom = 0, port_steps = 0, navy_steps = 0, army_steps = 0, lapsed = 0;
         for (const exploration_row& r : rows)
         {
             if (!r.ok) continue;
@@ -931,11 +984,52 @@ int main(int argc, char** argv)
             spent_navies += r.treasury_spent_on_navies;
             spent_ports  += r.treasury_spent_on_ports;
             spent_armies += r.treasury_spent_on_standing_armies;
+            top          += r.navy_holders_expn_top;
+            bottom       += r.navy_holders_expn_bottom;
+            port_steps   += r.port_steps;
+            navy_steps   += r.navy_steps;
+            army_steps   += r.army_steps;
+            lapsed       += r.navies_lapsed;
         }
         std::printf("  polities holding a navy at 1660: %lld  treasury spent -- ports=%lld "
                     "navies=%lld standing armies=%lld\n",
                     static_cast<long long>(navy_holders), static_cast<long long>(spent_ports),
                     static_cast<long long>(spent_navies), static_cast<long long>(spent_armies));
+        // BL-955 -- who holds the fleets, what was bought, and what was let go.
+        std::printf("  navies at 1660 by holder's expansion rank (1660): top half (>=500)=%lld  "
+                    "bottom half=%lld\n", static_cast<long long>(top), static_cast<long long>(bottom));
+        std::printf("  stock steps bought over the span: port=%lld navy=%lld standing army=%lld\n",
+                    static_cast<long long>(port_steps), static_cast<long long>(navy_steps),
+                    static_cast<long long>(army_steps));
+        std::printf("  polities that held a navy and let it decay to zero at least once: %lld\n",
+                    static_cast<long long>(lapsed));
+        {
+            std::vector<int64_t> st, ga;
+            int64_t holders = 0, saturated = 0, living = 0, violations = 0;
+            for (const exploration_row& r : rows)
+            {
+                if (!r.ok) continue;
+                st.insert(st.end(), r.standing_per_region.begin(), r.standing_per_region.end());
+                ga.insert(ga.end(), r.garrison_per_region.begin(), r.garrison_per_region.end());
+                holders   += r.standing_holders;
+                saturated += r.army_saturated;
+                violations += r.standing_invariant_violations;
+            }
+            living = static_cast<int64_t>(st.size());
+            const auto pct = [](std::vector<int64_t> v, int p) -> long long {
+                if (v.empty()) return 0;
+                std::sort(v.begin(), v.end());
+                return static_cast<long long>(v[(v.size() - 1) * static_cast<std::size_t>(p) / 100]);
+            };
+            std::printf("  paid standing army at 1660, heads per held region over %lld living polities: "
+                        "p50=%lld p75=%lld p90=%lld max=%lld  (holders=%lld, realm above cap=%lld)\n",
+                        static_cast<long long>(living), pct(st, 50), pct(st, 75), pct(st, 90),
+                        pct(st, 100), static_cast<long long>(holders), static_cast<long long>(saturated));
+            std::printf("  paid standing army invariant violations (every round + close): %lld\n",
+                        static_cast<long long>(violations));
+            std::printf("  garrison_target per held region: p50=%lld p75=%lld p90=%lld max=%lld\n",
+                        pct(ga, 50), pct(ga, 75), pct(ga, 90), pct(ga, 100));
+        }
         std::printf("  %s\n", spent_navies > 0
             ? "at least one polity funded a navy on this spread (decay itself is confirmed by "
               "exploration_sim_harness R5.8/R5.9, not by this aggregate sweep)."
