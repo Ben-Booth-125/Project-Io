@@ -689,7 +689,11 @@ exploration_spend_scores score_exploration_spend(const history_sim_params&     p
 
     // STANDING ARMY -- consolidation and the Alarm of long-known neighbours.
     s.army_eligible = p.standing_army_build_cost_q > 0 && f.treasury >= p.standing_army_build_cost_q;
-    s.army_q = (cons * p.spend_w_consolidator_q + alarm * p.spend_w_alarm_q) / 1000;
+    const int64_t army_saturation =
+        std::max<int64_t>(p.army_saturation_per_region, 0) * std::max<int64_t>(f.held_regions, 1);
+    s.army_q = f.standing_army > army_saturation
+             ? 0 // a standing army saturates, exactly as a fleet does
+             : (cons * p.spend_w_consolidator_q + alarm * p.spend_w_alarm_q) / 1000;
 
     // PORT and NAVY share the OUTWARD pull: expansion, and wants only water reaches.
     const int outward = (expn * p.spend_w_expansion_q + want * p.spend_w_water_want_q) / 1000;
@@ -806,6 +810,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             if (f.good < good_count && trade_land_line_q(trade_ctx, f.seller, f.buyer) > 0)
                 reachable[f.buyer][f.good] = true;
 
+        // The preference weight is only filled when `w_want_q` != 0 (generation
+        // runs 1000); at 0 the table is empty and every good weighs 0 here.
         static const std::vector<culture_good_preference> no_prefs;
         const std::vector<culture_good_preference>& prefs =
             (spend_ctx && spend_ctx->prefs) ? *spend_ctx->prefs : no_prefs;
@@ -919,7 +925,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // ---- BL-955 -- ONE SCORED CHOICE, then the unchanged decays. ------
         // EXPLORATION.md sec Force persists now ("Spend is ALLOCATED"): a
         // polity that can afford all three stocks still builds the one its
-        // situation asks for. The gates read the round's OPENING stocks.
+        // situation asks for. The gates read the round's OPENING stocks, so a
+        // navy step can land in a round whose unbuilt port also silts (accepted).
         const std::size_t pi = static_cast<std::size_t>(&q - polities.data());
         exploration_spend_facts facts;
         facts.expansion_rank_q    = expn_rank[pi];
@@ -930,10 +937,11 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         facts.port_window_q       = seat.port_q;
         facts.port_stock_q        = seat.port_stock_q;
         facts.navy_stock          = q.navy_stock;
+        facts.standing_army       = std::max<int64_t>(
+            0, seat.army_stock - garrison_target(seat, params.garrison_fraction_q));
         facts.held_regions        = held_regions[pi];
         const exploration_spend_option pick =
             choose_exploration_spend(score_exploration_spend(params, facts));
-
         // PORT -- only ground carrying the endowment WINDOW can host one at
         // all; `port_q` is that window and is never itself spent.
         if (seat.port_q > 0)

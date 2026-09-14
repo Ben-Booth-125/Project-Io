@@ -1898,6 +1898,12 @@ struct history_sim_params
     /// A fleet SATURATES: the navy score is 0 once `navy_stock` exceeds this
     /// many units per held region.
     int64_t navy_saturation_per_region  = 400;
+    /// A standing army SATURATES the same way: the army score is 0 once the
+    /// capital's STANDING army -- `region::army_stock` above its muster-alone
+    /// `garrison_target`, the excess the army step adds to and the fallback
+    /// decays -- exceeds this many heads per held region. Sized at one
+    /// `standing_army_build_step_q`, as the navy's reference is one navy step.
+    int64_t army_saturation_per_region  = 300;
 };
 
 // ---------------------------------------------------------------------------
@@ -3479,6 +3485,8 @@ struct exploration_spend_facts
     int     port_window_q       = 0; ///< the seat's `port_q` endowment window.
     int     port_stock_q        = 0; ///< the seat's built port, 0-1000.
     int64_t navy_stock          = 0;
+    /// The capital's standing army: `army_stock` above `garrison_target`, >= 0.
+    int64_t standing_army       = 0;
     int64_t held_regions        = 0;
 };
 
@@ -3493,7 +3501,8 @@ struct exploration_spend_scores
 ///   outward = (expansion_rank * w_expansion + water_want * w_water_want) / 1000
 ///   port    = outward * (1000 - port_stock) / 1000
 ///   navy    = outward, or 0 once navy_stock > navy_saturation_per_region * max(1, held)
-///   army    = (consolidator_rank * w_consolidator + alarm * w_alarm) / 1000
+///   army    = (consolidator_rank * w_consolidator + alarm * w_alarm) / 1000,
+///             or 0 once standing_army > army_saturation_per_region * max(1, held)
 ///   hold    = hold_base + consolidator_rank * w_hold_consolidator / 1000
 /// Eligibility: port needs a cost > 0 the treasury covers, a port window and
 /// port_stock < 1000; navy a cost > 0 the treasury covers and port_stock >=

@@ -944,6 +944,40 @@ int main()
                   "long-known neighbour's standing force alarms it; a frontier contact does not (BL-955)");
         }
 
+        // R8.8 -- a WELL-GARRISONED consolidator under the same near-home Alarm
+        // does not buy another army step: the standing army saturates.
+        {
+            spend_fixture fx;
+            add_spend_polity(fx, expansionist, 0, 0, 0);
+            add_spend_polity(fx, consolidator, 100000, /*port window*/1000, 0);
+            add_spend_polity(fx, consolidator, 0, 0, 0);
+            fx.regions[2].army_stock = 100000; // the alarming neighbour
+            contact c12; c12.from = 1; c12.to = 2; c12.first.year = 1000;
+            contact c21; c21.from = 2; c21.to = 1; c21.first.year = 1000;
+            fx.state.contacts = { c12, c21 };
+            const int64_t garrison = garrison_target(fx.regions[1], ep.garrison_fraction_q);
+            const int64_t cap      = ep.army_saturation_per_region * 1; // one held region
+            const auto run_with_standing = [&](int64_t standing) {
+                spend_fixture f2 = fx;
+                f2.regions[1].army_stock = garrison + standing;
+                const exploration_spend_context ctx = spend_context(f2);
+                exploration_upkeep_spend spend;
+                run_exploration_upkeep(f2.regions, f2.state.polities, {}, ep, 1234, 4, &spend,
+                                       nullptr, nullptr, &ctx);
+                return spend;
+            };
+            const exploration_upkeep_spend light = run_with_standing(0);
+            const exploration_upkeep_spend heavy = run_with_standing(cap + 1);
+            std::printf("      R8.8: standing 0 -> army steps %lld; standing %lld -> army %lld port %lld navy %lld\n",
+                        static_cast<long long>(light.army_steps), static_cast<long long>(cap + 1),
+                        static_cast<long long>(heavy.army_steps), static_cast<long long>(heavy.port_steps),
+                        static_cast<long long>(heavy.navy_steps));
+            check(light.army_steps == 1 && heavy.army_steps == 0,
+                  "R8.8  a consolidator under near-home Alarm buys the army step, but once its standing army "
+                  "(army_stock above garrison_target) passes army_saturation_per_region x held regions it "
+                  "holds or builds something else (BL-955)");
+        }
+
         // R8.4 -- the decays are untouched: BL-935's R5.8/R5.9 above run unchanged
         // on a round that buys nothing. Here: a navy bought and then held lapses.
         {
