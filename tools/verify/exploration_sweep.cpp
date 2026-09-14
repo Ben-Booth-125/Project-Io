@@ -174,6 +174,15 @@ struct exploration_row
     int64_t treasury_spent_on_navies = 0;
     int64_t treasury_spent_on_ports  = 0;
     int64_t treasury_spent_on_standing_armies = 0;
+    /// BL-955: navies at 1660 split by the holder's EXPANSION RANK at 1660
+    /// (`exploration_lean_ranks`): top half = rank >= 500.
+    int64_t navy_holders_expn_top    = 0;
+    int64_t navy_holders_expn_bottom = 0;
+    /// BL-955: stock steps bought over the span, by kind (one choice per round).
+    int64_t port_steps = 0, navy_steps = 0, army_steps = 0;
+    /// BL-955: polities whose navy decayed from a standing fleet to zero at
+    /// least once during the span.
+    int64_t navies_lapsed = 0;
 
     // --- Reading 3: both strategies pay -------------------------------------
     /// One realm in a seed's top 3, with every quantity either ranking reads.
@@ -507,8 +516,22 @@ int main(int argc, char** argv)
                     is_overlord[static_cast<std::size_t>(q.overlord)] = true;
             for (bool v : is_overlord) if (v) ++row.overlords_alive;
         }
-        for (const polity& q : traced.polities)
-            if (q.alive && q.navy_stock > 0) ++row.navy_holders;
+        {
+            std::vector<int> expn_rank, cons_rank;
+            exploration_lean_ranks(traced.polities, &cs_copy, expn_rank, cons_rank);
+            for (std::size_t p = 0; p < traced.polities.size(); ++p)
+            {
+                const polity& q = traced.polities[p];
+                if (!q.alive || q.navy_stock <= 0) continue;
+                ++row.navy_holders;
+                if (expn_rank[p] >= 500) ++row.navy_holders_expn_top;
+                else                     ++row.navy_holders_expn_bottom;
+            }
+            row.port_steps = traced.port_steps_bought;
+            row.navy_steps = traced.navy_steps_bought;
+            row.army_steps = traced.army_steps_bought;
+            for (uint8_t v : traced.navy_lapsed) if (v) ++row.navies_lapsed;
+        }
 
         // --- Reading 3 capture, off the traced re-run's 1660 close ---------
         // (`ss_copy`/`cs_copy` as the re-run left them).
@@ -917,6 +940,7 @@ int main(int argc, char** argv)
     std::printf("\n--- reading 7: fleets ---\n");
     {
         int64_t navy_holders = 0, spent_navies = 0, spent_ports = 0, spent_armies = 0;
+        int64_t top = 0, bottom = 0, port_steps = 0, navy_steps = 0, army_steps = 0, lapsed = 0;
         for (const exploration_row& r : rows)
         {
             if (!r.ok) continue;
@@ -924,11 +948,25 @@ int main(int argc, char** argv)
             spent_navies += r.treasury_spent_on_navies;
             spent_ports  += r.treasury_spent_on_ports;
             spent_armies += r.treasury_spent_on_standing_armies;
+            top          += r.navy_holders_expn_top;
+            bottom       += r.navy_holders_expn_bottom;
+            port_steps   += r.port_steps;
+            navy_steps   += r.navy_steps;
+            army_steps   += r.army_steps;
+            lapsed       += r.navies_lapsed;
         }
         std::printf("  polities holding a navy at 1660: %lld  treasury spent -- ports=%lld "
                     "navies=%lld standing armies=%lld\n",
                     static_cast<long long>(navy_holders), static_cast<long long>(spent_ports),
                     static_cast<long long>(spent_navies), static_cast<long long>(spent_armies));
+        // BL-955 -- who holds the fleets, what was bought, and what was let go.
+        std::printf("  navies at 1660 by holder's expansion rank (1660): top half (>=500)=%lld  "
+                    "bottom half=%lld\n", static_cast<long long>(top), static_cast<long long>(bottom));
+        std::printf("  stock steps bought over the span: port=%lld navy=%lld standing army=%lld\n",
+                    static_cast<long long>(port_steps), static_cast<long long>(navy_steps),
+                    static_cast<long long>(army_steps));
+        std::printf("  polities that held a navy and let it decay to zero at least once: %lld\n",
+                    static_cast<long long>(lapsed));
         std::printf("  %s\n", spent_navies > 0
             ? "at least one polity funded a navy on this spread (decay itself is confirmed by "
               "exploration_sim_harness R5.8/R5.9, not by this aggregate sweep)."

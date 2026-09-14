@@ -627,6 +627,113 @@ int choose_subjection_native(const std::vector<std::pair<int, int>>& candidates)
     return best_id;
 }
 
+// ---------------------------------------------------------------------------
+// BL-955 -- spend is ALLOCATED, not bought whenever affordable
+// ---------------------------------------------------------------------------
+
+void exploration_lean_ranks(const std::vector<polity>& polities, const creed_state* cs,
+                            std::vector<int>& expansion_rank_q,
+                            std::vector<int>& consolidator_rank_q)
+{
+    expansion_rank_q.assign(polities.size(), 0);
+    consolidator_rank_q.assign(polities.size(), 0);
+    if (cs == nullptr) return;
+
+    // The ranked set: living polities with a culture, in ascending index.
+    std::vector<std::size_t> members;
+    std::vector<int> expn, cons;
+    for (std::size_t i = 0; i < polities.size(); ++i)
+    {
+        const polity& q = polities[i];
+        if (!q.alive || q.culture < 0 || static_cast<std::size_t>(q.culture) >= cs->cultures.size())
+            continue;
+        const culture& c = cs->cultures[static_cast<std::size_t>(q.culture)];
+        members.push_back(i);
+        expn.push_back(expansion_lean_q(c));
+        cons.push_back(consolidator_lean_q(c));
+    }
+    if (members.empty()) return;
+
+    // Rank = how many members lean STRICTLY lower, read off a sorted copy by
+    // lower_bound -- a property of the integers alone, so ties share a rank.
+    std::vector<int> expn_sorted = expn, cons_sorted = cons;
+    std::sort(expn_sorted.begin(), expn_sorted.end());
+    std::sort(cons_sorted.begin(), cons_sorted.end());
+    const int64_t denom = std::max<int64_t>(1, static_cast<int64_t>(members.size()) - 1);
+    for (std::size_t k = 0; k < members.size(); ++k)
+    {
+        const int64_t below_e = std::lower_bound(expn_sorted.begin(), expn_sorted.end(), expn[k])
+                              - expn_sorted.begin();
+        const int64_t below_c = std::lower_bound(cons_sorted.begin(), cons_sorted.end(), cons[k])
+                              - cons_sorted.begin();
+        expansion_rank_q[members[k]]    = static_cast<int>(clampi64(below_e * 1000 / denom, 0, 1000));
+        consolidator_rank_q[members[k]] = static_cast<int>(clampi64(below_c * 1000 / denom, 0, 1000));
+    }
+}
+
+exploration_spend_scores score_exploration_spend(const history_sim_params&     p,
+                                                 const exploration_spend_facts& f)
+{
+    const int expn  = clampi(f.expansion_rank_q, 0, 1000);
+    const int cons  = clampi(f.consolidator_rank_q, 0, 1000);
+    const int want  = clampi(f.water_want_q, 0, 1000);
+    const int alarm = clampi(f.alarm_q, 0, 1000);
+    const int stock = clampi(f.port_stock_q, 0, 1000);
+
+    exploration_spend_scores s;
+
+    // HOLD -- the value of keeping the purse, leaning up with consolidation
+    // (a realm that grows inward has less to buy abroad), weighted below the
+    // army's own consolidator term.
+    s.hold_q = p.spend_hold_base_q + (cons * p.spend_w_hold_consolidator_q) / 1000;
+
+    // STANDING ARMY -- consolidation and the Alarm of long-known neighbours.
+    s.army_eligible = p.standing_army_build_cost_q > 0 && f.treasury >= p.standing_army_build_cost_q;
+    s.army_q = (cons * p.spend_w_consolidator_q + alarm * p.spend_w_alarm_q) / 1000;
+
+    // PORT and NAVY share the OUTWARD pull: expansion, and wants only water reaches.
+    const int outward = (expn * p.spend_w_expansion_q + want * p.spend_w_water_want_q) / 1000;
+
+    s.port_eligible = p.port_build_cost_q > 0 && f.treasury >= p.port_build_cost_q
+                   && f.port_window_q > 0 && f.port_stock_q < 1000;
+    s.port_q = (outward * (1000 - stock)) / 1000; // a nearly full port is worth little more
+
+    s.navy_eligible = p.navy_build_cost_q > 0 && f.treasury >= p.navy_build_cost_q
+                   && f.port_stock_q >= p.navy_min_port_stock_q;
+    const int64_t saturation =
+        std::max<int64_t>(p.navy_saturation_per_region, 0) * std::max<int64_t>(f.held_regions, 1);
+    s.navy_q = f.navy_stock > saturation ? 0 : outward; // a fleet saturates
+    return s;
+}
+
+exploration_spend_option choose_exploration_spend(const exploration_spend_scores& s)
+{
+    // TOTAL ORDER: walked hold -> army -> port -> navy, and a later option
+    // replaces the incumbent only on a STRICTLY higher score, so an exact tie
+    // goes to hold, then army, then port, then navy. Ineligible never wins.
+    exploration_spend_option best   = exploration_spend_option::hold;
+    int                      best_q = s.hold_q;
+    if (s.army_eligible && s.army_q > best_q) { best = exploration_spend_option::army_step; best_q = s.army_q; }
+    if (s.port_eligible && s.port_q > best_q) { best = exploration_spend_option::port_step; best_q = s.port_q; }
+    if (s.navy_eligible && s.navy_q > best_q) { best = exploration_spend_option::navy_step; best_q = s.navy_q; }
+    return best;
+}
+
+/// The best land line joining @p a and @p b in @p ctx (0 where none). The
+/// same lookup `trade_flow_volume_q` makes.
+static int trade_land_line_q(const trade_context& ctx, int a, int b)
+{
+    const uint16_t lo = static_cast<uint16_t>(std::min(a, b));
+    const uint16_t hi = static_cast<uint16_t>(std::max(a, b));
+    const auto it = std::lower_bound(
+        ctx.land_lines.begin(), ctx.land_lines.end(), std::pair<uint16_t, uint16_t>{lo, hi},
+        [](const trade_context::land_line& x, const std::pair<uint16_t, uint16_t>& k) {
+            if (x.lo != k.first) return x.lo < k.first;
+            return x.hi < k.second;
+        });
+    return (it != ctx.land_lines.end() && it->lo == lo && it->hi == hi) ? it->line_q : 0;
+}
+
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
@@ -635,7 +742,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                             int                                    step_years,
                             exploration_upkeep_spend*              spend,
                             const std::vector<dated_object>*       treaties,
-                            std::vector<trade_flow>*               flows_out)
+                            std::vector<trade_flow>*               flows_out,
+                            const exploration_spend_context*       spend_ctx)
 {
     // BL-939 -- the demand half, refreshed on the same round-level cadence
     // the treasury's own earn runs on: a market's signal is a fact about
@@ -649,10 +757,11 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
     // Flows are sized off the RAW signal only, so relief never feeds back
     // into the volume that produced it.
     std::vector<trade_flow> flows;
+    trade_context           trade_ctx; // BL-955 reads its land lines below
     if (treaties != nullptr && !treaties->empty())
     {
-        const trade_context ctx = build_trade_context(regions, polities, corridors);
-        flows = compute_trade_flows(ctx, regions, polities, *treaties);
+        trade_ctx = build_trade_context(regions, polities, corridors);
+        flows = compute_trade_flows(trade_ctx, regions, polities, *treaties);
     }
     std::vector<int64_t> trade_volume(polities.size(), 0); // both ends, per polity
     for (const trade_flow& f : flows)
@@ -662,6 +771,74 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         market.scarcity_q[f.good] = std::max(0, market.scarcity_q[f.good] - f.volume_q);
         trade_volume[f.seller] += f.volume_q;
         trade_volume[f.buyer]  += f.volume_q;
+    }
+
+    // ---- BL-955: THE ALLOCATION'S INPUTS, READ ONCE, BEFORE ANY STOCK MOVES.
+    // Ranks, across-water want and near-home Alarm are all read off the
+    // round's opening stocks (after the signal is relieved, before any polity
+    // pays or invests), so no polity's choice depends on the index order in
+    // which the others bought.
+    const std::size_t np = polities.size();
+    std::vector<int> expn_rank, cons_rank;
+    exploration_lean_ranks(polities, spend_ctx ? spend_ctx->creeds : nullptr, expn_rank, cons_rank);
+    std::vector<int>     water_want(np, 0), near_alarm(np, 0);
+    std::vector<int64_t> held_regions(np, 0);
+    {
+        constexpr int good_count = 4;
+        const region_class goods[good_count] =
+            { region_class::farm, region_class::ore, region_class::energy, region_class::port };
+        // A good is "across water" for a polity when it holds NO ground
+        // dominant in it AND no inbound flow of it arrives over a pair joined
+        // by a land line. The read is deliberately that simple: a want a
+        // realm's own ground or a road already answers is not one a hull
+        // would, and every other unmet want is.
+        std::vector<std::array<bool, good_count>> reachable(np);
+        for (auto& row : reachable) row.fill(false);
+        for (const region& r : regions)
+        {
+            if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= np) continue;
+            const std::size_t n = static_cast<std::size_t>(r.nation);
+            ++held_regions[n];
+            const int gi = scarcity_good_index(r.dominant);
+            if (gi >= 0) reachable[n][static_cast<std::size_t>(gi)] = true;
+        }
+        for (const trade_flow& f : flows)
+            if (f.good < good_count && trade_land_line_q(trade_ctx, f.seller, f.buyer) > 0)
+                reachable[f.buyer][f.good] = true;
+
+        static const std::vector<culture_good_preference> no_prefs;
+        const std::vector<culture_good_preference>& prefs =
+            (spend_ctx && spend_ctx->prefs) ? *spend_ctx->prefs : no_prefs;
+        const history_sim_state* st = spend_ctx ? spend_ctx->state : nullptr;
+
+        for (std::size_t i = 0; i < np; ++i)
+        {
+            if (!polities[i].alive) continue;
+            int want = 0;
+            for (int g = 0; g < good_count; ++g)
+                if (!reachable[i][static_cast<std::size_t>(g)])
+                    want = std::max(want, polity_good_want_q(regions, polities, prefs,
+                                                             static_cast<int>(i), goods[g]));
+            water_want[i] = want;
+
+            // NEAR-HOME ALARM: the max over every contact this polity made
+            // BEFORE the span opened (BL-941's near-home read), walked in the
+            // table's own sorted order.
+            if (st != nullptr && i <= 0xFFFE)
+            {
+                const uint16_t self = static_cast<uint16_t>(i);
+                auto it = std::lower_bound(st->contacts.begin(), st->contacts.end(), self,
+                    [](const contact& c, uint16_t k) { return c.from < k; });
+                int alarm = 0;
+                for (; it != st->contacts.end() && it->from == self; ++it)
+                {
+                    if (it->first.year >= params.start_year) continue;
+                    alarm = std::max(alarm, deterrence_alarm_q(regions, *st, params,
+                                                               static_cast<int>(i), it->to));
+                }
+                near_alarm[i] = alarm;
+            }
+        }
     }
 
     // BL-932 -- EARN, the first of "earn, then pay stocks, then invest"
@@ -739,17 +916,34 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // persists now: "spending capital on ports").
         const int64_t years_q = std::max(step_years, 1);
 
+        // ---- BL-955 -- ONE SCORED CHOICE, then the unchanged decays. ------
+        // EXPLORATION.md sec Force persists now ("Spend is ALLOCATED"): a
+        // polity that can afford all three stocks still builds the one its
+        // situation asks for. The gates read the round's OPENING stocks.
+        const std::size_t pi = static_cast<std::size_t>(&q - polities.data());
+        exploration_spend_facts facts;
+        facts.expansion_rank_q    = expn_rank[pi];
+        facts.consolidator_rank_q = cons_rank[pi];
+        facts.water_want_q        = water_want[pi];
+        facts.alarm_q             = near_alarm[pi];
+        facts.treasury            = seat.treasury;
+        facts.port_window_q       = seat.port_q;
+        facts.port_stock_q        = seat.port_stock_q;
+        facts.navy_stock          = q.navy_stock;
+        facts.held_regions        = held_regions[pi];
+        const exploration_spend_option pick =
+            choose_exploration_spend(score_exploration_spend(params, facts));
+
         // PORT -- only ground carrying the endowment WINDOW can host one at
         // all; `port_q` is that window and is never itself spent.
         if (seat.port_q > 0)
         {
-            if (params.port_build_cost_q > 0 && seat.port_stock_q < 1000
-             && seat.treasury >= params.port_build_cost_q)
+            if (pick == exploration_spend_option::port_step)
             {
                 seat.treasury -= params.port_build_cost_q;
                 seat.port_stock_q = clampi(
                     seat.port_stock_q + params.port_build_step_q, 0, 1000);
-                if (spend) spend->ports += params.port_build_cost_q;
+                if (spend) { spend->ports += params.port_build_cost_q; ++spend->port_steps; }
             }
             else if (seat.port_stock_q > 0)
             {
@@ -771,27 +965,28 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         {
             const int64_t decay = (q.navy_stock * params.navy_decay_per_mille_year_q * years_q) / 1000;
             q.navy_stock = clampi64(q.navy_stock - std::max<int64_t>(decay, 1), 0, 1LL << 48);
+            if (q.navy_stock == 0 && spend && pi <= 0xFFFE)
+                spend->navies_lapsed.push_back(static_cast<uint16_t>(pi)); // BL-955 reading 7
         }
-        if (params.navy_build_cost_q > 0
-         && seat.port_stock_q >= params.navy_min_port_stock_q
-         && seat.treasury >= params.navy_build_cost_q)
+        if (pick == exploration_spend_option::navy_step)
         {
             seat.treasury -= params.navy_build_cost_q;
             q.navy_stock = clampi64(q.navy_stock + params.navy_build_step_q, 0, 1LL << 48);
-            if (spend) spend->navies += params.navy_build_cost_q;
+            if (spend) { spend->navies += params.navy_build_cost_q; ++spend->navy_steps; }
         }
 
         // STANDING ARMY -- adds to `region::army_stock` directly (the same
         // pool `gather_army`/`resolve_battle` already read, so a funded
-        // standing army fights exactly like any other garrison); underfunded,
-        // it falls back toward the muster-alone baseline (`garrison_target`),
-        // never below it -- ordinary muster is untouched by this decay.
-        if (params.standing_army_build_cost_q > 0 && seat.treasury >= params.standing_army_build_cost_q)
+        // standing army fights exactly like any other garrison); not funded
+        // this round, it falls back toward the muster-alone baseline
+        // (`garrison_target`), never below it -- ordinary muster is untouched
+        // by this decay.
+        if (pick == exploration_spend_option::army_step)
         {
             seat.treasury -= params.standing_army_build_cost_q;
             seat.army_stock = clampi64(
                 seat.army_stock + params.standing_army_build_step_q, 0, 1LL << 48);
-            if (spend) spend->standing_armies += params.standing_army_build_cost_q;
+            if (spend) { spend->standing_armies += params.standing_army_build_cost_q; ++spend->army_steps; }
         }
         else
         {
@@ -904,18 +1099,7 @@ int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& reg
 
     // LINE: the better of land (a corridor joining the two realms) and sea
     // (both seats' built ports, carried by the SELLER's navy).
-    int land_q = 0;
-    {
-        const uint16_t lo = static_cast<uint16_t>(std::min(seller, buyer));
-        const uint16_t hi = static_cast<uint16_t>(std::max(seller, buyer));
-        const auto it = std::lower_bound(
-            ctx.land_lines.begin(), ctx.land_lines.end(), std::pair<uint16_t, uint16_t>{lo, hi},
-            [](const trade_context::land_line& x, const std::pair<uint16_t, uint16_t>& k) {
-                if (x.lo != k.first) return x.lo < k.first;
-                return x.hi < k.second;
-            });
-        if (it != ctx.land_lines.end() && it->lo == lo && it->hi == hi) land_q = it->line_q;
-    }
+    const int land_q = trade_land_line_q(ctx, seller, buyer);
     const int sea_q = ps.navy_stock > 0
                     ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
                     : 0;
@@ -2852,21 +3036,38 @@ history_sim_state run_history_sim(settlement_state&         ss,
         expire_dated_objects(out.dated_objects, y);
         if (params.exploration_upkeep_enabled)
         {
+            // BL-953 -- the round's preference, once. Derived AHEAD of the
+            // upkeep since BL-955, whose allocation weights the across-water
+            // want by it: `derive_culture_preference` reads ownership, culture
+            // shares, dominance, contacts and liveness -- nothing the upkeep
+            // writes -- so the table is identical either side of the call.
+            if (want_lean_on)
+                round_prefs = derive_culture_preference(ss.regions, out.contacts,
+                                                        out.polities, want_culture_count);
+
             exploration_upkeep_spend upkeep_spend;
+            // BL-955: the allocation reads the state's contacts (near-home
+            // Alarm), the creeds (lean ranks) and the round's preference.
+            exploration_spend_context spend_ctx;
+            spend_ctx.state  = &out;
+            spend_ctx.creeds = cs;
+            spend_ctx.prefs  = &round_prefs;
             // BL-954: the state's treaties open this round's flows, rebuilt
             // into `out.trade_flows` (never accumulated).
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
                                    params, y, step_years, &upkeep_spend,
-                                   &out.dated_objects, &out.trade_flows);
+                                   &out.dated_objects, &out.trade_flows, &spend_ctx);
             out.treasury_spent_on_ports           += upkeep_spend.ports;
             out.treasury_spent_on_navies          += upkeep_spend.navies;
             out.treasury_spent_on_standing_armies += upkeep_spend.standing_armies;
-
-            // BL-953 -- the round's preference, once, after the upkeep has
-            // refreshed the scarcity signal the want reads beside it.
-            if (want_lean_on)
-                round_prefs = derive_culture_preference(ss.regions, out.contacts,
-                                                        out.polities, want_culture_count);
+            out.port_steps_bought += upkeep_spend.port_steps;
+            out.navy_steps_bought += upkeep_spend.navy_steps;
+            out.army_steps_bought += upkeep_spend.army_steps;
+            for (uint16_t lapsed : upkeep_spend.navies_lapsed)
+            {
+                if (out.navy_lapsed.size() <= lapsed) out.navy_lapsed.resize(lapsed + 1u, 0);
+                out.navy_lapsed[lapsed] = 1;
+            }
 
             // ---- BL-940: THE ROAD LADDER'S THIRD RUNG, BOUGHT WITH CAPITAL.
             //

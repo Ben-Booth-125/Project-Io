@@ -1871,6 +1871,33 @@ struct history_sim_params
     /// muster baseline itself) lost per YEAR when the round's build was
     /// refused — "falls back toward what muster alone provides," not below it.
     int     standing_army_decay_per_mille_year_q = 60;
+
+    // --- BL-955: spend is ALLOCATED, not bought whenever affordable ----------
+    // EXPLORATION.md sec Force persists now ("Spend is ALLOCATED"). Once a
+    // round's EARN is in, each living polity makes ONE scored choice among
+    // {port step, navy step, standing-army step, hold}
+    // (`score_exploration_spend` / `choose_exploration_spend`). Every score is
+    // on a 0-1000 integer scale; the leans enter as per-mille RANKS over the
+    // round's living, cultured polities (`exploration_lean_ranks`), never as
+    // the raw leans, whose scales are incommensurable (NR-864). The decays
+    // above are untouched: only the purchases are chosen. FIRST CUT; see the
+    // BL-955 sweep report for the measurement these defaults stand on.
+
+    /// Weight of the EXPANSION rank in the port and navy scores.
+    int     spend_w_expansion_q         = 600;
+    /// Weight of the across-water want (0-1000) in the port and navy scores.
+    int     spend_w_water_want_q        = 400;
+    /// Weight of the CONSOLIDATOR rank in the standing-army score.
+    int     spend_w_consolidator_q      = 600;
+    /// Weight of the near-home Alarm (0-1000) in the standing-army score.
+    int     spend_w_alarm_q             = 400;
+    /// The flat value of keeping the purse — hold's floor.
+    int     spend_hold_base_q           = 250;
+    /// Weight of the CONSOLIDATOR rank in hold (weighted below the army's).
+    int     spend_w_hold_consolidator_q = 200;
+    /// A fleet SATURATES: the navy score is 0 once `navy_stock` exceeds this
+    /// many units per held region.
+    int64_t navy_saturation_per_region  = 400;
 };
 
 // ---------------------------------------------------------------------------
@@ -1945,6 +1972,37 @@ struct exploration_upkeep_spend
     int64_t ports           = 0;
     int64_t navies          = 0;
     int64_t standing_armies = 0;
+    /// BL-955: stock STEPS bought this call (one per polity per call at most,
+    /// across all three) — the observable for "a fully funded polity still
+    /// builds at most one stock per round".
+    int64_t port_steps      = 0;
+    int64_t navy_steps      = 0;
+    int64_t army_steps      = 0;
+    /// BL-955: polity indices whose navy decayed to zero this call.
+    std::vector<uint16_t> navies_lapsed;
+};
+
+struct history_sim_state;       // defined further down
+struct culture_good_preference; // defined further down
+
+/// BL-955 — WHAT THE ALLOCATION READS beyond the region/polity tables. Every
+/// pointer may be null, and a null reads as "no signal" rather than an error:
+///   - @c state   : its `contacts` give the near-home Alarm (contacts whose
+///                  first year predates `params.start_year`, read through
+///                  `deterrence_alarm_q`). Its `polities` MUST be the same
+///                  vector the upkeep call mutates (as `run_history_sim`
+///                  passes it); the Alarm is read in a pre-pass before any
+///                  stock moves, so the read never sees this round's buys.
+///   - @c creeds  : the cultures the leans are ranked from. Null ranks every
+///                  polity 0 on both leans.
+///   - @c prefs   : the round's live culture preference, weighting the
+///                  across-water want (`polity_good_want_q`). Null or empty
+///                  weights every good at 0 preference.
+struct exploration_spend_context
+{
+    const history_sim_state*                    state  = nullptr;
+    const creed_state*                          creeds = nullptr;
+    const std::vector<culture_good_preference>* prefs  = nullptr;
 };
 
 ///
@@ -1955,6 +2013,14 @@ struct exploration_upkeep_spend
 /// capitals — no flat market income), then pay and invest. @p treaties null
 /// means no clause binds anyone, so no flow forms; @p flows_out null discards
 /// the flows after they have relieved and earned.
+///
+/// BL-955 — PAY and INVEST are split: every DECAY runs exactly as BL-935 set
+/// it (a port silts on any round it is not built, a navy decays every round,
+/// a standing army falls back on any round it is not funded), but the
+/// PURCHASE is one scored choice per polity per round
+/// (`score_exploration_spend`/`choose_exploration_spend`), fed from
+/// @p spend_ctx. A null @p spend_ctx still runs the choice, on no leans, no
+/// Alarm and unweighted wants.
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
@@ -1963,7 +2029,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                             int                                    step_years,
                             exploration_upkeep_spend*              spend = nullptr,
                             const std::vector<dated_object>*       treaties = nullptr,
-                            std::vector<trade_flow>*               flows_out = nullptr);
+                            std::vector<trade_flow>*               flows_out = nullptr,
+                            const exploration_spend_context*       spend_ctx = nullptr);
 
 // ---------------------------------------------------------------------------
 // Actors
@@ -3009,6 +3076,17 @@ struct history_sim_state
     int64_t treasury_spent_on_navies         = 0;
     int64_t treasury_spent_on_standing_armies = 0;
 
+    /// BL-955: stock steps bought this run, by kind — with the allocation a
+    /// polity buys at most one per round, so these count CHOICES made.
+    int64_t port_steps_bought  = 0;
+    int64_t navy_steps_bought  = 0;
+    int64_t army_steps_bought  = 0;
+    /// BL-955: one flag per polity index, set once that polity's navy has
+    /// decayed from a standing fleet to zero at least once this run ("at
+    /// least one allowed to decay", reading 7). GENERATION SCRATCH, NOT SAVED,
+    /// same footing as `trade_flows`.
+    std::vector<uint8_t> navy_lapsed;
+
     /// BL-896 -- how many successor realms the dark age produced, and how much
     /// ground walked away with them. The pair is the item's "done when": an
     /// empire that forms and then fragments shows both non-zero, and a world
@@ -3364,6 +3442,68 @@ int visible_capability_q(const std::vector<region>& regions, const history_sim_s
 /// that has never met it). 0 where the two have not met.
 int deterrence_alarm_q(const std::vector<region>& regions, const history_sim_state& s,
                         const history_sim_params& p, int self, int other);
+
+// ---------------------------------------------------------------------------
+// BL-955 — spend is ALLOCATED (EXPLORATION.md sec Force persists now)
+// ---------------------------------------------------------------------------
+
+/// The lean RANKS the allocation reads (NR-864). Over the LIVING polities whose
+/// `culture` indexes @p cs, each one's per-mille rank of its
+/// `expansion_lean_q` and of its `consolidator_lean_q`:
+///     rank = (count with a STRICTLY lower lean) * 1000 / max(1, n - 1)
+/// so ties share a rank, the lowest reads 0 and the highest 1000. Both output
+/// vectors are sized to @p polities; a dead or culture-less polity (or every
+/// polity, when @p cs is null) reads 0 on both. Pure; computed once per round.
+void exploration_lean_ranks(const std::vector<polity>& polities, const creed_state* cs,
+                            std::vector<int>& expansion_rank_q,
+                            std::vector<int>& consolidator_rank_q);
+
+/// The four options, in TIE-BREAK order: an exact score tie goes to the
+/// lower enumerator (hold, then army, then port, then navy).
+enum class exploration_spend_option : uint8_t
+{
+    hold      = 0,
+    army_step = 1,
+    port_step = 2,
+    navy_step = 3,
+};
+
+/// Everything one polity's choice reads, already reduced to integers.
+struct exploration_spend_facts
+{
+    int     expansion_rank_q    = 0; ///< `exploration_lean_ranks`, 0-1000.
+    int     consolidator_rank_q = 0; ///< `exploration_lean_ranks`, 0-1000.
+    int     water_want_q        = 0; ///< across-water want, 0-1000 (see the upkeep).
+    int     alarm_q             = 0; ///< max near-home `deterrence_alarm_q`, 0-1000.
+    int64_t treasury            = 0; ///< the capital seat's treasury after EARN.
+    int     port_window_q       = 0; ///< the seat's `port_q` endowment window.
+    int     port_stock_q        = 0; ///< the seat's built port, 0-1000.
+    int64_t navy_stock          = 0;
+    int64_t held_regions        = 0;
+};
+
+/// Each option's score and whether it may be taken at all.
+struct exploration_spend_scores
+{
+    int  hold_q = 0, army_q = 0, port_q = 0, navy_q = 0;
+    bool army_eligible = false, port_eligible = false, navy_eligible = false;
+};
+
+/// The scores (0-1000 each, integer):
+///   outward = (expansion_rank * w_expansion + water_want * w_water_want) / 1000
+///   port    = outward * (1000 - port_stock) / 1000
+///   navy    = outward, or 0 once navy_stock > navy_saturation_per_region * max(1, held)
+///   army    = (consolidator_rank * w_consolidator + alarm * w_alarm) / 1000
+///   hold    = hold_base + consolidator_rank * w_hold_consolidator / 1000
+/// Eligibility: port needs a cost > 0 the treasury covers, a port window and
+/// port_stock < 1000; navy a cost > 0 the treasury covers and port_stock >=
+/// `navy_min_port_stock_q`; army a cost > 0 the treasury covers. Hold always.
+exploration_spend_scores score_exploration_spend(const history_sim_params&    p,
+                                                 const exploration_spend_facts& f);
+
+/// Argmax over a TOTAL order: the higher score wins; an exact tie goes to
+/// hold, then army, then port, then navy. Ineligible options never win.
+exploration_spend_option choose_exploration_spend(const exploration_spend_scores& s);
 
 // ---------------------------------------------------------------------------
 // The directed want table (BL-909)
