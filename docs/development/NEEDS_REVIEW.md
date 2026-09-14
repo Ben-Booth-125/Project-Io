@@ -415,17 +415,18 @@ Reading 4 printed treaties formed=5161, broken=4, non-aggression-blocked campaig
 
 *Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sweep.cpp`, `docs/generation/EXPLORATION.md`*
 
-### NR-862 — OBSERVATION: displacement fell from NR-855's 0.88 median to 0.04 on the same three seeds -- bisect in progress
+### NR-862 — OBSERVATION: displacement regressed 0.33 -> 0.08 (16 seeds) at the schism verb, and NR-855's 0.88 was a 3-seed artefact
 *observation · raised 2026-09-14 · from exploration_sweep at HEAD 643ebf79 vs NR-855 (sprint 40 wave 4, ec335d2c).*
 
-NR-855 recorded a 3-seed median displacement ratio of 0.88 after BL-941 (deterrence), with seed 1 at 1.11. At HEAD the same seeds read 0.01, 1.42 and 0.04 (median 0.04); the 16-seed median is 0.08. The exploration_sweep harness is unchanged since ec335d2c. The only sim-touching commits since are 3d58001d (BL-944, schism verb), fdc445fb (BL-947, Culture round coast) and e18ab370 (BL-946, wizard wiring and the exploration_sim_enabled default flip). Bisect worktrees are built at ec335d2c and 4605a90d.
+BISECTED 2026-09-14 with exploration_sweep at four commits. Seeds 0-2: wave-4 close ec335d2c and its successor 4f07f5ea (pre-schism) both read 0.0066 / 1.1054 / 0.8775 (median 0.88, exactly NR-855). 4605a90d (schism merged) and HEAD 643ebf79 both read 0.0116 / 1.4241 / 0.0392 (median 0.04). The only src/world commit between 4f07f5ea and 4605a90d is 3d58001d (BL-944, schism verb). It changes the EMPIRES round (seed 0: 6000 -> 6479 battles before 1200), so the Exploration span opens on a different world; seed 2 loses nearly all its frontier war (18.70 -> 0.43 skirmishes/century). WIDER SPREAD: the wave-4 tree over 16 seeds has a median of 0.33, not 0.88 -- the 3-seed median rested on seed 2 alone. HEAD over 16 seeds: 0.08.
 
-**Why it matters.** BL-950 (displacement clears the bar) is designed to strengthen deterrence from a 0.88 starting point. If the true current baseline is 0.04, that item's premise is stale, and something merged after wave 4 undid most of wave 4's effect without any reading going red (the sweep reports, it does not gate).
+**Why it matters.** BL-950 (displacement clears the bar) was designed to push from 0.88 to above 1.0. The honest starting point was 0.33 before the schism and 0.08 after. And the regression was silent: the sweep reports rather than gates, and nothing else reads displacement, so an upstream Empires verb cut the phase's headline reading by three quarters without a red line anywhere.
 
-- Find the causing commit, then decide whether it is a defect to fix or a legitimate interaction BL-950 must now work against.
-- Make exploration_sweep gate on a floor for the displacement median, so a regression like this goes red at merge time.
+- Treat BL-944 as legitimate (a schism is a real force) and let BL-950 tune against the post-schism world, from the integrated sprint-41 16-seed baseline.
+- Investigate why the schism collapses frontier war on some seeds (fewer, smaller realms at 1200 with no sea reach?) before tuning.
+- Make exploration_sweep gate on a displacement floor so the next upstream change goes red.
 
-> **Recommendation:** Option 1 now (bisect running); option 2 is a separate call, since the harness deliberately reports rather than gates.
+> **Recommendation:** Option 1, with option 2 as the first step of BL-950's tuning pass (cheap once the 16-seed run exists). Option 3 is a separate call: the harness deliberately reports.
 
 *Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sweep.cpp`*
 
