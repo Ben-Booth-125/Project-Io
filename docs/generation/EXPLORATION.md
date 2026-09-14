@@ -3,7 +3,7 @@
 > **Settles:** what the exploration age is for and which question it answers · where the treasury
 > sits and what it buys · why this phase carries a scarcity signal and never a price · how goods
 > move without a cargo ever existing · how a want met by throughput becomes a flow between
-> polities, and why that flow is what a market earns · where a want points a campaign · how the
+> polities, and why that flow is what a market earns · which campaign a want ranks · how the
 > treasury allocates its spend · what a treaty is as data and what it binds · what a colony
 > is and why it wants things of its own · how ports, navies and standing armies are paid for and
 > how they decay · how an arms race buys quiet at home and opportunity abroad · the two ways to
@@ -18,7 +18,7 @@
 > ../economy/MARKETS.md.
 
 > ⟳ **What changed (2026-09-14, the Exploration trade batch — remove once reviewed):** new § Trade
-> is a want met by throughput; § A want points a campaign outward; spend allocated in upkeep
+> is a want met by throughput; § A want ranks a campaign; spend allocated in upkeep
 > (§ Force persists now, § The engine is shared); unmet-want signal; no flat market income; trade
 > value in a binding; an eleventh reading (Trade); trade flows, grudges and the surviving network
 > added to the handoff list, with world setup reading them.
@@ -56,8 +56,10 @@ which both rise is Empires wearing a hat.
 
 **Three things make that displacement happen, and none of them is a term inside an actor.** The
 standing rule against agent handicaps binds here as everywhere: treaties raise the *cost* of a
-neighbour war, ports lower the *cost* of a distant one, and wants point *outward* because contact
-is what creates them. The actor's scorer is untouched; the world around it changed price.
+neighbour war, ports lower the *cost* of a distant one, and a neighbour's visible capability makes
+binding cheaper than testing it (§ The arms race). The actor's scorer is untouched; the world
+around it changed price. Wants rank which campaigns a polity takes; they do not by themselves move
+where it fights (§ A want ranks a campaign).
 
 ---
 
@@ -346,9 +348,9 @@ into a price is Digitisation's job.
 so a preference derived once at 1200 would describe a world that no longer exists. It is derived
 from the round's own state, by the same rule.
 
-### A want points a campaign outward
+### A want ranks a campaign
 
-**SETTLED (Ben, 2026-09-14): a want leans WHERE a polity campaigns and WHOM it subjects — and
+**SETTLED (Ben, 2026-09-14): a want leans WHICH campaign a polity takes and WHOM it subjects — and
 nothing else.** A campaign's prize leans up by the decider's own unmet want for the good the
 target ground holds, weighted by its people's preference for that good. Subjection ranks the
 natives a power could bind by the same want. Settlement is untouched: a people settles where
@@ -359,11 +361,13 @@ being next and the creed's appetite: one term reads a richer input rather than a
 added beside the score. A want never makes an unwinnable campaign attractive; it ranks winnable
 ones.
 
-**This is what points conflict OUTWARD, and it needs no rule saying so.** A long-contacted
-neighbour mostly holds the goods one's own region already holds, and is often bound by treaty. A
-newly met people holds what one's ground never did — the very definition of preference
-(§ A good acquires a cultural preference). The want lands on the frontier because that is where
-the unmet goods are.
+**A want ranks; it does not displace (Ben, 2026-09-14, NR-865).** It would be tempting to read
+the want as what sends conflict to the frontier, since a newly met people holds what one's ground
+never did. It does not follow at the grain the phase works in: with a handful of goods, a
+long-known neighbour lacks and holds the same goods as often as a stranger does, and trade already
+relieves the wants a bound neighbour can meet without pointing the rest outward. So the want
+decides between campaigns a polity could already win and reach; **where** it fights is decided by
+cost — treaties at home, ports abroad, and deterrence (§ The shape of the age).
 
 ---
 

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*50 entries — 33 open, 17 resolved.*
+*31 entries — 31 open, 0 resolved.*
 
 ---
 
@@ -461,21 +461,6 @@ BL-951 moved reading 3 to a treasury ranking; on seeds 0-2 all 18 top-3 entries 
 
 *Files: `tools/verify/exploration_sweep.cpp`, `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
 
-### NR-865 — OBSERVATION: outward wants alone do not point conflict outward -- the doc claim needs the trade flows beside it, measured on the integrated tree
-*observation · raised 2026-09-14 · from Sprint 41 T3 (BL-953, wants point outward), generation-dev agent, worktree branch 59768711.*
-
-BL-953 built as designed. w_want_q swept at 0/250/500/1000/2000 on 3 seeds: 0 reproduces the baseline exactly; 250-500 move about one battle; 1000 (chosen) moves the displacement median 0.04 -> 0.06 with the battle rate holding (18.91 -> 21.09 per century); 2000 swings whole seeds (neighbour wars +45% on seed 0, -60% on seed 2), which is the want deciding wars rather than ranking them. The lean raises neighbour wars about as much as frontier skirmishes. Two causes the agent named: frontier battles are rare for reach/supply reasons (seeds 0 and 2 fight ~1 frontier battle in 460 years), which a prize lean cannot fix; and at four goods a long-contacted neighbour lacks-and-holds the same goods as often as a newly met people, so EXPLORATION.md sec A want points a campaign outward -- "the want lands on the frontier because that is where the unmet goods are" -- does not follow at this grain on its own. MEASURED ON THE INTEGRATED TREE 2026-09-14 (main f260d202, 16 seeds): wants PLUS trade flows move the displacement median 0.08 -> 0.10 (per seed: 0.01, 1.52, 0.07, 0.10, 0.09, 0.11, 0.04, 0.00, 0.78, 0.05, 0.39, 1.94, 0.28, 0.49, 0.03, 0.05). Exploration battle rate 50 -> 52 per century. Trade exists and is uneven (700 flows, 8.7% of volume crossing landmasses, top-decile pairs 73%, 59% of bound pairs carry nothing) but relieving bound neighbours' wants did not send the residual want to the frontier. Option 1's test has been run and did not pass.
-
-**Why it matters.** The paragraph was written today as a consequence, and the first measurement contradicts it. It may still hold once BL-954 lands: trade flows relieve the signal wherever a treaty partner supplies a good, so the residual UNMET want should point at goods only unbound (mostly newly met) peoples hold. That is a testable claim, not an assumption.
-
-- Measure on the integrated tree (wave 1 merged) before changing anything: if displacement moves once flows relieve bound neighbours wants, the doc paragraph is right but incomplete -- amend it to name trade as the half that makes it true.
-- If it does not move, weaken the doc claim: wants rank winnable campaigns and nothing more, and outward displacement is owned by reach, ports and deterrence (BL-950).
-- Widen the goods grain beyond four so preference carries more information -- a larger change, likely out of this sprint.
-
-> **Recommendation:** Option 2: weaken EXPLORATION.md sec A want points a campaign outward to what the measurement supports (a want ranks winnable campaigns; displacement is owned by reach, ports and deterrence, BL-950), unless you would rather widen the goods grain. BL-950 then carries displacement alone.
-
-*Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`, `tools/verify/exploration_sweep.cpp`*
-
 ### NR-866 — CALL: the navy and army saturation in the spend scorer is a brake inside the scorer, where EXPLORATION.md wants a cost in the world
 *question · raised 2026-09-14 · from Sprint 41 wave 2 (BL-955, spend is scored), cold review finding 4.*
 
@@ -491,154 +476,10 @@ BL-955's allocation scores a navy step 0 once the fleet exceeds 400 per held reg
 
 *Files: `src/world/history_sim.cpp`, `src/world/settlement.hpp`, `docs/generation/EXPLORATION.md`*
 
-### NR-867 — AUTHORISE: sprint 41 moves every Exploration-on world -- the shape of the change, for the wave re-bless (BL-950 R3)
-*question · raised 2026-09-14 · from Sprint 41 close-out; exploration_sweep 16 seeds (0-15) at 643ebf79 (before) and 41e2f5c7 (after), both run in this session.*
-
-DIGESTS (world_determinism; asserts same-seed determinism, reports digests): seedA/on 584D731FC7E5DDD0 -> CC34FD59D4E79580; seedB/on 1BFB3594DB6A319A -> 728607C66CE6A4BE; seedA/off F9BF05466A631FF9 and 1960/two-span 851FE345B2E37618 UNCHANGED (the Empires span and the 1960 arc are untouched). THE SHAPE, 16 seeds before -> after: displacement median 0.08 -> 1.34 (frontier war now leads neighbour war on the median seed); Exploration battle rate median 50.0 -> 44.8 per century (Empires 404.9); trade flows none -> 710 flows, 7.1% of volume crossing landmasses, top-decile pairs 73%, 61% of bound pairs carry none, every flow on a trade-access clause; treaties formed 5161 -> 6140, broken 4 -> 5, standing at 1660 930 -> 1008; subjects 33 -> 27 (overlords 27 -> 26), 13 of 27 subjects want a different good first; navies at 1660 454 -> 189, 27 polities let a fleet decay to zero; spend steps bought port 7914 / navy 8363 / army 52232; post roads 0/16 -> 12/16 seeds (31 roads); treasury correlation with the corridor network 0.261 -> 0.254; living polities 792 -> 808; world setup now seeds sentiment from 1660 grudges and stamps 1660 roads (BL-956; invisible to the digest, BL-957). PER-WAVE ATTRIBUTION (16-seed displacement median): trade flows + outward wants + handoff 0.08 -> 0.10; scored spend + persistent standing armies 0.10 -> 0.17; road record seeding (reach) 0.17 -> 0.06 with battle rate 57 -> 98; deterrence widening (Alarm 575, far penalty 700) 0.06 -> 1.34 with battle rate 98 -> 45. THE COST: four seeds (0, 3, 9, 14) now fight under 5 battles per century across 460 years; the lowest seed before the sprint fought 11.5. With those four removed the median is still 1.34, so the reading is not produced by quiet maps -- but a frozen map is the failure EXPLORATION.md names for reading 2.
-
-**Why it matters.** DELIVERY.md sec The digest re-bless is one act per WAVE: Ben authorises against the shape, not the hash. Three calls ride on it. (1) Four near-frozen seeds of sixteen: acceptable spread, or a sign the deterrence widening calms rather than displaces on some worlds? Alarm 525 (with the same far penalty) leaves two quiet seeds for about 9% less frontier war and a median of 1.33. (2) The displacement median drops seeds with no neighbour war at all (seed 4: 7.6 frontier battles per century, 0 neighbour) and counts near-silent seeds with ratios like 3.0 off eight battles; the reading could weight by conflict volume instead. (3) EXPLORATION.md carries a `> what changed` note for this batch that should be reviewed and then removed.
-
-- Authorise as landed (Alarm 575 / far penalty 700); record the digests in the DEVLOG as the new baseline.
-- Authorise at Alarm 525 (two quiet seeds, median 1.33, ~9% less frontier war) -- a one-constant change and a re-run.
-- Do not authorise: investigate the four quiet seeds first (seed 0 already diagnosed: 851 frontier campaign scores cleared the bar but known neighbours always outscored them).
-
-> **Recommendation:** Option 2: it keeps the reading over the bar with half the frozen seeds, and a frozen map is the named failure. Pair it with a later item to weight the displacement reading by conflict volume.
-
-*Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sweep.cpp`, `tools/verify/world_determinism.cpp`, `docs/generation/EXPLORATION.md`*
-
 ---
 
 ## Resolved
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
-
-### NR-831 — w_aggr_q's lean sits INSIDE the season loop and so compounds across summer and winter
-*observation · raised 2026-09-11 · from Noticed by the BL-838 agent while siting its own lean; out of that item's scope, so flagged rather than changed.*
-
-BL-868's creed-aggression lean (`w_aggr_q`) is applied inside the per-season loop in `history_sim.cpp`, so it is applied more than once per candidate and compounds across the seasons. BL-838's fear lean was deliberately sited OUTSIDE that loop, on the reasoning that the property being read is a fact about the TARGET rather than about the weather.
-
-**Why it matters.** If the compounding is unintended, then BL-868's delivered magnitude is not the magnitude it appears to be -- it was tuned through seven failed attempts to a figure that includes a doubling nobody wrote down, and any future tuning of it starts from a false baseline. If it IS intended, the two lean sites now disagree about what a per-mille weight means in this file, which is the kind of quiet inconsistency that makes the next calibration wrong.
-
-> **Recommendation:** Worth ten minutes to read and then either fix or comment. It is cheap to settle now and expensive to discover during a future calibration -- this file has already published three wrong diagnoses that were caught only by one number contradicting another.
-
-> **RESOLVED.** BL-927 (2026-09-11): the lean was relocated outside the per-season loop in history_sim.cpp, so it applies once per candidate instead of compounding across summer and winter -- confirming the compounding WAS unintended, per this entry's own concern. Measured before/after on the wave-1 sweep: battles 3114 -> 3114 median (unchanged); world_determinism digests for seeds A and B unchanged by this item alone, but seeds 0 and 3 in the 4-seed reading moved slightly. No further action.
-
-*Files: `src/world/history_sim.cpp`*
-
-### NR-843 — NOVEL WORK: two new authority docs and a FOURTH tree, from one design session
-*novel-work · raised 2026-09-11 · from Exploration design session (BL-930..BL-937).*
-
-No doc owned the phase after Empires, so the session created two: docs/generation/EXPLORATION.md (full authority for 1200-1660) and docs/generation/DIGITISATION.md (a PLACEHOLDER, per Ben's ruling, owning only the boundary). Both are now rows in CLAUDE.md section 3.
-
-The scope growth worth flagging is the TREE. trees/TREES.md asserted "three trees, one grammar" as a settled shape (Ben, 2026-09-10); Ben's 2026-09-11 ruling that "exploration and industry use different trees" makes it four. The session re-pointed the chain in prose and in one store string - Empire's rim milestone now opens the EXPLORATION tree, and the Industry tree's root is gated behind Exploration's rim - but the fourth tree itself is unauthored and is BL-930's work. Until it exists, the rim milestone opens a tree that is not there.
-
-FLAGGED BECAUSE a design session turning a settled three into a four is the kind of growth the novelty rule wants chosen rather than accreted. Nothing in src/ moved.
-
-=== RESOLVED (Ben, 2026-09-11): "please go ahead and design a mock-up tech tree." EXPLORATION_TREE.md and exploration_tree.json now exist -- 31 nodes, 3 rings, 4 branches + spire, 3 milestones, 3 forks, lint OK. tree_lint.js knows the tree. The four-tree chain is confirmed and the rim no longer opens a tree that is not there. ===
-
-### NR-844 — DECISION TAKEN: Exploration tree sized at 3 rings / 4 branches / ~34 nodes, from the span ratio alone
-*decision taken on your behalf · raised 2026-09-11 · from Exploration design session; trees/TREES.md sec Sizes, BL-930.*
-
-TREES.md's sizing rule is that a tree is sized to the rounds its phase gives a leading polity, asserted by the sweep rather than picked. The Exploration tree has no sweep yet, so its row was set by SPAN RATIO: 460 years against the Empire phase's 1,600, so three rings rather than four, four branches, three milestones, ~34 nodes of the 64 cap. That is a guess wearing the rule's clothes, and it is recorded as a target.
-
-RELATED, AND NOT FIXED: the INDUSTRY tree is authored at 62 nodes across 4 rings for a 400-year span, and the split leaves it 300 years. By the same rule it is now oversized. The size row in TREES.md was left stating what the tree IS (4 rings, ~60) rather than what the rule wants, with a paragraph saying so - reshaping an authored 62-node tree is real work, not a row edit, and it was not in this session's scope.
-
-=== RESOLVED (Ben, 2026-09-11): "we should shrink the industry tree." BOTH HALVES ANSWERED, and the second differently than expected. (1) The Exploration tree is authored at 31 nodes over 3 rings -- under the ~34 target, reported rather than padded. (2) The Industry shrink is NOT a trim: measurement showed ring 4 is the twentieth century (electrification, oil, flight, broadcast, antibiotics) and must survive, while RING 1 IS THE EXPLORATION AGE and duplicates newly-authored Exploration nodes. The shrink is a migration of ring 1 with every ring shifting down, landing at ~44 nodes. BL-938 owns it. ===
-
-### NR-846 — DECISION TAKEN: build order is BL-930 -> BL-931 -> BL-937, not the NEXT_SESSION.md wave table's BL-937-first
-*decision taken on your behalf · raised 2026-09-12 · from Sprint 40 batch delivery, opening session.*
-
-NEXT_SESSION.md's wave table puts BL-937 (the ten readings) in Wave 0, ahead of Wave 1's BL-931/BL-930, with the framing 'lands first, not last'. But BL-937's own requires field names BL-931, and BL-931's requires BL-930 -- there is nothing for the readings to measure until the engine runs, and no tree for it to run against until the tree is wired. Read literally, the wave table asks for an impossible build order.
-
-RESOLUTION: build BL-930 (wire the tree) then BL-931 (the span runs) then BL-937 (instrument the readings), immediately, before any of waves 2-5. This preserves the intent the wave table was protecting -- instrumentation lands before any of the thirteen mechanism items, not deferred to the sprint's close -- while respecting the actual dependency graph. Nothing in EXPLORATION.md or the four rulings is touched by this; it is a sequencing correction, not a design change.
-
-### NR-847 — DECISION TAKEN: BL-931 wires the Exploration span opt-in, world_params::exploration_sim_enabled default false
-*decision taken on your behalf · raised 2026-09-12 · from BL-931, wave 1 of sprint 40.*
-
-Flipping exploration_sim_enabled to true by default would move region::nation from the 1200 CE map to the 1660 CE one and shift every generation golden -- real re-baselining work BL-931 did not scope in. Landed opt-in instead so the rest of sprint 40 can build against a real, running span without moving main's default generated world out from under every other in-flight consumer. A later item (likely the wave-5 tree-migration/exemplar wave, or its own item) needs to flip the default once the phase is far enough along that the golden move is worth taking once rather than piecemeal.
-
-=== RESOLVED (Ben, 2026-09-13, live review): flip the default now. BL-946 does the flip plus the wizard wiring and golden re-baseline together. ===
-
-### NR-848 — DECISION TAKEN: BL-937's displacement reading operationalizes "long-contacted neighbour" vs "newly-contacted, frontier" off the directed contact table, and reads the ratio WITHIN the Exploration span
-*decision taken on your behalf · raised 2026-09-12 · from BL-937, sprint 40 wave 1 (the readings harness).*
-
-EXPLORATION.md names the reading ("neighbour-war rate falls relative to frontier-skirmish rate") but does not say how a battle's pair is classified, or against what the two rates are compared. Taken: a pair is a LONG-CONTACTED NEIGHBOUR if the directed contact table (`pass_one_output::contacts`) already names it at 1200 CE (i.e. the Empires round already recorded a meeting); it is NEWLY-CONTACTED / frontier otherwise, i.e. the pair's first-ever contact falls inside 1200-1660. The two resulting rates (battles/century) are then compared to EACH OTHER within the Exploration span, not each independently against the Empires round's own rate -- read alongside reading 2 (conflict persists, which IS compared against Empires explicitly), this still catches the named trap (a world that simply stopped fighting passes neither reading, since both would read as a fall to near-zero rather than a displacement). Built and run over 16 seeds: median ratio (frontier-rate / neighbour-rate) 0.21 across seeds with any neighbour war -- neighbour-war rate leads throughout the spread, so NO DISPLACEMENT is measured yet on the bare BL-931 span (expected: the arms-race/deterrence mechanism this reading is meant to detect is Ben's later item, not built by BL-931 alone).
-
-=== RESOLVED (Ben, 2026-09-13, live review): confirmed -- the within-span neighbour-vs-frontier ratio is the right operationalisation. ===
-
-**Why it matters.** This is a judgement call on an underspecified measurement, not a mechanism decision -- but it sets what "displacement" means for every future sweep of this reading, including once BL-940/deterrence lands and the ratio is expected to move. If the intended comparison was actually against the Empires round's own rate (rather than within-span), the harness's verdict and its printed guidance text would need to change, though the raw counts it reports would not.
-
-*Files: `tools/verify/exploration_sweep.cpp`, `src/world/era_minus_one.hpp`, `src/world/hard_coded_world.cpp`*
-
-### NR-849 — OBSERVATION: the road ladder's third rung never fired in an 8-seed sweep
-*observation · raised 2026-09-12 · from BL-940, wave 2 of sprint 40.*
-
-post_roads_built totalled 0 across all 8 seeds in tools/verify/exploration_sweep.cpp's reading 9. Corridors DO carry materially different volumes (the throughput half of the reading passes), but the third-rung purchase (Post Roads, spend treasury on a tier-2->3 promotion) never fired. Likely cause: only 5-7 of ~375 polities hold ANY exploration-tree node by 1660 on a single-seed read, and firing needs a polity to hold EX-WY-1a specifically, on a tier-2 corridor, with enough treasury, simultaneously -- three independent-ish rarities compounding. Not re-tuned silently (post_road_treasury_cost is a first-cut constant, see NR-850 for the sibling treasury-constants call).
-
-=== RESOLVED (Ben, 2026-09-13, live review): tune it now. BL-949 lowers the cost/threshold so the rung fires. ===
-
-### NR-850 — DECISION TAKEN: treasury income is per-round recurring (three live terms) plus the one-time 1200 consolidation, not one-time alone
-*decision taken on your behalf · raised 2026-09-12 · from BL-932, wave 2 of sprint 40.*
-
-EXPLORATION.md names the one-time material_stock->treasury consolidation as the phase's visible opening act, and separately says the treasury is 'fed by' four sources (endowment, corridor network, markets, tribute) without saying whether that feeding is a single event or continuous. Read as CONTINUOUS (three of the four sources feed it every round; tribute is a hook, zero, until BL-934 subjects exist) because 'the treasury earns, then pays its stocks, then invests' in EXPLORATION.md sec The engine is shared reads as a recurring round-level cadence, not a one-time transfer. The three income-rate constants (treasury_endowment_income_q, treasury_corridor_income_q, treasury_market_income_q) are first-cut, not measured -- sweep shows a 4,048 to 625M spread correlating 0.33 with corridor touch, which meets BL-932's own done-when bar, but the constants themselves are mine to defend, not Ben's settled numbers.
-
-=== RESOLVED (Ben, 2026-09-13, live review): confirmed -- recurring income is the right reading, first-cut constants accepted pending a real tuning pass. ===
-
-### NR-851 — OBSERVATION: reading 1 (displacement) still hasn't moved despite BL-935's port discount and BL-933's non-aggression block
-*observation · raised 2026-09-12 · from BL-933/934/935, wave 3 of sprint 40.*
-
-Non-aggression treaties blocked ~1.3M campaign candidates across the 8-seed sweep and a funded port+navy now measurably cheapens a staged crossing (up to 2x), yet median displacement ratio moved from 0.16 (wave 2) to 0.01 (wave 3) -- WORSE, not better, on the raw ratio (though both neighbour-war and frontier rates fell in absolute terms: expl.battl/century dropped from a median ~227 to ~77). Read against reading 2 (conflict persists, still passing: 76.96/century median, well below Empires' 375), this looks like the treaty block is suppressing NEIGHBOUR war harder than the port discount is enabling FRONTIER war -- the two mechanisms landed together but pull in the same direction (less war overall) rather than the displacement the phase claims (war moving from home to frontier). The doc's own deterrence/arms-race mechanism (Ceiling/Alarm at polity grain, EXPLORATION.md sec The arms race) is explicitly NOT built yet -- it is a later wave, not BL-933/934/935's scope -- so this may resolve once that lands, but it is worth surfacing now rather than assuming a later wave will fix it silently.
-
-=== RESOLVED (Ben, 2026-09-13, live review): superseded by NR-855 -- wave 4 landed after this was filed and moved the reading materially. ===
-
-### NR-852 — OBSERVATION: BL-933/934/935's mechanics are verified by the aggregate sweep and a code review, not by direct per-mechanism harness assertions
-*observation · raised 2026-09-12 · from Wave 3 of sprint 40, main-session verification.*
-
-exploration_sim_harness gained direct assertions for BL-935 (R5.5-R5.9: port/navy/army funding and decay) but none for BL-933 (treaty formation, breaking, clause enforcement) or BL-934 (overlord link, subject wants, secession). Those two are exercised only through the aggregate exploration_sweep (readings 4-6: treaties form/break, subjects/overlords exist, tribute flows, contact-graph friction exists) and a manual code read in the main session (treaty_value_q's independent-scoring/no-bargaining shape, the sorted walk and tie-break, the non-aggression campaign-block site) -- both of which look sound, but neither is a repeatable, named assertion the way T5.x pins the scarcity signal's contact gate. A future change to treaty/colony logic could regress silently until the next full sweep, rather than failing a specific test.
-
-=== RESOLVED (Ben, 2026-09-13, live review): current sweep-plus-code-review coverage is enough for now; not filing a harness-coverage follow-up. ===
-
-### NR-853 — DECISION TAKEN: wave 3's three items landed as one commit, not three, after the fact
-*decision taken on your behalf · raised 2026-09-12 · from Wave 3 of sprint 40 (BL-933/934/935).*
-
-CLAUDE.md sec The Full lifecycle calls for one commit per item. The sub-agent building this wave found BL-933/934/935's code interleaved within the same shared functions (run_exploration_upkeep, the round loop's upkeep block) and judged that splitting after the fact risked committing an intermediate state that doesn't build -- so it landed one commit covering all three, clearly itemising each in the message body. Accepted as-is: the resolution field for each of the three backlog rows below points at the shared commit and names which parts are that item's own, which preserves the audit trail without a risky post-hoc split.
-
-### NR-854 — OBSERVATION: BL-934's trade-province-vs-subjected-polity split is a proxy, not the doc's literal two-object model
-*observation · raised 2026-09-12 · from BL-934, wave 3 of sprint 40.*
-
-EXPLORATION.md describes a trade province as a NEW seat planted on a native polity's coast (the native survives beside it) versus a subjected polity being the native polity itself, whole. The data model has no mechanism to spawn a new region/seat mid-sim, so `subject_kind` is instead DERIVED from whether the native's own capital seat already carries a port_q endowment (coastal -> trade-province reading, interior -> subjected-polity reading) -- the native polity itself is what gets the overlord link either way, never a literal new seat. This is called out in-code as 'the honest proxy available without a second, region-spawning placement pass', not presented as the literal model.
-
-=== RESOLVED (Ben, 2026-09-13, live review): keep the coastal/interior proxy -- it is fine. ===
-
-### NR-855 — OBSERVATION: BL-941's deterrence moved displacement from 0.01/0.16 to a median 0.88 -- real movement, still not over 1
-*observation · raised 2026-09-12 · from BL-941, wave 4 of sprint 40. Answers NR-851.*
-
-The Ceiling/Alarm pair, reused at polity grain and wired into treaty_value_q (near-home Alarm raises binding value; far-from-home gets a flat penalty instead), moved the 3-seed median displacement ratio from wave 3's 0.01 to 0.88 -- one seed alone (seed 1) crossed 1.0 (1.11, genuine displacement: frontier war rate exceeded neighbour war rate). This is the intended mechanism working, not a coincidence -- non-aggression-blocked campaigns stayed high (748,086 across 3 seeds) while the far/near cost gap this item was built to create is what moved the ratio, unlike wave 3's block alone which suppressed both sides evenly. Still <=1 on the spread median, so the harness's own bar (median must exceed 1 for the reading to pass) is not yet met -- this is closer, not done, and a wider seed sample (the 3-seed sweep was chosen for runtime, not statistical confidence) may show a different median.
-
-=== RESOLVED (Ben, 2026-09-13, live review): push further rather than accept as the resting state. BL-950 strengthens BL-941's deterrence mechanism and re-sweeps at 16 seeds. ===
-
-### NR-856 — OBSERVATION: BL-942's creed axes do not separate consolidator/expansionist strategies on a 3-seed sweep (0/3, per the doc's own instruction not to force it)
-*observation · raised 2026-09-12 · from BL-942, wave 4 of sprint 40.*
-
-Reading 3 ('both strategies pay'): across 3 seeds, the top-3-by-region-count realms included an expansionist-leaning creed in all 3 seeds and a consolidator-leaning creed in 0. EXPLORATION.md is explicit that if the creed axes (zeal/dominion/sea_legs_q) do not separate the two strategies, 'the fix is upstream [in the Empire phase], never a flag here' -- so this was NOT forced or re-weighted to produce a green reading. Two candidate explanations, neither ruled out: (1) 'top-3 by region count' as the strength metric may itself favour expansion-shaped growth regardless of creed, so a consolidator could be strong by another measure (treasury, throughput) and simply not show up in a region-count ranking; (2) the creed axes genuinely don't separate the strategies in the Empire phase's own output, which would be the doc's own named upstream-fix scenario. 3 seeds is also a small sample for this particular reading.
-
-=== RESOLVED (Ben, 2026-09-13, live review): change the ranking metric first. BL-951 moves reading 3 off region count onto treasury/throughput rank. ===
-
-### NR-857 — NOVEL WORK: BL-943's exemplars are wired but the Exploration span's own events never reach the lapse-map surface at all
-*novel-work · raised 2026-09-12 · from BL-943, wave 5 of sprint 40.*
-
-hard_coded_world.cpp's Exploration-span call (world_params::exploration_sim_enabled, still default false) never folds its result (kepler_exploration_hs) into prehistory_timelapse, which stays as_timelapse(hs) -- the EMPIRE-round state only. So today, no matter how BL-943's rendering is wired, the Exploration span's own events (Post Road promotions past tier 2, treaty formation/breaking, subject binding, the 1200 CE treasury consolidation) never reach the lapse map at all -- BL-943's consolidation-burst gate is correct code but permanently inert until this plumbing lands. The corridor-exemplar HALF of BL-943 is live and verified today regardless, because Track/Road promotions and cross-border trade-link opens already fire during the EMPIRE era (before Exploration even starts) -- confirmed by capture (history_lapse_press.lua, 0 failures, 375 road + 100 trade corridors baked, small diamond/dot marks visible on corridor lines under a 4x crop).
-
-=== RESOLVED (Ben, 2026-09-13, live review): wire it up now, plus a Digitisation placeholder round in the same pass. BL-946 does both. ===
-
-### NR-858 — OBSERVATION: BL-943's live click was not performed -- computer-use access to ProjectIo was denied; verified by capture instead, on Ben's own instruction
-*observation · raised 2026-09-12 · from BL-943, wave 5 of sprint 40, main-session verification.*
-
-The standing rule requires a live click for a UI requirement, not only a capture. request_access(['ProjectIo']) was denied by Ben. Ben's own instruction mid-session ('just use captures') supersedes the standing rule for this item: history_lapse_press.lua ran clean (0 failures) with real corridor data (375 road, 100 trade corridors) and a 4x crop of the capture shows small marks on corridor lines, matching the sub-agent's own zoomed-screenshot confirmation. This is real evidence the mechanism renders without crashing, but it is a capture, not a live press -- genuine legibility at native 1920x1080 scale (mark size/contrast, whether the road-rung distinction reads at a glance) is still an open judgement call for whoever next looks at it live.
-
-### NR-859 — OBSERVATION: BL-944's raised floor moved the Empire-span world_determinism digest (seedA/on 215542A35F26BAB8 -> 2F6FCCF705B49951)
-*observation · raised 2026-09-12 · from BL-944, wave 6 of sprint 40, main-session verification.*
-
-universal_creed_alien_penalty_q (200 -> 450) lives in the Empire-span creed-resolution code, not gated behind world_params::exploration_sim_enabled -- unlike every prior wave-2-through-5 change, so this is the first sprint-40 item to move the ordinary (non-Exploration) generated world at all. world_determinism still reports ALL PASS (0 failures): the harness checks same-seed determinism, not a fixed golden digest, so this is a reported movement, not a failure. seedA/on report also moved (battles 5890->5782, conquests 5209->5202, foundings 1062->1120). No golden file pins these specific digest strings, so nothing needs a --bless; this is purely a record for whoever next reads a world_determinism run and wonders why the number changed from an earlier session's notes.
 

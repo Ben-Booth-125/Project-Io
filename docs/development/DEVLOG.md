@@ -71,6 +71,13 @@ NR-867** — Ben authorises the world shape at Alarm 575, at the gentler 525, or
 **Filed for later:** BL-957 (world digest sees sentiment and roads), BL-959 (Empires corridor
 upgrade records its uses).
 
+**Authorised the same day (Ben, NR-867 and NR-865).** Alarm weight 575 -> **525**: displacement median
+1.33, battle rate 43.5/century, quiet seeds 4 -> 2 (9 and 14). **Authorised digest baseline:** seedA/on
+`49FB45407FF7C3C0`, seedB/on `728607C66CE6A4BE`, seedA/off `F9BF05466A631FF9`, 1960 `851FE345B2E37618`.
+`EXPLORATION.md` § A want points a campaign outward became § A want ranks a campaign: wants rank,
+deterrence, treaties and ports displace. BL-950 closed; sprint 41 complete. The release play build
+(`build_rel`) was rebuilt at 525 for Ben to watch the round live before the remaining five calls.
+
 ---
 
 ## 2026-09-12 — Sprint 40 (Exploration) closes in full: six waves, fifteen items, one new phase

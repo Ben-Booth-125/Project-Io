@@ -180,10 +180,10 @@
   {
    "id": "41",
    "theme": "Exploration trade",
-   "state": "gated",
-   "status_line": "GATED 2026-09-14 on Ben's authorisation of the wave's world shape (NR-867). Eight of nine items built, verified and merged (41e2f5c7); BL-950 closes when the authorisation lands.",
+   "state": "complete",
+   "status_line": "COMPLETE 2026-09-14. Nine items built and merged; the wave world shape authorised at Alarm 525 (NR-867); the wants claim weakened in EXPLORATION.md (NR-865).",
    "opened_date": "2026-09-14",
-   "closed_date": null,
+   "closed_date": "2026-09-14",
    "author": "Ben (2026-09-14: \"polish off the exploration phase\"; \"go for A then B ... build in a batch delivery\")",
    "goal": "Make the Exploration round do what EXPLORATION.md claims: goods flow between bound polities and that flow is what markets earn; wants point campaigns and subjection outward; spend is a choice that says something about the creed; the 1660 world crosses into world setup whole. Then tune the road rung and displacement against the integrated world, not the pre-trade one.",
    "planned": [

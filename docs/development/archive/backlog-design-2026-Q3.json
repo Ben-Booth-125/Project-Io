@@ -14151,6 +14151,49 @@
         "archived"
       ]
     },
+    "BL-950": {
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "resolution": "BUILT 2026-09-14 (sprint 41 wave 3, 41e2f5c7; authorised setting in the follow-up commit). Far penalty 700 grows frontier war; near-home Alarm weight 525 (Ben, NR-867, over the measured 575) keeps neighbour war from collapsing. 16 seeds: displacement median 0.08 at sprint start -> 1.33; battle rate 43.5/century; two seeds under 5/century. Authorised digests recorded in the DEVLOG.",
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": "41",
+      "written": "2026-09-13",
+      "author": "Ben (2026-09-13, live review); Claude (itemised from NR-855)",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "id": "BL-950",
+      "short_name": "DISPLACEMENT_CLEARS_THE_BAR",
+      "priority": "A",
+      "difficulty": 5,
+      "title": "Push the near/far cost split further so the displacement reading reliably clears its own bar",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "src/world/history_sim.cpp",
+        "tools/verify/exploration_sweep.cpp"
+      ],
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "blocked_on",
+        "parked",
+        "category",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "archived"
+      ]
+    },
     "BL-951": {
       "design": "@docs/development/archive/backlog-design-2026-Q3.json",
       "resolution": "BUILT 2026-09-14 (wave 1). Reading 3 ranks by capital treasury, tie-break mean held network_supply_q, with a region-count comparison. FINDING on 16 seeds at the sprint close: 0/16 seeds have a consolidator-leaning creed among the top 3 by treasury, 16/16 an expansionist -- the same as by region count. NR-864 records that the classifier compares a product lean to a mean lean, so the finding is not yet evidence about the creeds.",
