@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // exploration_sweep — BL-937. Run the Exploration span (1200 -> 1660 CE) over
-// a seed spread and report the TEN readings EXPLORATION.md sec "What the
+// a seed spread and report the ELEVEN readings EXPLORATION.md sec "What the
 // phase is judged on" names, all taken at 1660, all over the spread, NEVER
 // per world (the same distributional discipline history_sweep applies to the
 // Empire handoff).
@@ -43,6 +43,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -149,7 +150,55 @@ struct exploration_row
     int64_t treasury_spent_on_navies = 0;
     int64_t treasury_spent_on_ports  = 0;
     int64_t treasury_spent_on_standing_armies = 0;
+
+    // --- Reading 11: trade (BL-954) -----------------------------------------
+    int64_t flow_count            = 0;
+    int64_t flow_volume           = 0;
+    int64_t cross_landmass_volume = 0; ///< seller and buyer capitals on different landmasses.
+    int64_t unknown_landmass_volume = 0; ///< a capital tile that reads as water: landmass undefined.
+    int64_t flows_without_clause  = 0; ///< must be 0: every flow stands on a trade_access clause.
+    int64_t trade_bound_pairs     = 0; ///< distinct pairs holding trade_access at 1660.
+    std::vector<int64_t> pair_volume; ///< one per trade_access-bound pair, zero-flow pairs included.
 };
+
+/// LANDMASS IDENTITY for reading 11. `region::domain` only says land /
+/// coastal water / open ocean -- it carries no mass id, and `pass_one_output`
+/// says landmass identity is derived by a consumer. Derived here as the
+/// 4-connected components of non-water tiles over the sim's own terrain
+/// raster, columns wrapping (the map is a cylinder, history_sim.cpp's own
+/// distance helper). -1 on water.
+std::vector<int32_t> label_landmasses(const std::vector<terrain_substrate>& sub, int gw, int gh)
+{
+    std::vector<int32_t> mass(sub.size(), -1);
+    if (gw <= 0 || gh <= 0 || sub.size() < static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return mass;
+    int32_t next = 0;
+    std::vector<int> stack;
+    for (int start = 0; start < gw * gh; ++start)
+    {
+        if (mass[static_cast<std::size_t>(start)] >= 0 || is_water(sub[static_cast<std::size_t>(start)]))
+            continue;
+        mass[static_cast<std::size_t>(start)] = next;
+        stack.push_back(start);
+        while (!stack.empty())
+        {
+            const int idx = stack.back(); stack.pop_back();
+            const int c = idx % gw, r = idx / gw;
+            const int nb[4][2] = { {(c + 1) % gw, r}, {(c + gw - 1) % gw, r}, {c, r + 1}, {c, r - 1} };
+            for (const auto& n : nb)
+            {
+                if (n[1] < 0 || n[1] >= gh) continue;
+                const int ni = n[1] * gw + n[0];
+                if (mass[static_cast<std::size_t>(ni)] >= 0 || is_water(sub[static_cast<std::size_t>(ni)]))
+                    continue;
+                mass[static_cast<std::size_t>(ni)] = next;
+                stack.push_back(ni);
+            }
+        }
+        ++next;
+    }
+    return mass;
+}
 
 /// Century-scaled rate, avoiding a divide-by-zero span.
 double per_century(int64_t count, int64_t years)
@@ -355,6 +404,44 @@ int main(int argc, char** argv)
         }
         for (const polity& q : traced.polities)
             if (q.alive && q.navy_stock > 0) ++row.navy_holders;
+
+        // --- BL-954 -- reading 11, off the traced re-run's final round ----
+        {
+            const std::vector<int32_t> mass =
+                label_landmasses(fx.terrain.substrate, fx.gw, fx.gh);
+            const auto mass_of_capital = [&](int pid) -> int32_t {
+                if (pid < 0 || static_cast<std::size_t>(pid) >= traced.polities.size()) return -1;
+                const int cap = traced.polities[static_cast<std::size_t>(pid)].capital;
+                if (cap < 0 || static_cast<std::size_t>(cap) >= ss_copy.regions.size()) return -1;
+                const region& rg = ss_copy.regions[static_cast<std::size_t>(cap)];
+                if (rg.col < 0 || rg.row < 0 || rg.col >= fx.gw || rg.row >= fx.gh) return -1;
+                return mass[static_cast<std::size_t>(rg.row * fx.gw + rg.col)];
+            };
+
+            std::vector<std::pair<uint16_t, uint16_t>> bound;
+            for (const dated_object& o : traced.dated_objects)
+                if (o.kind == static_cast<int32_t>(treaty_clause::trade_access))
+                    bound.push_back({static_cast<uint16_t>(std::min(o.a, o.b)),
+                                     static_cast<uint16_t>(std::max(o.a, o.b))});
+            std::sort(bound.begin(), bound.end());
+            bound.erase(std::unique(bound.begin(), bound.end()), bound.end());
+            row.trade_bound_pairs = static_cast<int64_t>(bound.size());
+            row.pair_volume.assign(bound.size(), 0);
+
+            for (const trade_flow& f : traced.trade_flows)
+            {
+                ++row.flow_count;
+                row.flow_volume += f.volume_q;
+                const std::pair<uint16_t, uint16_t> key{std::min(f.seller, f.buyer),
+                                                        std::max(f.seller, f.buyer)};
+                const auto it = std::lower_bound(bound.begin(), bound.end(), key);
+                if (it == bound.end() || *it != key) ++row.flows_without_clause;
+                else row.pair_volume[static_cast<std::size_t>(it - bound.begin())] += f.volume_q;
+                const int32_t ms = mass_of_capital(f.seller), mb = mass_of_capital(f.buyer);
+                if (ms < 0 || mb < 0)  row.unknown_landmass_volume += f.volume_q;
+                else if (ms != mb)     row.cross_landmass_volume   += f.volume_q;
+            }
+        }
 
         row.ok = true;
         rows.push_back(row);
@@ -805,6 +892,63 @@ int main(int argc, char** argv)
                 ? "goods are weighted differently by different cultures on this spread."
                 : "every derived preference weighs the same -- no spread measured.");
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // READING 11 — TRADE (BL-954). "Flow crosses between polities on
+    // different landmasses, unevenly — some pairs carry most of it, most
+    // carry none — and every flow stands on a trade-access clause." Read off
+    // the traced re-run's `trade_flows`, which hold the span's FINAL decision
+    // round (flows are rebuilt each round, never accumulated).
+    // -----------------------------------------------------------------------
+    std::printf("\n--- reading 11: trade (flows at the final decision round) ---\n");
+    {
+        std::printf("%-6s %8s %10s %10s %10s %10s %12s\n",
+                    "seed", "flows", "volume", "cross-mass", "unk-mass", "tr-pairs", "pairs-w/flow");
+        int64_t flows = 0, volume = 0, cross = 0, unknown = 0, orphan = 0;
+        std::vector<int64_t> pooled_pairs;
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok) continue;
+            int64_t with_flow = 0;
+            for (int64_t v : r.pair_volume) if (v > 0) ++with_flow;
+            std::printf("%-6u %8lld %10lld %10lld %10lld %10lld %12lld\n", r.seed,
+                        static_cast<long long>(r.flow_count), static_cast<long long>(r.flow_volume),
+                        static_cast<long long>(r.cross_landmass_volume),
+                        static_cast<long long>(r.unknown_landmass_volume),
+                        static_cast<long long>(r.trade_bound_pairs), static_cast<long long>(with_flow));
+            flows += r.flow_count; volume += r.flow_volume; cross += r.cross_landmass_volume;
+            unknown += r.unknown_landmass_volume; orphan += r.flows_without_clause;
+            pooled_pairs.insert(pooled_pairs.end(), r.pair_volume.begin(), r.pair_volume.end());
+        }
+        std::printf("  total: flows=%lld volume=%lld  cross-landmass share=%.3f  "
+                    "(capital-on-water, landmass undefined: %.3f)\n",
+                    static_cast<long long>(flows), static_cast<long long>(volume),
+                    volume > 0 ? static_cast<double>(cross) / static_cast<double>(volume) : 0.0,
+                    volume > 0 ? static_cast<double>(unknown) / static_cast<double>(volume) : 0.0);
+
+        if (!pooled_pairs.empty() && volume > 0)
+        {
+            std::sort(pooled_pairs.begin(), pooled_pairs.end(), std::greater<int64_t>());
+            const std::size_t decile = std::max<std::size_t>(1, (pooled_pairs.size() + 9) / 10);
+            int64_t top = 0, zero = 0;
+            for (std::size_t k = 0; k < decile; ++k) top += pooled_pairs[k];
+            for (int64_t v : pooled_pairs) if (v == 0) ++zero;
+            std::printf("  %zu trade-access pairs pooled: top-decile (%zu pairs) share of volume=%.3f  "
+                        "pairs carrying none=%lld (%.3f)\n",
+                        pooled_pairs.size(), decile,
+                        static_cast<double>(top) / static_cast<double>(volume),
+                        static_cast<long long>(zero),
+                        static_cast<double>(zero) / static_cast<double>(pooled_pairs.size()));
+        }
+        else
+        {
+            std::printf("  no trade volume on this spread -- NOT MEASURED; report to Ben rather than "
+                        "re-tuning a weight silently.\n");
+        }
+        std::printf("  flows whose pair holds no trade_access clause at 1660: %lld\n",
+                    static_cast<long long>(orphan));
+        check(orphan == 0, "reading 11: every flow stands on a trade_access clause");
     }
 
     std::printf("\n%d failure(s) in structural checks.\n", g_failures);
