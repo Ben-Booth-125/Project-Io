@@ -430,16 +430,17 @@ BISECTED 2026-09-14 with exploration_sweep at four commits. Seeds 0-2: wave-4 cl
 
 *Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sweep.cpp`*
 
-### NR-863 — DECISION TAKEN: two calls made while writing the Exploration trade design into EXPLORATION.md
+### NR-863 — DECISION TAKEN: three calls made while writing and integrating the Exploration trade design
 *decision · raised 2026-09-14 · from Exploration trade batch, design-form follow-through (BL-953, BL-954).*
 
-Two things the form did not ask were written into the authority doc. (1) Outward wants lean campaigns and subjection ONLY, not settlement -- the form carried this question but it came back unanswered, so the recommended option was taken. (2) A trade flow earns BOTH ends (seller and buyer capitals), not the seller alone -- the form asked whether flow income replaces the flat market income (yes) but not who earns it.
+Two things the form did not ask were written into the authority doc. (1) Outward wants lean campaigns and subjection ONLY, not settlement -- the form carried this question but it came back unanswered, so the recommended option was taken. (2) A trade flow earns BOTH ends (seller and buyer capitals), not the seller alone -- the form asked whether flow income replaces the flat market income (yes) but not who earns it. (3) ADDED at integration, 2026-09-14, after the cold review: a seller's HOLDING is shared across its buyers, mirroring the buyer's want being shared across sellers. Without it a one-province farm city-state bound to five buyers exported five holdings' worth and earned five times over. The holding stays a per-mille SHARE of held ground, so a one-province holder and a hundred-province holder with the same share export the same volume -- that scale question is untouched.
 
 **Why it matters.** (2) decides whether being a buyer is ever profitable. Seller-only makes wealth flow to holders of scarce goods (a sharper resource asymmetry); both-ends makes any market on a busy line rich (a trading-hub asymmetry, and it keeps treasuries from collapsing for polities that hold little but sit on lines). Replacing the flat income with seller-only income would bankrupt most polities that hold no wanted good.
 
 - Keep both calls as written.
 - Seller-only income: a trade line enriches the holder, not the hub.
 - Let wants also lean settlement across water.
+- Make holding an absolute quantity (held regions dominant in the good, not a share), so a large realm out-exports a small one.
 
 > **Recommendation:** Keep both as written; revisit (2) from reading 8 (treasury spread) once BL-954 lands.
 
