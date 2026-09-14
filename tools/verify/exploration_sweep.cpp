@@ -19,13 +19,20 @@
 // job, and that is Ben's judgement to make off the printed table, not this
 // harness's to assert into a PASS/FAIL line.
 //
-// WHAT IS REAL AND WHAT IS SCAFFOLDING. Readings 1-2 (displacement,
-// conflict-persists) are computed off real sim output — BL-931's bare span
-// already produces battles tagged by attacker/defender polity, and the
-// directed contact table already says who had met whom by 1200. Readings
-// 3-10 have no mechanism yet (BL-932 through BL-942 land it wave by wave);
-// each still gets its row, printed as NOT YET MEASURABLE with the item that
-// owes it, so the gap is visible in the report rather than silently absent.
+// WHAT EACH READING IS READ OFF. Every one of the ten readings is computed
+// off real sim output. Readings 1-2 (displacement, conflict-persists) and
+// 3-7 read a traced, disposable re-run of the Exploration span (battle
+// traces, treaties, subjects, fleets, and the 1660 regions/cultures the
+// re-run leaves behind); readings 8-9 read the treasury/corridor state of
+// that re-run and of generation's own untraced run; reading 10 reads the
+// 1200 CE handoff state directly. Where a reading has no data on a spread it
+// says so in its own printed line (NOT MEASURED), never by a missing row.
+//
+// ONE GENERATION PER SEED (BL-952). `make_hard_coded_world` is the dominant
+// cost of this harness, so it is called exactly once per seed, in the main
+// loop, and everything any reading needs is captured onto `exploration_row`
+// there. The report sections below read `rows` only; none regenerates a
+// world. The `[gen budget]` line count therefore equals the seed count.
 //
 // Usage:  exploration_sweep [seed_count]      (default 8)
 // ---------------------------------------------------------------------------
@@ -149,6 +156,19 @@ struct exploration_row
     int64_t treasury_spent_on_navies = 0;
     int64_t treasury_spent_on_ports  = 0;
     int64_t treasury_spent_on_standing_armies = 0;
+
+    // --- Reading 3: both strategies pay -------------------------------------
+    bool strength_measured = false; ///< >= 2 living polities at the traced re-run's close.
+    bool top_has_consolidator = false;
+    bool top_has_expansionist = false;
+
+    // --- Reading 9: throughput, off generation's own (untraced) run ---------
+    std::vector<int32_t> corridor_uses;
+    int64_t post_roads_built        = 0;
+    int64_t treasury_spent_on_roads = 0;
+
+    // --- Reading 10: preference, off the 1200 CE handoff state --------------
+    std::vector<int16_t> preference_weights;
 };
 
 /// Century-scaled rate, avoiding a divide-by-zero span.
@@ -214,6 +234,26 @@ int main(int argc, char** argv)
         row.expl_conquests = fx.exploration_state.conquests;
         row.expl_foundings = fx.exploration_state.foundings;
         row.expl_years     = fx.exploration_state.years;
+
+        // --- Reading 9 capture: generation's own (untraced) run -------------
+        // `fx.exploration_state.supply_corridors`, finalised at that run's own
+        // close, and the two road-ladder counters BL-940 added.
+        for (const history_corridor& c : fx.exploration_state.supply_corridors)
+            row.corridor_uses.push_back(c.uses);
+        row.post_roads_built        = fx.exploration_state.post_roads_built;
+        row.treasury_spent_on_roads = fx.exploration_state.treasury_spent_on_roads;
+
+        // --- Reading 10 capture: the PRE-EXPLORATION handoff state ---------
+        // `derive_culture_preference` is pure and needs no traced re-run of
+        // its own — it takes the same regions/contacts/polities `derive_wants`
+        // already reads at 1200 CE. Taken BEFORE the traced re-run below so it
+        // reads the fixture exactly as generation left it.
+        {
+            const auto prefs = derive_culture_preference(
+                fx.pre_exploration_settlement.regions, fx.pre_exploration_contacts,
+                fx.pre_exploration_polities, static_cast<int>(fx.pre_exploration_creeds.cultures.size()));
+            for (const auto& p : prefs) row.preference_weights.push_back(p.weight_q);
+        }
 
         // --- THE TRACED RE-RUN (readings 1-2 need per-battle attacker/ -----
         // defender pairs, which only `battle_trace` carries, and tracing is
@@ -355,6 +395,39 @@ int main(int argc, char** argv)
         }
         for (const polity& q : traced.polities)
             if (q.alive && q.navy_stock > 0) ++row.navy_holders;
+
+        // --- Reading 3 capture, off the traced re-run's 1660 close ---------
+        // (`ss_copy`/`cs_copy` as the re-run left them). "Strongest" is read
+        // off HELD REGION COUNT at 1660.
+        {
+            std::vector<int64_t> region_count(traced.polities.size(), 0);
+            for (const region& r : ss_copy.regions)
+                if (r.nation >= 0 && static_cast<std::size_t>(r.nation) < region_count.size())
+                    ++region_count[static_cast<std::size_t>(r.nation)];
+
+            std::vector<int> alive_ids;
+            for (std::size_t p = 0; p < traced.polities.size(); ++p)
+                if (traced.polities[p].alive) alive_ids.push_back(static_cast<int>(p));
+            if (alive_ids.size() >= 2)
+            {
+                std::sort(alive_ids.begin(), alive_ids.end(), [&](int a, int b) {
+                    if (region_count[static_cast<std::size_t>(a)] != region_count[static_cast<std::size_t>(b)])
+                        return region_count[static_cast<std::size_t>(a)] > region_count[static_cast<std::size_t>(b)];
+                    return a < b; // explicit tie-break
+                });
+                const std::size_t top_n = std::min<std::size_t>(3, alive_ids.size());
+                for (std::size_t k = 0; k < top_n; ++k)
+                {
+                    const polity& p = traced.polities[static_cast<std::size_t>(alive_ids[k])];
+                    if (p.culture < 0 || static_cast<std::size_t>(p.culture) >= cs_copy.cultures.size()) continue;
+                    const culture& cu = cs_copy.cultures[static_cast<std::size_t>(p.culture)];
+                    const int cons = consolidator_lean_q(cu), expn = expansion_lean_q(cu);
+                    if (cons > expn) row.top_has_consolidator = true;
+                    else if (expn > cons) row.top_has_expansionist = true;
+                }
+                row.strength_measured = true;
+            }
+        }
 
         row.ok = true;
         rows.push_back(row);
@@ -508,33 +581,20 @@ int main(int argc, char** argv)
     // -----------------------------------------------------------------------
     // READING 9 — THROUGHPUT: corridors carrying materially different
     // volumes, with the road ladder visible in the difference (BL-940).
-    // Read off each seed's own (untraced, real) exploration run —
-    // `fx.exploration_state.supply_corridors`, finalised at that run's own
-    // close, and the two road-ladder counters BL-940 added.
+    // Read off each seed's own (untraced, real) exploration run, captured
+    // onto the row in the main loop.
     // -----------------------------------------------------------------------
     {
         std::vector<int32_t> uses;
         int64_t total_post_roads_built = 0, total_treasury_spent = 0;
         int seeds_with_post_road = 0;
-        for (int i = 0; i < seed_count; ++i)
+        for (const exploration_row& r : rows)
         {
-            // Re-derive nothing: `rows` does not keep the fixture, so this
-            // reading re-runs generation once more per seed, same cost class
-            // as the main loop above and paid once, at report time.
-            world_params wp2;
-            wp2.seed = static_cast<uint32_t>(i);
-            wp2.exploration_sim_enabled = true;
-            generation_report     rep2;
-            era_minus_one_fixture fx2;
-            const world w2 = make_hard_coded_world(wp2, &rep2, world_gen_config{},
-                                                   nullptr, nullptr, &fx2);
-            (void)w2;
-            if (!fx2.ran || !fx2.exploration_ran) continue;
-            for (const history_corridor& c : fx2.exploration_state.supply_corridors)
-                uses.push_back(c.uses);
-            if (fx2.exploration_state.post_roads_built > 0) ++seeds_with_post_road;
-            total_post_roads_built += fx2.exploration_state.post_roads_built;
-            total_treasury_spent   += fx2.exploration_state.treasury_spent_on_roads;
+            if (!r.ok) continue;
+            uses.insert(uses.end(), r.corridor_uses.begin(), r.corridor_uses.end());
+            if (r.post_roads_built > 0) ++seeds_with_post_road;
+            total_post_roads_built += r.post_roads_built;
+            total_treasury_spent   += r.treasury_spent_on_roads;
         }
 
         std::printf("\n--- reading 9: corridor throughput and the road ladder's third rung ---\n");
@@ -683,59 +743,13 @@ int main(int argc, char** argv)
     {
         int64_t seeds_measured = 0, seeds_with_consolidator_top = 0,
                 seeds_with_expansionist_top = 0, seeds_with_both = 0;
-        for (int i = 0; i < seed_count; ++i)
+        for (const exploration_row& r : rows)
         {
-            world_params wp3;
-            wp3.seed = static_cast<uint32_t>(i);
-            wp3.exploration_sim_enabled = true;
-            generation_report     rep3;
-            era_minus_one_fixture fx3;
-            const world w3 = make_hard_coded_world(wp3, &rep3, world_gen_config{},
-                                                   nullptr, nullptr, &fx3);
-            (void)w3;
-            if (!fx3.ran || !fx3.exploration_ran) continue;
-
-            history_sim_params ep3 = fx3.exploration_params;
-            ep3.resume_polities  = &fx3.pre_exploration_polities;
-            ep3.resume_grudges   = &fx3.pre_exploration_grudges;
-            ep3.resume_contacts  = &fx3.pre_exploration_contacts;
-            ep3.resume_corridors = &fx3.pre_exploration_corridors;
-            settlement_state ss3 = fx3.pre_exploration_settlement;
-            creed_state       cs3 = fx3.pre_exploration_creeds;
-            const history_sim_state traced3 = run_history_sim(
-                ss3, &cs3, fx3.terrain.view(), fx3.gw, fx3.gh, ep3,
-                fx3.exploration_seed, /*year_progress=*/nullptr, fx3.works, /*tap=*/nullptr);
-
-            std::vector<int64_t> region_count(traced3.polities.size(), 0);
-            for (const region& r : ss3.regions)
-                if (r.nation >= 0 && static_cast<std::size_t>(r.nation) < region_count.size())
-                    ++region_count[static_cast<std::size_t>(r.nation)];
-
-            std::vector<int> alive_ids;
-            for (std::size_t p = 0; p < traced3.polities.size(); ++p)
-                if (traced3.polities[p].alive) alive_ids.push_back(static_cast<int>(p));
-            if (alive_ids.size() < 2) continue;
-            std::sort(alive_ids.begin(), alive_ids.end(), [&](int a, int b) {
-                if (region_count[static_cast<std::size_t>(a)] != region_count[static_cast<std::size_t>(b)])
-                    return region_count[static_cast<std::size_t>(a)] > region_count[static_cast<std::size_t>(b)];
-                return a < b; // explicit tie-break
-            });
-            const std::size_t top_n = std::min<std::size_t>(3, alive_ids.size());
-
-            bool has_cons = false, has_expn = false;
-            for (std::size_t k = 0; k < top_n; ++k)
-            {
-                const polity& p = traced3.polities[static_cast<std::size_t>(alive_ids[k])];
-                if (p.culture < 0 || static_cast<std::size_t>(p.culture) >= cs3.cultures.size()) continue;
-                const culture& cu = cs3.cultures[static_cast<std::size_t>(p.culture)];
-                const int cons = consolidator_lean_q(cu), expn = expansion_lean_q(cu);
-                if (cons > expn) has_cons = true;
-                else if (expn > cons) has_expn = true;
-            }
+            if (!r.ok || !r.strength_measured) continue;
             ++seeds_measured;
-            if (has_cons) ++seeds_with_consolidator_top;
-            if (has_expn) ++seeds_with_expansionist_top;
-            if (has_cons && has_expn) ++seeds_with_both;
+            if (r.top_has_consolidator) ++seeds_with_consolidator_top;
+            if (r.top_has_expansionist) ++seeds_with_expansionist_top;
+            if (r.top_has_consolidator && r.top_has_expansionist) ++seeds_with_both;
         }
         std::printf("  seeds measured=%lld  top-3-by-regions include a consolidator-leaning "
                     "creed=%lld  include an expansionist-leaning creed=%lld  BOTH present=%lld\n",
@@ -752,34 +766,20 @@ int main(int argc, char** argv)
     // -----------------------------------------------------------------------
     // READING 10 — PREFERENCE (BL-936). Goods wanted differently by
     // different cultures, with the difference traceable to route. Read off
-    // the PRE-EXPLORATION handoff state directly (`derive_culture_preference`
-    // is pure and needs no traced re-run of its own — it takes the same
-    // regions/contacts/polities `derive_wants` already reads at 1200 CE).
+    // the PRE-EXPLORATION handoff state, captured onto the row in the main
+    // loop (`derive_culture_preference` over the 1200 CE fixture).
     // -----------------------------------------------------------------------
     std::printf("\n--- reading 10: preference (goods wanted differently by culture, by route) ---\n");
     {
         int64_t total_entries = 0, seeds_with_spread = 0, seeds_measured = 0;
         std::vector<int16_t> weights;
-        for (int i = 0; i < seed_count; ++i)
+        for (const exploration_row& r : rows)
         {
-            world_params wp4;
-            wp4.seed = static_cast<uint32_t>(i);
-            wp4.exploration_sim_enabled = true;
-            generation_report     rep4;
-            era_minus_one_fixture fx4;
-            const world w4 = make_hard_coded_world(wp4, &rep4, world_gen_config{},
-                                                   nullptr, nullptr, &fx4);
-            (void)w4;
-            if (!fx4.ran || !fx4.exploration_ran) continue;
+            if (!r.ok) continue;
             ++seeds_measured;
 
-            const auto prefs = derive_culture_preference(
-                fx4.pre_exploration_settlement.regions, fx4.pre_exploration_contacts,
-                fx4.pre_exploration_polities, static_cast<int>(fx4.pre_exploration_creeds.cultures.size()));
-
-            total_entries += static_cast<int64_t>(prefs.size());
-            std::vector<int16_t> seed_weights;
-            for (const auto& p : prefs) seed_weights.push_back(p.weight_q);
+            total_entries += static_cast<int64_t>(r.preference_weights.size());
+            const std::vector<int16_t>& seed_weights = r.preference_weights;
             if (!seed_weights.empty())
             {
                 const auto mm = std::minmax_element(seed_weights.begin(), seed_weights.end());
