@@ -3194,8 +3194,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             break;
                         }
                     }
-                    if (found_a >= 0)
-                        try_build_post_road(found_a, found_b, q.capital);
+                    if (found_a >= 0 && try_build_post_road(found_a, found_b, q.capital))
+                    {
+                        if (out.post_roads_by_polity.size() <= static_cast<std::size_t>(q.id))
+                            out.post_roads_by_polity.resize(static_cast<std::size_t>(q.id) + 1, 0);
+                        ++out.post_roads_by_polity[static_cast<std::size_t>(q.id)];
+                    }
                 }
             }
 
@@ -4131,6 +4135,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // run is byte-identical with tracing on or off.
             int      best_p_win_q = 0;
             int      best_hub     = -1;
+            int      best_dclass  = 0; // BL-950 diagnostic, trace only.
             // Sprint 28 lane A instrumentation, ALSO READ ONLY BY THE TRACE.
             // The best Campaign score that cleared `campaign_threshold_q` this
             // round, kept separately from `best_score` because `best_score` is
@@ -4208,6 +4213,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const std::size_t ti = static_cast<std::size_t>(tn);
                     const int to = owner[ti];
                     if (to == q.id || to < 0) continue;
+                    // BL-950 DIAGNOSTIC (trace only): is the target's owner a
+                    // pre-span neighbour (0), met during the span (1) or unmet
+                    // (2)? Read by nothing in the sim.
+                    const int dclass = params.trace_battles
+                        ? [&]() {
+                              const int64_t fy = contact_first_year(out, q.id, to);
+                              return fy == INT64_MAX ? 2 : (fy < params.start_year ? 0 : 1);
+                          }()
+                        : 0;
+                    if (params.trace_battles) ++out.campaign_class_trace[dclass][0];
                     // BL-933 -- A BOUND NON-AGGRESSION CLAUSE MAKES A
                     // CAMPAIGN ILLEGAL, not merely costly, exactly like the
                     // water gate just below (EXPLORATION.md sec What a
@@ -4217,6 +4232,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (has_treaty_clause(out, q.id, to, treaty_clause::non_aggression))
                     {
                         ++out.treaty_blocked_campaigns;
+                        if (params.trace_battles) ++out.campaign_class_trace[dclass][1];
                         continue;
                     }
                     if (params.trace_battles) ++out.campaign_contacts;
@@ -4240,6 +4256,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                      && !can_field_naval(ss.regions[static_cast<std::size_t>(hi)], mil_band))
                     {
                         ++out.illegal_campaigns;
+                        if (params.trace_battles) ++out.campaign_class_trace[dclass][2];
                         continue;
                     }
                     // Forage is the SAME reading: fed on one's own ground or
@@ -4379,6 +4396,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (forages && supply_here <= params.sustainable_campaign_floor_q)
                     {
                         ++out.reach_denied_campaigns;
+                        if (params.trace_battles) ++out.campaign_class_trace[dclass][3];
                         continue;
                     }
 
@@ -4623,6 +4641,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (params.trace_battles && s >= params.campaign_threshold_q)
                         {
                             ++out.campaign_cleared;
+                            ++out.campaign_class_trace[dclass][4];
                             campaign_cleared_now = true;
                             if (s > best_campaign_score) best_campaign_score = s;
                         }
@@ -4632,6 +4651,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             best_score = s; best_verb = sim_verb::campaign;
                             best_target = static_cast<int>(ti); best_winter = winter;
                             best_p_win_q = p_win_q; best_hub = hi; // trace only
+                            best_dclass = dclass;                  // trace only
                         }
                     }
                 }
@@ -5056,6 +5076,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             case sim_verb::campaign:
             {
                 if (params.trace_battles) ++out.campaign_chosen;
+                if (params.trace_battles) ++out.campaign_class_trace[best_dclass][5];
                 const std::size_t ti = static_cast<std::size_t>(best_target);
                 region& tgt = ss.regions[ti];
 

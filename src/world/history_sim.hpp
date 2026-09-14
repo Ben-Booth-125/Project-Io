@@ -662,14 +662,22 @@ struct history_sim_params
 
     /// Treasury spent (BL-932's `region::treasury`, NEVER `material_stock`)
     /// to promote one corridor from Road (tier 2) to Post Road (tier 3), once
-    /// the spending polity holds EX-WY-1a. A FIRST CUT on the same footing as
-    /// the treasury income weights above — a measurement owed from
-    /// `exploration_sweep`, not a guess dressed up as one. Read only when
+    /// the spending polity holds EX-WY-1a. MEASURED (BL-949, exploration_sweep
+    /// 16 seeds, 2026-09-14, after a resumed span began seeding its live
+    /// corridor counts): seeds with a post road / total bought at 3,000 15/69,
+    /// 100,000 15/69, 1,000,000 15/67, 3,000,000 15/61, 10,000,000 15/46,
+    /// 30,000,000 12/28, 100,000,000 9/15, 300,000,000 3/3. Up to 10M the
+    /// treasury gates nothing -- the purchase is decided by holding EX-WY-1a
+    /// and an internal Road, and the price is noise against capital
+    /// treasuries in the tens of millions. 30M is the first swept value at
+    /// which the bill refuses a real share of would-be builders while a clear
+    /// majority of worlds still buy one (median living capital treasury at
+    /// the close is ~1-8M, so only a rich seat affords it). Read only when
     /// `exploration_upkeep_enabled` is set (BL-931's own default-off
     /// discipline), so the Empire span and every fixture that never opts in
     /// is untouched regardless of this field's value; zero disables the
     /// purchase even where upkeep runs.
-    int64_t post_road_treasury_cost = 3000;
+    int64_t post_road_treasury_cost = 30000000;
 
     /// BL-942 — TWO WAYS TO BE STRONG. Per-mille weight applied to the creed-
     /// derived lean (`consolidator_lean_q`/`expansion_lean_q`, history_sim.cpp)
@@ -2718,6 +2726,12 @@ struct history_sim_state
     ///   - scored > 0 but `campaign_chosen` 0 -> the scorer sees war and prefers
     ///     something else every time. That is a threshold/weighting question.
     int64_t campaign_contacts = 0; ///< (own region, foreign-owned neighbour) pairs examined.
+    /// BL-950 DIAGNOSTIC, trace only: campaign candidates by the target owner's
+    /// contact class -- [0] met before the span, [1] met during it, [2] unmet --
+    /// and by gate: [0] examined, [1] treaty-blocked, [2] water-illegal,
+    /// [3] reach-denied, [4] season scores clearing the threshold, [5] chosen.
+    /// Read by nothing in the sim.
+    int64_t campaign_class_trace[3][6] = {};
     int64_t campaign_scored   = 0; ///< Candidates that reached the score comparison.
     int64_t campaign_chosen   = 0; ///< Rounds where Campaign won the verb choice.
 
@@ -3057,6 +3071,10 @@ struct history_sim_state
     /// EX-WY-1a in this seed", the same split `supply_sites_upgraded` makes.
     int64_t post_roads_built           = 0;
     int64_t treasury_spent_on_roads    = 0;
+    /// BL-949: post roads bought per polity id (grown on demand, so a polity
+    /// past the end bought none). Lets a sweep ask whether the spend tracks
+    /// the polities that built rather than only the world total.
+    std::vector<int32_t> post_roads_by_polity;
 
     // --- BL-933/934/935 sweep counters --------------------------------------
 
