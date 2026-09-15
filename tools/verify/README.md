@@ -1033,8 +1033,12 @@ node tools/verify/build_harness.js deposit_origin --run
 ./build_gen/verify/deposit_origin.exe [seeds]      # default 4
 ```
 
-It does **not** claim the life half is derived from the past — it is still drawn from present cover.
-That is the seam, not the crossing of it.
+D6 is the crossing of the seam: the same body generated with the drift record withheld must place
+coal and petroleum **elsewhere** (presence moves). **D6b** (BL-961) is its interior twin: with the
+drift record kept and only Planetology's `thermal_series` withheld, the fossil **magnitudes** must
+differ while presence does not — the series moves by about a percent over the record's depth and
+the check is sized to that honestly rather than to a swing the physics does not give. D7/D8 hold
+the world to still feeding and fuelling itself after the split.
 
 ## continent_drift — BL-763/BL-764, the drift time axis and the Lagrangian frame
 

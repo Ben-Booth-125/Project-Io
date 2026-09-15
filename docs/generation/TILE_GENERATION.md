@@ -527,6 +527,17 @@ after land is colonised, so the oil epoch is never shallower than the coal epoch
 the same body. Depth is **clamped** at the record's stated span rather than
 extrapolated past it (CONTINENTS.md § The drift clock).
 
+**The interior is read at the epoch too.** The basin half of the coal term and the
+shelf half of the oil term are both subsidence, and subsidence is driven by the thermal
+budget — S7 spends that budget on the coal window as a present-day scalar. The pre-pass
+scales each belt term by the epoch's budget relative to today's, read from
+`planetology_state::thermal_series` at the coal and oil epochs
+([PLANETOLOGY.md](PLANETOLOGY.md) § The thermal series). Heat only falls, so the factor
+is ≥ 1 and small — about a percent across the record's depth — and it is a
+**magnitude** term, never a presence one: *where* the seams are is the drift record's
+call, *how much* stacked there is the interior's. A missing series reads the present,
+exactly as a missing drift record does.
+
 **A body with no drift history reads the present, and that is the correct answer**
 rather than a degraded one. A stagnant lid never moved, and a body generated with no
 continents result has no plate set to wind back; in both cases every palaeo answer

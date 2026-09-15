@@ -261,6 +261,32 @@ measured: acceptance fell 78.5% → 60.2% and 69% of rejects became Mat Worlds. 
 properly needs an epoch-relative threshold, which is a calibration pass, not an edit — BL-301
 (GOE epoch-relative calibration); see NR-046.
 
+#### The thermal series — the same reconstruction, stored for the Life phase
+
+`theta_at` is a lambda inside the chain and is deliberately not exported. What the chain
+**does** export is its answer on the drift clock: `planetology_state::thermal_series`, one
+value per drift epoch ([CONTINENTS.md](CONTINENTS.md) § The drift clock — 5 My per epoch, to a
+depth of 20), so the vector is `continent_drift_epochs + 1` long with the present at index 0
+and the deepest epoch last. Three properties define it, and `planetology_harness` R15 asserts
+each:
+
+- **Index 0 is the present, bit for bit** — assigned from `theta`, never recomputed, because
+  `a + (theta − a)` is not guaranteed to round back to `theta` when the tidal term dominates.
+  Every deeper entry hangs off that identity.
+- **Derived, not rolled.** Each deeper entry is `theta_at(age − k × 5 My)`: the radiogenic term
+  re-evaluated at the epoch, the tidal term carried across unscaled. The series consumes no
+  RNG, so adding it moved no stream.
+- **Heat only falls**, so the series is monotone non-decreasing with depth. Over the record's
+  100 My the radiogenic term moves by about a percent (Kepler: ×1.019 at epoch 20), and the
+  series states that honestly rather than inventing a swing.
+
+A stripped core never runs the Engine and carries a full-length, all-cold series, so every state
+has one shape on the wire; the series is serialised with the rest of the state because the
+Generation Ledger replays a body's tiles from the saved record. Its consumer is the Life phase's
+palaeo pre-pass ([TILE_GENERATION.md](TILE_GENERATION.md) § Pass 6, *Fossils read the PAST*),
+which reads the subsidence the coal and oil epochs actually had instead of today's. BL-961
+(planetology thermal series) owns the design.
+
 The **C1 rejection census** (`tools/verify/planetology_sweep.cpp`) is the instrument for this:
 it measures *which floor clause* rejects each homeworld, so a preference that is expensive for
 a modelling reason ("cold and old" judged on heat the world only lost *after* the gate) shows up

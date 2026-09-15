@@ -566,6 +566,21 @@ struct planetology_state
     bool  mobile_lid          = false;///< Plate tectonics — gates porphyry copper.
     bool  core_exposed        = false;
 
+    /// THE THERMAL HISTORY, one value per drift epoch (BL-961). `[k]` is the
+    /// thermal budget as it stood `k` drift epochs before the present, on the
+    /// same clock the drift record keeps (`continent_epoch_years`, 5 My), so
+    /// the vector is `continent_drift_epochs + 1` long: the present at `[0]` —
+    /// bit-identical to `theta`, which is what lets a consumer treat the two as
+    /// one number — then one entry per epoch out to the record's stated depth.
+    /// DERIVED, NOT ROLLED: the same reconstruction the chain's own gates use
+    /// (`theta_at` — the radiogenic term re-evaluated at the age, the tidal term
+    /// carried across unscaled), consuming no RNG, so adding it moved no stream.
+    /// Over the 100 My the record spans the radiogenic term moves by about a
+    /// percent, and the series says so honestly rather than inventing a swing;
+    /// its consumer is the Life phase's palaeo pre-pass, which reads the
+    /// subsidence the coal and oil epochs actually had instead of today's.
+    std::vector<float> thermal_series;
+
     /// The DERIVED solar parameters. This is the narrow waist: Planetology's
     /// minimum viable output is that these six stop being hand-authored literals
     /// in make_hard_coded_world().

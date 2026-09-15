@@ -2123,6 +2123,31 @@ std::vector<entity_id> generate_body_tiles(
             if (oil_epoch < coal_epoch) oil_epoch = coal_epoch;
         }
 
+        // BL-961 — THE INTERIOR AS IT STOOD THEN. The basin half of the coal
+        // term and the shelf half of the oil term are both subsidence, and
+        // subsidence is driven by the thermal budget; S7 spends that budget on
+        // the coal window as a present-day scalar, and until now this pass did
+        // the same, implicitly. Planetology's thermal series carries theta at
+        // every drift epoch on the drift clock, so the two terms are scaled by
+        // the epoch's own budget relative to today's. Heat only falls, so the
+        // ratio is >= 1 and small — about a percent over the record's whole
+        // depth — and it is stated as that rather than inflated: the series
+        // is honest about how little the interior moved in 100 My, and the
+        // answer is now read from the record instead of proxied from the present.
+        // A missing series (or a dead interior) reads the present, exactly as a
+        // missing drift record does — the honest degraded answer, not a guess.
+        float coal_thermal = 1.0f, oil_thermal = 1.0f;
+        if (pl && !pl->thermal_series.empty() && pl->thermal_series[0] > 0.0f)
+        {
+            const auto at = [&](int epoch) {
+                const std::size_t k = static_cast<std::size_t>(
+                    std::clamp(epoch, 0, static_cast<int>(pl->thermal_series.size()) - 1));
+                return pl->thermal_series[k] / pl->thermal_series[0];
+            };
+            coal_thermal = at(coal_epoch);
+            oil_thermal  = at(oil_epoch);
+        }
+
         // A null continents result leaves the ground stationary at every epoch —
         // `paleo_tile_at` with an empty plate set returns the present, which is
         // the honest answer for a body with no drift history rather than a
@@ -2140,8 +2165,10 @@ std::vector<entity_id> generate_body_tiles(
                 const paleo_tile_state oil_past =
                     paleo_tile_at(cs, gw, gh, col, row, oil_epoch, profile.temperature, &moisture);
                 const float h = height[static_cast<std::size_t>(idx)];
-                sites[static_cast<std::size_t>(idx)].coal_belt = coal_belt_of(coal_past, h <= swamp_cut);
-                sites[static_cast<std::size_t>(idx)].oil_belt  = oil_belt_of(oil_past, h <= marine_cut);
+                sites[static_cast<std::size_t>(idx)].coal_belt =
+                    coal_belt_of(coal_past, h <= swamp_cut) * coal_thermal;
+                sites[static_cast<std::size_t>(idx)].oil_belt  =
+                    oil_belt_of(oil_past, h <= marine_cut) * oil_thermal;
             }
     }
 
