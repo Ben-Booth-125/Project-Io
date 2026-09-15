@@ -721,7 +721,22 @@ identity.
 
 `generate_body_tiles()` takes an optional `generation_record*`. When non-null it
 captures the per-pass intermediates (heightmap, ocean score and threshold, moisture,
-latitude bands). The common path passes `nullptr` and pays nothing. Generation is
+latitude bands). The common path passes `nullptr` and receives nothing. Generation is
 deterministic, so this is the seam the **Generation Ledger**
 (`GENERATION_LEDGER.md`) reads to explain *why* a tile turned out as it did; what the
 record does and does not attribute is in GENERATION_LEDGER.md § The data seam.
+
+**The record is also the seam between the generator's two halves** (BL-965, the
+Body/Life split). `generate_body_tiles()` is `generate_body_surface()` — Passes 1–5
+with 4b–4e and the Body phase of Pass 6, which creates the tiles — followed by
+`generate_life_deposits_over()` — the palaeo pre-pass, the ore-field pre-pass and the
+Life phase of Pass 6, which writes the deposit arrays. The whole is bit-identical to
+running them as one function. The record carries what the Life half can neither read
+off a tile nor re-derive from the seed: the Body phase's raw deposit per tile and the
+endemic amounts it drew. The endemic draw sits on the Body side of the cut for the
+reason § Pass 6 gives — it is taken on `tile_rng` between the deposit block and the
+environment jitter, and that stream cannot be re-cut — so the Body half *draws* it and
+the Life half *places* it. The Life half reads its inputs and writes only the two
+deposit arrays and `life_phase_placed`, so it can be re-run over the same tiles and
+record as often as a Life-phase rule changes; the census harness's `--life-only` mode
+is that loop, in-process, with no on-disk form of the seam.

@@ -37,12 +37,23 @@
 // rest of the census stays report-only, and the sweep count stays at 120: the
 // harness prints its own wall-clock so the cost of the gate is on the record.
 //
-// Run: earthlike_tile_census [seeds]      (default 120)
+// Run: earthlike_tile_census [seeds] [--life-only]      (default 120)
 //
 // Default sized against the 60 s CTest cap, not against statistical taste: each
 // seed costs up to seven full tile generations (six sea-gate probes plus the
 // accepted one), which measured ~0.36 s/seed. Pass a bigger number by hand when
 // reading the distribution properly.
+//
+// --life-only (BL-965). The generator is two halves with the generation_record
+// as the seam (generate_body_surface / generate_life_deposits_over). In this
+// mode each seed is generated in full ONCE, the Body half is kept in memory, and
+// the Life half is then re-run over it by the re-entry; the census is measured
+// off the re-run, every deposit on every tile is checked bit-for-bit against
+// the full run, and the wall-clock of the re-run is printed as a ratio against
+// both the whole per-seed census and the one accepted generation. In-process
+// reuse only: there is no on-disk form of the seam, so the first run of a
+// process always pays the Body half. What the ratio measures is what a tuning
+// loop that keeps the process alive would save on each Life-phase change.
 
 #include "world/continents.hpp"
 #include "world/planetology.hpp"
@@ -53,8 +64,10 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 
 namespace {
@@ -197,14 +210,66 @@ float pct(std::vector<float> v, float q)
     return v[k];
 }
 
-seed_metrics census_one(uint32_t campaign_seed)
+/// One seed's accepted surface, kept whole so the Life half can be re-run over
+/// it (BL-965). Everything the re-entry needs is here: the world holding the
+/// tiles, their raster ids, the record (the seam), and the inputs the Body half
+/// was given. Built per seed and dropped after it — 120 of these at once would
+/// be over a gigabyte, and the re-run needs only one at a time.
+struct seed_surface
+{
+    planetology_state st;
+    continent_state   cs;
+    uint32_t          chosen_seed = 0;
+    world             w;
+    std::vector<entity_id> ids;
+    generation_record rec;
+    double            gen_s = 0.0; ///< Wall-clock of the accepted full generation alone.
+};
+
+/// FNV-1a over every tile's two deposit arrays in raster order — the whole of
+/// what the Life half writes. Equal digests mean the re-run reproduced the full
+/// run to the bit, not merely to the census's four rows.
+std::uint64_t deposit_digest(const seed_surface& s)
+{
+    std::uint64_t h = 1469598103934665603ull;
+    auto mix = [&](const void* p, std::size_t n) {
+        const unsigned char* b = static_cast<const unsigned char*>(p);
+        for (std::size_t i = 0; i < n; ++i) { h ^= b[i]; h *= 1099511628211ull; }
+    };
+    for (entity_id id : s.ids)
+    {
+        const auto& t = s.w.tiles.at(id);
+        mix(t.resource_deposit.data(),   sizeof(float) * t.resource_deposit.size());
+        mix(t.resource_remaining.data(), sizeof(float) * t.resource_remaining.size());
+    }
+    return h;
+}
+
+/// Bearing-tile counts for the two fossils — the "fossil counts" the item names,
+/// read directly rather than through the concentration rows.
+void fossil_counts(const seed_surface& s, int& coal_tiles, int& oil_tiles)
+{
+    coal_tiles = 0; oil_tiles = 0;
+    for (entity_id id : s.ids)
+    {
+        const auto& t = s.w.tiles.at(id);
+        if (t.resource_deposit[static_cast<std::size_t>(resource_type::coal)]      > 0.0f) ++coal_tiles;
+        if (t.resource_deposit[static_cast<std::size_t>(resource_type::petroleum)] > 0.0f) ++oil_tiles;
+    }
+}
+
+/// Run the whole shipped pipeline for one seed — planetology, continents, the
+/// sea gate, the accepted generation, rivers — into @p s.
+void build_surface(uint32_t campaign_seed, seed_surface& s)
 {
     const resolved_world rw = resolve_preferences(world_preferences{}, campaign_seed);
     body_inputs home = prototype_body(1);
     home.orbit_au = rw.home_orbit_au;
     const uint32_t body_seed = campaign_seed ^ prototype_body_seed(1);
-    const planetology_state st = run_planetology(home, rw.params, body_seed);
-    const continent_state cs = run_continents(st, gw, gh, body_seed ^ 0xC0117E57u);
+    s.st = run_planetology(home, rw.params, body_seed);
+    s.cs = run_continents(s.st, gw, gh, body_seed ^ 0xC0117E57u);
+    const planetology_state& st = s.st;
+    const continent_state&   cs = s.cs;
 
     // --- BL-276 two-bar sea gate, mirrored from hard_coded_world.cpp ---------
     auto probe_sea = [&](uint32_t tile_seed)
@@ -242,16 +307,32 @@ seed_metrics census_one(uint32_t campaign_seed)
         if (!have_arena && have_floor) chosen_seed = floor_seed;
     }
 
-    world w;
-    const entity_id fb = w.create_entity();
-    generation_record rec;
-    const std::vector<entity_id> ids = generate_body_tiles(w, fb, gw, gh, st.profile,
-        chosen_seed, 1.0f, &st, &rec, &cs.height_bias, &cs.convergent, &cs);
+    s.chosen_seed = chosen_seed;
+    const entity_id fb = s.w.create_entity();
+    const auto g0 = std::chrono::steady_clock::now();
+    s.ids = generate_body_tiles(s.w, fb, gw, gh, st.profile,
+        chosen_seed, 1.0f, &st, &s.rec, &cs.height_bias, &cs.convergent, &cs);
+    s.gen_s = std::chrono::duration<double>(std::chrono::steady_clock::now() - g0).count();
 
     // Rivers are a SIBLING pass (BL-051 convention), not part of the six — so a
     // harness that calls generate_body_tiles alone measures a world with no
     // rivers at all. Mirrors hard_coded_world.cpp's call, seed included.
-    generate_rivers(w, ids, gw, gh, rec.height, campaign_seed ^ 0x52490001u);
+    generate_rivers(s.w, s.ids, gw, gh, s.rec.height, campaign_seed ^ 0x52490001u);
+}
+
+/// The Life half again, over the surface build_surface left (BL-965). The same
+/// arguments the full generation was given, minus the ones the Body half
+/// consumed; rivers are not re-run because the Life half does not touch them.
+void rerun_life(seed_surface& s)
+{
+    generate_life_deposits_over(s.w, s.ids, s.rec, s.st.profile, s.chosen_seed,
+                                1.0f, &s.st, &s.cs.convergent, &s.cs);
+}
+
+seed_metrics measure(const seed_surface& s)
+{
+    const world& w = s.w;
+    const std::vector<entity_id>& ids = s.ids;
 
     // --- measure -------------------------------------------------------------
     std::vector<char> land(static_cast<std::size_t>(k_cells), 0);
@@ -387,9 +468,16 @@ void report_full(const char* name, const std::vector<float>& v)
 
 int main(int argc, char** argv)
 {
-    const int n = (argc > 1) ? std::atoi(argv[1]) : 120;
+    int  n = 120;
+    bool life_only = false;
+    for (int i = 1; i < argc; ++i)
+    {
+        if (std::strcmp(argv[i], "--life-only") == 0) life_only = true;
+        else n = std::atoi(argv[i]);
+    }
 
-    std::printf("=== Earth-like tile census: %d campaign seeds through Kepler's pipeline ===\n", n);
+    std::printf("=== Earth-like tile census: %d campaign seeds through Kepler's pipeline%s ===\n",
+                n, life_only ? " (--life-only: measured off the Life-half re-run)" : "");
     std::printf("Grid %dx%d. Percentages of LAND unless stated. Report-only, except the\n"
                 "ORE FIELDS concentration rows, which are asserted in bands (BL-966).\n\n",
                 gw, gh);
@@ -400,7 +488,45 @@ int main(int argc, char** argv)
     const auto t0 = std::chrono::steady_clock::now();
     std::vector<seed_metrics> all;
     all.reserve(static_cast<std::size_t>(n));
-    for (int s = 0; s < n; ++s) all.push_back(census_one(static_cast<uint32_t>(s)));
+
+    // --life-only bookkeeping (BL-965). `full_s` is the whole per-seed census
+    // (planetology, continents, six probes, the accepted generation, rivers);
+    // `gen_s` the accepted generate_body_tiles alone; `life_s` the re-entry.
+    double full_s = 0.0, gen_s = 0.0, life_s = 0.0;
+    int digest_mismatches = 0, fossil_mismatches = 0;
+
+    for (int s = 0; s < n; ++s)
+    {
+        seed_surface surf;
+        const auto f0 = std::chrono::steady_clock::now();
+        build_surface(static_cast<uint32_t>(s), surf);
+        full_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - f0).count();
+        gen_s  += surf.gen_s;
+
+        if (!life_only)
+        {
+            all.push_back(measure(surf));
+            continue;
+        }
+
+        // The full run's answer, then the re-run's, compared on everything the
+        // Life half writes and on the two fossil counts by name.
+        const std::uint64_t digest_full = deposit_digest(surf);
+        int coal_full = 0, oil_full = 0;
+        fossil_counts(surf, coal_full, oil_full);
+
+        const auto l0 = std::chrono::steady_clock::now();
+        rerun_life(surf);
+        life_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - l0).count();
+
+        const std::uint64_t digest_life = deposit_digest(surf);
+        int coal_life = 0, oil_life = 0;
+        fossil_counts(surf, coal_life, oil_life);
+        if (digest_life != digest_full) ++digest_mismatches;
+        if (coal_life != coal_full || oil_life != oil_full) ++fossil_mismatches;
+
+        all.push_back(measure(surf));
+    }
     const double sweep_s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 
     auto col = [&](float seed_metrics::*f) {
@@ -472,6 +598,29 @@ int main(int argc, char** argv)
                       "C2 %-9s interquartile range across seeds %5.1f pts >= %.1f (not flat across worlds)",
                       b.name, static_cast<double>(iqr), static_cast<double>(b.iqr_floor));
         check(iqr >= b.iqr_floor, label);
+    }
+
+    // --- The re-entry block (BL-965) ------------------------------------------
+    if (life_only)
+    {
+        std::printf("\nLIFE-ONLY RE-RUN (BL-965): the Life half over the cached Body half, %d seeds\n", n);
+        char label[200];
+        std::snprintf(label, sizeof label,
+                      "L1 every deposit on every tile is BIT-IDENTICAL between the full run and the re-run (%d/%d seeds)",
+                      n - digest_mismatches, n);
+        check(digest_mismatches == 0, label);
+        std::snprintf(label, sizeof label,
+                      "L2 coal and petroleum bearing-tile counts identical between the full run and the re-run (%d/%d seeds)",
+                      n - fossil_mismatches, n);
+        check(fossil_mismatches == 0, label);
+        std::printf("  wall-clock, summed over seeds:\n");
+        std::printf("    full per-seed census (planetology + continents + sea gate + generation + rivers)  %8.3f s\n", full_s);
+        std::printf("    one accepted generate_body_tiles per seed                                       %8.3f s\n", gen_s);
+        std::printf("    Life-half re-run per seed                                                        %8.3f s\n", life_s);
+        std::printf("  ratio  life-only / full census      = %.3f  (%.1fx faster)\n",
+                    full_s > 0.0 ? life_s / full_s : 0.0, life_s > 0.0 ? full_s / life_s : 0.0);
+        std::printf("  ratio  life-only / one generation   = %.3f  (%.1fx faster)\n",
+                    gen_s > 0.0 ? life_s / gen_s : 0.0, life_s > 0.0 ? gen_s / life_s : 0.0);
     }
 
     std::printf("\n=== census complete (%d seeds, sweep %.1f s) — %d FAIL ===\n", n, sweep_s, g_failures);
