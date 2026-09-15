@@ -695,13 +695,14 @@ beat one with a well-served core and an expensive frontier at the same mean. The
 therefore a **per-market reading whose spread is scored**, exactly like terms 1 and 2, never a
 single global number added to the composite.
 
-**What the term reads is left open, deliberately, and settled by measurement rather than by
-argument.** Two candidates answer the axis: the mean traversal cost from a market to the tiles
-in its catchment, and the in-reach tile **count** rather than the coverage boolean. Both are
-continuous and both move when a tier does. The first slice's job is the one § The first slice is
-the scorer already states — score candidates that differ only in road tier and ask whether the
-chosen reading **discriminates between them at all**. A reading that does not is not worth
-keeping, and finding that out is cheaper than building the rest on it.
+**What the term reads was settled by measurement, not by argument (BL-977, search axes live and
+reach term).** Two candidates answered the axis — the mean traversal cost from a market to the
+tiles in its catchment, and the in-reach tile **count** — and the test was the one § The first
+slice is the scorer states: score candidates that differ only in road tier and ask whether the
+reading **discriminates between them at all**. The mean cost does, monotonically across three
+tiers; the count does not (two tiers apart by parts in a billion), so the term reads the **mean
+reach cost per market**, and its spread across markets is what the composite scores, as an equal
+third spread beside completeness and balance. The level never enters the composite.
 
 **Why the fourth term is not optional, and why the first three could not do its job.** Terms 1–3
 are computed from tiles, markets and population — none of which a candidate changes. Phase 6

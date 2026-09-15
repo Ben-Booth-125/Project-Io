@@ -1006,14 +1006,14 @@ void app::start_new_game_prelude()
     // is loaded (their measured stop condition reads real recipe outputs, which
     // setup_world's world-gen pass — run before load_economy — cannot see; see
     // generate_background_firms' own header comment for the full ordering
-    // rationale). Run BEFORE the pre-game warm start below so the new firms'
+    // rationale). Run BEFORE the validation run below (BL-978) so the new firms'
     // opening balances/pools get the same simulated operating history every
     // other generated corp receives.
     // BL-770 PHASE 6 — the landscape is SEARCHED, not simply generated.
     //
     // This is the caller `landscape_score` never had: until now it existed only
-    // inside its own harness, which is why BL-772 (retire the warm start) and
-    // BL-773 (the budget) were both blocked on an item that had already
+    // inside its own harness, which is why the warm start's retirement (now
+    // BL-978) and the budget were both blocked on an item that had already
     // "landed". Phase 6 scores candidate landscapes statically — no clock, no
     // ticks — and applies the winner by a deterministic argmax
     // (GENERATION_STRATEGY.md § The eight phases).
