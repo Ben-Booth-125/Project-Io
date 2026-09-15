@@ -73,10 +73,10 @@
   {
    "id": "38",
    "theme": "empire — the whole phase",
-   "state": "open",
+   "state": "complete",
    "status_line": "8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). REFRAMED 2026-09-10 on Ben's call (option B): the sprint no longer closes on BL-868's harness, but on a DISTRIBUTIONAL reading of history_sweep. The sweep was run and the reading is in: conflict is fixed, asymmetry and volatility are not. BL-889, BL-890, BL-891 and BL-892 were added to the sprint on that basis; BL-868 is now blocked on BL-889.",
    "opened_date": "2026-09-09",
-   "closed_date": null,
+   "closed_date": "2026-09-15",
    "author": null,
    "goal": "THE SPRINT IS THE PHASE (Ben, 2026-09-11). Sprint 38 owns the Empires phase of generation entire -- 400 BCE to 1200 CE -- rather than a fixed list of items. It closes when the phase produces what CIVILISATION.md says it must, not when a count is exhausted.\n\nDecompose CIVILISATION.md's Empires design (settled 2026-09-09) into delivery and build it: sparse settlements with seats and hinterlands, roads that gate reach, materials spent on action, culture relations as the engine of conquest, civilisations formed by mixing, and centres that grow only where the road network can supply and govern them.",
    "planned": [
@@ -134,16 +134,17 @@
     "THE REDIRECT WAS TAKEN, 2026-09-11 (Ben): 'we are still yet to work on the output data, and what our age of exploration expects to find after the age of empires.' The session that followed wrote the contract instead of more mechanism. CIVILISATION.md sec The closure of the Empire era is the output; BL-906..BL-912 are the work. Ben's framing was that some cultures gain the capacity to explore and others do not -- which turned out to be already designed as the Empire tree's rim milestone EM-SP-4m, whose sole effect opens the Industry tree, and which nothing in src/ reads.",
     "SIX CALLS TAKEN ON TWO FORMS, 2026-09-11. Tech tree: WIRE ONLY, no generation render (surfaced later via the tech ledger). Contact grain: POLITY to polity. Incentive: a DIRECTED WANT table, not a per-polity scarcity list. Explorer capacity: a THRESHOLD CROSSED, not a continuous spread. Roads: they CROSS, in this contract. Sprint close: the contract must be MEASURED at 1200 CE, not merely written -- Ben chose this having been told it re-opens every figure the sprint has already accepted.",
     "THE PHASE MAP CHANGED (Ben, 2026-09-11), as a consequence of splitting exploration from digitisation: Culture 2400 BCE - 400 BCE, Empires 400 BCE - 1200 CE, Globalisation 1200 - 1660 CE, Digitisation 1660 - 1960 CE. This removes the 1200 -> 1560 dark-age coast and supersedes 'pass 2 is the economy pass, 1560 -> 1960'. 1200 and 1960 are both unmoved, so this sprint's own span is untouched. BL-913 carries the rest, including the sibling-doc reconciliation Ben deliberately deferred ('don't stress too much about contradictions - once we have the full pipeline we will go over it in detail').",
-    "AN ASPECT WAS CONCEDED AND IS WORTH RECORDING. The first assessment argued that population demand belongs to the economy pass and should be descoped from this phase. Ben overturned it: a good you know exists, that you do not have, is an incentive without any price attached. That is why BL-909 is a want table rather than nothing, and it did not need the no-market ruling relaxed."
+    "AN ASPECT WAS CONCEDED AND IS WORTH RECORDING. The first assessment argued that population demand belongs to the economy pass and should be descoped from this phase. Ben overturned it: a good you know exists, that you do not have, is an incentive without any price attached. That is why BL-909 is a want table rather than nothing, and it did not need the no-market ruling relaxed.",
+    "CLOSED 2026-09-15 by Ben (\"I was happy with all the prior sprints as being done\"); archived with sprint 41 so that only sprint 42 is hot."
    ]
   },
   {
    "id": "39",
    "theme": "the drama of the time-lapse",
-   "state": "open",
+   "state": "complete",
    "status_line": "OPEN. Redefined 2026-09-11 (Ben) from \"tighten the levers\" to the DRAMA of generation: the political map is highly stable and empires never fragment back into city states, and the rounds render a computed record after the fact. Sixteen items filed off a holistic read of the generation layer (seven parallel readers, 67 stability claims adversarially checked); five design calls resolved on the form 2026-09-11 (NR-835..NR-839). Batch-delivered in one go.",
    "opened_date": "2026-09-11",
-   "closed_date": null,
+   "closed_date": "2026-09-15",
    "author": "Ben (2026-09-11, live build_rel review, then the sprint-39 design session)",
    "goal": "Make the Empires phase DRAMATIC and VISIBLE, in that order of cause and effect. Two axes. VISIBILITY: the pass rounds render while they compute, in fixed ticks that lag the calculation (about 30 s a round); rivers, mountains, seats, roads and bridges are drawn; typed events (a culture splitting, a realm breaking away, a realm ending) appear in the lapse as they happen; the Restart button is retired and its row goes to the ranking board. DRAMA: the migration coins many kin cultures and a range breaks into insular groups; the Empires phase opens on a dull culture map and city states rise by organising it; force follows the supply network so a large realm fights a larger battle and success compounds; supply has a real gradient so a realm can outrun itself; over-extended ground breaks back down into city states mid-lapse; cities are worth taking, kin neighbours trade. Ben's ordering: room in the culture map first, then visible strong growth, then breakdown; combat depth (rivers and mountains in the resolver) waits until growth is visible (BL-928, sprintless).",
    "planned": [
@@ -174,7 +175,8 @@
     "READOUT DEFECTS FOUND ON THE WAY, carried by BL-916: the wizard arc readout's \"destroyed\" is structurally 0 (living-only samples) and its peak share divides by the final region stride while the map grows 4-6x inside the run; the BL-891 capture's \"56 polities, 0 destroyed\" was an artefact.",
     "SEQUENCING: BL-926 first (baseline). Then the independent wave: BL-927, BL-918, BL-919, BL-915, BL-916, BL-922. Then BL-914, BL-917, BL-920, BL-921, BL-924, BL-925. BL-923 last (requires BL-920 and BL-922). Worktree agents per item; the main session merges, builds, sweeps and live-clicks.",
     "SUPERSEDES the sprint-39 id sprint 38's own handoff previously reserved for 'the new world' -- that content moved to sprint 40, unchanged.",
-    "THE FIVE CALLS, TAKEN 2026-09-11 (Ben, form): city states spawn in regions above a threshold population, the number left to the builder's judgement (NR-835); force is a POOLED LEVY along the supplied network (NR-836); a breakdown produces CITY STATES, one per cut-off seat, reversing NR-826 call 2 (NR-837); supply is priced in the polity's CAPITAL, which is the strategic headquarters where every material gain is stockpiled (NR-838); the isolation split runs in the Culture round only (NR-839). Further detail the same message: a polity upgrades supply sites by spending its stockpile -- BL-929 filed. Traversal domain of supply (held ground only) taken on Ben's behalf and recorded on NR-838."
+    "THE FIVE CALLS, TAKEN 2026-09-11 (Ben, form): city states spawn in regions above a threshold population, the number left to the builder's judgement (NR-835); force is a POOLED LEVY along the supplied network (NR-836); a breakdown produces CITY STATES, one per cut-off seat, reversing NR-826 call 2 (NR-837); supply is priced in the polity's CAPITAL, which is the strategic headquarters where every material gain is stockpiled (NR-838); the isolation split runs in the Culture round only (NR-839). Further detail the same message: a polity upgrades supply sites by spending its stockpile -- BL-929 filed. Traversal domain of supply (held ground only) taken on Ben's behalf and recorded on NR-838.",
+    "CLOSED 2026-09-15 by Ben (\"I was happy with all the prior sprints as being done\"); archived with sprint 41 so that only sprint 42 is hot."
    ]
   },
   {

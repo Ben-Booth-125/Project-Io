@@ -60,7 +60,7 @@ and/or a version goal (v0.1.1 etc.).
 ## Open now
 
 ### Sprint 38 — empire — the whole phase
-*Open · opened 2026-09-09*
+*Complete · opened 2026-09-09*
 
 **Goal.** THE SPRINT IS THE PHASE (Ben, 2026-09-11). Sprint 38 owns the Empires phase of generation entire -- 400 BCE to 1200 CE -- rather than a fixed list of items. It closes when the phase produces what CIVILISATION.md says it must, not when a count is exhausted.
 
@@ -145,8 +145,10 @@ THE PHASE MAP CHANGED (Ben, 2026-09-11), as a consequence of splitting explorati
 
 AN ASPECT WAS CONCEDED AND IS WORTH RECORDING. The first assessment argued that population demand belongs to the economy pass and should be descoped from this phase. Ben overturned it: a good you know exists, that you do not have, is an incentive without any price attached. That is why BL-909 is a want table rather than nothing, and it did not need the no-market ruling relaxed.
 
+CLOSED 2026-09-15 by Ben ("I was happy with all the prior sprints as being done"); archived with sprint 41 so that only sprint 42 is hot.
+
 ### Sprint 39 — the drama of the time-lapse
-*Open · opened 2026-09-11 · Ben (2026-09-11, live build_rel review, then the sprint-39 design session)*
+*Complete · opened 2026-09-11 · Ben (2026-09-11, live build_rel review, then the sprint-39 design session)*
 
 **Goal.** Make the Empires phase DRAMATIC and VISIBLE, in that order of cause and effect. Two axes. VISIBILITY: the pass rounds render while they compute, in fixed ticks that lag the calculation (about 30 s a round); rivers, mountains, seats, roads and bridges are drawn; typed events (a culture splitting, a realm breaking away, a realm ending) appear in the lapse as they happen; the Restart button is retired and its row goes to the ranking board. DRAMA: the migration coins many kin cultures and a range breaks into insular groups; the Empires phase opens on a dull culture map and city states rise by organising it; force follows the supply network so a large realm fights a larger battle and success compounds; supply has a real gradient so a realm can outrun itself; over-extended ground breaks back down into city states mid-lapse; cities are worth taking, kin neighbours trade. Ben's ordering: room in the culture map first, then visible strong growth, then breakdown; combat depth (rivers and mountains in the resolver) waits until growth is visible (BL-928, sprintless).
 
@@ -187,6 +189,8 @@ SEQUENCING: BL-926 first (baseline). Then the independent wave: BL-927, BL-918, 
 SUPERSEDES the sprint-39 id sprint 38's own handoff previously reserved for 'the new world' -- that content moved to sprint 40, unchanged.
 
 THE FIVE CALLS, TAKEN 2026-09-11 (Ben, form): city states spawn in regions above a threshold population, the number left to the builder's judgement (NR-835); force is a POOLED LEVY along the supplied network (NR-836); a breakdown produces CITY STATES, one per cut-off seat, reversing NR-826 call 2 (NR-837); supply is priced in the polity's CAPITAL, which is the strategic headquarters where every material gain is stockpiled (NR-838); the isolation split runs in the Culture round only (NR-839). Further detail the same message: a polity upgrades supply sites by spending its stockpile -- BL-929 filed. Traversal domain of supply (held ground only) taken on Ben's behalf and recorded on NR-838.
+
+CLOSED 2026-09-15 by Ben ("I was happy with all the prior sprints as being done"); archived with sprint 41 so that only sprint 42 is hot.
 
 ### Sprint 41 — Exploration trade
 *Complete · opened 2026-09-14 · Ben (2026-09-14: "polish off the exploration phase"; "go for A then B ... build in a batch delivery")*
