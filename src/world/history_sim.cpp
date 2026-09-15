@@ -6818,6 +6818,43 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         out.polities.push_back(np);
                         note_event(lapse_event_kind::schism, seat, np.id, qid);
 
+                        // BL-981 -- A SCHISM MOVES SEATS, IT DOES NOT RAZE
+                        // THEM. The block is grouped by residue culture, so
+                        // it can carry a region that is already a seat of the
+                        // parent realm (organised above the city-state
+                        // threshold, or a seat taken in an earlier war). The
+                        // first cut wrote `is_seat = (r == seat)` over every
+                        // block member, demoting any such seat while ground
+                        // OUTSIDE the block -- the parent's own, non-reasserted
+                        // hinterland -- kept pointing at it: one dangling
+                        // `seat_region` per demoted seat (colonisation_harness
+                        // D1, seed 2, one region). Three rules now hold the
+                        // pointer invariant (CIVILISATION.md sec The unit is
+                        // the city state) through the event:
+                        //   1. `seat` becomes the new polity's capital seat;
+                        //      every other seat in the block STAYS a seat --
+                        //      a realm born of a schism holds as many seats
+                        //      as walked out with it, exactly as an empire
+                        //      holds every seat it organised.
+                        //   2. A non-seat block member keeps its pointer when
+                        //      its seat came along in the block; otherwise
+                        //      its seat stayed with the parent, so it
+                        //      re-points at `seat` -- the same "re-pointed at
+                        //      the conqueror's seat" rule the campaign verb
+                        //      applies to ground taken on its own.
+                        //   3. Parent-held ground outside the block whose seat
+                        //      just left re-points at the parent's capital --
+                        //      the "surviving hinterland follows its realm's
+                        //      seat" rule the capital-fell block applies.
+                        //      Unorganised ground (`nation < 0`, BL-920's
+                        //      pure distance pointer) is untouched: the seat
+                        //      it points at is still a seat.
+                        // Block members are walked index-ascending and `seat`
+                        // is the lowest index, so its flag is set before any
+                        // member reads it.
+                        std::vector<char> in_block(ss.regions.size(), 0);
+                        for (int r : block) in_block[static_cast<std::size_t>(r)] = 1;
+
                         for (int r : block)
                         {
                             const std::size_t ri = static_cast<std::size_t>(r);
@@ -6826,12 +6863,38 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             void_stale_standing_army(ss.regions[ri]); // BL-955
                             touch_owner(qid);
                             touch_owner(np.id);
-                            ss.regions[ri].seat_region = seat;
-                            ss.regions[ri].is_seat     = (r == seat);
+                            if (r == seat)
+                            {
+                                ss.regions[ri].is_seat     = true;
+                                ss.regions[ri].seat_region = seat;
+                            }
+                            else if (!ss.regions[ri].is_seat)
+                            {
+                                const int sr = ss.regions[ri].seat_region;
+                                const bool seat_came_along =
+                                    sr >= 0 && static_cast<std::size_t>(sr) < ss.regions.size()
+                                    && in_block[static_cast<std::size_t>(sr)]
+                                    && ss.regions[static_cast<std::size_t>(sr)].is_seat;
+                                if (!seat_came_along) ss.regions[ri].seat_region = seat;
+                            }
+                            // else: an existing seat walks out as a seat --
+                            // `is_seat` and its self-pointer are already right.
                             out.owner_changes.push_back(owner_change{
                                 static_cast<int32_t>(y),
                                 static_cast<uint16_t>(r),
                                 static_cast<uint16_t>(np.id)});
+                        }
+
+                        // Rule 3: the parent's orphaned hinterland.
+                        for (std::size_t hi = 0; hi < ss.regions.size(); ++hi)
+                        {
+                            if (in_block[hi]) continue;
+                            region& h = ss.regions[hi];
+                            if (h.nation != qid) continue;
+                            const int sr = h.seat_region;
+                            if (sr < 0 || static_cast<std::size_t>(sr) >= ss.regions.size()) continue;
+                            if (!in_block[static_cast<std::size_t>(sr)]) continue;
+                            h.seat_region = (qcap >= 0) ? qcap : -1;
                         }
 
                         // A SCHISM IS A DEFEAT FOR THE PARENT TOO, through the
