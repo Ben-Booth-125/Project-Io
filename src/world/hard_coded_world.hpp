@@ -408,8 +408,12 @@ inline constexpr int generation_stage_label_count =
 ///
 /// This is a PRESENTATION artefact, not simulation state: it is filled during
 /// make_hard_coded_world and handed to the app, which reveals it stage by stage.
-/// It never enters the `world` struct, so it stays off the serialisation seam —
-/// the same reasoning that keeps world_params in the app (BL-114).
+/// It never enters the `world` struct — the same reasoning that keeps world_params
+/// in the app (BL-114). It is NOT off the serialisation seam, though:
+/// `core/save_game.cpp` writes the report whole (`w_report`), because a loaded
+/// campaign has no generation to consult and the Continent lens, the History
+/// ledger and the Generation Ledger's tile replay all read it. Two seams — a
+/// field added anywhere in this struct is a `save_game_version` bump.
 struct generation_report
 {
     struct body_entry
@@ -464,8 +468,8 @@ struct generation_report
         /// on, when their furnaces lit), the rupture `checkpoints`, and the
         /// `lacunae` count — the holes the wars left in the record. Nothing
         /// else records any of it. Presentation data, like the rest of this
-        /// struct: it never enters `world`, so it stays off the serialisation
-        /// seam.
+        /// struct: it never enters `world`, but it reaches the save with the
+        /// rest of the report (`w_settlement`, `core/save_game.cpp`).
         settlement_state settlement;
 
         /// THE RECORDED ERA -1 TIME-LAPSE (NR-733, Ben's ruling 2026-08-30) — the
@@ -507,8 +511,11 @@ struct generation_report
         /// The Generation Ledger (BL-303) regenerates a body's `generation_record`
         /// on demand from these rather than the world storing one per tile — the
         /// derivation is deterministic and cheap, so keeping it is bloat
-        /// (GENERATION_LEDGER.md § Data lifetime). Presentation data like the rest
-        /// of this struct: it never enters `world` and never reaches the save.
+        /// (GENERATION_LEDGER.md § Data lifetime). What DOES reach the save is
+        /// this struct: the six inputs are written with the rest of the report
+        /// (`w_body_entry`, `core/save_game.cpp`) precisely so a loaded campaign
+        /// can replay the same tiles the ledger explains. The intermediates it
+        /// regenerates never do.
         struct tile_inputs
         {
             bool     valid           = false; ///< False on a report built without a tile pass.

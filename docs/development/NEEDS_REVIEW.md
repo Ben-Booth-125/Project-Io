@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*31 entries — 31 open, 0 resolved.*
+*35 entries — 35 open, 0 resolved.*
 
 ---
 
@@ -475,6 +475,66 @@ BL-955's allocation scores a navy step 0 once the fleet exceeds 400 per held reg
 > **Recommendation:** Option 2: it is what the doc already says, and it fixes the free-manpower problem at the same stroke if paid heads also draw from manpower. It moves the world again, so it would be its own item after this sprint rather than folded into the tuning wave.
 
 *Files: `src/world/history_sim.cpp`, `src/world/settlement.hpp`, `docs/generation/EXPLORATION.md`*
+
+### NR-868 — CALL: COLLAPSE.md's six strategies, seven culminations and pairing matrix — still design, or retired?
+*decision · raised 2026-09-15 · from BL-980 (generation doc-versus-code reconciliation), item 4.*
+
+docs/lore/COLLAPSE.md authors an Era -1 collapse metagame: a strain accumulator per major polity, six strategies a polity plays against it, seven culminating events, and a matrix pairing them. No source file cites the doc (src/world/CLAUDE.md lists it as an owner and nothing else does) and none of the roster's names or mechanics appear in src/. The collapse the history sim actually models is written in CIVILISATION.md: secession as network failure (BL-896, collapse is network failure — sec The network is the estate, and it crosses; sec What the dark age must leave) and the schism verb in CREEDS.md (BL-944, the schism verb). A superseded banner now sits at the top of COLLAPSE.md pointing at both; no content was deleted.
+
+**Why it matters.** An authority doc that no code reads and no other doc defers to is either design still owed or a retired exploration wearing an authority header. Left as it is, the next reader takes the strain/strategy/culmination model as the design and builds against a roster the sim does not have; retiring it without a ruling loses a written exploration Ben asked for (2026-08-20). Either answer is cheap to record; only Ben can give it.
+
+- RETIRE: move COLLAPSE.md to docs/research/ (or archive) as a mechanism reference; CIVILISATION.md and CREEDS.md are the collapse authority. Remove the banner with the move.
+- KEEP AS DESIGN: the roster is owed to a later pass (a strategy layer over the network-failure model). File a backlog item that owns it, cite it from the banner, and leave the doc as authority.
+- FOLD: keep only the parts CIVILISATION.md does not already say (the ideological-axis narration, the affordability notes) as a section of CIVILISATION.md; retire the rest.
+
+> **Recommendation:** Option 1. The built model (network failure + schism) is a consequence of upstream state, which is the shape Ben chose for generation stages; a strategy roster is an agent-side term the same rulings have refused elsewhere. Keep the prose as research.
+
+*Files: `docs/lore/COLLAPSE.md`, `docs/generation/CIVILISATION.md`, `docs/lore/CREEDS.md`*
+
+### NR-869 — CALL: does the default epoch move from 0 CE to 1960 before Digitisation?
+*decision · raised 2026-09-15 · from BL-980 (generation doc-versus-code reconciliation), item 8.*
+
+GENERATION_STRATEGY.md said the campaign epoch is 1960 on the arc generation runs. The code default is world_params::epoch_year = 0 (hard_coded_world.hpp; Ben, 2026-08-12, NR-177); 1960 is the opt-in --epoch 1960 flag (main.cpp), and the industrial span and the ruptures pass run only on a 1700+ epoch. The doc now says the default honestly (0 CE, 1960 opt-in) and the pass map is rewritten from make_hard_coded_world's actual order. What the doc cannot decide is whether the default itself should move.
+
+**Why it matters.** Every default-epoch world today opens at 0 CE with the Exploration span having run to 1660 and the clock rebased. DIGITISATION.md is the placeholder for 1660 -> 1960; if the default epoch is to be 1960, the placeholder becomes the next phase to build and the Exploration handoff is its input. If the default stays 0 CE, the 1960 arc is a sandbox and Digitisation has no live consumer, which changes what sprint 42's seam work is for.
+
+- Default stays 0 CE until Digitisation is built; 1960 remains the opt-in arc. Docs say so (done in BL-980).
+- Default moves to 1960 now, with Digitisation absent: the campaign opens after a 300-year gap the sim does not simulate. Cheap; honest only if the gap is labelled on the wizard.
+- Default moves to 1960 when Digitisation lands, as that item's DONE WHEN — file it against DIGITISATION.md.
+
+> **Recommendation:** Option 3. It keeps the doc and code agreeing at every point in between and makes the move a consequence of a built phase rather than a flag flip.
+
+*Files: `docs/generation/GENERATION_STRATEGY.md`, `docs/generation/DIGITISATION.md`, `src/world/hard_coded_world.hpp`, `src/main.cpp`*
+
+### NR-870 — CALL: the per-tile derivation breadcrumb — owed a surface, or dropped from the design?
+*decision · raised 2026-09-15 · from BL-980 (generation doc-versus-code reconciliation), item 9.*
+
+GENERATION_LEDGER.md sec Per-tile derivation breadcrumb and sec Surfacing design a five-step per-tile "why" (height, band and moisture, substrate and cover, landform, deposits) built once and shared by the ledger, the hover card and the Selection element. Ben ruled DELETE on its builder, draw_tile_derivation, on 2026-08-30 (archived NR entry) when the ledger lost its tab strip; the function is gone from src/. generation_ledger.hpp and .cpp still pointed at it as surviving — corrected in BL-980 — and the doc section now carries a banner saying it is design with no surface, with the call recorded here.
+
+**Why it matters.** The ledger exists to answer "why did this tile generate as it did" (the doc's own opening line) and today only the per-body half of that answer has a surface. Keeping a designed-but-unsurfaced section in an authority doc is exactly the pattern NR-717 named; deleting it loses the best written explanation of the tile pipeline the ledger family has. The 2026-08-30 ruling deleted the code; it did not say whether the design goes with it.
+
+- DROP: remove sec Per-tile derivation breadcrumb and the per-tile half of sec Surfacing from GENERATION_LEDGER.md; the tile-grain "why" is not a question the game answers.
+- OWE: file a backlog item for a per-tile derivation frame in the Selection element (a tile is already a Selection subject), cite it from the section, keep the design.
+- OWE, as a lens only: the field overlay lenses (BL-304) show the spatial structure of each pass; the per-tile numbers come from the Tile Ledger's existing rows and no breadcrumb is built.
+
+> **Recommendation:** Option 2 if the tile-grain question matters for tuning generation (it did when the ledger was designed); option 1 otherwise. Not option 3: the lens answers a different question than the breadcrumb.
+
+*Files: `docs/generation/GENERATION_LEDGER.md`, `src/ui/generation_ledger.hpp`, `src/ui/generation_ledger.cpp`, `docs/ui/SELECTION.md`*
+
+### NR-871 — CALL: at 1200 CE, do EVERY seat's stores flow to the capital (doc) or only the capital seat's own stock (code)?
+*decision · raised 2026-09-15 · from BL-980 (generation doc-versus-code reconciliation), item 12.*
+
+EXPLORATION.md sec Capital arrives says consolidation is the phase's opening act: "At 1200 CE every seat's stores flow to the capital, once" (Ben, 2026-09-11: consolidate all stores of material into the polity level). history_sim.cpp (the consolidation block in the exploration round, at the span's start year) does `seat.treasury += seat.material_stock; seat.material_stock = 0;` for the CAPITAL region only. A polity holding several seats keeps every non-capital seat's material_stock where it stands; those stores are never folded into the treasury. Nothing was edited: the two readings are both defensible and the difference is a design choice, not a typo.
+
+**Why it matters.** The doc reading makes the opening treasury the whole realm's hoard, so a wide empire opens the exploration age rich and a city state opens poor — the asymmetry EXPLORATION.md wants, and a thing the time-lapse can show. The code reading leaves most of a multi-seat realm's wealth on the map as material, where conquest of a seat still takes it (CIVILISATION.md sec Materials are spent) but the treasury and the spend scorer never see it. Which one is true changes every treasury figure the sprint 41 sweep reported, and the doc's claim that consolidation is visible.
+
+- DOC IS RIGHT: fold every seat the polity holds (`is_seat` and owner == polity) into the capital's treasury at start_year; non-capital seats keep material_stock = 0 thereafter. Re-run exploration_sweep; treasury and Alarm readings move.
+- CODE IS RIGHT: only the capital's own stock becomes capital; the other seats' stores stay material on the ground, taken by conquest, never by the purse. Reword EXPLORATION.md sec Capital arrives to say so.
+- BOTH, staged: the capital's stock consolidates at 1200 and the other seats' stores flow in at a per-round rate over the network (reach-gated), so centralisation is visible as a process rather than an instant.
+
+> **Recommendation:** Option 1 is what Ben said and what the doc records; option 2 is what the code does. Given the standing preference for the doc, option 1 — but it moves the world, so it is a sprint 42 item with a sweep, not a one-line fix.
+
+*Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`, `src/world/settlement.hpp`*
 
 ---
 

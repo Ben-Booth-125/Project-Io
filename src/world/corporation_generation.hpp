@@ -252,11 +252,11 @@ std::vector<entity_id> generate_background_firms(
 /// author a processor (`generate_corporations`, `generate_background_firms`).
 void assign_default_recipes(world& w, const recipe_registry& reg);
 
-/// Measurement seam (2026-08-20) — the SHIPPED background-firm stop condition,
-/// readable from outside. `generate_background_firms` stops when the basket-
-/// weighted production/demand ratio reaches its target (0.90) OR when it hits
-/// `max_firms_per_body`; which one fires decides whether a body's markets open
-/// stocked or thin, and nothing outside that file could previously ask.
+/// Measurement seam (2026-08-20) — the SHIPPED coverage arithmetic, readable
+/// from outside. `generate_background_firms` stops on its caps (per resource,
+/// per province, `max_firms_per_body`), never on a coverage target; the basket-
+/// weighted production/demand ratio is what says whether a body's markets open
+/// stocked or thin, and nothing outside that file could previously ask it.
 ///
 /// Exported rather than re-derived on purpose: a harness that re-implements a
 /// generation rule drifts from it, which has now cost this project four wrong
