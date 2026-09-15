@@ -47,6 +47,8 @@
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
+#include "culture_footprint.hpp" // BL-968 step 1: the cultures that never hold ground
+
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
@@ -1289,6 +1291,28 @@ void case_split_census(int seed_count, int span_years)
             std::printf(" %s %d", split_trigger_name(static_cast<split_trigger>(t)), cc.splits[t]);
         std::printf("  (isolation moved %d regions over %d steps)\n",
                     cc.recultured_regions, cc.isolation_steps);
+
+        // BL-968 step 1 -- the cultures that never hold ground, on the SAME
+        // reading history_sweep prints (culture_footprint.hpp). Boundary =
+        // `fx.settlement` (what the Empires round was handed, 400 BCE); close
+        // = `fx.pre_exploration_settlement` (the Empires round's own 1200 CE
+        // state, captured before the Exploration span mutates it in place),
+        // or "-" when that span did not run and nothing captured it.
+        // REPORT-ONLY: no assertion, and no rule is chosen here.
+        {
+            const bool have_close = !fx.pre_exploration_settlement.regions.empty();
+            const culture_footprint cf = measure_culture_footprint(
+                fx.creeds.cultures, fx.settlement.regions,
+                have_close ? &fx.pre_exploration_settlement.regions : nullptr);
+            const int pm = cf.holding_boundary_permille();
+            std::printf("        BL-968.1 never-hold-ground: coined %d  holding@boundary %d  "
+                        "holding@1200 ", cf.coined, cf.holding_boundary);
+            if (have_close) std::printf("%d", cf.holding_close); else std::printf("-");
+            std::printf("  ratio %d.%d%%  empty leaves %d / interior %d  leaves by depth ",
+                        pm / 10, pm % 10, cf.empty_leaves, cf.empty_interior);
+            print_empty_leaf_depths(cf);
+            std::printf("\n");
+        }
 
         if (cc.cultures < 1739) ++under_ceiling;
         isolation_total += cc.splits[static_cast<int>(split_trigger::isolation)];
