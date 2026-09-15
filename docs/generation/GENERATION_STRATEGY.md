@@ -30,27 +30,45 @@ The subject docs:
 - **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map,
   driven by the pre-national history ladder.
 - **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
-  market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the ancient arc's epoch (Ben, 2026-08-12, NR-177)** — § Pass 2 is the economy pass owns the calendar — and
+  market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the
+  ancient arc's epoch (Ben, 2026-08-12, NR-177); `world_params::epoch_year` selects between them,
+  and which arc the default descriptor selects is NR-869's call** — § Pass 2 is the economy
+  pass owns the calendar, and the clock rebases at the handoff (`../economy/ERAS.md`) — and
   generation runs a stepped pre-campaign history whose span § Pass 2 is the economy pass states
-  (3,600 years, 2400 BCE → 1200 CE, divided at 400 BCE — Ben, 2026-09-09). The figure restated here
-  was 4000 BCE → 0 CE, which contradicted the section it defers to. Stages 5–6 (the energy transition and
+  (3,600 years, 2400 BCE → 1200 CE, divided at 400 BCE — Ben, 2026-09-09), followed by the
+  Exploration span, 1200 → 1660 (`EXPLORATION.md`). Stages 5–6 (the energy transition and
   saturation) fall *past* the epoch entirely and are DLC-era material (BL-223, averted rupture,
   owns their reshaping).
 - **`CORPORATION_GENERATION.md`** — corporation placement, focus, holdings, and finance.
 - **`GENERATION_LEDGER.md`** — the tuning surface that explains *why* a tile generated as it did.
 
-Generation runs, in `make_hard_coded_world`:
+Generation runs, in `make_hard_coded_world` (`src/world/hard_coded_world.cpp`), in this order:
 
 ```
-planetology → continents → tiles → rivers              (per body)
-  → history ladder → creeds → settlement                 (homeworld only, from here)
-  → history sim, pass 1 (ancient) → history sim, pass 2 (industrial)
+body names → planetology → continents                   (every body, up front)
+tiles                                                    (Cinder)
+tiles → rivers                                           (Kepler, the homeworld — homeworld only
+                                                          from here to the province line)
+  → history ladder → creeds → settlement → migration time-lapse
+  → history sim, Empires span (2400 BCE → 1200 CE)       (one call; a 1700+ epoch appends the
+                                                          industrial span to the same call)
+  → history sim, Exploration span (1200 → 1660)          (whenever Empires ran and there is
+                                                          no industrial span)
+  → markets standing at the close (one per `region::has_market`)
   → population centres → nations → national character
-  → ruptures → institutional history → provinces → roads → corporations → markets
-  → other bodies' tiles → laws
-  → provinces                                            (every other body, last)
-  → background firms → the economic settle (pass 3)      (after the worker, before play)
+  → grudge sentiment → national tariffs → national coverage centres
+  → centre naming → urban land use
+  → ruptures                                             (1700+ epoch only)
+  → history merge → provinces → anchor centres → roads
+  → corporations (specialists) → market carving → endemic demand
+tiles                                                    (Selene, then the asteroids)
+laws → provinces (every other body) → province holders → garrisons
 ```
+
+After the worker returns, the app runs **phase 6 — the landscape search** (`search_landscape`;
+the winning candidate's background firms *are* the background economy) and then the **settle**:
+phase 6's single validation run of the winner (`../economy/ERAS.md`; BL-978, warm start retired,
+owns the work).
 
 The three simulated passes — two polity spans and one economic settle — are § Three passes of
 simulated history; `../lore/HISTORY.md` owns the polity spans.

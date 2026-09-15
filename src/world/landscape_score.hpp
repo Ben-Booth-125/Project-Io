@@ -8,11 +8,15 @@
 // markets, deposits and population are all settled by the end of phase 4 and
 // none of them moves during phase 6, so there is nothing to step and no clock.
 //
-// THE OBJECTIVE HAS THREE TERMS (Ben, 2026-09-06, on the market-work form):
+// THE OBJECTIVE HAS FIVE TERMS (GENERATION_STRATEGY.md § What the objective is
+// made of — Ben, 2026-09-06 on the market-work form for the first four; the
+// fifth, Ben, 2026-09-08). FOUR ARE SCORED IN THIS FILE; the fifth is specified
+// and BL-977 (search axes live and reach term) owns it:
 //
 //   1. CHAIN COMPLETENESS  — terminals closed over terminals total, per market.
-//      Already built: measure_market_completeness (BL-775).
-//   2. THE SUPPLY-TO-DEMAND RATIO per resource per market. The static
+//      measure_market_completeness (BL-775). POTENTIAL closure.
+//   2. THE SUPPLY-TO-DEMAND RATIO per resource per market — `balance` below,
+//      the share of rated resources inside the pin band. The static
 //      price-feedback proxy. Completeness says a chain CAN close; it cannot see
 //      a good pinned at a band edge, and a good pinned at the ceiling is what
 //      actually killed the industrial field — processors buying inputs at 10x
@@ -21,6 +25,15 @@
 //      Scored for, not tolerated. An even map is the outcome
 //      § Asymmetry is the deliverable exists to prevent, and an objective that
 //      is merely neutral about evenness will drift into it.
+//   4. REALISATION — actual closure over potential closure (`realisation`
+//      below). Terms 1-3 read only what COULD close, so they come back
+//      identical for every roster; this is the term that makes the score
+//      discriminate between rosters.
+//   5. REACH QUALITY — at what traversal cost a market's catchment is actually
+//      crossed, read per market with its spread scored like terms 1 and 2.
+//      NOT SCORED HERE. Terms 1 and 4 read reach as a coverage boolean, so
+//      without it the objective ranks every road tier identically — the axis
+//      the search chooses along and cannot see. BL-977 owns the term.
 //
 // RECIPE MARGIN IS DELIBERATELY NOT A TERM. It exists (evaluate_margin, in
 // market_saturation.hpp) and it stays the AUTHORING GATE that every recipe can
@@ -51,18 +64,22 @@ class recipe_registry;
 /// STABLE across candidates, not calibrated against reality.
 struct landscape_score_params
 {
+    // The three balance weights INITIALISE FROM market_saturation.hpp's constants
+    // rather than restating them (BL-979): term 2 is computed there now, and the
+    // census prints it, so the search and the reading must start from one band.
+
     /// Household demand per head, for a resource the band's household basket names.
-    double household_per_head = 1.0;
+    double household_per_head = k_balance_household_per_head;
     /// Flat weight for each other structural market sink (process, construct,
     /// background, unit upkeep, industry upkeep, endemic).
-    double sink_weight = 250.0;
+    double sink_weight = k_balance_sink_weight;
 
     /// A resource is BALANCED when its supply:demand ratio sits inside
     /// [1/pin_ratio, pin_ratio]. Outside it the good is pinned — glutted below,
     /// starved above — which is the static shadow of a price at a band edge.
     /// 4.0 against the authored band of [0.25x, 10x] is deliberately INSIDE the
     /// band: a good does not have to reach the clamp to be a broken market.
-    double pin_ratio = 4.0;
+    double pin_ratio = k_balance_pin_ratio;
 
     /// How hard unevenness is rewarded in the composite. 0 scores viability
     /// alone; the composite is viability * (1 + unevenness_gain * spread).

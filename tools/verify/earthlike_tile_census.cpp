@@ -1,7 +1,8 @@
 // ---------------------------------------------------------------------------
 // Earth-like tile census (stage 3 of the earth-like battery; no SDL / Lua)
 // ---------------------------------------------------------------------------
-// A MEASUREMENT tool, not a pass/fail check.
+// A MEASUREMENT tool with ONE asserted block (the ore-field concentration rows,
+// BL-966); everything else is report-only.
 //
 // C1 (planetology_sweep) asks which floor clause rejects a homeworld, and the
 // corridor harness asks where each knob's edges are. Both stop at the BODY
@@ -23,6 +24,19 @@
 // point of a first run is to show Ben the spread so he can decide what a band
 // should be, not to encode a guess as a check.
 //
+// THE EXCEPTION IS THE ORE-FIELD BLOCK (BL-966). Terrain was covered
+// geometrically and for determinism and economically not at all: the four
+// top-10% concentration figures were the instrument that caught BL-765's +68%
+// petroleum, and they caught it only because a human read them. So those four
+// rows are now ASSERTED over the sweep, in wide bands derived from the measured
+// distribution (the numbers and the date are in the assertion text), plus a
+// minimum interquartile range per resource so a field that went FLAT across
+// seeds — every world concentrated the same — fails as loudly as one that went
+// uniform within a world. A band chosen from the data is a requirement that the
+// distribution stays where it was measured, not a target to tune toward. The
+// rest of the census stays report-only, and the sweep count stays at 120: the
+// harness prints its own wall-clock so the cost of the gate is on the record.
+//
 // Run: earthlike_tile_census [seeds]      (default 120)
 //
 // Default sized against the 60 s CTest cap, not against statistical taste: each
@@ -37,6 +51,7 @@
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -46,6 +61,14 @@ namespace {
 
 constexpr int gw = 180, gh = 84;
 constexpr int k_cells = gw * gh;
+
+int g_failures = 0;
+
+void check(bool ok, const char* label)
+{
+    std::printf("%s  %s\n", ok ? "PASS" : "FAIL", label);
+    if (!ok) ++g_failures;
+}
 
 // Odd-r offset hex neighbours (odd rows shifted right), columns wrap.
 void neighbours(int c, int r, int out_c[6], int out_r[6])
@@ -114,6 +137,40 @@ struct seed_metrics
     // REDISTRIBUTES ore rather than creating it.
     float coal_top10 = 0.0f, oil_top10 = 0.0f, copper_top10 = 0.0f, iron_top10 = 0.0f;
     float coal_total = 0.0f, oil_total = 0.0f, copper_total = 0.0f, iron_total = 0.0f;
+};
+
+/// One asserted concentration row (BL-966). `lo`/`hi` bound the sweep MEDIAN;
+/// `iqr_floor` is the least p75-p25 spread across seeds the row may show.
+struct concentration_band
+{
+    const char* name;
+    float seed_metrics::*field;
+    float measured_median; ///< What the 2026-09-15 run read, printed beside the band.
+    float lo, hi;          ///< Band on the median of top-10% share, in %.
+    float iqr_floor;       ///< Minimum interquartile range across seeds, in % points.
+};
+
+// MEASURED 2026-09-15 over the default 120 seeds (min / p05 / p25 / median /
+// p75 / p95 / max, in % of the world total held by the richest 10% of bearing
+// tiles):
+//   coal       25.3 / 28.9 / 37.7 / 41.5 / 46.3 / 50.5 / 54.0   (IQR 8.6)
+//   petroleum  52.3 / 54.9 / 61.6 / 64.9 / 67.1 / 70.3 / 74.1   (IQR 5.4)
+//   copper     15.9 / 16.3 / 66.9 / 68.8 / 70.7 / 75.1 / 76.7   (IQR 3.8)
+//   iron       43.2 / 45.9 / 57.0 / 61.5 / 65.0 / 69.0 / 76.9   (IQR 8.0)
+//
+// The bands are GENEROUS by construction — the measured median plus or minus
+// roughly twice its distance to the p05/p95 tails — so ordinary drift passes and
+// only a change of the kind BL-765 was (+68% on one resource) or a field that
+// stopped concentrating at all (a flat endowment lands at 10-20%) fails. The
+// IQR floors are about half the measured spread. Copper's low tail is real and
+// KEPT: its p05 sits near the flat line because copper's region model needs a
+// mobile lid, and a stagnant-lid world is honestly flat on copper — that is a
+// tail the band must contain, not a defect to trim.
+constexpr concentration_band k_bands[] = {
+    { "coal",      &seed_metrics::coal_top10,   41.5f, 25.0f, 60.0f, 4.0f },
+    { "petroleum", &seed_metrics::oil_top10,    64.9f, 50.0f, 80.0f, 2.5f },
+    { "copper",    &seed_metrics::copper_top10, 68.8f, 50.0f, 85.0f, 2.0f },
+    { "iron",      &seed_metrics::iron_top10,   61.5f, 45.0f, 80.0f, 4.0f },
 };
 
 /// Share of the total held by the richest 10% of non-zero entries.
@@ -313,6 +370,19 @@ void report(const char* name, std::vector<float> v, const char* earth)
                 static_cast<double>(pct(v, 0.95f)), earth);
 }
 
+/// The asserted rows get the whole distribution, because the band is read off
+/// it and a reader re-deriving the band needs the same seven numbers.
+void report_full(const char* name, const std::vector<float>& v)
+{
+    std::printf("  %-18s min %5.1f  p05 %5.1f  p25 %5.1f  median %5.1f  p75 %5.1f  p95 %5.1f  max %5.1f\n",
+                name,
+                static_cast<double>(*std::min_element(v.begin(), v.end())),
+                static_cast<double>(pct(v, 0.05f)), static_cast<double>(pct(v, 0.25f)),
+                static_cast<double>(pct(v, 0.50f)), static_cast<double>(pct(v, 0.75f)),
+                static_cast<double>(pct(v, 0.95f)),
+                static_cast<double>(*std::max_element(v.begin(), v.end())));
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -320,12 +390,18 @@ int main(int argc, char** argv)
     const int n = (argc > 1) ? std::atoi(argv[1]) : 120;
 
     std::printf("=== Earth-like tile census: %d campaign seeds through Kepler's pipeline ===\n", n);
-    std::printf("Grid %dx%d. Percentages of LAND unless stated. Report-only: nothing is asserted.\n\n",
+    std::printf("Grid %dx%d. Percentages of LAND unless stated. Report-only, except the\n"
+                "ORE FIELDS concentration rows, which are asserted in bands (BL-966).\n\n",
                 gw, gh);
 
+    // Wall-clock for the sweep alone, so the cost of running this as a gate is
+    // printed beside the result rather than guessed. Harness-side only; nothing
+    // generated depends on it.
+    const auto t0 = std::chrono::steady_clock::now();
     std::vector<seed_metrics> all;
     all.reserve(static_cast<std::size_t>(n));
     for (int s = 0; s < n; ++s) all.push_back(census_one(static_cast<uint32_t>(s)));
+    const double sweep_s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 
     auto col = [&](float seed_metrics::*f) {
         std::vector<float> v;
@@ -364,10 +440,12 @@ int main(int argc, char** argv)
 
     std::printf("\nORE FIELDS — share of the world total in the richest 10%% of bearing tiles\n");
     std::printf("(a flat endowment lands near 10-20%%; a region model well above it)\n");
-    report("coal top-10%",      col(&seed_metrics::coal_top10),   "(concentration)");
-    report("petroleum top-10%", col(&seed_metrics::oil_top10),    "(concentration)");
-    report("copper top-10%",    col(&seed_metrics::copper_top10), "(concentration)");
-    report("iron top-10%",      col(&seed_metrics::iron_top10),   "(concentration)");
+    for (const concentration_band& b : k_bands)
+    {
+        char label[32];
+        std::snprintf(label, sizeof label, "%s top-10%%", b.name);
+        report_full(label, col(b.field));
+    }
     std::printf("  world totals (for a regions-on/off conservation check):\n");
     report("coal total",      col(&seed_metrics::coal_total),   "(sum, not a rate)");
     report("petroleum total", col(&seed_metrics::oil_total),    "(sum, not a rate)");
@@ -376,6 +454,26 @@ int main(int argc, char** argv)
 
     std::printf("\nEarth figures are ORIENTATION, not targets. A generator that hit them all\n");
     std::printf("exactly would be reproducing one planet, not generating earth-LIKE ones.\n");
-    std::printf("\n=== census complete (%d seeds) ===\n", n);
-    return 0;
+
+    // --- The asserted block (BL-966) ---------------------------------------
+    std::printf("\nASSERTED: ore-field concentration over the sweep (bands from the 2026-09-15 run, %d seeds)\n", n);
+    for (const concentration_band& b : k_bands)
+    {
+        const std::vector<float> v = col(b.field);
+        const float med = pct(v, 0.50f);
+        const float iqr = pct(v, 0.75f) - pct(v, 0.25f);
+        char label[160];
+        std::snprintf(label, sizeof label,
+                      "C1 %-9s median top-10%% share %5.1f%% inside [%.0f, %.0f] (measured %.1f, 2026-09-15)",
+                      b.name, static_cast<double>(med), static_cast<double>(b.lo),
+                      static_cast<double>(b.hi), static_cast<double>(b.measured_median));
+        check(med >= b.lo && med <= b.hi, label);
+        std::snprintf(label, sizeof label,
+                      "C2 %-9s interquartile range across seeds %5.1f pts >= %.1f (not flat across worlds)",
+                      b.name, static_cast<double>(iqr), static_cast<double>(b.iqr_floor));
+        check(iqr >= b.iqr_floor, label);
+    }
+
+    std::printf("\n=== census complete (%d seeds, sweep %.1f s) — %d FAIL ===\n", n, sweep_s, g_failures);
+    return g_failures == 0 ? 0 : 1;
 }

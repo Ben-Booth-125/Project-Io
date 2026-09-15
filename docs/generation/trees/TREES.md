@@ -287,7 +287,9 @@ nodes[]
   kind          minor | major | milestone
   ring          1..n
   branch        branch key
-  links         ids of neighbours at ring−1..ring+1 (undirected; list each edge once, from the lower id)
+  links         ids of neighbours at ring−1..ring+1 (undirected; list each edge once, on the node
+                farther from the root — the root lists none, and that empty list is how the
+                generated table derives `is_root`; the lint holds exactly one per tree)
   gate          null | one of gate_atoms  (majors only)
   diffusion     practice | artifact | capacity   (majors only; minors are practice, milestones capacity)
   excludes      null | id   (a fork; symmetric)

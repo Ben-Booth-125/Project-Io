@@ -168,6 +168,12 @@ additive fields if a pass ever needs them attributed per tile.
 
 ### Per-tile derivation breadcrumb
 
+> *Design, not a description of a surface.* This section says what a per-tile "why" presents
+> wherever a surface carries it. Which surface does — a ledger view, the hover card, the
+> Selection frame, or none — is an open call in `docs/development/NEEDS_REVIEW.json`; the Tile
+> view that once framed it was retired with the ledger's tab strip (Ben, 2026-08-30 — the
+> ruling is recorded in this document's opening section).
+
 For one selected tile, the causal chain that produced it, one row per pass, each
 row naming the input value and the rule that fired:
 
@@ -192,10 +198,10 @@ row naming the input value and the rule that fired:
    the ambient-resource guarantee, with the RNG-derived magnitudes and the
    post-multiply factors applied to them.
 
-The breadcrumb is the per-tile content builder; the **hover card** and the
-**Selection info element** call the same builder to render a tile's "why" section
-(see SELECTION.md § Shared content builders). The ledger frames it full-height with
-the pass rules spelled out; the card shows a condensed form.
+The breadcrumb is designed as one per-tile content builder that the **hover card** and
+the **Selection info element** would share to render a tile's "why" section (see
+SELECTION.md § Shared content builders): a ledger frame shows it full-height with the pass
+rules spelled out; a card frame shows a condensed form.
 
 ### Per-body summaries
 
@@ -256,10 +262,11 @@ Two complementary presentations, because the two questions differ:
   is how you see "the equatorial ocean bias is too strong"; the breadcrumb is how you
   read one tile's exact numbers. The field lenses are BL-304 (field overlay lenses).
 
-The per-tile breadcrumb **shares its content builder with the hover card and the
-Selection info element** (SELECTION.md). The *frame* differs (ledger panel vs. tooltip
-vs. pinned panel); the *content* — the five-step causal chain — does not. It is built
-once as a tile-derivation builder and the three callers wrap it.
+The per-tile breadcrumb is designed to **share one content builder across the hover card,
+the Selection info element and any ledger frame** (SELECTION.md). The *frame* differs (ledger
+panel vs. tooltip vs. pinned panel); the *content* — the five-step causal chain — does not:
+one tile-derivation builder, wrapped by each caller. Whether any surface carries it is the open
+call § Per-tile derivation breadcrumb names.
 
 ---
 

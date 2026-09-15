@@ -54,10 +54,13 @@ single band is `hp.tick_bands[0] = {epoch_year, 4}` in `hard_coded_world.cpp`). 
 overrides it on every world. A settle-dominated run is the intended shape, not a defect (NR-205,
 ruled 2026-08-12). Authority for the prehistory run is `docs/lore/HISTORY.md`.
 
-**The opening position has no calendar meaning** (BL-369, warm start; BL-772, retire warm start).
+**The opening position has no calendar meaning** (BL-369, warm start; BL-978, warm start retired).
 The world is generated *at* the epoch and handed to play **already settled** — not generated at an
-earlier date and advanced to it. Whatever the pass that settles it spends in simulated quarters,
-the clock is **rebased at the handoff**, so play always opens at `epoch_year`. That rebase is the
+earlier date and advanced to it. The settling pass is phase 6's **single validation run** of the
+winning landscape — `../generation/GENERATION_STRATEGY.md` § Three passes: pass 3 *selects*, and its
+one validation tick-run is the settle (BL-978, warm start retired, owns the work; BL-369 owned the
+fixed `pre_game_ticks` warm start it replaces). Whatever the pass that settles it
+spends in simulated quarters, the clock is **rebased at the handoff**, so play always opens at `epoch_year`. That rebase is the
 load-bearing half of this paragraph and it does not depend on which pass does the settling: the
 opening position owes the calendar nothing.
 

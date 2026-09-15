@@ -486,18 +486,22 @@ survived.
 | Which provinces each polity holds | `pass_one_output::holdings` | **carried** |
 | Directed grudges | `pass_one_output::grudges` | **carried** |
 | Region endowment (farm / ore / energy / port) | `region` | **carried** |
-| **Culture PARENTAGE — the family tree** | `colonisation_field::spawns` | **DISCARDED — the gap** |
-| **The farm class a culture was coined on** | `front_entry::origin_class` | **DISCARDED** |
-| **The year a culture was coined** — the kinship clock | `front_entry` / arrival order | **DISCARDED** |
-| Settlement seats and hinterland pointers | `region::centres` (dense today) | **owed, § The unit is the city state** |
-| Material stores at the seat | — | **owed, § Materials are spent** |
+| **Culture PARENTAGE — the family tree** | `culture::parent` (`creeds.hpp`) — index of the mother culture, −1 at a cradle; a daughter always sits above her mother, so the walk to the root cannot loop | **carried** |
+| **The farm class a culture was coined on** | `culture::origin_farm_class` — the opposition half of culture relations | **carried** |
+| **The year a culture was coined** — the kinship clock | `culture::coined_year` — read by `culture_kinship_years` | **carried** |
+| Settlement seats and hinterland pointers | `region::is_seat`, `region::seat_region` (`settlement.hpp`) — one seat per polity at its capital, every hinterland region pointing at its seat | **carried** |
+| Material stores at the seat | `region::material_stock` — accumulates only where `is_seat`, falls with the seat | **carried** |
 
-**Three of those are discarded facts the migration already computed**, and all three are cheap to
-retain — parentage, origin farm class, and now the coining year that § The calls makes the kinship
-measure. Everything else is either carried today or is honest new work.
+**The three culture rows are facts the migration computes and the contract keeps** — parentage,
+origin farm class, and the coining year that § The calls makes the kinship measure. Parentage is
+the family tree; the origin class is the opposition half of culture relations (a people of the
+floodplain and a people of the highlands want different ground); the coining year is what makes
+kinship a years-since-common-ancestor measure rather than an adjacency, and kinship in years is
+worth nothing without the years.
 
-**The coining year is the newest of the three and it is owed by a ruling, not by an oversight.**
-Kinship in years is worth nothing without the years.
+**The two settlement rows are the city-state unit** (§ The unit is the city state, § Materials
+are spent): a seat is a fact about the ground, so conquest changes who governs from it and never
+whether it is one; the stores sit at the seat and fall with it.
 
 ---
 

@@ -10,6 +10,59 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-15 — Sprint 42 wave 0: instruments before mechanisms, and the harness that paid for itself the same day
+
+**Runtime:** Full / Batch Delivery, the same session as the audit below. Nine worktree agents,
+one per item, briefed to fast-forward first and block on their own runs; the main session merged
+each branch on `sprint-42-wave-0` after `agent_base_check` (9/9 PASS) and re-ran every harness the
+agent cited before trusting the merge. A cold `code-reviewer` pass over the integrated diff found
+eleven items; four were fixed here, two corrected the bookkeeping, the rest confirmed.
+
+| Item | Landed | Verified on the merged tree |
+|---|---|---|
+| BL-981 (colonisation D1/D3 regression) | the schism verb demoted every seat in a residue block; seats now walk out as seats, block hinterland keeps its seat or re-points at the new one, parent ground whose seat left re-points at the parent capital | `colonisation_harness` 0 failures (2484/206, 2773/168, 1720/116) |
+| BL-980 (corpus reconcile) | 8 contradictions corrected, 4 calls filed (NR-868..871), the 0.90 ratio deleted from code | `header_graph --strict` 81 → 81 dangling in clean worktrees |
+| BL-974 (tree roots and header lint) | two stores reoriented (7 and 14 leaves had derived as root), one-root rule, header-matches-store check | `tree_lint all` OK, both headers byte-identical |
+| BL-962 + BL-964 | endowment spread asserted (floor 40% after review); drift digest `481BDCA5300AF14F` and a cost ceiling | `planetology_sweep` OK, `continent_drift` ALL PASS |
+| BL-966 (terrain economic gate) | census bands asserted; `survey_endowment_harness` (34 rows); `survey_endowment` exposed from the anonymous namespace | both green, census 120 seeds in 29 s |
+| BL-970 (shares by population) | both columns on the face and in the JSON; scoreboard on population, region check kept beside it after review | `history_sweep 16` regenerated on the merged tree |
+| BL-971 (displacement weighted) | pooled and volume-weighted beside the median; silent floor 20; `exploration_sweep.json` checked in | reproduced byte-identical pre-BL-981, regenerated after |
+| BL-979 (instruments run the winner) | `apply_shipped_landscape` in `harness_params.hpp`; ten call sites; `fraction_in_band` | haulage on the winner **2183 / 1614** (seed candidate 1839 / 1411; baseline 1055 / 802) |
+| BL-969 (validators in production) | both handoff validators on the shipped path; culture table crosses and is checked against `creed_state`; `save_game_version` 14 → 15 | `world_determinism` ALL PASS with R3.6/R4.4; `pass_one_handoff` ALL PASS; `save_envelope_roundtrip` PASS via the CMake tree |
+
+**The one world-mover, attributed.** BL-981 alone moves seedA/on `49FB45407FF7C3C0` → `457483363D79D700`
+(the reviewer's control build at the merge before it reproduces main's digests exactly); seedB/on,
+seedA/off and the 1960 two-span are unchanged. `exploration_sim_harness` R3b (the exact-counter pin)
+is red by the same cause: battles 306 → 308, conquests 304 → 306, foundings 522 → 472, owner changes
+2174 → 2196. Not re-pinned. **NR-875 asks Ben to authorise the wave re-bless** against the shape:
+seed 2 holds 116 seats where the razing world held 154, because breakaway realms keep theirs.
+Exploration sweep on the integrated tree: pooled displacement 1.58 → 1.68, median 1.33 → 1.35, held
+6 → 6, silent 2 → 1, Exploration battle rate 43.5 → 55.9/century. History sweep on the integrated tree: all 16 rows moved; medians top share 85 → 89‰ by regions and 101 → 110‰ by population, powers at 1200 CE 52 → 49, rose-and-fell 74 → 67 by regions and 22 → 22 by population, battle and conquest medians unchanged; ALL PASS.
+
+**Findings that outrank the items.** NR-872: six of the ten varying endowments move together with
+metallicity, so 55.5% of accepted homeworlds are poor in nothing. NR-876: by population the largest
+polities are 2–5 points *more* concentrated than region count showed, while rose-and-fell counts
+drop three times (74 → 22 per world) — the audit's "growth inflates the arc" premise was wrong on
+concentration and right on shape. NR-874 records the design call taken in BL-981 (a schism moves
+seats, it does not raze them).
+
+**Review fixes made here.** `ownership_class` ran the search on an empty registry (now the stated
+seed candidate); the population scoreboard row could pass vacuously with no playback record (both
+columns now asserted, unrecorded fails); the planetology floor had 0.5 pp of headroom (40 now);
+ERAS.md, MARKETS.md and GENERATION_STRATEGY.md had been reworded to build state by BL-980 and are
+back to design state. All nine BL-979 instruments build on the merged tree; `ownership_class` ALL PASS on the stated seed candidate; `demand_census` PASS with pooled fraction-in-band 211 of 2335 (0.0904) industrial, identical to the agent's pre-merge figure — which, with haulage reading 2183/1614 both with and without the 0.90 ratio, also answers the reviewer's first finding: the deletion did not move the winner.
+
+**What the builder bought.** Every agent's first harness build was 22 s cold and each rebuild
+seconds; the regression BL-981 fixed had shipped through two sprints because the harness that
+catches it cost 12 minutes on top of a clean compile nobody paid.
+
+**Owed.** Six of BL-979's instruments were built but not run for their headline movement
+(campaign_lapse, acquisition_viability, material_floor, chain_conversion_probe, convoy_cargo_census,
+player_seed_sweep). `history_sim_harness` stays at its 2-failure baseline (R3a2/R3a3). Haulage seed
+4 scores composite 0, so the search cannot move there — BL-977's to look at.
+
+---
+
 ## 2026-09-15 — The generation audit: every stage delivers its struct and the next reads two fields of it; BL-960 lands, sprint 42 opens
 
 **Runtime:** Design → Light delivery → sprint open. Ben asked, before Digitisation: do the existing

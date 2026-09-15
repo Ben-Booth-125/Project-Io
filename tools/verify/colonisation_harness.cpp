@@ -1193,6 +1193,15 @@ void case_settlement_seats(int seed_count)
         // — so seats and ownership are still the OPENING map there. The report's
         // own body entry is assigned AFTER the sim (hard_coded_world.cpp), which
         // is the settlement this case needs to see conquest carry a hinterland.
+        //
+        // BL-981: AND IT IS THE STATE AFTER THE EXPLORATION SPAN TOO. With
+        // `world_params::exploration_sim_enabled` on by default, the report's
+        // settlement is assigned after the 1200 -> 1660 span has run its own
+        // rounds in place on the same regions, so every verb that moves seats
+        // or ownership in EITHER span (the schism verb that produced the one
+        // dangling pointer on seed 2 fires in both) is under this check. A
+        // caller that turns the span off narrows the check to the Empires
+        // span alone; nothing here re-reads a pre-Exploration snapshot.
         if (k == nullptr || k->settlement.regions.empty()) continue;
         ++worlds;
 

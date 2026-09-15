@@ -881,6 +881,36 @@ struct settlement_state
     std::vector<region_reculture> culture_recultured;
 };
 
+/// The ANCIENT endowment under a region — surveyed once, over the window the
+/// region's people would have walked. These deposits predate everyone; what
+/// changes across a campaign is who ends up standing on them.
+///
+/// Held as RAW per-tile-mean richness in thousandths, not as a 0-1000 score:
+/// the four classes live on completely different absolute scales (a rich coal
+/// window and a rich grain window are nowhere near the same number), so an
+/// absolute gain either saturates one class or never fires another. The scores
+/// are computed later, against the world's own means (`score_against` in
+/// settlement.cpp), which is what `region::farm_q` and its siblings hold.
+///
+/// DECLARED HERE, NOT IN settlement.cpp's ANONYMOUS NAMESPACE, so a harness can
+/// read it (BL-966: `tools/verify/survey_endowment_harness.cpp`). It is a pure
+/// function of the tiles under the window — no RNG, no state — and exposing it
+/// changes nothing about who calls it inside generation.
+struct endowment
+{
+    int farm = 0, ore = 0, energy = 0, water = 0; ///< Per-tile mean × 1000.
+};
+
+/// Survey the window centred on (`col`, `row`): `farm` reads agricultural
+/// produce, `ore` reads iron + copper + rare-earth ore, `energy` reads coal +
+/// petroleum, `water` is the share of the window that is water. Every class is
+/// the per-tile mean over the WHOLE window (water cells count in the divisor
+/// and contribute nothing), so a coastal window is poorer per tile than an
+/// inland one of the same ground — that is the harbour discount `classify`
+/// then re-weighs. `ids` is the body's raster-order tile list.
+endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
+                           int col, int row, int gw, int gh);
+
 /// Settle the body: place regions, inherit each one's cradle culture, survey
 /// its ancient endowment, and industrialise the ones the ground can pay for.
 ///

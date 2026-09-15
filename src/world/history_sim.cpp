@@ -6818,6 +6818,43 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         out.polities.push_back(np);
                         note_event(lapse_event_kind::schism, seat, np.id, qid);
 
+                        // BL-981 -- A SCHISM MOVES SEATS, IT DOES NOT RAZE
+                        // THEM. The block is grouped by residue culture, so
+                        // it can carry a region that is already a seat of the
+                        // parent realm (organised above the city-state
+                        // threshold, or a seat taken in an earlier war). The
+                        // first cut wrote `is_seat = (r == seat)` over every
+                        // block member, demoting any such seat while ground
+                        // OUTSIDE the block -- the parent's own, non-reasserted
+                        // hinterland -- kept pointing at it: one dangling
+                        // `seat_region` per demoted seat (colonisation_harness
+                        // D1, seed 2, one region). Three rules now hold the
+                        // pointer invariant (CIVILISATION.md sec The unit is
+                        // the city state) through the event:
+                        //   1. `seat` becomes the new polity's capital seat;
+                        //      every other seat in the block STAYS a seat --
+                        //      a realm born of a schism holds as many seats
+                        //      as walked out with it, exactly as an empire
+                        //      holds every seat it organised.
+                        //   2. A non-seat block member keeps its pointer when
+                        //      its seat came along in the block; otherwise
+                        //      its seat stayed with the parent, so it
+                        //      re-points at `seat` -- the same "re-pointed at
+                        //      the conqueror's seat" rule the campaign verb
+                        //      applies to ground taken on its own.
+                        //   3. Parent-held ground outside the block whose seat
+                        //      just left re-points at the parent's capital --
+                        //      the "surviving hinterland follows its realm's
+                        //      seat" rule the capital-fell block applies.
+                        //      Unorganised ground (`nation < 0`, BL-920's
+                        //      pure distance pointer) is untouched: the seat
+                        //      it points at is still a seat.
+                        // Block members are walked index-ascending and `seat`
+                        // is the lowest index, so its flag is set before any
+                        // member reads it.
+                        std::vector<char> in_block(ss.regions.size(), 0);
+                        for (int r : block) in_block[static_cast<std::size_t>(r)] = 1;
+
                         for (int r : block)
                         {
                             const std::size_t ri = static_cast<std::size_t>(r);
@@ -6826,12 +6863,38 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             void_stale_standing_army(ss.regions[ri]); // BL-955
                             touch_owner(qid);
                             touch_owner(np.id);
-                            ss.regions[ri].seat_region = seat;
-                            ss.regions[ri].is_seat     = (r == seat);
+                            if (r == seat)
+                            {
+                                ss.regions[ri].is_seat     = true;
+                                ss.regions[ri].seat_region = seat;
+                            }
+                            else if (!ss.regions[ri].is_seat)
+                            {
+                                const int sr = ss.regions[ri].seat_region;
+                                const bool seat_came_along =
+                                    sr >= 0 && static_cast<std::size_t>(sr) < ss.regions.size()
+                                    && in_block[static_cast<std::size_t>(sr)]
+                                    && ss.regions[static_cast<std::size_t>(sr)].is_seat;
+                                if (!seat_came_along) ss.regions[ri].seat_region = seat;
+                            }
+                            // else: an existing seat walks out as a seat --
+                            // `is_seat` and its self-pointer are already right.
                             out.owner_changes.push_back(owner_change{
                                 static_cast<int32_t>(y),
                                 static_cast<uint16_t>(r),
                                 static_cast<uint16_t>(np.id)});
+                        }
+
+                        // Rule 3: the parent's orphaned hinterland.
+                        for (std::size_t hi = 0; hi < ss.regions.size(); ++hi)
+                        {
+                            if (in_block[hi]) continue;
+                            region& h = ss.regions[hi];
+                            if (h.nation != qid) continue;
+                            const int sr = h.seat_region;
+                            if (sr < 0 || static_cast<std::size_t>(sr) >= ss.regions.size()) continue;
+                            if (!in_block[static_cast<std::size_t>(sr)]) continue;
+                            h.seat_region = (qcap >= 0) ? qcap : -1;
                         }
 
                         // A SCHISM IS A DEFEAT FOR THE PARENT TOO, through the
@@ -7914,16 +7977,94 @@ namespace
                 out.push_back(c);
         return out;
     }
+
+    // --- The culture table across the handoff (BL-969) ---------------------
+    //
+    // `culture` carries no operator==, and adding one to creeds.hpp for a
+    // check that lives here would widen a header with hundreds of includers.
+    // Field-wise instead, EVERY member listed, so a field added to `culture`
+    // that this omits is a silent hole in the equality proof -- keep this in
+    // step with creeds.hpp's `culture` and `culture_god`.
+    bool culture_god_equal(const culture_god& a, const culture_god& b)
+    {
+        return a.name == b.name && a.domain == b.domain && a.epithet == b.epithet
+            && a.zeal == b.zeal && a.dominion == b.dominion;
+    }
+
+    bool culture_row_equal(const culture& a, const culture& b)
+    {
+        if (a.cradle != b.cradle || a.name != b.name) return false;
+        if (a.speech.onsets != b.speech.onsets || a.speech.vowels != b.speech.vowels
+            || a.speech.codas != b.speech.codas)
+            return false;
+        if (a.pantheon.size() != b.pantheon.size()) return false;
+        for (std::size_t g = 0; g < a.pantheon.size(); ++g)
+            if (!culture_god_equal(a.pantheon[g], b.pantheon[g])) return false;
+        return a.aggression_q == b.aggression_q && a.sea_legs_q == b.sea_legs_q
+            && a.parent == b.parent && a.origin_farm_class == b.origin_farm_class
+            && a.coined_year == b.coined_year;
+    }
+
+    /// The culture-table half of both validators, shared so the two handoffs
+    /// hold the table to one rule. @p live is the `creed_state` the fold read
+    /// from, or null when the caller has none (a harness re-validating a
+    /// captured value); the equality check runs only when it is given, and
+    /// that check is the one that makes the doc's claim true.
+    bool culture_table_valid(const std::vector<culture>& table, int culture_count,
+                             int64_t stop_year, const creed_state* live, std::string* why)
+    {
+        const auto fail = [&](const std::string& msg) {
+            if (why) *why = msg;
+            return false;
+        };
+        if (static_cast<int>(table.size()) != culture_count)
+            return fail("the culture table holds " + std::to_string(table.size())
+                        + " rows but culture_count says " + std::to_string(culture_count));
+        for (std::size_t i = 0; i < table.size(); ++i)
+        {
+            const culture& c = table[i];
+            // A daughter's parent is ALWAYS at a lower index (creeds.hpp,
+            // BL-865) -- ids are handed out in arrival order -- so the walk
+            // toward the root strictly decreases. -1 is a cradle culture.
+            if (c.parent < -1 || c.parent >= static_cast<int>(i))
+                return fail("culture " + std::to_string(i) + " names parent "
+                            + std::to_string(c.parent) + " out of range (must be -1 or below "
+                            + std::to_string(i) + ")");
+            // Coined within the span or earlier. INT64_MIN is "unknown" and
+            // passes trivially, as it must -- a fixture culture carries no
+            // year and is not thereby malformed.
+            if (c.coined_year > stop_year)
+                return fail("culture " + std::to_string(i) + " was coined in "
+                            + std::to_string(c.coined_year) + ", after the close at "
+                            + std::to_string(stop_year));
+        }
+        if (live != nullptr)
+        {
+            if (live->cultures.size() != table.size())
+                return fail("the culture table copy holds " + std::to_string(table.size())
+                            + " rows but the live creed_state holds "
+                            + std::to_string(live->cultures.size()));
+            for (std::size_t i = 0; i < table.size(); ++i)
+                if (!culture_row_equal(table[i], live->cultures[i]))
+                    return fail("culture " + std::to_string(i)
+                                + " in the handoff copy differs from the live creed_state row");
+        }
+        return true;
+    }
 } // namespace
 
 pass_one_output make_pass_one_output(const settlement_state&  ss,
                                      const history_sim_state& hs,
-                                     int                      culture_count)
+                                     const creed_state*       cs)
 {
     pass_one_output o;
     o.regions             = ss.regions;
     o.polities            = hs.polities;
-    o.culture_count       = culture_count;
+    // BL-969: the count and the table from ONE source, so they cannot
+    // disagree; the validator still checks that they do not, because a
+    // hand-built value can.
+    o.culture_count       = cs != nullptr ? static_cast<int>(cs->cultures.size()) : 0;
+    if (cs != nullptr) o.cultures = cs->cultures;
     o.works_by_span_band  = hs.works_by_span_band;
     o.grudges             = hs.grudges;
     o.contacts            = hs.contacts;
@@ -7960,7 +8101,8 @@ pass_one_output make_pass_one_output(const settlement_state&  ss,
     return o;
 }
 
-bool pass_one_output_valid(const pass_one_output& o, std::string* why)
+bool pass_one_output_valid(const pass_one_output& o, std::string* why,
+                           const creed_state* live)
 {
     const auto fail = [&](const std::string& msg) {
         if (why) *why = msg;
@@ -8151,6 +8293,12 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why)
             return fail("a want names a good the wanting polity already holds");
     }
 
+    // 7. The culture table (BL-969): sized to `culture_count`, parents in
+    //    range and below their child, coined at or before the close, and --
+    //    when the live table is given -- equal to it row for row.
+    if (!culture_table_valid(o.cultures, o.culture_count, o.stop_year, live, why))
+        return false;
+
     if (why) why->clear();
     return true;
 }
@@ -8161,12 +8309,15 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why)
 
 exploration_output make_exploration_output(const settlement_state&  ss,
                                            const history_sim_state& hs,
-                                           int                      culture_count)
+                                           const creed_state*       cs)
 {
     exploration_output o;
     o.regions       = ss.regions;
     o.polities      = hs.polities;
+    // BL-969: count and table from one source, as `make_pass_one_output`.
+    const int culture_count = cs != nullptr ? static_cast<int>(cs->cultures.size()) : 0;
     o.culture_count = culture_count;
+    if (cs != nullptr) o.cultures = cs->cultures;
     o.contacts      = hs.contacts;
     o.grudges       = hs.grudges;
     o.start_year    = hs.start_year;
@@ -8216,7 +8367,8 @@ exploration_output make_exploration_output(const settlement_state&  ss,
     return o;
 }
 
-bool exploration_output_valid(const exploration_output& o, std::string* why)
+bool exploration_output_valid(const exploration_output& o, std::string* why,
+                              const creed_state* live)
 {
     const auto fail = [&](const std::string& msg) {
         if (why) *why = msg;
@@ -8442,6 +8594,10 @@ bool exploration_output_valid(const exploration_output& o, std::string* why)
     }
 
     if (o.start_year > o.stop_year) return fail("the span closes before it opens");
+
+    // 11. The culture table (BL-969), held to the same rule as pass 1's.
+    if (!culture_table_valid(o.cultures, o.culture_count, o.stop_year, live, why))
+        return false;
 
     if (why) why->clear();
     return true;

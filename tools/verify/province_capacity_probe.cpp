@@ -176,8 +176,8 @@ int main(int argc, char** argv)
 
         // Q4 (added on the spot, because Q1 came back zero): if the per-tile cap
         // refuses nothing, what DOES bound the built world? Background firms are
-        // generated per body until they cover `target_ratio` (0.90) of demand OR
-        // hit `max_firms_per_body` (40) — a bound whose own comment calls it a
+        // generated per body until a cap binds — per resource, per province, or
+        // `max_firms_per_body` (40 when this was written) — a bound whose own comment calls it a
         // "hard bound - never infinite-loop", i.e. a safety valve, not a design
         // target. If a body stops AT 40, the generator ran out of permission
         // before it ran out of demand to cover, and the market opens thin.
@@ -200,10 +200,11 @@ int main(int argc, char** argv)
             ++firms_per_body[home];
         }
         // Q5 - THE COVERAGE QUESTION (Ben, 2026-08-20: measure the coverage
-        // first, then raise the cap). The generator's own target is target_ratio
-        // 0.90; measure_production_ratio is the SHIPPED arithmetic, not a copy.
-        // A body that stops at 40 firms below 0.90 ran out of permission, not out
-        // of work to do.
+        // first, then raise the cap). The generator has NO coverage target — its
+        // caps bind (CORPORATION_GENERATION.md § Pass 6) — so the 0.90 below is
+        // this probe's own reference line; measure_production_ratio is the SHIPPED
+        // arithmetic, not a copy. A body that stops at its cap below 0.90 ran out
+        // of permission, not out of work to do.
         std::map<entity_id, float> ratio_by_body;
         for (const auto& [bid, b] : w.bodies)
             ratio_by_body[bid] = measure_production_ratio(w, reg, bid);
@@ -294,11 +295,11 @@ int main(int argc, char** argv)
                 continue;
             const auto rit = ratio_by_body.find(bid);
             const float ratio = (rit == ratio_by_body.end()) ? -1.0f : rit->second;
-            std::printf("       body %-8u firms %2d%s  coverage %.3f  (target 0.900)%s\n",
+            std::printf("       body %-8u firms %2d%s  coverage %.3f  (ref 0.900)%s\n",
                         static_cast<unsigned>(bid), n,
                         n >= 200 ? " AT BOUND" : "         ",
                         ratio,
-                        (ratio < 0.90f) ? "   <-- SHORT OF TARGET" : "");
+                        (ratio < 0.90f) ? "   <-- BELOW 0.90 REF" : "");
         }
         std::printf("       background firms: most on any body = %d%s (anti-runaway bound 200)\n",
                     max_firms, bodies_at_cap ? "  <-- AT THE BOUND" : "");

@@ -606,6 +606,12 @@ in `tools/verify/README.md`.
   Body phase places geological deposits and the Life phase places biological ones; this asserts the
   Body phase places **no** biological deposit. Nothing else can see that invariant.
 
+- **`survey_endowment_harness`** — **The first harness on `survey_endowment`** (BL-966), the
+  per-region farm/ore/energy read that drives cradle placement, region class and corporate focus.
+  On the reference seed's homeworld: determinism, ordering (the richest window by an independent
+  tile read outscores the barrenest, and the shipped `region::*_q` agree), the endowment-zero rule
+  on a body with the channel at 0.0, and a non-flat per-region spread (IQR above a measured floor).
+
 - **`landscape_score_harness`** — **The only thing that can tell whether phase 6 has anything to
   search on** (BL-770). Scores candidate landscapes on the four terms of
   `GENERATION_STRATEGY.md` § What the objective is made of and reports the **relative range** of

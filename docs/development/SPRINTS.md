@@ -232,6 +232,8 @@ BL-960 WENT FIRST BY BEN'S CALL and paid immediately: the world set now compiles
 
 SEQUENCING RULE: instruments before mechanisms. A wave that moves the world lands only after the reading it will be judged on is asserted and checked in.
 
+WAVE 0 RETRO, 2026-09-15: nine worktree agents, every one verified independently on the merged tree before its merge was trusted. Three findings outranked the items: BL-981 (the schism verb razed seats; found only because the cached builder made the colonisation harness cheap to run), NR-872 (six metal endowments move together) and NR-876 (the population column reverses the region-count premise: more concentrated, three times fewer real risers). Two agents yielded mid-wait despite the brief; one had to be resumed.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -296,7 +298,7 @@ SEQUENCING RULE: instruments before mechanisms. A wave that moves the world land
 | 38 | empire — the whole phase | 8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). REFRAMED 2026-09-10 on Ben's call (option B): the sprint no longer closes on BL-868's harness, but on a DISTRIBUTIONAL reading of history_sweep. The sweep was run and the reading is in: conflict is fixed, asymmetry and volatility are not. BL-889, BL-890, BL-891 and BL-892 were added to the sprint on that basis; BL-868 is now blocked on BL-889. |
 | 39 | the drama of the time-lapse | OPEN. Redefined 2026-09-11 (Ben) from "tighten the levers" to the DRAMA of generation: the political map is highly stable and empires never fragment back into city states, and the rounds render a computed record after the fact. Sixteen items filed off a holistic read of the generation layer (seven parallel readers, 67 stability claims adversarially checked); five design calls resolved on the form 2026-09-11 (NR-835..NR-839). Batch-delivered in one go. |
 | 41 | Exploration trade | COMPLETE 2026-09-14. Nine items built and merged; the wave world shape authorised at Alarm 525 (NR-867); the wants claim weakened in EXPLORATION.md (NR-865). |
-| 42 | generation sharpened before Digitisation | OPENED 2026-09-15. BL-960 (harness world lib) built first and landed; a colonisation_harness regression found by it is filed as BL-981 and goes first. Twenty-one items in four waves; every world-moving wave re-blesses the digests once with the movement described. |
+| 42 | generation sharpened before Digitisation | WAVE 0 COMPLETE 2026-09-15: nine items merged and verified on the integrated tree (gate list green; history_sim_harness at its 2-failure baseline). The BL-981 schism fix moved seedA/on and the exploration R3b pin; the wave re-bless is gated on NR-875. Waves 1-3 open. |
 
 **Next up.** SPRINT 42 OPEN (2026-09-15): generation sharpened before Digitisation. Wave 0 first (BL-981 the regression, then instruments and the corpus pass), then the physical stages, the history stages, and the seam. Sprints 38 and 39 are closed in DEVLOG.md but their hot rows are still not archived (pre-existing gap, unchanged).
 

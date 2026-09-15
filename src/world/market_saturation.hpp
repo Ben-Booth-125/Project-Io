@@ -126,6 +126,63 @@ measure_market_completeness(world& w, const recipe_registry& reg,
                             const std::array<resource_classification, resource_count>& cls);
 
 // ===========================================================================
+// The static supply:demand ratio — is the market IN BAND?
+// ===========================================================================
+//
+// THE SECOND HALF OF SATURATION, promoted for the same reason as the first
+// (BL-979). Chain completeness says a market CAN close its chains; this says
+// whether what the ground offers is in proportion to what the band's sinks
+// want. `landscape_score` computed it as its term 2 and nothing else could
+// read it, so no instrument could answer "what fraction of markets clear at
+// start". The arithmetic moved here VERBATIM — the scorer now calls this and
+// the census prints it — so the search and the reading cannot drift.
+//
+// SUPPLY is deposit magnitude summed over the market's IN-REACH catchment.
+// DEMAND is the structural want: heads for a household sink, a flat weight per
+// other market sink. Both static; neither reads a price. A priced resource with
+// any signal on either side is RATED; it is BALANCED when supply/demand sits
+// inside [1/pin_ratio, pin_ratio], GLUTTED above (or supplied with no sink
+// here), STARVED below (or wanted with nothing here yielding it).
+//
+// THE DEFAULTS LIVE HERE, ONCE. `landscape_score_params` initialises from these
+// constants rather than restating them, so the search and the census read the
+// same band unless a caller says otherwise. The band is not a verdict: 4.0 sits
+// deliberately inside the authored price band of [0.25x, 10x], and where the
+// line belongs is Ben's to set — this measure REPORTS, it does not gate.
+
+constexpr double k_balance_household_per_head = 1.0;
+constexpr double k_balance_sink_weight        = 250.0;
+constexpr double k_balance_pin_ratio          = 4.0;
+
+struct market_balance
+{
+    entity_id market   = null_entity;
+    entity_id body     = null_entity;
+    int       balanced = 0;    ///< priced resources whose ratio sits inside the band
+    int       glutted  = 0;    ///< supply >> demand, or supply with no sink here
+    int       starved  = 0;    ///< demand >> supply, or a want nothing here yields
+    int       rated    = 0;    ///< priced resources with any signal at all
+    double    fraction = 0.0;  ///< balanced / rated; 0 when nothing is rated
+};
+
+/// The balance term, per market, under an explicit band and demand weights.
+/// Builds the body reach fields it needs (a `world` cache) — which is why @p w
+/// is not const, and why a bare call is safe: "not computed" reach is
+/// PERMISSIVE, so a caller that skipped the build would count every tile in
+/// reach. Deterministic: sorted market walk, sorted tile walk.
+std::vector<market_balance>
+measure_market_balance(world& w, const recipe_registry& reg,
+                       const std::array<resource_classification, resource_count>& cls,
+                       double household_per_head, double sink_weight, double pin_ratio);
+
+/// THE HEADLINE READING: per market, the fraction of priced resources whose
+/// supply:demand ratio sits within [1/ratio, ratio], at the default demand
+/// weights. A convenience over `measure_market_balance` for an instrument that
+/// wants the number and not its decomposition.
+std::vector<market_balance>
+fraction_in_band(world& w, const recipe_registry& reg, double ratio);
+
+// ===========================================================================
 // The other half of the question — does each part PAY?
 // ===========================================================================
 //
