@@ -7106,10 +7106,23 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // The formula and the reason for its shape are on `polity::protection_q`.
     // Integer throughout, walked in polity-id order over a vector, so it is
     // byte-identical from a seed like everything else in this file.
+    //
+    // TWO-SPAN ARC ONLY (BL-976). Industrialisation timing is a fact of the
+    // industrial span, and only the two-span arc (`boundary_year` set by
+    // `era_minus_one_sim_params`) runs one. The single-span arc closes at
+    // 1200 CE with no furnace lit on any seed, so this derivation had nothing
+    // to read there and computed a number nothing could use; on that arc the
+    // scalar is Digitisation's to write from scarcity, flows and preference
+    // (DIGITISATION.md § The boundary). The broadcast below runs on both arcs:
+    // it is the seam `derive_national_protection` reads, and a zero field is
+    // the single-span world's honest tariff posture.
     {
+        const bool industrial_span_ran = params.boundary_year != INT64_MIN;
+
         std::vector<int> alive_ids;
-        for (const polity& q : out.polities)
-            if (q.alive) alive_ids.push_back(q.id);
+        if (industrial_span_ran)
+            for (const polity& q : out.polities)
+                if (q.alive) alive_ids.push_back(q.id);
 
         // The world's FIRST furnace, among the polities that survived to be
         // handed over. A polity that lit and was then eliminated is not part of
@@ -7122,7 +7135,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             if (lead == k_never_industrialised || yr < lead) lead = yr;
         }
 
-        if (lead != k_never_industrialised && alive_ids.size() > 1)
+        if (industrial_span_ran && lead != k_never_industrialised && alive_ids.size() > 1)
         {
             const int64_t span = std::max<int64_t>(1, params.stop_year - lead);
             for (int qi : alive_ids)

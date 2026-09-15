@@ -2240,6 +2240,11 @@ struct polity
     /// far-flung holding is a large empire, not an overseas one), the term is
     /// left out and recorded as owed. It is an addend on this scalar when
     /// BL-749 lands, not a restructure.
+    ///
+    /// WRITTEN ON THE TWO-SPAN ARC ONLY (BL-976). The single-span arc runs no
+    /// industrial span, so the sim leaves this at zero there and the
+    /// derivation is Digitisation's (DIGITISATION.md § The boundary);
+    /// `seed_national_tariffs` reads it on both arcs as the enactment seam.
     int protection_q = 0;
 
     /// True for a seeded great power (BL-299). Majors start with more ground
