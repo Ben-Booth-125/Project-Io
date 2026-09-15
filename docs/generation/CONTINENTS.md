@@ -241,9 +241,12 @@ guess rather than a reconstruction:
 - **Longitude across a pole.** Ground that crosses a pole physically comes down the
   far side, half a wrap away. The latitude folds; the column does not.
 - **A body-global palaeo-thermal term.** Over the 100 My the drift record spans, the
-  radiogenic budget moves by well under a percent — latitude is the whole story at
-  this depth, and a term that cannot change an answer is a term that only looks
-  rigorous.
+  radiogenic budget moves by about a percent — latitude is the whole story at this
+  depth, and the query does not pretend otherwise. The term is **Planetology's** to
+  state, not the drift query's: `planetology_state::thermal_series` carries theta at
+  every epoch of this same clock ([PLANETOLOGY.md](PLANETOLOGY.md) § The thermal
+  series), sized by `continent_drift_epochs`, and the Life phase reads it there. The
+  query itself stays position and latitude only.
 - **Boundary classification at a past epoch.** Convergent and divergent describe the
   present surface, for the reason the drift clock gives above.
 
