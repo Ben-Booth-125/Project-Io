@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*35 entries — 35 open, 0 resolved.*
+*37 entries — 37 open, 0 resolved.*
 
 ---
 
@@ -535,6 +535,28 @@ EXPLORATION.md sec Capital arrives says consolidation is the phase's opening act
 > **Recommendation:** Option 1 is what Ben said and what the doc records; option 2 is what the code does. Given the standing preference for the doc, option 1 — but it moves the world, so it is a sprint 42 item with a sweep, not a one-line fix.
 
 *Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`, `src/world/settlement.hpp`*
+
+### NR-872 — FINDING: six of the ten varying endowments move together with metallicity, so 55% of accepted homeworlds are poor in nothing
+*decision · raised 2026-09-15 · from BL-962 (endowment spread asserted), building agent's measurement over 20,000 accepted homeworlds; main session review.*
+
+planetology_sweep now prints the per-resource endowment distribution and asserts it has tails. The brief asked for "at least one resource per world in that resource's bottom decile"; the measurement says 55.5% of accepted homeworlds sit in NO resource's bottom decile. Cause: iron, copper, silica, rare earths, platinum-group metals and iron-nickel all scale with the same metallicity draw, so a metal-rich world is rich in all six at once. The assertion was pinned at the measured 44% rather than committed red. Also seen: every endemic good and most Tier-2/3 goods carry endowment 1.0 from S8's initial fill and are never overwritten (harmless while nothing reads them).
+
+**Why it matters.** GENERATION_STRATEGY.md sec Asymmetry is the deliverable names endowment as the first instrument of supply asymmetry and asks for a wide spread with real tails. A metallicity axis that moves six resources together produces rich worlds and poor worlds, not worlds rich in one thing and starved of another, which is the shape trade needs. Whether that is the planetology's honest physics or a generator flattening the map is the call.
+
+- Accept: metallicity is one real axis and the spread across worlds is enough; the within-world asymmetry comes from terrain and the endemic bands, not from endowment.
+- Decouple one or two metal endowments from metallicity with a second seeded scalar (a generator change; digests move; re-bless once with the movement described).
+- Leave until Digitisation shows whether the coupling is visible in the market; revisit with a chain-completeness reading in hand.
+
+### NR-873 — READING: displacement at Alarm 525 is 1.58 pooled and 1.33 median, with six held seeds and two silent
+*question · raised 2026-09-15 · from BL-971 (displacement volume-weighted), exploration_sweep over 16 seeds on the sprint-42 wave-0 tree; exploration_sweep.json is now checked in.*
+
+Ben asked on NR-867 for a volume-weighted displacement reading. Pooled (sum of frontier over sum of neighbour battles): 1.58 (2262 / 1436). Volume-weighted per-seed mean: 3.88, dominated by seed 10 (4 neighbour wars against 158 frontier, ratio 39.5); about 2.2 without it. Median, as before: 1.33. Per seed: 7 displaced by ratio, 1 displaced with zero neighbour wars (seed 4, 35 frontier), 6 HELD where neighbour war still leads (seeds 0, 3, 6, 7, 12, 15), 2 SILENT under the 20-battle floor (seeds 9, 14). Conflict persists: Exploration 43.5 battles/century against Empires 404.9.
+
+**Why it matters.** The sprint-41 authorisation rested on the median. The pooled reading is the robust one and also clears 1.0, so the conclusion survives the correction; but six of sixteen worlds still fight their neighbours more than their frontier, and the doc's claim is that conflict MOVES. Whether "clears on the pooled reading with six held seeds" is the phase's honest state or a tuning question is Ben's.
+
+- Authorisation stands on the pooled reading; the held seeds are a legitimate spread.
+- Treat the held count as the reading to move next, with a measured cause per held seed before any constant changes.
+- Require both pooled and median above 1.0 AND held seeds below a stated count before Digitisation is designed.
 
 ---
 
