@@ -7,6 +7,8 @@
 #include "world.hpp"
 
 #include <algorithm>
+#include <chrono>   // round timings — printed diagnostics only, never read by the walk
+#include <cstdio>
 #include <thread>
 
 namespace
@@ -131,6 +133,7 @@ int compare_landscape(const landscape_score& a, const landscape_score& b)
     c = cmp_double(a.mean_actual, b.mean_actual);           if (c) return c;
     c = cmp_double(a.mean_completeness, b.mean_completeness); if (c) return c;
     c = cmp_double(a.spread, b.spread);                     if (c) return c;
+    c = cmp_double(a.reach_spread, b.reach_spread);         if (c) return c;
     c = cmp_double(a.mean_balance, b.mean_balance);         if (c) return c;
     // Market count last: a landscape scoring identically over more markets is
     // the better-founded reading of the same number.
@@ -185,11 +188,30 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
 
     if (regenerate_specialists)
     {
+        // REPLACE, not append (BL-977). World-gen's roster goes first, then the
+        // candidate's is laid from the SAME settlement record world-gen read, so
+        // a searched specialist keeps its region-derived focus and ownership
+        // class rather than falling to the national-character fallback.
+        //
+        // The seed is the candidate's placement seed, exactly as the background
+        // pass below takes it: the two passes already draw from distinct
+        // xor-offset streams of one seed, and that seed is itself drawn from the
+        // search's (round, axis)-keyed stream on the placement axis. The roster
+        // axis moves the COUNT on a held seed, so its proposal is a neighbour of
+        // the incumbent — the same firms plus or minus a few — not a redraw.
+        remove_specialist_roster(w);
         corporation_params cp;
         cp.corporation_count = c.corporation_count;
-        generate_corporations(w, cp, c.placement_seed);
+        generate_corporations(w, cp, c.placement_seed, w.gen_settlement.get());
     }
     generate_background_firms(w, reg, c.placement_seed);
+
+    // Either pass can author a port or an inland hub, and each is a supply
+    // anchor. The base world's reach field was warmed by its own placement, so
+    // a copy scored without this would read a catchment that ignores every
+    // anchor the candidate just built. Unconditional: an over-clear costs one
+    // Dijkstra, a missed one is a reach field that lies.
+    invalidate_logistics_caches(w);
 }
 
 landscape_search_result search_landscape(const world& base, const recipe_registry& reg,
@@ -198,8 +220,15 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     landscape_search_result out;
     out.seed_candidate = p.start;
 
+    using clock = std::chrono::steady_clock;
+    const auto ms_since = [](clock::time_point t0)
+    {
+        return std::chrono::duration<double, std::milli>(clock::now() - t0).count();
+    };
+
     // --- the seed candidate -------------------------------------------------
     {
+        const auto t0 = clock::now();
         scored s;
         s.cand = p.start;
         score_one(base, reg, p, s);
@@ -207,6 +236,13 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
         out.winner       = s.cand;
         out.winner_score = s.score;
         out.evaluations  = 1;
+        out.round_ms.push_back(ms_since(t0));
+        if (p.print_rounds)
+            std::printf("[landscape_search] seed   corps=%d placement=%08X tier=%u  "
+                        "composite=%.6f  (%.0f ms)\n",
+                        s.cand.corporation_count, s.cand.placement_seed,
+                        static_cast<unsigned>(s.cand.road_tier), s.score.composite,
+                        out.round_ms.back());
     }
 
     const int threads = std::max(1, p.thread_count);
@@ -214,6 +250,7 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
 
     for (int r = 0; r < rounds; ++r)
     {
+        const auto round_t0 = clock::now();
         // --- propose, one per axis, in the fixed axis order ------------------
         std::vector<scored> props(landscape_axis_count);
         for (int a = 0; a < landscape_axis_count; ++a)
@@ -268,12 +305,28 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
         // A tie leaves the incumbent standing. Consulting the candidate key here
         // would make an equal-scoring proposal unseat the incumbent and let the
         // walk churn between equals for the rest of its fixed rounds.
+        const double incumbent_composite = out.winner_score.composite;
         const bool accept = compare_landscape(props[best].score, out.winner_score) > 0;
         if (accept)
         {
             out.winner       = props[best].cand;
             out.winner_score = props[best].score;
             ++out.accepted;
+            ++out.accepted_by_axis[best];
+        }
+
+        out.round_ms.push_back(ms_since(round_t0));
+        if (p.print_rounds)
+        {
+            const landscape_candidate& bc = props[best].cand;
+            std::printf("[landscape_search] round %d  %-9s %s  corps=%d placement=%08X tier=%u  "
+                        "composite=%.6f vs incumbent %.6f  (%.0f ms, %.0f ms/eval)\n",
+                        r, landscape_axis_name(static_cast<landscape_axis>(static_cast<int>(best))),
+                        accept ? "TAKEN" : "held ",
+                        bc.corporation_count, bc.placement_seed,
+                        static_cast<unsigned>(bc.road_tier), props[best].score.composite,
+                        incumbent_composite, out.round_ms.back(),
+                        out.round_ms.back() / static_cast<double>(landscape_axis_count));
         }
 
         for (std::size_t i = 0; i < props.size(); ++i)

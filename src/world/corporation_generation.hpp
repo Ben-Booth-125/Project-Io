@@ -121,6 +121,29 @@ std::vector<entity_id> generate_corporations(
     const struct settlement_state* settle = nullptr,
     struct generation_progress* progress = nullptr);
 
+/// BL-977 — strip the SPECIALIST roster so a candidate can lay a fresh one.
+///
+/// `generate_corporations` APPENDS, and has already run inside
+/// `make_hard_coded_world` by the time the landscape search sees the world; a
+/// second call would double every specialist. This is the inverse the roster
+/// axis needs: every corporation with `is_background == false` goes, with its
+/// asset buildings and their stockpiles, its body pools, any units it owns and
+/// its per-corp tech/modifier rows; `player_entity` is cleared when it named
+/// one of them (the seat is drawn afterwards, from the roster that survives).
+/// BACKGROUND FIRMS ARE UNTOUCHED — they are laid by the candidate's own
+/// placement pass and belong to it, not to the world-gen roster.
+///
+/// Walks corporations in ascending id, so the erase order — and the entity ids
+/// the regenerated roster then draws — is the same on every standard library.
+/// Invalidates the logistics caches: a removed port or hub was a supply anchor.
+///
+/// What it does NOT undo: the market carving already read where the world-gen
+/// roster clustered (`corps_in_nation`), and markets are settled by the end of
+/// phase 4 — the search moves rosters over fixed markets by design.
+///
+/// @return The number of corporations removed.
+int remove_specialist_roster(world& w);
+
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631)
 //

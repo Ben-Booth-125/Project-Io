@@ -5,10 +5,12 @@
 #include "world/hard_coded_world.hpp" // generation_progress — the BL-305 tap
 
 #include "world/economy_system.hpp"
+#include "world/logistics.hpp"      // invalidate_logistics_caches — remove_specialist_roster
 #include "world/placement_rules.hpp"
 #include "world/settlement.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <map>
 #include <array>
 #include <cmath>
@@ -2036,6 +2038,61 @@ std::vector<entity_id> generate_corporations(
     }
 
     return corp_ids;
+}
+
+// ---------------------------------------------------------------------------
+// BL-977 — remove_specialist_roster
+// ---------------------------------------------------------------------------
+
+int remove_specialist_roster(world& w)
+{
+    std::vector<entity_id> gone;
+    for (const auto& kv : w.corporations)
+        if (!kv.second.is_background)
+            gone.push_back(kv.first);
+    std::sort(gone.begin(), gone.end());
+    if (gone.empty())
+        return 0;
+
+    for (const entity_id cid : gone)
+    {
+        const corporation_component& cc = w.corporations.at(cid);
+        for (const entity_id bid : cc.assets)
+        {
+            w.buildings.erase(bid);
+            w.stockpiles.erase(bid);
+        }
+        if (cc.hq_building != null_entity)
+        {
+            w.buildings.erase(cc.hq_building);   // always among the assets; stated anyway
+            w.stockpiles.erase(cc.hq_building);
+        }
+
+        for (auto it = w.corp_body_pools.begin(); it != w.corp_body_pools.end();)
+            it = (it->first.first == cid) ? w.corp_body_pools.erase(it) : std::next(it);
+
+        // Units are keyed by their own id; collect then erase so the map is not
+        // mutated under its iterator. Order-insensitive: every erase is by key.
+        std::vector<entity_id> owned;
+        for (const auto& kv : w.units)
+            if (kv.second.owner == cid)
+                owned.push_back(kv.first);
+        for (const entity_id uid : owned)
+            w.units.erase(uid);
+
+        w.earned_techs.erase(cid);
+        w.corp_modifiers.erase(cid);
+        w.corp_embargo_conditions.erase(cid);
+
+        if (w.player_entity == cid)
+            w.player_entity = null_entity;
+        w.corporations.erase(cid);
+    }
+
+    // A specialist port or inland hub was a supply anchor; the reach field that
+    // still counts it would let a candidate score ground nobody can now reach.
+    invalidate_logistics_caches(w);
+    return static_cast<int>(gone.size());
 }
 
 // ---------------------------------------------------------------------------

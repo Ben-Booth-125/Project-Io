@@ -2300,5 +2300,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
         }
     }
 
+    // BL-977: the record the landscape search's roster axis regenerates
+    // specialists from (world.hpp § gen_settlement). Its `history` was moved
+    // into the ladder above; regions, charter and the industrial median — all
+    // `generate_corporations` reads — are intact. Set whether or not a report
+    // was requested, so the harness tier and the app hand the search one thing.
+    w.gen_settlement = std::make_shared<const settlement_state>(kepler_settlement);
+
     return w;
 }
