@@ -210,6 +210,28 @@ THE FIVE CALLS, TAKEN 2026-09-11 (Ben, form): city states spawn in regions above
 
 RETRO 2026-09-14. What went well: the design form settled five forks in one pass before any code; four wave-1 agents ran in parallel; every wave got a cold review, and the reviews caught real defects each time (over-import, a squared loss formula, a scorer/battle mismatch, flows outliving their clause). What cost the most: the sweep -- 65 minutes for 16 seeds at the start -- until BL-958 cut it to 99 s; and design arithmetic left implicit (what bounds a flow, whether a cap can bind), which reviews found after build instead of before. The bisect showed a 3-seed median (0.88) had stood as a tuning premise; the 16-seed rule now holds. Pacing: mechanism waves fanned out well; the tuning wave was quick only because the instrument had been fixed first.
 
+### Sprint 42 — generation sharpened before Digitisation
+*Open · opened 2026-09-15 · Ben (2026-09-15: "A then B ... return to A in development mode ... sharpen each prior step before the instrumental one (digitisation), where the generation becomes the world players see")*
+
+**Goal.** Make every generation stage before Digitisation deliver what its doc promises AND hand it forward to a reader. The 2026-09-15 audit found each stage delivering its own struct while the next stage reads two fields of it, the campaign economy reads grudges and roads only, and no stage measures its economic output until the end. This sprint closes those gaps stage by stage, corrects the twelve doc-versus-code contradictions, and makes the build and sweep loop cheap enough that the tuning Digitisation needs is affordable.
+
+**Planned.**
+- Wave 0 (gates and instruments; no world movement): BL-981 (colonisation D1/D3 regression), BL-980 (corpus reconcile), BL-974 (tree roots and header lint), BL-964 (drift snapshot golden), BL-962 (endowment spread asserted), BL-966 (terrain economic gate), BL-970 (share readings population-weighted), BL-971 (displacement volume-weighted), BL-979 (instruments run the winner), BL-969 (pass-one validator in production).
+- Wave 1 (physical stages): BL-965 (tile pass re-entry, bit-identical), BL-961 (planetology thermal series), BL-963 (tiles ride plates; the largest, sliced if the cost measurement says so).
+- Wave 2 (history stages): BL-967 (rivers priced in the walk), BL-968 (ephemeral cultures measured, then the rule Ben picks), BL-972 (force upkeep in the world), BL-973 (tree effects generated), BL-976 (tariff derivation hands to Digitisation).
+- Wave 3 (the seam into the campaign): BL-975 (nation treasury from Exploration), BL-977 (search axes live and the reach term), BL-978 (warm start retired).
+- Landed before the sprint opened: BL-960 (harness world lib).
+
+**Done when.** Every item terminal. history_sweep.json and exploration_sweep.json are checked in with the population-weighted and volume-weighted readings; both validators run on the shipped path; nations start with treasuries traceable to 1660; the landscape search discriminates road tiers and rosters; the warm start is gone and haulage stays above its baseline; header_graph --strict does not rise; and a 16-seed reading of the integrated tree is filed in NEEDS_REVIEW for Ben before Digitisation is designed.
+
+**Risk.** Three items move the world under the Empires and Exploration spans (BL-967, BL-972, BL-973) and every sweep reading was calibrated on the pre-change world; the displacement reading regressed silently once before (NR-862) because the sweep reports rather than gates. Wave 0 lands the weighted readings and the checked-in sweep artefacts FIRST so each world-moving wave is read against a baseline it cannot quietly move. BL-963 is the one item whose cost is unknown; it is measured before it is built.
+
+THE AUDIT THAT OPENED IT, 2026-09-15: five parallel readers over the physical stages, Culture and Empires, Exploration and the trees, the political map to the market, and the tooling. Per-stage verdict and the eighteen improvements are in DEVLOG.md 2026-09-15; the items carry the evidence with file:line pointers.
+
+BL-960 WENT FIRST BY BEN'S CALL and paid immediately: the world set now compiles once (22 s cold, 5 s to link a harness, 12 s after touching one world file) instead of 66 TUs per harness; the first harness run through it found BL-981, a colonisation_harness red that sprints 40 and 41 never ran.
+
+SEQUENCING RULE: instruments before mechanisms. A wave that moves the world lands only after the reading it will be judged on is asserted and checked in.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -274,9 +296,10 @@ RETRO 2026-09-14. What went well: the design form settled five forks in one pass
 | 38 | empire — the whole phase | 8 of 9 items landed and verified on main (BL-873, BL-871, BL-866, BL-837, BL-867, BL-870, BL-869, BL-872). REFRAMED 2026-09-10 on Ben's call (option B): the sprint no longer closes on BL-868's harness, but on a DISTRIBUTIONAL reading of history_sweep. The sweep was run and the reading is in: conflict is fixed, asymmetry and volatility are not. BL-889, BL-890, BL-891 and BL-892 were added to the sprint on that basis; BL-868 is now blocked on BL-889. |
 | 39 | the drama of the time-lapse | OPEN. Redefined 2026-09-11 (Ben) from "tighten the levers" to the DRAMA of generation: the political map is highly stable and empires never fragment back into city states, and the rounds render a computed record after the fact. Sixteen items filed off a holistic read of the generation layer (seven parallel readers, 67 stability claims adversarially checked); five design calls resolved on the form 2026-09-11 (NR-835..NR-839). Batch-delivered in one go. |
 | 41 | Exploration trade | COMPLETE 2026-09-14. Nine items built and merged; the wave world shape authorised at Alarm 525 (NR-867); the wants claim weakened in EXPLORATION.md (NR-865). |
+| 42 | generation sharpened before Digitisation | OPENED 2026-09-15. BL-960 (harness world lib) built first and landed; a colonisation_harness regression found by it is filed as BL-981 and goes first. Twenty-one items in four waves; every world-moving wave re-blesses the digests once with the movement described. |
 
-**Next up.** SPRINT 40 (EXPLORATION) CLOSED 2026-09-12. All fifteen planned items (BL-930..BL-944) built and independently verified; see archive/sprints-2026-Q3.json for the full retro. BL-945 stays parked for Digitisation. Sprints 38 and 39 are also closed in DEVLOG.md but their hot rows have not yet been archived -- a pre-existing bookkeeping gap this session did not create and did not fix, flagged here rather than left silent. No sprint is currently open; the next one is Ben's to define.
+**Next up.** SPRINT 42 OPEN (2026-09-15): generation sharpened before Digitisation. Wave 0 first (BL-981 the regression, then instruments and the corpus pass), then the physical stages, the history stages, and the seam. Sprints 38 and 39 are closed in DEVLOG.md but their hot rows are still not archived (pre-existing gap, unchanged).
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*57 sprints archived cold; 3 open/gated in the hot store.*
+*57 sprints archived cold; 4 open/gated in the hot store.*

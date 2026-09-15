@@ -115,28 +115,6 @@
    "requires": [],
    "blocked_on": null,
    "parked": false,
-   "category": "Tooling",
-   "id": "BL-960",
-   "short_name": "HARNESS_WORLD_LIB",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "build_harness.js compiles the world superset once into a static library and links every harness against it",
-   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
-   "files": [
-    "tools/verify/build_harness.js",
-    "tools/verify/README.md"
-   ],
-   "design": "FOUND 2026-09-15 (tooling audit). build_harness.js:231-253 compiles all 66 src/world/*.cpp per harness into a per-harness object dir, deletes the exe and reruns the whole cl line on every call with no up-to-date check. build_gen/verify holds 3.3 GB across 59 per-harness .obj dirs, ~46 MB each, of the same translation units. Editing one line of history_sim.cpp costs a clean build. The fix was measured and written down in DEVLOG (g++: objects once ~14 s with -P8, ar into a static lib, each link ~5 s; 63 of 77 harnesses built and ran that way) and never carried into this builder. CMakeLists already does it (io_world_obj, CMakeLists.txt:525, :1359); the CMake-free path is what every worktree agent uses.\n\nWORK. (1) Compile the world set once into build_gen/verify/_world/<config>/ (release and debug kept apart), then lib/ar it into io_world.lib / libio_world.a. (2) Rebuild only stale objects: compare each .obj mtime against its .cpp and against the newest header under src/world and src/ (a header-mtime max is the honest cheap rule; a false rebuild costs seconds, a missed one costs a wrong answer). (3) Each harness compiles its own TU and links against the lib. (4) --clean rebuilds the lib. (5) Keep every existing refusal (Lua symbols, save_game.hpp) and the deps-cache resolution untouched. (6) README.md:44 still advertises build_gen_harness.bat, which no longer exists; correct it.\n\nDONE WHEN: a second build of the same harness with no source change links in seconds without recompiling a world TU; a one-line edit to history_sim.cpp recompiles that TU only; history_sim_harness, colonisation_harness and world_determinism build and pass through the new path; and the per-harness .obj dirs are no longer written."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": null,
-   "written": "2026-09-15",
-   "author": "Claude (2026-09-15 generation audit, five parallel readers); Ben chose A) file, B) build the harness library, then build",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
    "category": "Generation",
    "id": "BL-961",
    "short_name": "PLANETOLOGY_THERMAL_SERIES",
@@ -611,6 +589,28 @@
     "docs/generation/EXPLORATION.md"
    ],
    "design": "CORPUS MODE. Each is a mechanical contradiction; the standing rule is that the fix is work, not a footnote. Where doc and code disagree on a DESIGN, file the call in NEEDS_REVIEW rather than pick; where one is simply stale, correct it.\n\n1. TILE_GENERATION.md:431 and :485-486 give peat as marsh cover; tile_generation.cpp:1624-1625 and RESOURCES.md:172 require the sedimentary-and-scrub pair rule (NR-789 reverted the marsh reading in code, not in the doc). Correct the doc rows.\n2. CONTINENTS.md:105-112 and hard_coded_world.hpp:511-513 say plate data never reaches the save; save_game.cpp:256-273 and :547-564 write it. BL-763's delivery note asked for this fix. Correct both.\n3. CIVILISATION.md § What the Culture phase must hand forward: five rows marked DISCARDED or owed (parentage, origin farm class, coining year, seats and hinterland, material stores) are all built (creeds.hpp:133/144/151, settlement.hpp:323/335/372). Update the table.\n4. docs/lore/COLLAPSE.md's six strategies, seven culminations and matrix have zero code references and no source file cites the doc; the built collapse model is network-failure secession (BL-896) plus the schism verb (BL-944), which COLLAPSE.md does not describe. A superseded banner and a pointer at minimum; whether the roster is still design or is retired is Ben's call, filed.\n5. landscape_score.hpp:11 says the objective has three terms; the code has four and the doc five. Correct the header (BL-977 lands the fifth).\n6. ERAS.md and MARKETS.md say the warm start is retired; app.cpp still runs 80 ticks. Until BL-978 lands, the docs must say the warm start stands; a doc may not assert a retirement ahead of the code.\n7. CORPORATION_GENERATION.md:345 says the 0.90 ratio is retired outright; corporation_generation.cpp:2076/:2198 still compile and test it. Delete the constant and the test (the caps bind; the ratio never fires) so doc and code agree.\n8. GENERATION_STRATEGY.md:33 says the campaign epoch is 1960 on the arc generation runs; the code default is epoch_year = 0 and only --epoch selects 1960. The pass map at :42-53 omits the sentiment, tariff and coverage-centre passes and lists an industrial pass that does not run by default. Rewrite the pass map from hard_coded_world.cpp's actual order and state the default epoch honestly. Whether the default moves to 1960 before Digitisation is a call for Ben, filed.\n9. GENERATION_LEDGER.md §§ the per-tile derivation breadcrumb, generation_ledger.hpp:13-16 and generation_ledger.cpp:279-282 describe and point at draw_tile_derivation, which does not exist anywhere in src/. Either the breadcrumb is owed (file it) or the doc and header drop it; filed as a call.\n10. NEXT_SESSION.md still briefs the sprint-40 build, two sprints closed. Replace with a note pointing at this item set.\n11. tools/verify/README.md:44 advertises build_gen_harness.bat, which no longer exists (BL-960 corrects it in passing; check it landed).\n12. EXPLORATION.md:80 says every seat's stores flow to the capital at 1200; history_sim.cpp:886-891 folds the capital seat's own stock only. Doc or code; filed as a call. The review banner at EXPLORATION.md:20-24 is pending Ben's read per NR-867.\n\nDONE WHEN: header_graph.js --strict count does not rise; each of the twelve is either corrected in place or has a NEEDS_REVIEW entry with the two readings; one NEEDS_REVIEW entry per call taken."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "42",
+   "written": "2026-09-15",
+   "author": "Claude (2026-09-15, found by the first colonisation_harness run through BL-960's cached build)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-981",
+   "short_name": "COLONISATION_D1_D3_REGRESSION",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "colonisation_harness D1/D3 is red again: one dangling seat pointer on seed 2 after sprints 40 and 41",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/colonisation_harness.cpp"
+   ],
+   "design": "FOUND 2026-09-15. colonisation_harness on main (0c56d339 plus the BL-960 builder) prints seed 2: regions 1700, seats 154, dangling 1, mismatches 0, and fails D1/D3 (\"every region resolves to a seat or to none; a taken seat carries its hinterland\"). Seeds 0 and 1 are clean. Confirmed through the PREVIOUS builder on the same tree (identical line), so it is the code, not the cache.\n\nHISTORY. The same shape (one dangling pointer, one of three seeds) was found and closed at sprint 39 (DEVLOG 2026-09-11: BL-920's nearest-seat pointer met BL-896's secession demotion; BL-923's rewrite closed it; \"colonisation_harness: 0 failures once both landed\"). Sprints 40 and 41 gated on exploration_sim_harness, history_sim_harness and world_determinism and never ran this harness, so a verb landed between 2026-09-12 and 2026-09-14 reintroduced it unseen. Both is_seat demotion sites (history_sim.cpp:2676 founding, :6181 organise-below-threshold) predate sprint 40; the suspects are the verbs that move ownership or seats without maintaining seat_region: the schism verb (BL-944, 3d58001d), colonial subjection and freeing (BL-934), the city-state breakdown under the Exploration span, or a capital move after organise pointed hinterland at q.capital.\n\nWORK: bisect with the cached builder (each build is seconds now) across the sprint-40/41 commits on seed 2 until the dangling count flips; fix at the verb, not in the check; extend D1/D3 to run on the Exploration span as well as the Empires span if the culprit is there. Never weaken the assertion.\n\nDONE WHEN: colonisation_harness 0 failures on main across its three seeds, and the harness named in sprint 42's gate list so it runs at every wave close."
   }
  ]
 }

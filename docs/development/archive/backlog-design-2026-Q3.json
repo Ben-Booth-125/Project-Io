@@ -14502,6 +14502,47 @@
         "design",
         "archived"
       ]
+    },
+    "BL-960": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": "42",
+      "written": "2026-09-15",
+      "author": "Claude (2026-09-15 generation audit, five parallel readers); Ben chose A) file, B) build the harness library, then build",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Tooling",
+      "id": "BL-960",
+      "short_name": "HARNESS_WORLD_LIB",
+      "priority": "A",
+      "difficulty": 3,
+      "title": "build_harness.js compiles the world superset once into a static library and links every harness against it",
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "files": [
+        "tools/verify/build_harness.js",
+        "tools/verify/README.md"
+      ],
+      "design": "FOUND 2026-09-15 (tooling audit). build_harness.js:231-253 compiles all 66 src/world/*.cpp per harness into a per-harness object dir, deletes the exe and reruns the whole cl line on every call with no up-to-date check. build_gen/verify holds 3.3 GB across 59 per-harness .obj dirs, ~46 MB each, of the same translation units. Editing one line of history_sim.cpp costs a clean build. The fix was measured and written down in DEVLOG (g++: objects once ~14 s with -P8, ar into a static lib, each link ~5 s; 63 of 77 harnesses built and ran that way) and never carried into this builder. CMakeLists already does it (io_world_obj, CMakeLists.txt:525, :1359); the CMake-free path is what every worktree agent uses.\n\nWORK. (1) Compile the world set once into build_gen/verify/_world/<config>/ (release and debug kept apart), then lib/ar it into io_world.lib / libio_world.a. (2) Rebuild only stale objects: compare each .obj mtime against its .cpp and against the newest header under src/world and src/ (a header-mtime max is the honest cheap rule; a false rebuild costs seconds, a missed one costs a wrong answer). (3) Each harness compiles its own TU and links against the lib. (4) --clean rebuilds the lib. (5) Keep every existing refusal (Lua symbols, save_game.hpp) and the deps-cache resolution untouched. (6) README.md:44 still advertises build_gen_harness.bat, which no longer exists; correct it.\n\nDONE WHEN: a second build of the same harness with no source change links in seconds without recompiling a world TU; a one-line edit to history_sim.cpp recompiles that TU only; history_sim_harness, colonisation_harness and world_determinism build and pass through the new path; and the per-harness .obj dirs are no longer written.\n\nLANDED 2026-09-15 (commit \"build_harness.js compiles the world set once\"). Measured: cold 22 s for the 62-TU set plus 6 s harness+link; unchanged rebuild 5 s; one world TU touched 12 s; world_determinism, history_sim_harness, colonisation_harness and river_generation_harness all build through the path, river_generation_harness runs green, colonisation_harness reproduces its pre-existing seed-2 red byte for byte through both builders (BL-981). The per-harness object dirs are swept on rebuild rather than deleted wholesale, so the 3.3 GB drains as harnesses are rebuilt. Objects are linked directly, not archived: a static library would drop any world TU whose contribution is a static initialiser, which the old full-object link never did.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "blocked_on",
+        "parked",
+        "category",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design"
+      ]
     }
   }
 }

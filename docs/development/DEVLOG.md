@@ -10,6 +10,54 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-15 — The generation audit: every stage delivers its struct and the next reads two fields of it; BL-960 lands, sprint 42 opens
+
+**Runtime:** Design → Light delivery → sprint open. Ben asked, before Digitisation: do the existing
+generation stages fill their promises, what tooling would make change cheaper, and will the chain end
+in a working market — with two improvements per step.
+
+**The audit.** Five parallel readers, one per stage group (physical stages; Culture and Empires;
+Exploration and the trees; the political map to the market; the tooling loop), each checking the
+authority doc's promises against the code, the harnesses and the sprint record. The verdict, stage
+by stage: each stage delivers its own struct and the harnesses prove that well; the promises break
+at the **handoffs**. The Exploration span writes treasuries, scarcity signals, trade flows and
+preference into `exploration_output`, and the campaign economy consumes grudges and roads and drops
+the rest into a test fixture; `nation_component::treasury` is 0.0 at generation. The shipped default
+is `epoch_year = 0` with a history ending in 1660, so the industrial span, tariffs and ruptures never
+run while GENERATION_STRATEGY.md says the campaign is the 1960 arc. No stage measures its economic
+output until the end: deposit spread is printed and never asserted, chain completeness did not move
+when 40% of reach was cut, the landscape search sees one live axis of three, and the warm start the
+docs call retired still runs 80 ticks. The Empires arc is now present in the spread (31/32 seeds
+eliminate polities and fall from a peak, 0/32 hegemony) but its share readings divide by a region
+count that grows 2–6× inside the run. Exploration's displacement median is carried by one constant
+pair, with two frozen seeds and zero-neighbour seeds dropped. Node effects in both wired trees reach
+the sim nowhere; three nodes are hand-wired by index or string. Twelve doc-versus-code
+contradictions were listed (peat rows, the plate serialisation claim, five stale contract rows,
+COLLAPSE.md unbuilt, the "three terms" header, the warm-start retirement, the 0.90 ratio, the epoch
+and pass map, the ledger breadcrumb, NEXT_SESSION, the README, the 1200 consolidation).
+
+**Ben's call: A then B, then build.** File the improvements, build the shared harness library, then
+return to the filed items in development mode — "sharpen each prior step before the instrumental
+one (digitisation), where the generation becomes the world players see."
+
+**Filed:** BL-960..BL-980 (two per stage, the corpus pass, the harness library). **Built:** BL-960 —
+`build_harness.js` compiles the 62-TU world set once per configuration and links every harness
+against the cached objects through a response file. Cold 22 s + 6 s link; unchanged rebuild 5 s;
+one world TU touched 12 s. Before: 3.3 GB of the same objects 59 times over and a clean build per
+edit. Objects are linked directly, not archived, so every world TU still reaches the link.
+
+**The first harness through the new path found a regression.** `colonisation_harness` D1/D3 is red
+on seed 2 (one dangling seat pointer), the exact shape closed at sprint 39; sprints 40 and 41 never
+ran this harness. Reproduced byte for byte through the previous builder before attributing it to the
+code. Filed as BL-981, first in sprint 42.
+
+**Sprint 42 opened** — "generation sharpened before Digitisation": twenty-one items in four waves,
+instruments before mechanisms, every world-moving wave re-blessed once. The perf CSVs and
+`history_sweep.json` remain modified in the tree from an earlier session; untouched here (the sweep
+JSON is stale against the harness schema, which BL-970 regenerates).
+
+---
+
 ## 2026-09-14 — Sprint 41 (Exploration trade): goods flow, spend is chosen, displacement clears 1.0 — gated on authorisation
 
 **Runtime:** long session, Design → Review → Full / Batch Delivery. Opened as a design question
