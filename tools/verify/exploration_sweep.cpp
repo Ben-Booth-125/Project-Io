@@ -37,6 +37,11 @@
 //
 // Usage:  exploration_sweep [seed_count] [--w_want_q=N]   (default 8)
 //
+// Writes: exploration_sweep.json in the working directory (BL-971) — one row
+// per seed over all eleven readings plus the spread face, checked in at the
+// repo root from a 16-seed run at generation's own constants. A tuning run
+// (any override flag) writes exploration_sweep.tuning.json instead.
+//
 //   --w_want_q=N  BL-953 TUNING ONLY: re-runs the traced span with the want
 //                 lean at N instead of generation's own value. Readings 1, 2,
 //                 4-7 then describe the overridden run; the traced-vs-untraced
@@ -825,6 +830,55 @@ int main(int argc, char** argv)
         "traced re-run reproduces generation's own (untraced) battles/conquests/foundings, every ran seed");
 
     // -----------------------------------------------------------------------
+    // THE SPREAD FACE (BL-971). Every aggregate a section prints is ALSO
+    // assigned here, and the JSON writer at the end prints this struct and
+    // `rows` — so the checked-in artefact carries exactly the numbers the
+    // console did, never a second computation of them.
+    // -----------------------------------------------------------------------
+    struct spread_face
+    {
+        // readings 1-2
+        bool    have_median = false, have_pooled = false, have_weighted = false;
+        double  median = 0.0, pooled = 0.0, weighted = 0.0;
+        int64_t sum_nb = 0, sum_fr = 0, weighted_battles = 0, no_nb_frontier_volume = 0;
+        int64_t silent_floor = 0;
+        int     seeds_ran = 0, seeds_silent = 0, seeds_displaced = 0, seeds_displaced_no_nb = 0, seeds_held = 0;
+        double  med_empire_rate = 0.0, med_expl_rate = 0.0;
+        int     ambiguous_total = 0;
+        // reading 8
+        int64_t r8_polities = 0, r8_treasury_min = 0, r8_treasury_max = 0;
+        double  r8_treasury_mean = 0.0, r8_corr = 0.0;
+        // reading 9
+        int64_t r9_corridors = 0; int32_t r9_uses_min = 0, r9_uses_median = 0, r9_uses_max = 0;
+        int64_t r9_post_roads = 0, r9_spent_roads = 0, r9_tier[4] = {0, 0, 0, 0}, r9_inherited_t3 = 0;
+        int     r9_seeds_with_post_road = 0;
+        // reading 4
+        int64_t r4_formed = 0, r4_broken = 0, r4_blocked = 0, r4_standing = 0;
+        int64_t r4_years_left_min = 0, r4_years_left_median = 0, r4_years_left_max = 0;
+        // reading 5
+        int64_t r5_subjects = 0, r5_overlords = 0, r5_alive = 0, r5_formed = 0, r5_freed = 0,
+                r5_tribute = 0, r5_max_distance = 0;
+        // reading 6
+        int64_t r6_friction = 0, r6_divergent = 0;
+        // reading 7
+        int64_t r7_navy_holders = 0, r7_spent_ports = 0, r7_spent_navies = 0, r7_spent_armies = 0,
+                r7_navy_top = 0, r7_navy_bottom = 0, r7_port_steps = 0, r7_navy_steps = 0,
+                r7_army_steps = 0, r7_lapsed = 0, r7_standing_holders = 0, r7_saturated = 0,
+                r7_violations = 0;
+        // reading 3
+        int64_t r3_measured = 0, r3_cons = 0, r3_expn = 0, r3_both = 0,
+                r3_reg_cons = 0, r3_reg_expn = 0, r3_reg_both = 0;
+        // reading 10
+        int64_t r10_live_entries = 0, r10_entries = 0, r10_seeds_with_spread = 0;
+        int     r10_w_min = 0, r10_w_median = 0, r10_w_max = 0;
+        // reading 11
+        int64_t r11_flows = 0, r11_volume = 0, r11_cross = 0, r11_unknown = 0, r11_orphan = 0,
+                r11_pairs = 0, r11_zero_pairs = 0;
+        double  r11_top_decile_share = 0.0;
+    };
+    spread_face face;
+
+    // -----------------------------------------------------------------------
     // READINGS 1-2 — DISPLACEMENT AND CONFLICT-PERSISTENCE, THE ONE TEST.
     // -----------------------------------------------------------------------
     //
@@ -843,57 +897,189 @@ int main(int argc, char** argv)
     // taken, because reading 2 (conflict persists, compared against the
     // Empires round explicitly) is read ALONGSIDE it, exactly as the doc
     // insists.
+    //
+    // THREE READINGS OF THE ONE RATIO (BL-971). A median of per-seed ratios
+    // lets a seed that barely fought (three frontier battles against one
+    // neighbour war reads as 3.0) count exactly as much as one that fought
+    // a hundred times, and drops every zero-neighbour seed from the count
+    // entirely — so the claim can be carried by silence, which is the doc's
+    // own named failure. So the ratio is read three ways, on one face:
+    //
+    //   median   — over seeds with any neighbour war, as before (kept for
+    //              continuity with the prose numbers recorded before this
+    //              item; NOT the verdict line);
+    //   pooled   — sum(frontier) / sum(neighbour) over every ran seed: one
+    //              ratio over the spread's whole conflict volume, so a silent
+    //              seed contributes exactly its handful of battles and no
+    //              more, and a zero-neighbour seed's frontier battles land in
+    //              the numerator rather than vanishing;
+    //   weighted — each defined per-seed ratio weighted by that seed's own
+    //              traced battle count (neighbour + frontier). Zero-neighbour
+    //              seeds have no finite ratio and are excluded here; their
+    //              frontier volume is printed beside it so the exclusion is
+    //              visible, and the pooled reading already carries them.
+    //
+    // SILENCE IS NAMED, NOT FOLDED IN. A seed whose traced battle count over
+    // the whole span sits below `kSilentFloorBattles` is reported SILENT: its
+    // ratio is printed but it carries no verdict either way. A zero-neighbour
+    // seed counts as displacement only when its frontier count alone clears
+    // the same floor. The floor is chosen off the 16-seed table at the
+    // authorised constants (deterrence_alarm_weight_q = 525): traced totals
+    // there, sorted, run 4, 15, 32, 34, 35, 60, ... — seeds 14 and 9 sit
+    // under 5 battles/century across 460 years (the two NR-867 named) and
+    // every other seed is at 32+ (7/century or more). 20 sits in that gap:
+    // ~4.3/century, above both silent seeds and well below the next. It is
+    // a report threshold, not a sim constant — moving it changes what is
+    // called silent, never what happened.
+    constexpr int64_t kSilentFloorBattles = 20;
+
+    struct displacement_seed
+    {
+        uint32_t    seed    = 0;
+        int64_t     nb      = 0;
+        int64_t     fr      = 0;
+        int64_t     total   = 0;     ///< nb + fr, the seed's traced conflict volume.
+        double      ratio   = -1.0;  ///< fr/nb; -1 when nb == 0.
+        const char* verdict = "";    ///< SILENT | displaced | displaced(no-nb) | held
+    };
+    std::vector<displacement_seed> disp;
+
     std::printf("\n--- readings 1-2 (read together) ---\n");
-    std::printf("%-6s %10s %10s %8s %8s %8s %10s | %10s %10s %8s\n",
+    std::printf("%-6s %10s %10s %8s %8s %8s %10s | %6s %6s %10s %10s %8s  %s\n",
                 "seed", "emp.battl", "emp.yrs", "emp/cent",
                 "expl.bat", "expl.yrs", "expl/cent",
-                "neigh/c", "front/c", "ratio");
+                "nb", "front", "neigh/c", "front/c", "ratio", "verdict");
     std::vector<double> ratios;
     std::vector<double> empire_rates, expl_rates;
+    int64_t sum_nb = 0, sum_fr = 0;
+    double  weighted_num = 0.0;
+    int64_t weighted_den = 0;
+    int64_t no_nb_frontier_volume = 0; ///< frontier battles the weighted reading cannot see.
+    int seeds_ran = 0, seeds_silent = 0, seeds_displaced = 0, seeds_displaced_no_nb = 0, seeds_held = 0;
     for (const exploration_row& r : rows)
     {
         if (!r.ok) continue;
+        ++seeds_ran;
         const double empire_rate = per_century(r.empire_battles, r.empire_years);
         const double expl_rate   = per_century(r.expl_battles, r.expl_years);
         const double neigh_rate  = per_century(r.neighbour_wars, r.expl_years);
         const double front_rate  = per_century(r.frontier_skirmishes, r.expl_years);
         const double ratio       = neigh_rate > 0.0 ? front_rate / neigh_rate : -1.0; // -1 => no neighbour wars at all
 
+        displacement_seed d;
+        d.seed  = r.seed;
+        d.nb    = r.neighbour_wars;
+        d.fr    = r.frontier_skirmishes;
+        d.total = d.nb + d.fr;
+        d.ratio = ratio;
+        if (d.total < kSilentFloorBattles)      { d.verdict = "SILENT";            ++seeds_silent; }
+        else if (d.nb == 0)                     { d.verdict = "displaced(no-nb)";  ++seeds_displaced_no_nb; }
+        else if (ratio > 1.0)                   { d.verdict = "displaced";         ++seeds_displaced; }
+        else                                    { d.verdict = "held";              ++seeds_held; }
+        disp.push_back(d);
+
         empire_rates.push_back(empire_rate);
         expl_rates.push_back(expl_rate);
-        if (ratio >= 0.0) ratios.push_back(ratio);
+        sum_nb += d.nb;
+        sum_fr += d.fr;
+        if (ratio >= 0.0)
+        {
+            ratios.push_back(ratio);
+            weighted_num += ratio * static_cast<double>(d.total);
+            weighted_den += d.total;
+        }
+        else
+        {
+            no_nb_frontier_volume += d.fr;
+        }
 
-        std::printf("%-6u %10lld %10lld %8.2f %8lld %8lld %10.2f | %10.2f %10.2f %8s\n",
+        std::printf("%-6u %10lld %10lld %8.2f %8lld %8lld %10.2f | %6lld %6lld %10.2f %10.2f %8s  %s\n",
                     r.seed,
                     static_cast<long long>(r.empire_battles), static_cast<long long>(r.empire_years), empire_rate,
                     static_cast<long long>(r.expl_battles), static_cast<long long>(r.expl_years), expl_rate,
+                    static_cast<long long>(d.nb), static_cast<long long>(d.fr),
                     neigh_rate, front_rate,
-                    ratio >= 0.0 ? (std::to_string(ratio).substr(0, 6)).c_str() : "no-nb");
+                    ratio >= 0.0 ? (std::to_string(ratio).substr(0, 6)).c_str() : "no-nb",
+                    d.verdict);
     }
 
+    // The three readings, each nullable on the face when its denominator is
+    // empty (undefined is not zero — the pre-BL-971 text already insisted).
+    bool   have_median = false, have_pooled = false, have_weighted = false;
+    double median_ratio = 0.0, pooled_ratio = 0.0, weighted_ratio = 0.0;
     if (!ratios.empty())
     {
         std::sort(ratios.begin(), ratios.end());
-        const double median_ratio = ratios[ratios.size() / 2];
-        std::printf("\n  DISPLACEMENT (frontier-rate / neighbour-rate), median across seeds with any "
-                    "neighbour war: %.2f\n", median_ratio);
-        std::printf("  %s\n", median_ratio > 1.0
-            ? "> 1: frontier-skirmish rate exceeds neighbour-war rate — displacement, not mere calming."
-            : "<= 1: neighbour-war rate still leads — no displacement measured on this spread.");
+        median_ratio = ratios[ratios.size() / 2];
+        have_median  = true;
     }
-    else
+    if (sum_nb > 0)
     {
-        std::printf("\n  DISPLACEMENT: no seed in this spread fought a single neighbour-war — "
-                    "the ratio is undefined, not zero. Report this spread's raw counts to Ben rather "
-                    "than reading a ratio into an empty denominator.\n");
+        pooled_ratio = static_cast<double>(sum_fr) / static_cast<double>(sum_nb);
+        have_pooled  = true;
+    }
+    if (weighted_den > 0)
+    {
+        weighted_ratio = weighted_num / static_cast<double>(weighted_den);
+        have_weighted  = true;
     }
 
+    std::printf("\n  DISPLACEMENT (frontier / neighbour), three readings over %d ran seeds:\n", seeds_ran);
+    if (have_pooled)
+        std::printf("    pooled   sum(frontier)=%lld / sum(neighbour)=%lld = %.2f   <- the verdict line\n",
+                    static_cast<long long>(sum_fr), static_cast<long long>(sum_nb), pooled_ratio);
+    else
+        std::printf("    pooled   UNDEFINED: no seed fought a single neighbour war (frontier total %lld)\n",
+                    static_cast<long long>(sum_fr));
+    if (have_weighted)
+        std::printf("    weighted by each seed's traced battles, over %zu seeds with a defined ratio "
+                    "(%lld battles): %.2f   (%lld frontier battles on zero-neighbour seeds not visible here)\n",
+                    ratios.size(), static_cast<long long>(weighted_den), weighted_ratio,
+                    static_cast<long long>(no_nb_frontier_volume));
+    else
+        std::printf("    weighted UNDEFINED: no seed carries a finite ratio\n");
+    if (have_median)
+        std::printf("    median   across %zu seeds with any neighbour war: %.2f   (kept beside; NOT the verdict)\n",
+                    ratios.size(), median_ratio);
+    else
+        std::printf("    median   UNDEFINED: no seed fought a single neighbour war\n");
+    std::printf("  seeds: displaced=%d displaced(no-nb, frontier >= %lld)=%d held=%d SILENT(< %lld traced battles)=%d",
+                seeds_displaced, static_cast<long long>(kSilentFloorBattles), seeds_displaced_no_nb,
+                seeds_held, static_cast<long long>(kSilentFloorBattles), seeds_silent);
+    if (seeds_silent > 0)
+    {
+        std::printf("  silent:");
+        for (const displacement_seed& d : disp)
+            if (std::strcmp(d.verdict, "SILENT") == 0) std::printf(" %u", d.seed);
+    }
+    std::printf("\n");
+    if (have_pooled)
+        std::printf("  %s\n", pooled_ratio > 1.0
+            ? "pooled > 1: frontier-skirmish volume exceeds neighbour-war volume — displacement, not mere calming."
+            : "pooled <= 1: neighbour-war volume still leads — no displacement measured on this spread.");
+    else
+        std::printf("  the ratio is undefined, not zero. Report this spread's raw counts to Ben rather "
+                    "than reading a ratio into an empty denominator.\n");
+    if (have_pooled && have_weighted && ((pooled_ratio > 1.0) != (weighted_ratio > 1.0)))
+        std::printf("  NOTE: pooled and weighted readings DISAGREE on the 1.0 line — a few heavy seeds "
+                    "carry the pooled figure; read the per-seed verdicts.\n");
+
+    face.have_median = have_median; face.have_pooled = have_pooled; face.have_weighted = have_weighted;
+    face.median = median_ratio; face.pooled = pooled_ratio; face.weighted = weighted_ratio;
+    face.sum_nb = sum_nb; face.sum_fr = sum_fr; face.weighted_battles = weighted_den;
+    face.no_nb_frontier_volume = no_nb_frontier_volume;
+    face.silent_floor = kSilentFloorBattles;
+    face.seeds_ran = seeds_ran; face.seeds_silent = seeds_silent; face.seeds_displaced = seeds_displaced;
+    face.seeds_displaced_no_nb = seeds_displaced_no_nb; face.seeds_held = seeds_held;
+
+    double med_empire = 0.0, med_expl = 0.0;
     if (!empire_rates.empty())
     {
         std::sort(empire_rates.begin(), empire_rates.end());
         std::sort(expl_rates.begin(), expl_rates.end());
-        const double med_empire = empire_rates[empire_rates.size() / 2];
-        const double med_expl   = expl_rates[expl_rates.size() / 2];
+        med_empire = empire_rates[empire_rates.size() / 2];
+        med_expl   = expl_rates[expl_rates.size() / 2];
+        face.med_empire_rate = med_empire; face.med_expl_rate = med_expl;
         std::printf("\n  CONFLICT PERSISTS: median Empires battle rate %.2f/century vs median "
                     "Exploration battle rate %.2f/century.\n", med_empire, med_expl);
         std::printf("  %s\n",
@@ -906,6 +1092,7 @@ int main(int argc, char** argv)
 
     int ambiguous_total = 0;
     for (const exploration_row& r : rows) ambiguous_total += static_cast<int>(r.ambiguous_battles);
+    face.ambiguous_total = ambiguous_total;
     if (ambiguous_total > 0)
         std::printf("\n  NOTE: %d battle(s) traced with BOTH attacker and defender id 0 across the "
                     "spread, excluded from both counts above (battle_trace's own comment: defender "
@@ -945,6 +1132,9 @@ int main(int argc, char** argv)
                 cov += dt * dc; var_t += dt * dt; var_c += dc * dc;
             }
             const double corr = (var_t > 0.0 && var_c > 0.0) ? cov / std::sqrt(var_t * var_c) : 0.0;
+            face.r8_polities = static_cast<int64_t>(pairs.size());
+            face.r8_treasury_min = min_t; face.r8_treasury_max = max_t; face.r8_treasury_mean = mean_t;
+            face.r8_corr = corr;
 
             std::printf("  %zu living polities across the spread: treasury min=%lld max=%lld mean=%.1f\n",
                         pairs.size(), static_cast<long long>(min_t), static_cast<long long>(max_t), mean_t);
@@ -988,6 +1178,12 @@ int main(int argc, char** argv)
             std::sort(uses.begin(), uses.end());
             const int32_t min_u = uses.front(), max_u = uses.back();
             const int32_t med_u = uses[uses.size() / 2];
+            face.r9_corridors = static_cast<int64_t>(uses.size());
+            face.r9_uses_min = min_u; face.r9_uses_median = med_u; face.r9_uses_max = max_u;
+            face.r9_post_roads = total_post_roads_built; face.r9_spent_roads = total_treasury_spent;
+            face.r9_seeds_with_post_road = seeds_with_post_road;
+            for (int t = 0; t < 4; ++t) face.r9_tier[t] = tiers[t];
+            face.r9_inherited_t3 = inherited_t3;
             std::printf("  %zu corridors across the spread: uses min=%d median=%d max=%d\n",
                         uses.size(), min_u, med_u, max_u);
             std::printf("  %s\n", (max_u > min_u)
@@ -1031,6 +1227,15 @@ int main(int argc, char** argv)
                     "(across %d seeds)\n",
                     static_cast<long long>(formed), static_cast<long long>(broken),
                     static_cast<long long>(blocked_campaigns), seed_count);
+        face.r4_formed = formed; face.r4_broken = broken; face.r4_blocked = blocked_campaigns;
+        face.r4_standing = static_cast<int64_t>(years_left.size());
+        if (!years_left.empty())
+        {
+            std::vector<int64_t> yl = years_left;
+            std::sort(yl.begin(), yl.end());
+            face.r4_years_left_min = yl.front(); face.r4_years_left_median = yl[yl.size() / 2];
+            face.r4_years_left_max = yl.back();
+        }
         if (years_left.empty())
         {
             std::printf("  no treaty stood at 1660 on this spread — NOT MEASURED (or the "
@@ -1063,6 +1268,9 @@ int main(int argc, char** argv)
             formed += r.subjections_formed; freed += r.subjections_freed; tribute += r.tribute_remitted;
             max_dist = std::max(max_dist, r.max_subject_distance);
         }
+        face.r5_subjects = subjects; face.r5_overlords = overlords; face.r5_alive = alive;
+        face.r5_formed = formed; face.r5_freed = freed; face.r5_tribute = tribute;
+        face.r5_max_distance = max_dist;
         std::printf("  subjects=%lld overlords=%lld alive-polities=%lld (formed=%lld freed=%lld) "
                     "tribute remitted total=%lld  max subject-overlord distance=%lld\n",
                     static_cast<long long>(subjects), static_cast<long long>(overlords),
@@ -1094,6 +1302,7 @@ int main(int argc, char** argv)
             divergent += r.subjects_with_divergent_top_want;
             subjects  += r.subjects_alive;
         }
+        face.r6_friction = friction; face.r6_divergent = divergent;
         std::printf("  subjects whose contact graph names a polity their overlord never met: %lld\n",
                     static_cast<long long>(friction));
         std::printf("  subjects whose top want (argmax good, live 1660 preference) differs from "
@@ -1126,6 +1335,11 @@ int main(int argc, char** argv)
             army_steps   += r.army_steps;
             lapsed       += r.navies_lapsed;
         }
+        face.r7_navy_holders = navy_holders; face.r7_spent_ports = spent_ports;
+        face.r7_spent_navies = spent_navies; face.r7_spent_armies = spent_armies;
+        face.r7_navy_top = top; face.r7_navy_bottom = bottom;
+        face.r7_port_steps = port_steps; face.r7_navy_steps = navy_steps; face.r7_army_steps = army_steps;
+        face.r7_lapsed = lapsed;
         std::printf("  polities holding a navy at 1660: %lld  treasury spent -- ports=%lld "
                     "navies=%lld standing armies=%lld\n",
                     static_cast<long long>(navy_holders), static_cast<long long>(spent_ports),
@@ -1151,6 +1365,7 @@ int main(int argc, char** argv)
                 violations += r.standing_invariant_violations;
             }
             living = static_cast<int64_t>(st.size());
+            face.r7_standing_holders = holders; face.r7_saturated = saturated; face.r7_violations = violations;
             const auto pct = [](std::vector<int64_t> v, int p) -> long long {
                 if (v.empty()) return 0;
                 std::sort(v.begin(), v.end());
@@ -1216,6 +1431,9 @@ int main(int argc, char** argv)
             print_top("treasury:", r.top_by_treasury);
             print_top("regions:",  r.top_by_regions);
         }
+        face.r3_measured = seeds_measured; face.r3_cons = seeds_with_consolidator_top;
+        face.r3_expn = seeds_with_expansionist_top; face.r3_both = seeds_with_both;
+        face.r3_reg_cons = reg_cons; face.r3_reg_expn = reg_expn; face.r3_reg_both = reg_both;
         std::printf("  seeds measured=%lld  top-3-by-TREASURY include a consolidator-leaning "
                     "creed=%lld  include an expansionist-leaning creed=%lld  BOTH present=%lld\n",
                     static_cast<long long>(seeds_measured), static_cast<long long>(seeds_with_consolidator_top),
@@ -1242,6 +1460,7 @@ int main(int argc, char** argv)
     {
         int64_t live_entries = 0;
         for (const exploration_row& r : rows) if (r.ok) live_entries += r.live_pref_entries_1660;
+        face.r10_live_entries = live_entries;
         std::printf("  LIVE at 1660 (the preference the span's scorer reads, off the traced run): "
                     "total (culture, good) entries=%lld\n", static_cast<long long>(live_entries));
     }
@@ -1261,6 +1480,13 @@ int main(int argc, char** argv)
                 if (*mm.second > *mm.first) ++seeds_with_spread;
             }
             weights.insert(weights.end(), seed_weights.begin(), seed_weights.end());
+        }
+        face.r10_entries = total_entries; face.r10_seeds_with_spread = seeds_with_spread;
+        if (!weights.empty())
+        {
+            std::vector<int16_t> ws = weights;
+            std::sort(ws.begin(), ws.end());
+            face.r10_w_min = ws.front(); face.r10_w_median = ws[ws.size() / 2]; face.r10_w_max = ws.back();
         }
         std::printf("  seeds measured=%lld  total (culture, good) preference entries=%lld  "
                     "seeds with a non-uniform weight spread=%lld\n",
@@ -1309,6 +1535,9 @@ int main(int argc, char** argv)
             unknown += r.unknown_landmass_volume; orphan += r.flows_without_clause;
             pooled_pairs.insert(pooled_pairs.end(), r.pair_volume.begin(), r.pair_volume.end());
         }
+        face.r11_flows = flows; face.r11_volume = volume; face.r11_cross = cross;
+        face.r11_unknown = unknown; face.r11_orphan = orphan;
+        face.r11_pairs = static_cast<int64_t>(pooled_pairs.size());
         std::printf("  total: flows=%lld volume=%lld  cross-landmass share=%.3f  "
                     "(capital-on-water, landmass undefined: %.3f)\n",
                     static_cast<long long>(flows), static_cast<long long>(volume),
@@ -1322,6 +1551,8 @@ int main(int argc, char** argv)
             int64_t top = 0, zero = 0;
             for (std::size_t k = 0; k < decile; ++k) top += pooled_pairs[k];
             for (int64_t v : pooled_pairs) if (v == 0) ++zero;
+            face.r11_top_decile_share = static_cast<double>(top) / static_cast<double>(volume);
+            face.r11_zero_pairs = zero;
             std::printf("  %zu trade-access pairs pooled: top-decile (%zu pairs) share of volume=%.3f  "
                         "pairs carrying none=%lld (%.3f)\n",
                         pooled_pairs.size(), decile,
@@ -1337,6 +1568,310 @@ int main(int argc, char** argv)
         std::printf("  flows whose pair holds no trade_access clause at 1660: %lld\n",
                     static_cast<long long>(orphan));
         check(orphan == 0, "reading 11: every flow stands on a trade_access clause");
+    }
+
+    // -----------------------------------------------------------------------
+    // THE CHECKED-IN TABLE (BL-971). exploration_sweep.json at the working
+    // directory (the repo root when run as documented), one row per seed
+    // over all eleven readings plus the spread face above — the same spirit
+    // as history_sweep.json, so the numbers survive as data rather than as
+    // prose in a devlog. A tuning run (--w_want_q / --set) writes
+    // exploration_sweep.tuning.json instead, so the committed artefact
+    // always describes generation's own constants.
+    // -----------------------------------------------------------------------
+    {
+        const char* json_path = want_override ? "exploration_sweep.tuning.json" : "exploration_sweep.json";
+        FILE* f = std::fopen(json_path, "w");
+        if (!f)
+        {
+            std::printf("\nCould not write %s\n", json_path);
+        }
+        else
+        {
+            // Small helpers: nullable doubles, and min/median/max over a
+            // sorted copy of an integer vector (empty -> nulls).
+            const auto put_d = [&](const char* key, bool have, double v, const char* tail) {
+                if (have) std::fprintf(f, "\"%s\": %.4f%s", key, v, tail);
+                else      std::fprintf(f, "\"%s\": null%s", key, tail);
+            };
+            const auto put_mmm = [&](const char* prefix, std::vector<int64_t> v, const char* tail) {
+                if (v.empty())
+                {
+                    std::fprintf(f, "\"%s_min\": null, \"%s_median\": null, \"%s_max\": null%s",
+                                 prefix, prefix, prefix, tail);
+                    return;
+                }
+                std::sort(v.begin(), v.end());
+                std::fprintf(f, "\"%s_min\": %lld, \"%s_median\": %lld, \"%s_max\": %lld%s",
+                             prefix, static_cast<long long>(v.front()),
+                             prefix, static_cast<long long>(v[v.size() / 2]),
+                             prefix, static_cast<long long>(v.back()), tail);
+            };
+            const auto top3 = [&](const std::vector<exploration_row::strength_entry>& v) {
+                std::fprintf(f, "[");
+                for (std::size_t k = 0; k < v.size(); ++k)
+                {
+                    const auto& e = v[k];
+                    std::fprintf(f, "%s{\"id\": %d, \"lean\": \"%s\", \"treasury\": %lld, \"supply_q\": %d, "
+                                    "\"regions\": %lld, \"cons_q\": %d, \"expn_q\": %d}",
+                                 k ? ", " : "", e.id,
+                                 e.cons_q > e.expn_q ? "C" : (e.expn_q > e.cons_q ? "E" : "-"),
+                                 static_cast<long long>(e.treasury), e.mean_supply_q,
+                                 static_cast<long long>(e.regions), e.cons_q, e.expn_q);
+                }
+                std::fprintf(f, "]");
+            };
+
+            std::fprintf(f, "{\n \"_note\": \"BL-937/BL-971 exploration sweep, 1200 -> 1660 CE. Reported, not gated "
+                            "- see the harness header. One row per seed over the eleven readings of "
+                            "EXPLORATION.md sec What the phase is judged on; 'spread' carries the face the "
+                            "console prints. Displacement is read pooled (the verdict), volume-weighted and "
+                            "as a median; a seed under silent_floor_battles traced battles is SILENT and "
+                            "carries no verdict.\",\n");
+            std::fprintf(f, " \"seed_count\": %d,\n \"deterrence_alarm_weight_q\": %d,\n \"overrides\": [",
+                         seed_count, history_sim_params{}.deterrence_alarm_weight_q);
+            {
+                bool first = true;
+                if (want_override && want_override_q >= 0)
+                { std::fprintf(f, "\"w_want_q=%d\"", want_override_q); first = false; }
+                for (const auto& kv : param_sets)
+                { std::fprintf(f, "%s\"%s=%lld\"", first ? "" : ", ", kv.first.c_str(), kv.second); first = false; }
+            }
+            std::fprintf(f, "],\n \"structural_failures\": %d,\n", g_failures);
+
+            // --- the spread face -------------------------------------------
+            std::fprintf(f, " \"spread\": {\n  \"displacement\": {");
+            put_d("pooled", face.have_pooled, face.pooled, ", ");
+            put_d("weighted", face.have_weighted, face.weighted, ", ");
+            put_d("median", face.have_median, face.median, ", ");
+            std::fprintf(f, "\"sum_frontier\": %lld, \"sum_neighbour\": %lld, \"weighted_battles\": %lld, "
+                            "\"no_nb_frontier_volume\": %lld, \"silent_floor_battles\": %lld, "
+                            "\"seeds_ran\": %d, \"seeds_displaced\": %d, \"seeds_displaced_no_nb\": %d, "
+                            "\"seeds_held\": %d, \"seeds_silent\": %d, \"silent_seeds\": [",
+                         static_cast<long long>(face.sum_fr), static_cast<long long>(face.sum_nb),
+                         static_cast<long long>(face.weighted_battles),
+                         static_cast<long long>(face.no_nb_frontier_volume),
+                         static_cast<long long>(face.silent_floor),
+                         face.seeds_ran, face.seeds_displaced, face.seeds_displaced_no_nb,
+                         face.seeds_held, face.seeds_silent);
+            {
+                bool first = true;
+                for (const displacement_seed& d : disp)
+                    if (std::strcmp(d.verdict, "SILENT") == 0)
+                    { std::fprintf(f, "%s%u", first ? "" : ", ", d.seed); first = false; }
+            }
+            std::fprintf(f, "], \"ambiguous_battles\": %d},\n", face.ambiguous_total);
+            std::fprintf(f, "  \"conflict_persists\": {\"median_empire_rate_per_century\": %.4f, "
+                            "\"median_exploration_rate_per_century\": %.4f},\n",
+                         face.med_empire_rate, face.med_expl_rate);
+            std::fprintf(f, "  \"strategies\": {\"seeds_measured\": %lld, \"treasury_top_has_consolidator\": %lld, "
+                            "\"treasury_top_has_expansionist\": %lld, \"treasury_top_has_both\": %lld, "
+                            "\"regions_top_has_consolidator\": %lld, \"regions_top_has_expansionist\": %lld, "
+                            "\"regions_top_has_both\": %lld},\n",
+                         static_cast<long long>(face.r3_measured), static_cast<long long>(face.r3_cons),
+                         static_cast<long long>(face.r3_expn), static_cast<long long>(face.r3_both),
+                         static_cast<long long>(face.r3_reg_cons), static_cast<long long>(face.r3_reg_expn),
+                         static_cast<long long>(face.r3_reg_both));
+            std::fprintf(f, "  \"treaty_depth\": {\"formed\": %lld, \"broken\": %lld, \"blocked_campaigns\": %lld, "
+                            "\"standing_1660\": %lld, ",
+                         static_cast<long long>(face.r4_formed), static_cast<long long>(face.r4_broken),
+                         static_cast<long long>(face.r4_blocked), static_cast<long long>(face.r4_standing));
+            if (face.r4_standing > 0)
+                std::fprintf(f, "\"years_left_min\": %lld, \"years_left_median\": %lld, \"years_left_max\": %lld},\n",
+                             static_cast<long long>(face.r4_years_left_min),
+                             static_cast<long long>(face.r4_years_left_median),
+                             static_cast<long long>(face.r4_years_left_max));
+            else
+                std::fprintf(f, "\"years_left_min\": null, \"years_left_median\": null, \"years_left_max\": null},\n");
+            std::fprintf(f, "  \"colonial_asymmetry\": {\"subjects\": %lld, \"overlords\": %lld, \"alive_polities\": %lld, "
+                            "\"subjections_formed\": %lld, \"subjections_freed\": %lld, \"tribute_remitted\": %lld, "
+                            "\"max_subject_distance\": %lld},\n",
+                         static_cast<long long>(face.r5_subjects), static_cast<long long>(face.r5_overlords),
+                         static_cast<long long>(face.r5_alive), static_cast<long long>(face.r5_formed),
+                         static_cast<long long>(face.r5_freed), static_cast<long long>(face.r5_tribute),
+                         static_cast<long long>(face.r5_max_distance));
+            std::fprintf(f, "  \"subject_friction\": {\"contact_graph_friction\": %lld, \"divergent_top_want\": %lld},\n",
+                         static_cast<long long>(face.r6_friction), static_cast<long long>(face.r6_divergent));
+            std::fprintf(f, "  \"fleets\": {\"navy_holders\": %lld, \"spent_ports\": %lld, \"spent_navies\": %lld, "
+                            "\"spent_standing_armies\": %lld, \"navy_holders_expn_top\": %lld, "
+                            "\"navy_holders_expn_bottom\": %lld, \"port_steps\": %lld, \"navy_steps\": %lld, "
+                            "\"army_steps\": %lld, \"navies_lapsed\": %lld, \"standing_holders\": %lld, "
+                            "\"army_saturated\": %lld, \"standing_invariant_violations\": %lld},\n",
+                         static_cast<long long>(face.r7_navy_holders), static_cast<long long>(face.r7_spent_ports),
+                         static_cast<long long>(face.r7_spent_navies), static_cast<long long>(face.r7_spent_armies),
+                         static_cast<long long>(face.r7_navy_top), static_cast<long long>(face.r7_navy_bottom),
+                         static_cast<long long>(face.r7_port_steps), static_cast<long long>(face.r7_navy_steps),
+                         static_cast<long long>(face.r7_army_steps), static_cast<long long>(face.r7_lapsed),
+                         static_cast<long long>(face.r7_standing_holders), static_cast<long long>(face.r7_saturated),
+                         static_cast<long long>(face.r7_violations));
+            std::fprintf(f, "  \"treasury_spread\": {\"polities\": %lld, \"treasury_min\": %lld, \"treasury_max\": %lld, "
+                            "\"treasury_mean\": %.4f, \"corr_treasury_corridor_touch\": %.4f},\n",
+                         static_cast<long long>(face.r8_polities), static_cast<long long>(face.r8_treasury_min),
+                         static_cast<long long>(face.r8_treasury_max), face.r8_treasury_mean, face.r8_corr);
+            std::fprintf(f, "  \"throughput\": {\"corridors\": %lld, \"uses_min\": %d, \"uses_median\": %d, \"uses_max\": %d, "
+                            "\"post_roads_built\": %lld, \"seeds_with_post_road\": %d, \"treasury_spent_on_roads\": %lld, "
+                            "\"tier_none\": %lld, \"tier_track\": %lld, \"tier_road\": %lld, \"tier_post_road\": %lld, "
+                            "\"inherited_traffic_tier3\": %lld},\n",
+                         static_cast<long long>(face.r9_corridors), face.r9_uses_min, face.r9_uses_median,
+                         face.r9_uses_max, static_cast<long long>(face.r9_post_roads), face.r9_seeds_with_post_road,
+                         static_cast<long long>(face.r9_spent_roads),
+                         static_cast<long long>(face.r9_tier[0]), static_cast<long long>(face.r9_tier[1]),
+                         static_cast<long long>(face.r9_tier[2]), static_cast<long long>(face.r9_tier[3]),
+                         static_cast<long long>(face.r9_inherited_t3));
+            std::fprintf(f, "  \"preference\": {\"live_entries_1660\": %lld, \"entries_1200\": %lld, "
+                            "\"seeds_with_spread\": %lld, \"weight_min\": %d, \"weight_median\": %d, \"weight_max\": %d},\n",
+                         static_cast<long long>(face.r10_live_entries), static_cast<long long>(face.r10_entries),
+                         static_cast<long long>(face.r10_seeds_with_spread),
+                         face.r10_w_min, face.r10_w_median, face.r10_w_max);
+            std::fprintf(f, "  \"trade\": {\"flows\": %lld, \"volume\": %lld, \"cross_landmass_volume\": %lld, "
+                            "\"unknown_landmass_volume\": %lld, \"flows_without_clause\": %lld, "
+                            "\"trade_access_pairs\": %lld, \"pairs_carrying_none\": %lld, ",
+                         static_cast<long long>(face.r11_flows), static_cast<long long>(face.r11_volume),
+                         static_cast<long long>(face.r11_cross), static_cast<long long>(face.r11_unknown),
+                         static_cast<long long>(face.r11_orphan), static_cast<long long>(face.r11_pairs),
+                         static_cast<long long>(face.r11_zero_pairs));
+            put_d("cross_landmass_share", face.r11_volume > 0,
+                  face.r11_volume > 0 ? static_cast<double>(face.r11_cross) / static_cast<double>(face.r11_volume) : 0.0, ", ");
+            put_d("top_decile_share", face.r11_volume > 0 && face.r11_pairs > 0, face.r11_top_decile_share, "}\n");
+            std::fprintf(f, " },\n");
+
+            // --- one row per seed -------------------------------------------
+            std::fprintf(f, " \"worlds\": [\n");
+            for (std::size_t i = 0; i < rows.size(); ++i)
+            {
+                const exploration_row& r = rows[i];
+                const char* sep = (i + 1 < rows.size()) ? "," : "";
+                if (!r.ok)
+                {
+                    std::fprintf(f, "  {\"seed\": %u, \"ok\": false}%s\n", r.seed, sep);
+                    continue;
+                }
+                const displacement_seed* d = nullptr;
+                for (const displacement_seed& x : disp) if (x.seed == r.seed) { d = &x; break; }
+
+                std::fprintf(f, "  {\"seed\": %u, \"ok\": true, \"traced_matches_untraced\": %s,\n", r.seed,
+                             r.traced_matches_untraced ? "true" : "false");
+                // readings 1-2
+                std::fprintf(f, "   \"empire_battles\": %lld, \"empire_years\": %lld, \"expl_battles\": %lld, "
+                                "\"expl_conquests\": %lld, \"expl_foundings\": %lld, \"expl_years\": %lld, "
+                                "\"neighbour_wars\": %lld, \"frontier_skirmishes\": %lld, \"ambiguous_battles\": %lld, ",
+                             static_cast<long long>(r.empire_battles), static_cast<long long>(r.empire_years),
+                             static_cast<long long>(r.expl_battles), static_cast<long long>(r.expl_conquests),
+                             static_cast<long long>(r.expl_foundings), static_cast<long long>(r.expl_years),
+                             static_cast<long long>(r.neighbour_wars), static_cast<long long>(r.frontier_skirmishes),
+                             static_cast<long long>(r.ambiguous_battles));
+                put_d("empire_rate_per_century", true, per_century(r.empire_battles, r.empire_years), ", ");
+                put_d("expl_rate_per_century", true, per_century(r.expl_battles, r.expl_years), ", ");
+                put_d("displacement_ratio", d && d->ratio >= 0.0, d ? d->ratio : 0.0, ", ");
+                std::fprintf(f, "\"displacement_verdict\": \"%s\",\n", d ? d->verdict : "");
+                // reading 3
+                std::fprintf(f, "   \"strength_measured\": %s, \"treasury_top_has_consolidator\": %s, "
+                                "\"treasury_top_has_expansionist\": %s, \"regions_top_has_consolidator\": %s, "
+                                "\"regions_top_has_expansionist\": %s, \"top_by_treasury\": ",
+                             r.strength_measured ? "true" : "false",
+                             r.top_has_consolidator ? "true" : "false", r.top_has_expansionist ? "true" : "false",
+                             r.regions_top_has_consolidator ? "true" : "false",
+                             r.regions_top_has_expansionist ? "true" : "false");
+                top3(r.top_by_treasury);
+                std::fprintf(f, ", \"top_by_regions\": ");
+                top3(r.top_by_regions);
+                std::fprintf(f, ",\n");
+                // reading 4
+                std::fprintf(f, "   \"treaties_formed\": %lld, \"treaties_broken\": %lld, \"treaty_blocked_campaigns\": %lld, "
+                                "\"treaties_standing_1660\": %zu, ",
+                             static_cast<long long>(r.treaties_formed_total), static_cast<long long>(r.treaties_broken_total),
+                             static_cast<long long>(r.treaty_blocked_campaigns), r.treaty_years_left.size());
+                put_mmm("treaty_years_left", r.treaty_years_left, ",\n");
+                // reading 5-6
+                std::fprintf(f, "   \"subjects_alive\": %lld, \"overlords_alive\": %lld, \"alive_polities\": %lld, "
+                                "\"max_subject_distance\": %lld, \"subjections_formed\": %lld, \"subjections_freed\": %lld, "
+                                "\"tribute_remitted\": %lld, \"subjects_with_friction\": %lld, "
+                                "\"subjects_with_divergent_top_want\": %lld, \"live_pref_entries_1660\": %lld,\n",
+                             static_cast<long long>(r.subjects_alive), static_cast<long long>(r.overlords_alive),
+                             static_cast<long long>(r.alive_polities), static_cast<long long>(r.max_subject_distance),
+                             static_cast<long long>(r.subjections_formed), static_cast<long long>(r.subjections_freed),
+                             static_cast<long long>(r.tribute_remitted), static_cast<long long>(r.subjects_with_friction),
+                             static_cast<long long>(r.subjects_with_divergent_top_want),
+                             static_cast<long long>(r.live_pref_entries_1660));
+                // reading 7
+                std::fprintf(f, "   \"navy_holders\": %lld, \"navy_holders_expn_top\": %lld, \"navy_holders_expn_bottom\": %lld, "
+                                "\"spent_navies\": %lld, \"spent_ports\": %lld, \"spent_standing_armies\": %lld, "
+                                "\"port_steps\": %lld, \"navy_steps\": %lld, \"army_steps\": %lld, \"navies_lapsed\": %lld, "
+                                "\"standing_holders\": %lld, \"army_saturated\": %lld, \"standing_invariant_violations\": %lld, ",
+                             static_cast<long long>(r.navy_holders), static_cast<long long>(r.navy_holders_expn_top),
+                             static_cast<long long>(r.navy_holders_expn_bottom),
+                             static_cast<long long>(r.treasury_spent_on_navies), static_cast<long long>(r.treasury_spent_on_ports),
+                             static_cast<long long>(r.treasury_spent_on_standing_armies),
+                             static_cast<long long>(r.port_steps), static_cast<long long>(r.navy_steps),
+                             static_cast<long long>(r.army_steps), static_cast<long long>(r.navies_lapsed),
+                             static_cast<long long>(r.standing_holders), static_cast<long long>(r.army_saturated),
+                             static_cast<long long>(r.standing_invariant_violations));
+                put_mmm("standing_per_region", r.standing_per_region, ", ");
+                put_mmm("garrison_per_region", r.garrison_per_region, ",\n");
+                // reading 8 (per seed: living polities, treasury spread, and the
+                // seed's own correlation where >= 2 polities exist)
+                {
+                    std::vector<int64_t> tr;
+                    for (const auto& tc : r.polity_treasury_corridor) tr.push_back(tc.first);
+                    std::fprintf(f, "   \"living_polities\": %zu, ", r.polity_treasury_corridor.size());
+                    put_mmm("treasury", tr, ", ");
+                    double corr = 0.0; bool have_corr = false;
+                    if (r.polity_treasury_corridor.size() >= 2)
+                    {
+                        const double n = static_cast<double>(r.polity_treasury_corridor.size());
+                        double mt = 0.0, mc = 0.0;
+                        for (const auto& p : r.polity_treasury_corridor)
+                        { mt += static_cast<double>(p.first); mc += static_cast<double>(p.second); }
+                        mt /= n; mc /= n;
+                        double cov = 0.0, vt = 0.0, vc = 0.0;
+                        for (const auto& p : r.polity_treasury_corridor)
+                        {
+                            const double dt = static_cast<double>(p.first) - mt;
+                            const double dc = static_cast<double>(p.second) - mc;
+                            cov += dt * dc; vt += dt * dt; vc += dc * dc;
+                        }
+                        have_corr = vt > 0.0 && vc > 0.0;
+                        corr = have_corr ? cov / std::sqrt(vt * vc) : 0.0;
+                    }
+                    put_d("corr_treasury_corridor_touch", have_corr, corr, ",\n");
+                }
+                // reading 9
+                {
+                    std::vector<int64_t> uses(r.corridor_uses.begin(), r.corridor_uses.end());
+                    std::fprintf(f, "   \"corridors\": %zu, ", r.corridor_uses.size());
+                    put_mmm("uses", uses, ", ");
+                    std::fprintf(f, "\"post_roads_built\": %lld, \"treasury_spent_on_roads\": %lld, "
+                                    "\"tier_none\": %lld, \"tier_track\": %lld, \"tier_road\": %lld, "
+                                    "\"tier_post_road\": %lld, \"inherited_traffic_tier3\": %lld,\n",
+                                 static_cast<long long>(r.post_roads_built), static_cast<long long>(r.treasury_spent_on_roads),
+                                 static_cast<long long>(r.tier_count[0]), static_cast<long long>(r.tier_count[1]),
+                                 static_cast<long long>(r.tier_count[2]), static_cast<long long>(r.tier_count[3]),
+                                 static_cast<long long>(r.inherited_traffic_tier3));
+                }
+                // reading 10
+                {
+                    std::vector<int64_t> w(r.preference_weights.begin(), r.preference_weights.end());
+                    std::fprintf(f, "   \"preference_entries_1200\": %zu, ", r.preference_weights.size());
+                    put_mmm("preference_weight", w, ",\n");
+                }
+                // reading 11
+                {
+                    int64_t with_flow = 0;
+                    for (int64_t v : r.pair_volume) if (v > 0) ++with_flow;
+                    std::fprintf(f, "   \"flows\": %lld, \"flow_volume\": %lld, \"cross_landmass_volume\": %lld, "
+                                    "\"unknown_landmass_volume\": %lld, \"flows_without_clause\": %lld, "
+                                    "\"trade_access_pairs\": %lld, \"pairs_with_flow\": %lld}%s\n",
+                                 static_cast<long long>(r.flow_count), static_cast<long long>(r.flow_volume),
+                                 static_cast<long long>(r.cross_landmass_volume),
+                                 static_cast<long long>(r.unknown_landmass_volume),
+                                 static_cast<long long>(r.flows_without_clause),
+                                 static_cast<long long>(r.trade_bound_pairs), static_cast<long long>(with_flow), sep);
+                }
+            }
+            std::fprintf(f, " ]\n}\n");
+            std::fclose(f);
+            std::printf("\nWrote %s (%d rows)\n", json_path, static_cast<int>(rows.size()));
+        }
     }
 
     std::printf("\n%d failure(s) in structural checks.\n", g_failures);
