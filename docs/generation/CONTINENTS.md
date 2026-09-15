@@ -225,13 +225,24 @@ applies a bias — and the palaeo frame honours that: the ground of a stagnant b
 where it sits, at every epoch. A world whose whole characterisation is that it has no
 drift history is not given one.
 
+**The frame has a raster form, and the generator reads through it.** The per-tile
+question above, asked of every tile at one epoch, is a raster of latitude, band,
+moisture and an on-grid flag — and that raster is what the tile pipeline consumes.
+Pass 3's present band raster *is* the frame at epoch 0; the Life phase's coal and
+petroleum rasters are the frame at the two fossil epochs
+([TILE_GENERATION.md](TILE_GENERATION.md) § The Life phase). One implementation,
+indexed by epoch: the present is a member of the family, not a separate lookup the
+query had to be proved equal to. The raster form is built *by* the per-tile query,
+tile for tile, so it cannot be a third answer.
+
 ### The boundary of the frame
 
-The frame is a **query over the finished world**, not a moving frame the generator
-runs in, and the difference is the whole of its safety. Pass 3 still bands by present
-row and must: banding by a past row would change every world. So at epoch 0 the frame
-returns the present exactly — same position, same band, same moisture cell — and
-nothing downstream moves until a consumer asks for a non-zero epoch.
+The frame's safety is the **epoch-0 identity**, not a separation between the
+generator and the query. At epoch 0 the frame returns the present exactly — same
+position, same band, same moisture cell — so a generator reading the present through
+it produces the world it produced before, bit for bit, and only the fossil epochs move
+anything. Banding the *present* by a past row would change every world, and nothing
+does; the present reads the frame at zero.
 
 Four things it deliberately does **not** answer, each because answering it would be a
 guess rather than a reconstruction:

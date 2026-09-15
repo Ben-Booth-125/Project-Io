@@ -184,8 +184,12 @@ from `H` remain land and receive valley or canyon landforms in Pass 5.
 
 ### Pass 3 — Latitude band assignment
 
-Divide the grid rows into named temperature bands. Band boundaries are shifted by
-`temperature_class`:
+Divide the grid rows into named temperature bands. The band raster is read from each
+tile's **plate-carried position at epoch 0** through the palaeo frame
+([CONTINENTS.md](CONTINENTS.md) § The Lagrangian frame) — the same frame the Life
+phase reads the fossil epochs from — and at epoch 0 that position is the raster row,
+so the row-percent table below is exactly what every tile receives. Band boundaries
+are shifted by `temperature_class`:
 
 | Band | Temperate row % | Scorching row % | Cold row % |
 |---|---|---|---|

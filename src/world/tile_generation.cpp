@@ -1490,8 +1490,8 @@ void generate_deposits(terrain_substrate sub, terrain_cover cov, std::uint8_t de
 
 /// What the palaeo record says about one tile, reduced to the two numbers the
 /// Life phase actually consumes. Computed once per tile, before the ore-field
-/// pre-pass replays the deposit rules, so `paleo_tile_at` is called exactly
-/// twice per tile for the whole generation.
+/// pre-pass replays the deposit rules, from two frames (`paleo_frame_at`, one
+/// per fossil epoch) built exactly once for the whole generation.
 struct life_site
 {
     /// How readily an everwet mire stacked here at the land-burial epoch.
@@ -1510,7 +1510,7 @@ struct life_site
 /// The belt weighting says the rest: equatorial everwet mires are the type
 /// locality, the cool-temperate measures are real but thinner, and nothing
 /// stacks under a subpolar or polar sky.
-float coal_belt_of(const paleo_tile_state& past, bool basin)
+float coal_belt_of(const paleo_frame& past, std::size_t idx, bool basin)
 {
     // THE BASIN IS HALF THE MECHANISM, and S7 already says so: the coal window
     // is `greened_at x subsidence x climate`, and a world with no mobile lid
@@ -1519,9 +1519,10 @@ float coal_belt_of(const paleo_tile_state& past, bool basin)
     // over a subsiding basin rot rather than becoming a seam, which is why the
     // ore-field candidate test has always wanted low ground for coal too.
     if (!basin) return 0.0f;
-    if (!past.on_grid) return 0.0f;                        // no honest climate sample
-    if (moisture_column(past.moisture) != 2) return 0.0f;  // not everwet
-    switch (past.band)
+    if (!past.on_grid[idx]) return 0.0f;                        // no honest climate sample
+    if (past.moisture.empty()) return 0.0f;                     // no field to be everwet in
+    if (moisture_column(past.moisture[idx]) != 2) return 0.0f;  // not everwet
+    switch (past.band[idx])
     {
         case lat_band::tropical:    return 1.00f;
         case lat_band::subtropical: return 0.85f;
@@ -1537,10 +1538,10 @@ float coal_belt_of(const paleo_tile_state& past, bool basin)
 /// so the ground has to have sat low (a shelf or an epicontinental basin, the
 /// same reading `ore_fields_for` already uses for its regions) and under a
 /// productive sky. Warm water is the productive water; a polar shelf is not.
-float oil_belt_of(const paleo_tile_state& past, bool shelf)
+float oil_belt_of(const paleo_frame& past, std::size_t idx, bool shelf)
 {
-    if (!shelf || !past.on_grid) return 0.0f;
-    switch (past.band)
+    if (!shelf || !past.on_grid[idx]) return 0.0f;
+    switch (past.band[idx])
     {
         case lat_band::tropical:
         case lat_band::subtropical: return 1.00f;
@@ -1879,13 +1880,24 @@ std::vector<entity_id> generate_body_tiles(
     }
 
     // --- Pass 3: latitude bands ---
-    std::vector<lat_band> band(total);
-    for (int row = 0; row < gh; ++row)
-    {
-        const lat_band b = band_for_row(row, gh, profile.temperature);
-        for (int col = 0; col < gw; ++col)
-            band[col + row * gw] = b;
-    }
+    //
+    // BL-963: THE PRESENT IS THE FRAME AT EPOCH 0. The band raster is read from
+    // each tile's plate-carried position through the same frame the Life phase
+    // reads the fossil epochs from, not from the raster row — the row is where
+    // the ground IS, and at epoch 0 that is also where the frame puts it, so
+    // the two agree bit for bit (continent_drift P1b/P7 hold them to each
+    // other). The difference is what the present now IS: one member of a
+    // family indexed by epoch, rather than a separate lookup the palaeo query
+    // had to be proved equal to.
+    //
+    // A null continents result leaves the ground stationary at every epoch —
+    // the frame with an empty plate set returns the present, which is the
+    // honest answer for a body with no drift history rather than a degraded
+    // one. The same reference serves the Life phase's fossil epochs below.
+    static const continent_state k_no_drift{};
+    const continent_state& cs = continents ? *continents : k_no_drift;
+    std::vector<lat_band> band =
+        paleo_frame_at(cs, gw, gh, /*epochs_back=*/0, profile.temperature).band;
 
     // --- Pass 4: composition ---
     std::mt19937 comp_rng(seed_comp);
@@ -2077,9 +2089,10 @@ std::vector<entity_id> generate_body_tiles(
     // from these terms — so both readers need the same array, and neither should
     // pay for the query twice.
     //
-    // CONSUMES NO RANDOMNESS. `paleo_tile_at` is a pure function of the plate set
-    // and the tile's present position, which is the property that let BL-764 add
-    // it at all; nothing here can shift a stream.
+    // CONSUMES NO RANDOMNESS. `paleo_frame_at` is `paleo_tile_at` over the
+    // raster, and that is a pure function of the plate set and the tile's
+    // present position — the property that let BL-764 add it at all; nothing
+    // here can shift a stream.
     std::vector<life_site> sites(static_cast<std::size_t>(total));
     {
         // "Sat low" has to be a percentile of the LAND range, not an absolute
@@ -2123,26 +2136,25 @@ std::vector<entity_id> generate_body_tiles(
             if (oil_epoch < coal_epoch) oil_epoch = coal_epoch;
         }
 
-        // A null continents result leaves the ground stationary at every epoch —
-        // `paleo_tile_at` with an empty plate set returns the present, which is
-        // the honest answer for a body with no drift history rather than a
-        // degraded one.
-        static const continent_state k_no_drift{};
-        const continent_state& cs = continents ? *continents : k_no_drift;
+        // BL-963: the two fossil epochs are read as FRAMES — the same family
+        // Pass 3 read the present from at epoch 0, here at the coal and oil
+        // epochs. `cs` is the reference Pass 3 established: a null continents
+        // result leaves the ground stationary at every epoch, so both frames
+        // collapse to the present, which is the honest answer for a body with
+        // no drift history rather than a degraded one.
+        const paleo_frame coal_frame =
+            paleo_frame_at(cs, gw, gh, coal_epoch, profile.temperature, &moisture);
+        const paleo_frame oil_frame =
+            paleo_frame_at(cs, gw, gh, oil_epoch, profile.temperature, &moisture);
 
-        for (int row = 0; row < gh; ++row)
-            for (int col = 0; col < gw; ++col)
-            {
-                const int idx = col + row * gw;
-                if (is_ocean[idx]) continue; // no deposit pass runs on water
-                const paleo_tile_state coal_past =
-                    paleo_tile_at(cs, gw, gh, col, row, coal_epoch, profile.temperature, &moisture);
-                const paleo_tile_state oil_past =
-                    paleo_tile_at(cs, gw, gh, col, row, oil_epoch, profile.temperature, &moisture);
-                const float h = height[static_cast<std::size_t>(idx)];
-                sites[static_cast<std::size_t>(idx)].coal_belt = coal_belt_of(coal_past, h <= swamp_cut);
-                sites[static_cast<std::size_t>(idx)].oil_belt  = oil_belt_of(oil_past, h <= marine_cut);
-            }
+        for (int idx = 0; idx < total; ++idx)
+        {
+            if (is_ocean[idx]) continue; // no deposit pass runs on water
+            const std::size_t i = static_cast<std::size_t>(idx);
+            const float h = height[i];
+            sites[i].coal_belt = coal_belt_of(coal_frame, i, h <= swamp_cut);
+            sites[i].oil_belt  = oil_belt_of(oil_frame, i, h <= marine_cut);
+        }
     }
 
     // ore fields (Open calls 4). Own RNG stream, so adding this pass leaves
