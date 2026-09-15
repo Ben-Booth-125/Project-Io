@@ -12,10 +12,10 @@ namespace ui {
 ///
 /// One flat panel of stacked per-body sections — composition/landform histograms,
 /// the ocean threshold against the profile's target, the latitude bands, and the
-/// profile that drove all of it. The per-tile derivation breadcrumb (the old Tile
-/// view) was retired with the tab strip that carried it and its builder deleted
-/// (Ben, 2026-08-30); nothing in src/ draws one. GENERATION_LEDGER.md § Per-tile
-/// derivation breadcrumb keeps the design without a surface.
+/// profile that drove all of it. There is no per-tile view: the old Tile view and
+/// its breadcrumb builder were retired (Ben, 2026-08-30) and the design left
+/// GENERATION_LEDGER.md with them (Ben, 2026-09-15). A tile's "why", if it returns,
+/// is a Selection subject, not a ledger view.
 ///
 /// The per-pass intermediates it reads are REGENERATED ON DEMAND from the report's
 /// recorded tile-pass inputs and cached for as long as one body stays the subject;
@@ -25,10 +25,11 @@ namespace ui {
 ///
 /// @param w      Read-only world — the FINAL tile state (composition, landform,
 ///               deposits) the record's intermediates are joined against.
-/// @param s      UI state; carries the ledger's view index and the selected tile.
+/// @param s      UI state; carries the active body and each section's disclosure
+///               flag (`gen_*_open`, so a verify script can drive it).
 /// @param report The world's generation report (app::m_generation_report) — the
 ///               profile, the Continents output, and the tile-pass inputs.
-/// @param p_open Open/closed flag; cleared by re-clicking the active view tab.
+/// @param p_open Open/closed flag; toggled by the nav-rail slot.
 void draw_generation_ledger(const world& w, ui_state& s,
                             const generation_report& report, bool* p_open);
 
