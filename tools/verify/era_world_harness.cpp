@@ -18,16 +18,24 @@
 //   R5  THE 1960 ARC IS UNTOUCHED. An explicit epoch_year = 1960 world still
 //       industrialises, still resolves ruptures (lacunae or checkpoints
 //       present), and holds at least as many regions as the 0 CE world.
+//   R7  THE 1660 TREASURIES CROSS THE FOLD (BL-975). Every nation's starting
+//       treasury is its folded polities' Exploration-span chest through the
+//       one per-mille NATION_GENERATION.md § Pass 7 names; a nation folded
+//       from a richer polity starts richer, and garrisons differentiate on it.
 //
 // Exits non-zero on any FAIL. Links the generation TU superset (as
 // world_audit / determinism_harness).
 
+#include "world/era_minus_one.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/logistics.hpp"
+#include "world/nation_generation.hpp"
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
 #include <cinttypes>
+#include <cmath>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -79,7 +87,8 @@ int main()
     antiq.epoch_year = 0;
 
     generation_report rep_a{}, rep_b{}, rep_1960{};
-    world wa = make_hard_coded_world(antiq, &rep_a);
+    era_minus_one_fixture fx_a{};
+    world wa = make_hard_coded_world(antiq, &rep_a, {}, nullptr, nullptr, &fx_a);
     world wb = make_hard_coded_world(antiq, &rep_b);
 
     // R5's control world. NOT `{}` any more: the default epoch became 0 with the
@@ -226,6 +235,161 @@ int main()
                     trade_markets, seeds_with_trade_market);
         check(seeds_with_trade_market > 0,
               "R6d a market emerges where trade concentrated (reachable across the seed sweep)");
+    }
+
+    // --- R7: the 1660 treasuries cross the fold (BL-975) ---------------------
+    //
+    // Derived INDEPENDENTLY of generate_nations' own arithmetic, by the rule
+    // NATION_GENERATION.md § Pass 7 states: a polity's chest is the sum of
+    // `region::treasury` over the ground flying its flag at 1660 (read off the
+    // fixture's handoff struct, where `region::nation` is still the POLITY id),
+    // and it lands on the nation that polity FOLDED INTO — the nation holding
+    // the polity's lowest-indexed land-anchored region, which is the seed the
+    // fold represents it by. A water-seated polity (its capital is a coastal-
+    // water region whose tile no nation holds) is why this walks the polity's
+    // regions rather than reading its capital tile: seed 0 has one, and its
+    // chest belongs to the realm its land became, not to nobody.
+    // Converted through the one stated per-mille, read off nation_params'
+    // default and never restated here.
+    {
+        std::vector<entity_id> nids;
+        for (const auto& kv : wa.nations) nids.push_back(kv.first);
+        std::sort(nids.begin(), nids.end());
+        const double per_mille = static_cast<double>(nation_params{}.treasury_credit_per_mille);
+        const double floor_v   = static_cast<double>(nation_params{}.treasury_floor);
+
+        const std::vector<region>& hx = fx_a.exploration_handoff.regions;
+        check(fx_a.exploration_ran && hx.size() == ps.size(),
+              "R7 the Exploration span ran and its handoff table is the report's region table");
+
+        // Polity id -> (chest, nation index it folded into).
+        int max_polity = -1;
+        for (const region& r : hx) max_polity = std::max(max_polity, r.nation);
+        std::vector<int64_t> polity_chest(static_cast<std::size_t>(max_polity + 1), 0);
+        std::vector<int>     polity_nation(static_cast<std::size_t>(max_polity + 1), -1);
+        const std::vector<entity_id>& grid = body_tile_grid(wa, ka->id);
+        for (std::size_t i = 0; i < hx.size(); ++i)
+        {
+            const int pol = hx[i].nation;
+            if (pol < 0) continue;
+            if (hx[i].treasury > 0) polity_chest[static_cast<std::size_t>(pol)] += hx[i].treasury;
+            if (polity_nation[static_cast<std::size_t>(pol)] >= 0) continue;
+            if (hx[i].domain != region_domain::land) continue;
+            if (hx[i].anchor < 0 || static_cast<std::size_t>(hx[i].anchor) >= grid.size()) continue;
+            const auto tn = wa.tile_to_nation.find(grid[static_cast<std::size_t>(hx[i].anchor)]);
+            if (tn == wa.tile_to_nation.end()) continue;
+            const auto it = std::lower_bound(nids.begin(), nids.end(), tn->second);
+            if (it != nids.end() && *it == tn->second)
+                polity_nation[static_cast<std::size_t>(pol)] = static_cast<int>(it - nids.begin());
+        }
+        std::vector<int64_t> chest(nids.size(), 0);
+        int folded_polities = 0, unplaced_chests = 0;
+        for (int pol = 0; pol <= max_polity; ++pol)
+        {
+            const int ni = polity_nation[static_cast<std::size_t>(pol)];
+            if (ni < 0)
+            {
+                if (polity_chest[static_cast<std::size_t>(pol)] > 0) ++unplaced_chests;
+                continue;
+            }
+            ++folded_polities;
+            chest[static_cast<std::size_t>(ni)] += polity_chest[static_cast<std::size_t>(pol)];
+        }
+
+        std::vector<double> actual(nids.size()), expected(nids.size());
+        double max_abs_err = 0.0;
+        int    unfolded    = 0; // nations no polity's chest reached
+        for (std::size_t i = 0; i < nids.size(); ++i)
+        {
+            actual[i]   = static_cast<double>(wa.nations.at(nids[i]).treasury);
+            expected[i] = static_cast<double>(chest[i]) * per_mille / 1000.0;
+            max_abs_err = std::max(max_abs_err, std::fabs(actual[i] - expected[i]));
+            if (chest[i] == 0) ++unfolded;
+        }
+
+        // "A nation folded from a richer polity starts richer": every ordered
+        // pair, not just the top.
+        int pairs = 0, agree = 0;
+        std::size_t richest_expected = 0, richest_actual = 0;
+        for (std::size_t a = 0; a < nids.size(); ++a)
+        {
+            if (expected[a] > expected[richest_expected]) richest_expected = a;
+            if (actual[a]   > actual[richest_actual])     richest_actual   = a;
+            for (std::size_t b = 0; b < nids.size(); ++b)
+            {
+                if (expected[a] <= expected[b]) continue;
+                ++pairs;
+                if (actual[a] > actual[b]) ++agree;
+            }
+        }
+
+        std::vector<double> sorted = actual;
+        std::sort(sorted.begin(), sorted.end());
+        const double median = sorted.empty() ? 0.0 : sorted[sorted.size() / 2];
+        int on_floor = 0;
+        for (double v : actual) if (v <= floor_v) ++on_floor;
+
+        // Garrisons: units a NATION owns. Every garrison of one nation is
+        // sized alike (seed_nation_garrisons sizes per nation, then places one
+        // per target province), so the PER-UNIT count is the treasury-scaled
+        // figure; a total headcount would also count how many provinces it
+        // garrisons, which is a border fact, not a treasury one.
+        std::vector<int64_t> garrison(nids.size(), 0);
+        for (const auto& [uid, u] : wa.units)
+        {
+            (void)uid;
+            const auto it = std::lower_bound(nids.begin(), nids.end(), u.owner);
+            if (it != nids.end() && *it == u.owner)
+            {
+                int64_t& g = garrison[static_cast<std::size_t>(it - nids.begin())];
+                g = std::max<int64_t>(g, u.count);
+            }
+        }
+        std::vector<int64_t> gs = garrison;
+        std::sort(gs.begin(), gs.end());
+        const int64_t distinct_garrisons =
+            static_cast<int64_t>(std::unique(gs.begin(), gs.end()) - gs.begin());
+        int garrison_pairs = 0, garrison_agree = 0;
+        for (std::size_t a = 0; a < nids.size(); ++a)
+            for (std::size_t b = 0; b < nids.size(); ++b)
+            {
+                if (actual[a] <= actual[b]) continue;
+                ++garrison_pairs;
+                if (garrison[a] >= garrison[b]) ++garrison_agree;
+            }
+
+        std::printf("\nR7 starting treasuries (BL-975): %zu nations from %d folded polities (%d chests unplaced), per-mille %.3f, floor %.1f cr\n",
+                    nids.size(), folded_polities, unplaced_chests, per_mille, floor_v);
+        std::printf("  min %.2f  median %.2f  max %.2f cr; %d on the floor (%d with no folded chest)\n",
+                    sorted.empty() ? 0.0 : sorted.front(), median,
+                    sorted.empty() ? 0.0 : sorted.back(), on_floor, unfolded);
+        std::printf("  max |actual - chest x per-mille| = %.4f cr; richer-polity pairs agreeing %d of %d\n",
+                    max_abs_err, agree, pairs);
+        std::printf("  garrisons: %" PRId64 " distinct sizes across %zu nations; richer-nation pairs with >= garrison %d of %d\n",
+                    distinct_garrisons, nids.size(), garrison_agree, garrison_pairs);
+        std::printf("  %-30s %12s %12s %8s\n", "nation", "treasury cr", "chest", "garrison");
+        {
+            std::vector<std::size_t> order(nids.size());
+            for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+            std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+                return actual[a] != actual[b] ? actual[a] > actual[b] : nids[a] < nids[b];
+            });
+            for (std::size_t k = 0; k < order.size(); ++k)
+            {
+                const std::size_t i = order[k];
+                std::printf("  %-30s %12.2f %12" PRId64 " %8" PRId64 "\n",
+                            wa.nations.at(nids[i]).name.c_str(), actual[i], chest[i], garrison[i]);
+            }
+        }
+
+        check(max_abs_err < 0.5, "R7a every nation's starting treasury is its folded polities' 1660 chest through the one per-mille");
+        check(pairs > 0 && agree == pairs, "R7b a nation folded from a richer polity starts richer (every pair)");
+        check(richest_expected == richest_actual, "R7c the richest 1660 polity folds into the richest nation");
+        check(sorted.size() > 1 && sorted.back() > median && median > floor_v,
+              "R7d treasuries spread: the median nation is off the floor and the top is above it");
+        check(distinct_garrisons > 1, "R7e garrisons differentiate: more than one garrison size");
+        check(garrison_pairs > 0 && garrison_agree == garrison_pairs,
+              "R7f a richer nation never garrisons fewer than a poorer one");
     }
 
     // --- The dossier ---------------------------------------------------------
