@@ -1304,7 +1304,7 @@ int main(int argc, char** argv)
         // what the stamp pass in generation now reads, so this measures what
         // generation actually produces.
         {
-            const pass_one_output o = make_pass_one_output(ss, sim, /*culture_count=*/0);
+            const pass_one_output o = make_pass_one_output(ss, sim, /*cs=*/nullptr);
             row.surv_corridors = static_cast<int64_t>(o.surviving_corridors.size());
 
             std::vector<int64_t> per_polity(o.polities.size(), 0);

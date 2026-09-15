@@ -597,6 +597,18 @@ struct generation_report
     /// measure the whole era rather than this term.
     int64_t markets_from_trade   = 0;
 
+    // --- The handoff validators' verdict (BL-969) ---------------------------
+    //
+    // `pass_one_output_valid` and `exploration_output_valid` run on the
+    // SHIPPED path, right after each fold, against the live `creed_state`
+    // the fold read from. A violation is recorded here rather than swallowed:
+    // the flag so a harness can assert it never trips, the message so a
+    // human can read which clause of GENERATION_STRATEGY.md § What crosses
+    // each handoff the world just broke. Debug builds also assert; every
+    // build prints one line to stderr. Both handoffs share the pair -- the
+    // message names which validator spoke, and a second failure appends.
+    bool        handoff_invalid = false;
+    std::string handoff_violation;
 };
 
 /// Construct and return a world populated with the prototype's authored bodies.
