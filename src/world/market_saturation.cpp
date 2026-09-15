@@ -233,6 +233,29 @@ bool tile_in_reach(const world& w, entity_id tile, float max_reach)
     return reach <= max_reach;             // infinity fails this, which is the point
 }
 
+namespace
+{
+
+/// The reach fields, one multi-source Dijkstra per body carrying a market,
+/// seeded in ascending body id. `body_reach_field` is itself deterministic
+/// (seeded from the anchor set in raster order); the order here only fixes
+/// which bodies get a field, and every one of them does. Shared by both
+/// saturation measures because "not computed" reach is PERMISSIVE — a measure
+/// that skipped this would silently count every tile as in reach.
+void build_reach_fields(world& w, const std::vector<entity_id>& mids)
+{
+    std::vector<entity_id> bodies;
+    bodies.reserve(mids.size());
+    for (const entity_id mid : mids)
+        bodies.push_back(w.markets.at(mid).body);
+    std::sort(bodies.begin(), bodies.end());
+    bodies.erase(std::unique(bodies.begin(), bodies.end()), bodies.end());
+    for (const entity_id b : bodies)
+        (void)body_reach_field(w, b);
+}
+
+} // namespace
+
 std::vector<market_completeness>
 measure_market_completeness(world& w, const recipe_registry& reg,
                      const std::array<resource_classification, resource_count>& cls)
@@ -250,20 +273,7 @@ measure_market_completeness(world& w, const recipe_registry& reg,
         slot[mids[i]]           = i;
     }
 
-    // The reach fields, one multi-source Dijkstra per body carrying a market,
-    // seeded in ascending body id. `body_reach_field` is itself deterministic
-    // (seeded from the anchor set in raster order); the order here only fixes
-    // which bodies get a field, and every one of them does.
-    {
-        std::vector<entity_id> bodies;
-        bodies.reserve(mids.size());
-        for (const entity_id mid : mids)
-            bodies.push_back(w.markets.at(mid).body);
-        std::sort(bodies.begin(), bodies.end());
-        bodies.erase(std::unique(bodies.begin(), bodies.end()), bodies.end());
-        for (const entity_id b : bodies)
-            (void)body_reach_field(w, b);
-    }
+    build_reach_fields(w, mids);
 
     const float max_reach = reg.construction().max_logistics_reach;
 
@@ -357,6 +367,116 @@ measure_market_completeness(world& w, const recipe_registry& reg,
     }
 
     return rows;
+}
+
+std::vector<market_balance>
+measure_market_balance(world& w, const recipe_registry& reg,
+                       const std::array<resource_classification, resource_count>& cls,
+                       double household_per_head, double sink_weight, double pin_ratio)
+{
+    const std::vector<entity_id> mids = sorted_market_ids(w);
+    std::vector<market_balance> rows(mids.size());
+    std::unordered_map<entity_id, std::size_t> slot;
+    for (std::size_t i = 0; i < mids.size(); ++i)
+    {
+        rows[i].market = mids[i];
+        rows[i].body   = w.markets.at(mids[i]).body;
+        slot[mids[i]]  = i;
+    }
+
+    build_reach_fields(w, mids);
+
+    // THE TILE WALK IS SORTED BY ID, and that is not optional politeness.
+    // Accumulation here is `+=` on a double, which is not associative, and
+    // `w.tiles` is an unordered_map — so summing in hash order makes the result
+    // depend on bucket layout, which varies with the standard library. The
+    // completeness measure above needs no sort because every accumulation there
+    // is an integer increment or a boolean OR; this one sums magnitudes, so it
+    // sorts. A score is a recorded number in a repo whose verification culture
+    // is pinned digits, and the same world must not score differently under
+    // libstdc++ than under MSVC. Sorting ~31k ids per call is far cheaper than a
+    // number nobody can reproduce.
+    std::vector<entity_id> tile_ids;
+    tile_ids.reserve(w.tiles.size());
+    for (const auto& kv : w.tiles)
+        tile_ids.push_back(kv.first);
+    std::sort(tile_ids.begin(), tile_ids.end());
+
+    const float max_reach = reg.construction().max_logistics_reach;
+
+    std::vector<std::array<double, resource_count>> supply(mids.size());
+    for (auto& row : supply)
+        row.fill(0.0);
+    std::vector<long long> heads(mids.size(), 0);
+
+    for (const entity_id tid : tile_ids)
+    {
+        const auto it = slot.find(market_for_tile(w, tid));
+        if (it == slot.end())
+            continue;
+        if (max_reach >= 0.0f && !tile_in_reach(w, tid, max_reach))
+            continue;
+        const tile_component& t = w.tiles.at(tid);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (t.resource_deposit[r] > 0.0f)
+                supply[it->second][r] += static_cast<double>(t.resource_deposit[r]);
+    }
+
+    for (const auto& [cid, pcc] : w.population_centres)
+    {
+        if (pcc.razed)
+            continue;
+        const auto tit = w.population_centre_tile.find(cid);
+        if (tit == w.population_centre_tile.end())
+            continue;
+        const auto it = slot.find(market_for_tile(w, tit->second));
+        if (it != slot.end())
+            heads[it->second] += static_cast<long long>(pcc.scale);
+    }
+
+    for (std::size_t s = 0; s < rows.size(); ++s)
+    {
+        market_balance& m = rows[s];
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const resource_classification& c = cls[r];
+            if (!c.priced)
+                continue;                 // untradeable: no price to pin
+
+            double demand = 0.0;
+            if (c.sink_household)
+                demand += household_per_head * static_cast<double>(heads[s]);
+            if (c.sink_process)     demand += sink_weight;
+            if (c.sink_construct)   demand += sink_weight;
+            if (c.sink_background)  demand += sink_weight;
+            if (c.sink_unit_upkeep) demand += sink_weight;
+            if (c.sink_industry)    demand += sink_weight;
+            if (c.sink_endemic)     demand += sink_weight;
+
+            const double sup = supply[s][r];
+            if (sup <= 0.0 && demand <= 0.0)
+                continue;                 // neither side: the good is absent here
+
+            ++m.rated;
+            if (demand <= 0.0)      { ++m.glutted; continue; }  // supply, nobody wants it
+            if (sup <= 0.0)         { ++m.starved; continue; }  // wanted, nothing makes it
+            const double ratio = sup / demand;
+            if (ratio > pin_ratio)            ++m.glutted;
+            else if (ratio < 1.0 / pin_ratio) ++m.starved;
+            else                              ++m.balanced;
+        }
+        m.fraction = m.rated > 0 ? static_cast<double>(m.balanced) / m.rated : 0.0;
+    }
+
+    return rows;
+}
+
+std::vector<market_balance>
+fraction_in_band(world& w, const recipe_registry& reg, double ratio)
+{
+    return measure_market_balance(w, reg, classify_resources(w, reg),
+                                  k_balance_household_per_head, k_balance_sink_weight,
+                                  ratio);
 }
 
 margin_eval evaluate_margin(double revenue, double inputs, double wage_pb,

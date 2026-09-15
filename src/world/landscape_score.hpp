@@ -51,18 +51,22 @@ class recipe_registry;
 /// STABLE across candidates, not calibrated against reality.
 struct landscape_score_params
 {
+    // The three balance weights INITIALISE FROM market_saturation.hpp's constants
+    // rather than restating them (BL-979): term 2 is computed there now, and the
+    // census prints it, so the search and the reading must start from one band.
+
     /// Household demand per head, for a resource the band's household basket names.
-    double household_per_head = 1.0;
+    double household_per_head = k_balance_household_per_head;
     /// Flat weight for each other structural market sink (process, construct,
     /// background, unit upkeep, industry upkeep, endemic).
-    double sink_weight = 250.0;
+    double sink_weight = k_balance_sink_weight;
 
     /// A resource is BALANCED when its supply:demand ratio sits inside
     /// [1/pin_ratio, pin_ratio]. Outside it the good is pinned — glutted below,
     /// starved above — which is the static shadow of a price at a band edge.
     /// 4.0 against the authored band of [0.25x, 10x] is deliberately INSIDE the
     /// band: a good does not have to reach the clamp to be a broken market.
-    double pin_ratio = 4.0;
+    double pin_ratio = k_balance_pin_ratio;
 
     /// How hard unevenness is rewarded in the composite. 0 scores viability
     /// alone; the composite is viability * (1 + unevenness_gain * spread).
