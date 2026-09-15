@@ -109,8 +109,13 @@ it in sync with `hard_coded_world.cpp` when either changes.
   discarded. The boundary that raised a mountain range is invisible once the bias
   folds into the heightmap; keeping the assignment lets the lens draw the plates
   the bias was derived *from* instead of inferring landmasses back out of finished
-  terrain. Presentation data — never enters `world`, stays off the serialisation
-  seam.
+  terrain. Presentation data — it never enters `world` — but it **is serialised**: the
+  generation report is written whole by `src/core/save_game.cpp` (`w_continents` carries the
+  plate set, `plate_id`, `height_bias` and both boundary masks), because a loaded campaign has
+  no generation to consult — the Continent lens draws the plates from the saved report, and the
+  Generation Ledger replays a body's tiles from the report's recorded pass inputs, which need
+  the same `convergent` mask generation used. Two seams, then: a field added to
+  `continent_state` is a `save_game_version` bump exactly as a field on the world is.
 - **`convergent`** — per-tile `uint8_t` mask, 1 where the tile touches a **classified
   convergent** boundary (the pairs that earned the +0.12 uplift). **Empty on a stagnant
   lid**, which has no boundaries at all. Written in the same loop that applies the bias.

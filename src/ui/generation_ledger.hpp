@@ -10,10 +10,12 @@ namespace ui {
 /// Draws the Generation Ledger — the developer tuning surface that explains WHY a
 /// tile generated as it did. Design authority: docs/generation/GENERATION_LEDGER.md.
 ///
-/// Two views, because the two questions differ: **Body** (the aggregate shape —
-/// composition/landform histograms, the ocean threshold against the profile's
-/// target, the latitude bands, and the profile that drove all of it) and **Tile**
-/// (the five-step derivation breadcrumb for the selected tile).
+/// One flat panel of stacked per-body sections — composition/landform histograms,
+/// the ocean threshold against the profile's target, the latitude bands, and the
+/// profile that drove all of it. The per-tile derivation breadcrumb (the old Tile
+/// view) was retired with the tab strip that carried it and its builder deleted
+/// (Ben, 2026-08-30); nothing in src/ draws one. GENERATION_LEDGER.md § Per-tile
+/// derivation breadcrumb keeps the design without a surface.
 ///
 /// The per-pass intermediates it reads are REGENERATED ON DEMAND from the report's
 /// recorded tile-pass inputs and cached for as long as one body stays the subject;

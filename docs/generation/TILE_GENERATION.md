@@ -428,7 +428,7 @@ extractable resource.
 | Timber | Life | Forest or marsh cover | 15–40 |
 | Sand | Body | Barren (plains/canyon landform) | 10–25 |
 | Clay | Body | Marsh cover, any valley landform | 8–20 |
-| Peat | Life | Marsh cover | 5–15 |
+| Peat | Life | Scrub cover on sedimentary substrate, plains or valley landform — the pair rule, `RESOURCES.md` § Ambient goods | 5–15 |
 
 **Calibrated subset deposit table** — the seven-resource subset, authored on the
 per-tile `tile_rng` stream. These values are hand-calibrated and the economy is
@@ -483,8 +483,9 @@ world keeps its coal and loses its forests
 row reads.
 
 **Living resources read the PRESENT.** Timber follows forest and marsh cover, peat
-the marsh itself, agricultural produce and fibre the cover on sedimentary ground —
-because that is where they are, not where they were.
+the scrub-on-sedimentary pair on plains or valley (the rule `RESOURCES.md` § Ambient goods
+authors — a marsh-only reading narrows it and is not the design), agricultural produce and
+fibre the cover on sedimentary ground — because that is where they are, not where they were.
 
 | Cover (on sedimentary) | Resource | Base range | Valley mod |
 |---|---|---|---|

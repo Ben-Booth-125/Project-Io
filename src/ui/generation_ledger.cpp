@@ -278,8 +278,9 @@ void draw_generation_ledger(const world& w, ui_state& s,
     // ONE FLAT PANEL OF STACKED SECTIONS, not a tab strip (Ben, 2026-08-30). The
     // Tile view - the per-tile derivation breadcrumb - was retired with the strip
     // that carried it, leaving the Body selector below as the only cross-cutting
-    // control. The breadcrumb itself survives as `draw_tile_derivation`; see the
-    // note on its declaration in generation_ledger.hpp.
+    // control. The breadcrumb's builder (`draw_tile_derivation`) went with it —
+    // ruled delete, Ben, 2026-08-30 — so nothing in src/ draws a per-tile
+    // derivation; GENERATION_LEDGER.md keeps the design.
     //
     // With no tabs there is no active-tab press to close the ledger. That is the
     // Balance ledger's shape and needs no extra control: the rail slot toggles the

@@ -9,6 +9,15 @@
 > (../EVENTS) · the sibling roster at corp grain (../ai/STRATEGIES).
 > **Confused with:** HISTORY.md, ../EVENTS.md, ../ai/STRATEGIES.md.
 
+> ⚠ **Superseded in part — remove once ruled.** The collapse the generation layer models is
+> written elsewhere: secession as network failure in
+> [`../generation/CIVILISATION.md`](../generation/CIVILISATION.md) § The network is the estate,
+> and it crosses, and § What the dark age must leave (BL-896, collapse is network failure); and
+> the schism verb in [`CREEDS.md`](CREEDS.md) § The schism verb (BL-944, the schism verb). The
+> six strategies, the seven culminations and the pairing matrix below are not what that model
+> reads. Whether they remain design for a later pass or are retired is an open call in
+> `docs/development/NEEDS_REVIEW.json`; nothing below is deleted on that account.
+
 This document is the authority for the Era −1 collapse metagame: the strain a major polity
 accumulates, the strategies a polity plays against it, and the culminating events that resolve
 it. It sits on `docs/lore/HISTORY.md` (the institutional ladder this plays out inside) and
