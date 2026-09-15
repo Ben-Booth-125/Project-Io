@@ -25,6 +25,8 @@
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
 
+#include "culture_footprint.hpp" // BL-968 step 1: the cultures that never hold ground
+
 #include <algorithm>
 #include <bit>
 #include <chrono>
@@ -504,6 +506,17 @@ struct sweep_row
     int cultures       = -1;
     int culture_depth  = -1; ///< Longest `parent` chain, roots at 0.
     int cultures_root  = -1; ///< Cultures with no parent.
+
+    /// BL-968 step 1 -- the cultures that never hold ground. -1 = no creeds.
+    /// `culture_footprint.hpp` is the one reading both this sweep and
+    /// `colonisation_harness` C15 print; REPORTED, not gated, and no rule is
+    /// chosen off it here (fold-back vs gate-coining is Ben's call).
+    int cultures_coined            = -1; ///< == `cultures`; carried under the item's own key.
+    int cultures_holding_boundary  = -1; ///< Plurality on >= 1 region at 400 BCE (the sim's opening map).
+    int cultures_holding_close     = -1; ///< Plurality on >= 1 region at the sim's close (1200 CE).
+    int cultures_empty_leaves      = -1; ///< Empty at the boundary and childless.
+    int cultures_empty_interior    = -1; ///< Empty at the boundary with >= 1 child.
+    std::vector<int> cultures_empty_leaf_depth; ///< Empty leaves by depth below a cradle.
 
     int64_t foundings_scheduled = 0;
     int64_t foundings_settled   = 0;
@@ -1863,6 +1876,19 @@ int main(int argc, char** argv)
                     { at = cu[static_cast<std::size_t>(at)].parent; ++depth; }
                     if (depth > row.culture_depth) row.culture_depth = depth;
                 }
+
+                // BL-968 step 1: the boundary is the settlement the sim was
+                // HANDED (`fx.settlement`, 400 BCE); the close is `ss`, which
+                // `run_history_sim` mutated in place to the stop year (1200 CE
+                // on this single-span run). Same reading as C15.
+                const culture_footprint cf =
+                    measure_culture_footprint(cu, fx.settlement.regions, &ss.regions);
+                row.cultures_coined           = cf.coined;
+                row.cultures_holding_boundary = cf.holding_boundary;
+                row.cultures_holding_close    = cf.holding_close;
+                row.cultures_empty_leaves     = cf.empty_leaves;
+                row.cultures_empty_interior   = cf.empty_interior;
+                row.cultures_empty_leaf_depth = cf.empty_leaf_depth;
             }
 
             row.arc_name  = derive_from_generation ? "generation" : "struct-default";
@@ -3259,6 +3285,73 @@ int main(int argc, char** argv)
                         static_cast<long long>(rows.front().city_states_step));
         }
 
+        // BL-968 step 1 -- THE CULTURES THAT NEVER HOLD GROUND. Per seed:
+        // coined, holding >= 1 region (plurality) at the Culture/Empires
+        // boundary (400 BCE) and at the close (1200 CE), the ratio, and
+        // where the empty names sit in the tree (leaves vs interior nodes,
+        // leaves by depth). REPORTED, NOT GATED: the rule -- fold an empty
+        // culture back into its parent, or gate coining on a footprint -- is
+        // Ben's call once these numbers are on the table.
+        std::printf("\n--- BL-968.1  THE CULTURES THAT NEVER HOLD GROUND (report-only) ---\n");
+        std::printf("  seed   coined   hold@boundary   hold@close   ratio   "
+                    "empty: leaves / interior   empty leaves by depth\n");
+        {
+            std::vector<int64_t> coined, hold_b, hold_c, ratio, leaves, interior;
+            for (const sweep_row& r : rows)
+            {
+                if (r.cultures_coined < 0)
+                {
+                    std::printf("  %4u   (no creeds -- struct-default path)\n", r.seed);
+                    continue;
+                }
+                const int pm = r.cultures_coined > 0
+                    ? static_cast<int>((static_cast<int64_t>(r.cultures_holding_boundary) * 1000)
+                                       / r.cultures_coined)
+                    : 0;
+                std::printf("  %4u   %6d   %13d   %10d   %3d.%d%%   %6d / %-8d   ",
+                            r.seed, r.cultures_coined, r.cultures_holding_boundary,
+                            r.cultures_holding_close, pm / 10, pm % 10,
+                            r.cultures_empty_leaves, r.cultures_empty_interior);
+                culture_footprint cf;
+                cf.empty_leaf_depth = r.cultures_empty_leaf_depth;
+                print_empty_leaf_depths(cf);
+                std::printf("\n");
+                coined.push_back(r.cultures_coined);
+                hold_b.push_back(r.cultures_holding_boundary);
+                hold_c.push_back(r.cultures_holding_close);
+                ratio.push_back(pm);
+                leaves.push_back(r.cultures_empty_leaves);
+                interior.push_back(r.cultures_empty_interior);
+            }
+            if (!coined.empty())
+            {
+                int64_t sum_coined = 0, sum_hold_b = 0, sum_hold_c = 0, sum_leaves = 0, sum_interior = 0;
+                for (std::size_t i = 0; i < coined.size(); ++i)
+                {
+                    sum_coined += coined[i]; sum_hold_b += hold_b[i]; sum_hold_c += hold_c[i];
+                    sum_leaves += leaves[i]; sum_interior += interior[i];
+                }
+                const int64_t pooled_pm = sum_coined > 0 ? (sum_hold_b * 1000) / sum_coined : 0;
+                std::printf("\n  COINED                 median %lld per world   pooled %lld\n",
+                            static_cast<long long>(median_of(coined)), static_cast<long long>(sum_coined));
+                std::printf("  HOLDING @ boundary     median %lld   pooled %lld  (%lld.%lld%% of coined; "
+                            "per-seed median ratio %lld.%lld%%)\n",
+                            static_cast<long long>(median_of(hold_b)), static_cast<long long>(sum_hold_b),
+                            static_cast<long long>(pooled_pm / 10), static_cast<long long>(pooled_pm % 10),
+                            static_cast<long long>(median_of(ratio) / 10),
+                            static_cast<long long>(median_of(ratio) % 10));
+                std::printf("  HOLDING @ close        median %lld   pooled %lld\n",
+                            static_cast<long long>(median_of(hold_c)), static_cast<long long>(sum_hold_c));
+                std::printf("  EMPTY                  leaves pooled %lld   interior pooled %lld  "
+                            "(an empty INTERIOR node is a name the tree cannot drop without re-parenting)\n",
+                            static_cast<long long>(sum_leaves), static_cast<long long>(sum_interior));
+                std::printf("  (holding = plurality on >= 1 region, the same test run_history_sim seeds a\n"
+                            "   polity from. Boundary = the settlement the sim was handed; close = the\n"
+                            "   in-place state at its stop year. REPORTED, not gated -- BL-968 step 2 is\n"
+                            "   Ben's call: fold-back into the parent, or gate coining on a footprint.)\n");
+            }
+        }
+
         // BL-920 -- ground taken by ORGANISE beside ground taken by
         // CONQUEST, and the count of city states that ROSE (crossed
         // `city_state_population_threshold` on unorganised ground) rather
@@ -3359,10 +3452,14 @@ int main(int argc, char** argv)
             std::fprintf(f,
                 "],\n"
                 "   \"cultures\": %d, \"cultures_root\": %d, \"culture_depth\": %d,\n"
+                "   \"cultures_coined\": %d, \"cultures_holding_boundary\": %d, "
+                "\"cultures_holding_close\": %d, \"cultures_empty_leaves\": %d,\n"
                 "   \"foundings_scheduled\": %lld, \"foundings_settled\": %lld, "
                 "\"civilisations\": %lld,\n"
                 "   \"city_states_step\": %lld, \"city_states_series\": [",
                 r.cultures, r.cultures_root, r.culture_depth,
+                r.cultures_coined, r.cultures_holding_boundary,
+                r.cultures_holding_close, r.cultures_empty_leaves,
                 static_cast<long long>(r.foundings_scheduled),
                 static_cast<long long>(r.foundings_settled),
                 static_cast<long long>(r.civilisations),
