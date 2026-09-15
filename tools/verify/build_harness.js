@@ -2,7 +2,14 @@
 // build_harness.js — build ONE tools/verify/<name>.cpp against the world superset,
 // with no CMake configure and no network.
 //
-//   node tools/verify/build_harness.js <name> [--run] [--debug] [--jobs N]
+//   node tools/verify/build_harness.js <name> [--run] [--debug] [--jobs N] [--clean]
+//
+// THE WORLD SET IS CACHED (BL-960): the 66 src/world TUs compile once per
+// configuration into build_gen/verify/_world/<release|debug>/ and every harness
+// links the cached objects. A TU recompiles when its .cpp or any header under
+// src/ is newer than its object, or when the flags change; --clean drops the
+// cache. See the comment at the cache for why objects are linked directly
+// rather than archived.
 //
 // WHY THIS EXISTS (NR-392, Ben's ruling 2026-08-23). A fresh worktree has no
 // configured build tree, and `cmake -B build` pulls SDL3, Lua, sol2 and ImGui over
@@ -202,7 +209,7 @@ const jobs = jobsArg >= 0 ? parseInt(argv[jobsArg + 1], 10) : Math.max(1, os.cpu
 const positional = argv.filter((a, i) => !a.startsWith('--') && !(jobsArg >= 0 && i === jobsArg + 1));
 const name = positional[0];
 
-if (!name) die('usage: node tools/verify/build_harness.js <name> [--run] [--debug] [--jobs N]');
+if (!name) die('usage: node tools/verify/build_harness.js <name> [--run] [--debug] [--jobs N] [--clean]');
 if (!/^[A-Za-z0-9_]+$/.test(name)) die(`"${name}" is not a harness name (letters, digits and underscore only)`);
 
 const src = path.join(ROOT, 'tools', 'verify', name + '.cpp');
@@ -239,15 +246,79 @@ const isWindows = process.platform === 'win32';
 const outDir = path.join(ROOT, 'build_gen', 'verify');
 // The object dir carries a suffix deliberately: on Linux the executable has no
 // extension, so a bare <name> directory would collide with the binary itself.
+// Since BL-960 it holds only the harness's OWN object; the world set lives in
+// the shared cache below.
 const objDir = path.join(outDir, name + '.obj');
-fs.mkdirSync(isWindows ? objDir : outDir, { recursive: true });
+fs.mkdirSync(objDir, { recursive: true });
+// Sweep the world objects an earlier build of this harness left here, so the
+// 3.3 GB of duplicated objects drains as harnesses are rebuilt rather than
+// sitting beside the cache forever. Only this harness's own object survives.
+for (const f of fs.readdirSync(objDir)) {
+  if (/\.(obj|o)$/.test(f) && path.basename(f, path.extname(f)) !== name) fs.unlinkSync(path.join(objDir, f));
+}
 
 const exe = path.join(outDir, name + (isWindows ? '.exe' : ''));
 // A stale binary must never be mistaken for a fresh one if the compile fails.
 if (fs.existsSync(exe) && fs.statSync(exe).isFile()) fs.unlinkSync(exe);
 
 const debug = flags.has('--debug');
+
+// THE WORLD SET IS COMPILED ONCE AND SHARED (BL-960). Before this, every
+// harness recompiled all 66 src/world TUs into its own object dir, with no
+// up-to-date check: build_gen/verify held 3.3 GB of the same objects 59 times
+// over, and a one-line edit to history_sim.cpp cost a clean build. CMakeLists
+// already compiles the set once (io_world_obj); this is the same discipline
+// for the CMake-free path every worktree agent uses.
+//
+// Objects live in build_gen/verify/_world/<release|debug>/, one dir per
+// configuration because the flags differ (/Zi and asan objects must never
+// meet /O2 ones at link time). A TU is rebuilt when its object is missing,
+// older than its .cpp, older than the NEWEST HEADER under src/, or when the
+// flag stamp changed. The header rule is deliberately coarse: a false rebuild
+// costs seconds, a missed one costs a wrong answer, and a real dependency scan
+// is what CMake is for.
+//
+// The cached objects are LINKED DIRECTLY, not archived into a static library.
+// A .lib pulls in only the objects a symbol reference reaches, which would
+// silently drop any world TU whose contribution is a static initialiser; the
+// old path linked every object, and this keeps that meaning exactly. The
+// object list goes through a response file so the command line cannot
+// overflow cmd's limit as the set grows.
+const cfgName = debug ? 'debug' : 'release';
+const worldDir = path.join(outDir, '_world', cfgName);
+const objExt = isWindows ? '.obj' : '.o';
+if (flags.has('--clean')) {
+  fs.rmSync(worldDir, { recursive: true, force: true });
+  console.log(`build_harness: cleaned ${path.relative(ROOT, worldDir)}`);
+}
+fs.mkdirSync(worldDir, { recursive: true });
+
+/// Newest mtime of any header under @p dir (recursive). The coarse dependency
+/// rule described above.
+function newestHeaderMtime(dir) {
+  let newest = 0;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) newest = Math.max(newest, newestHeaderMtime(p));
+    else if (/\.(hpp|h|inl|ipp)$/.test(entry.name)) newest = Math.max(newest, fs.statSync(p).mtimeMs);
+  }
+  return newest;
+}
+const headerMtime = newestHeaderMtime(path.join(ROOT, 'src'));
+
+const worldObj = (s) => path.join(worldDir, path.basename(s, '.cpp') + objExt);
+function objIsFresh(s) {
+  const o = worldObj(s);
+  if (!fs.existsSync(o)) return false;
+  const om = fs.statSync(o).mtimeMs;
+  return om >= fs.statSync(s).mtimeMs && om >= headerMtime;
+}
+
 let cmd, args;
+// The world-set compile and the harness compile+link are separate steps; each
+// branch fills these. `worldCmd` is null when nothing in the cache is stale.
+let worldCmd = null, worldArgs;
+let stale;
 
 if (isWindows) {
   // cl is only on PATH inside a Developer Prompt; vcvars64 puts it there.
@@ -258,7 +329,7 @@ if (isWindows) {
   // confusingly instead of here with the message that names the fix.
   if (!fs.existsSync(vcvars) && spawnSync('where', ['cl'], { shell: true }).status !== 0)
     die('cl not found and vcvars64.bat is not at its default path — open a Developer Prompt, or build through CMake');
-  const cl = ['cl', '/nologo', '/std:c++20', '/EHsc', '/MP',
+  const clFlags = ['cl', '/nologo', '/std:c++20', '/EHsc', '/MP',
     debug ? '/Od /Zi' : '/O2', '/I', 'src', '/I', 'tools\\verify',
     // sol2 + Lua headers. NOT because a harness wants Lua - none do - but because
     // a src/world TU in the superset now includes scripting/lua_state.hpp, whose
@@ -282,10 +353,27 @@ if (isWindows) {
     // the wrong-builder symptom this file exists to diagnose. Shell quoting is
     // not string escaping. Verified from a worktree with IO_DEPS_CACHE unset.
     // Fifth rot of this arg list; the header comment warned about the first two.
-    '/I', q(path.join(DEPS, 'sol2_src', 'include')), '/I', q(path.join(DEPS, 'lua_src')),
+    '/I', q(path.join(DEPS, 'sol2_src', 'include')), '/I', q(path.join(DEPS, 'lua_src'))];
+
+  // The flag stamp: a change to the compile flags above invalidates the whole
+  // cache, since an object carries no record of the flags that made it.
+  stale = staleWorldSet(clFlags.join(' '));
+
+  if (stale.length) {
+    // Compile only the stale TUs, objects into the shared dir. /c with
+    // /Fo:<dir>\ names each object after its source.
+    worldCmd = `call "${vcvars}" >nul 2>&1 && ` + [...clFlags, '/c',
+      ...stale.map(s => q(path.relative(ROOT, s))),
+      `/Fo:${path.relative(ROOT, worldDir)}\\`].join(' ');
+    worldArgs = undefined;
+  }
+  // The harness's own TU, then the cached objects by response file. cl hands
+  // .obj arguments straight to the linker, so no separate link step.
+  const rsp = writeResponseFile();
+  const cl = [...clFlags,
     q(path.relative(ROOT, src)),
-    ...sources.map(s => q(path.relative(ROOT, s))),
-    `/Fo:${path.relative(ROOT, objDir)}\\`, `/Fe:${path.relative(ROOT, exe)}`].join(' ');
+    `/Fo:${path.relative(ROOT, objDir)}\\`, `/Fe:${path.relative(ROOT, exe)}`,
+    `@${path.relative(ROOT, rsp)}`].join(' ');
   // ONE command string, and argv0 is NOT 'cmd'. It used to be
   // spawnSync('cmd', ['/c', ...], { shell: true }), which is a DOUBLE WRAP:
   // node runs `cmd /d /s /c "cmd /c call "<vcvars>" >nul 2>&1 && cl ..."`, the
@@ -297,30 +385,78 @@ if (isWindows) {
   // this invocation; the header comment warns about the earlier three.
   cmd = `call "${vcvars}" >nul 2>&1 && ${cl}`; args = undefined;
 } else {
-  cmd = 'g++';
-  args = ['-std=c++20', debug ? '-O0' : '-O2', '-g',
+  const gxxFlags = ['-std=c++20', debug ? '-O0' : '-O2', '-g',
     '-I', path.join(ROOT, 'src'), '-I', path.join(ROOT, 'tools', 'verify'),
     // See the MSVC branch above: a world TU reaches scripting/lua_state.hpp -> sol/sol.hpp.
     '-I', path.join(DEPS, 'sol2_src', 'include'),
     '-I', path.join(DEPS, 'lua_src'),
-    ...(debug ? ['-fsanitize=address,undefined'] : []),
-    src, ...sources, '-o', exe];
-  void jobs; // g++ compiles the TU set in one invocation; --jobs is the MSVC /MP knob
+    ...(debug ? ['-fsanitize=address,undefined'] : [])];
+  stale = staleWorldSet(gxxFlags.join(' '));
+  if (stale.length) {
+    // `g++ -c a.cpp b.cpp` writes a.o and b.o into the cwd, so the world dir
+    // is the cwd for this step. Sequential; --jobs is the MSVC /MP knob.
+    worldCmd = 'g++'; worldArgs = [...gxxFlags, '-c', ...stale];
+  }
+  const rsp = writeResponseFile();
+  cmd = 'g++';
+  args = [...gxxFlags, src, `@${rsp}`, '-o', exe];
+  void jobs;
+}
+
+/// Which world TUs need compiling, honouring the flag stamp.
+function staleWorldSet(flagString) {
+  const stampPath = path.join(worldDir, 'flags.txt');
+  let previous = null;
+  try { previous = fs.readFileSync(stampPath, 'utf8'); } catch { /* first build */ }
+  if (previous !== flagString) {
+    // Flags changed (or first build): every object is suspect. Remove them so
+    // a failed compile cannot leave a mixed-flag cache behind.
+    for (const s of sources) { try { fs.unlinkSync(worldObj(s)); } catch { /* absent */ } }
+    fs.writeFileSync(stampPath, flagString, 'utf8');
+    return sources.slice();
+  }
+  return sources.filter(s => !objIsFresh(s));
+}
+
+/// One object path per line, in the same sorted order the old command line
+/// used, so link order stays deterministic.
+function writeResponseFile() {
+  const rsp = path.join(worldDir, 'objects.rsp');
+  fs.writeFileSync(rsp, sources.map(s => q(isWindows ? path.relative(ROOT, worldObj(s)) : worldObj(s))).join('\n') + '\n', 'utf8');
+  return rsp;
 }
 
 const label = isWindows ? 'cl' : 'g++';
-console.log(`build_harness: ${name} <- ${sources.length} world TUs (${label}, ${debug ? 'debug+asan' : 'release'})`);
+console.log(`build_harness: ${name} <- ${sources.length} world TUs, ${stale.length} to compile, ${sources.length - stale.length} cached (${label}, ${debug ? 'debug+asan' : 'release'})`);
 const t0 = Date.now();
+
+if (worldCmd !== null) {
+  const w = worldArgs === undefined
+    ? spawnSync(worldCmd, { cwd: ROOT, stdio: 'inherit', shell: true })
+    : spawnSync(worldCmd, worldArgs, { cwd: worldDir, stdio: 'inherit' });
+  const missing = stale.filter(s => !fs.existsSync(worldObj(s)));
+  if (w.status !== 0 || missing.length) {
+    // Never leave a half-fresh object behind: a TU that failed has no object,
+    // and one that compiled before the failure is fine to keep.
+    console.error(`build_harness: COMPILE_FAILED in the world set (${((Date.now() - t0) / 1000).toFixed(1)}s)` +
+      (missing.length ? `; no object for ${missing.map(m => path.basename(m)).join(', ')}` : ''));
+    process.exit(1);
+  }
+  console.log(`build_harness: world set ready (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+}
+
+const t1 = Date.now();
 const r = args === undefined
   ? spawnSync(cmd, { cwd: ROOT, stdio: 'inherit', shell: true })
   : spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: isWindows });
 const secs = ((Date.now() - t0) / 1000).toFixed(1);
+const linkSecs = ((Date.now() - t1) / 1000).toFixed(1);
 
 if (r.status !== 0 || !fs.existsSync(exe)) {
   console.error(`build_harness: COMPILE_FAILED (${secs}s)`);
   process.exit(1);
 }
-console.log(`build_harness: COMPILE_OK  ${path.relative(ROOT, exe)}  (${secs}s)`);
+console.log(`build_harness: COMPILE_OK  ${path.relative(ROOT, exe)}  (${secs}s total, ${linkSecs}s harness+link)`);
 
 if (flags.has('--run')) {
   // Run from the repo root: a script-rooted harness resolves scripts/ relative to cwd.
