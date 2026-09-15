@@ -845,11 +845,32 @@ int main()
         ep_consolidate_only.navy_build_cost_q = 0;
         ep_consolidate_only.standing_army_build_cost_q = 0;
         regions[0].material_stock = 500;
-        const int64_t before_treasury = regions[0].treasury;
+        // BL-998 (Ben, 2026-09-15, NR-871): EVERY held seat folds, not the
+        // capital alone. Give polity 0 a second, non-capital seat carrying
+        // its own hoard, and polity 1 a seat of its own that must NOT fold
+        // into polity 0's purse (nation is the filter, not is_seat alone).
+        regions[0].is_seat = true;
+        regions.push_back(region{});
+        regions[2].nation = 0; regions[2].is_seat = true; regions[2].material_stock = 300;
+        regions.push_back(region{});
+        regions[3].nation = 1; regions[3].is_seat = true; regions[3].material_stock = 70;
+        // A hinterland region (not a seat) with a stray stock is left alone:
+        // stores only ever accumulate on seats, and the fold reads seats only.
+        regions.push_back(region{});
+        regions[4].nation = 0; regions[4].is_seat = false; regions[4].material_stock = 11;
+        const int64_t before_treasury   = regions[0].treasury;
+        const int64_t before_treasury_1 = regions[1].treasury;
         run_exploration_upkeep(regions, qs, {}, ep_consolidate_only, /*year=*/1200, /*step_years=*/4);
         check(regions[0].treasury >= before_treasury + 500 && regions[0].material_stock == 0,
               "R5.4  consolidation folds material_stock into treasury once, at the span's own "
               "start year, and empties the seat's material_stock");
+        check(regions[0].treasury >= before_treasury + 800 && regions[2].material_stock == 0,
+              "R5.4b a two-seat polity opens with BOTH seats' stock in its treasury and the "
+              "non-capital seat at 0 (BL-998)");
+        check(regions[1].treasury == before_treasury_1 + 70 && regions[3].material_stock == 0
+           && regions[4].material_stock == 11,
+              "R5.4c another polity's seat folds into ITS capital, not a neighbour's, and a "
+              "non-seat region's stray stock is not swept (BL-998)");
     }
 
     // -----------------------------------------------------------------

@@ -880,14 +880,33 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         region& seat = regions[static_cast<std::size_t>(q.capital)];
 
         // ---- CONSOLIDATION: THE PHASE'S OPENING ACT, ONCE (EXPLORATION.md
-        // sec Capital arrives: "material becomes capital"). Fires exactly on
-        // the round at the span's own start year -- which for every caller
-        // before this item is unreachable, because `exploration_upkeep_
-        // enabled` is false throughout the Empire span.
+        // sec Capital arrives: "At 1200 CE every seat's stores flow to the
+        // capital, once"). Fires exactly on the round at the span's own start
+        // year -- which for every caller before this item is unreachable,
+        // because `exploration_upkeep_enabled` is false throughout the
+        // Empire span.
+        //
+        // BL-998 (Ben, 2026-09-15, NR-871): EVERY seat the polity holds, not
+        // the capital alone. A polity's hinterland seats each carry their own
+        // `material_stock` (CIVILISATION.md: stores sit AT THE SEAT); before
+        // this ruling only the capital's own stock became treasury and every
+        // other held seat kept its hoard on the ground, unseen by the spend
+        // scorer. "Once" is literal: the non-capital seats are zeroed here and
+        // accumulate again as the round runs -- nothing sweeps them later.
         if (year == params.start_year)
         {
-            seat.treasury += seat.material_stock;
+            int64_t folded = 0;
+            for (region& r : regions)
+            {
+                if (!r.is_seat || r.nation != q.id) continue;
+                folded += r.material_stock;
+                r.material_stock = 0;
+            }
+            // The capital itself may not carry `is_seat` in a synthetic
+            // fixture; its own stock folds regardless, exactly as before.
+            folded += seat.material_stock;
             seat.material_stock = 0;
+            seat.treasury = clampi64(seat.treasury + folded, 0, 1LL << 48);
         }
 
         // ---- ONGOING EARN: endowment, the inherited network, a market. ----
