@@ -219,7 +219,8 @@ std::vector<entity_id> generate_body_surface(
     const planetology_state* pl,
     generation_record& record,
     const std::vector<float>* continent_bias = nullptr,
-    const std::vector<uint8_t>* convergent = nullptr);
+    const std::vector<uint8_t>* convergent = nullptr,
+    const continent_state* continents = nullptr);
 
 /// The LIFE half of `generate_body_tiles` (BL-965): the palaeo pre-pass, the
 /// ore-field pre-pass and the Life phase of Pass 6, run over a tile set the Body

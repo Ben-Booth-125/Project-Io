@@ -1760,7 +1760,8 @@ std::vector<entity_id> generate_body_surface(
     const planetology_state* pl,
     generation_record& record,
     const std::vector<float>* continent_bias,
-    const std::vector<uint8_t>* convergent)
+    const std::vector<uint8_t>* convergent,
+    const continent_state* continents)
 {
     const int total = gw * gh;
 
@@ -2628,7 +2629,7 @@ std::vector<entity_id> generate_body_tiles(
     generation_record& seam = record ? *record : local;
 
     std::vector<entity_id> tile_ids =
-        generate_body_surface(w, body_id, gw, gh, profile, seed, pl, seam, continent_bias, convergent);
+        generate_body_surface(w, body_id, gw, gh, profile, seed, pl, seam, continent_bias, convergent, continents);
     generate_life_deposits_over(w, tile_ids, seam, profile, seed, deposit_scalar, pl, convergent, continents);
     return tile_ids;
 }
