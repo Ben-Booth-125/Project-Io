@@ -438,6 +438,19 @@ int main()
                              && rep_a1.prehistory_foundings == rep_a2.prehistory_foundings;
     check(report_same,
           "R3.5 the era sim's reported outcome is identical across two same-seed runs");
+
+    // 3.6 — BL-969: both handoff validators now run on the SHIPPED path and
+    //       record a violation on the report rather than in a harness only.
+    //       Asserted on both seeds, so a world whose folded handoff broke
+    //       the contract cannot pass for one that honoured it.
+    if (rep_a1.handoff_invalid)
+        std::printf("     seed A handoff violation: %s\n", rep_a1.handoff_violation.c_str());
+    if (rep_b.handoff_invalid)
+        std::printf("     seed B handoff violation: %s\n", rep_b.handoff_violation.c_str());
+    check(!rep_a1.handoff_invalid && !rep_a2.handoff_invalid,
+          "R3.6 seed A's pass_one/exploration handoffs pass their validators on the shipped path");
+    check(!rep_b.handoff_invalid,
+          "R3.6 seed B's pass_one/exploration handoffs pass their validators on the shipped path");
     if (!report_same)
         std::printf("     run #2:          years=%lld battles=%lld conquests=%lld foundings=%lld\n",
                     static_cast<long long>(rep_a2.prehistory_years),
@@ -489,6 +502,10 @@ int main()
           "R4.2 the era pass DID something at epoch 1960 (it used to be skipped entirely)");
     check(d_i1 == d_i2 && rep_i1.prehistory_battles == rep_i2.prehistory_battles,
           "R4.3 the two-span run is deterministic (deep digest and counters both agree)");
+    if (rep_i1.handoff_invalid)
+        std::printf("     1960 handoff violation: %s\n", rep_i1.handoff_violation.c_str());
+    check(!rep_i1.handoff_invalid,
+          "R4.4 the 1960 arc's handoffs pass their validators on the shipped path (BL-969)");
 
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "ALL PASS" : "FAILURES", failures,
                 failures == 1 ? "" : "s");

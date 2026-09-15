@@ -596,6 +596,9 @@ void w_report(std::ostream& o, const generation_report& g)
     w_i64(o, g.exploration_battles);
     w_i64(o, g.exploration_conquests);
     w_i64(o, g.exploration_foundings);
+    // save_game_version 15 (BL-969, the handoff validators' verdict) -- keep r_report in step.
+    w_bool(o, g.handoff_invalid);
+    w_str(o, g.handoff_violation);
 }
 
 bool r_report(std::istream& i, generation_report& g)
@@ -611,7 +614,9 @@ bool r_report(std::istream& i, generation_report& g)
         && r_i64(i, g.markets_from_trade)
         // save_game_version 14 (BL-946) -- keep w_report in step.
         && r_i64(i, g.exploration_years) && r_i64(i, g.exploration_battles)
-        && r_i64(i, g.exploration_conquests) && r_i64(i, g.exploration_foundings);
+        && r_i64(i, g.exploration_conquests) && r_i64(i, g.exploration_foundings)
+        // save_game_version 15 (BL-969) -- keep w_report in step.
+        && r_bool(i, g.handoff_invalid) && r_str(i, g.handoff_violation);
 }
 
 // ---------------------------------------------------------------------------

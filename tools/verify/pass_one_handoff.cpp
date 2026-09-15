@@ -552,11 +552,18 @@ int main()
     // C7 — THE HANDOFF (BL-828). The doc's list and the struct's fields.
     // -----------------------------------------------------------------------
     {
-        const pass_one_output o = make_pass_one_output(war_ss, war, /*culture_count=*/3);
+        // BL-969: the fold now takes the culture table itself rather than a
+        // count. The strip's three peoples get three blank rows -- a fixture
+        // culture carries no year or pantheon and is not thereby malformed.
+        creed_state strip_creeds;
+        strip_creeds.cultures.resize(3);
+        const pass_one_output o = make_pass_one_output(war_ss, war, &strip_creeds);
         std::string why;
-        const bool ok = pass_one_output_valid(o, &why);
+        const bool ok = pass_one_output_valid(o, &why, &strip_creeds);
         if (!ok) std::printf("      invalid: %s\n", why.c_str());
-        check(ok, "C7a  the handoff validates — shares, holdings and grudges all well-formed");
+        check(ok, "C7a  the handoff validates — shares, holdings, grudges and cultures all well-formed");
+        check(o.cultures.size() == 3 && o.culture_count == 3,
+              "C7a' the culture table crosses in the struct, sized to culture_count (BL-969)");
 
         check(o.regions.size() == war_ss.regions.size()
               && o.polities.size() == war.polities.size(),
@@ -590,7 +597,7 @@ int main()
         // the fix the sibling rows already took, and BL-908's own C7i/C7k
         // pass on the SAME strip, so only the "a war leaves a contact" claim
         // -- which needs a real loser -- moves fixtures.
-        const pass_one_output real_o = make_pass_one_output(real_ss, real_hs, /*culture_count=*/3);
+        const pass_one_output real_o = make_pass_one_output(real_ss, real_hs, &real_fx.creeds);
         check(!real_o.contacts.empty(),
               "C7j  a war between neighbours leaves at least one contact pair");
         bool contact_symmetric = true;
@@ -663,6 +670,35 @@ int main()
             broken3.wants[0].from = broken3.wants[0].to; // A "want" from oneself.
             check(!pass_one_output_valid(broken3, &why),
                   "C7o  the validator catches a want naming its own polity as the holder");
+        }
+
+        // BL-969 — the culture table is checked, not carried on trust: a
+        // short copy, a parent above its child, a coining year past the
+        // close, and a copy that silently differs from the live table each
+        // fail, and each for its own stated reason.
+        {
+            const auto rejects_with = [&](const pass_one_output& v, const char* needle,
+                                          const creed_state* live) {
+                std::string w;
+                const bool rejected = !pass_one_output_valid(v, &w, live);
+                if (!rejected || w.find(needle) == std::string::npos)
+                    std::printf("      (got: %s)\n", w.c_str());
+                return rejected && w.find(needle) != std::string::npos;
+            };
+            pass_one_output c1 = o; c1.cultures.pop_back();
+            check(rejects_with(c1, "culture_count", nullptr),
+                  "C7p  a culture table shorter than culture_count fails the validator");
+            pass_one_output c2 = o; c2.cultures[0].parent = 2; // Above its own index.
+            check(rejects_with(c2, "parent", nullptr),
+                  "C7q  a culture whose parent sits above it fails the validator");
+            pass_one_output c3 = o; c3.cultures[1].coined_year = c3.stop_year + 1;
+            check(rejects_with(c3, "after the close", nullptr),
+                  "C7r  a culture coined after the close fails the validator");
+            pass_one_output c4 = o; c4.cultures[2].aggression_q += 1;
+            check(pass_one_output_valid(c4, &why, nullptr),
+                  "C7s  without the live table, a drifted copy is only shape-checked");
+            check(rejects_with(c4, "differs from the live", &strip_creeds),
+                  "C7t  against the live table, a copy that drifted by one field fails the validator");
         }
     }
 

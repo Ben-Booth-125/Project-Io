@@ -3838,6 +3838,7 @@ struct polity_holdings
 /// than inferred:
 ///   - the region table          -> `regions`
 ///   - cultures                  -> `region::culture` (shares) + `culture_count`
+///                                  + `cultures` (the table itself, BL-969)
 ///   - works                     -> `region::works_built` and the five
 ///                                  `work_*_mod` fields, plus `works_by_span_band`
 ///   - the strain accumulators   -> `region::contest_q` and `polity::cohesion_q`
@@ -3855,8 +3856,25 @@ struct pass_one_output
     std::vector<polity> polities;
 
     /// How many cultures the shares above index into. Carried so a consumer can
-    /// bound-check a share without holding a `creed_state`.
+    /// bound-check a share without holding a `creed_state`. Always equals
+    /// `cultures.size()` on a value the fold produced; the validator checks it.
     int culture_count = 0;
+
+    /// THE CULTURE TABLE ITSELF (BL-969) -- a copy of `creed_state::cultures`
+    /// as it stood at the fold. The doc's list names "cultures" as crossing,
+    /// and until this field the shares crossed here while the table they
+    /// index into (pantheon, tongue, aggression, parentage, coining year)
+    /// crossed OUT OF BAND through the live `creed_state` -- so "the struct
+    /// is the whole of what crosses" was false for the largest row of the
+    /// contract. The sim DOES write that table (a coined civilisation, a
+    /// schism), so a copy at the close is a real record, not a duplicate of
+    /// the migration's.
+    ///
+    /// Consumers keep reading `creed_state`; what this field buys is the
+    /// CHECK. `pass_one_output_valid` compares it against the live table it
+    /// is handed, so the two channels are proven to agree at the fold rather
+    /// than assumed to.
+    std::vector<culture> cultures;
 
     /// Works raised, cross-tabulated [span][band] exactly as the sim counts them.
     std::array<std::array<int64_t, roster_band_count>, 2> works_by_span_band{};
@@ -3907,18 +3925,27 @@ struct pass_one_output
 };
 
 /// Fold the live sim state and settlement state into the handoff value.
-/// @param culture_count Cultures the shares index into; 0 when unknown.
+/// @param cs The culture table at the fold, copied into `cultures` and
+///           sizing `culture_count`; null leaves both empty/0 ("unknown"),
+///           which disables the share range check exactly as a 0 count did.
+///           One source for the count and the table, so they cannot disagree.
 pass_one_output make_pass_one_output(const settlement_state&  ss,
                                      const history_sim_state& hs,
-                                     int                      culture_count);
+                                     const creed_state*       cs);
 
 /// The enforcement half of the struct above. Checks what the doc's clause
 /// actually claims: every region's shares sum to exactly 1000 and name only
 /// cultures in range; every holding names a living polity and an existing
 /// region, with no region held twice; every grudge names polities in range and
 /// carries at least one event; every contact names polities in range and
-/// carries the event that joined it. Writes the first failure into @p why.
-bool pass_one_output_valid(const pass_one_output& o, std::string* why);
+/// carries the event that joined it; the culture table's size equals
+/// `culture_count`, every parent index is in range and below its child, every
+/// coining year is at or before `stop_year` -- and, when @p live is given, the
+/// table EQUALS the live `creed_state`'s row for row (BL-969), which is what
+/// makes "the struct is the whole of what crosses" a checked claim rather
+/// than a sentence. Writes the first failure into @p why.
+bool pass_one_output_valid(const pass_one_output& o, std::string* why,
+                           const creed_state* live = nullptr);
 
 // ---------------------------------------------------------------------------
 // The Exploration -> Digitisation handoff (BL-956)
@@ -3972,6 +3999,8 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why);
 ///   - The grudge table and the surviving network
 ///                               -> `grudges`, `surviving_corridors`
 ///   - (the political map, as a set) -> `holdings`
+///   - (the culture table, BL-969) -> `cultures`, on the footing
+///                                  `pass_one_output::cultures` sets
 struct exploration_output
 {
     /// The region table at the span's close — carries treasury, scarcity_q,
@@ -3983,7 +4012,15 @@ struct exploration_output
     std::vector<polity> polities;
 
     /// How many cultures the shares and `culture_preference` index into.
+    /// Always equals `cultures.size()` on a folded value; validated.
     int culture_count = 0;
+
+    /// The culture table at the 1660 close (BL-969) -- a copy of
+    /// `creed_state::cultures`, on exactly the footing and for exactly the
+    /// reason `pass_one_output::cultures` gives: the span writes the table,
+    /// so the close is a record, and the validator proves the copy equals the
+    /// live table it is handed. Consumers keep reading `creed_state`.
+    std::vector<culture> cultures;
 
     /// Treaty clauses (and tribute) STILL STANDING at `stop_year`: every
     /// object whose term ended at or before `stop_year` is expired out by
@@ -4027,10 +4064,11 @@ struct exploration_output
 };
 
 /// Fold the Exploration span's closing sim state and settlement state into
-/// the handoff value. @param culture_count Cultures the shares index into.
+/// the handoff value. @param cs The culture table at the close, copied into
+/// `cultures` and sizing `culture_count`; null leaves both empty/0.
 exploration_output make_exploration_output(const settlement_state&  ss,
                                            const history_sim_state& hs,
-                                           int                      culture_count);
+                                           const creed_state*       cs);
 
 /// The enforcement half of `exploration_output`: every table sorted, every id
 /// in range, no self-pairs; every holding matches region ownership (and every
@@ -4039,6 +4077,10 @@ exploration_output make_exploration_output(const settlement_state&  ss,
 /// overlord is; every standing dated object still inside its term; no
 /// negative treasury, army or navy stock and every `port_stock_q` on 0-1000;
 /// every trade flow sorted, between two distinct living polities, a known
-/// good at positive volume, on a pair holding a standing trade_access clause.
+/// good at positive volume, on a pair holding a standing trade_access clause;
+/// the culture table sized to `culture_count`, parents in range and below
+/// their child, coining years at or before `stop_year`, and -- when @p live
+/// is given -- equal row for row to the live `creed_state` (BL-969).
 /// Writes the first failure into @p why.
-bool exploration_output_valid(const exploration_output& o, std::string* why);
+bool exploration_output_valid(const exploration_output& o, std::string* why,
+                              const creed_state* live = nullptr);

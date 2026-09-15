@@ -411,8 +411,7 @@ int main()
 
         // R2/R3: fold the handoff, then run the Exploration span off it,
         // TWICE from independent copies, at the same seed.
-        const pass_one_output p1 = make_pass_one_output(
-            ss_a, hs_a, static_cast<int>(fixture.creeds.cultures.size()));
+        const pass_one_output p1 = make_pass_one_output(ss_a, hs_a, &fixture.creeds);
 
         check(!p1.polities.empty(), "R2.0  the Empires close leaves at least one living polity");
 
@@ -630,6 +629,23 @@ int main()
         check(eo.start_year == fixture.exploration_params.start_year
            && eo.stop_year == fixture.exploration_params.stop_year,
               "R6.2  the handoff's span is the span generation actually ran");
+
+        // BL-969: the culture table crosses IN the value, sized to its own
+        // count, and the validator bites on a short copy -- the fixture
+        // holds no post-span creed_state to prove equality against here;
+        // the shipped path does that itself (world_determinism R3.6).
+        check(!eo.cultures.empty()
+           && eo.cultures.size() == static_cast<std::size_t>(eo.culture_count),
+              "R6.2' the 1660 culture table crosses in the handoff, sized to culture_count (BL-969)");
+        if (!eo.cultures.empty())
+        {
+            exploration_output short_table = eo;
+            short_table.cultures.pop_back();
+            std::string w;
+            check(!exploration_output_valid(short_table, &w)
+               && w.find("culture_count") != std::string::npos,
+                  "R6.2'' a culture table shorter than culture_count fails the validator, for that reason");
+        }
 
         // R6.3-R6.5: the validator is not a rubber stamp -- a deliberately
         // corrupted copy of the same value fails it.

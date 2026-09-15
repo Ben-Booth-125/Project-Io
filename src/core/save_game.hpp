@@ -142,7 +142,12 @@ inline constexpr uint32_t save_game_magic =
 /// prehistory counters. Same strict-equality refusal as every prior bump — a
 /// v13 stream has no bytes there at all, so partial-reading it would misparse
 /// the next field.
-inline constexpr uint32_t save_game_version = 14; // BL-946, the EXPLORATION span's own time-lapse
+///
+/// 15 (BL-969): `handoff_invalid` / `handoff_violation` on `generation_report`,
+/// written by `w_report` after the Exploration counters -- the two handoff
+/// validators' verdict on the shipped path. Same strict-equality refusal: a
+/// v14 stream has no bytes there.
+inline constexpr uint32_t save_game_version = 15; // BL-969, the handoff validators' verdict
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.
