@@ -290,20 +290,10 @@ bool touches_ocean(const world& w, const std::vector<entity_id>& ids,
     return false;
 }
 
-/// The ANCIENT endowment under a region — surveyed once, over the window the
-/// region's people would have walked. These deposits predate everyone; what
-/// changes across a campaign is who ends up standing on them.
-///
-/// Held as RAW per-tile-mean richness in thousandths, not as a 0-1000 score:
-/// the four classes live on completely different absolute scales (a rich coal
-/// window and a rich grain window are nowhere near the same number), so an
-/// absolute gain either saturates one class or never fires another. The scores
-/// are computed later, against the world's own means — see `score_endowments`.
-struct endowment
-{
-    int farm = 0, ore = 0, energy = 0, water = 0; ///< Per-tile mean × 1000.
-};
+} // namespace
 
+// `endowment` and this survey are declared in settlement.hpp (BL-966): a harness
+// reads them, so they sit outside the anonymous namespace. Nothing else moved.
 endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
                            int col, int row, int gw, int gh)
 {
@@ -342,6 +332,8 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
     e.water  = (water * 1000) / n;
     return e;
 }
+
+namespace {
 
 /// Score one class against the world's own mean for that class: an average
 /// region scores 500, twice the average scores 1000.
