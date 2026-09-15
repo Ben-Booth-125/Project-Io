@@ -224,14 +224,64 @@ Each Tick, a population centre consumes a basket of goods drawn from the local m
 | Consumer goods | Discretionary welfare; shortage reduces workforce efficiency |
 | Habitability goods | Amenity and services; shortage caps population growth |
 
-Demand is supplied from the body's market. If demand exceeds local supply, the deficit is met by imports (via convoys, Layer 5). Persistent unmet demand reduces habitability, which reduces workforce efficiency, which propagates as a production penalty — the first indirect feedback loop in the economy.
+Demand is supplied from the centre's catchment market. If demand exceeds local supply, the deficit is met by imports (via convoys, `SUPPLY.md`). Persistent unmet demand reduces habitability, which reduces workforce efficiency, which propagates as a production penalty — the first indirect feedback loop in the economy.
 
-Two demand signals carry this. A centre's **own** market demand is one unit of `agricultural_produce` per scale level per tick — the subsistence half of the basket, the only half with a `resource_type` value (RESOURCES.md § Prototype scope: clean water, consumer goods and habitability goods are a resource *category*, not enumerators). The broader consumption signal is the **nation-substrate basket** (`scripts/economy.lua` § `substrate`), which is nation-level rather than per-centre.
+**The whole basket is one per-centre signal.** Each centre bids its basket into its catchment
+market every tick, price-elastically (`inject_population_demand`, `MARKETS.md` § The clearing
+tick). Clean water, consumer goods and medical supplies are tradeable `resource_type` values
+(`RESOURCES.md` § Habitability goods); no nation-level substrate basket stands beside it.
 
 **Demand ladders with scale** (Ben, 2026-08-25). The basket's *composition*, not only its size,
 follows the stratum: higher strata consume up the value chain — a city pulls consumer goods, a
 metropolis electronics — so big centres are demand **endpoints** that give goods value from day
 one, and the markets worth reaching.
+
+### The stratum ladder — size, rungs, wealth, promotion (Ben, 2026-09-15)
+
+Four rulings, taken on one form, make the direction above a mechanism.
+
+**1. A centre's appetite follows its HEADCOUNT, renormalised.** A metropolis of five million is
+not five villages. Basket volume is `heads × basket[r] × elasticity`, divided by one derived
+constant — **heads per demand unit** — so the world's total household demand at generation equals
+what the tier index produced. The rank-size rungs (10k / 50k / 200k / 1M / 5M) then give a
+metropolis 500× a village's appetite instead of 5×, and big cities become the markets worth a long
+haul. The constant is **derived, not picked**: the mean heads per scale point over the generated
+centre distribution (on the generation weights 40/30/20/8/2 that is 239k heads over 2.02 scale
+points, about 118k heads a unit), recorded with its derivation and re-derived whenever the rungs
+or the distribution move. It is held fixed in play, so a growing city grows its market.
+
+**2. The rungs are CUMULATIVE.** Each stratum keeps everything below it and adds a rung; nothing is
+substituted away. Industrial band:
+
+| Stratum | Adds |
+|---|---|
+| 1 | Staples — food rations, agricultural produce, water |
+| 2 | Clean water, medical supplies |
+| 3 | Consumer goods |
+| 4 | Refined fuel |
+| 5 | Electronics |
+
+Rung volumes are measured against the recipe-margin anchor, not authored to taste. The ancient
+band composes the same way over its own terminal goods (PROPOSED: charcoal and timber at 2, cloth
+and ceramics at 3, planks and leather at 4, dressed stone at 5). Era decides the chain; stratum
+decides how far up it a centre reaches.
+
+**3. Qualification scales the UPPER rungs.** A nation's qualification fraction (§ Qualification) —
+already seeded from how early it industrialised — multiplies the volume of rungs 4 and 5,
+normalised to the world mean at generation. A qualified nation's cities buy more fuel and
+electronics than an equally large city in a nation that industrialised late. Staples and welfare
+goods do not scale with it: a head eats whatever the nation's history. This is the campaign's half
+of *wealthier nations leverage their wealth into production* (`../generation/DIGITISATION.md` § 2),
+read from a slow, seeded quantity rather than from balances that swing every tick.
+
+**4. An unmet top rung BLOCKS PROMOTION.** A centre promotes only while its own highest rung is met
+— the sustained-met-supply precondition of § Growth, decline and razing, made specific. Lower rungs
+keep their habitability effects (`RESOURCES.md` § Habitability goods). So supplying a city's top
+rung is how a city grows, and a player who wants a metropolis in their catchment has a good to
+bring it.
+
+**Cultural weight composes on top** (`MARKETS.md` § Three properties the set has to hold, property
+5 as amended): stratum decides which goods and how much; the culture of the heads weights each.
 
 **And it ladders by ERA as well as by stratum (BL-640).** The basket is masked by era band exactly
 as recipes are (BL-433's `era` field), and the omission was load-bearing: a basket authored in
@@ -413,11 +463,11 @@ fraction (§ Qualification).
 
 ## Open items
 
-- **Cost of living is unquantified** (Ben, 2026-08-25). Neither how much it costs a head to
-  live, nor which goods each stratum consumes in what proportion, has numbers. § Population
-  demand states the direction (demand ladders with scale); the quantification — basket
-  contents per stratum, and the wage a head needs to afford it — is open, and couples to
-  BL-544 (unit wage reference).
+- **The wage a head needs is unquantified** (Ben, 2026-08-25). § The stratum ladder settles which
+  goods each stratum consumes and how volume scales; the rung volumes are measured, and what a
+  head must earn to afford its basket stays open, coupled to BL-544 (unit wage reference).
+- **Whether households buy power.** Power is a bought good for buildings (`PRODUCTION.md`
+  § Power); a household rung for it is natural and unasked.
 - **Wage-clearing detail.** BL-614 (wage competition)'s first cut answers both of its own
   questions provisionally, flagged for overturn (NR-629): the dial is **per building**
   (`wage_bid`, § Wages), and the qualified pool clears **by the same wage rule, before** the

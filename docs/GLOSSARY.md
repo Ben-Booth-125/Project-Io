@@ -255,7 +255,7 @@ The configured input/output specification of a processing building. One building
 Any tradeable good in the economy. Resources occupy one of three tiers: raw materials (extracted from tile deposits), refined goods (produced by processing buildings), or products (manufactured from refined goods). See `docs/economy/RESOURCES.md`.
 
 **Stockpile**
-A per-entity store of resource quantities, held in a `stockpile_component`. Extraction and processing outputs accumulate in the building's stockpile each simulation step. At the economy tick boundary, all building stockpiles on a body aggregate into the body's market supply.
+A corporation's store of resource quantities **per market** — the `(corp, market)` pool a building's output enters and its inputs draw from, keyed by the catchment its tile sits in (Ben, 2026-09-15; `docs/economy/PRODUCTION.md` § Stockpile and output flow). A corporation with works in two catchments holds two pools, and moving goods between them is a haul. The per-building `stockpile_component` is not what the economy reads.
 
 
 **Culture share**

@@ -37,7 +37,7 @@ A convoy is a world ECS component. Each active convoy carries:
 | `held` | bool | While true `advance_convoys` skips the convoy: stopped, not slowed |
 | `cost_paid` | credits | What the haul was charged at dispatch; read by the Convoys tab |
 
-The coupling is **market-to-market**, not body-to-body. A convoy is created when goods are dispatched toward a destination shortfall. It advances `progress` by `speed` each Tick (linear; no orbital mechanics in the prototype). On arrival (`progress >= 1.0`) it credits the destination `(corp, body)` pool, then is retired; the cargo reaches the destination market's supply through the ordinary auto-surplus path at the next clear. There is no direct supply write on arrival — the clearing pass would zero it before pricing read it.
+The coupling is **market-to-market**, not body-to-body. A convoy is created when a seller's goods fetch more at another market, net of the haul, than at home (§ Dispatch trigger). It advances `progress` by `speed` each Tick (linear; no orbital mechanics in the prototype). On arrival (`progress >= 1.0`) it credits the destination **`(corp, market)`** pool, pays any import duty owed at a border (`MARKETS.md` § Tariffs), then is retired; the cargo reaches the destination market's supply through the ordinary auto-surplus path at the next clear — **at the destination, not at the owner's home market**, because the pool it lands in belongs to that market (`PRODUCTION.md` § Stockpile and output flow). There is no direct supply write on arrival — the clearing pass would zero it before pricing read it.
 
 `speed` is fixed at dispatch from the leg's travel time, which [`LOGISTICS.md`](LOGISTICS.md) § 5 (physical scale and travel time) settles: the body's tile scale, the terrain weighting the path already carries, and the medium's rate, quantised to whole econ ticks.
 
@@ -57,27 +57,55 @@ Each convoy incurs a budget outflow:
 logistical_cost = base_logistics_cost × distance × cargo_qty
 ```
 
-`base_logistics_cost` is a per-mode multiplier from the Lua economy-constants registry (`scripts/economy.lua`), ordered:
+`base_logistics_cost` is a per-mode multiplier from the Lua economy-constants registry (`scripts/economy.lua`), ordered **per distance**:
 
 ```
-land < sea < air < space
+sea < land (at its best road tier) < air < space
 ```
+
+**SEA IS THE CHEAPEST WAY TO MOVE A TON A LONG WAY, AND A PORT IS WHAT IT COSTS TO START (Ben,
+2026-09-15).** That is the mechanism history shows and the one the opening map needs: a long
+overseas haul should beat a short overland one, and a short coastal hop should not beat a road.
+Two terms carry it:
+
+- **Per distance, a sea leg costs less than land on a highway.** The ordering is the ruling; the
+  values are measured.
+- **Every port a cargo passes through charges a HANDLING fee per unit** — at loading and again at
+  unloading — independent of distance. A short sea leg pays two fees for little saving; a long one
+  amortises them. The crossover distance at which sea beats land is the design reading, and it is
+  reported whenever either term moves.
 
 For **space convoys**, `distance` is the Euclidean distance between the parent bodies' centres (no path routing — straight-line in the prototype). For **intra-body convoys** (land / sea), `distance` is the **terrain-weighted A\* path** over the body's tile grid (BL-077, intra-body pathfinding; `src/world/logistics.{hpp,cpp}`): each tile weighted by its landform cost (TILES.md — plains 1.0 … mountain 2.0) and discounted by `road_level`, respecting the east–west cylinder wrap; the edge cost is the average of the two tiles (so the path is symmetric) and results cache per fixed endpoint pair. Water tiles carry a higher sea-leg cost, so the cheapest path prefers land and a water crossing selects **sea** mode.
 
-**Mode is a property of the leg, not of the whole route.** `logistics_path::crosses_ocean` as a single route-wide bit makes one water tile bill every land tile on that route at the sea rate and travel at the coastal speed; the honest shape is per-leg pricing, which BL-522 (crosses-ocean is a whole-route bit) owns.
+**Mode is a property of the leg, not of the whole route.** A route that crosses water is three legs: **land** from the source to a port, **sea** from port to port, **land** from the far port to the destination, each priced at its own mode and each travelling at its own speed. The ports are chosen to minimise the whole route's cost including both handling fees, and a sea leg runs only port to port (§ Infrastructure gates). A single route-wide `crosses_ocean` bit, which billed every land tile at the sea rate once any water appeared, cannot express a cheap sea leg between two land legs and is retired with this ordering.
 
 The cost is charged in full at dispatch (`dispatch_convoys` debits `corp.balance` before the convoy is created; a corp that cannot afford the cheapest route dispatches nothing). It is the term that makes distant arbitrage marginal: a profitable inter-body trade requires `source_price + logistical_cost_per_unit < destination_price`.
 
 **Logistics-node discount** (BL-148 / BL-149, logistics nodes). The intra-body haul cost is further discounted for each **logistics node** the A\* path crosses, so the world's cities — and the player's own hubs — form a cheap network the specialist corporation plugs into. A **population centre** on the path discounts by `logistics.node_discount.city_per_scale × centre.scale` (tier 1–5); an **Inland Logistics Hub** by a flat `logistics.node_discount.hub`. The summed discount is capped (`node_discount.cap`) so a route is never free, and is applied as `cost × (1 − discount)` (`dispatch_convoys`, over `logistics_path.tiles`). Since intra-body markets are city-seeded, most hauls deliver *into* a city and take the discount; the player extends the reach by placing hubs along a corridor. Deterministic — a pure function of the path tiles and the (population-centre / hub) node sets.
 
-**Same-body dispatch** fills a same-body market shortfall from the corp's on-body pool, hauling from the corp's representative tile (its lowest-id building on the body) to the short market's `centre_tile` at the A\* cost + mode above.
+**Same-body dispatch** moves goods from one of the corp's market pools to another market on the same body, hauling from the source market's `centre_tile` to the destination's at the per-leg cost above. It is real trade: the goods leave one pool and sell from another.
 
 ---
 
 ## Dispatch trigger
 
-**Auto-dispatch is the default.** On each economy Tick the system scans for destination shortfalls (demand exceeds local supply) and dispatches convoys from the cheapest reachable source to fill them. The loop runs without player intervention.
+**Auto-dispatch is the default, and it is the SELLER chasing a NET PRICE (Ben, 2026-09-15).** On each economy Tick, for every `(corp, market)` pool holding a good above its processor reservation, the system asks where that good fetches the most once the haul is paid, and sends it there if that beats selling at home. The loop runs without player intervention.
+
+It replaced a buyer-side rule — scan each market for a shortfall, fill it from the cheapest reachable source — that never read a price at all. Under it a seller never moved goods toward a better market, only toward an empty one, and trade stayed local however wide the gaps were.
+
+**The rule, stated so it can be checked.** Using last tick's resolved prices:
+
+```
+net(d) = price_d − haul_per_unit(src → d) − handling_per_unit − duty_per_unit(d)
+send to argmax_d net(d)   if   net(d) − price_src  >  margin_threshold × price_src
+```
+
+- **The destination is chosen by net price**, ties to the lower market id — a total order, so every run picks the same market.
+- **The quantity is what the gap can absorb, not what the pool holds.** From `price ∝ √(demand/supply)`, adding `q` units to a destination's supply brings its price down to the source's landed price when `q = supply_d × ((price_d / (price_src + haul + handling + duty))² − 1)`. The send is `min(surplus, q)`, less what the corp already has in transit to that market — so a gap draws enough to close it and no herd of convoys floods it. A destination with **no** supply has nothing for the formula to scale, so its absorbable quantity is its unmet demand instead.
+- **The threshold is authored in data and measured**, never zero: a margin of a rounding error is not a reason to move a cargo across a continent.
+- **A shortfall is not a separate trigger.** A market short of a good prices it high, so the net-price rule already reaches it — and reaches it from wherever landing it is cheapest, not merely from wherever is nearest.
+
+**It is one rule for every corporation, the player's included** (Ben, 2026-09-15). Auto-dispatch is logistics automation of the same kind as auto-surplus, not a strategic act on the player's behalf, so the player's goods move by the same rule a rival's do. The player keeps `hold_convoy` on any convoy and the directed verb below for any haul the rule would not choose. The rival scorer's own directed-dispatch valuation reads the same net price, home price subtracted — a scorer that valued a haul by the destination price alone would send goods away from a better home market.
 
 **Player-direction is the exception** (BL-452, convoy verbs). A player (or an agent) directs a
 specific convoy through the `dispatch_convoy` corp_verb: subject = source market, `counterparty` =
@@ -110,12 +138,12 @@ decision is a design call that belongs to the space arc.
 
 ## Infrastructure gates
 
-Mode is selected by the source/destination pair: inter-body → **space**; intra-body → **land** by default, **sea** when the cheapest A\* path crosses water (`path.crosses_ocean` — the *path* picks the mode, not an infrastructure check). The endpoint gates per mode:
+Mode is selected by the source/destination pair: inter-body → **space**; intra-body → a route of **legs**, land by default with a **sea** leg wherever a port-to-port crossing makes the whole route cheaper (§ Logistical cost — the *route* picks the legs, and a sea leg exists only where ports do). The gates per mode:
 
 | Mode | Gate |
 |---|---|
 | **Land** | Ungated |
-| **Sea** | **Port** building at both endpoints — BL-608 (sea port gate) owns the Port and the gate; BL-188's archived coastal-trade prose is reference |
+| **Sea** | A **Port** at each end of the sea leg — not at the source or destination market, which may lie inland behind a land leg. BL-608 (sea port gate) owns the Port; every port a cargo passes through charges handling (§ Logistical cost) |
 | **Air** | **Airfield** building at both endpoints |
 | **Space** | **Launchpad** at origin (`corp_has_launchpad_on`) + **Orbital Port** at destination; Era 1 required (ERAS.md) |
 

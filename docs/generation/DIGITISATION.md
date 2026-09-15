@@ -124,13 +124,13 @@ not needed to satisfy the property.
 into a centre's industry-point yield (§ Beat 1). A rich polity grows production faster because it
 has more to pay with, not because a term favours it — the standing rule against agent handicaps.
 
-**THE HARD PART IS THE BUYER, NOT THE SELLER.** Industrial demand in the campaign is thin: most
-electronics and machinery is bought by a world-scale background stopgap, and the rule that demand
-ladders with a centre's stratum is written in `../economy/POPULATION.md` but has no authored
-basket. Seeding advanced installations with no buyer reproduces the failure that killed the
-industrial field once already — processors paying the ceiling and idling. **Property 2 therefore
-depends on the stratum demand ladder.** That is campaign economy work, and it is on this
-property's critical path.
+**THE HARD PART IS THE BUYER, NOT THE SELLER.** Seeding advanced installations with no buyer
+reproduces the failure that killed the industrial field once already — processors paying the
+ceiling and idling. **Property 2 therefore depends on the stratum demand ladder**
+(`../economy/POPULATION.md` § The stratum ladder, Ben 2026-09-15): appetite by headcount, a
+metropolis rung that buys electronics, upper rungs scaled by the nation's qualification — which is
+the campaign's own reading of *wealthier nations leverage their wealth*. The intermediates
+(silicon, alloys, machinery) still lean on a labelled stopgap until building upkeep buys them.
 
 ### 3. Some conflict is live at the epoch, mostly by proxy
 
@@ -224,15 +224,17 @@ Regime names are invented, never Earth labels (the standing names rule).
 
 **This is the property most at risk, because most of it is not generation's to deliver.**
 Generation can seed price gaps; only the campaign economy decides whether a seller chases them.
-Five rules in the campaign model point the other way:
+Six rules kept trade local, and Ben ruled five of them changed on 2026-09-15, in the campaign's
+own docs:
 
-| Rule | Where | Why it keeps trade local |
+| Rule that kept trade local | Ruled | Where it now lives |
 |---|---|---|
-| One `base_price` per good in every market | `../economy/MARKETS.md` § Price resolution | Gaps come only from clearing noise or endemic goods |
-| A tile sells to its **nearest** market | `MARKETS.md` § Market centres and seeding | Proximity, not price, picks the buyer |
-| Dispatch chases **shortfall**, not price | `../economy/SUPPLY.md` | Nothing moves goods toward a better price |
-| Sea costs **more** per distance than land | `SUPPLY.md` § Logistical cost | Overseas is dearer, the opposite of the mechanism history shows |
-| Tariffs apply only to matched order-book trades | `MARKETS.md` § Tariffs — the first flow that pays a nation | Protection that never fires shapes nothing |
+| Goods pools per body, so a same-body haul returned to the pool it left and sold at home | Pools per **market** | `../economy/PRODUCTION.md` § Stockpile and output flow |
+| A corp sells through its lowest-id building's market | A corp clears in every market it holds a pool in | `../economy/MARKETS.md` § Market centres and seeding |
+| Dispatch chases **shortfall**, never price | The **seller chases net price**, bounded by what the gap absorbs | `../economy/SUPPLY.md` § Dispatch trigger |
+| Sea costs **more** per distance than land | Sea **cheapest** per distance, with a handling fee at each port | `SUPPLY.md` § Logistical cost |
+| Tariffs apply only to matched order-book trades, so none fire | Duty on **convoy arrival across a border**, paid by the shipper | `MARKETS.md` § Tariffs — the first flow that pays a nation |
+| One `base_price` per good in every market | **Kept** — gaps come from forces, not from authored prices | `MARKETS.md` § Price resolution |
 
 **What generation owes is gaps with visible causes that outlive the first year of play.** Five
 sources, each a consequence of upstream scalars:
@@ -447,11 +449,12 @@ exactly what its terms score down.
 
 ## Where it will be hard, ranked
 
-1. **Property 7 is mostly campaign economy work.** Five rules keep trade local, and a seeded gap
-   erased in a year of play proves nothing. Needs `MARKETS.md` and `SUPPLY.md` to let a seller
-   reach for price, and a reading taken after play, not only at the epoch.
-2. **Property 2 needs a buyer before it has a seller.** Seeding advanced installations without the
-   stratum demand ladder reproduces the idle-at-the-ceiling failure.
+1. **Property 7 is mostly campaign economy work.** Its design is ruled (§ 7), and the build is
+   deep: per-market pools change the save format and every pool read, and per-leg routing replaces
+   the path's mode bit. A seeded gap erased in a year of play still proves nothing, so the reading
+   is taken after play, not only at the epoch.
+2. **Property 2 needs a buyer before it has a seller.** The stratum ladder is ruled; until it is
+   built, seeding advanced installations reproduces the idle-at-the-ceiling failure.
 3. **War that kills reopens the dead-region loop's door.** The mechanisms above are shaped to keep
    it shut, and a sweep must show no region emptied by war before any constant is tuned.
 4. **The downscale (Part III) has no precedent.** Every earlier handoff crossed at region grain.

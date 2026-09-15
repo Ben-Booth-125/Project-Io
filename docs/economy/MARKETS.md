@@ -60,8 +60,12 @@ into its neighbour keeps a market where the routes cross. BL-768 (roads and mark
 history) owns the design.
 
 **Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
-(`market_for_tile`); a corp's body-aggregate clearing routes via its lowest-id building's tile
-(`market_for_corp_on_body`).
+(`market_for_tile`). **A corporation clears in every market it holds a pool in** (Ben, 2026-09-15):
+goods pools are per `(corp, market)` (`PRODUCTION.md` § Stockpile and output flow), so a building
+sells into and buys from its own tile's catchment, and goods a convoy delivers sell at the market
+they were delivered to. The earlier body-aggregate rule — every sale routed through the corp's
+lowest-id building — is retired with the per-body pool; it is what made a same-body haul sell back
+at home.
 
 ## Spontaneous market emergence
 
@@ -147,24 +151,29 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
 3. **Demand injection** — two pure demand-side pulls, both after the reset so they are not
    erased the tick they land:
    - `inject_population_demand` — each population centre pulls a price-elastic, multi-resource
-     DEMAND from its catchment market (food rations, agricultural produce, water, clean water,
-     consumer goods, medical supplies): `pcc.scale × demand_scale × basket[r] ×
-     elasticity(price)`. Population is a pure **consumer** — no supply term. Tunables in
-     `scripts/economy.lua` § `population_demand`.
-   - `inject_background_demand` — the offstage economy's own pull on the mid-chain processing
-     goods (silicon, refined copper, REE alloy, machinery, alloys, electronics — **not**
+     DEMAND from its catchment market, over the cumulative rungs its stratum reaches:
+     `heads / heads_per_demand_unit × basket[r] × elasticity(price)`, with rungs 4–5 scaled by the
+     nation's qualification and every rung weighted by the catchment's culture
+     (`POPULATION.md` § The stratum ladder). Population is a pure **consumer** — no supply term.
+     Tunables in `scripts/economy.lua` § `population_demand`.
+   - `inject_background_demand` — **a labelled STOPGAP**: the offstage economy's own pull on the
+     mid-chain processing goods (silicon, refined copper, REE alloy, machinery, alloys — **not**
      `spacecraft_components`, which stays procurement-only so the militia's contracts remain its
-     only buyer), world-scale rather than per-centre, because real background firms alone would
-     under-consume these before enough of them exist. Per-body population scale is gathered in a
-     `std::map` so accumulation order is deterministic. Tunables in `scripts/economy.lua` §
-     `background_demand`.
-4. **Auto-surplus** — each `(corp, body)` pool lists everything above its **processor
+     only buyer), because real background firms alone would under-consume these before enough of
+     them exist. **It retires good by good as a real channel claims each one (Ben, 2026-09-15):**
+     electronics left it when the metropolis rung of the household ladder took it
+     (`POPULATION.md` § The stratum ladder); the intermediates stay until the Industry channel's
+     building upkeep buys them. **A body's pull is SPLIT across its markets in proportion to their
+     catchment population**, never granted whole to each — a body carved into nine markets does not
+     want nine times as much. Per-body population is gathered in a `std::map` so accumulation order
+     is deterministic. Tunables in `scripts/economy.lua` § `background_demand`.
+4. **Auto-surplus** — each `(corp, market)` pool lists everything above its **processor
    reservation** (the inputs its own processors need for a full run next tick) for sale. A
    resource under a standing sell order is exempted — the manual order governs.
 5. **Standing sell orders** — read from `world::sell_orders` (the book is world state, placed by
    the player and by rival corps through the same `place_sell_order` verb), quantity capped by the
    pool, entered into both market supply and the explicit sell book with their `floor_price`.
-   Multiple orders against one `(corp, body, resource)` share a **running remainder**: total
+   Multiple orders against one `(corp, market, resource)` share a **running remainder**: total
    listed quantity never exceeds the pool, each order's matched/auto-cleared quantity is tracked
    per order, and pool debits clamp at zero.
 6. **Auto-demand** — two registers, read separately (§ Want and fill below). `report.wants` —
@@ -389,9 +398,10 @@ gameplay that good produces.
 ### What each channel adds, and what it already has
 
 - **Household** (BL-640, era-banded household basket). The basket gains an era band and the
-  stratum ladder POPULATION.md § Population demand already calls for and leaves unquantified. It is
+  stratum ladder (`POPULATION.md` § The stratum ladder, Ben 2026-09-15): volume by headcount,
+  cumulative rungs up to electronics at a metropolis, upper rungs scaled by qualification. It is
   the sink for terminal artisan goods — the ancient roster's ceramics, cloth, leather, dressed
-  stone — which is what those goods were authored to be.
+  stone — and, in the industrial band, the first genuine buyer for electronics.
 - **Industry** (BL-641, building upkeep in goods). Today a building pays maintenance and wages in
   **credits only**, while a unit pays credits **and a goods vector** (`run_unit_upkeep`). Giving
   buildings the same shape turns every firm in the world into a consumer, and it is the single
@@ -526,7 +536,7 @@ branch for zero supply against real demand takes the price to the top of the ban
 input.
 
 **Two registers, one of them priced.** `economy_report` carries `wants` alongside `purchases`,
-both `std::map` keyed by `(corp, body)`:
+both `std::map` keyed by `(corp, market)`:
 
 - **`wants`** — the full-run input need, computed **before** any coverage decision, so it is the
   same number whether the draw then succeeds, runs short, or fails outright. Registered by
@@ -765,11 +775,25 @@ those. The form itself — its verbs, its terms, its pricing and its reputation 
 > **clearing-tick half**: how the duty is charged when a trade matches.
 
 A market resolves to a jurisdiction: `market_component::centre_tile` through
-`world::tile_to_nation`. A sale whose buyer is domiciled outside that jurisdiction is a
-**cross-border** sale, and that is what a tariff reads.
+`world::tile_to_nation`. Goods that arrive in one jurisdiction from another have crossed a border,
+and that is what a tariff reads.
 
-**The rule, in one line:** a matched trade whose buyer is domiciled outside the market's own
-nation pays that nation's enacted import duty, and the duty is credited to that nation's treasury.
+**The rule, in one line (Ben, 2026-09-15):** a convoy arriving at a market whose nation differs
+from its source market's nation pays the destination nation's enacted import duty on the cargo, at
+the destination's price, charged to the convoy's owner and credited to that nation's treasury.
+
+**Why the border and not the sale.** An import duty taxes goods coming in, and the convoy is the
+only object that carries goods across a line — so it is the only place the duty has a real payer
+without inventing one. The earlier rule charged a *matched order-book trade* whose buyer was
+domiciled abroad; that path is the only clearing path with a counterparty on both sides, and it is
+dormant in play, so no tariff ever fired and a nation's protection shaped nothing. Charging the
+shipper at arrival reaches every import, auto-dispatched or directed, and it is **the one** point
+of charge — the matched-trade charge is retired with it, so no good pays twice.
+
+- **The base is the cargo's value at the destination** — quantity × the destination market's last
+  resolved price at the arrival tick. The goods are priced where they will be sold.
+- **A market with no nation charges nothing.** An off-world market emerges outside any
+  jurisdiction, so a space convoy pays no duty until law reaches the sky.
 
 - **The rate is set by law, and only by law.** `law_effect_kind::import_tariff` is ad-valorem
   (`law::rate` is a fraction of the trade's value, not a per-unit charge) and has a second party.
@@ -780,13 +804,12 @@ nation pays that nation's enacted import duty, and the duty is credited to that 
 - **`nation_component` carries a `treasury`**, zero at generation — a treasury that started full
   would be a balance change smuggled in as a field. Its spend side is the national budget
   (`docs/politics/NATIONS.md`, BL-537).
-- **A same-nation sale is charged nothing.** A tariff that taxed domestic trade would be a sales
+- **A same-nation haul is charged nothing.** A tariff that taxed domestic trade would be a sales
   tax wearing the wrong name.
-- **Only matched explicit trades are charged**, and that is a principled limit rather than an
-  oversight: a matched trade is the only clearing path with a real counterparty on both sides. The
-  auto-surplus and buyer-of-last-resort paths trade against the market itself, and taxing an
-  import from nobody would invent the second party the flow does not have.
-- **It is a transfer.** The buyer's expenditure rises by exactly what the treasury rises by, in
+- **The payer is the shipper, and the shipper is always real.** The objection that retired a
+  charge on auto-surplus — *taxing an import from nobody* — does not reach a convoy: every convoy
+  has an owner who paid to move it.
+- **It is a transfer.** The shipper's expenditure rises by exactly what the treasury rises by, in
   the same statement. `apply_budget` charges expenditure unconditionally (a balance may go
   negative), so the two sides cannot drift apart on a solvency edge.
 - **Off by default, and provably so.** The whole pass is gated on `any_import_tariff_enacted`; with
@@ -896,12 +919,23 @@ at 280), which would delete the tier model; that reading is rejected and recorde
 **The floor is 0.25×.** The requirement derives a ceiling and says nothing about a floor; lowering
 it would widen the arbitrage margin only by cutting what an abundant producer receives (NR-290).
 
+**The nearest-neighbour reading is no longer the whole requirement (Ben, 2026-09-15).** Trade
+now chases price over distance (`SUPPLY.md` § Dispatch trigger), and a sea leg is the cheapest
+per distance (`SUPPLY.md` § Logistical cost), so the haul that matters is not only to the nearest
+neighbour but to wherever a gap is. The ceiling still covers every nearest pair; what is owed
+beside it is a reading of the far pairs a seller actually reaches, taken after play has run, since
+a gap play erases in a year was never a working international market.
+
 **Re-derive rather than trust.** Re-run `haulage_measure` whenever the logistics cost table
 (`logistics.base_cost_per_unit_distance`), the map scale (`body_km_per_tile`), or the
 `base_price` table changes — all three move the number this ceiling is computed from.
 
 **The band does not create inter-market trade; the convoy does.** Measured over five seeds, 1,677
-of 2,146 dispatched convoys are intra-body market-to-market hauls. **Inter-body** trade is gated
+of 2,146 dispatched convoys are intra-body market-to-market hauls. **Under per-body pools those
+hauls moved nothing** (found 2026-09-15): the cargo returned to the pool it left and sold at the
+corp's home market, so the count measured dispatch, never trade. Per-market pools
+(`PRODUCTION.md` § Stockpile and output flow) are what make the figure mean what it says, and it
+must be re-read as delivered volume sold at the destination. **Inter-body** trade is gated
 separately: the space lane is refused by the launchpad and propellant gates in `dispatch_convoys`
 before any price is consulted. `trade_routes` (BL-088, persistent trade routes) is a body-level
 record, so it is structurally blind to intra-body trade (NR-289).
