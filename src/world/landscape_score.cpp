@@ -70,97 +70,27 @@ landscape_score score_landscape(world& w, const recipe_registry& reg,
 
     // --- term 2: the static supply:demand ratio, per resource per market -----
     //
-    // SUPPLY is deposit magnitude summed over the market's IN-REACH catchment —
-    // the ground a building could legally take, not merely ground that clears
-    // here. DEMAND is the structural want: heads for a household sink, a flat
-    // weight per other market sink. Both are static; neither reads a price.
-    //
-    // THE TILE WALK IS SORTED BY ID, and that is not optional politeness.
-    // Accumulation here is `+=` on a double, which is not associative, and
-    // `w.tiles` is an unordered_map — so summing in hash order makes the result
-    // depend on bucket layout, which varies with the standard library. This file
-    // is in src/world, where the invariant is absolute: no pointer- or
-    // hash-layout-dependent iteration order, with no "same process" carve-out.
-    // market_saturation.cpp — the sibling this file delegates term 1 to — refuses
-    // exactly this and says so at its own tile walk: every accumulation there is
-    // an integer increment or a boolean OR, precisely so it needs no sort.
-    //
-    // The earlier version of this comment argued the unsorted walk was fine
-    // because every candidate sees the same traversal within one run. That is
-    // true and it is not the standard: a score is a recorded number in a repo
-    // whose verification culture is pinned digits, and the same world must not
-    // score differently under libstdc++ than under MSVC. Sorting ~31k ids per
-    // score is far cheaper than a number nobody can reproduce.
-    std::vector<entity_id> tile_ids;
-    tile_ids.reserve(w.tiles.size());
-    for (const auto& kv : w.tiles)
-        tile_ids.push_back(kv.first);
-    std::sort(tile_ids.begin(), tile_ids.end());
-
-    const float max_reach = reg.construction().max_logistics_reach;
-
-    std::vector<std::array<double, resource_count>> supply(mids.size());
-    for (auto& row : supply)
-        row.fill(0.0);
-    std::vector<long long> heads(mids.size(), 0);
-
-    for (const entity_id tid : tile_ids)
+    // PROMOTED to market_saturation.hpp (BL-979), for the reason term 1 already
+    // was: the census prints what the search scores on, off ONE implementation,
+    // so a candidate cannot score on a number verification does not recognise.
+    // The arithmetic moved verbatim — SUPPLY is deposit magnitude over the
+    // in-reach catchment, DEMAND the structural want, the tile walk sorted by
+    // id because a double sum is not associative. See `measure_market_balance`.
     {
-        const auto it = slot.find(market_for_tile(w, tid));
-        if (it == slot.end())
-            continue;
-        if (max_reach >= 0.0f && !tile_in_reach(w, tid, max_reach))
-            continue;
-        const tile_component& t = w.tiles.at(tid);
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (t.resource_deposit[r] > 0.0f)
-                supply[it->second][r] += static_cast<double>(t.resource_deposit[r]);
-    }
-
-    for (const auto& [cid, pcc] : w.population_centres)
-    {
-        if (pcc.razed)
-            continue;
-        const auto tit = w.population_centre_tile.find(cid);
-        if (tit == w.population_centre_tile.end())
-            continue;
-        const auto it = slot.find(market_for_tile(w, tit->second));
-        if (it != slot.end())
-            heads[it->second] += static_cast<long long>(pcc.scale);
-    }
-
-    for (std::size_t s = 0; s < out.markets.size(); ++s)
-    {
-        market_score& m = out.markets[s];
-        for (std::size_t r = 0; r < resource_count; ++r)
+        const std::vector<market_balance> bal = measure_market_balance(
+            w, reg, cls, p.household_per_head, p.sink_weight, p.pin_ratio);
+        for (const market_balance& b : bal)
         {
-            const resource_classification& c = cls[r];
-            if (!c.priced)
-                continue;                 // untradeable: no price to pin
-
-            double demand = 0.0;
-            if (c.sink_household)
-                demand += p.household_per_head * static_cast<double>(heads[s]);
-            if (c.sink_process)     demand += p.sink_weight;
-            if (c.sink_construct)   demand += p.sink_weight;
-            if (c.sink_background)  demand += p.sink_weight;
-            if (c.sink_unit_upkeep) demand += p.sink_weight;
-            if (c.sink_industry)    demand += p.sink_weight;
-            if (c.sink_endemic)     demand += p.sink_weight;
-
-            const double sup = supply[s][r];
-            if (sup <= 0.0 && demand <= 0.0)
-                continue;                 // neither side: the good is absent here
-
-            ++m.rated;
-            if (demand <= 0.0)      { ++m.glutted; continue; }  // supply, nobody wants it
-            if (sup <= 0.0)         { ++m.starved; continue; }  // wanted, nothing makes it
-            const double ratio = sup / demand;
-            if (ratio > p.pin_ratio)      ++m.glutted;
-            else if (ratio < 1.0 / p.pin_ratio) ++m.starved;
-            else                          ++m.balanced;
+            const auto it = slot.find(b.market);
+            if (it == slot.end())
+                continue;
+            market_score& m = out.markets[it->second];
+            m.balanced = b.balanced;
+            m.glutted  = b.glutted;
+            m.starved  = b.starved;
+            m.rated    = b.rated;
+            m.balance  = b.fraction;
         }
-        m.balance = m.rated > 0 ? static_cast<double>(m.balanced) / m.rated : 0.0;
     }
 
     // --- THE ROSTER-AWARE TERM (BL-770 slice 2) -----------------------------

@@ -126,9 +126,9 @@ int main(int argc, char** argv)
     p.seed       = seed;
     p.epoch_year = epoch;
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
-    assign_default_recipes(w, reg);
-    generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
-    assign_default_recipes(w, reg);
+    // The landscape-search WINNER, as the app applies it — not the seed candidate
+    // (BL-979; apply_shipped_landscape in harness_params.hpp).
+    print_shipped_landscape(apply_shipped_landscape(w, reg, seed));
     if (init_survey)
         init_survey_states(w);
 

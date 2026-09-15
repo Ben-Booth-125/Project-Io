@@ -150,7 +150,10 @@ int run_roster(uint32_t seed, const recipe_registry& reg)
         specialists.push_back(id);
     std::sort(specialists.begin(), specialists.end());
 
-    generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
+    // The landscape-search WINNER, as the app applies it — not the seed candidate
+    // (BL-979; apply_shipped_landscape in harness_params.hpp). This also runs the
+    // app's second assign_default_recipes pass, which the bare call here skipped.
+    apply_shipped_landscape(w, reg, seed);
 
     std::vector<corp_row> rows;
     for (const auto& [id, cc] : w.corporations)
@@ -323,10 +326,10 @@ spawn_seat_result build_and_seat(uint32_t seed, const recipe_registry& reg,
     world_params p = fast ? no_prehistory() : world_params{};
     p.seed = seed;
     out_world = make_hard_coded_world(p);
-    // The app's own ordering: background firms need the loaded registry, then
-    // the recipe authoring pass, then the warm start (app::start_new_game_prelude).
-    generate_background_firms(out_world, reg, seed ^ 0x8A21F00Du);
-    assign_default_recipes(out_world, reg);
+    // The app's own ordering: the landscape-search WINNER applied over the loaded
+    // registry (not the seed candidate — BL-979), the recipe authoring pass, then
+    // the warm start (app::start_new_game_prelude).
+    apply_shipped_landscape(out_world, reg, seed);
     for (int t = 1; t <= k_seat_warm_ticks; ++t)
         warm_tick(out_world, reg, t);
     return seat_player_corporation(out_world, seed);
@@ -633,7 +636,8 @@ int main(int argc, char** argv)
             p.seed = r.seed;
             world w = make_hard_coded_world(p);
             seed_default_recipes(w, reg);
-            generate_background_firms(w, reg, r.seed ^ 0x8A21F00Du);
+            // The landscape-search WINNER, not the seed candidate (BL-979).
+            apply_shipped_landscape(w, reg, r.seed);
 
             const entity_id corp = w.player_entity;
             const auto      cit  = w.corporations.find(corp);

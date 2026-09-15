@@ -22,9 +22,9 @@
 //
 // THE WORLD IS THE SHIPPED ONE (acquisition_viability's R0 lesson, verbatim):
 // gen config PARSED and passed, priced-resource count printed in the manifest;
-// spawn order: make_hard_coded_world -> assign_default_recipes ->
-// generate_background_firms -> assign_default_recipes; the tick is
-// app::step_economy's order. Spectating stays TRUE for warm start AND the
+// spawn order: make_hard_coded_world -> apply_shipped_landscape (harness_params.hpp:
+// load_economy's recipe pass, search_landscape with app.cpp's params, the WINNER
+// applied, the second recipe pass — BL-979); the tick is app::step_economy's order. Spectating stays TRUE for warm start AND the
 // measured window — the field is the subject; nobody is seated.
 //
 // PARAMETER OVERRIDES take the demand_census --reach pattern (NR-763): applied
@@ -220,15 +220,9 @@ std::vector<entity_id> sorted_corp_ids(const world& w)
     return ids;
 }
 
-std::vector<entity_id> sorted_market_ids(const world& w)
-{
-    std::vector<entity_id> ids;
-    ids.reserve(w.markets.size());
-    for (const auto& kv : w.markets)
-        ids.push_back(kv.first);
-    std::sort(ids.begin(), ids.end());
-    return ids;
-}
+// sorted_market_ids — the local copy is gone (BL-979): world/market_saturation.hpp
+// declares the same ascending-id walk, and harness_params.hpp now reaches it
+// through landscape_search.hpp, so a second definition here was ambiguous.
 
 // ---------------------------------------------------------------------------
 // Metric derivations — every walk sorted, every sum accumulated in doubles
@@ -392,11 +386,10 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
         if (gen_cfg.kepler_base_price[i] > 0.0f)
             ++out.priced;
 
-    // The shipped spawn's own order (acquisition_viability's header).
+    // The shipped spawn's own order: the landscape-search WINNER, not the seed
+    // candidate (BL-979 — see apply_shipped_landscape in harness_params.hpp).
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
-    assign_default_recipes(w, reg);
-    generate_background_firms(w, reg, lp.seed ^ 0x8A21F00Du);
-    assign_default_recipes(w, reg);
+    print_shipped_landscape(apply_shipped_landscape(w, reg, lp.seed));
 
     // The corp index, once — ids and identities never change mid-campaign.
     out.corps_index = "corp,name,focus,home_nation,is_background\n";
