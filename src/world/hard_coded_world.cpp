@@ -699,6 +699,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     /// index — the same field, read at the one moment it still names a polity.
     std::vector<int> kepler_region_polity;
 
+    /// BL-975: indexed by POLITY id, the 1660 treasury each polity held —
+    /// `region::treasury` summed over the regions flying its flag at the
+    /// Exploration span's close. Empty when the span did not run, so a world
+    /// without it credits nothing and every nation starts on the floor.
+    std::vector<int64_t> kepler_polity_treasuries;
+
     nation_params kepler_np =
         nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 });
     {
@@ -1188,6 +1194,24 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 kepler_grudges    = kepler_exploration.grudges;
                 kepler_grudge_cap = static_cast<int32_t>(ep.grudge_cap);
 
+                // BL-975: THE TREASURIES CROSS TOO. Read off the handoff
+                // struct's own region table, not the live sim state, because
+                // this is on EXPLORATION.md's list of what the span hands
+                // forward (BL-956 named it first). Summed per polity over the
+                // regions it holds at 1660 — the chest is a fact about the
+                // ground and the flag over the ground owns it (settlement.hpp,
+                // `region::treasury`) — in ascending region order, as
+                // integers, so the sum is exact. `generate_nations` Pass 7
+                // converts it once (NATION_GENERATION.md § Pass 7).
+                for (const region& rg : kepler_exploration.regions)
+                {
+                    if (rg.nation < 0 || rg.treasury <= 0) continue;
+                    const std::size_t pol = static_cast<std::size_t>(rg.nation);
+                    if (pol >= kepler_polity_treasuries.size())
+                        kepler_polity_treasuries.resize(pol + 1, 0);
+                    kepler_polity_treasuries[pol] += rg.treasury;
+                }
+
                 if (fixture != nullptr)
                     fixture->exploration_handoff = kepler_exploration;
 
@@ -1333,6 +1357,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // sim wrote as it ran. Phase 5 folds a polity's regions into one nation
         // instead of growing an independent realm out of each anchor.
         kepler_np.seed_polities = settlement_seed_polities(kepler_settlement);
+
+        // BL-975 — THE HISTORY'S CHESTS CROSS WITH ITS MAP. Indexed by the
+        // same polity ids `seed_polities` just read, so Pass 2d can land each
+        // polity's 1660 treasury on the seed it folds to. Empty when the
+        // Exploration span did not run (opted out, or the wizard's Empires-
+        // round launch), which credits nothing.
+        kepler_np.polity_treasuries = kepler_polity_treasuries;
 
         // BL-898 — THE SAME READ, KEPT FOR THE SAME WINDOW. `seed_polities`
         // above is filtered to anchored regions because `generate_nations`
