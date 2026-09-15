@@ -467,9 +467,8 @@ quantities are the two pure demand pulls in step 3. The design is BL-365 (real b
 corporations).
 
 **The background economy is the landscape phase 6 selected** — not a separate injection pass bolted
-on after generation. The warm start — the fixed run of `pre_game_ticks` economy ticks that settles
-the opening position (`../economy/ERAS.md`) — is what phase 6's single validation run is designed to
-replace (BL-978, warm start retired). Generation scores candidate corporate landscapes
+on after generation. The settle that hands play its opening position is phase 6's single
+validation run of the winner (`../economy/ERAS.md`; BL-978, warm start retired, owns the work). Generation scores candidate corporate landscapes
 — rosters, placements and road tiers — statically against the finished world, and the winning
 candidate's firms *are* the background economy: real buildings, on real tiles, with
 `corporation_component.is_background = true`. Placement mechanics are

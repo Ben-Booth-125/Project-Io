@@ -30,9 +30,9 @@ The subject docs:
 - **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map,
   driven by the pre-national history ladder.
 - **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
-  market-based and non-hegemonic. **The world opens at `world_params::epoch_year`, whose default is 0 CE (Ben, 2026-08-12,
-  NR-177); the 1960 arc is the opt-in `--epoch 1960`, and whether the default moves to 1960 before
-  Digitisation is an open call in `docs/development/NEEDS_REVIEW.json`** — § Pass 2 is the economy
+  market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the
+  ancient arc's epoch (Ben, 2026-08-12, NR-177); `world_params::epoch_year` selects between them,
+  and which arc the default descriptor selects is NR-869's call** — § Pass 2 is the economy
   pass owns the calendar, and the clock rebases at the handoff (`../economy/ERAS.md`) — and
   generation runs a stepped pre-campaign history whose span § Pass 2 is the economy pass states
   (3,600 years, 2400 BCE → 1200 CE, divided at 400 BCE — Ben, 2026-09-09), followed by the
@@ -66,9 +66,9 @@ laws → provinces (every other body) → province holders → garrisons
 ```
 
 After the worker returns, the app runs **phase 6 — the landscape search** (`search_landscape`;
-the winning candidate's background firms *are* the background economy) and then the **warm
-start** (`pre_game_ticks`), whose settle role phase 6's validation run is designed to take
-(`../economy/ERAS.md`; BL-978, warm start retired).
+the winning candidate's background firms *are* the background economy) and then the **settle**:
+phase 6's single validation run of the winner (`../economy/ERAS.md`; BL-978, warm start retired,
+owns the work).
 
 The three simulated passes — two polity spans and one economic settle — are § Three passes of
 simulated history; `../lore/HISTORY.md` owns the polity spans.

@@ -419,7 +419,7 @@ int main(int argc, char** argv)
             // not against noise:
             //   varying resources   measured 10        floor 10
             //   narrowest IQR       measured 0.129     floor 0.10   (timber; ag produce 0.165)
-            //   poor-in-something   measured 44.5%     floor 44%
+            //   poor-in-something   measured 44.5%     floor 40% (headroom for sampled deciles)
             // The third number is the honest one. BL-962 asked for "at least one
             // resource per world in that resource's bottom decile"; the
             // generator does NOT deliver that today — 55.5% of accepted
@@ -430,13 +430,17 @@ int main(int argc, char** argv)
             // generator change, not a harness edit.
             constexpr int   k_varying_floor = 10;
             constexpr float k_iqr_floor     = 0.10f;
-            constexpr float k_poor_share    = 44.0f;
+            // 40, not the measured 44.5: the figure is a correlation reading over
+            // sampled deciles and moves with the draw count; 0.5 pp of headroom
+            // made it a brittle pin rather than a floor (cold review, sprint-42
+            // wave 0, finding 10). The finding itself is NR-872.
+            constexpr float k_poor_share    = 40.0f;
             check(varying >= k_varying_floor,
                   "R4 at least 10 resources vary across accepted homeworlds (measured 10, 2026-09-15)");
             check(min_iqr >= k_iqr_floor,
                   "R4 every varying resource has an interquartile range >= 0.10 (narrowest measured 0.129, 2026-09-15)");
             check(poor_share >= k_poor_share,
-                  "R4 at least 44% of worlds sit in the bottom decile of some resource (measured 44.5%, 2026-09-15)");
+                  "R4 at least 40% of worlds sit in the bottom decile of some resource (measured 44.5%, 2026-09-15; floor set with headroom)");
         }
     }
 

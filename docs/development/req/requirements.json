@@ -5171,29 +5171,31 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "resolution": "Bisected on seed 2 with the cached builder; fixed in the schism apply loop. Digest seedA/on moved 49FB45407FF7C3C0 -> 457483363D79D700 (seedB/on, seedA/off, 1960 unchanged); exploration_sim_harness R3b pin red by the same cause (battles 306->308, conquests 304->306, foundings 522->472, owner_changes 2174->2196). Not re-pinned; NR-875 asks Ben to authorise the wave re-bless.",
    "promoted_from": "backlog.json BL-981 - Sprint 42, wave 0",
    "batch": "sprint-42-wave-0",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: colonisation_harness"
      ],
      "requirement": "colonisation_harness reports 0 failures across its three seeds on the merged tree.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "3/3 seeds dangling 0, mismatches 0; 0 failures on the merged tree"
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: diff review"
      ],
      "requirement": "The cause is named at the verb that moved ownership without maintaining seat_region, fixed there, and the assertion is not weakened.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "culprit 3d58001d (schism verb): the apply loop demoted every seat in the residue block; fixed at the verb (seats in the block stay seats; block hinterland keeps its seat if it came along, else the new seat; parent ground whose seat left re-points at the parent capital). Assertion untouched."
     }
    ]
   },
@@ -5203,29 +5205,31 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "resolution": "Twelve contradictions reconciled; the 0.90 ratio deleted from code with province_capacity_probe per-body rows identical before and after.",
    "promoted_from": "backlog.json BL-980 - Sprint 42, wave 0",
    "batch": "sprint-42-wave-0",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: the twelve files named in the item"
      ],
      "requirement": "Each of the twelve listed contradictions is either corrected in place or carried by a NEEDS_REVIEW entry stating both readings.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "8 corrected in place, 4 calls filed (NR-868..871), 1 already fixed on main"
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: node tools/session/header_graph.js --strict"
      ],
      "requirement": "header_graph.js --strict reports no more dangling citations than before the change.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "header_graph --strict: 81 dangling before, 81 after (clean worktrees; the in-tree figure is inflated by agent worktrees)"
     }
    ]
   },
@@ -5235,38 +5239,41 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "resolution": "The two unwired stores had declared edges outward, so 7 and 14 leaves derived as root; reoriented, lint asserts one root and a fresh header. Exploration store then deduplicated (30 edges declared twice) in the main session.",
    "promoted_from": "backlog.json BL-974 - Sprint 42, wave 0",
    "batch": "sprint-42-wave-0",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: node tools/session/tree_lint.js <tree>"
      ],
      "requirement": "tree_lint.js fails when a generated tree header differs from a regeneration of its store, and passes on main after regeneration.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "red on a stale header (term_count 12 vs 11 demonstrated), green on main; \"header checked\" on empire and exploration"
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: node tools/session/tree_lint.js"
      ],
      "requirement": "CO-SP-1a and IN-SP-1a derive is_root true; every tree has exactly one root by the is_root derivation.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "both stores reoriented (edge declared on the node farther from the root); CO-SP-1a and IN-SP-1a sole roots; one-root rule asserted"
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: git diff on src/world/*_tree_data.hpp"
      ],
      "requirement": "The empire and exploration headers regenerate byte-identical, so no world moves.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "git diff on both generated headers: 0 lines"
     }
    ]
   },
@@ -5276,29 +5283,31 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "resolution": "Both assertions green on the merged tree. Finding filed as NR-872: six metal endowments move with metallicity, so 55.5% of worlds are poor in nothing.",
    "promoted_from": "backlog.json BL-962 + BL-964 - Sprint 42, wave 0",
    "batch": "sprint-42-wave-0",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: planetology_sweep"
      ],
      "requirement": "planetology_sweep asserts a minimum interquartile range of endowment per resource across accepted homeworlds and at least one bottom-decile resource per world; red on a forced-flat endowment (demonstrated locally), green on main.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "10 varying resources; IQR floor 0.10 (narrowest measured 0.129); 44% of worlds bottom-decile in some resource (measured 44.5%); red on forced-flat demonstrated"
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: continent_drift"
      ],
      "requirement": "continent_drift asserts a digest over the reference seed's per-epoch snapshots; red on a deliberate one-epoch perturbation (demonstrated locally), green on main.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "drift digest 481BDCA5300AF14F over 21 epochs; red on a skipped epoch demonstrated; C6 ceiling 4x full pass"
     }
    ]
   },
@@ -5308,38 +5317,41 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "resolution": "survey_endowment exposed from settlement.cpp's anonymous namespace (no behaviour change); the census gates its four concentration figures.",
    "promoted_from": "backlog.json BL-966 - Sprint 42, wave 0",
    "batch": "sprint-42-wave-0",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: earthlike_tile_census"
      ],
      "requirement": "earthlike_tile_census asserts wide bands with required tails on the top-10% concentration of coal, petroleum, copper and iron over its sweep.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "coal/petroleum/copper/iron median bands [25,60]/[50,80]/[50,85]/[45,80], IQR floors 4.0/2.5/2.0/4.0; 120 seeds in 29 s; red on a flat field 8/8 demonstrated"
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: survey_endowment_harness"
      ],
      "requirement": "survey_endowment_harness asserts determinism, rich-over-barren ordering, endowment 0.0 yields 0 in every region, and a non-flat per-region spread on the reference seed.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "survey_endowment_harness 34 PASS 0 FAIL on the merged tree; endowment-zero exercised on three airless bodies"
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: .claude/skills/verifier-headless/SKILL.md"
      ],
      "requirement": "The new harness is named in the verifier-headless skill.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "named in verifier-headless"
     }
    ]
   },
@@ -5349,38 +5361,41 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "resolution": "By population the largest polities are 2-5 points MORE concentrated than by region count (median 10% vs 8%; peak 13% vs 11%), while rose-and-fell counts drop 3x (74 -> 22 per world): most region-count risers were founding empty ground. Filed for Ben as NR-876.",
    "promoted_from": "backlog.json BL-970 - Sprint 42, wave 0",
    "batch": "sprint-42-wave-0",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: history_sweep"
      ],
      "requirement": "history_sweep prints every share reading twice (region-weighted, population-weighted) and writes both into history_sweep.json with the arc counter.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "both columns on the face and in history_sweep.json (*_pop_q siblings, arc counter); population from the BL-817 playback record, no sim change"
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: history_sweep"
      ],
      "requirement": "The BL-907 closure scoreboard rows assert on the population-weighted reading.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "BL-907.2 asserts on top_share_pop_q; no verdict changed between columns"
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: git diff history_sweep.json"
      ],
      "requirement": "history_sweep.json is regenerated over 16 seeds on the merged tree and checked in.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "history_sweep.json regenerated over 16 seeds on the merged tree and checked in"
     }
    ]
   },
@@ -5390,38 +5405,41 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "resolution": "The sprint-41 conclusion survives the volume correction on the pooled reading; six held seeds and two silent are on the face.",
    "promoted_from": "backlog.json BL-971 - Sprint 42, wave 0",
    "batch": "sprint-42-wave-0",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: exploration_sweep"
      ],
      "requirement": "exploration_sweep prints the summed-count displacement and a per-seed volume-weighted variant beside the median; zero-neighbour seeds count only above a frontier floor and are otherwise reported as silent.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "pooled 1.58 (2262/1436), volume-weighted 3.88 (seed 10 dominates), median 1.33; silent floor 20 battles/span; 7 displaced, 1 displaced no-nb, 6 held, 2 silent"
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: git diff exploration_sweep.json"
      ],
      "requirement": "exploration_sweep.json at the repo root carries the per-seed table for all eleven readings over 16 seeds and is checked in.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "exploration_sweep.json checked in, 16 rows, reproduced byte-identical on the merged tree before BL-981; regenerated after it"
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "doc: docs/development/NEEDS_REVIEW.json"
      ],
      "requirement": "A NEEDS_REVIEW entry reports whether the weighted reading clears 1.0 at Alarm 525.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "NR-873 filed"
     }
    ]
   },
@@ -5431,38 +5449,41 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "resolution": "Trade on the winner reads up, not down. Six instruments built but not run (campaign_lapse, acquisition_viability, material_floor, chain_conversion_probe, convoy_cargo_census, player_seed_sweep); their headline movements are owed. Haulage seed 4 scores composite 0 (the search cannot move there) — noted for BL-977.",
    "promoted_from": "backlog.json BL-979 - Sprint 42, wave 0",
    "batch": "sprint-42-wave-0",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: grep generate_background_firms tools/verify"
      ],
      "requirement": "One shared helper builds the shipped start (generate, search, apply winner) and all nine named instruments call it.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "apply_shipped_landscape in harness_params.hpp; ten call sites across nine instruments converted (player_seed_sweep had a third)"
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: demand_census"
      ],
      "requirement": "market_saturation exposes fraction_in_band and demand_census prints it per market and as a spread.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "fraction_in_band in market_saturation; demand_census median 0.10 ancient / 0.09 industrial"
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: haulage_measure"
      ],
      "requirement": "haulage_measure is re-read on the winner and its movement against the 1055/802 baseline is recorded.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "haulage on the winner 2183 all / 1614 intra-body (seed candidate 1839/1411; baseline 1055/802); reproduced on the merged tree"
     }
    ]
   },
@@ -5472,40 +5493,43 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
-   "resolved": null,
-   "resolution": "",
+   "status": "complete",
+   "resolved": "2026-09-15",
+   "resolution": "The doc's \"the struct is the whole of what crosses\" now holds by check.",
    "promoted_from": "backlog.json BL-969 - Sprint 42, wave 0",
    "batch": "sprint-42-wave-0",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "code: diff review"
      ],
      "requirement": "pass_one_output_valid and exploration_output_valid run on the shipped generation path and a violation fails generation loudly.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "both validators run after each fold; violation recorded on generation_report (handoff_invalid, handoff_violation), stderr line, assert; world_determinism R3.6/R4.4 assert the flag false"
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: grep"
      ],
-     "requirement": "No consumer in hard_coded_world.cpp reads hs.* after the fold; grudges and corridors come from the structs.",
-     "notes": ""
+     "requirement": "Grudges, corridors and the time-lapse come from the structs; the remaining hs.* reads in hard_coded_world.cpp are the narrative log, the report counters and the fixture capture, each justified in a comment beside it.",
+     "notes": "",
+     "result_metric": "kepler_grudges and the timelapse read from the struct; remaining hs.* reads justified in comments (narrative log, report counters, fixture capture)"
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "headless: pass_one_handoff"
      ],
      "requirement": "Both structs carry the culture table at their close and the validator checks it equals creed_state, so the doc's \"the struct is the whole of what crosses\" holds by check; world_determinism digests are unchanged.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "cultures field on both structs; validator checks size, parentage, coining year, and equality with creed_state; digests unchanged; save_game_version 14->15, save_envelope_roundtrip PASS via the CMake tree"
     }
    ]
   }

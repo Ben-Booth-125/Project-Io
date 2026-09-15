@@ -207,7 +207,7 @@
    "id": "42",
    "theme": "generation sharpened before Digitisation",
    "state": "open",
-   "status_line": "OPENED 2026-09-15. BL-960 (harness world lib) built first and landed; a colonisation_harness regression found by it is filed as BL-981 and goes first. Twenty-one items in four waves; every world-moving wave re-blesses the digests once with the movement described.",
+   "status_line": "WAVE 0 COMPLETE 2026-09-15: nine items merged and verified on the integrated tree (gate list green; history_sim_harness at its 2-failure baseline). The BL-981 schism fix moved seedA/on and the exploration R3b pin; the wave re-bless is gated on NR-875. Waves 1-3 open.",
    "opened_date": "2026-09-15",
    "closed_date": null,
    "author": "Ben (2026-09-15: \"A then B ... return to A in development mode ... sharpen each prior step before the instrumental one (digitisation), where the generation becomes the world players see\")",
@@ -224,7 +224,8 @@
    "notes": [
     "THE AUDIT THAT OPENED IT, 2026-09-15: five parallel readers over the physical stages, Culture and Empires, Exploration and the trees, the political map to the market, and the tooling. Per-stage verdict and the eighteen improvements are in DEVLOG.md 2026-09-15; the items carry the evidence with file:line pointers.",
     "BL-960 WENT FIRST BY BEN'S CALL and paid immediately: the world set now compiles once (22 s cold, 5 s to link a harness, 12 s after touching one world file) instead of 66 TUs per harness; the first harness run through it found BL-981, a colonisation_harness red that sprints 40 and 41 never ran.",
-    "SEQUENCING RULE: instruments before mechanisms. A wave that moves the world lands only after the reading it will be judged on is asserted and checked in."
+    "SEQUENCING RULE: instruments before mechanisms. A wave that moves the world lands only after the reading it will be judged on is asserted and checked in.",
+    "WAVE 0 RETRO, 2026-09-15: nine worktree agents, every one verified independently on the merged tree before its merge was trusted. Three findings outranked the items: BL-981 (the schism verb razed seats; found only because the cached builder made the colonisation harness cheap to run), NR-872 (six metal endowments move together) and NR-876 (the population column reverses the region-count premise: more concentrated, three times fewer real risers). Two agents yielded mid-wait despite the brief; one had to be resumed."
    ]
   }
  ],

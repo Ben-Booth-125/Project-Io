@@ -816,12 +816,55 @@
   "kind": "question",
   "status": "open",
   "source": "BL-971 (displacement volume-weighted), exploration_sweep over 16 seeds on the sprint-42 wave-0 tree; exploration_sweep.json is now checked in.",
-  "what": "Ben asked on NR-867 for a volume-weighted displacement reading. Pooled (sum of frontier over sum of neighbour battles): 1.58 (2262 / 1436). Volume-weighted per-seed mean: 3.88, dominated by seed 10 (4 neighbour wars against 158 frontier, ratio 39.5); about 2.2 without it. Median, as before: 1.33. Per seed: 7 displaced by ratio, 1 displaced with zero neighbour wars (seed 4, 35 frontier), 6 HELD where neighbour war still leads (seeds 0, 3, 6, 7, 12, 15), 2 SILENT under the 20-battle floor (seeds 9, 14). Conflict persists: Exploration 43.5 battles/century against Empires 404.9.",
+  "what": "Ben asked on NR-867 for a volume-weighted displacement reading. On the integrated wave-0 tree (which carries BL-981's schism fix): pooled (sum of frontier over sum of neighbour battles) 1.68; volume-weighted per-seed mean 5.76, dominated by seed 10; median 1.35. Per seed: 7 displaced by ratio, 2 displaced with zero neighbour wars, 6 HELD where neighbour war still leads, 1 SILENT under the 20-battle floor (seed 9). Conflict persists: Exploration 55.9 battles/century against Empires 404.9. Before the schism fix the same tree read pooled 1.58, weighted 3.88, median 1.33, six held, two silent (9, 14); nine of sixteen seed rows moved. exploration_sweep.json at the repo root is the integrated-tree artefact.",
   "why_it_matters": "The sprint-41 authorisation rested on the median. The pooled reading is the robust one and also clears 1.0, so the conclusion survives the correction; but six of sixteen worlds still fight their neighbours more than their frontier, and the doc's claim is that conflict MOVES. Whether \"clears on the pooled reading with six held seeds\" is the phase's honest state or a tuning question is Ben's.",
   "options": [
    "Authorisation stands on the pooled reading; the held seeds are a legitimate spread.",
    "Treat the held count as the reading to move next, with a measured cause per held seed before any constant changes.",
    "Require both pooled and median above 1.0 AND held seeds below a stated count before Digitisation is designed."
+  ]
+ },
+ {
+  "id": "NR-874",
+  "title": "DECISION TAKEN: a schism moves seats, it does not raze them (BL-981)",
+  "raised": "2026-09-15",
+  "kind": "decision-taken",
+  "status": "open",
+  "source": "BL-981 (colonisation D1/D3 regression), building agent; main session review.",
+  "what": "The schism verb (BL-944) grouped a breakaway by residue culture and wrote is_seat = (r == seat) over every member, demoting any seat that walked out with the block; parent hinterland outside the block kept pointing at the demoted seat. The fix: every seat in the block stays a seat under the new realm (a realm born of a schism holds as many seats as walked out with it); a block member keeps its pointer if its seat came along, otherwise re-points at the new seat; parent ground whose seat left re-points at the parent capital. The alternative, demote and re-point everything at the new seat and parent capital, also satisfies D1/D3 but razes a settlement over a faith fracture and strands its material_stock and treasury on a non-seat.",
+  "why_it_matters": "CIVILISATION.md's hinterland-pointer rule is satisfied either way; which reading is right is a design call about what a schism IS. Taken on Ben's behalf because the harness was red and both sprints 40 and 41 had shipped over it.",
+  "options": [
+   "Stands: seats move.",
+   "Reverse: a schism razes the seats it takes, and the material is lost."
+  ]
+ },
+ {
+  "id": "NR-875",
+  "title": "AUTHORISE: the sprint-42 wave-0 re-bless — seedA/on digest and the exploration R3b pin moved by the schism fix",
+  "raised": "2026-09-15",
+  "kind": "decision",
+  "status": "open",
+  "source": "BL-981 merged on sprint-42-wave-0; world_determinism and exploration_sim_harness on the integrated tree.",
+  "what": "One cause: the schism verb no longer demotes seats (NR-874). Digest seedA/on 49FB45407FF7C3C0 -> 457483363D79D700; seedB/on 728607C66CE6A4BE, seedA/off F9BF05466A631FF9 and the 1960 two-span 851FE345B2E37618 are unchanged. exploration_sim_harness R3b (the w_want_q = 0 pin) reads battles 308 (pinned 306), conquests 306 (304), foundings 472 (522), owner_changes 2196 (2174); subjections, freed, tribute, treaties, broken unchanged. Shape on seed 2 of the colonisation harness: 1720 regions and 116 seats, where the razing world had 1700 and 154 — fewer seats because breakaway realms now keep theirs instead of the parent re-founding. history_sweep.json and exploration_sweep.json are regenerated on the integrated tree and checked in; their movement is in the sprint-42 wave-0 DEVLOG entry.",
+  "why_it_matters": "DELIVERY.md sec The digest re-bless is one act per WAVE: the pin and the digest are re-blessed against a described shape, by Ben, never absorbed. Until authorised, R3b stays red with this entry as its stated cause.",
+  "options": [
+   "Authorise: re-pin R3b to 308/306/472/2196 and record 457483363D79D700 as the seedA/on baseline.",
+   "Not yet: keep the pin red and read the sweep movement first."
+  ]
+ },
+ {
+  "id": "NR-876",
+  "title": "READING: by population the Empires arc is more concentrated and has three times fewer real risers than region count showed",
+  "raised": "2026-09-15",
+  "kind": "question",
+  "status": "open",
+  "source": "BL-970 (share readings population-weighted), history_sweep over 16 seeds; both columns now on the face and in history_sweep.json.",
+  "what": "Largest share at 1200 CE: median 8% by regions, 10% by population (ranges 5-18 / 6-19). Peak share: 11% vs 13% (8-20 / 9-25). Hegemony 0/16 both. Rise/peak/fall worlds 16/16 both. Polities that rose AND fell per world: median 74 by regions, 22 by population. Eliminations 16/16 gross (median 191 dead of about 237 ever held). Weakest survivor is 4916 heads in every seed, a derived founding floor with no spread.",
+  "why_it_matters": "The audit's premise was that region growth inflates the arc. On concentration it deflated it (the biggest polities hold denser ground than the founded frontier); on shape it inflated it (most risers were founding empty ground, not gathering people). Sprint 38's distributional done_when reads the same verdict on either column, but the magnitudes Ben has been shown were the region ones. Is a 10-25% biggest-empire world the shape Ben wants before Digitisation, and should the wizard's leaderboard show the population column?",
+  "options": [
+   "Accept the shape; make the population column the one the wizard shows.",
+   "Tune toward larger empires (a wave-2 item, tuned by forces, never clamped).",
+   "Read again after wave 2 moves the world."
   ]
  }
  ]

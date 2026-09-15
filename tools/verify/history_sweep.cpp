@@ -2159,12 +2159,14 @@ int main(int argc, char** argv)
             // not a share of the world.
             {
                 std::vector<int64_t> tops, smalls2, survivors, tops_p, smalls_p;
+                int pop_unrec = 0; // rows whose population column is 0 because no playback record existed
                 for (const auto& r : rows)
                 {
                     tops.push_back(r.top_share_q);
                     smalls2.push_back(r.smallest_holding);
                     survivors.push_back(r.powers_end);
                     tops_p.push_back(r.top_share_pop_q);
+                    if (!r.pop_recorded) ++pop_unrec;
                     smalls_p.push_back(r.smallest_holding_pop);
                 }
                 const int64_t top_med   = median_of(tops);
@@ -2194,6 +2196,14 @@ int main(int argc, char** argv)
                             static_cast<long long>(smalls_p.empty() ? 0 : smalls_p.front()),
                             static_cast<long long>(small_pmed),
                             static_cast<long long>(smalls_p.empty() ? 0 : smalls_p.back()));
+                // Both columns are asserted: the population column is the reading, the
+                // region column stays as the guard that cannot go vacuous, and a row
+                // whose population column was never recorded fails rather than reads 0
+                // (cold review of sprint-42 wave 0, finding 5).
+                check(pop_unrec == 0,
+                      "BL-907.2 every seed carried a playback record, so the population column is a reading and not a zero");
+                check(!tops.empty() && tops.back() < 1000,
+                      "BL-907.2 at least some seeds show unequal strength (largest holder < 100% of regions held)");
                 check(!tops_p.empty() && tops_p.back() < 1000,
                       "BL-907.2 at least some seeds show unequal strength (largest holder < 100% of population held)");
             }

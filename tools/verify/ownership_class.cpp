@@ -705,12 +705,15 @@ int main(int argc, char* argv[])
         // charter reach enters it. The class stays a CORPORATION's property, and
         // the settle-less cohort immediately above is what still holds the
         // national-character derivation to account.
-        // The firms are the landscape-search WINNER's, exactly as the app lays
-        // them (BL-979; apply_shipped_landscape in harness_params.hpp). The world
-        // seed is 0, so the seed candidate's placement is the old bare 0x8A21F00D.
+        // The registry is EMPTY in this headless build (no Lua), so the landscape
+        // search would score every candidate on nothing and pick by tie-break;
+        // BL-979's helper is used with search=false, which is the old bare
+        // seed-candidate spawn (0x8A21F00D) stated rather than pretended to be the
+        // winner. The class check below does not read placement. (Cold review of
+        // sprint-42 wave 0, finding 4.)
         recipe_registry reg;
         const std::vector<entity_id> firms =
-            apply_shipped_landscape(w, reg, /*world_seed=*/0u).firms;
+            apply_shipped_landscape(w, reg, /*world_seed=*/0u, /*search=*/false).firms;
         int firm_not_public = 0;
         for (const entity_id cid : firms)
         {
