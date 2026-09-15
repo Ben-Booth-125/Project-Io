@@ -47,6 +47,14 @@ this phase is where the actor appears.
 That list is the contract, in the same sense `CIVILISATION.md` § The closure of the Empire era is
 the contract before it: a struct, not a promise.
 
+**The tariff posture is derived here, from inputs that already cross.** Scarcity
+(`region::scarcity_q`), trade flows (`trade_flows`) and cultural preference (`culture_preference`)
+arrive in `exploration_output`; the derivation of `polity::protection_q` from them is owed to this
+phase (BL-976, tariff derivation hands to Digitisation), and `derive_national_protection` →
+`seed_national_tariffs` is the enactment seam that reads whatever this phase writes. The Era −1
+sim derives the scalar only on the two-span arc, from industrialisation timing; a single-span world
+carries no tariff, which is a legitimate outcome rather than a gap.
+
 ---
 
 ## Deliberately deferred

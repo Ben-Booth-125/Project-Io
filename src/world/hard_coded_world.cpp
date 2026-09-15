@@ -1502,6 +1502,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
     //
     // A world whose polities never industrialised enacts NOTHING here, and that
     // is a legitimate outcome rather than a gap — see `polity::protection_q`.
+    // THIS IS THE ENACTMENT SEAM, NOT THE DERIVATION (BL-976): the Era -1 sim
+    // writes `protection_q` only on the two-span arc, and Digitisation owns the
+    // derivation on the shipped arc (DIGITISATION.md § The boundary). The call
+    // stays so that whatever writes the field is read by one path.
     seed_national_tariffs(w, kepler_nations,
                           derive_national_protection(
                               kepler_settlement, static_cast<int>(kepler_nations.size())));
