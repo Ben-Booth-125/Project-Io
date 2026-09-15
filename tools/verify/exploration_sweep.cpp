@@ -40,7 +40,10 @@
 // Writes: exploration_sweep.json in the working directory (BL-971) — one row
 // per seed over all eleven readings plus the spread face, checked in at the
 // repo root from a 16-seed run at generation's own constants. A tuning run
-// (any override flag) writes exploration_sweep.tuning.json instead.
+// (any override flag) writes exploration_sweep.tuning.json instead. Every
+// HELD seed on readings 1-2 also carries a named cause (BL-999): printed in
+// its own section and written per seed as `held_cause` with the facts it
+// was read off (`held_cause_facts`, written for every ran seed).
 //
 //   --w_want_q=N  BL-953 TUNING ONLY: re-runs the traced span with the want
 //                 lean at N instead of generation's own value. Readings 1, 2,
@@ -244,6 +247,32 @@ struct exploration_row
     int64_t flows_without_clause  = 0; ///< must be 0: every flow stands on a trade_access clause.
     int64_t trade_bound_pairs     = 0; ///< distinct pairs holding trade_access at 1660.
     std::vector<int64_t> pair_volume; ///< one per trade_access-bound pair, zero-flow pairs included.
+
+    // --- BL-999: the held-seed cause census, off the traced re-run ---------
+    // Every quantity here is captured for EVERY ran seed (so a displaced
+    // seed's numbers sit beside a held one's for comparison) and read only
+    // when readings 1-2 call the seed HELD.
+    /// `campaign_class_trace` copied whole: [class][gate], class 0 = met
+    /// before the span (a neighbour), 1 = met during it, 2 = unmet; gate 0 =
+    /// examined, 1 = treaty-blocked, 2 = water-illegal, 3 = reach-denied,
+    /// 4 = cleared the score threshold, 5 = chosen. Candidate-grain, summed
+    /// over the whole span.
+    int64_t campaign_class[3][6] = {};
+    /// Pairs at 1660 by contact class, and how many of each hold a
+    /// non-aggression clause at the close.
+    int64_t near_pairs = 0, near_bound = 0, far_pairs = 0, far_bound = 0;
+    /// Of the near pairs, those where EITHER side reads a positive
+    /// `deterrence_alarm_q` at the close (a snapshot, not a span integral —
+    /// the sim keeps no cumulative alarm counter), and the largest such read.
+    int64_t near_pairs_alarmed = 0;
+    int     near_alarm_max_q   = 0;
+    /// Polities holding the exploration tree's rim node at the close: alive,
+    /// and ever (the mask is never cleared, so a dead holder still reads).
+    int64_t rim_holders_alive = 0, rim_holders_ever = 0;
+    /// The directed want table derived at the close: entries, those whose
+    /// holder sits on ANOTHER landmass from the wanter's capital (the doc's
+    /// own "outward, across water"), and those whose pair met during the span.
+    int64_t wants_total = 0, wants_outward = 0, wants_frontier = 0;
 };
 
 /// LANDMASS IDENTITY for reading 11. `region::domain` only says land /
@@ -515,6 +544,50 @@ int main(int argc, char** argv)
             int64_t navies = 0, ports = 0;
             for (const polity& q : traced.polities) if (q.alive && q.navy_stock > 0) ++navies;
             for (const region& r : ss_copy.regions) if (r.port_stock_q > 0) ++ports;
+
+            // BL-999: the same counters onto the row, plus the rim, the alarm
+            // read and the want table, so the held-seed census below reads
+            // `rows` like every other section.
+            for (int k = 0; k < 3; ++k)
+                for (int g = 0; g < 6; ++g) row.campaign_class[k][g] = ct[k][g];
+            row.near_pairs = near_pairs; row.near_bound = near_bound;
+            row.far_pairs  = far_met;    row.far_bound  = far_bound;
+            for (const contact& c : traced.contacts)
+            {
+                if (c.from >= c.to || c.first.year >= ep2.start_year) continue;
+                const int aa = deterrence_alarm_q(ss_copy.regions, traced, ep2, c.from, c.to);
+                const int ab = deterrence_alarm_q(ss_copy.regions, traced, ep2, c.to, c.from);
+                const int m  = std::max(aa, ab);
+                if (m > 0) ++row.near_pairs_alarmed;
+                row.near_alarm_max_q = std::max(row.near_alarm_max_q, m);
+            }
+            for (const polity& q : traced.polities)
+            {
+                if (!polity_holds_exploration_rim(q)) continue;
+                ++row.rim_holders_ever;
+                if (q.alive) ++row.rim_holders_alive;
+            }
+            {
+                const std::vector<int32_t> mass_w =
+                    label_landmasses(fx.terrain.substrate, fx.gw, fx.gh);
+                const auto mass_of = [&](int pid) -> int32_t {
+                    if (pid < 0 || static_cast<std::size_t>(pid) >= traced.polities.size()) return -1;
+                    const int cap = traced.polities[static_cast<std::size_t>(pid)].capital;
+                    if (cap < 0 || static_cast<std::size_t>(cap) >= ss_copy.regions.size()) return -1;
+                    const region& rg = ss_copy.regions[static_cast<std::size_t>(cap)];
+                    if (rg.col < 0 || rg.row < 0 || rg.col >= fx.gw || rg.row >= fx.gh) return -1;
+                    return mass_w[static_cast<std::size_t>(rg.row * fx.gw + rg.col)];
+                };
+                const std::vector<want> wants =
+                    derive_wants(ss_copy.regions, traced.contacts, traced.polities);
+                row.wants_total = static_cast<int64_t>(wants.size());
+                for (const want& w : wants)
+                {
+                    const int32_t mf = mass_of(w.from), mt = mass_of(w.to);
+                    if (mf >= 0 && mt >= 0 && mf != mt) ++row.wants_outward;
+                    if (contact_first_year(traced, w.from, w.to) >= ep2.start_year) ++row.wants_frontier;
+                }
+            }
             std::printf("  diag seed %d: cand[near ex=%lld blk=%lld wet=%lld rch=%lld clr=%lld ch=%lld]"
                         " [met-in-span ex=%lld blk=%lld wet=%lld rch=%lld clr=%lld ch=%lld]"
                         " [unmet ex=%lld blk=%lld wet=%lld rch=%lld clr=%lld ch=%lld]"
@@ -845,6 +918,9 @@ int main(int argc, char** argv)
         int     seeds_ran = 0, seeds_silent = 0, seeds_displaced = 0, seeds_displaced_no_nb = 0, seeds_held = 0;
         double  med_empire_rate = 0.0, med_expl_rate = 0.0;
         int     ambiguous_total = 0;
+        // BL-999 held-seed cause census: NO FRONTIER, NO EXPLORER, TREATY-CALM,
+        // DETERRENCE-INERT, UNCLASSIFIED.
+        int     held_cause[5] = {0, 0, 0, 0, 0};
         // reading 8
         int64_t r8_polities = 0, r8_treasury_min = 0, r8_treasury_max = 0;
         double  r8_treasury_mean = 0.0, r8_corr = 0.0;
@@ -941,6 +1017,7 @@ int main(int argc, char** argv)
         int64_t     total   = 0;     ///< nb + fr, the seed's traced conflict volume.
         double      ratio   = -1.0;  ///< fr/nb; -1 when nb == 0.
         const char* verdict = "";    ///< SILENT | displaced | displaced(no-nb) | held
+        const char* cause   = nullptr; ///< BL-999: set on held seeds only (see the census below).
     };
     std::vector<displacement_seed> disp;
 
@@ -1071,6 +1148,130 @@ int main(int argc, char** argv)
     face.silent_floor = kSilentFloorBattles;
     face.seeds_ran = seeds_ran; face.seeds_silent = seeds_silent; face.seeds_displaced = seeds_displaced;
     face.seeds_displaced_no_nb = seeds_displaced_no_nb; face.seeds_held = seeds_held;
+
+    // -----------------------------------------------------------------------
+    // THE HELD-SEED CAUSE CENSUS (BL-999, Ben's ruling 2026-09-15, NR-873):
+    // every seed readings 1-2 call HELD carries a NAMED CAUSE before any
+    // constant moves. Report only; nothing here asserts.
+    //
+    // WHAT EACH COLUMN IS. Deterrence in this sim acts through ONE channel:
+    // near-home Alarm raises `treaty_value_q`, a bound pair holds a
+    // non-aggression clause, and a campaign against a bound owner is
+    // treaty-blocked at the funnel's first gate. So "refused by deterrence"
+    // is read as NEAR-class candidates (owner met before the span) that the
+    // clause blocked, against those allowed past it. The FRONTIER is two
+    // classes, printed apart because the sim makes them differently: a
+    // contact is raised ONLY by a campaign crossing onto the other's ground
+    // (`raise_contact`'s two call sites) or inherited from a conquest, so the
+    // MET-IN-SPAN class exists only after an UNMET candidate was chosen once
+    // -- the first crossing. "In reach" is what cleared the treaty, water and
+    // reach gates and was actually scored. The rim is the exploration tree's
+    // rim node. The want table is derived at the close; its outward share is
+    // the doc's own "outward, across water" -- holder on another landmass
+    // from the wanter's capital. The alarm read is a 1660 snapshot: the sim
+    // keeps no cumulative alarm counter. GRAINS DIFFER along the funnel, as
+    // `campaign_class_trace`'s own comment says: examined / blocked / wet /
+    // reach-denied are candidate-grain, "cleared" is SEASON-grain (up to two
+    // scores per candidate, so it can exceed "in reach"), "chosen" is
+    // round-grain (one per round Campaign won, by the winner's class).
+    //
+    // THE LADDER, in the item's order, with its report thresholds
+    // (thresholds on the READING, like kSilentFloorBattles -- moving them
+    // changes what a seed is called, never what happened):
+    //   NO FRONTIER       the span raised fewer than kFrontierPairsFloor new
+    //                     contact pairs -- nothing was met to displace to;
+    //   NO EXPLORER       no polity ever held the rim;
+    //   TREATY-CALM       neighbours bound (>= kBoundShareCalm of near
+    //                     candidates treaty-blocked) and fewer than
+    //                     kFrontierReachFloor met-in-span candidates in reach;
+    //   DETERRENCE-INERT  met-in-span candidates in reach at or over the floor
+    //                     and neighbours NOT bound -- Alarm did not quiet them.
+    // A seed with a reachable frontier AND bound neighbours that is still
+    // held fits none of the four -- its remaining unbound near pairs carry
+    // the war -- and is printed UNCLASSIFIED rather than forced into one.
+    constexpr int64_t kFrontierPairsFloor = 2;    ///< met-in-span pairs at 1660.
+    constexpr int64_t kFrontierReachFloor = 100;  ///< met-in-span candidates scored over the span.
+    constexpr double  kBoundShareCalm     = 0.5;  ///< near candidates treaty-blocked / examined.
+
+    struct held_cause_census { int no_frontier = 0, no_explorer = 0, treaty_calm = 0,
+                                   deterrence_inert = 0, unclassified = 0; } census;
+    std::printf("\n--- held-seed causes (BL-999) -- report thresholds: NO FRONTIER under %lld met-in-span pairs, "
+                "frontier reach floor %lld scored met-in-span candidates, neighbours bound at >= %.0f%% blocked ---\n",
+                static_cast<long long>(kFrontierPairsFloor), static_cast<long long>(kFrontierReachFloor),
+                kBoundShareCalm * 100.0);
+    for (displacement_seed& d : disp)
+    {
+        if (std::strcmp(d.verdict, "held") != 0) continue;
+        const exploration_row* rp = nullptr;
+        for (const exploration_row& r : rows) if (r.ok && r.seed == d.seed) { rp = &r; break; }
+        if (!rp) continue;
+        const exploration_row& r = *rp;
+        const int64_t* near_c  = r.campaign_class[0];
+        const int64_t* met_c   = r.campaign_class[1];
+        const int64_t* unmet_c = r.campaign_class[2];
+        const auto in_reach = [](const int64_t* c) { return c[0] - c[1] - c[2] - c[3]; };
+        const int64_t near_allowed  = near_c[0] - near_c[1];
+        const int64_t near_in_reach = in_reach(near_c);
+        const int64_t met_in_reach  = in_reach(met_c);
+        const int64_t unmet_in_reach = in_reach(unmet_c);
+        const auto pct = [](int64_t num, int64_t den) {
+            return den > 0 ? 100.0 * static_cast<double>(num) / static_cast<double>(den) : 0.0;
+        };
+        const double blocked_share  = pct(near_c[1], near_c[0]) / 100.0;
+        const bool neighbours_bound   = blocked_share >= kBoundShareCalm;
+        const bool frontier_reachable = met_in_reach >= kFrontierReachFloor;
+
+        if      (r.far_pairs < kFrontierPairsFloor)          { d.cause = "NO FRONTIER";      ++census.no_frontier; }
+        else if (r.rim_holders_ever == 0)                   { d.cause = "NO EXPLORER";      ++census.no_explorer; }
+        else if (!frontier_reachable && neighbours_bound)   { d.cause = "TREATY-CALM";      ++census.treaty_calm; }
+        else if (!frontier_reachable)                       { d.cause = "NO FRONTIER";      ++census.no_frontier; }
+        else if (!neighbours_bound)                         { d.cause = "DETERRENCE-INERT"; ++census.deterrence_inert; }
+        else                                                { d.cause = "UNCLASSIFIED";     ++census.unclassified; }
+
+        std::printf("  seed %-3u nb=%lld fr=%lld  %s%s\n",
+                    d.seed, static_cast<long long>(d.nb), static_cast<long long>(d.fr), d.cause,
+                    std::strcmp(d.cause, "UNCLASSIFIED") == 0
+                        ? " (frontier reachable AND neighbours bound; the unbound near pairs carry the war)" : "");
+        std::printf("    neighbour campaigns: examined %lld, refused by deterrence (treaty-blocked) %lld (%.1f%%), "
+                    "allowed %lld -> in reach %lld -> cleared %lld -> chosen %lld\n",
+                    static_cast<long long>(near_c[0]), static_cast<long long>(near_c[1]), pct(near_c[1], near_c[0]),
+                    static_cast<long long>(near_allowed), static_cast<long long>(near_in_reach),
+                    static_cast<long long>(near_c[4]), static_cast<long long>(near_c[5]));
+        std::printf("    pairs at 1660: near %lld, bound %lld (%.1f%%), unbound %lld; met-in-span %lld, bound %lld (%.1f%%); "
+                    "near pairs reading alarm > 0: %lld/%lld (max alarm %d)\n",
+                    static_cast<long long>(r.near_pairs), static_cast<long long>(r.near_bound),
+                    pct(r.near_bound, r.near_pairs), static_cast<long long>(r.near_pairs - r.near_bound),
+                    static_cast<long long>(r.far_pairs), static_cast<long long>(r.far_bound),
+                    pct(r.far_bound, r.far_pairs),
+                    static_cast<long long>(r.near_pairs_alarmed), static_cast<long long>(r.near_pairs),
+                    r.near_alarm_max_q);
+        std::printf("    explorer rim: %lld polities ever held it (%lld alive at 1660)\n",
+                    static_cast<long long>(r.rim_holders_ever), static_cast<long long>(r.rim_holders_alive));
+        std::printf("    frontier, met-in-span: examined %lld, treaty-blocked %lld, water-illegal %lld, reach-denied %lld, "
+                    "IN REACH %lld, cleared %lld, chosen %lld\n",
+                    static_cast<long long>(met_c[0]), static_cast<long long>(met_c[1]), static_cast<long long>(met_c[2]),
+                    static_cast<long long>(met_c[3]), static_cast<long long>(met_in_reach),
+                    static_cast<long long>(met_c[4]), static_cast<long long>(met_c[5]));
+        std::printf("    frontier, unmet (the first crossing): examined %lld, water-illegal %lld, reach-denied %lld, "
+                    "IN REACH %lld, cleared %lld, chosen %lld\n",
+                    static_cast<long long>(unmet_c[0]), static_cast<long long>(unmet_c[2]),
+                    static_cast<long long>(unmet_c[3]), static_cast<long long>(unmet_in_reach),
+                    static_cast<long long>(unmet_c[4]), static_cast<long long>(unmet_c[5]));
+        std::printf("    want table at 1660: %lld wants, outward (across water) %lld (%.1f%%), "
+                    "pointing at a met-in-span polity %lld (%.1f%%)\n",
+                    static_cast<long long>(r.wants_total), static_cast<long long>(r.wants_outward),
+                    pct(r.wants_outward, r.wants_total),
+                    static_cast<long long>(r.wants_frontier), pct(r.wants_frontier, r.wants_total));
+    }
+    if (seeds_held == 0)
+        std::printf("  no held seed on this spread.\n");
+    else
+        std::printf("  census: NO FRONTIER=%d NO EXPLORER=%d TREATY-CALM=%d DETERRENCE-INERT=%d UNCLASSIFIED=%d\n",
+                    census.no_frontier, census.no_explorer, census.treaty_calm,
+                    census.deterrence_inert, census.unclassified);
+    face.held_cause[0] = census.no_frontier;      face.held_cause[1] = census.no_explorer;
+    face.held_cause[2] = census.treaty_calm;      face.held_cause[3] = census.deterrence_inert;
+    face.held_cause[4] = census.unclassified;
 
     double med_empire = 0.0, med_expl = 0.0;
     if (!empire_rates.empty())
@@ -1660,7 +1861,11 @@ int main(int argc, char** argv)
                     if (std::strcmp(d.verdict, "SILENT") == 0)
                     { std::fprintf(f, "%s%u", first ? "" : ", ", d.seed); first = false; }
             }
-            std::fprintf(f, "], \"ambiguous_battles\": %d},\n", face.ambiguous_total);
+            std::fprintf(f, "], \"ambiguous_battles\": %d, \"held_cause_census\": {\"NO FRONTIER\": %d, "
+                            "\"NO EXPLORER\": %d, \"TREATY-CALM\": %d, \"DETERRENCE-INERT\": %d, "
+                            "\"UNCLASSIFIED\": %d}},\n",
+                         face.ambiguous_total, face.held_cause[0], face.held_cause[1],
+                         face.held_cause[2], face.held_cause[3], face.held_cause[4]);
             std::fprintf(f, "  \"conflict_persists\": {\"median_empire_rate_per_century\": %.4f, "
                             "\"median_exploration_rate_per_century\": %.4f},\n",
                          face.med_empire_rate, face.med_expl_rate);
@@ -1764,6 +1969,37 @@ int main(int argc, char** argv)
                 put_d("expl_rate_per_century", true, per_century(r.expl_battles, r.expl_years), ", ");
                 put_d("displacement_ratio", d && d->ratio >= 0.0, d ? d->ratio : 0.0, ", ");
                 std::fprintf(f, "\"displacement_verdict\": \"%s\",\n", d ? d->verdict : "");
+                // BL-999: the named cause (held seeds only; null otherwise) and
+                // the facts it was read off, for every ran seed. The three
+                // campaign classes are written apart (near / met-in-span /
+                // unmet) because the census reads them apart.
+                if (d && d->cause) std::fprintf(f, "   \"held_cause\": \"%s\", ", d->cause);
+                else               std::fprintf(f, "   \"held_cause\": null, ");
+                {
+                    const auto put_class = [&](const char* prefix, const int64_t* c, const char* tail) {
+                        std::fprintf(f, "\"%s_examined\": %lld, \"%s_treaty_blocked\": %lld, \"%s_water_illegal\": %lld, "
+                                        "\"%s_reach_denied\": %lld, \"%s_in_reach\": %lld, \"%s_cleared\": %lld, "
+                                        "\"%s_chosen\": %lld%s",
+                                     prefix, static_cast<long long>(c[0]), prefix, static_cast<long long>(c[1]),
+                                     prefix, static_cast<long long>(c[2]), prefix, static_cast<long long>(c[3]),
+                                     prefix, static_cast<long long>(c[0] - c[1] - c[2] - c[3]),
+                                     prefix, static_cast<long long>(c[4]), prefix, static_cast<long long>(c[5]), tail);
+                    };
+                    std::fprintf(f, "\"held_cause_facts\": {");
+                    put_class("near",  r.campaign_class[0], ", ");
+                    put_class("met",   r.campaign_class[1], ", ");
+                    put_class("unmet", r.campaign_class[2], ", ");
+                    std::fprintf(f, "\"near_pairs\": %lld, \"near_pairs_bound\": %lld, \"met_pairs\": %lld, "
+                                    "\"met_pairs_bound\": %lld, \"near_pairs_alarmed\": %lld, \"near_alarm_max_q\": %d, "
+                                    "\"rim_holders_ever\": %lld, \"rim_holders_alive\": %lld, \"wants\": %lld, "
+                                    "\"wants_outward\": %lld, \"wants_frontier\": %lld},\n",
+                                 static_cast<long long>(r.near_pairs), static_cast<long long>(r.near_bound),
+                                 static_cast<long long>(r.far_pairs), static_cast<long long>(r.far_bound),
+                                 static_cast<long long>(r.near_pairs_alarmed), r.near_alarm_max_q,
+                                 static_cast<long long>(r.rim_holders_ever), static_cast<long long>(r.rim_holders_alive),
+                                 static_cast<long long>(r.wants_total), static_cast<long long>(r.wants_outward),
+                                 static_cast<long long>(r.wants_frontier));
+                }
                 // reading 3
                 std::fprintf(f, "   \"strength_measured\": %s, \"treasury_top_has_consolidator\": %s, "
                                 "\"treasury_top_has_expansionist\": %s, \"regions_top_has_consolidator\": %s, "
