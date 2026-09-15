@@ -99,6 +99,10 @@ int add_spend_polity(spend_fixture& fx, const culture& c, int64_t treasury, int 
     const int i = static_cast<int>(fx.state.polities.size());
     region r;
     r.nation = i; r.treasury = treasury; r.port_q = port_window_q; r.port_stock_q = port_stock_q;
+    // BL-972: a paid army step is a LEVY off the seat's pool, so every
+    // fixture seat carries one -- 200,000 people (manpower ceiling 10,000 at
+    // the 5% frac) with the whole ceiling banked.
+    r.population = 200000; r.manpower_stock = 10000;
     fx.regions.push_back(r);
     polity q;
     q.id = i; q.alive = true; q.capital = i; q.culture = i;
@@ -890,17 +894,32 @@ int main()
         check(army_funded,
               "R5.7  a funded standing army adds to `army_stock` and spends the treasury doing it");
 
-        // R5.8: underfunded, a built port silts and the navy still decays --
-        // a fleet is a running cost, never a one-time purchase.
+        // R5.8: underfunded, a built port silts and the navy decays -- a
+        // fleet is a running cost, never a one-time purchase. BL-972: that
+        // running cost is a BILL; a fleet whose bill is met holds, and the
+        // hulls the purse cannot keep are what decay.
+        {
+            const int64_t navy_paid_before = qs[0].navy_stock;
+            exploration_upkeep_spend spend_paid;
+            run_exploration_upkeep(regions, qs, /*corridors=*/{}, ep, /*year=*/1235,
+                                   /*step_years=*/1, &spend_paid, nullptr, nullptr, &ctx);
+            check(qs[0].navy_stock >= navy_paid_before && spend_paid.navy_unpaid == 0
+               && spend_paid.navy_upkeep
+                    == (navy_paid_before * ep.navy_upkeep_per_1000_units_year_q) / 1000,
+                  "R5.9a a fleet whose bill the purse meets does not decay, and the bill charged is "
+                  "navy_stock x navy_upkeep_per_1000_units_year_q / 1000 per year (BL-972)");
+        }
         regions[0].treasury = 0;
         const int port_before = regions[0].port_stock_q;
         const int64_t navy_before = qs[0].navy_stock;
+        exploration_upkeep_spend spend_unpaid;
         run_exploration_upkeep(regions, qs, /*corridors=*/{}, ep, /*year=*/1235,
-                               /*step_years=*/1);
+                               /*step_years=*/1, &spend_unpaid);
         check(regions[0].port_stock_q < port_before,
               "R5.8  an underfunded port silts toward nothing");
-        check(qs[0].navy_stock < navy_before,
-              "R5.9  a navy decays every round regardless of funding");
+        check(qs[0].navy_stock < navy_before && spend_unpaid.navy_unpaid == 1,
+              "R5.9  a navy whose bill the purse cannot meet decays (treasury 0: the whole fleet is the "
+              "unpaid share, BL-955's decay exactly) (BL-972)");
     }
 
     // -----------------------------------------------------------------
@@ -1028,40 +1047,45 @@ int main()
                   "long-known neighbour's standing force alarms it; a frontier contact does not (BL-955)");
         }
 
-        // R8.8 -- a WELL-GARRISONED consolidator under the same near-home Alarm
-        // does not buy another army step: the standing army saturates.
+        // R8.8 -- BL-972: THE BILL BINDS. A polity standing the old cap's
+        // worth of paid heads (BL-955's 300 per held region, one region) on a
+        // seat earning the most the endowment term can pay is poorer every
+        // round, whatever else it chooses: the bill (300 x 1667 x 4 / 1000 =
+        // 2000 a round) is an order above the income ((3 x 1000 + 0) / 4 = 750
+        // mean endowment x 40 / 1000 x 4 years = 120). This is the proof the
+        // cap could be deleted on: the cost does what the cap did, in the world.
         {
             spend_fixture fx;
+            add_spend_polity(fx, consolidator, 100000, /*no port window*/0, 0);
             add_spend_polity(fx, expansionist, 0, 0, 0);
-            add_spend_polity(fx, consolidator, 100000, /*port window*/1000, 0);
-            add_spend_polity(fx, consolidator, 0, 0, 0);
-            fx.regions[2].army_stock = 100000; // the alarming neighbour
-            contact c12; c12.from = 1; c12.to = 2; c12.first.year = 1000;
-            contact c21; c21.from = 2; c21.to = 1; c21.first.year = 1000;
-            fx.state.contacts = { c12, c21 };
-            const int64_t garrison = garrison_target(fx.regions[1], ep.garrison_fraction_q);
-            const int64_t cap      = ep.army_saturation_per_region * 1; // one held region
-            const auto run_with_standing = [&](int64_t standing) {
-                spend_fixture f2 = fx;
-                f2.regions[1].army_stock          = garrison + standing;
-                f2.regions[1].standing_army       = standing; // the PAID heads
-                f2.regions[1].standing_army_owner = 1;
-                const exploration_spend_context ctx = spend_context(f2);
+            fx.regions[0].farm_q = fx.regions[0].ore_q = fx.regions[0].energy_q = 1000;
+            const int64_t cap_heads = 300; // BL-955's old army_saturation_per_region x 1 held region
+            fx.regions[0].army_stock = cap_heads; fx.regions[0].standing_army = cap_heads;
+            fx.regions[0].standing_army_owner = 0;
+            const exploration_spend_context ctx = spend_context(fx);
+            bool poorer_every_round = true;
+            int64_t prev = fx.regions[0].treasury, first_bill = 0, steps = 0;
+            for (int round = 0; round < 8; ++round)
+            {
                 exploration_upkeep_spend spend;
-                run_exploration_upkeep(f2.regions, f2.state.polities, {}, ep, 1234, 4, &spend,
+                run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234 + round * 4, 4, &spend,
                                        nullptr, nullptr, &ctx);
-                return spend;
-            };
-            const exploration_upkeep_spend light = run_with_standing(0);
-            const exploration_upkeep_spend heavy = run_with_standing(cap + 1);
-            std::printf("      R8.8: standing 0 -> army steps %lld; standing %lld -> army %lld port %lld navy %lld\n",
-                        static_cast<long long>(light.army_steps), static_cast<long long>(cap + 1),
-                        static_cast<long long>(heavy.army_steps), static_cast<long long>(heavy.port_steps),
-                        static_cast<long long>(heavy.navy_steps));
-            check(light.army_steps == 1 && heavy.army_steps == 0,
-                  "R8.8  a consolidator under near-home Alarm buys the army step, but once its standing army "
-                  "(its paid standing heads) passes army_saturation_per_region x held regions it "
-                  "holds or builds something else (BL-955)");
+                if (round == 0) first_bill = spend.army_upkeep;
+                steps += spend.army_steps;
+                if (fx.regions[0].treasury >= prev) poorer_every_round = false;
+                prev = fx.regions[0].treasury;
+            }
+            const int64_t expected_bill =
+                (cap_heads * ep.standing_army_upkeep_per_1000_heads_year_q * 4) / 1000;
+            const int64_t income = ((3000 / 4) * ep.treasury_endowment_income_q / 1000) * 4;
+            std::printf("      R8.8: first-round bill=%lld (expected %lld) round income=%lld army steps=%lld "
+                        "treasury 100000 -> %lld over 8 rounds\n",
+                        static_cast<long long>(first_bill), static_cast<long long>(expected_bill),
+                        static_cast<long long>(income), static_cast<long long>(steps),
+                        static_cast<long long>(fx.regions[0].treasury));
+            check(poorer_every_round && first_bill == expected_bill && expected_bill > income,
+                  "R8.8  a polity standing the old cap's paid heads is poorer every round: the per-head bill "
+                  "exceeds the seat's whole endowment income, so the cost binds where the cap used to (BL-972)");
         }
 
         // R8.9-R8.12 -- the PAID standing army persists through the muster,
@@ -1074,11 +1098,16 @@ int main()
             const int64_t target = garrison_target(fx.regions[0], ep.garrison_fraction_q);
             fx.regions[0].army_stock = target;  // the muster's own garrison, exactly at target
             const exploration_spend_context ctx = spend_context(fx);
+            const int64_t manpower_before = fx.regions[0].manpower_stock; // BL-972: the levy's pool
             exploration_upkeep_spend spend;
             run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
                                    nullptr, nullptr, &ctx);
             const int64_t paid = standing_army_heads(fx.regions[0]);
             const int64_t stock_bought = fx.regions[0].army_stock;
+            check(spend.levy_raised == paid && paid > 0
+               && fx.regions[0].manpower_stock == manpower_before - paid,
+                  "R8.9b the bought heads are a LEVY: the seat's manpower_stock fell by exactly the step "
+                  "bought, and the step counter agrees (BL-972)");
 
             // A year of the muster, disbanding HALF of any excess.
             region mustered = fx.regions[0];
@@ -1096,16 +1125,30 @@ int main()
                   "R8.9  a bought standing army survives a year of muster intact; the same heads unpaid "
                   "are disbanded as excess (BL-955)");
 
-            // Unfunded next round (empty purse): the paid status decays, the men stay.
+            // Unpaid next round (empty purse): the whole paid army is the
+            // unpaid share, so BL-955's decay applies in full -- and BL-972
+            // sends the men HOME: they leave army_stock and return to the
+            // seat's manpower pool. The levy returns on disband.
             fx.regions[0].treasury = 0;
+            const int64_t manpower_before_decay = fx.regions[0].manpower_stock;
             exploration_upkeep_spend spend2;
             run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1238, 4, &spend2,
                                    nullptr, nullptr, &ctx);
-            const int64_t expected = paid - (paid * ep.standing_army_decay_per_mille_year_q * 4) / 1000;
-            check(spend2.army_steps == 0 && standing_army_heads(fx.regions[0]) == expected
-               && fx.regions[0].army_stock == stock_bought,
-                  "R8.10 unfunded, the paid standing army decays toward zero at "
-                  "standing_army_decay_per_mille_year_q; the men revert to the muster's garrison (BL-955)");
+            const int64_t gone     = (paid * ep.standing_army_decay_per_mille_year_q * 4) / 1000;
+            const int64_t expected = paid - gone;
+            std::printf("      R8.10: paid=%lld unpaid -> %lld go home (army %lld -> %lld, manpower %lld -> %lld)\n",
+                        static_cast<long long>(paid), static_cast<long long>(gone),
+                        static_cast<long long>(stock_bought), static_cast<long long>(fx.regions[0].army_stock),
+                        static_cast<long long>(manpower_before_decay),
+                        static_cast<long long>(fx.regions[0].manpower_stock));
+            check(spend2.army_steps == 0 && spend2.army_unpaid == 1
+               && standing_army_heads(fx.regions[0]) == expected
+               && fx.regions[0].army_stock == stock_bought - gone
+               && fx.regions[0].manpower_stock == manpower_before_decay + gone
+               && spend2.levy_returned == gone,
+                  "R8.10 unpaid, the paid standing army decays at standing_army_decay_per_mille_year_q and "
+                  "the men go home: army_stock falls by the same heads and the seat's manpower_stock rises "
+                  "by them -- the levy returns on disband (BL-972; the rate is BL-955's)");
 
             // Lost in battle alike: a pool losing half loses half its paid heads;
             // ground taken by another polity carries none of the loser's.
@@ -1119,16 +1162,51 @@ int main()
                   "R8.11 a battle loss falls on paid heads in proportion (1000->500 pool, 400->200 paid), "
                   "and ground that changes hands carries none of the loser's paid army (BL-955)");
 
-            // The cap on a real-sized realm: 120 held regions.
-            exploration_spend_facts f;
-            f.consolidator_rank_q = 1000; f.treasury = 100000; f.held_regions = 120;
-            f.standing_army = ep.army_saturation_per_region * 120;
-            const int at_cap = score_exploration_spend(ep, f).army_q;
-            f.standing_army += 1;
-            const int past_cap = score_exploration_spend(ep, f).army_q;
-            check(at_cap > 0 && past_cap == 0,
-                  "R8.12 the cap binds on a real-sized army: 120 regions x army_saturation_per_region "
-                  "still scores, one head more scores 0 (BL-955)");
+            // BL-972: the bill binds on a real-sized realm too. 120 held
+            // regions at the old cap (36,000 paid heads), every region's
+            // endowment maxed and 200 corridors touched -- the most the
+            // non-tribute terms can earn in a round -- and the round still
+            // ends poorer, with the whole realm billed as one.
+            {
+                spend_fixture rf;
+                add_spend_polity(rf, consolidator, 10000000, /*no port window*/0, 0);
+                add_spend_polity(rf, expansionist, 0, 0, 0);
+                rf.regions[0].farm_q = rf.regions[0].ore_q = rf.regions[0].energy_q = 1000;
+                rf.regions[0].army_stock = 300; rf.regions[0].standing_army = 300;
+                rf.regions[0].standing_army_owner = 0;
+                for (int i = 1; i < 120; ++i)
+                {
+                    region held;
+                    held.nation = 0; held.population = 200000;
+                    held.farm_q = held.ore_q = held.energy_q = held.port_q = 1000;
+                    held.army_stock = 300; held.standing_army = 300; held.standing_army_owner = 0;
+                    rf.regions.push_back(held);
+                }
+                std::vector<history_corridor> corridors(200);
+                for (int i = 0; i < 200; ++i)
+                {
+                    corridors[static_cast<std::size_t>(i)].a = 0;
+                    corridors[static_cast<std::size_t>(i)].b = static_cast<uint16_t>(2 + (i % 118));
+                }
+                const exploration_spend_context ctx = spend_context(rf);
+                const int64_t before = rf.regions[0].treasury;
+                exploration_upkeep_spend spend;
+                run_exploration_upkeep(rf.regions, rf.state.polities, corridors, ep, 1234, 4, &spend,
+                                       nullptr, nullptr, &ctx);
+                const int64_t income_max = (1000 * ep.treasury_endowment_income_q / 1000) * 4
+                                         + 200 * ep.treasury_corridor_income_q * 4;
+                const int64_t expected_bill =
+                    (36000 * ep.standing_army_upkeep_per_1000_heads_year_q * 4) / 1000;
+                std::printf("      R8.12: 120 regions x 300 paid -> bill=%lld (expected %lld) vs max income=%lld; "
+                            "treasury %lld -> %lld\n", static_cast<long long>(spend.army_upkeep),
+                            static_cast<long long>(expected_bill), static_cast<long long>(income_max),
+                            static_cast<long long>(before), static_cast<long long>(rf.regions[0].treasury));
+                check(spend.army_upkeep == expected_bill && expected_bill > income_max
+                   && rf.regions[0].treasury < before && spend.army_unpaid == 0,
+                      "R8.12 the bill binds on a real-sized realm: 120 regions x 300 paid heads are billed as "
+                      "one realm, and the bill exceeds the most the endowment and corridor terms can earn in a "
+                      "round (BL-972)");
+            }
         }
 
         // R8.13-R8.17 -- the cold review's cases (F1, F2, F4, F5b).
@@ -1178,40 +1256,67 @@ int main()
                   "R8.15 for a region whose men are all paid, the scorer's defender estimate equals what "
                   "the battle-path muster fields: the levy reads ordinary men only (BL-955 F2)");
 
-            // F4: the saturation reads the REALM's paid heads, not the seat's.
-            const auto realm_run = [&](int64_t paid_off_seat) {
+            // F4 under BL-972: the BILL reads the REALM's paid heads, not the
+            // seat's -- heads a campaign marched onto other held ground are
+            // billed to the capital that pays them, and when the bill is
+            // short they go home from the ground they stand on.
+            struct realm_bill { int64_t upkeep, unpaid, pool, stock; };
+            const auto realm_run = [&](int64_t paid_off_seat, int64_t treasury) {
                 spend_fixture fx;
-                add_spend_polity(fx, consolidator, 100000, 0, 0);
+                add_spend_polity(fx, consolidator, treasury, 0, 0);
                 add_spend_polity(fx, expansionist, 0, 0, 0);
                 region held;
-                held.nation = 0; held.army_stock = paid_off_seat; held.standing_army = paid_off_seat;
+                held.nation = 0; held.population = 200000; held.manpower_stock = 0;
+                held.army_stock = paid_off_seat; held.standing_army = paid_off_seat;
                 held.standing_army_owner = 0;
                 fx.regions.push_back(held); // a second held region, not the seat
                 const exploration_spend_context ctx = spend_context(fx);
                 exploration_upkeep_spend spend;
                 run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
                                        nullptr, nullptr, &ctx);
-                return spend.army_steps;
+                return realm_bill{spend.army_upkeep, spend.army_unpaid,
+                                  fx.regions[2].manpower_stock, fx.regions[2].army_stock};
             };
-            const int64_t cap2 = ep.army_saturation_per_region * 2;
-            check(realm_run(0) == 1 && realm_run(cap2 + 1) == 0,
-                  "R8.16 paid heads marched onto other held ground still count: past the realm's cap the "
-                  "seat buys no further army step (BL-955 F4)");
+            const realm_bill billed = realm_run(1000, 100000);
+            const realm_bill broke  = realm_run(1000, 0);
+            const int64_t off_seat_bill = (1000 * ep.standing_army_upkeep_per_1000_heads_year_q * 4) / 1000;
+            const int64_t home = (1000 * ep.standing_army_decay_per_mille_year_q * 4) / 1000;
+            check(billed.upkeep == off_seat_bill && billed.unpaid == 0 && billed.pool == 0
+               && broke.unpaid == 1 && broke.pool == home && broke.stock == 1000 - home,
+                  "R8.16 paid heads standing off the seat are billed to the seat that pays them; unpaid, they "
+                  "go home into the pool of the ground they stand on (BL-972; BL-955 F4's realm read)");
 
-            // F5b: a fleet rebuilt the round it hit zero is not a lapse.
+            // F5b under BL-972: one hull with a full purse has its bill met
+            // and does not decay at all; the same hull with a purse under one
+            // unit's rate is unpaid, decays to zero, cannot be rebuilt (the
+            // step costs more than the bill it could not meet) and IS a
+            // lapse. The lapse is still recorded after the step, as F5b set.
             {
-                spend_fixture fx;
-                add_spend_polity(fx, expansionist, 100000, 1000, /*port full*/1000);
-                add_spend_polity(fx, consolidator, 0, 0, 0);
-                fx.state.polities[0].navy_stock = 1; // decays to 0 this round
-                const exploration_spend_context ctx = spend_context(fx);
-                exploration_upkeep_spend spend;
-                run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
-                                       nullptr, nullptr, &ctx);
-                check(spend.navy_steps == 1 && fx.state.polities[0].navy_stock > 0
-                   && spend.navies_lapsed.empty(),
-                      "R8.17 a fleet that hits zero and is rebuilt the same round is not counted as lapsed "
-                      "(BL-955 F5b)");
+                struct one_hull { int64_t navy, steps, unpaid, lapses; };
+                // The poor seat carries NO port window: a window is endowment
+                // too, and even a quarter of one earns 40 a round -- enough to
+                // meet one hull's bill of 6. (Its port stock still clears
+                // navy_min_port_stock_q for the read; nothing is bought.)
+                const auto run_one_hull = [&](int64_t treasury, int port_window_q) {
+                    spend_fixture fx;
+                    add_spend_polity(fx, expansionist, treasury, port_window_q, /*port full*/1000);
+                    add_spend_polity(fx, consolidator, 0, 0, 0);
+                    fx.state.polities[0].navy_stock = 1;
+                    const exploration_spend_context ctx = spend_context(fx);
+                    exploration_upkeep_spend spend;
+                    run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234, 4, &spend,
+                                           nullptr, nullptr, &ctx);
+                    return one_hull{fx.state.polities[0].navy_stock, spend.navy_steps, spend.navy_unpaid,
+                                    static_cast<int64_t>(spend.navies_lapsed.size())};
+                };
+                const one_hull rich = run_one_hull(100000, /*window*/1000);
+                const one_hull poor = run_one_hull(1, /*no window*/0); // under one hull's four-year rate (6)
+                check(rich.steps == 1 && rich.navy == 1 + ep.navy_build_step_q && rich.unpaid == 0
+                   && rich.lapses == 0
+                   && poor.steps == 0 && poor.navy == 0 && poor.unpaid == 1 && poor.lapses == 1,
+                      "R8.17 one hull with a full purse is paid, holds and grows; the same hull with a purse "
+                      "under its rate is unpaid, lapses to zero and is recorded once (BL-972; BL-955 F5b's "
+                      "record-after-step order kept)");
             }
         }
 
@@ -1233,6 +1338,54 @@ int main()
                && spend.navies_lapsed[0] == 0,
                   "R8.4  an unfunded navy still decays every round, and its lapse to zero is recorded "
                   "once (BL-955)");
+        }
+
+        // R8.19 -- BL-972: with the cap gone, a cap-free allocation still does
+        // not buy an army every round. Two in-world forces stop it, and each
+        // is shown alone: (a) the PURSE -- a modest treasury with no income
+        // buys steps until the bill plus the next step outrun it, then the
+        // unpaid share goes home; (b) the LEVY -- a bottomless purse on a seat
+        // whose pool is finite buys only while the pool lends a whole step,
+        // then holds.
+        {
+            struct rounds_out { int64_t steps, unpaid_rounds, returned, paid, treasury, manpower; };
+            const auto run_rounds = [&](int64_t treasury, int64_t manpower, int rounds) {
+                spend_fixture fx;
+                add_spend_polity(fx, consolidator, treasury, 0, 0);
+                add_spend_polity(fx, expansionist, 0, 0, 0);
+                fx.regions[0].manpower_stock = manpower;
+                fx.regions[0].population     = 2000000; // ceiling 100,000: the pool, not its cap, binds
+                const exploration_spend_context ctx = spend_context(fx);
+                int64_t steps = 0, unpaid_rounds = 0, returned = 0;
+                for (int round = 0; round < rounds; ++round)
+                {
+                    exploration_upkeep_spend spend;
+                    run_exploration_upkeep(fx.regions, fx.state.polities, {}, ep, 1234 + round * 4, 4,
+                                           &spend, nullptr, nullptr, &ctx);
+                    steps += spend.army_steps; unpaid_rounds += spend.army_unpaid;
+                    returned += spend.levy_returned;
+                }
+                return rounds_out{steps, unpaid_rounds, returned, standing_army_heads(fx.regions[0]),
+                                  fx.regions[0].treasury, fx.regions[0].manpower_stock};
+            };
+            const rounds_out purse = run_rounds(/*treasury*/6000, /*manpower*/100000, 30);
+            const rounds_out levy  = run_rounds(/*treasury*/10000000, /*manpower*/10000, 60);
+            std::printf("      R8.19: purse-bound (6000, no income, 30 rounds): steps=%lld unpaid rounds=%lld "
+                        "sent home=%lld paid at close=%lld treasury=%lld\n",
+                        static_cast<long long>(purse.steps), static_cast<long long>(purse.unpaid_rounds),
+                        static_cast<long long>(purse.returned), static_cast<long long>(purse.paid),
+                        static_cast<long long>(purse.treasury));
+            std::printf("      R8.19: levy-bound (10M, pool 10000, 60 rounds): steps=%lld unpaid rounds=%lld "
+                        "paid at close=%lld pool left=%lld\n",
+                        static_cast<long long>(levy.steps), static_cast<long long>(levy.unpaid_rounds),
+                        static_cast<long long>(levy.paid), static_cast<long long>(levy.manpower));
+            check(purse.steps > 0 && purse.steps < 30 && purse.unpaid_rounds > 0 && purse.returned > 0,
+                  "R8.19a purse-bound: a modest treasury with no income buys some army steps, not one every "
+                  "round; once the bill outruns the purse the unpaid share goes home (BL-972)");
+            check(levy.steps > 0 && levy.steps < 60 && levy.steps <= 32 && levy.unpaid_rounds == 0
+               && levy.manpower < ep.standing_army_build_step_q * 2,
+                  "R8.19b levy-bound: a bottomless purse buys only while the seat's pool lends a whole step "
+                  "(10,000 banked at 500 per mille: at most 32 steps of 300 in 60 rounds), then holds (BL-972)");
         }
 
         // R8.5 -- the argmax tie order: hold, then army, then port, then navy.
@@ -1258,15 +1411,30 @@ int main()
             f.expansion_rank_q = 1000; f.port_window_q = 1000; f.treasury = 0;
             check(choose_exploration_spend(score_exploration_spend(ep, f)) == exploration_spend_option::hold,
                   "R8.6  a purse that covers no cost holds, whatever the leans ask for (BL-955)");
-            // A saturated fleet stops scoring.
-            f.treasury = 100000; f.port_stock_q = 1000; f.held_regions = 2;
-            f.navy_stock = ep.navy_saturation_per_region * 2 + 1;
-            const exploration_spend_scores sat = score_exploration_spend(ep, f);
+            // BL-972: no fleet saturates in the scorer -- a fleet a hundred
+            // times a realm's size scores exactly what an empty slip does;
+            // its bill is what bounds it. A full port is still not eligible.
+            f.treasury = 100000; f.port_stock_q = 1000;
+            f.navy_stock = 40000;
+            const exploration_spend_scores huge = score_exploration_spend(ep, f);
             f.navy_stock = 0;
             const exploration_spend_scores fresh = score_exploration_spend(ep, f);
-            check(sat.navy_q == 0 && fresh.navy_q > 0 && !fresh.port_eligible,
-                  "R8.7  a fleet saturates past navy_saturation_per_region x held regions; a full port "
-                  "is not eligible for another step (BL-955)");
+            check(huge.navy_q == fresh.navy_q && fresh.navy_q > 0 && !fresh.port_eligible,
+                  "R8.7  the navy score carries no saturation term (a 40,000-unit fleet scores as an empty "
+                  "slip); a full port is not eligible for another step (BL-972)");
+            // BL-972: the army step needs a whole step of levy room.
+            exploration_spend_facts g;
+            g.consolidator_rank_q = 1000; g.treasury = 100000;
+            g.levy_room = ep.standing_army_build_step_q - 1;
+            const bool short_pool = !score_exploration_spend(ep, g).army_eligible;
+            g.levy_room = ep.standing_army_build_step_q;
+            const bool whole_step = score_exploration_spend(ep, g).army_eligible;
+            g.standing_army = 1000000; // a million paid heads: no cap in the score either
+            const bool no_army_cap = score_exploration_spend(ep, g).army_q == 600;
+            check(short_pool && whole_step && no_army_cap,
+                  "R8.7b the army step is eligible only when the seat's pool lends a whole step "
+                  "(levy_room >= standing_army_build_step_q), and its score carries no saturation term "
+                  "(BL-972)");
         }
     }
 

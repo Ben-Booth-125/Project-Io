@@ -199,7 +199,15 @@ struct exploration_row
     std::vector<int64_t> standing_per_region;
     std::vector<int64_t> garrison_per_region;
     int64_t standing_holders = 0; ///< living polities with any paid standing heads at 1660.
-    int64_t army_saturated   = 0; ///< of those, realm paid heads above the saturation cap.
+    /// BL-972: the BILL replaces the scorer caps. Polity-rounds on which the
+    /// army/navy bill went short, treasury paid in upkeep over the span, and
+    /// the levy drawn from / returned to the manpower pools.
+    int64_t army_unpaid_rounds = 0;
+    int64_t navy_unpaid_rounds = 0;
+    int64_t spent_army_upkeep  = 0;
+    int64_t spent_navy_upkeep  = 0;
+    int64_t levy_raised        = 0;
+    int64_t levy_returned      = 0;
     int64_t standing_invariant_violations = 0; ///< must be 0 (BL-955 F3).
 
     // --- Reading 3: both strategies pay -------------------------------------
@@ -325,6 +333,10 @@ int main(int argc, char** argv)
             else if (kv.first == "deterrence_alarm_weight_q")    hp.deterrence_alarm_weight_q = static_cast<int>(kv.second);
             else if (kv.first == "treaty_far_penalty_q")         hp.treaty_far_penalty_q = static_cast<int>(kv.second);
             else if (kv.first == "visible_capability_reference") hp.visible_capability_reference = kv.second;
+            // BL-972: the bill and the levy bound, for tuning runs.
+            else if (kv.first == "standing_army_upkeep_per_1000_heads_year_q") hp.standing_army_upkeep_per_1000_heads_year_q = kv.second;
+            else if (kv.first == "navy_upkeep_per_1000_units_year_q")          hp.navy_upkeep_per_1000_units_year_q = kv.second;
+            else if (kv.first == "standing_army_levy_per_mille_q")             hp.standing_army_levy_per_mille_q = static_cast<int>(kv.second);
             else { std::printf("unknown --set %s\n", kv.first.c_str()); std::exit(2); }
         }
     };
@@ -691,9 +703,14 @@ int main(int argc, char** argv)
                 row.standing_per_region.push_back(standing[p] / held[p]);
                 row.garrison_per_region.push_back(garrison[p] / held[p]);
                 if (standing[p] > 0) ++row.standing_holders;
-                if (standing[p] > ep2.army_saturation_per_region * held[p]) ++row.army_saturated;
             }
             row.standing_invariant_violations = traced.standing_army_invariant_violations;
+            row.army_unpaid_rounds = traced.army_upkeep_unpaid_rounds;
+            row.navy_unpaid_rounds = traced.navy_upkeep_unpaid_rounds;
+            row.spent_army_upkeep  = traced.treasury_spent_on_army_upkeep;
+            row.spent_navy_upkeep  = traced.treasury_spent_on_navy_upkeep;
+            row.levy_raised        = traced.levy_heads_raised;
+            row.levy_returned      = traced.levy_heads_returned;
         }
 
         // --- Reading 3 capture, off the traced re-run's 1660 close ---------
@@ -863,7 +880,9 @@ int main(int argc, char** argv)
         // reading 7
         int64_t r7_navy_holders = 0, r7_spent_ports = 0, r7_spent_navies = 0, r7_spent_armies = 0,
                 r7_navy_top = 0, r7_navy_bottom = 0, r7_port_steps = 0, r7_navy_steps = 0,
-                r7_army_steps = 0, r7_lapsed = 0, r7_standing_holders = 0, r7_saturated = 0,
+                r7_army_steps = 0, r7_lapsed = 0, r7_standing_holders = 0,
+                r7_army_unpaid = 0, r7_navy_unpaid = 0, r7_army_upkeep = 0, r7_navy_upkeep = 0,
+                r7_levy_raised = 0, r7_levy_returned = 0, // BL-972
                 r7_violations = 0;
         // reading 3
         int64_t r3_measured = 0, r3_cons = 0, r3_expn = 0, r3_both = 0,
@@ -1354,27 +1373,40 @@ int main(int argc, char** argv)
                     static_cast<long long>(lapsed));
         {
             std::vector<int64_t> st, ga;
-            int64_t holders = 0, saturated = 0, living = 0, violations = 0;
+            int64_t holders = 0, living = 0, violations = 0;
+            int64_t army_unpaid = 0, navy_unpaid = 0, army_upkeep = 0, navy_upkeep = 0,
+                    levy_raised = 0, levy_returned = 0; // BL-972
             for (const exploration_row& r : rows)
             {
                 if (!r.ok) continue;
                 st.insert(st.end(), r.standing_per_region.begin(), r.standing_per_region.end());
                 ga.insert(ga.end(), r.garrison_per_region.begin(), r.garrison_per_region.end());
-                holders   += r.standing_holders;
-                saturated += r.army_saturated;
+                holders    += r.standing_holders;
                 violations += r.standing_invariant_violations;
+                army_unpaid += r.army_unpaid_rounds; navy_unpaid += r.navy_unpaid_rounds;
+                army_upkeep += r.spent_army_upkeep;  navy_upkeep += r.spent_navy_upkeep;
+                levy_raised += r.levy_raised;        levy_returned += r.levy_returned;
             }
             living = static_cast<int64_t>(st.size());
-            face.r7_standing_holders = holders; face.r7_saturated = saturated; face.r7_violations = violations;
+            face.r7_standing_holders = holders; face.r7_violations = violations;
+            face.r7_army_unpaid = army_unpaid; face.r7_navy_unpaid = navy_unpaid;
+            face.r7_army_upkeep = army_upkeep; face.r7_navy_upkeep = navy_upkeep;
+            face.r7_levy_raised = levy_raised; face.r7_levy_returned = levy_returned;
             const auto pct = [](std::vector<int64_t> v, int p) -> long long {
                 if (v.empty()) return 0;
                 std::sort(v.begin(), v.end());
                 return static_cast<long long>(v[(v.size() - 1) * static_cast<std::size_t>(p) / 100]);
             };
             std::printf("  paid standing army at 1660, heads per held region over %lld living polities: "
-                        "p50=%lld p75=%lld p90=%lld max=%lld  (holders=%lld, realm above cap=%lld)\n",
+                        "p50=%lld p75=%lld p90=%lld max=%lld  (holders=%lld)\n",
                         static_cast<long long>(living), pct(st, 50), pct(st, 75), pct(st, 90),
-                        pct(st, 100), static_cast<long long>(holders), static_cast<long long>(saturated));
+                        pct(st, 100), static_cast<long long>(holders));
+            // BL-972: the bill is the observable that replaced the cap.
+            std::printf("  upkeep (BL-972): army bill paid=%lld navy bill paid=%lld  polity-rounds short: "
+                        "army=%lld navy=%lld  levy raised=%lld returned=%lld heads\n",
+                        static_cast<long long>(army_upkeep), static_cast<long long>(navy_upkeep),
+                        static_cast<long long>(army_unpaid), static_cast<long long>(navy_unpaid),
+                        static_cast<long long>(levy_raised), static_cast<long long>(levy_returned));
             std::printf("  paid standing army invariant violations (every round + close): %lld\n",
                         static_cast<long long>(violations));
             std::printf("  garrison_target per held region: p50=%lld p75=%lld p90=%lld max=%lld\n",
@@ -1696,13 +1728,19 @@ int main(int argc, char** argv)
                             "\"spent_standing_armies\": %lld, \"navy_holders_expn_top\": %lld, "
                             "\"navy_holders_expn_bottom\": %lld, \"port_steps\": %lld, \"navy_steps\": %lld, "
                             "\"army_steps\": %lld, \"navies_lapsed\": %lld, \"standing_holders\": %lld, "
-                            "\"army_saturated\": %lld, \"standing_invariant_violations\": %lld},\n",
+                            "\"army_unpaid_rounds\": %lld, \"navy_unpaid_rounds\": %lld, "
+                            "\"spent_army_upkeep\": %lld, \"spent_navy_upkeep\": %lld, "
+                            "\"levy_raised\": %lld, \"levy_returned\": %lld, "
+                            "\"standing_invariant_violations\": %lld},\n",
                          static_cast<long long>(face.r7_navy_holders), static_cast<long long>(face.r7_spent_ports),
                          static_cast<long long>(face.r7_spent_navies), static_cast<long long>(face.r7_spent_armies),
                          static_cast<long long>(face.r7_navy_top), static_cast<long long>(face.r7_navy_bottom),
                          static_cast<long long>(face.r7_port_steps), static_cast<long long>(face.r7_navy_steps),
                          static_cast<long long>(face.r7_army_steps), static_cast<long long>(face.r7_lapsed),
-                         static_cast<long long>(face.r7_standing_holders), static_cast<long long>(face.r7_saturated),
+                         static_cast<long long>(face.r7_standing_holders),
+                         static_cast<long long>(face.r7_army_unpaid), static_cast<long long>(face.r7_navy_unpaid),
+                         static_cast<long long>(face.r7_army_upkeep), static_cast<long long>(face.r7_navy_upkeep),
+                         static_cast<long long>(face.r7_levy_raised), static_cast<long long>(face.r7_levy_returned),
                          static_cast<long long>(face.r7_violations));
             std::fprintf(f, "  \"treasury_spread\": {\"polities\": %lld, \"treasury_min\": %lld, \"treasury_max\": %lld, "
                             "\"treasury_mean\": %.4f, \"corr_treasury_corridor_touch\": %.4f},\n",
@@ -1797,14 +1835,19 @@ int main(int argc, char** argv)
                 std::fprintf(f, "   \"navy_holders\": %lld, \"navy_holders_expn_top\": %lld, \"navy_holders_expn_bottom\": %lld, "
                                 "\"spent_navies\": %lld, \"spent_ports\": %lld, \"spent_standing_armies\": %lld, "
                                 "\"port_steps\": %lld, \"navy_steps\": %lld, \"army_steps\": %lld, \"navies_lapsed\": %lld, "
-                                "\"standing_holders\": %lld, \"army_saturated\": %lld, \"standing_invariant_violations\": %lld, ",
+                                "\"standing_holders\": %lld, \"army_unpaid_rounds\": %lld, \"navy_unpaid_rounds\": %lld, "
+                                "\"spent_army_upkeep\": %lld, \"spent_navy_upkeep\": %lld, "
+                                "\"levy_raised\": %lld, \"levy_returned\": %lld, \"standing_invariant_violations\": %lld, ",
                              static_cast<long long>(r.navy_holders), static_cast<long long>(r.navy_holders_expn_top),
                              static_cast<long long>(r.navy_holders_expn_bottom),
                              static_cast<long long>(r.treasury_spent_on_navies), static_cast<long long>(r.treasury_spent_on_ports),
                              static_cast<long long>(r.treasury_spent_on_standing_armies),
                              static_cast<long long>(r.port_steps), static_cast<long long>(r.navy_steps),
                              static_cast<long long>(r.army_steps), static_cast<long long>(r.navies_lapsed),
-                             static_cast<long long>(r.standing_holders), static_cast<long long>(r.army_saturated),
+                             static_cast<long long>(r.standing_holders),
+                             static_cast<long long>(r.army_unpaid_rounds), static_cast<long long>(r.navy_unpaid_rounds),
+                             static_cast<long long>(r.spent_army_upkeep), static_cast<long long>(r.spent_navy_upkeep),
+                             static_cast<long long>(r.levy_raised), static_cast<long long>(r.levy_returned),
                              static_cast<long long>(r.standing_invariant_violations));
                 put_mmm("standing_per_region", r.standing_per_region, ", ");
                 put_mmm("garrison_per_region", r.garrison_per_region, ",\n");
