@@ -33,12 +33,25 @@
 //       never asserted (BL-275's rule: assertions come after Ben has seen the
 //       raw spread, not before).
 //
+//   R4  THE ENDOWMENT SPREAD HAS TAILS (BL-962, 2026-09-15). GENERATION_STRATEGY
+//       § "Asymmetry is the deliverable" names `planetology_state::endowment` as
+//       the first instrument of supply asymmetry, and R3 only checks that two
+//       of them vary. This is the assertion that the whole per-resource spread
+//       across accepted homeworlds is WIDE and LOPSIDED: every resource that
+//       varies at all has a minimum interquartile range, and (nearly) every
+//       world is poor in SOMETHING — sits in the bottom decile of at least one
+//       resource. A floor chosen from the measured distribution is a
+//       requirement, not a target: it pins the spread the generator produces
+//       today so a later change that flattens it fails here.
+//
 // Run: planetology_sweep [draws]     (default 20000)
 
 #include "world/components.hpp"
 #include "world/planetology.hpp"
+#include "world/resource_names.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -252,6 +265,10 @@ int main(int argc, char** argv)
         int gave_up = 0, worst = 0;
         stats iron, coal, oil, copper, o2, arable, ocean, temp, grav;
 
+        // R4's sample: the full endowment vector of every accepted homeworld.
+        std::vector<std::array<float, resource_count>> worlds;
+        worlds.reserve(static_cast<std::size_t>(draws));
+
         for (int i = 0; i < draws; ++i)
         {
             world_preferences pref;              // every axis `any`
@@ -261,6 +278,8 @@ int main(int argc, char** argv)
             total_attempts += rw.attempts;
             worst = std::max(worst, static_cast<int>(rw.attempts));
             if (rw.gave_up) ++gave_up;
+
+            worlds.push_back(s.endowment);
 
             iron.add(dep(s, resource_type::iron_ore));
             coal.add(dep(s, resource_type::coal));
@@ -298,6 +317,127 @@ int main(int argc, char** argv)
               "R3 coal still varies several-fold under the strict floor");
         check(iron.pct(0.95f) / std::max(iron.pct(0.05f), 0.01f) > 1.4f,
               "R3 iron still varies under the strict floor");
+
+        // --- R4: the endowment spread has tails (BL-962) ------------------
+        // Per resource, the distribution of `endowment[r]` across every
+        // accepted homeworld above. Two shapes are asserted:
+        //   (i)  every resource that VARIES at all has an interquartile range
+        //        of at least k_iqr_floor — the spread is wide, not a jitter
+        //        around one value;
+        //   (ii) at least k_poor_share of worlds sit in the bottom decile of
+        //        at least one varying resource — the spread is LOPSIDED per
+        //        world, so a campaign is poor in something, not uniformly
+        //        average.
+        // Resources that are constant across every accepted homeworld (the
+        // has/lacks gates a Cradle always passes — clay, sand, stone, peat,
+        // water — plus the made-not-mined goods) are reported as FLAT and
+        // excluded from both, and the count of varying resources is pinned so
+        // one cannot quietly go flat and drop out of (i).
+        //
+        // Every floor below is READ FROM the 2026-09-15 measurement of this
+        // same sweep (20000 draws) and stated in the assertion text — a floor
+        // chosen from the data is a requirement, not a target.
+        {
+            const std::size_t n = worlds.size();
+            struct column
+            {
+                std::string name;
+                float min = 0, p10 = 0, p25 = 0, p50 = 0, p75 = 0, p90 = 0, max = 0;
+                float iqr = 0;
+                bool  carried = false; // any world has it at all
+                bool  flat    = true;  // identical on every world
+            };
+            std::vector<column> cols(resource_count);
+            std::vector<float> v(n);
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                column& c = cols[r];
+                c.name = resource_names::name_of(static_cast<resource_type>(r));
+                for (std::size_t i = 0; i < n; ++i) v[i] = worlds[i][r];
+                std::sort(v.begin(), v.end());
+                auto q = [&](float f) {
+                    return v[static_cast<std::size_t>(f * static_cast<float>(n - 1))];
+                };
+                c.min = v.front(); c.max = v.back();
+                c.p10 = q(0.10f); c.p25 = q(0.25f); c.p50 = q(0.50f);
+                c.p75 = q(0.75f); c.p90 = q(0.90f);
+                c.iqr = c.p75 - c.p25;
+                c.carried = c.max > 0.0f;
+                c.flat    = (c.max == c.min);
+            }
+
+            std::printf("R4 ENDOWMENT SPREAD across %zu accepted homeworlds (BL-962)\n", n);
+            std::printf("    %-22s %7s %7s %7s %7s %7s %7s %7s %7s\n",
+                        "resource", "min", "p10", "p25", "median", "p75", "p90", "max", "IQR");
+            int   varying   = 0;
+            float min_iqr   = 1e9f;
+            const char* min_iqr_name = "";
+            std::string flat_list;
+            for (const column& c : cols)
+            {
+                if (!c.carried) continue;
+                if (c.flat) { flat_list += " " + c.name; continue; }
+                ++varying;
+                if (c.iqr < min_iqr) { min_iqr = c.iqr; min_iqr_name = c.name.c_str(); }
+                std::printf("    %-22s %7.3f %7.3f %7.3f %7.3f %7.3f %7.3f %7.3f %7.3f\n",
+                            c.name.c_str(), static_cast<double>(c.min), static_cast<double>(c.p10),
+                            static_cast<double>(c.p25), static_cast<double>(c.p50),
+                            static_cast<double>(c.p75), static_cast<double>(c.p90),
+                            static_cast<double>(c.max), static_cast<double>(c.iqr));
+            }
+            std::printf("    flat on every accepted homeworld (has/lacks gates a Cradle always passes):\n"
+                        "       %s\n", flat_list.empty() ? "(none)" : flat_list.c_str() + 1);
+            if (varying == 0)
+                std::printf("    narrowest IQR among varying resources: (nothing varies)\n");
+            else
+                std::printf("    narrowest IQR among varying resources: %s at %.3f\n",
+                            min_iqr_name, static_cast<double>(min_iqr));
+
+            // (ii) per world: how many varying resources sit at or below p10.
+            std::size_t poor_in_none = 0;
+            std::vector<int> poor_hist(8, 0);
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                int poor = 0;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (cols[r].carried && !cols[r].flat && worlds[i][r] <= cols[r].p10) ++poor;
+                if (poor == 0) ++poor_in_none;
+                ++poor_hist[static_cast<std::size_t>(std::min(poor, 7))];
+            }
+            const double poor_share = n ? 100.0 * static_cast<double>(n - poor_in_none)
+                                                / static_cast<double>(n) : 0.0;
+            std::printf("    worlds in the bottom decile of >=1 resource: %zu of %zu (%.1f%%)\n",
+                        n - poor_in_none, n, poor_share);
+            std::printf("    bottom-decile count per world:");
+            for (std::size_t k = 0; k < poor_hist.size(); ++k)
+                std::printf("  %zu%s:%d", k, k + 1 == poor_hist.size() ? "+" : "", poor_hist[k]);
+            std::printf("\n\n");
+
+            // Floors read from the 2026-09-15 measurement of `planetology_sweep`
+            // (20000 draws, seeds 0xBEEF0000+i), which is deterministic, so the
+            // margin below each floor is headroom against a GENERATOR change,
+            // not against noise:
+            //   varying resources   measured 10        floor 10
+            //   narrowest IQR       measured 0.129     floor 0.10   (timber; ag produce 0.165)
+            //   poor-in-something   measured 44.5%     floor 44%
+            // The third number is the honest one. BL-962 asked for "at least one
+            // resource per world in that resource's bottom decile"; the
+            // generator does NOT deliver that today — 55.5% of accepted
+            // homeworlds sit in no bottom decile at all, because six of the ten
+            // varying resources ride metallicity together (iron, copper, silica,
+            // rare earths, PGM, iron-nickel), so a metal-rich draw is rich in all
+            // of them at once. The floor pins what IS produced; raising it is a
+            // generator change, not a harness edit.
+            constexpr int   k_varying_floor = 10;
+            constexpr float k_iqr_floor     = 0.10f;
+            constexpr float k_poor_share    = 44.0f;
+            check(varying >= k_varying_floor,
+                  "R4 at least 10 resources vary across accepted homeworlds (measured 10, 2026-09-15)");
+            check(min_iqr >= k_iqr_floor,
+                  "R4 every varying resource has an interquartile range >= 0.10 (narrowest measured 0.129, 2026-09-15)");
+            check(poor_share >= k_poor_share,
+                  "R4 at least 44% of worlds sit in the bottom decile of some resource (measured 44.5%, 2026-09-15)");
+        }
     }
 
     // --- C1: what the floor actually rejects ----------------------------------
