@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*32 entries — 32 open, 0 resolved.*
+*33 entries — 33 open, 0 resolved.*
 
 ---
 
@@ -490,6 +490,21 @@ Ben ruled nine calls and set the three beats and seven properties. Eight further
 > **Recommendation:** Keep all as written. Each is a consequence of an upstream scalar the sim already holds, and each is filed with a reading that would show it failing.
 
 *Files: `docs/generation/DIGITISATION.md`, `docs/generation/MILITARY_HISTORY.md`*
+
+### NR-878 — DECISION TAKEN: the detail written under the ten trade and demand rulings
+*decision taken on your behalf · raised 2026-09-15 · from Trade and demand design form follow-through (BL-995, BL-996, BL-1003..BL-1006).*
+
+Ben ruled ten calls. The specifics below were written into the docs without being asked: (1) the industrial rung assignment — 1 staples, 2 clean water and medical supplies, 3 consumer goods, 4 refined fuel, 5 electronics (consumer goods move from every centre to Town+); (2) ancient rungs, marked PROPOSED; (3) heads_per_demand_unit derived from the generated distribution and held fixed in play, so a growing city grows its market; (4) qualification scales rungs 4-5 only; (5) the net-price dispatch quantity bound q = supply_d x ((price_d / landed)^2 - 1), from the sqrt price law, with a non-zero data threshold; (6) the arrival duty REPLACES the matched-trade charge (one point of charge), is priced at the destination, and off-world markets pay none; (7) labour pools stay per body while goods pools go per market; (8) a body with no market keeps one body-level pool until its first building spawns one; (9) uniform base_price is kept — gaps come from forces. Also filed: the background-demand stopgap multiplies with market count and counts razed centres (folded into BL-996 as a defect).
+
+**Why it matters.** (1) moves consumer goods off small centres, which shrinks demand in village markets; (3) decides whether demand grows with a city in play; (6) decides whether a protected nation earns anything from trade that never touches the order book.
+
+- Keep all as written.
+- Overturn any by number; doc and item amended together.
+- Keep consumer goods at every stratum and start the ladder at clean water.
+
+> **Recommendation:** Keep all as written. Each is the smallest reading of a ruled call that the reading items (BL-1006, demand_census) can show failing.
+
+*Files: `docs/economy/POPULATION.md`, `docs/economy/SUPPLY.md`, `docs/economy/MARKETS.md`, `docs/economy/PRODUCTION.md`*
 
 ---
 

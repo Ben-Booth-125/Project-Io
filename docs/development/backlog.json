@@ -709,7 +709,8 @@
    "written": "2026-09-15",
    "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
    "requires": [
-    "BL-985"
+    "BL-985",
+    "BL-996"
    ],
    "blocked_on": null,
    "parked": false,
@@ -806,12 +807,16 @@
    "design": "DIGITISATION.md § 6, SET (Ben, 2026-09-15): \"very simple stubs for now.\" TECH: the Industry tree mask sets the campaign tree's starting unlocks per nation (The Renewed Line opens it). REGIME: one field beside the three character enums, derived from the Works fork, charter reach, subject history and whether the polity fought a world war; invented names only. GARRISONS: sized from carried army_stock, navy and mechanised force, not from a treasury seeded at zero.\n\nStubs mean one field each with a named source; nothing reads the regime in play yet.\n\nDONE WHEN: two nations on one world open with different tech state, regime and garrison strength traceable to their history, and the save round-trips the new fields."
   },
   {
-   "status": "design-owed",
-   "glyph": "~",
+   "status": "designed",
+   "glyph": "✓",
    "sprint": null,
    "written": "2026-09-15",
-   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
-   "requires": [],
+   "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION)",
+   "requires": [
+    "BL-1003",
+    "BL-1004",
+    "BL-1006"
+   ],
    "blocked_on": null,
    "parked": false,
    "id": "BL-995",
@@ -819,22 +824,22 @@
    "category": "Economy",
    "priority": "A",
    "difficulty": 5,
-   "title": "Campaign trade chases price over distance: a seller can reach a far market, and sea is cheap per distance at bulk",
-   "authority_doc": "docs/economy/MARKETS.md",
+   "title": "Auto-dispatch is the seller chasing a net price, bounded by what the gap absorbs, for every corp including the player",
+   "authority_doc": "docs/economy/SUPPLY.md",
    "files": [
-    "docs/economy/MARKETS.md",
-    "docs/economy/SUPPLY.md",
     "src/world/supply_system.cpp",
-    "src/world/market_clearing.cpp"
+    "src/world/corp_ai.cpp",
+    "scripts/economy.lua",
+    "tools/verify/convoy_command.cpp"
    ],
-   "design": "DESIGN OWED. The opening-map property most at risk (DIGITISATION.md § 7 and § Where it will be hard, item 1): Ben, 2026-09-15, wants \"working international markets, where often it will be better to send materials overseas — or over distance on land — than to send materials to the closest market.\" Generation can seed price gaps; five campaign rules erase or ignore them: one base_price per good everywhere; a tile sells to its NEAREST market; dispatch chases SHORTFALL not price; sea costs MORE per distance than land; tariffs fire only on matched order-book trades whose buy side has no emitter.\n\nTHE QUESTIONS FOR A DESIGN SESSION on MARKETS.md and SUPPLY.md: may a seller route to a non-catchment market by landed price; is sea per-distance cheaper than land at bulk (the real mechanism); do tariffs act on every cross-border sale; does the 10x ceiling derivation (nearest-neighbour haul) still hold.\n\nDONE WHEN (once designed): the far-trade reading holds at the epoch AND after a year of play — a gap play erases in a year was never a working international market."
+   "design": "SETTLED (Ben, 2026-09-15, form). SUPPLY.md § Dispatch trigger owns the rule.\n\nFor every (corp, market) pool holding a good above its processor reservation, using last tick's prices: net(d) = price_d - haul_per_unit(src->d) - handling_per_unit - duty_per_unit(d); send to argmax_d net(d) (ties lower market id) if net(d) - price_src > margin_threshold x price_src. Quantity = min(surplus, q) less what the corp already has in transit to d, where q = supply_d x ((price_d / landed_cost)^2 - 1) from the sqrt price law; a destination with zero supply absorbs its unmet demand. The threshold is authored in data, measured, never zero. The shortfall scan is RETIRED — a short market prices high, so the rule reaches it.\n\nONE RULE FOR EVERY CORP, THE PLAYER'S INCLUDED; the player keeps hold_convoy and the directed verb. The rival scorer's directed-dispatch valuation (corp_ai.cpp:2068-2072, qty x dest_price - leg.cost) subtracts the home price too.\n\nWHY: the shortfall trigger never read a price, so a seller never moved goods toward a better market. With per-market pools (BL-1003) and cheap sea legs (BL-1004) this is property 7 of DIGITISATION.md.\n\nDONE WHEN: convoy_command asserts the directed verb and auto-dispatch price a leg identically; a harness row shows a seller sending to a farther higher-priced market over a nearer cheaper one; no destination receives more in one tick than its q; and the far-trade reading (BL-1006) shows a material share of delivered volume skipping the nearest market after a year of play."
   },
   {
-   "status": "design-owed",
-   "glyph": "~",
+   "status": "designed",
+   "glyph": "✓",
    "sprint": null,
    "written": "2026-09-15",
-   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION)",
    "requires": [],
    "blocked_on": null,
    "parked": false,
@@ -843,14 +848,15 @@
    "category": "Economy",
    "priority": "A",
    "difficulty": 3,
-   "title": "Household demand ladders with centre stratum, so advanced goods have a buyer before the epoch seeds their sellers",
+   "title": "Household demand follows headcount up cumulative stratum rungs, upper rungs scaled by qualification, and an unmet top rung blocks promotion",
    "authority_doc": "docs/economy/POPULATION.md",
    "files": [
     "scripts/economy.lua",
-    "docs/economy/POPULATION.md",
-    "docs/economy/MARKETS.md"
+    "src/world/market_clearing.cpp",
+    "src/world/population_growth.cpp",
+    "tools/verify/demand_census.cpp"
    ],
-   "design": "DESIGN OWED. DIGITISATION.md § 2: advanced production at the epoch needs a buyer. POPULATION.md states that demand ladders with stratum (a metropolis pulls electronics) but no basket authors it, and most industrial demand is a world-scale background stopgap. Seeding electronics and machinery installations without it reproduces the idle-at-the-ceiling failure that killed the industrial field.\n\nOWED: the per-stratum basket for the industrial band — which goods each stratum adds, and at what volume — authored against the recipe-margin anchor.\n\nDONE WHEN (once designed): electronics and machinery clear against household demand in metropolis-scale markets without the stopgap carrying them."
+   "design": "SETTLED (Ben, 2026-09-15, form). POPULATION.md § The stratum ladder owns it.\n\n(1) SIZE BY HEADCOUNT, RENORMALISED: volume = heads / heads_per_demand_unit x basket[r] x elasticity. The constant is DERIVED from the generated centre distribution so world household demand at generation equals the tier-index total (on generation weights 40/30/20/8/2 and rungs 10k..5M: 239k heads over 2.02 scale points, ~118k heads a unit); recorded with its derivation, re-derived when rungs or distribution move, held fixed in play. A metropolis is 500x a village, not 5x.\n\n(2) CUMULATIVE RUNGS, industrial band: 1 staples (food rations, agricultural produce, water); 2 clean water, medical supplies; 3 consumer goods; 4 refined fuel; 5 electronics. Volumes measured against the recipe-margin anchor. Ancient rungs PROPOSED in the doc.\n\n(3) QUALIFICATION SCALES RUNGS 4-5, normalised to the world mean at generation. Staples and welfare do not scale.\n\n(4) AN UNMET TOP RUNG BLOCKS PROMOTION (the sustained-met-supply precondition made specific).\n\n(5) STOPGAP: electronics leaves inject_background_demand (the metropolis rung buys it); silicon, refined copper, REE alloy, machinery, alloys stay, labelled stopgap, until building upkeep buys them.\n\nDEFECT FOLDED IN (found 2026-09-15): inject_background_demand grants each market its whole body's population total, so demand multiplies with market count (market_clearing.cpp:294-348) and razed centres are not skipped. Split the body pull across markets by catchment population; skip razed centres.\n\nCultural weight (BL-991) composes on top.\n\nDONE WHEN: demand_census shows electronics with a household buyer in metropolis-scale markets with the stopgap no longer carrying it; the heads_per_demand_unit derivation is printed and world household demand at generation matches the tier-index total within rounding; a centre with its top rung unmet does not promote in a harness row; background demand on a nine-market body equals, not nine-folds, its population pull."
   },
   {
    "status": "designed",
@@ -876,6 +882,106 @@
     "src/ui/history_lapse.hpp"
    ],
    "design": "SETTLED (Ben, 2026-09-15, elicitation): STARTUP.md § Rounds, round 6 — a time-lapse on the same 2D map as rounds 3–5 showing industrialisation (cities lighting, rail spreading), mass migration (streams into cities, their culture tint turning mixed) and decolonisation (subjects standing up, wars over empire flaring, one sometimes general), closing on the epoch's opening map with firms and the market carve drawn in place. Replaces the placeholder and the still-globe specification.\n\nSame contract as rounds 3–5: write-only tap, playhead lags the calculation at a constant rate (~30 s span), scrubbable once landed, causal reroll, no Run button.\n\nDONE WHEN: a live click through the wizard reaches round 6, watches the three beats and lands on the seeded map, and a watched and unwatched run are byte-identical."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION)",
+   "requires": [
+    "BL-1006"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1003",
+   "short_name": "POOLS_PER_MARKET",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 5,
+   "title": "Goods pools are keyed per (corp, market), so a same-body haul delivers and sells where it arrives",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/world.hpp",
+    "src/world/market_clearing.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/supply_system.cpp",
+    "src/world/world_save.cpp",
+    "src/world/landscape_score.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-15, form: pools per market over a consignment). PRODUCTION.md § Stockpile and output flow owns it; MARKETS.md § Market centres and seeding and SUPPLY.md § Convoy entity amended.\n\nDEFECT IT FIXES (found 2026-09-15): pools are keyed (corp, body) (world.hpp:272, :701-703); commit_convoy debits pool_for(corp, src_body) (supply_system.cpp:660) and arrival credits pool_for(corp, dest_body) (:182-183) — the same pool on one body — and auto-surplus then sells through market_for_corp_on_body, the lowest-id building's market (market_clearing.cpp:206-221). Every same-body market-to-market haul paid haulage and sold back at home. haulage_measure's 1614 same-body hauls measured dispatch, never trade.\n\nTHE RULE: a building's output enters the pool of market_for_tile(building tile); its inputs draw that pool plus that market's inventory; wants, purchases, auto-surplus, standing orders and the running remainder key (corp, market). A body with no market keeps one body-level pool until its first building spawns one. Labour pools stay (corp, body).\n\nCOSTS, STATED: save format (save_game_version moves, round-trip assertion owed per NR-708); state_hash folds the new key in sorted order; a roster straddling a catchment line now needs hauls, so the landscape search must score it — measure how many generated firms straddle before and after.\n\nDONE WHEN: a harness hauls a good between two markets on one body and the goods sell at the destination price; world_determinism bit-identical across runs; save round-trips pools; the landscape search winner still validates."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1004",
+   "short_name": "SEA_LEGS_AND_PORT_HANDLING",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "A water-crossing route is land, sea and land legs; sea is cheapest per distance and every port charges handling",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "src/world/logistics.cpp",
+    "src/world/logistics.hpp",
+    "src/world/supply_system.cpp",
+    "scripts/economy.lua",
+    "tools/verify/haulage_measure.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-15, form). SUPPLY.md § Logistical cost and § Infrastructure gates own it.\n\nORDERING PER DISTANCE: sea < land at its best road tier (today land 0.02 x highway 0.40 = 0.008 against sea 0.05 — reversed). Values measured; the ordering is the ruling. HANDLING: a per-unit fee at each port a cargo passes through, independent of distance, so a short coastal hop loses to a road and a long crossing wins. REPORT THE CROSSOVER DISTANCE whenever either term moves.\n\nPER-LEG ROUTING replaces the whole-route crosses_ocean bit (logistics.cpp:223-225, :308; supply_system.cpp:513-527; formerly BL-522, purged): land source->port A, sea A->B, land B->destination, ports chosen to minimise total including both fees; each leg at its own speed (caravan 25 km/day, coastal 130). A sea leg runs only port to port; source and destination markets may be inland.\n\nRE-DERIVE the price ceiling input (MARKETS.md § Where the ceiling comes from) with haulage_measure on per-leg costs.\n\nDONE WHEN: a harness route across water prices as three legs with two handling fees; a long crossing beats the land detour and a short hop does not; haulage_measure re-run and its table updated; convoy_command still asserts directed and auto legs agree."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION)",
+   "requires": [
+    "BL-1003"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1005",
+   "short_name": "TARIFF_ON_CONVOY_ARRIVAL",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Import duty is charged when a convoy arrives across a border, paid by the shipper, replacing the matched-trade charge",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/market_clearing.cpp",
+    "tools/verify/money_conservation.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-15, form). MARKETS.md § Tariffs — the first flow that pays a nation owns it.\n\nOn arrival, if the destination market's nation differs from the source market's nation, the convoy owner pays qty x destination last-resolved price x the destination nation's import_tariff rate (law.cpp:214-234, stacked, clamped [0,1]) to that nation's treasury, as a transfer in one statement. Same-nation hauls and markets with no nation (off-world) pay nothing. The matched-order-book charge (market_clearing.cpp:1257-1291) is RETIRED so no good pays twice.\n\nWHY: the old charge fired only on matched trades whose buy side has no emitter in play, so no tariff ever fired and seeded protection (law.hpp:247-254) shaped nothing.\n\nDONE WHEN: money_conservation asserts the duty is a transfer and that a no-tariff world stays hash-identical; a harness row shows a cross-border convoy paying and a same-nation convoy not."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1006",
+   "short_name": "FAR_TRADE_READING",
+   "category": "Harness truth",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "One reading measures delivered volume sold at its destination and the share that skipped the seller's nearest market, after a year of play",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "tools/verify/haulage_measure.cpp",
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "LANDS FIRST, before BL-1003/1004/1005/995, the way the Digitisation and Exploration readings did: a mechanism with no reading cannot be judged.\n\nMEASURES, on the landscape-search winner over a seed spread, at the epoch and again after four quarterly ticks x N (a year of play): (a) volume DELIVERED and SOLD at a destination market other than the source pool's market — not dispatch count; (b) the share of that volume whose destination is not the seller's nearest market; (c) the price gap per delivered good at dispatch and at arrival, so a gap play erases is visible.\n\nRE-READS the recorded 1614 same-body hauls honestly: under per-body pools they deliver zero, and the reading must say so on today's tree.\n\nDONE WHEN: the reading prints all three on today's tree (expected ~0 for (a) same-body) and is named in the gate list for BL-1003, BL-1004 and BL-995."
   }
  ]
 }
