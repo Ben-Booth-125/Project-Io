@@ -688,12 +688,13 @@ exploration_spend_scores score_exploration_spend(const history_sim_params&     p
     s.hold_q = p.spend_hold_base_q + (cons * p.spend_w_hold_consolidator_q) / 1000;
 
     // STANDING ARMY -- consolidation and the Alarm of long-known neighbours.
-    s.army_eligible = p.standing_army_build_cost_q > 0 && f.treasury >= p.standing_army_build_cost_q;
-    const int64_t army_saturation =
-        std::max<int64_t>(p.army_saturation_per_region, 0) * std::max<int64_t>(f.held_regions, 1);
-    s.army_q = f.standing_army > army_saturation
-             ? 0 // a standing army saturates, exactly as a fleet does
-             : (cons * p.spend_w_consolidator_q + alarm * p.spend_w_alarm_q) / 1000;
+    // BL-972: no saturation term. What stops a realm buying an army every
+    // round is the bill it has already paid this round (the treasury the
+    // eligibility reads is the treasury AFTER upkeep) and the levy bound: a
+    // step is a whole step of heads the seat's pool can actually lend.
+    s.army_eligible = p.standing_army_build_cost_q > 0 && f.treasury >= p.standing_army_build_cost_q
+                   && f.levy_room >= std::max<int64_t>(p.standing_army_build_step_q, 1);
+    s.army_q = (cons * p.spend_w_consolidator_q + alarm * p.spend_w_alarm_q) / 1000;
 
     // PORT and NAVY share the OUTWARD pull: expansion, and wants only water reaches.
     const int outward = (expn * p.spend_w_expansion_q + want * p.spend_w_water_want_q) / 1000;
@@ -704,9 +705,7 @@ exploration_spend_scores score_exploration_spend(const history_sim_params&     p
 
     s.navy_eligible = p.navy_build_cost_q > 0 && f.treasury >= p.navy_build_cost_q
                    && f.port_stock_q >= p.navy_min_port_stock_q;
-    const int64_t saturation =
-        std::max<int64_t>(p.navy_saturation_per_region, 0) * std::max<int64_t>(f.held_regions, 1);
-    s.navy_q = f.navy_stock > saturation ? 0 : outward; // a fleet saturates
+    s.navy_q = outward; // BL-972: a fleet no longer saturates; its bill is what bounds it
     return s;
 }
 
@@ -801,11 +800,14 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
     // pays or invests), so no polity's choice depends on the index order in
     // which the others bought.
     const std::size_t np = polities.size();
-    std::vector<uint8_t> army_funded(regions.size(), 0); // seats whose army step was bought
+    // BL-972: per polity, the per-mille of its paid standing heads that this
+    // round's bill did NOT cover (0 = met in full). Read by the decay pass
+    // at the end, which is why it is per polity and not per seat: the paid
+    // heads a campaign marched onto other held ground are on the same bill.
+    std::vector<int> army_unpaid_per_mille(np, 0);
     std::vector<int> expn_rank, cons_rank;
     exploration_lean_ranks(polities, spend_ctx ? spend_ctx->creeds : nullptr, expn_rank, cons_rank);
     std::vector<int>     water_want(np, 0), near_alarm(np, 0);
-    std::vector<int64_t> held_regions(np, 0);
     // The REALM's paid standing heads, wherever they stand -- a campaign that
     // marches them onto conquered ground does not reset the saturation read.
     std::vector<int64_t> realm_paid(np, 0);
@@ -824,7 +826,6 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         {
             if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= np) continue;
             const std::size_t n = static_cast<std::size_t>(r.nation);
-            ++held_regions[n];
             realm_paid[n] += standing_army_heads(r); // 0 unless paid for by this holder
             const int gi = scarcity_good_index(r.dominant);
             if (gi >= 0) reachable[n][static_cast<std::size_t>(gi)] = true;
@@ -955,6 +956,67 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             seat.treasury + endowment_income + corridor_income + trade_income + tribute_income,
             0, 1LL << 48);
 
+        // ---- BL-972 -- THE BILL, before any purchase. ----------------------
+        // EXPLORATION.md sec Force persists now: each stock is one "the
+        // treasury maintains", and "a polity that over-builds is poorer every
+        // round afterwards". The army is billed first (the garrison at home
+        // before the hulls), then the fleet. Each bill is met in full where
+        // the purse allows, else for as many heads/units as it covers, and
+        // the UNPAID share decays at BL-955's rates -- a treasury of 0
+        // reproduces BL-955's decay exactly. The treasury the scored choice
+        // below reads is the treasury AFTER this, which is what makes a
+        // standing force a cost in the world rather than a cap in the scorer.
+        const int64_t years_q = std::max(step_years, 1);
+        const std::size_t pi = static_cast<std::size_t>(&q - polities.data());
+        const bool had_navy = q.navy_stock > 0; // the round's OPENING fleet, for the lapse record
+        {
+            const int64_t heads = realm_paid[pi];
+            const int64_t rate  =
+                std::max<int64_t>(params.standing_army_upkeep_per_1000_heads_year_q, 0) * years_q;
+            if (heads > 0 && rate > 0)
+            {
+                const int64_t due = (heads * rate) / 1000;
+                int64_t heads_paid = heads;
+                int64_t paid_sum   = due;
+                if (seat.treasury < due)
+                {
+                    heads_paid = std::min(heads, (seat.treasury * 1000) / rate);
+                    paid_sum   = (heads_paid * rate) / 1000; // floor: never above the purse
+                    // Every unpaid head counts, even where the per-mille would round to 0.
+                    army_unpaid_per_mille[pi] = static_cast<int>(
+                        clampi64(((heads - heads_paid) * 1000 + heads - 1) / heads, 1, 1000));
+                    if (spend) ++spend->army_unpaid;
+                }
+                seat.treasury -= std::min(paid_sum, seat.treasury);
+                if (spend) spend->army_upkeep += paid_sum;
+            }
+        }
+        {
+            const int64_t units = q.navy_stock;
+            const int64_t rate  =
+                std::max<int64_t>(params.navy_upkeep_per_1000_units_year_q, 0) * years_q;
+            if (units > 0 && rate > 0)
+            {
+                const int64_t due = (units * rate) / 1000;
+                int64_t units_paid = units;
+                int64_t paid_sum   = due;
+                if (seat.treasury < due)
+                {
+                    units_paid = std::min(units, (seat.treasury * 1000) / rate);
+                    paid_sum   = (units_paid * rate) / 1000;
+                    // The hulls the purse could not keep: BL-955's decay, on
+                    // the unpaid share only, at least one unit while any is.
+                    const int64_t unpaid = units - units_paid;
+                    const int64_t decay  = std::max<int64_t>(
+                        (unpaid * params.navy_decay_per_mille_year_q * years_q) / 1000, 1);
+                    q.navy_stock = clampi64(units - std::min(decay, units), 0, 1LL << 48);
+                    if (spend) ++spend->navy_unpaid;
+                }
+                seat.treasury -= std::min(paid_sum, seat.treasury);
+                if (spend) spend->navy_upkeep += paid_sum;
+            }
+        }
+
         // ---- BL-935 -- PAY, then INVEST: ports, navies, standing armies. --
         //
         // Same all-or-nothing SHAPE `try_build_post_road` already uses: one
@@ -962,14 +1024,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // funded, never a fractional trickle. All three spend the CAPITAL'S
         // treasury, never `material_stock` (EXPLORATION.md sec Force
         // persists now: "spending capital on ports").
-        const int64_t years_q = std::max(step_years, 1);
 
         // ---- BL-955 -- ONE SCORED CHOICE, then the unchanged decays. ------
         // EXPLORATION.md sec Force persists now ("Spend is ALLOCATED"): a
         // polity that can afford all three stocks still builds the one its
         // situation asks for. The gates read the round's OPENING stocks, so a
         // navy step can land in a round whose unbuilt port also silts (accepted).
-        const std::size_t pi = static_cast<std::size_t>(&q - polities.data());
         exploration_spend_facts facts;
         facts.expansion_rank_q    = expn_rank[pi];
         facts.consolidator_rank_q = cons_rank[pi];
@@ -980,7 +1040,10 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         facts.port_stock_q        = seat.port_stock_q;
         facts.navy_stock          = q.navy_stock;
         facts.standing_army       = realm_paid[pi]; // the realm's PAID heads, persistent
-        facts.held_regions        = held_regions[pi];
+        // BL-972: what the seat's pool can lend this round, in whole heads.
+        facts.levy_room           =
+            (std::max<int64_t>(seat.manpower_stock, 0)
+             * clampi(params.standing_army_levy_per_mille_q, 0, 1000)) / 1000;
         const exploration_spend_option pick =
             choose_exploration_spend(score_exploration_spend(params, facts));
         // PORT -- only ground carrying the endowment WINDOW can host one at
@@ -1007,15 +1070,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             seat.port_stock_q = 0; // no window, no port, ever.
         }
 
-        // NAVY -- decays EVERY round, unconditionally ("a running cost, not
-        // a purchase"), then grows if the round affords it and the capital's
-        // own port is built up enough to stage one from.
-        const bool had_navy = q.navy_stock > 0;
-        if (q.navy_stock > 0)
-        {
-            const int64_t decay = (q.navy_stock * params.navy_decay_per_mille_year_q * years_q) / 1000;
-            q.navy_stock = clampi64(q.navy_stock - std::max<int64_t>(decay, 1), 0, 1LL << 48);
-        }
+        // NAVY -- BL-972: the running cost is the bill above, and the unpaid
+        // share already decayed there. Here only growth, if the round chose
+        // it and the capital's own port is built up enough to stage it from.
         if (pick == exploration_spend_option::navy_step)
         {
             seat.treasury -= params.navy_build_cost_q;
@@ -1035,24 +1092,40 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // never disbands. Not funded this round, the paid status decays below.
         if (pick == exploration_spend_option::army_step)
         {
-            const int64_t paid = standing_army_heads(seat);
+            const int64_t paid   = standing_army_heads(seat);
+            // BL-972: a LEVY, not a conjuring. The step's heads leave the
+            // seat's pool of eligible civilians -- the same pool the yearly
+            // muster draws its garrison from, so a paid army and a mustered
+            // one now contend for the same people. Eligibility already
+            // proved the pool lends a whole step, so `raised` is the step.
+            const int64_t raised = raise_manpower(seat, params.standing_army_build_step_q);
             seat.treasury -= params.standing_army_build_cost_q;
-            seat.army_stock = clampi64(
-                seat.army_stock + params.standing_army_build_step_q, 0, 1LL << 48);
-            seat.standing_army       = std::min(paid + params.standing_army_build_step_q, seat.army_stock);
+            seat.army_stock = clampi64(seat.army_stock + raised, 0, 1LL << 48);
+            seat.standing_army       = std::min(paid + raised, seat.army_stock);
             seat.standing_army_owner = q.id;
-            army_funded[static_cast<std::size_t>(q.capital)] = 1;
-            if (spend) { spend->standing_armies += params.standing_army_build_cost_q; ++spend->army_steps; }
+            if (spend)
+            {
+                spend->standing_armies += params.standing_army_build_cost_q;
+                ++spend->army_steps;
+                spend->levy_raised += raised;
+            }
         }
     }
 
-    // ---- BL-955: AN UNFUNDED STANDING ARMY DECAYS TOWARD ZERO. ------------
-    // Every region still carrying paid heads that this round did not fund --
-    // a seat whose polity chose otherwise, or ground a campaign's paid
-    // survivors garrisoned -- loses `standing_army_decay_per_mille_year_q`
-    // of them per year, never below zero. The heads are not killed: they
-    // revert to ORDINARY men, which the muster then treats as it treats any
-    // garrison above target. Muster-alone behaviour is untouched.
+    // ---- BL-972: THE UNPAID SHARE OF A STANDING ARMY GOES HOME. -----------
+    // Every region carrying paid heads whose payer's bill went short this
+    // round loses, of those heads, the unpaid share times
+    // `standing_army_decay_per_mille_year_q` per year -- never below zero,
+    // at least one head while any is unpaid. The men are not killed, and
+    // they are not left standing as ordinary garrison either: a levy that
+    // is no longer paid returns to the `manpower_stock` of the ground it
+    // stands on, capped at that ground's ceiling exactly as
+    // `muster_garrison`'s own disband is. A realm whose bill was met in full
+    // loses none; ground whose payer is not a tracked polity reads as wholly
+    // unpaid (the pre-BL-972 "not funded this round" reading). A polity
+    // whose bill went short cannot have bought a step this round (the
+    // remainder after a short bill is under one head's rate), so this pass
+    // never touches heads raised above.
     {
         const int64_t years_q = std::max(step_years, 1);
         for (std::size_t ri = 0; ri < regions.size(); ++ri)
@@ -1061,9 +1134,18 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             const int64_t paid = standing_army_heads(r);
             if (paid <= 0) { r.standing_army = 0; continue; }
             r.standing_army = paid;
-            if (army_funded[ri]) continue;
-            const int64_t decay = (paid * params.standing_army_decay_per_mille_year_q * years_q) / 1000;
-            r.standing_army = std::max<int64_t>(0, paid - std::max<int64_t>(decay, 1));
+            const bool tracked = r.nation >= 0 && static_cast<std::size_t>(r.nation) < np;
+            const int unpaid_q =
+                tracked ? army_unpaid_per_mille[static_cast<std::size_t>(r.nation)] : 1000;
+            if (unpaid_q <= 0) continue;
+            int64_t gone = (paid * unpaid_q * params.standing_army_decay_per_mille_year_q * years_q)
+                         / 1000000;
+            gone = std::min(std::max<int64_t>(gone, 1), paid);
+            r.standing_army = paid - gone;
+            r.army_stock    = std::max<int64_t>(r.army_stock - gone, 0);
+            const int64_t ceiling = manpower_ceiling(r.population, r.work_manpower_mod);
+            r.manpower_stock = clampi64(r.manpower_stock + gone, 0, ceiling);
+            if (spend) spend->levy_returned += gone;
         }
     }
 
@@ -3152,6 +3234,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.treasury_spent_on_ports           += upkeep_spend.ports;
             out.treasury_spent_on_navies          += upkeep_spend.navies;
             out.treasury_spent_on_standing_armies += upkeep_spend.standing_armies;
+            // BL-972: the bill and the levy, summed over the span.
+            out.treasury_spent_on_army_upkeep += upkeep_spend.army_upkeep;
+            out.treasury_spent_on_navy_upkeep += upkeep_spend.navy_upkeep;
+            out.army_upkeep_unpaid_rounds     += upkeep_spend.army_unpaid;
+            out.navy_upkeep_unpaid_rounds     += upkeep_spend.navy_unpaid;
+            out.levy_heads_raised             += upkeep_spend.levy_raised;
+            out.levy_heads_returned           += upkeep_spend.levy_returned;
             out.port_steps_bought += upkeep_spend.port_steps;
             out.navy_steps_bought += upkeep_spend.navy_steps;
             out.army_steps_bought += upkeep_spend.army_steps;
