@@ -57,3 +57,7 @@ the contract before it: a struct, not a promise.
 - **Everything else.** The verbs, the firm-spawn rule, the tariff derivation, the industrial
   crossing's relationship to the Industry tree, and what the phase is judged on. Owed when the
   phase is designed.
+- **The default epoch.** The campaign epoch is 1960 (Ben, 2026-09-08). The default world
+  descriptor selects that arc **when this phase lands, as its done-when** (Ben, 2026-09-15,
+  NR-869) — never before, because a 1960 world with no Digitisation opens on a 300-year gap the sim
+  did not simulate.

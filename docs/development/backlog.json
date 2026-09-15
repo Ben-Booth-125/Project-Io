@@ -364,6 +364,124 @@
     "src/world/landscape_search.hpp"
    ],
    "design": "FOUND 2026-09-15. BL-772 (retire warm start) was cancelled in the purge with its own record saying the startup drop \"reads ZERO SECONDS, recorded as failed rather than quietly dropped\". app.cpp:634/639 still arms 80 pre_game_ticks, runs them in slices (:561-584), prints warm_start_80_ticks (:1083) and seeds m_econ_steps from them (:1766). ERAS.md and MARKETS.md were both rewritten to say the warm start is gone. Two docs assert a retirement the code did not do, and phase 6's ~20 s sits on top of the ~72 s it was meant to replace.\n\nWORK: GENERATION_STRATEGY § Three passes: pass 3 SELECTS, it does not settle. Run the winner's one short validation tick-simulation (the doc's \"validate dynamically, once\") in place of the 80 ticks, keep the balances it produces, and delete pre_game_ticks and the sliced loop. If the validation run must be shorter than 80 ticks to hold the budget, say how short and why in ERAS.md. m_econ_steps starts from the validation run's length.\n\nDONE WHEN: startup time drops by the warm start's measured cost minus the validation run's; haulage_measure stays above the 1055/802 baseline (the only instrument that sees trade); econ goldens re-blessed once with the movement described."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "42",
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, form on the wave-0 review calls); Claude (filed)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "id": "BL-998",
+   "short_name": "CONSOLIDATION_FOLDS_EVERY_SEAT",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "At 1200 CE every seat a polity holds folds its stores into the capital treasury, as EXPLORATION.md says",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/exploration_sim_harness.cpp",
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "RULED 2026-09-15 (Ben, NR-871): the doc is right. EXPLORATION.md sec Capital arrives: \"At 1200 CE every seat's stores flow to the capital, once.\" history_sim.cpp's consolidation block at the span's start year does seat.treasury += seat.material_stock; material_stock = 0 for the CAPITAL region only; every other seat the polity holds keeps its material_stock on the ground, unseen by the treasury and the spend scorer.\n\nWORK: at start_year, for every region with is_seat and nation == polity, fold material_stock into the capital's treasury and zero it; non-capital seats then accumulate again as the round runs (the doc's \"once\"). A world-moving change under exploration_sim_enabled: measure before and after in isolation (exploration_sweep 16, treasury spread and Alarm readings will move), report the movement, do not re-bless. exploration_sim_harness gains a check that a two-seat polity opens with both seats' stock in its treasury and the non-capital seat at 0.\n\nDONE WHEN: the check is green; the sweep movement is described (treasury_spread, readings 7-8) for the wave re-bless."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "42",
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, form on the wave-0 review calls); Claude (filed)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Harness truth",
+   "id": "BL-999",
+   "short_name": "HELD_SEEDS_CAUSE_MEASURED",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Each held seed in the displacement reading gets a named cause before any constant moves",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "tools/verify/exploration_sweep.cpp",
+    "exploration_sweep.json"
+   ],
+   "design": "RULED 2026-09-15 (Ben, NR-873): measure a cause per held seed before any constant moves. On the integrated wave-0 tree six of sixteen seeds are HELD (neighbour war still leads the frontier): seeds 0, 3, 6, 7, 12, 15 before the schism fix; re-read the set from exploration_sweep.json.\n\nWORK: for each held seed, the sweep prints a cause line from the counters it already has: the share of neighbour campaigns refused by deterrence versus allowed, the share of pairs bound by treaty, whether any polity crossed the explorer rim, the number of frontier candidates in reach (the water gate and the reach gate counters), and the want table's outward share. Classify each held seed as NO FRONTIER (nothing to displace to), NO EXPLORER (no polity holds the rim), TREATY-CALM (neighbours bound, frontier not reachable) or DETERRENCE-INERT (frontier reachable, Alarm never fired). Print the classification on the face and write it into exploration_sweep.json per seed. No constant moves in this item.\n\nDONE WHEN: every held seed carries one of the four causes on the face and in the JSON; a NEEDS_REVIEW entry summarises the census for Ben with the constant each cause would implicate."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "42",
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, form on the wave-0 review calls); Claude (filed)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "id": "BL-1000",
+   "short_name": "WIZARD_LEADERBOARD_POPULATION_SHARE",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "The Empires round leaderboard ranks share of the world by population held, not regions held",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/history_lapse.cpp",
+    "src/ui/history_lapse.hpp",
+    "src/ui/startup_screens.cpp",
+    "docs/ui/STARTUP.md"
+   ],
+   "design": "RULED 2026-09-15 (Ben, NR-876): accept the arc's shape, and the wizard shows the population column. history_sweep now reads every share by population held beside region count (BL-970): by population the largest polities are 2-5 points MORE concentrated (median 10% vs 8%), and rose-and-fell counts drop three times, because most region-count risers were founding empty ground. The round-4 leaderboard (STARTUP.md sec Rounds 4 and 5: \"share of the world owned\") ranks by regions.\n\nWORK: the lapse leaderboard's share column reads polity_sample::population over the total population held at that sample (the BL-817 record already carries it); label the column \"people\" not \"land\"; the arc readout (BL-891/BL-916) uses the same column. Region share may stay as a second column if it fits the panel; the population one is the rank. Live click required (a UI requirement): open build_rel, run round 4, read the board.\n\nDONE WHEN: the board ranks by population share on a live run and the readout's peak figure matches history_sweep's peak_share_pop_q for the same seed."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "42",
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, form on the wave-0 review calls); Claude (filed)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Docs",
+   "id": "BL-1001",
+   "short_name": "COLLAPSE_DOC_FOLDED_AND_RETIRED",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "COLLAPSE.md folds what CIVILISATION.md lacks into it and retires to research",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "docs/lore/COLLAPSE.md",
+    "docs/generation/CIVILISATION.md",
+    "docs/research/COLLAPSE_ROSTER.md",
+    "CLAUDE.md",
+    "src/world/CLAUDE.md",
+    "docs/generation/GENERATION_STRATEGY.md",
+    "docs/lore/HISTORY.md"
+   ],
+   "design": "RULED 2026-09-15 (Ben, NR-868): fold the parts CIVILISATION.md lacks into it; retire the rest. COLLAPSE.md's six-strategy roster, seven culminations and pairing matrix are read by no code; the built collapse is network-failure secession (BL-896) and the schism verb (BL-944).\n\nWORK: (1) read COLLAPSE.md against CIVILISATION.md sec The network is the estate and sec What the dark age must leave and CREEDS.md sec The schism verb; identify what COLLAPSE.md says that they do not (the ideological-axis narration, the affordability notes in sec The 4000-year problem, anything on culmination that the network-failure model still needs). (2) Fold those parts into CIVILISATION.md as sections in its own voice, state-independent. (3) Move the rest to docs/research/COLLAPSE_ROSTER.md with a research header (not authority). (4) Repoint every citation: CLAUDE.md's doc table, src/world/CLAUDE.md, GENERATION_STRATEGY.md, HISTORY.md, MILITARY_HISTORY.md, and any backlog/NR text via header_graph; the count of dangling citations must not rise.\n\nDONE WHEN: docs/lore/COLLAPSE.md no longer exists; header_graph --strict dangling count unchanged or lower; CIVILISATION.md carries the folded sections."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": "42",
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, form on the wave-0 review calls); Claude (filed)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Docs",
+   "id": "BL-1002",
+   "short_name": "BREADCRUMB_DROPPED",
+   "priority": "C",
+   "difficulty": 1,
+   "title": "The per-tile derivation breadcrumb leaves GENERATION_LEDGER.md",
+   "authority_doc": "docs/generation/GENERATION_LEDGER.md",
+   "files": [
+    "docs/generation/GENERATION_LEDGER.md",
+    "src/ui/generation_ledger.hpp"
+   ],
+   "design": "RULED 2026-09-15 (Ben, NR-870): drop it. Ben ruled DELETE on draw_tile_derivation on 2026-08-30; the design section outlived the surface.\n\nWORK: remove sec Per-tile derivation breadcrumb and the per-tile half of sec Surfacing (the shared-content-builder rule) from GENERATION_LEDGER.md; keep the per-body ledger and the cache. If generation_ledger.hpp's header comment still names two views, make it one. header_graph --strict dangling count must not rise (other docs may cite the removed section; repoint or drop those citations).\n\nDONE WHEN: the doc describes only surfaces that exist as design; no citation dangles."
   }
  ]
 }

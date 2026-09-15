@@ -73,6 +73,13 @@ wet-versus-dry accretion. Radiogenic U/Th is **decoupled** from [Fe/H] — U and
 r-process events, so mantle Th/U plausibly varies an order of magnitude between systems at the same
 metallicity. That decoupling is free variety: an iron-rich system can be a geologically dead one.
 
+**The mined metals share the metallicity axis by design (Ben, 2026-09-15, NR-872).** Iron, copper,
+silica, rare earths, platinum-group metals and iron-nickel all scale with the one nebular draw, so a
+metal-rich world is rich in all six and about half of accepted homeworlds are poor in no mined
+resource. That is the planetology's honest shape, not a flattening to fix: the within-world
+asymmetry the economy needs comes from terrain, the endemic bands and the deposit passes, and the
+endowment spread across worlds is measured (planetology_sweep) rather than tuned.
+
 Because the star brightens ~30% over its main sequence, the **continuously** habitable corridor is
 much narrower than the instantaneous one — 0.976–1.428 AU for a Sun over 4.5 Gyr, **63%** of the
 instantaneous width.

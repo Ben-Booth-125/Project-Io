@@ -561,10 +561,15 @@ int main()
                     static_cast<long long>(ex1.tribute_remitted),
                     static_cast<long long>(ex1.treaties_formed),
                     static_cast<long long>(ex1.treaties_broken), ex1.owner_changes.size());
-        check(ex1.battles == 306 && ex1.conquests == 304 && ex1.foundings == 522
+        // RE-PINNED 2026-09-15 (Ben, NR-875): BL-981 stopped the schism verb razing
+        // the seats that walk out with a breakaway realm, so the resumed span opens
+        // on a different 1200 world. 306/304/522/2174 -> 308/306/472/2196; the
+        // subjection, tribute and treaty counters did not move. Authorised against
+        // the described shape (seed 2: 116 seats where the razing world held 154).
+        check(ex1.battles == 308 && ex1.conquests == 306 && ex1.foundings == 472
            && ex1.subjections_formed == 5 && ex1.subjections_freed == 1
            && ex1.tribute_remitted == 134358620 && ex1.treaties_formed == 293
-           && ex1.treaties_broken == 2 && ex1.owner_changes.size() == 2174,
+           && ex1.treaties_broken == 2 && ex1.owner_changes.size() == 2196,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
