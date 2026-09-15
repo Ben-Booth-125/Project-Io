@@ -257,3 +257,24 @@ Any tradeable good in the economy. Resources occupy one of three tiers: raw mate
 **Stockpile**
 A per-entity store of resource quantities, held in a `stockpile_component`. Extraction and processing outputs accumulate in the building's stockpile each simulation step. At the economy tick boundary, all building stockpiles on a body aggregate into the body's market supply.
 
+
+**Culture share**
+A per-mille distribution over peoples, carried on a **region** and on a **population centre** — never on a province or a tile. It crosses each generation handoff whole, so a conquest arrives half-digested and a city full of migrants reads mixed. A **province** *reads* culture by blending the shares beneath it; it holds none of its own. See `docs/generation/DIGITISATION.md` § 4 and `docs/ui/LENSES.md` § Culture lens.
+
+**Industry point**
+The Digitisation span's located industrial stock: one number per population centre, built by large cities from their scale, fuel within reach, capital paid in and tree capacity. Spent on **rail**, **mechanised force** or **works**; what is left at the epoch is the centre's **charter budget**. Located, so a conqueror who takes the city takes it. Not a campaign quantity. See `docs/generation/DIGITISATION.md` § Beat 1.
+
+**Charter budget**
+A population centre's unspent industry points at the epoch — the corporate capital the landscape search spends on firms around that centre. It is what makes firm density follow cities. See `docs/generation/DIGITISATION.md` § This phase sets budgets; the search spends them.
+
+**Decolonisation**
+A subject polity leaving its overlord in the Digitisation span — by refusing renewal of its tribute clause once it can pay for itself, or by a war over empire. Holding a subject grows dearer as the subject's cities and industry grow, whether or not anyone fights. See `docs/generation/DIGITISATION.md` § Beat 3.
+
+**Proxy war**
+A war in a weak or decolonised polity with a great power as **patron**, paying into one side. At the epoch it crosses into play as a **standing war condition** on the provinces it covers — contested ground, interdicted supply, raised ordnance demand, a named patron — not as a war any actor plays. See `docs/generation/DIGITISATION.md` § 3.
+
+**Listed value**
+A **market's** cap: the summed buyout valuation of the firms headquartered in its catchment. Derived, never stored, and a sum over firms — it gives no corporation equity or a share price. See `docs/economy/MARKETS.md` § A market's listed value.
+
+**GDP**
+A **nation's** valued production — output on its tiles at local market prices. Derived, never stored. GDP per head is the axis of inequality between nations. See `docs/politics/NATIONS.md` § GDP.

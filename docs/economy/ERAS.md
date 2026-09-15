@@ -123,6 +123,14 @@ deterrence ceiling (*"a per-nation scalar, NOT a nuclear-equivalent object"*):
 | **Ceiling** | How much restraint this nation carries — the memory of the rupture that *was* averted | The history-ladder outcome; decays slowly as the memory ages |
 | **Alarm** | How threatened this nation feels *by others* | Others' **visible** capability, severed trade ties, posture, domestic instability |
 
+**The epoch opens with Alarm the history left, and a world war leaves more (Ben, 2026-09-15).** A
+world that fought a world war late in the pre-game span opens *"more likely to fail our Era 1
+catastrophe"*: its survivors carry standing force their neighbours can see, grudges written by the
+dead and trade flows the war severed — all three already Alarm's inputs — and none of it adds
+Ceiling, which remembers only a rupture *averted*. The war moves a world toward the failure branch
+without deciding it (`../generation/DIGITISATION.md` § A world war leaves the campaign closer to its
+catastrophe).
+
 ### The test
 
 The Era event arrives on its **seeded date** with a visible countdown. **The date decides when the

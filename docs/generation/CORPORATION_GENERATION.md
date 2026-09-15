@@ -357,6 +357,14 @@ a world that consumes twice as much of the same goods gets the same firms. That 
 and it is now the intended one — but it means the demand basket's breadth is a **density knob**,
 and anything editing that basket is editing the size of the background economy.
 
+**AMENDED FORWARD (Ben, 2026-09-15): density follows the city on a Digitisation world.** The opening
+map wants *many companies around population centres*, which breadth cannot place. Where the
+Digitisation span has run, each population centre arrives with a **charter budget** — its unspent
+industry points — and the landscape search spends it on firms around that centre
+(`DIGITISATION.md` § This phase sets budgets; the search spends them). Breadth still decides which
+goods a firm can serve; the budget decides how many firms stand where. How a budget converts to a
+firm count is owed and is measured against tick cost before it is tuned.
+
 **Pass 6 is a one-shot, and the economic settle it used to recur through no longer exists.** This
 section said Pass 6 was re-run at a fixed cadence through a settle, with firm exit as the cull.
 `GENERATION_STRATEGY.md` § The eight phases retires the warm start and the settle together and

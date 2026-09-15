@@ -76,6 +76,22 @@ sentiment model, not two.
 
 `world::tile_to_nation` is the reverse index, and it is what gives a law its **jurisdiction**.
 
+### GDP
+
+**A nation's GDP is the value of production on its tiles at local market prices** (NR-774, promoted
+here 2026-09-15 as the player-facing figure Ben's opening map asks for). It is **derived, never
+stored**: a reading over what the nation's ground produces and what its markets pay, read over a
+trailing window in play and over output capacity at the seeded price field at the epoch
+(`../generation/DIGITISATION.md` § 5. Wealth inequality, market cap and GDP).
+
+**GDP per head is the axis of inequality between nations**, and output per centre is the axis
+within one. Neither is a household measure, and neither feeds the treasury — a levy does
+(§ 2). GDP says how much a nation makes; the treasury says how much the state holds.
+
+**A regime field sits beside the three character fields** as a stub, derived at the epoch from the
+Works fork, charter reach, subject history and whether the polity fought a world war
+(`../generation/DIGITISATION.md` § 6. Stubs). Its names are invented, never Earth labels.
+
 ### 2. The treasury — *a balance with both halves*
 
 `nation_component::treasury` is a float. It is zero the instant the field is constructed —

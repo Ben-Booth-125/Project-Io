@@ -315,6 +315,15 @@ So the second half is **suppositional**: self-sufficiency is expected to be poss
 unevenly distributed. What generation owes is the **spread**, not the floor. See
 `docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the deliverable.
 
+**AMENDED (Ben, 2026-09-15): demand keeps universal PRESENCE and takes a cultural WEIGHT.** The
+first half above stands — every market keeps a buyer for every terminal good its band supports.
+What changes is the volume: household demand for a good is weighted by the population-weighted
+preference of the cultures in the market's catchment. Trade therefore arises from **both**
+asymmetries — supply, because deposits are regional, and demand, because peoples are. The
+preference is derived in the history (`docs/generation/EXPLORATION.md` § A good acquires a cultural
+preference) and seeded at the epoch (`docs/generation/DIGITISATION.md` § 1. A dense corporate web,
+and markets that stock what their people want).
+
 **6. Two channels are settled by the power and construction design** (Ben, 2026-08-31), and both
 are worth naming here because they change what the register measures.
 
@@ -726,6 +735,20 @@ pillar of gameplay, but the strategy 'just build the most profitable' is a red h
 potential trade sorted by margin is information the player must still weigh against reach, stock,
 competition and what the price does next — so ordering it does not decide the game. Ordering
 *tiles to build on* by margin does, and is refused.
+
+## A market's listed value
+
+**A market's cap is its LISTED VALUE (Ben, 2026-09-15): the summed valuation of the firms
+headquartered in its catchment.** It answers *how much capital sits here*, which is the reading a
+player means by a market's size. Each firm is valued by the formula a whole-firm buyout already
+prices (`FINANCE.md` § Whole-firm acquisition), so the sum introduces no second valuation.
+
+**It is a sum over firms, not a share price.** The corporation ledger's ruling that a firm has no
+market cap stands; nothing here gives a corporation equity, a share count or a stake. A firm counts
+toward the market whose catchment holds its headquarters, once.
+
+**It is derived, never stored**, and it is seeded at the epoch only in the sense that the firms it
+sums are (`docs/generation/DIGITISATION.md` § 5. Wealth inequality, market cap and GDP).
 
 ## Procurement is not the order book
 

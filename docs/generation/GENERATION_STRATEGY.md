@@ -323,7 +323,7 @@ They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds 4 and 5):
 | Round | Phase | The moving object |
 |---|---|---|
 | **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of 400 BCE → 1200 CE** (Ben, 2026-09-09) — the empire half of pass 1's 3,600 years; the migration half (2400 BCE → 400 BCE) is round 3's. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
-| **5** | **6 — The economic substrate** | Four, in order: **metros growing** from the population centres, **colonial reach across water**, **firm markers and their charters**, and the **market carve with its price field**. |
+| **5** | **6 — The economic substrate** | A time-lapse of 1660 → 1960 showing **industrialisation**, **mass migration** and **decolonisation**, closing on **firm markers and their charters** and the **market carve with its price field** (Ben, 2026-09-15; `DIGITISATION.md` § Part II). |
 
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
 any `world_preference`, and targets no outcome — the tune-the-forces-never-the-outcome rule of
@@ -332,6 +332,11 @@ premise carries over unchanged: **you set conditions, you do not steer.**
 
 **Round 5 shows the selected landscape, not the search.** Phase 6 scores candidates statically in
 milliseconds and the ranking is not a spectacle; what the player watches is the winner being drawn.
+
+**The search is Digitisation's last act, spending its budgets (Ben, 2026-09-15).** Digitisation
+decides how much corporate capital each city holds and where; phase 6 decides which roster and
+placement spends each city's charter budget viably, on the five terms below. Neither decides the
+other's question (`DIGITISATION.md` § This phase sets budgets; the search spends them).
 
 **And the wait becomes the round.** The planetology rounds preview by re-running a cheap pure
 chain per control move; the history sim cannot be previewed that way at any budget. So rounds 4

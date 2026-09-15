@@ -38,6 +38,12 @@ whose id can be folded into the battle's seed stream. Everything else it carries
 that one requirement, and any of a name, a culture or an economy would be a new system, not a
 field.
 
+**A province READS a culture; it still does not own one (Ben, 2026-09-15).** The culture lens
+shows a primary culture per province (`DIGITISATION.md` § 4. A culture lens at province grain). The
+restraint above survives by the idiom the owner already uses: a province's culture is **derived**
+from the shares beneath it — its region's rural share blended with the shares of any population
+centre inside it, weighted by population — and held nowhere on the province itself.
+
 **How it relates to a nation's territory.** A nation owns tiles (`nation_component::tiles`,
 `world::tile_to_nation`); the partition cuts space into cells **inside** that assignment. **No
 province contains tiles of two nations** (Ben, 2026-08-22: *"generate provinces alongside
@@ -427,6 +433,11 @@ So **adding a lens does not mean answering a reduction question.** The argument 
 worth keeping even though it lost: *the mean of two nation colours is a third nation colour*, so a
 blended political map draws borders that do not exist. Ben's ruling accepts that in exchange for
 one visual language across the whole map.
+
+**One exception: the culture lens's checker (Ben, 2026-09-15).** Its primary fill blends like any
+other; its secondary culture, drawn where the second share is at least 95% of the first, is a hard
+checkered pattern per province and is not blended. A blended checker is no checker, and the pattern
+exists to mark a contested province as a unit (`../ui/LENSES.md` § Culture lens).
 
 ---
 

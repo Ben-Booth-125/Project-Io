@@ -218,6 +218,13 @@ population, it does so through a **famine or displacement mechanism of its own**
 and visible as such — never as a coefficient hidden inside a battle. A battle that quietly killed
 farmers is exactly the accounting this section replaced.
 
+**Digitisation takes that exception, and only by that route (Ben, 2026-09-15):** *"we really need
+to ensure that people die when wars happen."* Industrial war kills through named, visible
+mechanisms — conscript dead drawn back from the regions that raised them, displacement toward safe
+cities, and famine under interdicted supply — and never by a battle coefficient, so no region is
+emptied by being fought over. The ruling above is unchanged for the Empire and Exploration spans
+(`DIGITISATION.md` § War kills people, and it is bad for everyone).
+
 ---
 
 **FORCE FOLLOWS THE NETWORK (Ben, 2026-09-11).** A campaign's stack is not the staging hub's own

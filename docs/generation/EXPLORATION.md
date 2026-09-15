@@ -577,5 +577,7 @@ that ran off it.
 - **Whether the creed axes actually separate consolidators from expansionists.** § Two ways to be
   strong argues they should, from `zeal`, `dominion` and `sea_legs_q`. If a sweep shows they do
   not, the fix is upstream in the Empire phase, never a flag here.
-- **Whether Exploration should also raise the Digitisation-era world war** (Ben, 2026-09-11:
-  on the fence, deferred). If it does, its cause is built here and fires there.
+- **What this phase's treaty graph hands the world war.** Ben, 2026-09-15, permits a world war in
+  Digitisation and never forces it; `DIGITISATION.md` § A world war is permitted, never forced
+  reads its spread through the mutual-defence clause this phase creates. How densely great powers
+  are bound at 1660 is therefore one of that war's causes, and it is measured, not tuned for.

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*31 entries — 31 open, 0 resolved.*
+*32 entries — 32 open, 0 resolved.*
 
 ---
 
@@ -475,6 +475,21 @@ BL-955's allocation scores a navy step 0 once the fleet exceeds 400 per held reg
 > **Recommendation:** Option 2: it is what the doc already says, and it fixes the free-manpower problem at the same stroke if paid heads also draw from manpower. It moves the world again, so it would be its own item after this sprint rather than folded into the tuning wave.
 
 *Files: `src/world/history_sim.cpp`, `src/world/settlement.hpp`, `docs/generation/EXPLORATION.md`*
+
+### NR-868 — DECISION TAKEN: the PROPOSED readings in DIGITISATION.md the form did not ask about stand until overturned
+*decision taken on your behalf · raised 2026-09-15 · from Digitisation design session, elicitation form follow-through (BL-982..BL-997).*
+
+Ben ruled nine calls and set the three beats and seven properties. Eight further readings were written into DIGITISATION.md as PROPOSED and filed into items without being asked: (1) 1960 computing is the existing electronics good, no new resource; (2) an industry point is LOCATED at a centre and capturable; (3) the Works fork (State Arsenal / Private Works) decides spend versus stockpile; (4) migration is two streams (urbanisation, emigration) pulled by industry-point output; (5) colonies are lost by renewal refusal plus a holding cost that scales with the subject; (6) proxy war is the arms race's next displacement, a patron link; (7) war kills through exactly three mechanisms — conscript dead, displacement, blockade famine; (8) a world war spreads through the mutual-defence clause; plus the stub sources for tech, regime and garrisons. Also: Ben's note on war deaths was read as taking MILITARY_HISTORY.md's authored-mechanism exception for the Digitisation span only, not overturning war-is-non-demographic for Empires and Exploration.
+
+**Why it matters.** (7) and the scope of the war-deaths reading decide whether the dead-region loop can return; (2) decides whether capturing an industrial city is worth a war; (3) decides why two industrial powers open with different corporate webs.
+
+- Keep all as written.
+- Overturn any by number; the doc and its item are amended together.
+- Apply war deaths to the Exploration span as well.
+
+> **Recommendation:** Keep all as written. Each is a consequence of an upstream scalar the sim already holds, and each is filed with a reading that would show it failing.
+
+*Files: `docs/generation/DIGITISATION.md`, `docs/generation/MILITARY_HISTORY.md`*
 
 ---
 

@@ -198,14 +198,24 @@ same terrain base, same seat dots, same frontier — with its own battle/conques
 counters rather than round 4's. `world_params::exploration_sim_enabled` defaults **true**
 (BL-946; it was opt-in and invisible to the player before).
 
-**Round 6 — Digitisation.** The same globe, at the epoch, gaining four things in
-order: **metros growing** out of the population centres the history sacked and grew,
-**colonial reach across water**, **firm markers with their charters**, and the
-**market carve with its price field**. This is phase 6's search made watchable — the
-player sees the landscape that was selected, not every candidate that was scored.
-Renamed from Industrialisation (BL-946, Ben 2026-09-13) as the honest label for
-everything after 1660 CE; still the same labelled placeholder BL-914 built — its own
-content is not BL-946's scope.
+**Round 6 — Digitisation.** The span **1660 → 1960 CE**, three hundred years, and its
+authority is [`DIGITISATION.md`](../generation/DIGITISATION.md). **A time-lapse that ends
+on the seeded map (Ben, 2026-09-15)** — not the still globe this round was first specified
+as, because its three beats are things that happen across a span, and a globe shows a
+state. It draws on the same 2D map as rounds 3–5, over the same terrain base, and shows
+the phase's three beats as they occur:
+
+- **Industrialisation** — large cities light and accumulate industry points; rail spreads
+  along the corridors they pay for.
+- **Mass migration** — people stream from countryside into cities and across borders, and
+  the cities' culture tint turns mixed as they arrive.
+- **Decolonisation** — subjects refuse renewal and stand as their own polities; wars over
+  empire flare, and on some worlds one becomes general.
+
+**The round closes on the epoch's opening map.** When the playhead reaches 1960 the firms
+the search chartered from each city's budget draw in place, with the market carve and its
+price field — the landscape that was selected, never the candidates that were scored. The
+player's last sight before Begin is the map they will play on.
 
 **Each pass round is rerollable, and rerolling re-runs the pass** rather than re-drawing
 a cached one (Ben, 2026-09-08) — which is the whole reason § The wait is the round has to

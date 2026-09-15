@@ -611,6 +611,400 @@
     "tools/verify/colonisation_harness.cpp"
    ],
    "design": "FOUND 2026-09-15. colonisation_harness on main (0c56d339 plus the BL-960 builder) prints seed 2: regions 1700, seats 154, dangling 1, mismatches 0, and fails D1/D3 (\"every region resolves to a seat or to none; a taken seat carries its hinterland\"). Seeds 0 and 1 are clean. Confirmed through the PREVIOUS builder on the same tree (identical line), so it is the code, not the cache.\n\nHISTORY. The same shape (one dangling pointer, one of three seeds) was found and closed at sprint 39 (DEVLOG 2026-09-11: BL-920's nearest-seat pointer met BL-896's secession demotion; BL-923's rewrite closed it; \"colonisation_harness: 0 failures once both landed\"). Sprints 40 and 41 gated on exploration_sim_harness, history_sim_harness and world_determinism and never ran this harness, so a verb landed between 2026-09-12 and 2026-09-14 reintroduced it unseen. Both is_seat demotion sites (history_sim.cpp:2676 founding, :6181 organise-below-threshold) predate sprint 40; the suspects are the verbs that move ownership or seats without maintaining seat_region: the schism verb (BL-944, 3d58001d), colonial subjection and freeing (BL-934), the city-state breakdown under the Exploration span, or a capital move after organise pointed hinterland at q.capital.\n\nWORK: bisect with the cached builder (each build is seconds now) across the sprint-40/41 commits on seed 2 until the dangling count flips; fix at the verb, not in the check; extend D1/D3 to run on the Exploration span as well as the Empires span if the culprit is there. Never weaken the assertion.\n\nDONE WHEN: colonisation_harness 0 failures on main across its three seeds, and the harness named in sprint 42's gate list so it runs at every wave close."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-982",
+   "short_name": "DIGITISATION_READINGS",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "The thirteen Digitisation readings are instrumented over a seed spread before any mechanism lands",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "tools/verify/digitisation_sim_harness.cpp",
+    "src/world/history_sim.hpp"
+   ],
+   "design": "DIGITISATION.md § What the phase is judged on lists thirteen readings at 1960 CE, one per opening-map property and beat: density follows cities, cultural stock, advanced chains, live conflict, mixed cities, inequality, far trade, industrialisation, migration, decolonisation, world war (some worlds, never all, never none), war dead (population falls, no region emptied), and catastrophe lean (world-war worlds open with higher aggregate Alarm against Ceiling).\n\nWHY FIRST. The Exploration sprint landed its readings first (BL-937) and it was the reason the frozen-map risk was measurable. Pass 1 grew mechanisms nobody could judge. This phase is designed backwards from its consumer; the readings are that consumer made executable.\n\nDONE WHEN: a harness prints all thirteen over a 16-seed sweep with a spread, not a per-world verdict, and each reading prints n/a honestly until the mechanism it reads exists. Never weaken a reading to pass."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-983",
+   "short_name": "DIGITISATION_SPAN_RUNS",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "The Digitisation span runs 1660 → 1960 on the shared engine, taking exploration_output and producing a validated digitisation handoff",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "design": "The fourth span on history_sim, opening where Exploration closes. Its only input is the exploration_output struct (EXPLORATION.md § What this phase hands digitisation); its output is a struct with a validator on the same footing as the Empire and Exploration handoffs, whose fields are DIGITISATION.md § What crosses into play. The Industry tree is the tree invested in, gated behind Exploration's rim.\n\nMEASURE COST FIRST (DIGITISATION.md § Where it will be hard, item 5): 300 years on a region count that grows inside the run, with migration adding per-round work. Report wall-clock per seed against the Exploration span before adding mechanism.\n\nDONE WHEN: world setup reads grudges and corridors from the 1960 handoff where the span ran (the 1660 ones otherwise), the validator runs in production, world_determinism is bit-identical, and history_sim_harness plus exploration_sim_harness stay green."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-983"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-984",
+   "short_name": "INDUSTRY_POINTS_AT_CENTRES",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "Large cities build located industry points, spent on rail, mechanised force or works; the remainder is the charter budget",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "DIGITISATION.md § Beat 1. SETTLED (Ben, 2026-09-15): three sinks — RAIL (the road ladder's next rung on corridors from the city), MECHANISED FORCE (army and navy stock from industry rather than treasury), WORKS (the city's own yield next round) — and what is unspent at 1960 is the centre's CHARTER BUDGET.\n\nPROPOSED in the doc and carried: one number per population centre, LOCATED (a conqueror takes it); produced from centre scale, fuel within reach (the Industry tree fuel gate), capital paid in from the polity treasury, and Industry tree capacity; the Works fork (State Arsenal spends, Private Works stockpiles) decides the lean as a derived disposition, never a flag.\n\nThe spend is an allocation inside the upkeep step, the Exploration idiom (EXPLORATION.md § Force persists now). No term inside the scorer picks a sink for a polity.\n\nDONE WHEN: the industrialisation reading shows industry points unevenly held with the fuel gate visible in who holds them, and both Works-fork sides appear among industrialised polities."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-983",
+    "BL-984"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-985",
+   "short_name": "MIGRATION_INTO_CITIES",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "People and culture shares stream into cities and across borders, and innovation reads urban mass",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/settlement.hpp"
+   ],
+   "design": "DIGITISATION.md § Beat 2. Two streams on one rule: URBANISATION (countryside to a centre in the same polity) and EMIGRATION (a centre to a centre in another polity), pulled by industry-point output at the destination (the sim holds no wage), pushed by depleted or strained ground, war and a lost colony, carried on a line (held corridors; contact, a line that carries people, no war between the pair).\n\nMIGRATION CARRIES CULTURE SHARES, so population centres gain a culture_shares of their own — the substrate for the culture lens (BL-992) and the cultural demand weight (BL-991).\n\nINNOVATION READS URBAN MASS: Industry tree investment reads the population of a polity's largest centres, superlinearly, on the scorer's one shape (trees/TREES.md § The scorer).\n\nOPEN AND MEASURED: where the pull saturates, so the countryside is not emptied.\n\nDONE WHEN: the migration reading shows urban share rising across the span and a cross-border stream in most worlds, and the mixed-cities reading finds checker-qualifying centres concentrated in large ones."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-984",
+    "BL-985"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-986",
+   "short_name": "DECOLONISATION_BY_RISING_COST",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Subjects refuse renewal once they can pay for themselves, and holding one grows dearer as its cities grow",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "design": "DIGITISATION.md § Beat 3. Ben, 2026-09-15: \"the ability to keep colonies grows harder regardless of whether there is war.\" Reuses Exploration's tribute-renewal refusal (EXPLORATION.md § A colony is a subject); the refusal score gains the subject's own urban mass and industry points. The overlord's holding cost (garrison upkeep) scales with the subject's population and industry, so the bill grows with no shot fired. NOTHING COUNTS DOWN — no timer, no era flag.\n\nWars over empire are contests for subjects between powers, on the existing campaign verb. A decolonised polity crosses at 1960 as a nation.\n\nDONE WHEN: the decolonisation reading shows fewer subjects at 1960 than 1660, not zero, with at least one lost without a war in most worlds."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-983"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-987",
+   "short_name": "WAR_KILLS_PEOPLE",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "Industrial war kills through conscript dead, displacement and blockade famine, and never empties a region",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/MILITARY_HISTORY.md"
+   ],
+   "design": "SETTLED (Ben, 2026-09-15, notes): \"we really need to ensure that people die when wars happen. It's not good for any regime or polity.\" Takes MILITARY_HISTORY.md's 2026-09-09 exception route — an authored, visible mechanism, never a battle coefficient — and only for the Digitisation span.\n\nTHREE MECHANISMS (PROPOSED in the doc): CONSCRIPT DEAD — mechanised force is raised from population, and losses are drawn back from the raising regions in proportion to what each gave; DISPLACEMENT — war ground pushes an emigration stream toward safe cities (BL-985); BLOCKADE FAMINE — interdicted supply thins a civilian count while it stands, bounded by duration and food.\n\nTHE DEAD-REGION LOOP MUST STAY SHUT (MILITARY_HISTORY.md: 258 battles, 258 conquests, one region). No loss falls on the battlefield region by being fought over.\n\nRELATED: NR-866 records that paid heads cost no population today; conscript dead makes force cost people for the first time.\n\nCOST FOR THE VICTOR: fewer people, smaller cities, fewer industry points; war weariness lowers cohesion and raises every subject's refusal.\n\nDONE WHEN: the war-dead reading shows every war lowering population somewhere and no region emptied, across 16 seeds."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-986",
+    "BL-987"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-988",
+   "short_name": "WORLD_WAR_BY_MUTUAL_DEFENCE",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 4,
+   "title": "A war over empire becomes general when the mutual-defence graph draws in the great powers, and leaves the epoch more Alarmed",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.cpp",
+    "docs/economy/ERAS.md"
+   ],
+   "design": "SETTLED (Ben, 2026-09-15): a world war is PERMITTED, NEVER FORCED — \"we don't force it, but it is not unlikely. So I am happy with seeds that reach either target.\" And a world that fought one is \"more likely to fail our Era 1 catastrophe — nuclear war.\"\n\nPROPOSED MECHANISM: a contest for a subject draws each power's mutual-defence partners, and theirs in turn; how densely the great powers are bound decides whether a colonial war stays local. No scheduled event, no roll.\n\nTHE ERA 1 LINK uses ERAS.md's two scalars and no third: standing mechanised force, grudges from the dead and severed flows seed per-nation Alarm at world setup; none of it adds Ceiling. It is not the rupture (HISTORY.md § Stage 5: averted, not past).\n\nDONE WHEN: the world-war reading finds one in some worlds and not others across 16 seeds (never all, never none), and the catastrophe-lean reading shows higher aggregate Alarm against Ceiling on world-war worlds. If the rate is all or nothing, the fix is the treaty graph's causes, never a clamp on the war."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-986"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-989",
+   "short_name": "PROXY_WAR_CONDITION",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 4,
+   "title": "Great powers back clients in left-behind or decolonised polities, and wars standing at 1960 cross as a province condition",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/province.hpp"
+   ],
+   "design": "DIGITISATION.md § 3. SETTLED (Ben, 2026-09-15, elicitation): a war standing at the epoch crosses as a STANDING PROVINCE CONDITION — contested ground, interdicted supply, raised ordnance demand, a named patron — resolved by in-world cost, not by an actor choosing moves. NO NEW GRANT: a live nation war would widen AI_OPPONENT.md § 11 and is raised separately if ever wanted.\n\nPROPOSED in the sim: a patron link (a great power paying treasury or force into a client's army), arising where mutual deterrence makes direct war dear — the arms race's next displacement. Nothing picks the client; the price gap does.\n\nWORK SPANS the sim (patron link), the handoff (standing wars and patrons), and the campaign province condition's effect on supply and ordnance demand.\n\nDONE WHEN: the live-conflict reading shows a standing condition in most worlds, most on left-behind or decolonised ground, and a player can see the condition and its patron on the planetary canvas."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-984",
+    "BL-977"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-990",
+   "short_name": "CHARTER_BUDGET_SEARCH_SPENDS",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "The landscape search spends each city's charter budget, so firm density follows cities",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/landscape_search.cpp",
+    "src/world/corporation_generation.cpp",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "design": "SETTLED (Ben, 2026-09-15, elicitation): Digitisation decides HOW MUCH and WHERE; the search decides WHICH. The search is Digitisation's last act (GENERATION_STRATEGY.md § Round 5 note; DIGITISATION.md § This phase sets budgets; the search spends them). CORPORATION_GENERATION.md § Pass 6 is amended forward: breadth decides which goods a firm serves, the budget decides how many firms stand where.\n\nOWED AND MEASURED: how a budget converts to a firm count, and whether it is spent whole. MEASURE AGAINST TICK COST before tuning density for the map — a dense web is many actors running the corporate scorer every tick.\n\nDONE WHEN: the density reading shows firm count per market rising with catchment urban population rather than good count, and a campaign tick at the seeded density is measured and reported."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-985"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-991",
+   "short_name": "CULTURAL_DEMAND_WEIGHT",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Household demand keeps universal presence and takes a cultural weight from the catchment's peoples",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/economy_system.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-15, elicitation): MARKETS.md § Three properties the set has to hold, property 5, AMENDED — every market keeps a buyer for every terminal good its band supports; the VOLUME of household demand for a good is weighted by the population-weighted preference of the culture shares across the catchment (region and centre shares). Preference is Exploration's derived per-culture weight, carried to 1960.\n\nALSO SEEDED HERE: the starting price per market from the scarcity signal, inside the band (DIGITISATION.md Part III).\n\nDONE WHEN: the cultural-stock reading shows the most-preferred goods with a local or preferred seller in most markets, and two markets on one world show different household demand for the same good for a reason the culture lens can show."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-985"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-992",
+   "short_name": "CULTURE_LENS",
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "A culture lens fills provinces with the primary culture and checkers the second where it is within 95%",
+   "authority_doc": "docs/ui/LENSES.md",
+   "files": [
+    "src/ui/ui_state.hpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/history_lapse.cpp",
+    "docs/ui/question_log.json",
+    "docs/ui/ui_elements.json"
+   ],
+   "design": "LENSES.md § Culture lens. SETTLED (Ben, 2026-09-15): primary culture per province as a blended lineage-hue fill; a HARD CHECKER of the top two where the second share is at least 95% OF THE FIRST (relative: 42/40 checkers, 42/38 does not). Only the top two draw. The checker is the one exception to PROVINCES.md § Every lens blends across provinces.\n\nDATA: province culture is DERIVED (PROVINCES.md § What a province is, amended) — region rural shares blended with each inside centre's shares, population-weighted; nothing stored on the province. Reuses palette::lineage_colour (BL-919).\n\nQUESTION (required on every surface): \"Who lives here, and so what does this market want?\" — add the question_log entry and the ui_elements row.\n\nDONE WHEN: a verifier-visual capture shows plain countryside and checkered cities on a Digitisation world, AND a live click in the built app arms the lens and reads a checkered province (a UI requirement needs a live check)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-990"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-993",
+   "short_name": "GDP_LISTED_VALUE_INEQUALITY",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "Nations read GDP, markets read listed value, and inequality reads as spreads between nations and cities",
+   "authority_doc": "docs/politics/NATIONS.md",
+   "files": [
+    "src/world/world.hpp",
+    "src/ui/ledgers",
+    "docs/economy/MARKETS.md"
+   ],
+   "design": "SETTLED (Ben, 2026-09-15, elicitation). GDP (NATIONS.md § GDP): valued production on a nation's tiles at local prices, derived, trailing window in play, capacity at the seeded price field at the epoch; promotes NR-774's tool-only definition. LISTED VALUE (MARKETS.md § A market's listed value): summed buyout valuation of firms headquartered in the catchment — a sum over firms, no equity, no share price. INEQUALITY: GDP per head across nations and output per centre within one, read never stored, never households.\n\nOne shared implementation for the harness reading and the player surface, so a check never measures something different from the screen.\n\nDONE WHEN: the inequality reading shows wide spreads on both axes, and the nation and market surfaces show GDP and listed value with a live click."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-983",
+    "BL-984"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-994",
+   "short_name": "EPOCH_STUBS_TECH_REGIME_GARRISONS",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "The epoch seeds stub campaign tech, a regime field and garrison strength from the Digitisation handoff",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/nation_generation.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/components.hpp"
+   ],
+   "design": "DIGITISATION.md § 6, SET (Ben, 2026-09-15): \"very simple stubs for now.\" TECH: the Industry tree mask sets the campaign tree's starting unlocks per nation (The Renewed Line opens it). REGIME: one field beside the three character enums, derived from the Works fork, charter reach, subject history and whether the polity fought a world war; invented names only. GARRISONS: sized from carried army_stock, navy and mechanised force, not from a treasury seeded at zero.\n\nStubs mean one field each with a named source; nothing reads the regime in play yet.\n\nDONE WHEN: two nations on one world open with different tech state, regime and garrison strength traceable to their history, and the save round-trips the new fields."
+  },
+  {
+   "status": "design-owed",
+   "glyph": "~",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-995",
+   "short_name": "TRADE_REACHES_FOR_PRICE",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 5,
+   "title": "Campaign trade chases price over distance: a seller can reach a far market, and sea is cheap per distance at bulk",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "docs/economy/MARKETS.md",
+    "docs/economy/SUPPLY.md",
+    "src/world/supply_system.cpp",
+    "src/world/market_clearing.cpp"
+   ],
+   "design": "DESIGN OWED. The opening-map property most at risk (DIGITISATION.md § 7 and § Where it will be hard, item 1): Ben, 2026-09-15, wants \"working international markets, where often it will be better to send materials overseas — or over distance on land — than to send materials to the closest market.\" Generation can seed price gaps; five campaign rules erase or ignore them: one base_price per good everywhere; a tile sells to its NEAREST market; dispatch chases SHORTFALL not price; sea costs MORE per distance than land; tariffs fire only on matched order-book trades whose buy side has no emitter.\n\nTHE QUESTIONS FOR A DESIGN SESSION on MARKETS.md and SUPPLY.md: may a seller route to a non-catchment market by landed price; is sea per-distance cheaper than land at bulk (the real mechanism); do tariffs act on every cross-border sale; does the 10x ceiling derivation (nearest-neighbour haul) still hold.\n\nDONE WHEN (once designed): the far-trade reading holds at the epoch AND after a year of play — a gap play erases in a year was never a working international market."
+  },
+  {
+   "status": "design-owed",
+   "glyph": "~",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-996",
+   "short_name": "STRATUM_DEMAND_LADDER",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Household demand ladders with centre stratum, so advanced goods have a buyer before the epoch seeds their sellers",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "scripts/economy.lua",
+    "docs/economy/POPULATION.md",
+    "docs/economy/MARKETS.md"
+   ],
+   "design": "DESIGN OWED. DIGITISATION.md § 2: advanced production at the epoch needs a buyer. POPULATION.md states that demand ladders with stratum (a metropolis pulls electronics) but no basket authors it, and most industrial demand is a world-scale background stopgap. Seeding electronics and machinery installations without it reproduces the idle-at-the-ceiling failure that killed the industrial field.\n\nOWED: the per-stratum basket for the industrial band — which goods each stratum adds, and at what volume — authored against the recipe-margin anchor.\n\nDONE WHEN (once designed): electronics and machinery clear against household demand in metropolis-scale markets without the stopgap carrying them."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-15",
+   "author": "Ben (2026-09-15, Digitisation design session, elicitation form and notes); Claude (written into DIGITISATION.md and siblings)",
+   "requires": [
+    "BL-983"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-997",
+   "short_name": "DIGITISATION_WIZARD_ROUND",
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "Wizard round 6 is a 1660 → 1960 time-lapse of the three beats that closes on the seeded opening map",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/ui/history_lapse.cpp",
+    "src/ui/history_lapse.hpp"
+   ],
+   "design": "SETTLED (Ben, 2026-09-15, elicitation): STARTUP.md § Rounds, round 6 — a time-lapse on the same 2D map as rounds 3–5 showing industrialisation (cities lighting, rail spreading), mass migration (streams into cities, their culture tint turning mixed) and decolonisation (subjects standing up, wars over empire flaring, one sometimes general), closing on the epoch's opening map with firms and the market carve drawn in place. Replaces the placeholder and the still-globe specification.\n\nSame contract as rounds 3–5: write-only tap, playhead lags the calculation at a constant rate (~30 s span), scrubbable once landed, causal reroll, no Run button.\n\nDONE WHEN: a live click through the wizard reaches round 6, watches the three beats and lands on the seeded map, and a watched and unwatched run are byte-identical."
   }
  ]
 }
