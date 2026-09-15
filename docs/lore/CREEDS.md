@@ -6,8 +6,8 @@
 > **Not here:** which names each generation pass draws from a tongue, and on what terms
 > (../generation/NATION_GENERATION § Pass 5 — Naming, the register of naming sites) · the
 > stage ladder this pass interleaves with (HISTORY) · how a polity narrates its doom
-> (COLLAPSE).
-> **Confused with:** HISTORY.md, COLLAPSE.md, ../generation/NATION_GENERATION.md.
+> (../generation/CIVILISATION § How a fall is told).
+> **Confused with:** HISTORY.md, ../generation/CIVILISATION.md, ../generation/NATION_GENERATION.md.
 
 > **The tongue is coined here and CONSUMED elsewhere.** This doc owns the phonology and the
 > lexicon; it does not own the naming sites. Which passes draw on a tongue — and the one
@@ -103,9 +103,8 @@ conquered region records its founders in `founding_culture` and its
 conquerors in `culture`, which is the pair a religion or diplomacy layer
 needs to describe a grievance. The Population lens and the diplomacy layer
 are that pair's intended readers; a live religion mechanic — creed axes that
-bias which culmination a strained polity falls toward, and the myth bank that
-tells it — is BL-487 (polity creed axes) and BL-300 (myth/theology), designed
-in `COLLAPSE.md` § Telling the story.
+bias which way a strained polity breaks, and the myth bank that tells it — is
+designed in `../generation/CIVILISATION.md` § How a fall is told.
 
 ## A creed that spans cultures — the universalising turn (Ben, 2026-09-11)
 

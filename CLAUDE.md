@@ -110,7 +110,6 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/generation/GENERATION_LEDGER.md` | The why-did-this-tile-generate surface. |
 | `docs/generation/MILITARY_HISTORY.md` | **How force works inside the Era −1 sim** — `resolve_battle`, the band ladder, naval, the forage simplification, sea legs. A *generation* doc: its rules are what make a history cheap to generate, not claims about the game. `military/MILITARY.md` is its campaign-era sibling. |
 | `docs/lore/HISTORY.md` | The institutional ladder that drives the Era −1 sim. |
-| `docs/lore/COLLAPSE.md` | Polity strategies and culminating events for Era −1. |
 | `docs/lore/CREEDS.md` | Pantheons per cradle-culture, generated tongues. |
 
 ### AI & tech
@@ -122,7 +121,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/ai/LANGUAGE_POLICY_FEASIBILITY.md` | Research note: does a language-driven opponent compress and run locally. |
 | `docs/tech/TECH_FOUNDATIONS.md` | Settled technical decisions and the prototype scope/exclusions. Read before any code or architecture suggestion. |
 | `docs/multiplayer/MULTIPLAYER_PRINCIPLES.md` | Which settled decisions keep multiplayer cheap later. Non-binding. |
-| `docs/research/*.md` | Research scaffolding (tech effects, ancient ladder, Era 1 landscape). Not authority. |
+| `docs/research/*.md` | Research scaffolding (tech effects, ancient ladder, Era 1 landscape, the retired collapse roster). Not authority. |
 
 ### UI
 | Doc | Owns |
