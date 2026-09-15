@@ -398,16 +398,28 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
 /// rows re-ranking as the centuries pass is the surface that shows RISE AND FALL,
 /// and an uncapped list of everything would show none of it.
 ///
-/// @param lagged  The same slice taken a few centuries earlier. It is what makes
-///                an ENTRY or an EXIT visible: a row that was not on the board
-///                then is marked, and the rank delta is drawn against it.
-/// @param year    The playhead year, for the Population and Might columns: they
-///                read the recorded step AT OR BEFORE it (BL-916 on BL-817's
-///                series), so the board and the map show the same instant.
+/// RANKED BY SHARE OF PEOPLE (BL-1000; Ben, 2026-09-15, NR-876): each polity's
+/// sampled population over every living polity's at the recorded step at or
+/// before the playhead — `history_sweep`'s own arithmetic, so a figure on the
+/// board is the figure the sweep prints. Share of land is the second column
+/// and the tie-break; where a step has no samples (the opening years; the whole
+/// Culture round) every row holds no one and the board orders by land.
+///
+/// @param lagged       The same slice taken a few centuries earlier. It is what
+///                     makes an ENTRY or an EXIT visible: a row that was not on
+///                     the board then is marked, and the rank delta is drawn
+///                     against it.
+/// @param year         The playhead year: the People, Pop and Might columns
+///                     read the recorded step AT OR BEFORE it (BL-916 on
+///                     BL-817's series), so the board and the map show the
+///                     same instant.
+/// @param lagged_year  The year @p lagged was taken at, so the lagged board is
+///                     ranked by the same rule and a rank delta means a move
+///                     on one axis rather than a change of axis.
 void draw_lapse_scoreboard(const history_lapse& h,
                            const std::vector<uint16_t>& slice,
                            const std::vector<uint16_t>& lagged,
-                           int year);
+                           int year, int lagged_year);
 
 /// BL-916 -- one event as a line of prose, with its region's generated name and
 /// the year. Never an Earth name: every noun here comes off the region table.
@@ -449,14 +461,25 @@ int lapse_marker_window_years(const history_lapse& h);
 /// four to six times inside the run, so an early empire read a quarter of its
 /// true share. `eliminated` now counts `realm_ended` events, and the peak share
 /// is taken against the regions that EXISTED at the peak's own step.
+///
+/// THE SHARE THE READOUT PRINTS IS OF PEOPLE (BL-1000; Ben, 2026-09-15, NR-876),
+/// the same column the board ranks by: `peak_share_pop_q` is `history_sweep`'s
+/// `peak_share_pop_q` arithmetic exactly — a century walk from the record's
+/// first year, the largest polity's sampled population over every living
+/// polity's at the step at or before each mark — and `end_share_pop_q` is its
+/// `top_share_pop_q`, so the panel and the sweep print one figure for one
+/// world. The region-share fields stay, as the fallback for a record that
+/// carries no samples and for the shape test, whose definition is the sweep's.
 struct lapse_arc
 {
-    int polities        = 0; ///< Distinct polities ever seen holding ground.
-    int eliminated      = 0; ///< Realms ended -- the `realm_ended` event count.
-    int peak_share_q    = 0; ///< Largest share any one polity ever held, per-mille of the regions live at that step.
-    int rose_and_fell   = 0; ///< ...that doubled and then fell back under 60% of peak.
-    int biggest_end_q   = 0; ///< Largest share still held at the end, per-mille.
-    int smallest_end    = 0; ///< Regions held by the smallest surviving polity.
+    int polities         = 0; ///< Distinct polities ever seen holding ground.
+    int eliminated       = 0; ///< Realms ended -- the `realm_ended` event count.
+    int peak_share_q     = 0; ///< Largest share of REGIONS any one polity ever held, per-mille of the regions live at that step.
+    int rose_and_fell    = 0; ///< ...that doubled and then fell back under 60% of peak.
+    int biggest_end_q    = 0; ///< Largest share of regions still held at the end, per-mille.
+    int smallest_end     = 0; ///< Regions held by the smallest surviving polity.
+    int peak_share_pop_q = 0; ///< Largest share of PEOPLE any one polity held at a century mark, per-mille; 0 with no samples.
+    int end_share_pop_q  = 0; ///< Largest share of people held at the closing step, per-mille.
 };
 
 /// Walks the replay record once. Cheap: linear in `samples`.

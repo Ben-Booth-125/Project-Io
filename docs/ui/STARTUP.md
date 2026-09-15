@@ -183,8 +183,15 @@ reaching 1200 CE without that shape has failed even if every number is plausible
 
 On the left, where the planetology rounds stack their charts, round 4 keeps a
 **leaderboard** — how cultures grew and fell, on four metrics: **military might**,
-**research speed**, **population**, and **share of the world owned**. It is the round's
-chart surface, and it moves with the map.
+**research speed**, **population**, and **share of the world's people held**. It is the
+round's chart surface, and it moves with the map. **The board ranks by people, not
+ground (Ben, 2026-09-15, NR-876):** a polity's share is its held population over the
+population every living polity holds at that instant — the same arithmetic
+`history_sweep` reads its own share by — with share of land as a second, qualifying
+column. Share of land measures founding as much as conquest: read by population the
+largest realms come out two to five points *more* concentrated, and most region-count
+risers turn out to have been founding empty ground. The arc readout under the board
+("the largest empire held N% of the world's people") prints its peak on the same column.
 
 **Round 5 — Exploration (BL-946, Ben 2026-09-13).** The span **1200 → 1660 CE**, four
 hundred and sixty years, on the same shared engine as round 4 — its authority is

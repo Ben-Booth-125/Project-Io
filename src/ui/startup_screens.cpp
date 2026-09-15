@@ -945,6 +945,7 @@ void app::draw_generation_screen()
     // future lands" into "has a growing record from the first publish on".
     if (lapse_round) poll_wizard_history_tap(lapse_index);
     std::vector<uint16_t> hist_slice, hist_lagged;
+    int hist_lagged_year = INT32_MIN; // the year `hist_lagged` was taken at (BL-1000)
     if (lapse_round && !m_wiz_history[lapse_index].empty())
     {
         // The land mask comes from the wizard's OWN packed surface — the same
@@ -1021,7 +1022,8 @@ void app::draw_generation_screen()
         // far enough that a rank move means something, near enough that the marks
         // are not permanently lit.
         const int lag = std::max(1, (last - first) / 12);
-        hist_lagged = owner_slice_at(rec.lapse, year - lag);
+        hist_lagged_year = year - lag;
+        hist_lagged = owner_slice_at(rec.lapse, hist_lagged_year);
     }
 
     const wizard_round_head wr       = wizard_round_head_at(m_wiz_round);
@@ -1158,6 +1160,11 @@ void app::draw_generation_screen()
         const float footer_h = 34.0f * 2.0f + style.ItemSpacing.y * 3.0f;
         ImGui::BeginChild("##wiz_charts", {0.0f, -(decide_h + footer_h)}, false,
                           ImGuiWindowFlags_NoBackground);
+        // BL-1000: the lapse rounds' board, ticker and arc readout live in THIS
+        // child, and at 1080p the arc readout sits below its fold — so
+        // verify.scroll_panel("wizard_charts", ...) needs a scroller of its own
+        // to reach it, exactly as "wizard" reaches the outer column.
+        ui::foldout_scroll_child("##wiz_charts");
 
         // The player still watches the chain work link by link — they have just
         // stopped clicking between the links. Each stage measures its own column
@@ -1304,7 +1311,8 @@ void app::draw_generation_screen()
                 ImGui::Separator();
 
                 ui::draw_lapse_scoreboard(rec, hist_slice, hist_lagged,
-                                          m_wiz_history_year[lapse_index]);
+                                          m_wiz_history_year[lapse_index],
+                                          hist_lagged_year);
                 // BL-916: the ticker — the named moments at or before the
                 //         playhead, the newest of which is the marker on the map.
                 ui::draw_lapse_ticker(rec, m_wiz_history_year[lapse_index]);
