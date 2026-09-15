@@ -272,17 +272,20 @@ The wizard's "Begin", and the one and only generation call:
 2. `setup_world(m_pending_world_params)` — build the world; fills
    `m_generation_report` (presentation artefact, off the serialisation seam).
 3. `load_economy()` — recipes + economy constants from Lua.
-4. **Pre-game warm start** ([C3]): seed the balance history, then run
-   `app::pre_game_ticks` (**80**) quarterly econ ticks, sliced across loading-screen
-   frames, so every corp opens onto non-empty pools and live markets rather than a
-   cold zero state. It runs **in spectate** — `corp_ai_params::spectating`, no corp
-   seated — because the seat is decided from what the warm start produces.
-   `run_verify` stays cold.
+4. **The winner's validation run** (BL-978, warm start retired): seed the balance
+   history, search the landscape (phase 6), then run `app::validation_ticks`
+   quarterly econ ticks on the winner — the length and its measurement are
+   `../economy/ERAS.md` § The opening position — so every corp opens onto non-empty
+   pools and live markets rather than a cold zero state. Batched across
+   loading-screen frames (a tick on a searched landscape is ~0.9 s in Release, so
+   the run in one frame would trip Windows' hang kill). It runs **in spectate** —
+   `corp_ai_params::spectating`, no corp seated — because the seat is decided from
+   what the run produces. `run_verify` stays cold.
 5. **Seat the player**: shortlist the specialists whose filed returns clear the
    viability floor, draw one against the world seed, and re-point `is_player` /
    `world::player_entity` onto it. Owned by CORPORATION_GENERATION.md § The spawn
    shortlist, and the seat.
-6. Rebase the clock again (generation + warm-start wall time must not become
+6. Rebase the clock again (generation + validation-run wall time must not become
    in-game days), then `m_screen = in_game`.
 
 Play opens on the corporation's home planet — the Planetary rung, home body

@@ -274,8 +274,8 @@ int app::run_autostart()
     // Headless coverage for the path --verify has never reached.
     //
     // run_verify (below) calls setup_world + load_economy and stops. It never
-    // calls start_new_game, so generate_background_firms and the pre-game warm
-    // start have NO automated coverage — which is how a crash in "placing
+    // calls start_new_game, so the landscape search and the winner's validation
+    // run have NO automated coverage — which is how a crash in "placing
     // companies" reached a player build. This runs the real interactive tail,
     // headlessly, and reports which step it died on.
     // run() loads init.lua before anything else; start_new_game reads `config`
@@ -307,7 +307,7 @@ int app::run_autostart()
     while (m_screen != app_screen::in_game && std::chrono::steady_clock::now() < deadline)
     {
         // BL-630: no fork to take. poll_worldgen drives generation, then the
-        // warm start, then the seat, and lands on in_game by itself.
+        // winner's validation run, then the seat, and lands on in_game by itself.
         poll_worldgen();
         std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 Hz, as the app polls
     }

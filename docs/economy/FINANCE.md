@@ -189,12 +189,16 @@ A negative balance compounds once per tick by `k_debt_interest_per_quarter` (**0
 1.5 %/qtr, ≈ 6.1 %/yr; was 0.02 until Ben's ruling of 2026-08-26). Non-negative balances are
 never charged.
 
-**The rate is set against what compounding does over the PRE-GAME, not over a quarter.** The warm
-start runs 80 quarters before the player is seated, so the rate is applied eighty times to whatever
-deficit a corp is carrying: at 0.02 that is ×4.9, at 0.015 it is ×3.3. Measured 2026-08-26, nine of
-twelve seeded corps had gone underwater and interest was then **43–60 % of their entire loss**,
-against an operating gap of only −24 to −40 cr/qtr — so the debt was mostly the compounding, not
-the trading. Ben's framing for the cut: *"it's not fun to see an inevitable loss."* Paired with a
+**The rate is set against what compounding does over the PRE-GAME, not over a quarter.** The
+ruling was measured under the eighty-quarter warm start of the time: the rate was applied eighty
+times to whatever deficit a corp carried — at 0.02 that is ×4.9, at 0.015 it is ×3.3 — and on
+2026-08-26 nine of twelve seeded corps had gone underwater with interest then **43–60 % of their
+entire loss**, against an operating gap of only −24 to −40 cr/qtr, so the debt was mostly the
+compounding, not the trading. The pre-game is now the winner's twelve-tick validation run
+(`ERAS.md` § The opening position; BL-978, warm start retired), so the rate compounds twelve
+times before the seat (×1.20 at 0.015) and the pre-game spiral that motivated the cut is far
+shallower; the rate is the same constant either way. Ben's framing for
+the cut: *"it's not fun to see an inevitable loss."* Paired with a
 non-zero opening capital (`corporation_params::base_capital`, 400), which is the buffer that stops
 a survivable bad quarter starting the spiral at all. The constant is the single
 source of truth: the live loop and the `econ_bankruptcy` harness read the same value.

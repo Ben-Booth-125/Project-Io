@@ -47,8 +47,9 @@ struct corporation_params
     /// **400 (Ben, 2026-08-26), superseding the 0 of 2026-07-06.** The zero was a
     /// deliberate "model every corp as a new charter — capital is *earned*, not
     /// granted" steer, and the earning half of it still holds: the opening balance
-    /// is still overwhelmingly the pre-game warm start's doing (`app::pre_game_ticks`
-    /// = **80** quarters, ~20 in-game years, against the generation-time asset
+    /// is still overwhelmingly the pre-game ticks' doing (the eighty-quarter warm
+    /// start when this was measured; now the winner's validation run,
+    /// `app::validation_ticks`, BL-978 — against the generation-time asset
     /// placement). What the zero did NOT anticipate is what a zero buffer does when
     /// combined with compounding debt interest.
     ///

@@ -129,7 +129,7 @@ void check(bool ok, const char* row, const char* what)
 struct lapse_params
 {
     uint32_t    seed        = 0;
-    int         warm_ticks  = 80;    ///< app::pre_game_ticks.
+    int         warm_ticks  = 80;    ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978) — a re-read this harness owes.
     int         ticks       = 120;   ///< measured window (30 years of quarters).
     bool        prehistory  = true;  ///< the shipped spawn; --fast zeroes it.
     int         epoch_year  = 0;     ///< 0 = leave world_params' own default.

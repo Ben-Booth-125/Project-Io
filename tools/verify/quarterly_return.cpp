@@ -53,7 +53,8 @@
 //       untouched.
 //
 //   R6  THE ITEM-SPANNING GATE. End to end over the pre-game warm start
-//       (`app::pre_game_ticks` == 80 economy ticks on a really generated
+//       (80 economy ticks — the retired `app::pre_game_ticks`; the app now
+//       runs `app::validation_ticks`, BL-978 — on a really generated
 //       world): every corporation has a filed history, each corp's last
 //       return's balance is bit-identical to its live
 //       corporation_component.balance, and two identical runs produce
@@ -461,7 +462,7 @@ void run_save_rows(const recipe_registry& reg)
 // ---------------------------------------------------------------------------
 // R6 — the item-spanning gate: the real pre-game warm start
 // ---------------------------------------------------------------------------
-constexpr int k_warm_ticks = 80; ///< app::pre_game_ticks.
+constexpr int k_warm_ticks = 80; ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978), and this harness's own settle length is a re-read it owes.
 
 world warm_started_world(const recipe_registry& reg, uint32_t seed)
 {
