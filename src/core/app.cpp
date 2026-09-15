@@ -1018,31 +1018,41 @@ void app::start_new_game_prelude()
     // ticks — and applies the winner by a deterministic argmax
     // (GENERATION_STRATEGY.md § The eight phases).
     //
-    // WHAT VARIES HERE IS NARROWER THAN THE HARNESS, and the reason is a hard
-    // constraint rather than a choice. `generate_corporations` APPENDS and has
-    // already run inside make_hard_coded_world by this point, so re-running it
-    // would double every specialist — `regenerate_specialists = false` keeps the
-    // world-gen roster and searches over the BACKGROUND economy's placement and
-    // the road tier instead. Widening it to the roster axis means moving the
-    // specialist pass behind the registry load, which is BL-772's restructure
-    // and not this wiring's.
+    // ALL THREE AXES ARE LIVE HERE (BL-977). The roster axis used to be a no-op
+    // at this seam — `generate_corporations` appends and had already run inside
+    // make_hard_coded_world, so `regenerate_specialists` was held false and a
+    // third of every round proposed a roster nobody could apply. Every candidate
+    // now REPLACES the world-gen specialists (`remove_specialist_roster`, then
+    // `generate_corporations` from `world::gen_settlement`, the same record
+    // world-gen read) and lays its background firms; the winner is applied the
+    // same way. The road axis is likewise live now that term 5 reads reach COST
+    // rather than the coverage boolean NR-793 showed never flips.
     //
-    // The seed is the same one the bare pass used, so a single-candidate search
-    // reproduces the old world exactly.
+    // The seat is drawn AFTER this (seat_player, from the surviving specialists),
+    // so replacing the roster here orphans nothing. What the loading screen's
+    // ledger listed during generation was the world-gen roster; the one the
+    // player meets is the winner's.
+    //
+    // The seed is the same one the bare pass used. Mirrored by
+    // tools/verify/harness_params.hpp `shipped_search_params` — change both.
     {
         landscape_search_params sp;
-        sp.regenerate_specialists = false;
-        sp.seed                   = m_active_world_params.seed ^ 0x8A21F00Du;
-        sp.start.placement_seed   = sp.seed;
-        // MEASURED 2026-09-07: 1 candidate 70.8 s of startup, 19 candidates
-        // 90.8 s — so the search costs ~20 s, about 1.1 s per evaluation. That
-        // is affordable against BL-773's 3-6 minute budget and is a REGRESSION
-        // until BL-772 removes the 72 s warm start it sits beside. Note also
-        // that a third of those evaluations are the ROAD axis, which NR-793
-        // measured as provably inert on a live ten-market world — resolving
-        // that entry gets this cost down without touching anything else.
+        sp.regenerate_specialists  = true;
+        sp.seed                    = m_active_world_params.seed ^ 0x8A21F00Du;
+        sp.start.placement_seed    = sp.seed;
+        sp.start.corporation_count = m_worldgen_cfg.corporation_count;
+        // MEASURED 2026-09-07 (placement + tier only): ~20 s for 19 evaluations,
+        // ~1.1 s each. The per-round lines the search prints are the live
+        // measurement now that the roster axis regenerates specialists per
+        // candidate; BL-977's report carries the before/after.
         const landscape_search_result r = search_landscape(m_world, m_registry, sp);
-        apply_landscape_candidate(m_world, m_registry, r.winner, false);
+        apply_landscape_candidate(m_world, m_registry, r.winner, true);
+        std::printf("[landscape_search] winner corps=%d placement=%08X tier=%u  "
+                    "accepted roster=%d placement=%d road_tier=%d of %d rounds\n",
+                    r.winner.corporation_count, r.winner.placement_seed,
+                    static_cast<unsigned>(r.winner.road_tier),
+                    r.accepted_by_axis[0], r.accepted_by_axis[1], r.accepted_by_axis[2],
+                    sp.rounds);
     }
     mark("background_firms");
 

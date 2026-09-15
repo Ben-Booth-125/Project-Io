@@ -18,8 +18,9 @@
 //   1. PLACEMENT   — the seed their holdings are staked from.
 //   2. ROAD TIER   — how far the existing network is developed (1 Track,
 //                    2 Road, 3 Highway). Live rather than decorative: the tier
-//                    moves `body_reach_field`, which moves every market's
-//                    catchment, which moves terms 1, 2 and 4.
+//                    moves `body_reach_field`, which moves every market's reach
+//                    COST — term 5, the only term that reads it (NR-793 showed
+//                    the coverage booleans in terms 1, 2 and 4 never flip).
 //
 // FIXED ROUNDS IS A DETERMINISM REQUIREMENT, NOT A BUDGET ONE. A convergence
 // test makes the amount of work depend on the landscape, so two worlds run the
@@ -116,20 +117,25 @@ struct landscape_search_params
     //     identical proposal is a legal no-op that simply loses its round.
     int          min_corporations = 4;
     int          max_corporations = 24;
-    /// Whether applying a candidate re-runs `generate_corporations` (the
-    /// SPECIALIST roster) as well as the background firms.
+    /// Whether applying a candidate REPLACES the specialist roster — strips the
+    /// one world-gen laid (`remove_specialist_roster`) and lays the candidate's
+    /// own (`generate_corporations`, from `world::gen_settlement`) — as well as
+    /// laying the background firms.
     ///
-    /// FALSE AT THE LIVE GENERATION SEAM, and the reason is a hard constraint
-    /// rather than a preference: `generate_corporations` APPENDS — it does not
-    /// clear what is already there — and by the time the registry is loaded it
-    /// has already run inside `make_hard_coded_world`. Re-running it on the live
-    /// world would double every specialist. So the live caller varies the
-    /// candidate's PLACEMENT and ROAD axes over the background economy, and
-    /// leaves the specialists world-gen placed.
-    ///
-    /// TRUE in the harness, whose base world has no corporations yet, so the
-    /// roster axis is genuinely free there.
+    /// TRUE AT THE LIVE SEAM (BL-977). It was false there because
+    /// `generate_corporations` appends and had already run inside
+    /// `make_hard_coded_world`, which made the roster axis a no-op that still
+    /// cost a third of every round. The removal is the inverse that makes the
+    /// axis real. False is kept for an instrument that wants to hold the
+    /// world-gen roster fixed and vary only placement and tier.
     bool regenerate_specialists = true;
+
+    /// Print one line per round — which axis the round's best proposal came
+    /// from, whether it unseated the incumbent, and the round's cost. The
+    /// timing is a DIAGNOSTIC read from the steady clock and printed; nothing
+    /// in the search reads it back, so the walk stays a pure function of
+    /// (base world, seed, rounds).
+    bool print_rounds = true;
 
     std::uint8_t min_road_tier    = 1;
     std::uint8_t max_road_tier    = 3;
@@ -162,15 +168,22 @@ struct landscape_search_result
     std::vector<landscape_search_step> path;
     int evaluations = 0;      ///< score_landscape calls, seed included
     int accepted    = 0;      ///< rounds that produced a strict improvement
+
+    /// Accepted steps per axis, indexed by `landscape_axis` — which axes the
+    /// walk actually moved along. An axis that never wins over a whole sweep
+    /// is the measurement that says it should not cost a third of each round.
+    int accepted_by_axis[landscape_axis_count] = { 0, 0, 0 };
+
+    /// Wall time per round, milliseconds, DIAGNOSTIC ONLY (see `print_rounds`).
+    /// Index 0 is the seed candidate's evaluation.
+    std::vector<double> round_ms;
 };
 
 /// Lay a candidate onto @p w, which must be a copy of the phase-4 base world.
-/// Applies the road tier, invalidates the logistics caches the tier moves, then
-/// layers the roster and its background firms. Deterministic in the candidate
-/// alone.
-/// Apply a candidate, choosing whether the specialist roster is regenerated.
-/// See `landscape_search_params::regenerate_specialists` for why the live
-/// generation seam passes false.
+/// Applies the road tier, then (when @p regenerate_specialists) replaces the
+/// specialist roster, then lays the background firms, and invalidates the
+/// logistics caches every one of those can move. Deterministic in the
+/// candidate alone. See `landscape_search_params::regenerate_specialists`.
 void apply_landscape_candidate(world& w, const recipe_registry& reg,
                                const landscape_candidate& c,
                                bool regenerate_specialists);

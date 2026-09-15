@@ -11,12 +11,15 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+struct settlement_state; // settlement.hpp — held by pointer below, never by value
 
 /// The system's single asteroid belt — a band between two orbital radii. The
 /// belt is not a body (it owns no entity); it is rendered as a thick, translucent
@@ -262,6 +265,21 @@ struct world
     /// is made. Exactly one entry will have corporation_component::is_player == true,
     /// and world::player_entity will equal that entry's key.
     std::unordered_map<entity_id, corporation_component> corporations;
+
+    /// The Era -1 settlement record the SPECIALIST roster pass reads (BL-977):
+    /// `generate_corporations` derives each corp's focus, ownership class and
+    /// home province from `settlement_state::regions` / `charter` /
+    /// `median_industrial_year`. World-gen holds the record in a local and
+    /// passes a pointer; the landscape search regenerates the roster per
+    /// candidate AFTER world-gen has returned, so it needs the same record —
+    /// or every searched roster would fall to the national-character fallback
+    /// and lose the specialists premise (BL-219, BL-631).
+    ///
+    /// A GENERATION-TIME INDEX, like `tile_settled` above: written once at the
+    /// end of `make_hard_coded_world`, shared (read-only) by every per-candidate
+    /// copy of the world, and NOT SERIALISED — the search runs only at new-game,
+    /// and a loaded world never regenerates its roster. Null after a load.
+    std::shared_ptr<const settlement_state> gen_settlement;
 
     /// Shared stockpile pool keyed by (corporation, body). This is the Layer 3
     /// economy's working store — extraction and processing credit/draw it, the

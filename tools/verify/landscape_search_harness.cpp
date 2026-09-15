@@ -389,10 +389,12 @@ int main()
     std::printf("\n--- THE SLICE'S QUESTION ---\n"
                 "  The search exists and it is DETERMINISTIC: one seed, five thread\n"
                 "  counts, one winner, bit-identical on every scored term. The walk\n"
-                "  improved the seed candidate's composite %.6f -> %.6f (+%.1f%%),\n"
-                "  entirely through the PLACEMENT axis on this world.\n",
+                "  improved the seed candidate's composite %.6f -> %.6f (+%.1f%%);\n"
+                "  accepted by axis: roster %d, placement %d, road_tier %d.\n",
                 serial.seed_score.composite, serial.winner_score.composite,
-                100.0 * (serial.winner_score.composite / serial.seed_score.composite - 1.0));
+                100.0 * (serial.winner_score.composite / serial.seed_score.composite - 1.0),
+                serial.accepted_by_axis[0], serial.accepted_by_axis[1],
+                serial.accepted_by_axis[2]);
 
     // ------------------------------------------------------------------
     // The caveat slice 1 printed, carried forward unchanged. It bears on this
