@@ -1115,40 +1115,10 @@ namespace {
 struct board_row
 {
     uint16_t owner   = owner_none;
-    int32_t  land    = 0; ///< Tiles held.
+    int32_t  land    = 0;  ///< Tiles held.
     int      regions = 0;
+    int64_t  people  = -1; ///< Population held at the sampled step; -1 = no sample.
 };
-
-/// Total the land each polity holds in one slice, ordered by it.
-///
-/// SHARE OF LAND is the ordering metric, and it is the honest default for a round
-/// about borders (BL-830): it is the one quantity the ownership record alone can
-/// answer, and share of LAND rather than of surface — an ocean nobody can hold
-/// would otherwise compress every polity into the bottom of the axis.
-std::vector<board_row> rank_slice(const history_lapse& h,
-                                  const std::vector<uint16_t>& slice)
-{
-    std::vector<board_row> rows;
-    for (std::size_t r = 0; r < slice.size() && r < h.region_area.size(); ++r)
-    {
-        const uint16_t o = slice[r];
-        if (o == owner_none) continue;
-        auto it = std::find_if(rows.begin(), rows.end(),
-                               [&](const board_row& b) { return b.owner == o; });
-        if (it == rows.end()) { rows.push_back({o, 0, 0}); it = rows.end() - 1; }
-        it->land += h.region_area[r];
-        ++it->regions;
-    }
-    // Deterministic: land descending, then polity index, so two equal holders do
-    // not swap places frame to frame.
-    std::sort(rows.begin(), rows.end(), [](const board_row& a, const board_row& b) {
-        if (a.land != b.land) return a.land > b.land;
-        return a.owner < b.owner;
-    });
-    return rows;
-}
-
-constexpr int k_board_rows = 16;
 
 /// The recorded step at or before @p year, or -1 before the first. `steps` is
 /// ascending by year, so this is one binary search.
@@ -1163,6 +1133,82 @@ int step_at_or_before(const era_timelapse& t, int year)
     }
     return best;
 }
+
+/// The sample one polity has at a recorded step, or nullptr when it has none.
+/// Linear in the step's samples: a few dozen living polities, called per row.
+const polity_sample* sample_at_step(const history_lapse& h, int step, uint16_t polity)
+{
+    if (step < 0 || static_cast<std::size_t>(step) >= h.lapse.steps.size()) return nullptr;
+    const timelapse_step& st = h.lapse.steps[static_cast<std::size_t>(step)];
+    for (int i = 0; i < st.sample_count; ++i)
+    {
+        const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
+        if (k < h.lapse.samples.size() && h.lapse.samples[k].polity == polity)
+            return &h.lapse.samples[k];
+    }
+    return nullptr;
+}
+
+/// Every living polity's population summed at a recorded step — the "people"
+/// share's denominator, taken over the STEP'S samples exactly as
+/// `history_sweep`'s `pop_slice_at` takes it, so the board and the sweep divide
+/// by the same number. 0 before the first step.
+int64_t people_held_at_step(const history_lapse& h, int step)
+{
+    if (step < 0 || static_cast<std::size_t>(step) >= h.lapse.steps.size()) return 0;
+    const timelapse_step& st = h.lapse.steps[static_cast<std::size_t>(step)];
+    int64_t total = 0;
+    for (int i = 0; i < st.sample_count; ++i)
+    {
+        const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
+        if (k < h.lapse.samples.size()) total += h.lapse.samples[k].population;
+    }
+    return total;
+}
+
+/// Total the land and the people each polity holds in one slice, ordered by it.
+///
+/// SHARE OF PEOPLE is the ordering metric (Ben, 2026-09-15, NR-876 / BL-1000).
+/// Share of LAND was the honest default while the ownership record was all
+/// there was (BL-830), but it measures founding as much as conquest: read by
+/// population instead, the largest realms are two to five points MORE
+/// concentrated and most region-count "risers" were founding empty ground.
+/// The population is `polity_sample::population` at the recorded step at or
+/// before @p year — the sum of held regions' headcounts (history_sim.cpp,
+/// `record_step`) — and a polity with no sample at that step (the opening
+/// years, before the first recorded step; every polity on the Culture round,
+/// whose record carries no samples) ranks as holding no one, so the board
+/// falls back to land order exactly where people are unmeasured.
+std::vector<board_row> rank_slice(const history_lapse& h,
+                                  const std::vector<uint16_t>& slice, int year)
+{
+    std::vector<board_row> rows;
+    for (std::size_t r = 0; r < slice.size() && r < h.region_area.size(); ++r)
+    {
+        const uint16_t o = slice[r];
+        if (o == owner_none) continue;
+        auto it = std::find_if(rows.begin(), rows.end(),
+                               [&](const board_row& b) { return b.owner == o; });
+        if (it == rows.end()) { rows.push_back({o, 0, 0, -1}); it = rows.end() - 1; }
+        it->land += h.region_area[r];
+        ++it->regions;
+    }
+    const int step = step_at_or_before(h.lapse, year);
+    for (board_row& b : rows)
+        if (const polity_sample* s = sample_at_step(h, step, b.owner)) b.people = s->population;
+
+    // Deterministic: people descending, then land descending, then polity index,
+    // so two equal holders do not swap places frame to frame.
+    std::sort(rows.begin(), rows.end(), [](const board_row& a, const board_row& b) {
+        const int64_t pa = std::max<int64_t>(0, a.people), pb = std::max<int64_t>(0, b.people);
+        if (pa != pb) return pa > pb;
+        if (a.land != b.land) return a.land > b.land;
+        return a.owner < b.owner;
+    });
+    return rows;
+}
+
+constexpr int k_board_rows = 16;
 
 /// A headcount in the width a board column can afford.
 void fmt_population(char* buf, std::size_t n, int64_t pop)
@@ -1196,26 +1242,17 @@ const char* polity_name_of(const history_lapse& h, uint16_t polity)
 void draw_lapse_scoreboard(const history_lapse& h,
                            const std::vector<uint16_t>& slice,
                            const std::vector<uint16_t>& lagged,
-                           int year)
+                           int year, int lagged_year)
 {
-    const std::vector<board_row> now  = rank_slice(h, slice);
-    const std::vector<board_row> then = rank_slice(h, lagged);
+    const std::vector<board_row> now  = rank_slice(h, slice, year);
+    const std::vector<board_row> then = rank_slice(h, lagged, lagged_year);
 
-    // BL-916 on BL-817: the sample this instant's Population and Might columns
+    // BL-916 on BL-817: the sample this instant's People, Pop and Might columns
     // read. The step AT OR BEFORE the playhead, so the board never shows a
-    // number from a future the map has not reached.
-    const int step = step_at_or_before(h.lapse, year);
-    const auto sample_for = [&](uint16_t polity) -> const polity_sample* {
-        if (step < 0) return nullptr;
-        const timelapse_step& st = h.lapse.steps[static_cast<std::size_t>(step)];
-        for (int i = 0; i < st.sample_count; ++i)
-        {
-            const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
-            if (k < h.lapse.samples.size() && h.lapse.samples[k].polity == polity)
-                return &h.lapse.samples[k];
-        }
-        return nullptr;
-    };
+    // number from a future the map has not reached. `people_total` is the
+    // sweep's own denominator — every living polity's sample summed at the step.
+    const int     step         = step_at_or_before(h.lapse, year);
+    const int64_t people_total = people_held_at_step(h, step);
 
     int32_t held = 0;
     for (const board_row& b : now) held += b.land;
@@ -1234,10 +1271,15 @@ void draw_lapse_scoreboard(const history_lapse& h,
     ImGui::PopStyleColor();
     ImGui::Spacing();
 
-    // POPULATION and MIGHT are read off BL-817's per-polity sample series at the
-    // step this instant falls in (BL-916). Still ORDERED BY LAND: share of ground
-    // is the round's subject, and the two columns qualify a row rather than rank
-    // it. Might is the military capacity band, 1-6, exactly as the sim holds it.
+    // PEOPLE, POPULATION and MIGHT are read off BL-817's per-polity sample series
+    // at the step this instant falls in (BL-916). ORDERED BY PEOPLE (BL-1000):
+    // the share of everyone held that this polity holds, which is the rank; the
+    // share of LAND stays as the second column because a realm that is large and
+    // empty is a different thing from one that is small and full, and the pair
+    // says which. The region COUNT that used to sit here is gone — it measured
+    // the placement pass more than the ground anybody held, and its width is
+    // what pays for the second share. Might is the military capacity band, 1-6,
+    // exactly as the sim holds it.
     //
     // A RESEARCH COLUMN DOES NOT GO HERE, and that is a standing refusal rather
     // than a deferral: research points accrue from population (BL-822), so the
@@ -1247,16 +1289,16 @@ void draw_lapse_scoreboard(const history_lapse& h,
                            ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
         return;
 
-    // "Rgn", not "Regions": the header is drawn by ImGui's own TableHeadersRow,
-    // which neither elides nor reports, so a header wider than its column simply
-    // clips ("Re...") with nothing recording that it did. "Pop" and "Mt" for the
-    // same reason.
-    ImGui::TableSetupColumn("#",    ImGuiTableColumnFlags_WidthFixed, 22.0f);
-    ImGui::TableSetupColumn("Seat", ImGuiTableColumnFlags_WidthStretch);
-    ImGui::TableSetupColumn("Land", ImGuiTableColumnFlags_WidthFixed, 48.0f);
-    ImGui::TableSetupColumn("Rgn",  ImGuiTableColumnFlags_WidthFixed, 30.0f);
-    ImGui::TableSetupColumn("Pop",  ImGuiTableColumnFlags_WidthFixed, 46.0f);
-    ImGui::TableSetupColumn("Mt",   ImGuiTableColumnFlags_WidthFixed, 24.0f);
+    // Short headers throughout: the header is drawn by ImGui's own
+    // TableHeadersRow, which neither elides nor reports, so a header wider than
+    // its column simply clips ("Popul...") with nothing recording that it did.
+    // "People" is the rank column and reads as a share; "Pop" is the headcount.
+    ImGui::TableSetupColumn("#",      ImGuiTableColumnFlags_WidthFixed, 22.0f);
+    ImGui::TableSetupColumn("Seat",   ImGuiTableColumnFlags_WidthStretch);
+    ImGui::TableSetupColumn("People", ImGuiTableColumnFlags_WidthFixed, 48.0f);
+    ImGui::TableSetupColumn("Land",   ImGuiTableColumnFlags_WidthFixed, 48.0f);
+    ImGui::TableSetupColumn("Pop",    ImGuiTableColumnFlags_WidthFixed, 46.0f);
+    ImGui::TableSetupColumn("Mt",     ImGuiTableColumnFlags_WidthFixed, 24.0f);
     ImGui::TableHeadersRow();
 
     const int shown = std::min(k_board_rows, static_cast<int>(now.size()));
@@ -1322,17 +1364,31 @@ void draw_lapse_scoreboard(const history_lapse& h,
             if (entered) ImGui::PopStyleColor();
         }
 
+        // The rank column: this polity's share of everyone held at the step.
+        // Per-mille integer arithmetic, the sweep's `share_q_of`, so a figure
+        // read off the board is the figure the sweep would print. A polity with
+        // no sample at this step — the record starts on the first decision
+        // round, so the opening years have none — draws a dim dash rather than
+        // a zero it never measured.
+        const polity_sample* smp = sample_at_step(h, step, b.owner);
         ImGui::TableSetColumnIndex(2);
+        if (smp != nullptr && people_total > 0)
+        {
+            const int q = static_cast<int>((smp->population * 1000) / people_total);
+            ImGui::Text("%d.%d%%", q / 10, q % 10);
+        }
+        else
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+            ImGui::TextUnformatted("-");
+            ImGui::PopStyleColor();
+        }
+
+        ImGui::TableSetColumnIndex(3);
         ImGui::Text("%.1f%%", 100.0f * static_cast<float>(b.land)
                                      / static_cast<float>(held));
 
-        ImGui::TableSetColumnIndex(3);
-        ImGui::Text("%d", b.regions);
-
-        // The two sampled columns. A polity with no sample at this step — the
-        // record starts on the first decision round, so the opening years have
-        // none — draws a dim dash rather than a zero it never measured.
-        const polity_sample* smp = sample_for(b.owner);
+        // The two remaining sampled columns, dashed on the same rule.
         ImGui::TableSetColumnIndex(4);
         if (smp != nullptr)
         {
@@ -1475,6 +1531,39 @@ lapse_arc summarise_lapse_arc(const history_lapse& h)
     }
     out.biggest_end_q = (biggest_end * 1000) / stride;
     out.smallest_end  = smallest_end;
+
+    // THE SAME PEAK BY PEOPLE (BL-1000), and it is history_sweep's
+    // `peak_share_pop_q` ARITHMETIC EXACTLY, not a per-step maximum: the sweep
+    // walks the span a century at a time from its first year, reads the step
+    // at or before each mark, and takes the largest polity's population over
+    // every living polity's at that step (`pop_slice_at` / `share_q_of`). A
+    // per-step walk would find a higher peak between two marks and the panel
+    // and the sweep would then disagree about the same world — which is the
+    // one thing this readout must never do. The end share is the sweep's
+    // `top_share_pop_q`: the closing year's own step.
+    if (!h.lapse.steps.empty())
+    {
+        const int first = h.lapse.start_year;
+        const int last  = h.lapse.start_year + h.lapse.years;
+        const auto share_at = [&](int y) -> int {
+            const int si = step_at_or_before(h.lapse, y);
+            if (si < 0) return 0;
+            const timelapse_step& st = h.lapse.steps[static_cast<std::size_t>(si)];
+            int64_t total = 0, top = 0;
+            for (int k = 0; k < st.sample_count; ++k)
+            {
+                const std::size_t idx = static_cast<std::size_t>(st.first_sample + k);
+                if (idx >= h.lapse.samples.size()) break;
+                const int64_t p = h.lapse.samples[idx].population;
+                total += p;
+                if (p > top) top = p;
+            }
+            return total > 0 ? static_cast<int>((top * 1000) / total) : 0;
+        };
+        for (int y = first; y <= last; y += 100)
+            out.peak_share_pop_q = std::max(out.peak_share_pop_q, share_at(y));
+        out.end_share_pop_q = share_at(last);
+    }
     return out;
 }
 
@@ -1489,7 +1578,15 @@ void draw_lapse_arc(const history_lapse& h)
     // STATED AS PROSE, NOT A TABLE. The player is deciding whether to keep this
     // world, which is a judgement about SHAPE; a table of six numbers makes them
     // do the reading. The numbers are still all present.
-    if (a.eliminated == 0 && a.rose_and_fell == 0 && a.peak_share_q < 100)
+    //
+    // THE SHARES ARE OF PEOPLE, the board's rank column (BL-1000), so the
+    // sentence and the board agree about who was largest. The region figures
+    // stay as the fallback for a record that carries no samples, so the
+    // readout never goes silent on a world it can still describe.
+    const bool by_people = a.peak_share_pop_q > 0;
+    const int  peak_q    = by_people ? a.peak_share_pop_q : a.peak_share_q;
+    const int  end_q     = by_people ? a.end_share_pop_q  : a.biggest_end_q;
+    if (a.eliminated == 0 && a.rose_and_fell == 0 && peak_q < 100)
     {
         ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
         ImGui::TextWrapped("A quiet age. %d peoples held ground and none of them "
@@ -1499,11 +1596,13 @@ void draw_lapse_arc(const history_lapse& h)
     else
     {
         ImGui::Text("%d polities, %d destroyed.", a.polities, a.eliminated);
-        ImGui::Text("The largest empire held %d%% of the world; %d rose and fell back.",
-                    a.peak_share_q / 10, a.rose_and_fell);
+        // Wrapped, not Text: "people" made this line the column's longest, and
+        // an unwrapped line clips at the column edge with nothing recording it.
+        ImGui::TextWrapped("The largest empire held %d%% of the world's %s; %d rose and fell back.",
+                           peak_q / 10, by_people ? "people" : "land", a.rose_and_fell);
         ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
         ImGui::TextWrapped("At the end the greatest holds %d%%, the least %d region%s.",
-                           a.biggest_end_q / 10, a.smallest_end,
+                           end_q / 10, a.smallest_end,
                            a.smallest_end == 1 ? "" : "s");
         ImGui::PopStyleColor();
     }
