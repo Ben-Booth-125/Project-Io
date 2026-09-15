@@ -1736,18 +1736,30 @@ void derive_environment(terrain_substrate sub, terrain_cover cov, terrain_landfo
 
 } // namespace
 
-std::vector<entity_id> generate_body_tiles(
+// ---------------------------------------------------------------------------
+// BL-965 — THE BODY HALF. Passes 1-5 (with 4b-4e) and the BODY phase of Pass 6.
+// ---------------------------------------------------------------------------
+//
+// `generate_body_tiles` used to be one function running every pass, so tuning
+// a coal or peat rule cost a full regeneration of the surface above it — and
+// the census that shows the effect runs 120 of them. The pipeline is cut at the
+// Body/Life boundary into two callable halves with the `generation_record` as
+// the seam: this half owns everything that is a fact about the GROUND (the
+// heightmap, the ocean, the climate, the composition, the landforms, the
+// lithosphere's deposits, the environment), `generate_life_deposits_over` owns
+// everything that is a fact about what LIVED on it, and `generate_body_tiles`
+// is the two called in order. The whole is bit-identical to the monolith; the
+// halves exist so the second can be re-run over a cached first.
+std::vector<entity_id> generate_body_surface(
     world& w,
     entity_id body_id,
     int gw, int gh,
     const body_profile& profile,
     uint32_t seed,
-    float deposit_scalar,
     const planetology_state* pl,
-    generation_record* record,
+    generation_record& record,
     const std::vector<float>* continent_bias,
-    const std::vector<uint8_t>* convergent,
-    const continent_state* continents)
+    const std::vector<uint8_t>* convergent)
 {
     const int total = gw * gh;
 
@@ -1874,8 +1886,8 @@ std::vector<entity_id> generate_body_tiles(
         }
 
         // Last use of `biased`, so the capture costs a move rather than a copy.
-        if (record)
-            ocean_score = std::move(biased);
+        // Always taken since BL-965: the record is the seam, and is always built.
+        ocean_score = std::move(biased);
     }
 
     // --- Pass 3: latitude bands ---
@@ -2064,10 +2076,250 @@ std::vector<entity_id> generate_body_tiles(
             claimed[idx] = true;
         }
 
-    // --- Pass 6: deposits, derived environment, entity creation ---
+    // --- Pass 6, BODY phase: the lithosphere's deposits, the environment, the tiles ---
+    //
+    // BL-965 — THE CUT. This is the last thing the Body half does, and the seam
+    // it leaves is exactly two things the Life half cannot read off a tile or
+    // recompute without re-running the passes above: the raw geological deposit
+    // per tile, and the endemic amounts drawn below. Everything else the Life
+    // half needs is either on the tile it is handed (the three axes, the water
+    // kind) or already in the record (height, moisture).
+    //
+    // THE ONE STREAM THAT CROSSES THE CUT. `tile_rng` is consumed by three things
+    // in order: the body deposit block, the endemic amount draw, and
+    // derive_environment's hazard/habitability jitter. The middle one is
+    // Life-phase OUTPUT (an endemic good is biosphere by origin, and it is
+    // accounted in `life_phase_placed`) sitting on a Body-phase STREAM, and it
+    // cannot move to the other side of the cut without re-cutting the stream and
+    // moving hazard and habitability on every tile of every world — the hazard
+    // BL-762 and BL-765 both name. So this half DRAWS it, keeping every draw
+    // exactly where they left it, and records each amount for the Life half to
+    // PLACE. The accounting stays with the placement.
+    //
     // Per-body rarity field (BL-040): one seeded draw, stable across the body's
     // tiles, so each campaign varies while the rare-stays-rare ordering holds.
+    // A pure function of the seed, so the Life half re-derives the same profile
+    // rather than carrying it.
     const std::array<float, resource_count> rarity = build_rarity_profile(seed ^ 0x68E31DA4u);
+
+    // BL-762: what the body phase PLACED, summed over the body. Accumulated in
+    // raster order out of one traversal, so the sum is order-independent in fact
+    // and order-fixed in form — no map walk, no float ordering surprise.
+    std::array<double, resource_count> body_placed{};
+
+    record.body_deposits.assign(static_cast<std::size_t>(total), std::array<float, resource_count>{});
+    record.endemic_draws.clear();
+
+    std::vector<entity_id> tile_ids(total, null_entity);
+    for (int row = 0; row < gh; ++row)
+    {
+        for (int col = 0; col < gw; ++col)
+        {
+            const int idx = col + row * gw;
+
+            // Per-tile RNG keyed on body seed + tile index: deposits are stable
+            // across runs and independent of neighbouring tiles.
+            std::mt19937 tile_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 2654435761u));
+            // Independent stream for the full raw-set additions, so they cannot
+            // perturb the calibrated subset draws or derive_environment (BL-040).
+            std::mt19937 rare_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 40503u) ^ 0x5BD1E995u);
+
+            // BL-762/BL-765: the body traversal is untouched draw-for-draw (it
+            // still draws every biological row and discards it). Only its
+            // geological half is kept; the life half is placed by
+            // generate_life_deposits_over on its own stream.
+            tile_deposits phases{};
+            if (!is_ocean[idx])
+                generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], phases, tile_rng, rare_rng, rarity);
+
+            for (std::size_t r = 0; r < resource_count; ++r)
+                body_placed[r] += static_cast<double>(phases.geological[r]);
+            record.body_deposits[static_cast<std::size_t>(idx)] = phases.geological;
+
+            // C -> D: endemic trade goods (BL-191) — the DRAW only; the Life half
+            // places it. A tile qualifies only if it is inside the good's
+            // latitude band AND its longitude sector AND carries a composition
+            // the crop can grow on. The sector test is what makes it endemic
+            // rather than merely climatic, and it wraps, since the surface does.
+            if (pl && !pl->endemics.empty() && !is_ocean[idx])
+            {
+                const float lat = std::fabs(static_cast<float>(row) / static_cast<float>(gh - 1) - 0.5f) * 2.0f;
+                const float lon = static_cast<float>(col) / static_cast<float>(gw);
+
+                for (const endemic_good& e : pl->endemics)
+                {
+                    if (lat < e.lat_lo || lat > e.lat_hi)
+                        continue;
+
+                    // Wrapped angular separation from the origin region's centre.
+                    float d = std::fabs(lon - e.sector_centre);
+                    if (d > 0.5f) d = 1.0f - d;
+                    if (d > e.sector_width * 0.5f)
+                        continue;
+
+                    // Composition the crop actually grows on. All of these are
+                    // biotic, so they only exist on a world that reached a land
+                    // biosphere in the first place — which is the same gate the
+                    // endemic set itself sits behind.
+                    // CROPS FOLLOW THE COVER (BL-519). Each of these is a
+                    // claim about what grows here, not about the geology — which
+                    // is why the old list had to name compositions to say it.
+                    const terrain_cover c = cov[idx];
+                    bool suitable = false;
+                    switch (e.good)
+                    {
+                        case resource_type::tobacco: suitable = (c == terrain_cover::grass); break;
+                        case resource_type::spices:  suitable = (c == terrain_cover::marsh
+                                                             || c == terrain_cover::forest); break;
+                        case resource_type::coffee:  suitable = (c == terrain_cover::forest); break;
+                        // Furs were the old `tundra` row. Tundra is gone as a
+                        // terrain (Ben, 2026-08-21) and its ground is scrub, which
+                        // is where the trapping actually happens.
+                        case resource_type::furs:    suitable = (c == terrain_cover::scrub); break;
+                        // BL-586 slice 2 (2026-08-24). Hides are pastured /
+                        // hunted livestock and game, the literal reading of
+                        // grazing ground — `grass`, shared with tobacco's
+                        // cover exactly as `furs`/`scrub` already stands
+                        // alone: the two are differentiated by latitude band
+                        // and sector, not by cover.
+                        case resource_type::hides:    suitable = (c == terrain_cover::grass); break;
+                        default: break;
+                    }
+                    if (!suitable)
+                        continue;
+
+                    // Densest at the heart of the range, thinning toward its edge —
+                    // so a origin region has a centre worth holding rather than a
+                    // hard border.
+                    const float falloff = 1.0f - (d / std::max(e.sector_width * 0.5f, 1e-4f));
+                    std::uniform_real_distribution<float> u(0.0f, 1.0f);
+                    const float amount = (30.0f + 90.0f * u(tile_rng)) * e.richness * falloff;
+                    // The `> 1` gate is a pure function of the amount, so the
+                    // draws that fail it are dropped here rather than carried:
+                    // the Life half sees exactly the writes the monolith made,
+                    // in the order it made them (raster, then endemic order).
+                    if (amount > 1.0f)
+                        record.endemic_draws.push_back(
+                            generation_record::endemic_draw{ idx, e.good, amount });
+                }
+            }
+
+            float hazard = 0.0f, habitability = 0.0f;
+            derive_environment(sub[idx], cov[idx], land[idx], hazard, habitability, tile_rng);
+
+            // The deposit arrays are left value-initialised here and written by
+            // the Life half; the finished tile is identical to the one the
+            // monolith assembled in a single initialiser.
+            const entity_id tile_id = w.create_entity();
+            w.tiles[tile_id] = tile_component{
+                .body               = body_id,
+                .grid_x             = col,
+                .grid_y             = row,
+                .substrate          = reported_sub[idx], // BL-516 water kind; == sub[idx] on land
+                .cover              = cov[idx],
+                .cover_density      = dens[idx],
+                .landform           = land[idx],
+                .resource_deposit   = {},
+                .resource_remaining = {},
+                .hazard_level       = hazard,
+                .habitability       = habitability,
+                // BL-517: retain Pass 1's heightmap value. A pure CAPTURE of the float
+                // this function already computed — the same element that goes on to fill
+                // generation_record::height below. It reads no RNG, derives nothing, and
+                // changes no terrain, deposit or placement rule, so the generated surface
+                // is bit-identical to the pre-BL-517 build.
+                .height             = height[static_cast<std::size_t>(idx)],
+            };
+            tile_ids[idx] = tile_id;
+        }
+    }
+
+    record.gw = gw;
+    record.gh = gh;
+    record.height   = std::move(height);
+    record.moisture = std::move(moisture);
+    record.band.resize(static_cast<std::size_t>(total));
+    for (int idx = 0; idx < total; ++idx)
+        record.band[static_cast<std::size_t>(idx)] = static_cast<uint8_t>(band[idx]);
+    record.ocean_score     = std::move(ocean_score);
+    record.ocean_threshold = ocean_threshold;
+    record.ocean_tiles     = ocean_tiles;
+    record.body_phase_placed = body_placed;
+    // The Life half owns this; cleared so a record that was filled by the Body
+    // half and never finished reads as such rather than carrying a stale sum.
+    record.life_phase_placed = {};
+
+    return tile_ids;
+}
+
+// ---------------------------------------------------------------------------
+// BL-965 — THE LIFE HALF. The LIFE phase of Pass 6 and the ore-field pre-pass.
+// ---------------------------------------------------------------------------
+//
+// Runs over a tile set the Body half built and the record it left, and can run
+// over them AGAIN: it reads the seam and the tiles' axes, writes only the two
+// deposit arrays on each tile and `life_phase_placed` on the record, and
+// mutates nothing it reads. That is what makes it the re-entry a tuning loop
+// wants — one Body half per seed, then the Life half as many times as the rule
+// under test changes.
+//
+// The ore-field pre-pass lives here rather than with the body because its four
+// region-forming resources are two of each phase and its one `prov_rng` stream
+// draws for them interleaved (copper, petroleum, iron, coal): it needs the
+// Life phase's bearing set before it can draw at all, and it cannot draw for
+// the body's two first without moving the stream.
+void generate_life_deposits_over(
+    world& w,
+    const std::vector<entity_id>& tile_ids,
+    generation_record& record,
+    const body_profile& profile,
+    uint32_t seed,
+    float deposit_scalar,
+    const planetology_state* pl,
+    const std::vector<uint8_t>* convergent,
+    const continent_state* continents)
+{
+    const int gw = record.gw, gh = record.gh;
+    const int total = gw * gh;
+    // A record the Body half did not fill is a caller error, not a surface to
+    // guess at: nothing is written rather than reading past the end.
+    if (total <= 0
+        || tile_ids.size()           != static_cast<std::size_t>(total)
+        || record.height.size()      != static_cast<std::size_t>(total)
+        || record.moisture.size()    != static_cast<std::size_t>(total)
+        || record.body_deposits.size() != static_cast<std::size_t>(total))
+        return;
+
+    // The same derived seeds the Body half used — the deposit stream key is what
+    // ties `life_rng` to its tile, and the rarity profile is a pure draw off its
+    // own salt, so re-deriving both here is exact.
+    const uint32_t seed_deposit = seed ^ 0x165667B1u;
+    const std::array<float, resource_count> rarity = build_rarity_profile(seed ^ 0x68E31DA4u);
+
+    const std::vector<float>& height   = record.height;
+    const std::vector<float>& moisture = record.moisture;
+
+    // The three axes and the ocean mask, read back off the tiles. The tile
+    // carries the BL-516 water kind (ocean/coast/lake) where the passes above
+    // saw the coarse `ocean`; on land the two are the same value. The coarse
+    // form is what the deposit rules below were written against, and on water
+    // no deposit rule runs, so folding the kinds back to `ocean` reproduces
+    // exactly the `sub` the monolith handed them.
+    std::vector<terrain_substrate> sub(total, terrain_substrate::barren);
+    std::vector<terrain_cover>     cov(total, terrain_cover::none);
+    std::vector<std::uint8_t>      dens(total, 0u);
+    std::vector<terrain_landform>  land(total, terrain_landform::plains);
+    std::vector<bool>              is_ocean(total, false);
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const tile_component& t = w.tiles.at(tile_ids[static_cast<std::size_t>(idx)]);
+        const bool water = is_water(t.substrate);
+        is_ocean[idx] = water;
+        sub[idx]      = water ? terrain_substrate::ocean : t.substrate;
+        cov[idx]      = t.cover;
+        dens[idx]     = t.cover_density;
+        land[idx]     = t.landform;
+    }
 
     // BL-765 — THE PALAEO PRE-PASS. Ask every tile where it SAT when its fossils
     // formed, once, and reduce the answer to the two terms the Life phase
@@ -2165,29 +2417,29 @@ std::vector<entity_id> generate_body_tiles(
             { resource_type::iron_ore,   2, 0.55f },
             { resource_type::coal,       3, 0.45f },
         };
-        // Which tiles will actually bear each of these. generate_deposits is a
-        // pure function of (substrate, cover, landform, per-tile seeds), so replaying
-        // it here is exact and costs one extra table-driven pass. Necessary
-        // because the region budget has to be conserved over the BEARING set:
-        // normalising over all land instead silently cost a world 10-47% of its
-        // ore wherever a region landed on ground that carries none.
+        // Which tiles will actually bear each of these. The region budget has to
+        // be conserved over the BEARING set: normalising over all land instead
+        // silently cost a world 10-47% of its ore wherever a region landed on
+        // ground that carries none.
+        //
+        // BOTH PHASES, deliberately: two of the four specs are biological
+        // (coal, petroleum) and two geological, and the region budget is
+        // conserved over the BEARING set regardless of which phase placed it.
+        // The body's half is read off the seam — what the Body half placed, not
+        // a replay of it — and the life half is replayed here, because
+        // `generate_life_deposits` is a pure function of (axes, site, per-tile
+        // stream) and the replay is exact. BL-765 made the split literal: the
+        // two biological specs are not written by the body phase at all, so a
+        // mask built from the seam alone would hand the field builder an empty
+        // coal and petroleum set and silently throw both regions away.
         std::array<std::vector<uint8_t>, 4> bears;
         for (auto& b : bears) b.assign(static_cast<std::size_t>(total), 0u);
         for (int idx = 0; idx < total; ++idx)
         {
             if (is_ocean[idx]) continue;
-            std::mt19937 tr(seed_deposit ^ (static_cast<uint32_t>(idx) * 2654435761u));
-            std::mt19937 rr(seed_deposit ^ (static_cast<uint32_t>(idx) * 40503u) ^ 0x5BD1E995u);
             std::mt19937 lr(seed_deposit ^ (static_cast<uint32_t>(idx) * 2246822519u) ^ 0x1EAF10DEu);
-            // BOTH PHASES, deliberately: two of the four specs are biological
-            // (coal, petroleum) and two geological, and the region budget is
-            // conserved over the BEARING set regardless of which phase placed it.
-            // BL-765 made that literal — the two biological specs are no longer
-            // written by generate_deposits at all, so replaying only it would
-            // have handed the field builder an empty coal and petroleum mask and
-            // silently thrown both regions away.
             tile_deposits td{};
-            generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], td, tr, rr, rarity);
+            td.geological = record.body_deposits[static_cast<std::size_t>(idx)];
             generate_life_deposits(sub[idx], cov[idx], dens[idx], land[idx],
                                    sites[static_cast<std::size_t>(idx)], td, lr, rarity);
             const std::array<float, resource_count> d = td.merged();
@@ -2208,25 +2460,21 @@ std::vector<entity_id> generate_body_tiles(
         }
     }
 
-    // BL-762: what each phase PLACED, summed over the body. Accumulated in raster
-    // order out of one traversal, so the sum is order-independent in fact and
-    // order-fixed in form — no map walk, no float ordering surprise.
-    std::array<double, resource_count> body_placed{};
+    // BL-762: what the life phase PLACED, summed over the body. Accumulated in
+    // raster order out of one traversal, so the sum is order-independent in fact
+    // and order-fixed in form — no map walk, no float ordering surprise.
     std::array<double, resource_count> life_placed{};
 
-    std::vector<entity_id> tile_ids(total, null_entity);
+    // The endemic draws were recorded in raster order, then endemic order within
+    // a tile; a cursor walks them in the same order the monolith wrote them.
+    std::size_t endemic_cursor = 0;
+
     for (int row = 0; row < gh; ++row)
     {
         for (int col = 0; col < gw; ++col)
         {
             const int idx = col + row * gw;
 
-            // Per-tile RNG keyed on body seed + tile index: deposits are stable
-            // across runs and independent of neighbouring tiles.
-            std::mt19937 tile_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 2654435761u));
-            // Independent stream for the full raw-set additions, so they cannot
-            // perturb the calibrated subset draws or derive_environment (BL-040).
-            std::mt19937 rare_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 40503u) ^ 0x5BD1E995u);
             // BL-765: the LIFE phase's own stream, added for the reason rare_rng
             // was added — tile_rng is consumed past the deposit call by the
             // endemic draw and by derive_environment's jitter, so re-cutting the
@@ -2235,22 +2483,16 @@ std::vector<entity_id> generate_body_tiles(
             std::mt19937 life_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 2246822519u) ^ 0x1EAF10DEu);
 
             // BL-762/BL-765: the two phases are separate destinations AND
-            // separate rules. The body traversal is untouched draw-for-draw (it
-            // still draws every biological row and discards it); the life
+            // separate rules. The body's half arrives through the seam; the life
             // traversal places the biosphere's residue from the palaeo record.
             tile_deposits phases{};
+            phases.geological = record.body_deposits[static_cast<std::size_t>(idx)];
             if (!is_ocean[idx])
-            {
-                generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], phases, tile_rng, rare_rng, rarity);
                 generate_life_deposits(sub[idx], cov[idx], dens[idx], land[idx],
                                        sites[static_cast<std::size_t>(idx)], phases, life_rng, rarity);
-            }
 
             for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                body_placed[r] += static_cast<double>(phases.geological[r]);
                 life_placed[r] += static_cast<double>(phases.biological[r]);
-            }
 
             // Recombined for everything downstream. The halves are disjoint, so
             // this is a union and the tile carries exactly what it always did.
@@ -2287,79 +2529,22 @@ std::vector<entity_id> generate_body_tiles(
                     deposits[ri] *= field[static_cast<std::size_t>(idx)];
             }
 
-            // C -> D: endemic trade goods (BL-191). Unlike the endowment above
-            // this ADDS a deposit rather than scaling one, because an endemic good
+            // C -> D: endemic trade goods (BL-191) — the PLACEMENT of the draws
+            // the Body half made on `tile_rng`. Unlike the endowment above this
+            // ADDS a deposit rather than scaling one, because an endemic good
             // has no base distribution to scale — it exists only where it evolved.
-            //
-            // A tile qualifies only if it is inside the good's latitude band AND
-            // its longitude sector AND carries a composition the crop can grow on.
-            // The sector test is what makes it endemic rather than merely
-            // climatic, and it wraps, since the surface does.
-            if (pl && !pl->endemics.empty() && !is_ocean[idx])
+            for (; endemic_cursor < record.endemic_draws.size()
+                   && record.endemic_draws[endemic_cursor].idx == idx; ++endemic_cursor)
             {
-                const float lat = std::fabs(static_cast<float>(row) / static_cast<float>(gh - 1) - 0.5f) * 2.0f;
-                const float lon = static_cast<float>(col) / static_cast<float>(gw);
-
-                for (const endemic_good& e : pl->endemics)
-                {
-                    if (lat < e.lat_lo || lat > e.lat_hi)
-                        continue;
-
-                    // Wrapped angular separation from the origin region's centre.
-                    float d = std::fabs(lon - e.sector_centre);
-                    if (d > 0.5f) d = 1.0f - d;
-                    if (d > e.sector_width * 0.5f)
-                        continue;
-
-                    // Composition the crop actually grows on. All of these are
-                    // biotic, so they only exist on a world that reached a land
-                    // biosphere in the first place — which is the same gate the
-                    // endemic set itself sits behind.
-                    // CROPS FOLLOW THE COVER (BL-519). Each of these is a
-                    // claim about what grows here, not about the geology — which
-                    // is why the old list had to name compositions to say it.
-                    const terrain_cover c = cov[idx];
-                    bool suitable = false;
-                    switch (e.good)
-                    {
-                        case resource_type::tobacco: suitable = (c == terrain_cover::grass); break;
-                        case resource_type::spices:  suitable = (c == terrain_cover::marsh
-                                                             || c == terrain_cover::forest); break;
-                        case resource_type::coffee:  suitable = (c == terrain_cover::forest); break;
-                        // Furs were the old `tundra` row. Tundra is gone as a
-                        // terrain (Ben, 2026-08-21) and its ground is scrub, which
-                        // is where the trapping actually happens.
-                        case resource_type::furs:    suitable = (c == terrain_cover::scrub); break;
-                        // BL-586 slice 2 (2026-08-24). Hides are pastured /
-                        // hunted livestock and game, the literal reading of
-                        // grazing ground — `grass`, shared with tobacco's
-                        // cover exactly as `furs`/`scrub` already stands
-                        // alone: the two are differentiated by latitude band
-                        // and sector, not by cover.
-                        case resource_type::hides:    suitable = (c == terrain_cover::grass); break;
-                        default: break;
-                    }
-                    if (!suitable)
-                        continue;
-
-                    // Densest at the heart of the range, thinning toward its edge —
-                    // so a origin region has a centre worth holding rather than a
-                    // hard border.
-                    const float falloff = 1.0f - (d / std::max(e.sector_width * 0.5f, 1e-4f));
-                    std::uniform_real_distribution<float> u(0.0f, 1.0f);
-                    const float amount = (30.0f + 90.0f * u(tile_rng)) * e.richness * falloff;
-                    if (amount > 1.0f)
-                    {
-                        deposits[static_cast<std::size_t>(e.good)] = amount * deposit_scalar;
-                        // BL-762: an endemic good is biosphere output, so it is
-                        // the LIFE phase that placed it. Every good in the
-                        // endemic set is `biological` by the origin table, and
-                        // the set itself is empty on a world that never reached
-                        // a land biosphere — the accounting and the gate agree.
-                        life_placed[static_cast<std::size_t>(e.good)] +=
-                            static_cast<double>(amount * deposit_scalar);
-                    }
-                }
+                const generation_record::endemic_draw& e = record.endemic_draws[endemic_cursor];
+                deposits[static_cast<std::size_t>(e.good)] = e.amount * deposit_scalar;
+                // BL-762: an endemic good is biosphere output, so it is the LIFE
+                // phase that placed it. Every good in the endemic set is
+                // `biological` by the origin table, and the set itself is empty
+                // on a world that never reached a land biosphere — the
+                // accounting and the gate agree.
+                life_placed[static_cast<std::size_t>(e.good)] +=
+                    static_cast<double>(e.amount * deposit_scalar);
             }
 
             // Seed the finite extraction reserve from richness. Richness stays the
@@ -2370,49 +2555,37 @@ std::vector<entity_id> generate_body_tiles(
                 if (deposits[r] > 0.0f)
                     remaining[r] = deposits[r] * deposit_reserve_factor;
 
-            float hazard = 0.0f, habitability = 0.0f;
-            derive_environment(sub[idx], cov[idx], land[idx], hazard, habitability, tile_rng);
-
-            const entity_id tile_id = w.create_entity();
-            w.tiles[tile_id] = tile_component{
-                .body               = body_id,
-                .grid_x             = col,
-                .grid_y             = row,
-                .substrate          = reported_sub[idx], // BL-516 water kind; == sub[idx] on land
-                .cover              = cov[idx],
-                .cover_density      = dens[idx],
-                .landform           = land[idx],
-                .resource_deposit   = deposits,
-                .resource_remaining = remaining,
-                .hazard_level       = hazard,
-                .habitability       = habitability,
-                // BL-517: retain Pass 1's heightmap value. A pure CAPTURE of the float
-                // this function already computed — the same element that goes on to fill
-                // generation_record::height below. It reads no RNG, derives nothing, and
-                // changes no terrain, deposit or placement rule, so the generated surface
-                // is bit-identical to the pre-BL-517 build.
-                .height             = height[static_cast<std::size_t>(idx)],
-            };
-            tile_ids[idx] = tile_id;
+            tile_component& t = w.tiles.at(tile_ids[static_cast<std::size_t>(idx)]);
+            t.resource_deposit   = deposits;
+            t.resource_remaining = remaining;
         }
     }
 
-    if (record)
-    {
-        record->gw = gw;
-        record->gh = gh;
-        record->height   = std::move(height);
-        record->moisture = std::move(moisture);
-        record->band.resize(static_cast<std::size_t>(total));
-        for (int idx = 0; idx < total; ++idx)
-            record->band[static_cast<std::size_t>(idx)] = static_cast<uint8_t>(band[idx]);
-        record->ocean_score     = std::move(ocean_score);
-        record->ocean_threshold = ocean_threshold;
-        record->ocean_tiles     = ocean_tiles;
-        record->body_phase_placed = body_placed;
-        record->life_phase_placed = life_placed;
-    }
+    record.life_phase_placed = life_placed;
+}
 
+std::vector<entity_id> generate_body_tiles(
+    world& w,
+    entity_id body_id,
+    int gw, int gh,
+    const body_profile& profile,
+    uint32_t seed,
+    float deposit_scalar,
+    const planetology_state* pl,
+    generation_record* record,
+    const std::vector<float>* continent_bias,
+    const std::vector<uint8_t>* convergent,
+    const continent_state* continents)
+{
+    // BL-965: the two halves in order, over one record. A caller that asked for
+    // no record still needs the seam between them, so a local one is built and
+    // dropped; what the caller sees is unchanged — nothing.
+    generation_record local;
+    generation_record& seam = record ? *record : local;
+
+    std::vector<entity_id> tile_ids =
+        generate_body_surface(w, body_id, gw, gh, profile, seed, pl, seam, continent_bias, convergent);
+    generate_life_deposits_over(w, tile_ids, seam, profile, seed, deposit_scalar, pl, convergent, continents);
     return tile_ids;
 }
 
