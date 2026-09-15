@@ -96,7 +96,7 @@
 
     { "id": "EX-HL-3a", "name": "Oceanic Navigation", "kind": "major", "ring": 3, "branch": "HL",
       "links": [ "EX-HL-2a", "EX-GD-3b" ], "gate": "coastal", "diffusion": "practice", "excludes": null,
-      "effects": [ { "kind": "access", "target": "a crossing to unmet ground no longer requires an adjacent shore" }, { "kind": "modifier", "target": "reach", "per_mille": 260 } ],
+      "effects": [ { "kind": "access", "key": "sea_legs", "target": "a crossing to unmet ground no longer requires an adjacent shore" }, { "kind": "modifier", "target": "reach", "per_mille": 260 } ],
       "pursued_when": { "term": "wants_unmet", "situation": "Every want the realm can reach is already met; the remaining ones are across water nobody has crossed." },
       "earth_ref": "latitude, then longitude — a passage that can be repeated blind" },
 
@@ -144,7 +144,7 @@
 
     { "id": "EX-WY-1a", "name": "Post Roads", "kind": "major", "ring": 1, "branch": "WY",
       "links": [ "EX-SP-1a" ], "gate": null, "diffusion": "capacity", "excludes": null,
-      "effects": [ { "kind": "modifier", "target": "reach", "per_mille": 150 }, { "kind": "upgrade", "target": "Road becomes Highway on a corridor that carries" } ],
+      "effects": [ { "kind": "modifier", "target": "reach", "per_mille": 150 }, { "kind": "upgrade", "key": "post_roads", "target": "Road becomes Highway on a corridor that carries" } ],
       "pursued_when": { "term": "reach_bound", "situation": "The realm's own ground is the constraint: corridors that carry are worn past what a Road answers, and the next rung is the cheapest relief." },
       "earth_ref": "the maintained trunk line; the third rung above track and road" },
 

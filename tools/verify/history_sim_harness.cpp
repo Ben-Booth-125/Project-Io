@@ -1956,6 +1956,74 @@ int main()
               "M3c  the captured seat's preloaded stock is carried by the ownership change, never reset");
     }
 
+    // -----------------------------------------------------------------
+    // E1: BL-973 — every EMPIRE store effect reaches the sim through the
+    //     generated table, and is either read or declared unread. The
+    //     exploration twin is exploration_sim_harness T7.
+    // -----------------------------------------------------------------
+    {
+        int read = 0, unread = 0, both = 0, neither = 0;
+        int by_kind_read[io::tree_effect_kind_count]   = {};
+        int by_kind_unread[io::tree_effect_kind_count] = {};
+        for (int i = 0; i < io::empire_tree::effect_count; ++i)
+        {
+            const io::tree_effect& e = io::empire_tree::effects[i];
+            const bool r = tree_effect_reader_of(e) != tree_effect_reader::unread;
+            const bool u = tree_effect_declared_unread(e);
+            if (r && u) ++both; else if (!r && !u) { ++neither; std::printf("      NEITHER: %s\n", e.target); }
+            else if (r) { ++read;   ++by_kind_read[static_cast<int>(e.kind)]; }
+            else        { ++unread; ++by_kind_unread[static_cast<int>(e.kind)]; }
+        }
+        std::printf("      empire effects: %d rows, %d read, %d declared unread, %d both, %d neither\n",
+                    io::empire_tree::effect_count, read, unread, both, neither);
+        for (int k = 0; k < io::tree_effect_kind_count; ++k)
+            if (by_kind_read[k] || by_kind_unread[k])
+                std::printf("        %-12s read %2d  unread %2d\n",
+                            io::tree_effect_kind_names[k], by_kind_read[k], by_kind_unread[k]);
+        check(neither == 0, "E1a  every empire store effect has a reader or is on the stated unread list");
+        check(both == 0,    "E1b  no empire effect is both read and declared unread (the list is not stale)");
+
+        int tiled = 0;
+        bool contiguous = true;
+        for (int i = 0; i < io::empire_tree::node_count; ++i)
+        {
+            const io::empire_tree::node& n = io::empire_tree::nodes[i];
+            if (static_cast<int>(n.effects_begin) != tiled) contiguous = false;
+            if (n.effects_n == 0) contiguous = false;
+            tiled += n.effects_n;
+        }
+        check(contiguous && tiled == io::empire_tree::effect_count,
+              "E1c  node effect ranges tile the effects table exactly, no node effectless");
+
+        // The rim and the ring gates are store effects now, not counted milestones.
+        const io::tree_effect& rim_e = io::empire_tree::effects[
+            io::empire_tree::nodes[io::empire_tree::rim_node_index].effects_begin];
+        polity q;
+        q.empire_mask = 1ULL << io::empire_tree::rim_node_index;
+        apply_tree_effects(q);
+        check(rim_e.kind == io::tree_effect_kind::open && rim_e.open_tree
+           && tree_effect_reader_of(rim_e) == tree_effect_reader::tree_gate
+           && polity_holds_empire_rim(q),
+              "E1d  the empire rim is the node carrying the open-next-tree effect, and holding it is the rim read");
+        int ring_opens = 0;
+        for (int i = 0; i < io::empire_tree::effect_count; ++i)
+            if (io::empire_tree::effects[i].kind == io::tree_effect_kind::open
+             && io::empire_tree::effects[i].open_ring > 0) ++ring_opens;
+        check(ring_opens == 3,
+              "E1e  three ring-opening effects (rings 2, 3, 4) sit in the table for the availability gate to read");
+        // A summed modifier term: hold every node and the reach sum is the store's own total.
+        q.empire_mask = (io::empire_tree::node_count >= 64) ? ~0ULL : ((1ULL << io::empire_tree::node_count) - 1);
+        apply_tree_effects(q);
+        int reach_total = 0;
+        for (int i = 0; i < io::empire_tree::effect_count; ++i)
+            if (io::empire_tree::effects[i].kind == io::tree_effect_kind::modifier
+             && io::empire_tree::effects[i].term == io::tree_modifier_term::reach)
+                reach_total += io::empire_tree::effects[i].per_mille;
+        std::printf("      empire reach per-mille total over every node: %d\n", reach_total);
+        check(reach_total > 0 && tree_mod_q(q, io::tree_modifier_term::reach) == reach_total,
+              "E1f  holding every node folds the store's whole reach total into the surface");
+    }
+
     std::printf("\n%s (%d failure%s)\n",
                 g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");

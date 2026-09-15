@@ -1657,6 +1657,73 @@ int main()
         }
     }
 
+    // -----------------------------------------------------------------
+    // T7: BL-973 — every EXPLORATION store effect reaches the sim through
+    //     the generated table, and is either read or declared unread.
+    //     Fails when a new kind/term is authored into the store with no
+    //     reader and no declaration, or when the unread list goes stale.
+    // -----------------------------------------------------------------
+    {
+        int read = 0, unread = 0, both = 0, neither = 0;
+        int by_kind_read[io::tree_effect_kind_count]   = {};
+        int by_kind_unread[io::tree_effect_kind_count] = {};
+        for (int i = 0; i < io::exploration_tree::effect_count; ++i)
+        {
+            const io::tree_effect& e = io::exploration_tree::effects[i];
+            const bool r = tree_effect_reader_of(e) != tree_effect_reader::unread;
+            const bool u = tree_effect_declared_unread(e);
+            if (r && u) ++both; else if (!r && !u) { ++neither; std::printf("      NEITHER: %s\n", e.target); }
+            else if (r) { ++read;   ++by_kind_read[static_cast<int>(e.kind)]; }
+            else        { ++unread; ++by_kind_unread[static_cast<int>(e.kind)]; }
+        }
+        std::printf("      exploration effects: %d rows, %d read, %d declared unread, %d both, %d neither\n",
+                    io::exploration_tree::effect_count, read, unread, both, neither);
+        for (int k = 0; k < io::tree_effect_kind_count; ++k)
+            if (by_kind_read[k] || by_kind_unread[k])
+                std::printf("        %-12s read %2d  unread %2d\n",
+                            io::tree_effect_kind_names[k], by_kind_read[k], by_kind_unread[k]);
+        check(neither == 0, "T7.1  every exploration store effect has a reader or is on the stated unread list");
+        check(both == 0,    "T7.2  no exploration effect is both read and declared unread (the list is not stale)");
+
+        // The table covers every node: effect ranges tile the array exactly.
+        int tiled = 0;
+        bool contiguous = true;
+        for (int i = 0; i < io::exploration_tree::node_count; ++i)
+        {
+            const io::exploration_tree::node& n = io::exploration_tree::nodes[i];
+            if (static_cast<int>(n.effects_begin) != tiled) contiguous = false;
+            if (n.effects_n == 0) contiguous = false;
+            tiled += n.effects_n;
+        }
+        check(contiguous && tiled == io::exploration_tree::effect_count,
+              "T7.3  node effect ranges tile the effects table exactly, no node effectless");
+
+        // The fold: the three retired hand-wirings, re-read through the surface.
+        const int hl3a = find_node("EX-HL-3a");
+        const int wy1a = find_node("EX-WY-1a");
+        polity q;
+        q.exploration_mask = 1ULL << hl3a;
+        apply_tree_effects(q);
+        check(polity_holds_exploration_sea_legs(q)
+           && !polity_holds_tree_key(q, io::tree_effect_key::post_roads)
+           && tree_mod_q(q, io::tree_modifier_term::reach) == 260,
+              "T7.4  holding the sea-legs node folds its key and its reach +260 into the surface, nothing else");
+        q.exploration_mask |= 1ULL << wy1a;
+        apply_tree_effects(q);
+        check(polity_holds_tree_key(q, io::tree_effect_key::post_roads)
+           && tree_mod_q(q, io::tree_modifier_term::reach) == 410,
+              "T7.5  adding the post-roads node sets its key and sums reach to 410 (the fold is a sum)");
+        q.exploration_mask = 0;
+        apply_tree_effects(q);
+        check(q.tree_keys == 0 && tree_mod_q(q, io::tree_modifier_term::reach) == 0,
+              "T7.6  the fold is a rewrite, not an accumulator: an empty mask clears the surface");
+        const io::tree_effect& rim_e = io::exploration_tree::effects[
+            io::exploration_tree::nodes[io::exploration_tree::rim_node_index].effects_begin];
+        check(rim_e.kind == io::tree_effect_kind::open && rim_e.open_tree
+           && tree_effect_reader_of(rim_e) == tree_effect_reader::tree_gate,
+              "T7.7  the rim is the node carrying the open-next-tree effect, read as the tree gate");
+    }
+
     std::printf("\n%s (%d failure%s)\n",
                 g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");

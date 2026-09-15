@@ -45,6 +45,10 @@ const GATE_ATOMS = new Set(['ore_q', 'fuel', 'arable', 'coastal', 'grassland']);
 const DIFFUSION = new Set(['practice', 'artifact', 'capacity']);
 const MOD_TERMS = new Set(['reach', 'carrying_capacity', 'manpower', 'defence', 'industrial', 'stores',
   'cohesion', 'assimilation', 'plague', 'research', 'forage', 'muster_cost']);
+// The machine keys a non-modifier effect may carry when the sim reads it by identity
+// (TREES.md § Effects; src/world/tree_effect.hpp `tree_effect_key` is the C++ twin, and
+// gen_empire_tree_table.js carries the same list — change all three together, BL-973).
+const EFFECT_KEYS = new Set(['sea_legs', 'post_roads']);
 const KINDS = new Set(['minor', 'major', 'milestone']);
 const CAP = 64;
 
@@ -105,6 +109,12 @@ function lintTree(name, spec) {
       if (!EFFECT_KINDS.has(e.kind)) fail(`${n.id}: effect kind ${e.kind} not in vocabulary`);
       if (e.kind === 'modifier' && !MOD_TERMS.has(e.target)) fail(`${n.id}: modifier target ${e.target} not a sim term`);
       if (e.kind === 'modifier' && typeof e.per_mille !== 'number') fail(`${n.id}: modifier needs per_mille`);
+      if (e.key != null) {
+        if (e.kind === 'modifier') fail(`${n.id}: a modifier effect carries no key (its target is the term)`);
+        if (!EFFECT_KEYS.has(e.key)) fail(`${n.id}: effect key ${e.key} not in vocabulary`);
+      }
+      if (e.kind === 'open' && !/^ring \d+$/.test(e.target) && !/^[a-z]+ tree$/.test(e.target))
+        fail(`${n.id}: open target must be "ring N" or "<tree> tree", got "${e.target}"`);
     }
     if (n.kind === 'minor' && !(effects.length === 1 && effects[0].kind === 'modifier'))
       fail(`${n.id}: a minor carries exactly one modifier`);
