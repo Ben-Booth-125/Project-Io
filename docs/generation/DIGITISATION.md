@@ -30,6 +30,11 @@
 instant Exploration closes and ends at the epoch, so the world it produces is the world the
 campaign opens on (`GENERATION_STRATEGY.md` § Pass 2).
 
+**The default epoch flips to 1960 as this phase's done-when (Ben, 2026-09-15, NR-869).** The
+campaign epoch is 1960 (Ben, 2026-09-08), and the default world descriptor selects that arc when
+this phase lands — never before, because a 1960 world with no Digitisation opens on a 300-year gap
+the sim did not simulate.
+
 **This phase is designed backwards, from the map it leaves.** Ben, 2026-09-15: *"While the wizard
 visibly should show these happening, the real aim of our functions on this round is to seed the
 tile view players will have when the game begins."* Pass 1 was designed forwards and grew

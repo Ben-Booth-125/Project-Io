@@ -294,6 +294,13 @@ This is the phase's **outcome shape**, and it is what every mechanism above is u
 answerable to. `GENERATION_STRATEGY.md` § The asymmetry is POLITICAL as well as
 economic owns the full statement; what belongs here is what it demands of *this* phase.
 
+**Every share reading is by POPULATION HELD, not regions held (Ben, 2026-09-15, NR-876).** The map
+grows several times over inside the run as polities found new ground, so a share of regions counts
+founded emptiness the same as a captured city; by population the largest realms are more concentrated
+than region count shows and far fewer polities genuinely rise and fall. The region column stays as a
+guard beside it, and the wizard's leaderboard ranks by the population column (BL-1000, wizard
+leaderboard population share).
+
 **Conquest must COMPOUND.** Territory changing hands is necessary and nowhere near sufficient. A
 transfer that leaves the winner no better placed to win the next one produces churn — a map that
 moves constantly and ends the shape it started. The arc needs holding ground to make the next

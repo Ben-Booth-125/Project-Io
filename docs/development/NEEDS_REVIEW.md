@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*41 entries — 41 open, 0 resolved.*
+*32 entries — 32 open, 0 resolved.*
 
 ---
 
@@ -475,119 +475,6 @@ BL-955's allocation scores a navy step 0 once the fleet exceeds 400 per held reg
 > **Recommendation:** Option 2: it is what the doc already says, and it fixes the free-manpower problem at the same stroke if paid heads also draw from manpower. It moves the world again, so it would be its own item after this sprint rather than folded into the tuning wave.
 
 *Files: `src/world/history_sim.cpp`, `src/world/settlement.hpp`, `docs/generation/EXPLORATION.md`*
-
-### NR-868 — CALL: COLLAPSE.md's six strategies, seven culminations and pairing matrix — still design, or retired?
-*decision · raised 2026-09-15 · from BL-980 (generation doc-versus-code reconciliation), item 4.*
-
-docs/lore/COLLAPSE.md authors an Era -1 collapse metagame: a strain accumulator per major polity, six strategies a polity plays against it, seven culminating events, and a matrix pairing them. No source file cites the doc (src/world/CLAUDE.md lists it as an owner and nothing else does) and none of the roster's names or mechanics appear in src/. The collapse the history sim actually models is written in CIVILISATION.md: secession as network failure (BL-896, collapse is network failure — sec The network is the estate, and it crosses; sec What the dark age must leave) and the schism verb in CREEDS.md (BL-944, the schism verb). A superseded banner now sits at the top of COLLAPSE.md pointing at both; no content was deleted.
-
-**Why it matters.** An authority doc that no code reads and no other doc defers to is either design still owed or a retired exploration wearing an authority header. Left as it is, the next reader takes the strain/strategy/culmination model as the design and builds against a roster the sim does not have; retiring it without a ruling loses a written exploration Ben asked for (2026-08-20). Either answer is cheap to record; only Ben can give it.
-
-- RETIRE: move COLLAPSE.md to docs/research/ (or archive) as a mechanism reference; CIVILISATION.md and CREEDS.md are the collapse authority. Remove the banner with the move.
-- KEEP AS DESIGN: the roster is owed to a later pass (a strategy layer over the network-failure model). File a backlog item that owns it, cite it from the banner, and leave the doc as authority.
-- FOLD: keep only the parts CIVILISATION.md does not already say (the ideological-axis narration, the affordability notes) as a section of CIVILISATION.md; retire the rest.
-
-> **Recommendation:** Option 1. The built model (network failure + schism) is a consequence of upstream state, which is the shape Ben chose for generation stages; a strategy roster is an agent-side term the same rulings have refused elsewhere. Keep the prose as research.
-
-*Files: `docs/lore/COLLAPSE.md`, `docs/generation/CIVILISATION.md`, `docs/lore/CREEDS.md`*
-
-### NR-869 — CALL: does the default epoch move from 0 CE to 1960 before Digitisation?
-*decision · raised 2026-09-15 · from BL-980 (generation doc-versus-code reconciliation), item 8.*
-
-GENERATION_STRATEGY.md said the campaign epoch is 1960 on the arc generation runs. The code default is world_params::epoch_year = 0 (hard_coded_world.hpp; Ben, 2026-08-12, NR-177); 1960 is the opt-in --epoch 1960 flag (main.cpp), and the industrial span and the ruptures pass run only on a 1700+ epoch. The doc now says the default honestly (0 CE, 1960 opt-in) and the pass map is rewritten from make_hard_coded_world's actual order. What the doc cannot decide is whether the default itself should move.
-
-**Why it matters.** Every default-epoch world today opens at 0 CE with the Exploration span having run to 1660 and the clock rebased. DIGITISATION.md is the placeholder for 1660 -> 1960; if the default epoch is to be 1960, the placeholder becomes the next phase to build and the Exploration handoff is its input. If the default stays 0 CE, the 1960 arc is a sandbox and Digitisation has no live consumer, which changes what sprint 42's seam work is for.
-
-- Default stays 0 CE until Digitisation is built; 1960 remains the opt-in arc. Docs say so (done in BL-980).
-- Default moves to 1960 now, with Digitisation absent: the campaign opens after a 300-year gap the sim does not simulate. Cheap; honest only if the gap is labelled on the wizard.
-- Default moves to 1960 when Digitisation lands, as that item's DONE WHEN — file it against DIGITISATION.md.
-
-> **Recommendation:** Option 3. It keeps the doc and code agreeing at every point in between and makes the move a consequence of a built phase rather than a flag flip.
-
-*Files: `docs/generation/GENERATION_STRATEGY.md`, `docs/generation/DIGITISATION.md`, `src/world/hard_coded_world.hpp`, `src/main.cpp`*
-
-### NR-870 — CALL: the per-tile derivation breadcrumb — owed a surface, or dropped from the design?
-*decision · raised 2026-09-15 · from BL-980 (generation doc-versus-code reconciliation), item 9.*
-
-GENERATION_LEDGER.md sec Per-tile derivation breadcrumb and sec Surfacing design a five-step per-tile "why" (height, band and moisture, substrate and cover, landform, deposits) built once and shared by the ledger, the hover card and the Selection element. Ben ruled DELETE on its builder, draw_tile_derivation, on 2026-08-30 (archived NR entry) when the ledger lost its tab strip; the function is gone from src/. generation_ledger.hpp and .cpp still pointed at it as surviving — corrected in BL-980 — and the doc section now carries a banner saying it is design with no surface, with the call recorded here.
-
-**Why it matters.** The ledger exists to answer "why did this tile generate as it did" (the doc's own opening line) and today only the per-body half of that answer has a surface. Keeping a designed-but-unsurfaced section in an authority doc is exactly the pattern NR-717 named; deleting it loses the best written explanation of the tile pipeline the ledger family has. The 2026-08-30 ruling deleted the code; it did not say whether the design goes with it.
-
-- DROP: remove sec Per-tile derivation breadcrumb and the per-tile half of sec Surfacing from GENERATION_LEDGER.md; the tile-grain "why" is not a question the game answers.
-- OWE: file a backlog item for a per-tile derivation frame in the Selection element (a tile is already a Selection subject), cite it from the section, keep the design.
-- OWE, as a lens only: the field overlay lenses (BL-304) show the spatial structure of each pass; the per-tile numbers come from the Tile Ledger's existing rows and no breadcrumb is built.
-
-> **Recommendation:** Option 2 if the tile-grain question matters for tuning generation (it did when the ledger was designed); option 1 otherwise. Not option 3: the lens answers a different question than the breadcrumb.
-
-*Files: `docs/generation/GENERATION_LEDGER.md`, `src/ui/generation_ledger.hpp`, `src/ui/generation_ledger.cpp`, `docs/ui/SELECTION.md`*
-
-### NR-871 — CALL: at 1200 CE, do EVERY seat's stores flow to the capital (doc) or only the capital seat's own stock (code)?
-*decision · raised 2026-09-15 · from BL-980 (generation doc-versus-code reconciliation), item 12.*
-
-EXPLORATION.md sec Capital arrives says consolidation is the phase's opening act: "At 1200 CE every seat's stores flow to the capital, once" (Ben, 2026-09-11: consolidate all stores of material into the polity level). history_sim.cpp (the consolidation block in the exploration round, at the span's start year) does `seat.treasury += seat.material_stock; seat.material_stock = 0;` for the CAPITAL region only. A polity holding several seats keeps every non-capital seat's material_stock where it stands; those stores are never folded into the treasury. Nothing was edited: the two readings are both defensible and the difference is a design choice, not a typo.
-
-**Why it matters.** The doc reading makes the opening treasury the whole realm's hoard, so a wide empire opens the exploration age rich and a city state opens poor — the asymmetry EXPLORATION.md wants, and a thing the time-lapse can show. The code reading leaves most of a multi-seat realm's wealth on the map as material, where conquest of a seat still takes it (CIVILISATION.md sec Materials are spent) but the treasury and the spend scorer never see it. Which one is true changes every treasury figure the sprint 41 sweep reported, and the doc's claim that consolidation is visible.
-
-- DOC IS RIGHT: fold every seat the polity holds (`is_seat` and owner == polity) into the capital's treasury at start_year; non-capital seats keep material_stock = 0 thereafter. Re-run exploration_sweep; treasury and Alarm readings move.
-- CODE IS RIGHT: only the capital's own stock becomes capital; the other seats' stores stay material on the ground, taken by conquest, never by the purse. Reword EXPLORATION.md sec Capital arrives to say so.
-- BOTH, staged: the capital's stock consolidates at 1200 and the other seats' stores flow in at a per-round rate over the network (reach-gated), so centralisation is visible as a process rather than an instant.
-
-> **Recommendation:** Option 1 is what Ben said and what the doc records; option 2 is what the code does. Given the standing preference for the doc, option 1 — but it moves the world, so it is a sprint 42 item with a sweep, not a one-line fix.
-
-*Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`, `src/world/settlement.hpp`*
-
-### NR-872 — FINDING: six of the ten varying endowments move together with metallicity, so 55% of accepted homeworlds are poor in nothing
-*decision · raised 2026-09-15 · from BL-962 (endowment spread asserted), building agent's measurement over 20,000 accepted homeworlds; main session review.*
-
-planetology_sweep now prints the per-resource endowment distribution and asserts it has tails. The brief asked for "at least one resource per world in that resource's bottom decile"; the measurement says 55.5% of accepted homeworlds sit in NO resource's bottom decile. Cause: iron, copper, silica, rare earths, platinum-group metals and iron-nickel all scale with the same metallicity draw, so a metal-rich world is rich in all six at once. The assertion was pinned at the measured 44% rather than committed red. Also seen: every endemic good and most Tier-2/3 goods carry endowment 1.0 from S8's initial fill and are never overwritten (harmless while nothing reads them).
-
-**Why it matters.** GENERATION_STRATEGY.md sec Asymmetry is the deliverable names endowment as the first instrument of supply asymmetry and asks for a wide spread with real tails. A metallicity axis that moves six resources together produces rich worlds and poor worlds, not worlds rich in one thing and starved of another, which is the shape trade needs. Whether that is the planetology's honest physics or a generator flattening the map is the call.
-
-- Accept: metallicity is one real axis and the spread across worlds is enough; the within-world asymmetry comes from terrain and the endemic bands, not from endowment.
-- Decouple one or two metal endowments from metallicity with a second seeded scalar (a generator change; digests move; re-bless once with the movement described).
-- Leave until Digitisation shows whether the coupling is visible in the market; revisit with a chain-completeness reading in hand.
-
-### NR-873 — READING: displacement at Alarm 525 is 1.58 pooled and 1.33 median, with six held seeds and two silent
-*question · raised 2026-09-15 · from BL-971 (displacement volume-weighted), exploration_sweep over 16 seeds on the sprint-42 wave-0 tree; exploration_sweep.json is now checked in.*
-
-Ben asked on NR-867 for a volume-weighted displacement reading. On the integrated wave-0 tree (which carries BL-981's schism fix): pooled (sum of frontier over sum of neighbour battles) 1.68; volume-weighted per-seed mean 5.76, dominated by seed 10; median 1.35. Per seed: 7 displaced by ratio, 2 displaced with zero neighbour wars, 6 HELD where neighbour war still leads, 1 SILENT under the 20-battle floor (seed 9). Conflict persists: Exploration 55.9 battles/century against Empires 404.9. Before the schism fix the same tree read pooled 1.58, weighted 3.88, median 1.33, six held, two silent (9, 14); nine of sixteen seed rows moved. exploration_sweep.json at the repo root is the integrated-tree artefact.
-
-**Why it matters.** The sprint-41 authorisation rested on the median. The pooled reading is the robust one and also clears 1.0, so the conclusion survives the correction; but six of sixteen worlds still fight their neighbours more than their frontier, and the doc's claim is that conflict MOVES. Whether "clears on the pooled reading with six held seeds" is the phase's honest state or a tuning question is Ben's.
-
-- Authorisation stands on the pooled reading; the held seeds are a legitimate spread.
-- Treat the held count as the reading to move next, with a measured cause per held seed before any constant changes.
-- Require both pooled and median above 1.0 AND held seeds below a stated count before Digitisation is designed.
-
-### NR-874 — DECISION TAKEN: a schism moves seats, it does not raze them (BL-981)
-*decision taken on your behalf · raised 2026-09-15 · from BL-981 (colonisation D1/D3 regression), building agent; main session review.*
-
-The schism verb (BL-944) grouped a breakaway by residue culture and wrote is_seat = (r == seat) over every member, demoting any seat that walked out with the block; parent hinterland outside the block kept pointing at the demoted seat. The fix: every seat in the block stays a seat under the new realm (a realm born of a schism holds as many seats as walked out with it); a block member keeps its pointer if its seat came along, otherwise re-points at the new seat; parent ground whose seat left re-points at the parent capital. The alternative, demote and re-point everything at the new seat and parent capital, also satisfies D1/D3 but razes a settlement over a faith fracture and strands its material_stock and treasury on a non-seat.
-
-**Why it matters.** CIVILISATION.md's hinterland-pointer rule is satisfied either way; which reading is right is a design call about what a schism IS. Taken on Ben's behalf because the harness was red and both sprints 40 and 41 had shipped over it.
-
-- Stands: seats move.
-- Reverse: a schism razes the seats it takes, and the material is lost.
-
-### NR-875 — AUTHORISE: the sprint-42 wave-0 re-bless — seedA/on digest and the exploration R3b pin moved by the schism fix
-*decision · raised 2026-09-15 · from BL-981 merged on sprint-42-wave-0; world_determinism and exploration_sim_harness on the integrated tree.*
-
-One cause: the schism verb no longer demotes seats (NR-874). Digest seedA/on 49FB45407FF7C3C0 -> 457483363D79D700; seedB/on 728607C66CE6A4BE, seedA/off F9BF05466A631FF9 and the 1960 two-span 851FE345B2E37618 are unchanged. exploration_sim_harness R3b (the w_want_q = 0 pin) reads battles 308 (pinned 306), conquests 306 (304), foundings 472 (522), owner_changes 2196 (2174); subjections, freed, tribute, treaties, broken unchanged. Shape on seed 2 of the colonisation harness: 1720 regions and 116 seats, where the razing world had 1700 and 154 — fewer seats because breakaway realms now keep theirs instead of the parent re-founding. history_sweep.json and exploration_sweep.json are regenerated on the integrated tree and checked in; their movement is in the sprint-42 wave-0 DEVLOG entry.
-
-**Why it matters.** DELIVERY.md sec The digest re-bless is one act per WAVE: the pin and the digest are re-blessed against a described shape, by Ben, never absorbed. Until authorised, R3b stays red with this entry as its stated cause.
-
-- Authorise: re-pin R3b to 308/306/472/2196 and record 457483363D79D700 as the seedA/on baseline.
-- Not yet: keep the pin red and read the sweep movement first.
-
-### NR-876 — READING: by population the Empires arc is more concentrated and has three times fewer real risers than region count showed
-*question · raised 2026-09-15 · from BL-970 (share readings population-weighted), history_sweep over 16 seeds; both columns now on the face and in history_sweep.json.*
-
-Largest share at 1200 CE: median 8% by regions, 10% by population (ranges 5-18 / 6-19). Peak share: 11% vs 13% (8-20 / 9-25). Hegemony 0/16 both. Rise/peak/fall worlds 16/16 both. Polities that rose AND fell per world: median 74 by regions, 22 by population. Eliminations 16/16 gross (median 191 dead of about 237 ever held). Weakest survivor is 4916 heads in every seed, a derived founding floor with no spread.
-
-**Why it matters.** The audit's premise was that region growth inflates the arc. On concentration it deflated it (the biggest polities hold denser ground than the founded frontier); on shape it inflated it (most risers were founding empty ground, not gathering people). Sprint 38's distributional done_when reads the same verdict on either column, but the magnitudes Ben has been shown were the region ones. Is a 10-25% biggest-empire world the shape Ben wants before Digitisation, and should the wizard's leaderboard show the population column?
-
-- Accept the shape; make the population column the one the wizard shows.
-- Tune toward larger empires (a wave-2 item, tuned by forces, never clamped).
-- Read again after wave 2 moves the world.
 
 ### NR-877 — DECISION TAKEN: the PROPOSED readings in DIGITISATION.md the form did not ask about stand until overturned
 *decision taken on your behalf · raised 2026-09-15 · from Digitisation design session, elicitation form follow-through (BL-982..BL-997).*

@@ -10,7 +10,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
-| 2026-09-15 | [Sprint 42 wave 0: instruments before mechanisms, and the harness that paid for itself the same day](DEVLOG.md) | BL-962 BL-964 BL-966 BL-969 BL-970 BL-971 BL-974 BL-977 BL-979 BL-980 BL-981 | DEVLOG.md |
+| 2026-09-15 | [Sprint 42 wave 0: instruments before mechanisms, and the harness that paid for itself the same day](DEVLOG.md) | BL-1000 BL-1001 BL-1002 BL-962 BL-964 BL-966 BL-969 BL-970 BL-971 BL-974 BL-977 BL-979 BL-980 BL-981 BL-998 BL-999 | DEVLOG.md |
 | 2026-09-15 | [The generation audit: every stage delivers its struct and the next reads two fields of it; BL-960 lands, sprint 42 opens](DEVLOG.md) | BL-960 BL-970 BL-980 BL-981 | DEVLOG.md |
 | 2026-09-14 | [Sprint 41 (Exploration trade): goods flow, spend is chosen, displacement clears 1.0 — gated on authorisation](DEVLOG.md) | BL-944 BL-949 BL-950 BL-951 BL-952 BL-953 BL-954 BL-955 BL-956 BL-957 BL-958 BL-959 | DEVLOG.md |
 | 2026-09-12 | [Sprint 40 (Exploration) closes in full: six waves, fifteen items, one new phase](DEVLOG.md) | BL-928 BL-930 BL-931 BL-932 BL-933 BL-934 BL-935 BL-936 BL-937 BL-938 BL-939 BL-940 BL-941 BL-942 BL-943 BL-944 BL-945 | DEVLOG.md |
