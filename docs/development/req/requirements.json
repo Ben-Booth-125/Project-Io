@@ -5532,6 +5532,515 @@
      "result_metric": "cultures field on both structs; validator checks size, parentage, coining year, and equality with creed_state; digests unchanged; save_game_version 14->15, save_envelope_roundtrip PASS via the CMake tree"
     }
    ]
+  },
+  {
+   "brief": "tile-pass-reentry",
+   "title": "BL-965 - generate_body_tiles splits at the Body/Life boundary so the Life phase re-runs over a cached record",
+   "difficulty": 5,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-965 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "headless: tile_height_retention"
+     ],
+     "requirement": "The split whole is bit-identical: tile_height_retention and world_determinism digests unchanged.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: earthlike_tile_census"
+     ],
+     "requirement": "earthlike_tile_census --life-only reproduces the full run's fossil counts and reports the time ratio.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "planetology-thermal-series",
+   "title": "BL-961 - Planetology stores its thermal history as a per-epoch series the Life phase samples",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-961 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: planetology_harness"
+     ],
+     "requirement": "planetology_harness asserts the series is deterministic, epoch 0 equals the present, and no RNG is consumed.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: deposit_origin"
+     ],
+     "requirement": "deposit_origin shows withholding the thermal series moves fossil placement; D6 still holds.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "Digest movement measured in isolation and reported, not re-blessed.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "tiles-ride-plates",
+   "title": "BL-963 - The banding pass reads plate-carried position so palaeo climate is a frame",
+   "difficulty": 7,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-963 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: home_surface_bench"
+     ],
+     "requirement": "Cost measured FIRST against home_surface_bench's 1 s ceiling; the item is sliced or stopped if the frame exceeds it.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: continent_drift",
+      "headless: deposit_origin"
+     ],
+     "requirement": "continent_drift epoch 0 stays bit-identical (C1) and gains a band-at-epoch check; deposit_origin D6 moves more ground.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "Digest movement measured in isolation and reported.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "rivers-priced-in-walk",
+   "title": "BL-967 - The migration walk prices rivers as corridors",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-967 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: colonisation_harness"
+     ],
+     "requirement": "colonisation_harness shows a cradle on a river reaches inland earlier than with the river masked; C3/C3c hold.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "Digest movement measured in isolation and reported.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "ephemeral-cultures-measured",
+   "title": "BL-968 - Cultures that never hold ground are measured (step 1 only; the rule is Ben's call)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-968 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep",
+      "headless: colonisation_harness"
+     ],
+     "requirement": "history_sweep and colonisation_harness print cultures coined, holding at the boundary, and the ratio per seed.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "doc: NEEDS_REVIEW.json"
+     ],
+     "requirement": "A NEEDS_REVIEW entry puts the two candidate rules to Ben with the numbers; no rule is built in this item.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "force-upkeep-in-the-world",
+   "title": "BL-972 - Navies and standing armies cost a per-head upkeep from the treasury, replacing the scorer caps",
+   "difficulty": 5,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-972 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sim_harness"
+     ],
+     "requirement": "exploration_sim_harness shows an over-built polity poorer every round and a cap-free allocation not buying an army every round.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "exploration_sweep: treaty breaks above the 0.08% baseline; pooled displacement not below 1.0; movement reported.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "tree-effects-generated",
+   "title": "BL-973 - Node effects are generated from the tree stores and applied by the sim",
+   "difficulty": 6,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-973 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: grep",
+      "headless: exploration_sim_harness"
+     ],
+     "requirement": "No node index or id literal remains in history_sim.*; a harness proves every store effect kind has a reader.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep",
+      "headless: exploration_sweep"
+     ],
+     "requirement": "Sweeps re-read and the movement described, since effects that did nothing now do something.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "tariff-derivation-hands-to-digitisation",
+   "title": "BL-976 - The industrial-timing tariff derivation is retired on the single-span arc",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-976 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "The shipped arc's behaviour is unchanged (no tariffs) and the 1960 arc digest is unchanged.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "doc: docs/generation/DIGITISATION.md"
+     ],
+     "requirement": "DIGITISATION.md records that the inputs cross and the derivation is owed there.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "nation-treasury-from-exploration",
+   "title": "BL-975 - Nation treasuries are credited from the Exploration treasury at the fold",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-975 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: era_world_harness"
+     ],
+     "requirement": "era_world_harness: a nation folded from a richer polity starts richer; garrisons differentiate.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "doc: docs/generation/NATION_GENERATION.md",
+      "headless: world_determinism"
+     ],
+     "requirement": "The conversion is one named per-mille in NATION_GENERATION.md sec Pass 7; digest movement reported.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "search-axes-live-and-reach-term",
+   "title": "BL-977 - The landscape search perturbs a live roster and a scored road tier; the reach-quality term lands",
+   "difficulty": 6,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-977 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: landscape_score_harness"
+     ],
+     "requirement": "landscape_score_harness: three road tiers score differently; two rosters score differently.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: landscape_search_harness"
+     ],
+     "requirement": "The search prints which axis each round's winner came from; startup cost reported before and after.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "warm-start-retired",
+   "title": "BL-978 - pre_game_ticks is removed; the search's single validation run is the settle",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-978 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: haulage_measure"
+     ],
+     "requirement": "Startup time drops by the warm start's measured cost minus the validation run's; haulage stays above 1055/802.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: econ_stability"
+     ],
+     "requirement": "Econ goldens re-blessed once with the movement described (authorised).",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "consolidation-folds-every-seat",
+   "title": "BL-998 - At 1200 CE every seat a polity holds folds its stores into the capital treasury",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-998 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sim_harness"
+     ],
+     "requirement": "exploration_sim_harness: a two-seat polity opens with both seats' stock in its treasury and the non-capital seat at 0.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "exploration_sweep movement (treasury spread, readings 7-8) described for the wave re-bless.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "held-seeds-cause-measured",
+   "title": "BL-999 - Each held seed in the displacement reading gets a named cause",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-999 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "Every held seed carries one of four causes on the face and in exploration_sweep.json.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "doc: NEEDS_REVIEW.json"
+     ],
+     "requirement": "A NEEDS_REVIEW entry summarises the census with the constant each cause implicates.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "wizard-leaderboard-population-share",
+   "title": "BL-1000 - The Empires round leaderboard ranks share of the world by population held",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-1000 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: live click"
+     ],
+     "requirement": "The board ranks by population share on a live run; the readout's peak matches history_sweep's peak_share_pop_q for the seed.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "collapse-doc-folded-and-retired",
+   "title": "BL-1001 - COLLAPSE.md folds what CIVILISATION.md lacks into it and retires to research",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-1001 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "doc: header_graph --strict"
+     ],
+     "requirement": "docs/lore/COLLAPSE.md no longer exists; CIVILISATION.md carries the folded sections; header_graph dangling count not risen.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "breadcrumb-dropped",
+   "title": "BL-1002 - The per-tile derivation breadcrumb leaves GENERATION_LEDGER.md",
+   "difficulty": 1,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-1002 - Sprint 42, wave 1 (the batch)",
+   "batch": "sprint-42-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "doc: header_graph --strict"
+     ],
+     "requirement": "The section and the per-tile half of Surfacing are gone; no citation dangles.",
+     "notes": ""
+    }
+   ]
   }
  ]
 }
