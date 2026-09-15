@@ -7,7 +7,6 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
-#include <cstring>
 #include <queue>
 #include <unordered_map>
 
@@ -144,6 +143,12 @@ int region_value_q(const region& p)
 /// its scoring site never went through `region_value_q` in the first place
 /// (it reads `w_farm`/`w_ore`/`w_port` against the target directly), so this
 /// term is added there, and there only.
+/// BL-973: a modifier term read for a region's OWNER (defined with the tree
+/// effect surface, below the run loop, in this same unnamed namespace;
+/// declared here because the campaign pricing and resolution sites inside
+/// `run_history_sim` read it).
+int nation_tree_mod_q(const std::vector<polity>& ps, int nation, io::tree_modifier_term t);
+
 int campaign_prize_q(const region& p)
 {
     const int centre_q = clampi(p.centres * 200, 0, 1000);
@@ -2623,6 +2628,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const std::size_t century =
             static_cast<std::size_t>((y - params.start_year) / 100);
 
+        // ---- BL-973: fold every polity's held nodes into its effect surface
+        // before anything this round reads a term or a key. Re-run the
+        // instant a node is bought (the Invest verb below), so a purchase is
+        // visible to every later reader in the same round. Polity order is
+        // id order; the fold is pure in the masks, so the order is moot.
+        for (polity& q : out.polities)
+            apply_tree_effects(q);
+
         // ---- The founding schedule (BL-846) ------------------------------
         //
         // COLONISATION HAPPENS HERE, INSIDE THE SPAN, and that is the whole
@@ -3157,22 +3170,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // hash), each one's neighbour list read in its own stored
             // (insertion) order — the same discipline `rebuild_reach`'s own
             // walks already hold to.
-            // NOT a function-local `static`: `run_history_sim` is called
-            // repeatedly within one process (every determinism harness does
-            // this), and while the looked-up index cannot itself change
-            // between calls, a cached local defeats any inspection tool that
-            // assumes this function carries no state across invocations.
-            // The tree is ~31 nodes; the lookup costs nothing measurable.
-            int post_roads_node = -1;
-            for (int i = 0; i < io::exploration_tree::node_count; ++i)
-                if (std::strcmp(io::exploration_tree::nodes[i].id, "EX-WY-1a") == 0)
-                { post_roads_node = i; break; }
-            if (post_roads_node >= 0 && params.post_road_treasury_cost > 0)
+            // BL-973: the capability is the store effect keyed `post_roads`
+            // (EX-WY-1a's `upgrade`, today), read off the polity's folded
+            // effect surface — no node id is compared here any more.
+            if (params.post_road_treasury_cost > 0)
             {
                 for (polity& q : out.polities)
                 {
                     if (!q.alive) continue;
-                    if (!(q.exploration_mask & (1ULL << post_roads_node))) continue;
+                    if (!polity_holds_tree_key(q, io::tree_effect_key::post_roads)) continue;
                     if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= ss.regions.size())
                         continue;
                     if (ss.regions[static_cast<std::size_t>(q.capital)].treasury
@@ -3799,6 +3805,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const std::size_t hidx = static_cast<std::size_t>(hi);
                 const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
                                       ? reach[hidx] : (1 << 27);
+                // BL-973 FINDING, NOT WIRED: the `reach` term is folded into
+                // `polity::tree_mod_q` but deliberately NOT added here. At
+                // the authored magnitudes (empire reach nodes sum to 540‰,
+                // exploration's to 1380‰, against `work_reach_relief_cap_q`
+                // = 800) technology alone discounts most of the terrain
+                // price, and the BL-872 fixtures — cut-off ground stops
+                // growing, a far campaign starves — stop holding. Whether
+                // the store's magnitudes or the sim's cap moves is a
+                // design call; until it is made, `reach` is on the stated
+                // unread list (`tree_effect_declared_unread`).
                 const int hub_reach_q = clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
                 // 64-BIT ON PURPOSE (BL-922): the unreachable sentinel is
                 // 1 << 27, and sentinel x cost overflowed `int` at any cost
@@ -3913,6 +3929,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int reach_here = hub_reached
                                      ? reach[hs] + edge_step(hub, static_cast<int>(ti))
                                      : (1 << 27);
+                // (BL-973: the tree's `reach` term is NOT added here either —
+                // see the holdings-supply site above for the finding.)
                 const int hub_reach_q = (hub >= 0)
                     ? clampi(ss.regions[hs].work_reach_mod, 0, params.work_reach_relief_cap_q)
                     : 0;
@@ -4298,7 +4316,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // The two lines below are `muster_garrison`'s arithmetic
                     // asked as a question instead of applied as a mutation.
                     const int64_t def_men = defender_levy_estimate(tgt, params);
-                    const int def_works   = clampi(tgt.work_defence_mod, 0, 1000);
+                    // BL-973: the DEFENDER's held `defence` nodes stack with
+                    // its ground's works, in the same clamp.
+                    const int def_works   = clampi(tgt.work_defence_mod
+                                                 + nation_tree_mod_q(out.polities, owner[ti],
+                                                                     io::tree_modifier_term::defence),
+                                                   0, 1000);
                     const int def_scaled  = static_cast<int>(clampi64(
                         (def_men / 64) * (1000 + def_works) / 1000, 0, 1000));
 
@@ -5228,7 +5251,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
                 const int atk_ready = clampi(1000 - material_penalty_q, 0, 1000);
 
-                const int def_works_q = clampi(tgt.work_defence_mod, 0, 1000);
+                const int def_works_q = clampi(tgt.work_defence_mod
+                                             + nation_tree_mod_q(out.polities, owner[ti],
+                                                                 io::tree_modifier_term::defence), // BL-973
+                                               0, 1000);
                 const int def_ready = (best_winter ? (1000 - params.winter_readiness_penalty_q) : 1000)
                                     + def_works_q;
 
@@ -5824,8 +5850,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // mechanism is wired and the boost is zero until that is fixed
                 // — which is a finding about BL-757, not a reason to route this
                 // through a domain it does not belong to.
+                // BL-973: the polity's held `industrial` nodes pull the
+                // same crossing forward, beside its works' mean.
                 const bool  ind_domain = (d == static_cast<int>(sim_domain::materials));
-                const int   ind_boost  = ind_domain ? clampi(mean_industrial_q, 0, 1000) : 0;
+                const int   ind_boost  = ind_domain
+                    ? clampi(mean_industrial_q + tree_mod_q(q, io::tree_modifier_term::industrial), 0, 1000)
+                    : 0;
                 const int   progress   = clampi(best_score, 0, 1000) * step_years;
                 q.progress_q[d] += progress + (progress * ind_boost) / 1000;
                 // A band costs more the higher it sits — capacity follows the
@@ -5931,10 +5961,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         // at that point, not a restructure.
                         const int contact_degree = 0;
 
+                        // BL-973: the `research` modifier term is the
+                        // tree's own reader of itself — every held
+                        // research node scales the flow (TREES.md sec
+                        // Effects: "the research rate itself").
                         const int64_t research_q =
                             (industry_sum * params.empire_research_fraction_q) / 1000
                                 * (1000 + spire_ring * 150) / 1000
-                                * (1000 + clampi(contact_degree, 0, 10) * 40) / 1000;
+                                * (1000 + clampi(contact_degree, 0, 10) * 40) / 1000
+                                * (1000 + clampi(tree_mod_q(q, io::tree_modifier_term::research), 0, 4000)) / 1000;
                         q.empire_progress_q += static_cast<int32_t>(
                             clampi64(research_q * step_years, 0, INT32_MAX));
 
@@ -5950,6 +5985,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             q.empire_mask |= (1ULL << q.empire_investing);
                             q.empire_progress_q = 0;
                             q.empire_investing  = -1;
+                            apply_tree_effects(q); // BL-973: the surface follows the mask at once
                         }
                     }
 
@@ -6048,7 +6084,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                     ss.regions[static_cast<std::size_t>(hi)]);
 
                             const int64_t research_q =
-                                (industry_sum * params.empire_research_fraction_q) / 1000;
+                                (industry_sum * params.empire_research_fraction_q) / 1000
+                                    * (1000 + clampi(tree_mod_q(q, io::tree_modifier_term::research), 0, 4000)) / 1000; // BL-973
                             q.exploration_progress_q += static_cast<int32_t>(
                                 clampi64(research_q * step_years, 0, INT32_MAX));
 
@@ -6064,6 +6101,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                 q.exploration_mask |= (1ULL << q.exploration_investing);
                                 q.exploration_progress_q = 0;
                                 q.exploration_investing  = -1;
+                                apply_tree_effects(q); // BL-973
                             }
                         }
                     }
@@ -6207,7 +6245,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // documented per year of Consolidate, so a coarse band credits
                 // the interval it actually covers. The clamp still bounds it,
                 // so a 100-year band recovers fully rather than overshooting.
-                q.cohesion_q = clampi(q.cohesion_q + params.cohesion_recovery_q * step_years,
+                // BL-973: held `cohesion` nodes scale the recovery rate
+                // (TREES.md sec Effects: "recovery on Consolidate").
+                q.cohesion_q = clampi(q.cohesion_q
+                                    + params.cohesion_recovery_q * step_years
+                                        * (1000 + clampi(tree_mod_q(q, io::tree_modifier_term::cohesion), 0, 4000)) / 1000,
                                       params.cohesion_floor_q, 1000);
                 break;
             }
@@ -7160,6 +7202,156 @@ history_sim_state run_history_sim(settlement_state&         ss,
 }
 
 // ---------------------------------------------------------------------------
+// The tree effect surface (BL-973) — one fold for every tree
+// ---------------------------------------------------------------------------
+//
+// The two generated tables (`io::empire_tree`, `io::exploration_tree`) have
+// distinct `node` types with one layout, so the walkers are templates over
+// the node type rather than a per-tree twin — the same reason the generator
+// itself was generalised (BL-930). Walk order is the table's fixed authored
+// order; nothing here depends on anything transient.
+
+namespace {
+
+/// Fold one tree's held effects into the polity's surface.
+template <typename NodeT, int N, int E>
+void fold_tree_effects(uint64_t mask, const NodeT (&nodes)[N],
+                       const io::tree_effect (&effects)[E], polity& q)
+{
+    for (int i = 0; i < N; ++i)
+    {
+        if (!(mask & (1ULL << i))) continue;
+        const NodeT& n = nodes[i];
+        for (int r = 0; r < static_cast<int>(n.effects_n); ++r)
+        {
+            const io::tree_effect& e = effects[n.effects_begin + r];
+            if (e.kind == io::tree_effect_kind::modifier
+             && e.term != io::tree_modifier_term::none)
+                q.tree_mod_q[static_cast<int>(e.term)] += e.per_mille;
+            if (e.key != io::tree_effect_key::none)
+                q.tree_keys |= (1u << static_cast<unsigned>(e.key));
+        }
+    }
+}
+
+/// Rule 1's ring lock, read off the store: is there a held node carrying
+/// `open "ring <ring>"`?
+template <typename NodeT, int N, int E>
+bool tree_ring_open(uint64_t mask, int ring, const NodeT (&nodes)[N],
+                    const io::tree_effect (&effects)[E])
+{
+    for (int i = 0; i < N; ++i)
+    {
+        if (!(mask & (1ULL << i))) continue;
+        const NodeT& n = nodes[i];
+        for (int r = 0; r < static_cast<int>(n.effects_n); ++r)
+        {
+            const io::tree_effect& e = effects[n.effects_begin + r];
+            if (e.kind == io::tree_effect_kind::open && static_cast<int>(e.open_ring) == ring)
+                return true;
+        }
+    }
+    return false;
+}
+
+/// A term read for a region's OWNER. Every creation site assigns
+/// `id = out.polities.size()`, so the id is the index; that is checked
+/// rather than assumed, with the id walk (`dq`'s idiom) as the fallback.
+/// 0 for unowned ground or an unknown id. Called per candidate target in
+/// campaign pricing, hence O(1) on the common path.
+int nation_tree_mod_q(const std::vector<polity>& ps, int nation, io::tree_modifier_term t)
+{
+    if (nation < 0) return 0;
+    const std::size_t ni = static_cast<std::size_t>(nation);
+    if (ni < ps.size() && ps[ni].id == nation) return tree_mod_q(ps[ni], t);
+    for (const polity& o : ps)
+        if (o.id == nation) return tree_mod_q(o, t);
+    return 0;
+}
+
+} // namespace
+
+void apply_tree_effects(polity& q)
+{
+    for (int i = 0; i < io::tree_modifier_term_count; ++i) q.tree_mod_q[i] = 0;
+    q.tree_keys = 0;
+    fold_tree_effects(q.empire_mask,      io::empire_tree::nodes,      io::empire_tree::effects,      q);
+    fold_tree_effects(q.exploration_mask, io::exploration_tree::nodes, io::exploration_tree::effects, q);
+}
+
+tree_effect_reader tree_effect_reader_of(const io::tree_effect& e)
+{
+    using K = io::tree_effect_kind;
+    using T = io::tree_modifier_term;
+    using Y = io::tree_effect_key;
+
+    // Identity reads first: a keyed effect is read by its key whatever its
+    // kind (the key is the contract; the kind is the doc's classification).
+    switch (e.key)
+    {
+        case Y::sea_legs:   return tree_effect_reader::sea_legs_gate;
+        case Y::post_roads: return tree_effect_reader::post_roads_gate;
+        case Y::none: break;
+    }
+    if (e.kind == K::open)
+    {
+        if (e.open_tree)      return tree_effect_reader::tree_gate;
+        if (e.open_ring > 0)  return tree_effect_reader::ring_gate;
+        return tree_effect_reader::unread;
+    }
+    if (e.kind == K::modifier)
+    {
+        switch (e.term)
+        {
+            // `reach` is folded but unread — see the holdings-supply site in
+            // run_history_sim for the BL-872 finding that keeps it so.
+            case T::defence:    return tree_effect_reader::modifier_defence;
+            case T::industrial: return tree_effect_reader::modifier_industrial;
+            case T::cohesion:   return tree_effect_reader::modifier_cohesion;
+            case T::research:   return tree_effect_reader::modifier_research;
+            default:            return tree_effect_reader::unread;
+        }
+    }
+    return tree_effect_reader::unread;
+}
+
+bool tree_effect_declared_unread(const io::tree_effect& e)
+{
+    using K = io::tree_effect_kind;
+    using T = io::tree_modifier_term;
+    if (e.key != io::tree_effect_key::none) return false; // keyed effects are read by key
+    switch (e.kind)
+    {
+        case K::open:
+            return false; // every open is a gate
+        case K::modifier:
+            switch (e.term)
+            {
+                // Consumers read region fields (`work_capacity_mod`,
+                // `work_manpower_mod`) inside settlement.cpp with no polity
+                // in scope, or the sim carries no such term at all (stores
+                // decay, plague resistance, forage, a labour split). `reach`
+                // HAS a surface (the hub's `work_reach_mod`) and is withheld
+                // on a measured finding — the BL-872 fixtures fail at the
+                // authored magnitudes; see the holdings-supply site.
+                case T::reach:
+                case T::carrying_capacity: case T::manpower: case T::stores:
+                case T::assimilation:      case T::plague:   case T::forage:
+                case T::muster_cost:
+                    return true;
+                default:
+                    return false;
+            }
+        // Works and unit rows still gate on the derived band (TREES.md's open
+        // question); the rest are prose the sim has no term for.
+        case K::unlock: case K::upgrade: case K::retire: case K::access: case K::reach:
+        case K::intel:  case K::institution: case K::doctrine: case K::resource:
+            return true;
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------
 // The empire tree (BL-912) — availability, the scorer, the rim
 // ---------------------------------------------------------------------------
 
@@ -7176,20 +7368,13 @@ bool empire_node_available(uint64_t mask, int node_idx)
     // un-completes, so this is a one-way gate on the mask alone.
     if (n.excludes >= 0 && (mask & (1ULL << n.excludes))) return false;
 
-    // Rule 1/the spire: ring r+1 is locked until the milestone at ring r is
-    // held (TREES.md sec Milestones). Ring 1 has no gate.
-    if (n.ring > 1)
-    {
-        bool prior_ring_open = false;
-        for (int i = 0; i < io::empire_tree::node_count; ++i)
-        {
-            const io::empire_tree::node& m = io::empire_tree::nodes[i];
-            if (m.kind == io::empire_tree::node_kind::milestone
-             && m.ring == n.ring - 1 && (mask & (1ULL << i)))
-            { prior_ring_open = true; break; }
-        }
-        if (!prior_ring_open) return false;
-    }
+    // Rule 1/the spire: ring r is locked until a held node carries the
+    // store's `open "ring r"` effect — the milestone one ring down, by the
+    // spire's shape (TREES.md sec Milestones). Ring 1 has no gate. BL-973:
+    // read off the effect, not off "a milestone at ring r-1".
+    if (n.ring > 1
+     && !tree_ring_open(mask, static_cast<int>(n.ring), io::empire_tree::nodes, io::empire_tree::effects))
+        return false;
 
     // Rule 2: travel is OR. Available if it is the tree's true root (its OWN
     // declared `links` was empty — see `node::is_root`'s comment: every
@@ -7310,20 +7495,12 @@ bool exploration_node_available(uint64_t mask, int node_idx)
     // one-way gate `empire_node_available` runs.
     if (n.excludes >= 0 && (mask & (1ULL << n.excludes))) return false;
 
-    // Rule 1/the spire: ring r+1 is locked until the milestone at ring r is
-    // held. Ring 1 has no gate.
-    if (n.ring > 1)
-    {
-        bool prior_ring_open = false;
-        for (int i = 0; i < io::exploration_tree::node_count; ++i)
-        {
-            const io::exploration_tree::node& m = io::exploration_tree::nodes[i];
-            if (m.kind == io::exploration_tree::node_kind::milestone
-             && m.ring == n.ring - 1 && (mask & (1ULL << i)))
-            { prior_ring_open = true; break; }
-        }
-        if (!prior_ring_open) return false;
-    }
+    // Rule 1/the spire: ring r is locked until a held node carries the
+    // store's `open "ring r"` effect (BL-973 — the effect, not a counted
+    // milestone). Ring 1 has no gate.
+    if (n.ring > 1
+     && !tree_ring_open(mask, static_cast<int>(n.ring), io::exploration_tree::nodes, io::exploration_tree::effects))
+        return false;
 
     // Rule 2: travel is OR. Available if it is the tree's true root, or at
     // least one linked neighbour is held.

@@ -2374,6 +2374,30 @@ struct polity
     /// readable by a third party without a second ledger: `treaty_value_q`
     /// reads the COUNTERPART's copy of this field, never the decider's own.
     int32_t treaties_broken = 0;
+
+    // -----------------------------------------------------------------------
+    // BL-973 — THE TREE EFFECT SURFACE, folded from the masks above.
+    // -----------------------------------------------------------------------
+    //
+    // DERIVED, NEVER AUTHORED: `apply_tree_effects` rewrites both fields
+    // from `empire_mask` and `exploration_mask` at the top of every round
+    // and again the instant a node is bought, walking the generated
+    // `effects[]` tables (tree_effect.hpp is the vocabulary). Nothing else
+    // writes them, and nothing in the sim names a node — a reader asks for
+    // a TERM or a KEY, never for "node 11". NOT SERIALISED, same footing as
+    // the masks: recomputable from them, and this struct does not cross the
+    // save seam.
+
+    /// Per-term sum of held `modifier` effects' per-mille, both trees,
+    /// indexed by `io::tree_modifier_term`. A term with no reader in the
+    /// sim is still summed here (the surface is generic); which terms are
+    /// read is `tree_effect_reader_of`'s to say.
+    int32_t tree_mod_q[io::tree_modifier_term_count] = {};
+
+    /// Bit `k` set iff some held node carries an effect with
+    /// `key == io::tree_effect_key(k)`. The identity reads (sea legs, post
+    /// roads) test this and nothing else.
+    uint32_t tree_keys = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -2471,17 +2495,76 @@ inline bool polity_holds_exploration_rim(const polity& q)
     return (q.exploration_mask & (1ULL << io::exploration_tree::rim_node_index)) != 0;
 }
 
+// ---------------------------------------------------------------------------
+// The tree effect surface (BL-973) — one fold, generic readers, an honest
+// unread list
+// ---------------------------------------------------------------------------
+//
+// TREES.md sec Effects: "a node whose effect nothing in the sim reads is not
+// authored." Before this item the generated tables carried topology only and
+// the sim read three nodes by hand (a counted rim index, `index 11` for sea
+// legs, a strcmp on "EX-WY-1a"). Now every store effect reaches the sim
+// through ONE fold, and what the sim does with each kind is stated here in
+// code, so the harness can hold the store to it.
+
+/// Fold `q.empire_mask` and `q.exploration_mask` into `q.tree_mod_q[]` and
+/// `q.tree_keys`, walking both generated `effects[]` tables in their fixed
+/// authored order. Pure in the masks; idempotent; cheap (≈140 rows).
+void apply_tree_effects(polity& q);
+
+/// Does a held node carry an effect keyed `k`? Reads the folded surface.
+inline bool polity_holds_tree_key(const polity& q, io::tree_effect_key k)
+{
+    return (q.tree_keys & (1u << static_cast<unsigned>(k))) != 0;
+}
+
+/// The polity's summed per-mille for one modifier term (0 when nothing held).
+inline int tree_mod_q(const polity& q, io::tree_modifier_term t)
+{
+    const int i = static_cast<int>(t);
+    return (i >= 0 && i < io::tree_modifier_term_count) ? q.tree_mod_q[i] : 0;
+}
+
 /// BL-934 — THE ASYMMETRY THAT PERMITS SUBJECTION, AS A NODE, NEVER A RANK
-/// (EXPLORATION.md sec Where subjects come from: "nothing reads size"). Index
-/// 11, `EX-HL-3a` "Oceanic Navigation": "a crossing to unmet ground no longer
-/// requires an adjacent shore" — the exact capability a far, unmet continent's
-/// contact requires, read straight off `exploration_mask` exactly as
-/// `polity_holds_exploration_rim` reads its own bit.
-inline constexpr int exploration_sea_legs_node_index = 11;
+/// (EXPLORATION.md sec Where subjects come from: "nothing reads size"): the
+/// store effect keyed `sea_legs` ("a crossing to unmet ground no longer
+/// requires an adjacent shore"), whichever node carries it.
 inline bool polity_holds_exploration_sea_legs(const polity& q)
 {
-    return (q.exploration_mask & (1ULL << exploration_sea_legs_node_index)) != 0;
+    return polity_holds_tree_key(q, io::tree_effect_key::sea_legs);
 }
+
+/// Which sim surface consumes an effect. `unread` is the honest gap: the
+/// effect is folded (a modifier still sums into `tree_mod_q`) but nothing
+/// downstream reads it yet.
+enum class tree_effect_reader : uint8_t
+{
+    unread = 0,
+    ring_gate,        ///< open "ring N": `*_node_available`'s ring lock
+    tree_gate,        ///< open "<tree> tree": `polity_holds_*_rim`
+    sea_legs_gate,    ///< key sea_legs: the subjection block
+    post_roads_gate,  ///< key post_roads: the treasury-bought third road rung
+    modifier_defence,     ///< the defender's readiness (campaign pricing and resolution)
+    modifier_industrial,  ///< the materials ladder's pull-forward
+    modifier_cohesion,    ///< Consolidate's recovery rate
+    modifier_research,    ///< both trees' research flow
+};
+tree_effect_reader tree_effect_reader_of(const io::tree_effect& e);
+
+/// THE STATED UNREAD LIST. True for exactly the effects the sim does not
+/// consume today: kinds `unlock`, `upgrade`, `retire`, `access`, `reach`,
+/// `intel`, `institution`, `doctrine`, `resource` when they carry no key
+/// (works and unit rows still gate on the derived band — TREES.md's open
+/// question; the rest are prose the sim has no term for), and modifier
+/// terms `carrying_capacity`, `manpower`, `stores`, `assimilation`, `plague`,
+/// `forage`, `muster_cost` (their consumers read region fields or do not
+/// exist in this sim) plus `reach`, which HAS a surface and is withheld on
+/// a measured finding (the authored magnitudes collapse the BL-872 distance
+/// fixtures — see the holdings-supply site in run_history_sim). A harness
+/// asserts every store effect is either read or on this list, and never
+/// both, so authoring a new kind or term into a store without a reader
+/// fails loudly instead of doing nothing.
+bool tree_effect_declared_unread(const io::tree_effect& e);
 
 /// What the scorer chose for one polity in one year — kept for the harness and
 /// for the History Log, so a run can be read back as decisions rather than as

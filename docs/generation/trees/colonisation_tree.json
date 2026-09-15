@@ -76,7 +76,7 @@
       "effects": [
         {
           "kind": "open",
-          "target": "ring_2"
+          "target": "ring 2"
         }
       ],
       "earth_ref": "a band that eats more than it gathers — the surplus that makes a second ground worth learning",
@@ -135,7 +135,7 @@
       "effects": [
         {
           "kind": "open",
-          "target": "ring_3"
+          "target": "ring 3"
         }
       ],
       "earth_ref": "the year-round village — a store worth staying beside",
@@ -199,7 +199,7 @@
       "effects": [
         {
           "kind": "open",
-          "target": "empire"
+          "target": "empire tree"
         }
       ],
       "earth_ref": "a town that can be seated — the condition for a polity, not a polity",
