@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*156 entries — 27 gameplay · 25 canvas · 15 lens · 54 ledger · 35 chrome.*
+*155 entries — 27 gameplay · 25 canvas · 15 lens · 53 ledger · 35 chrome.*
 
 ---
 
@@ -1307,24 +1307,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Generation Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it explains why the surface generated as it did, split into Body (histograms, thresholds, profile echo) and Tile (the per-tile derivation breadcrumb) views. Opening or switching body REGENERATES that body's per-pass record from the recorded tile-pass inputs - a deterministic replay costing one tile pass, cached while the body stays the subject. Nothing it shows is stored on the world or in the save.
+**Expected output.** Toggles the Generation Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it explains why the body generated as it did: ONE FLAT PANEL of six collapsing sections over tables - Profile, Thresholds, Latitude bands, and the Substrate / Cover / Landform distributions - behind a Body combo (Ben, 2026-08-30). There is no tab strip and no per-tile view: each section header toggles its own section, and the rail slot is the only press that closes the surface. Every distribution names its denominator in its header, and they do not all share one - Substrate and Cover are taken over the whole grid, ocean included; Landform over land alone, since water carries no landform (Ben, 2026-08-30). Opening or switching body REGENERATES that body's per-pass record from the recorded tile-pass inputs - a deterministic replay costing one tile pass, cached while the body stays the subject. Nothing it shows is stored on the world or in the save. A Body/Tile tab strip and a Tile view (the per-tile derivation breadcrumb) were retired 2026-08-30 with the reshaping; a press on either no longer exists.
 
-**Reason to select.** A DEVELOPER TUNING surface, not a play read: it answers why a tile or a whole body came out as it did. An AI player has no strategic use for it - the deposits and terrain it would act on are already on the tile.
-
-### `ledger.generation_view_tab` — Generation Ledger, view tab strip
-
-**Press.** Click the 'Body' or 'Tile' tab button
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `view` | `enum` | 'Body' (composition/landform histograms, ocean threshold, latitude bands, profile echo) or 'Tile' (the five-pass derivation breadcrumb for the selected tile) |
-
-**Valid when:**
-- Generation Ledger is open
-
-**Expected output.** Switches the view. Re-clicking the currently-active tab closes the whole Generation Ledger (toggle rule); switching tabs is an ordinary view change. The Tile view reads the shared selection: with no tile selected, or a tile on another body, it says so rather than showing a stale breadcrumb.
-
-**Reason to select.** Body answers 'what shape did this generation come out, and which input made it that shape?'; Tile answers 'why is THIS tile what it is?'
+**Reason to select.** A DEVELOPER TUNING surface, not a play read: it answers why a whole body came out the shape it did, and which input made it that shape. An AI player has no strategic use for it - the deposits and terrain it would act on are already on the tile.
 
 ### `ledger.generation_body_selector` — Generation Ledger, 'Body' combo
 

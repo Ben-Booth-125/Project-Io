@@ -409,11 +409,11 @@ void draw_generation_ledger(const world& w, ui_state& s,
     // Histograms over the LIVE tiles: the record holds the intermediates, the
     // world holds the outcome, and the outcome is what a balance question is about.
     //
-    // EVERY DENOMINATOR IS NAMED IN ITS HEADER, and it is the same one for all
-    // three: the whole grid, ocean included. That matters most on Landform, where
-    // water carries `plains` and so inflates the plains share far above its share
-    // of LAND. Naming the denominator does not fix that - it makes it visible,
-    // which is the least a tuning surface owes its reader.
+    // EVERY DENOMINATOR IS NAMED IN ITS HEADER, and they do not all share one:
+    // Substrate and Cover are taken over the whole grid, ocean included; Landform
+    // over land alone (see the note at that section). Naming the denominator is
+    // the least a tuning surface owes its reader - a share is only an answer once
+    // the reader knows what it is a share of.
     const std::vector<entity_id> tiles = raster_index(w, subject, rec->gw, rec->gh);
     // BL-519: two histograms where there was one. Collapsing them back into a
     // single 12-row table is exactly the overloading the axis split undid.
