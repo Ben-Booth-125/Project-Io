@@ -6,7 +6,7 @@
     "64-node cap, the spire shape, fork symmetry, reachability, and the doc/store cross-check both ways.",
     "Edit a table in the doc, update this store, run the lint.",
     "Ids are EM-<branch>-<ring><seq>; 'm' is the one milestone per ring, on the spire (SP).",
-    "links list each undirected edge ONCE, from the lower id. cost = base(kind) x ring, never stored.",
+    "links list each undirected edge ONCE, on the node farther from the root; the root EM-SP-1a lists none, and that empty list is how the generated table derives is_root (tree_lint holds exactly one). cost = base(kind) x ring, never stored.",
     "per_mille magnitudes are authored by judgement and are PLACEHOLDERS, as the works magnitudes are.",
     "pursued_when is the scorer's per-node specification: the term that makes this node the top pick,",
     "and the one-line state of the world in which that happens. Terms are in scorer_terms and defined",

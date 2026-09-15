@@ -3,7 +3,7 @@
   "_note": [
     "The Industry tree — the economy pass, 1560 → 1960 (TREES.md § The store). Invested: the Invest verb takes one node a round, chosen by the scorer.",
     "INDUSTRY_TREE.md is the authority; this file transcribes its tables. tree_lint.js cross-checks the two both ways and enforces the five rules.",
-    "Ids carry branch and ring (IN-<BR>-<ring><seq>; seq m is the ring's milestone). Links are undirected and stored once, from the lower id.",
+    "Ids carry branch and ring (IN-<BR>-<ring><seq>; seq m is the ring's milestone). Links are undirected and stored once, on the node farther from the root; the root IN-SP-1a lists none, and that empty list is how the generated table derives is_root (tree_lint holds exactly one).",
     "Magnitudes (per_mille) are authored by judgement and are placeholders; the sweep re-prices them. Names are generic mechanism nouns — real history is a mechanism reference, never a name source; earth_ref is calibration prose only."
   ],
   "tree": "industry",
@@ -73,9 +73,7 @@
       "kind": "major",
       "ring": 1,
       "branch": "SP",
-      "links": [
-        "IN-SP-1m"
-      ],
+      "links": [],
       "gate": "fuel",
       "diffusion": "capacity",
       "excludes": null,
@@ -104,7 +102,7 @@
       "ring": 1,
       "branch": "SP",
       "links": [
-        "IN-SP-2a"
+        "IN-SP-1a"
       ],
       "gate": null,
       "diffusion": "capacity",
@@ -135,7 +133,7 @@
       "ring": 2,
       "branch": "SP",
       "links": [
-        "IN-SP-2m"
+        "IN-SP-1m"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
@@ -166,7 +164,7 @@
       "ring": 2,
       "branch": "SP",
       "links": [
-        "IN-SP-3a"
+        "IN-SP-2a"
       ],
       "gate": null,
       "diffusion": "capacity",
@@ -198,7 +196,8 @@
       "ring": 3,
       "branch": "SP",
       "links": [
-        "IN-SP-3m"
+        "IN-SP-2m",
+        "IN-MV-3a"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
@@ -228,7 +227,9 @@
       "kind": "milestone",
       "ring": 3,
       "branch": "SP",
-      "links": [],
+      "links": [
+        "IN-SP-3a"
+      ],
       "gate": null,
       "diffusion": "capacity",
       "excludes": null,
@@ -256,8 +257,7 @@
       "ring": 1,
       "branch": "MT",
       "links": [
-        "IN-MT-1a",
-        "IN-MT-1b"
+        "IN-MT-1a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -283,7 +283,6 @@
       "ring": 1,
       "branch": "MT",
       "links": [
-        "IN-MT-2a",
         "IN-MV-1b"
       ],
       "gate": "fuel",
@@ -317,7 +316,9 @@
       "kind": "major",
       "ring": 1,
       "branch": "MT",
-      "links": [],
+      "links": [
+        "IN-MT-1e"
+      ],
       "gate": null,
       "diffusion": "capacity",
       "excludes": "IN-MT-1a",
@@ -351,7 +352,6 @@
       "ring": 1,
       "branch": "MT",
       "links": [
-        "IN-MT-1d",
         "IN-SP-1a"
       ],
       "gate": "ore_q",
@@ -383,7 +383,7 @@
       "ring": 1,
       "branch": "MT",
       "links": [
-        "IN-MT-2a"
+        "IN-MT-1c"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -409,9 +409,9 @@
       "ring": 2,
       "branch": "MT",
       "links": [
-        "IN-MT-2b",
-        "IN-MT-3a",
-        "IN-SP-2a"
+        "IN-MT-1d",
+        "IN-SP-2a",
+        "IN-MT-1a"
       ],
       "gate": "ore_q",
       "diffusion": "capacity",
@@ -444,7 +444,9 @@
       "kind": "major",
       "ring": 2,
       "branch": "MT",
-      "links": [],
+      "links": [
+        "IN-MT-2a"
+      ],
       "gate": null,
       "diffusion": "capacity",
       "excludes": null,
@@ -473,8 +475,7 @@
       "ring": 3,
       "branch": "MT",
       "links": [
-        "IN-MT-3b",
-        "IN-MT-3c"
+        "IN-MT-2a"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
@@ -504,7 +505,10 @@
       "kind": "major",
       "ring": 3,
       "branch": "MT",
-      "links": [],
+      "links": [
+        "IN-MT-3a",
+        "IN-LD-3b"
+      ],
       "gate": "fuel",
       "diffusion": "capacity",
       "excludes": null,
@@ -532,7 +536,9 @@
       "kind": "minor",
       "ring": 3,
       "branch": "MT",
-      "links": [],
+      "links": [
+        "IN-MT-3a"
+      ],
       "gate": null,
       "diffusion": "practice",
       "excludes": null,
@@ -557,8 +563,6 @@
       "ring": 1,
       "branch": "MV",
       "links": [
-        "IN-MV-1b",
-        "IN-MV-2b",
         "IN-SP-1a"
       ],
       "gate": "fuel",
@@ -592,7 +596,9 @@
       "kind": "minor",
       "ring": 1,
       "branch": "MV",
-      "links": [],
+      "links": [
+        "IN-MV-1a"
+      ],
       "gate": null,
       "diffusion": "practice",
       "excludes": null,
@@ -643,7 +649,6 @@
       "ring": 2,
       "branch": "MV",
       "links": [
-        "IN-MV-3a",
         "IN-SP-2a"
       ],
       "gate": "coastal",
@@ -677,7 +682,9 @@
       "kind": "major",
       "ring": 2,
       "branch": "MV",
-      "links": [],
+      "links": [
+        "IN-MV-1a"
+      ],
       "gate": null,
       "diffusion": "capacity",
       "excludes": null,
@@ -710,9 +717,7 @@
       "ring": 3,
       "branch": "MV",
       "links": [
-        "IN-MV-3b",
-        "IN-MV-3c",
-        "IN-SP-3a"
+        "IN-MV-2a"
       ],
       "gate": "fuel",
       "diffusion": "capacity",
@@ -741,7 +746,9 @@
       "kind": "major",
       "ring": 3,
       "branch": "MV",
-      "links": [],
+      "links": [
+        "IN-MV-3a"
+      ],
       "gate": null,
       "diffusion": "artifact",
       "excludes": null,
@@ -770,7 +777,9 @@
       "kind": "major",
       "ring": 3,
       "branch": "MV",
-      "links": [],
+      "links": [
+        "IN-MV-3a"
+      ],
       "gate": null,
       "diffusion": "capacity",
       "excludes": null,
@@ -803,8 +812,6 @@
       "ring": 1,
       "branch": "LD",
       "links": [
-        "IN-LD-1b",
-        "IN-LD-1c",
         "IN-LD-1d"
       ],
       "gate": null,
@@ -830,7 +837,9 @@
       "kind": "major",
       "ring": 1,
       "branch": "LD",
-      "links": [],
+      "links": [
+        "IN-LD-1a"
+      ],
       "gate": "arable",
       "diffusion": "practice",
       "excludes": "IN-LD-1c",
@@ -864,7 +873,9 @@
       "kind": "major",
       "ring": 1,
       "branch": "LD",
-      "links": [],
+      "links": [
+        "IN-LD-1a"
+      ],
       "gate": "arable",
       "diffusion": "practice",
       "excludes": "IN-LD-1b",
@@ -899,8 +910,7 @@
       "ring": 1,
       "branch": "LD",
       "links": [
-        "IN-LD-1e",
-        "IN-LD-2a"
+        "IN-LD-1e"
       ],
       "gate": "arable",
       "diffusion": "capacity",
@@ -957,8 +967,7 @@
       "ring": 2,
       "branch": "LD",
       "links": [
-        "IN-LD-2b",
-        "IN-LD-3a"
+        "IN-LD-1d"
       ],
       "gate": null,
       "diffusion": "artifact",
@@ -988,7 +997,8 @@
       "ring": 2,
       "branch": "LD",
       "links": [
-        "IN-MV-2a"
+        "IN-MV-2a",
+        "IN-LD-2a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1014,7 +1024,7 @@
       "ring": 3,
       "branch": "LD",
       "links": [
-        "IN-LD-3b"
+        "IN-LD-2a"
       ],
       "gate": "arable",
       "diffusion": "capacity",
@@ -1045,8 +1055,8 @@
       "ring": 3,
       "branch": "LD",
       "links": [
-        "IN-MT-3b",
-        "IN-MV-3a"
+        "IN-MV-3a",
+        "IN-LD-3a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1072,9 +1082,7 @@
       "ring": 1,
       "branch": "CH",
       "links": [
-        "IN-CH-1b",
-        "IN-CH-2b",
-        "IN-HL-1a"
+        "IN-CH-2b"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1099,7 +1107,9 @@
       "kind": "major",
       "ring": 1,
       "branch": "CH",
-      "links": [],
+      "links": [
+        "IN-CH-1a"
+      ],
       "gate": null,
       "diffusion": "practice",
       "excludes": null,
@@ -1128,7 +1138,6 @@
       "ring": 1,
       "branch": "CH",
       "links": [
-        "IN-CH-2a",
         "IN-MV-1a"
       ],
       "gate": null,
@@ -1155,7 +1164,7 @@
       "ring": 2,
       "branch": "CH",
       "links": [
-        "IN-CH-2c"
+        "IN-CH-1c"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -1216,8 +1225,7 @@
       "ring": 2,
       "branch": "CH",
       "links": [
-        "IN-CH-2d",
-        "IN-CH-2e",
+        "IN-CH-2a",
         "IN-MT-2a"
       ],
       "gate": null,
@@ -1243,7 +1251,9 @@
       "kind": "major",
       "ring": 2,
       "branch": "CH",
-      "links": [],
+      "links": [
+        "IN-CH-2c"
+      ],
       "gate": null,
       "diffusion": "capacity",
       "excludes": "IN-CH-2e",
@@ -1276,7 +1286,9 @@
       "kind": "major",
       "ring": 2,
       "branch": "CH",
-      "links": [],
+      "links": [
+        "IN-CH-2c"
+      ],
       "gate": null,
       "diffusion": "capacity",
       "excludes": "IN-CH-2d",
@@ -1346,6 +1358,7 @@
       "ring": 1,
       "branch": "HL",
       "links": [
+        "IN-CH-1a",
         "IN-HL-2a"
       ],
       "gate": null,
