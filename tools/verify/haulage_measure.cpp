@@ -40,7 +40,13 @@
 // authored data and the assertions on it live in price_band_harness.cpp. Its one
 // assertion is a vacuity guard: that it measured a world with markets in it.
 //
-// Run: .\build\haulage_measure.exe [seeds]
+// Run: .\build\haulage_measure.exe [seeds] [ticks] [--per-tick]
+//
+// --per-tick (BL-978) prints the dispatch count of EVERY tick, pooled over the
+// seeds, after the totals. It is the instrument that sized the winner's
+// validation run: the settle that hands play its opening position is a fixed
+// number of econ ticks on the searched landscape, and "how many" is answered
+// by reading where this series stops moving, not by picking a round number.
 
 #include "scripting/lua_state.hpp"
 #include "world/components.hpp"
@@ -90,9 +96,13 @@ int main(int argc, char** argv)
 {
     const int n_seeds       = (argc > 1) ? std::atoi(argv[1]) : 5;
     const int n_trade_ticks = (argc > 2) ? std::atoi(argv[2]) : 20;
+    bool per_tick = false;
+    for (int i = 3; i < argc; ++i)
+        if (std::string(argv[i]) == "--per-tick")
+            per_tick = true;
     if (n_seeds <= 0 || n_trade_ticks <= 0)
     {
-        std::printf("usage: %s [seeds] [ticks]  (both positive)\n", argv[0]);
+        std::printf("usage: %s [seeds] [ticks] [--per-tick]  (both positive)\n", argv[0]);
         return 2;
     }
 
@@ -293,6 +303,10 @@ int main(int argc, char** argv)
     //                                     only, so it can only ever see the second
     std::printf("\n--- does inter-market trade OCCUR? (%d ticks per seed) ---\n", n_trade_ticks);
     long conv_total = 0, conv_inter_market = 0, conv_inter_body = 0, routes = 0;
+    // Per-tick dispatches pooled over seeds (all / intra-body market->market);
+    // printed only under --per-tick.
+    std::vector<long> tick_all(static_cast<std::size_t>(n_trade_ticks), 0L);
+    std::vector<long> tick_im(static_cast<std::size_t>(n_trade_ticks), 0L);
     for (int s = 0; s < n_seeds; ++s)
     {
         world_params p = no_prehistory();
@@ -314,10 +328,14 @@ int main(int argc, char** argv)
             {
                 const convoy_component& c = w.convoys[i];
                 ++conv_total;
+                ++tick_all[static_cast<std::size_t>(t - 1)];
                 if (c.mode == convoy_mode::space)
                     ++conv_inter_body;
                 else if (c.source_market != c.dest_market)
+                {
                     ++conv_inter_market;
+                    ++tick_im[static_cast<std::size_t>(t - 1)];
+                }
             }
             advance_convoys(w);
             const economy_report report = run_economy_step(w, reg);
@@ -332,6 +350,15 @@ int main(int argc, char** argv)
     std::printf("  ... intra-body, market -> market  : %ld\n", conv_inter_market);
     std::printf("  ... inter-body (space lane)       : %ld\n", conv_inter_body);
     std::printf("  persistent trade_routes (BL-088)  : %ld\n", routes);
+    if (per_tick)
+    {
+        std::printf("\n--- per-tick dispatches, pooled over %d seeds "
+                    "(tick, all, intra-body market->market) ---\n", n_seeds);
+        for (int t = 0; t < n_trade_ticks; ++t)
+            std::printf("  tick %3d : %6ld %6ld\n", t + 1,
+                        tick_all[static_cast<std::size_t>(t)],
+                        tick_im[static_cast<std::size_t>(t)]);
+    }
 
     std::printf("\n=== haulage_measure: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;

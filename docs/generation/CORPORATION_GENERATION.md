@@ -291,12 +291,13 @@ focus receive slightly higher starting capital to offset their lack of direct re
 access.
 
 **Pre-game operating history.** Corporations do not open cold. At campaign start the economy
-is run forward a fixed number of **pre-game ticks** (`app::pre_game_ticks` = 80, sliced across
-loading-screen frames after generation completes and the corp is chosen) so every corporation
-enters turn one with a **multi-tick operating history** — warm stockpile pools and a balance
-already moved by production, wages, and trade, rather than the seeded capital alone. The
-headless `--verify` path stays deterministically cold (no pre-game ticks) so generation audits
-remain reproducible.
+is run forward a fixed number of **pre-game ticks** — phase 6's single validation run of the
+winning landscape (`app::validation_ticks`; the length and its measurement are
+`../economy/ERAS.md` § The opening position; BL-978, warm start retired, owns the work) — so
+every corporation enters turn one with a **multi-tick operating history**: warm stockpile pools
+and a balance already moved by production, wages, and trade, rather than the seeded capital
+alone. The headless `--verify` path stays deterministically cold (no pre-game ticks) so
+generation audits remain reproducible.
 
 ### Pass 4b — Starting stockpile
 

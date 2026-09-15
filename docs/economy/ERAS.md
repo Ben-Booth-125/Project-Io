@@ -64,6 +64,28 @@ spends in simulated quarters, the clock is **rebased at the handoff**, so play a
 load-bearing half of this paragraph and it does not depend on which pass does the settling: the
 opening position owes the calendar nothing.
 
+**The validation run is twelve quarterly econ ticks** (`app::validation_ticks`), run on the winner
+in time-boxed batches across loading-screen frames, under spectate with nobody seated, with the
+persona counsel and battle dispatches suppressed. The balances, pools, filed returns and prices those ticks leave
+*are* the opening position; the seat is drawn from the returns they file. Twelve is **measured,
+not round**, and the instrument is `haulage_measure --per-tick` (the only harness that sees
+trade): pooled over five seeds, the per-tick convoy dispatch count climbs from zero — tick 1
+dispatches nothing, tick 2 about 40 % of the settled rate, tick 4 about 90 % — and then holds at
+its 80-tick level (≈125 convoys per tick over the last eight of eighty). Twelve is the first tick
+at which **both** the 4-tick and the 8-tick trailing means of that count sit within 5 % of the
+80-tick level (98 % and 96 %; at eleven the 8-tick mean is still 94.8 %). A longer run buys
+nothing the player can see. It also covers the spawn floor's whole trailing window
+(`k_spawn_trailing_quarters` = 8, `../generation/CORPORATION_GENERATION.md` § The spawn
+shortlist), so the seat is drawn on a full viability read rather than a partial one.
+
+One series does not settle in twelve, and it is named rather than hidden: the **intra-body
+market-to-market** share of those convoys drifts upward slowly, from ≈80 % of its 80-tick level
+at tick 12 to within 5 % only around tick 40, inside ±15 % quarter-to-quarter noise. That is a
+slow composition drift in the trade mix, not the cold-start transient the settle exists to
+absorb; buying it would cost half the eighty-tick warm start this replaces. If a future reading
+needs that share settled at the handoff, the number to move is `app::validation_ticks` and the
+measurement to re-run is the one above.
+
 **What settles it is a search, not a settle.** The third pass of simulated history is phase 6 — a
 **directed static search** over candidate corporate landscapes (rosters, placements, road tiers),
 scored on chain completeness, the supply-to-demand ratio and the *spread* of both, with one short

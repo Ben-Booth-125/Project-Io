@@ -286,7 +286,7 @@ void warm_tick(world& w, const recipe_registry& reg, int t)
     credit_arrived_convoys(w, t);
 }
 
-constexpr int k_seat_warm_ticks = 80; ///< app::pre_game_ticks.
+constexpr int k_seat_warm_ticks = 80; ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978), and this harness's own settle length is a re-read it owes.
 /// How many seeds get the two-independently-built-worlds treatment (S4).
 constexpr int k_reproduce_seeds  = 4;
 

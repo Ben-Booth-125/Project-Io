@@ -338,15 +338,15 @@ private:
     void refresh_wizard_preview();
 
     /// Actually start the campaign, from the params the wizard settled: rebase the
-    /// sim clock, build the world, load the economy, run the pre-game warm start,
-    /// and hand over to play. The wizard's "Begin" button.
+    /// sim clock, build the world, load the economy, search the landscape and run
+    /// the winner's validation ticks, and hand over to play. The wizard's "Begin"
+    /// button.
     ///
-    /// SPLIT 2026-08-12 (the AppHangB1 stall): the tail no longer runs as one
-    /// synchronous block inside a frame. `start_new_game_prelude` does the cheap
-    /// main-thread setup (~20 ms), then poll_worldgen runs the 80 warm-start
-    /// ticks in time-boxed slices — one slice per loading-screen frame — and
-    /// `finish_new_game` rebases the clock and enters play. The UI repaints
-    /// between slices, so Windows never judges the app hung.
+    /// `start_new_game_prelude` does the main-thread setup, then poll_worldgen
+    /// runs the `validation_ticks` (BL-978, warm start retired) in time-boxed
+    /// batches — one per loading-screen frame, so the window keeps repainting
+    /// and Windows never judges the app hung (the 2026-08-12 AppHangB1 stall) —
+    /// seats the player, and `finish_new_game` rebases the clock and enters play.
     void start_new_game_prelude();
     void finish_new_game();
     /// Kick generation onto a worker and switch to the loading screen. Loads the
@@ -488,9 +488,9 @@ private:
     /// reported the process as "not responding" — indistinguishable from a crash.
     // BL-630 retired the `choosing_corp` stage that used to sit between
     // `building` and play: the player is no longer asked which corporation to
-    // be, they are SEATED on one drawn from the spawn shortlist after the warm
-    // start (STARTUP.md § The seat). `building` now hosts both phases — the
-    // carve, then the warm start — and hands straight to `in_game`.
+    // be, they are SEATED on one drawn from the spawn shortlist after the
+    // winner's validation run (STARTUP.md § The seat). `building` hosts the
+    // carve and the validation run, and hands straight to `in_game`.
     enum class app_screen { menu, generating, building, in_game };
     app_screen m_screen = app_screen::menu;
     /// Pending `--load` target, consumed by run() before the frame loop.
@@ -703,20 +703,36 @@ private:
     spawn_seat_result m_seat_result;
     void seat_player();                ///< Draw the seat and re-point the player-scoped caches.
 
-    /// Pre-game warm start: 20 in-game years of quarterly econ ticks (Ben,
-    /// 2026-08-10) — see start_new_game_prelude's warm-start comment.
-    static constexpr int pre_game_ticks = 80;
-    /// Warm-start ticks completed so far, or -1 when no warm start is in
-    /// progress. >= 0 marks the sliced phase between generation finishing and
+    /// The winner's VALIDATION RUN (BL-978, warm start retired): the one short
+    /// tick-simulation phase 6 runs on the searched landscape to confirm the
+    /// static proxy held — GENERATION_STRATEGY.md § Three passes, ERAS.md § the
+    /// opening position. It is the settle that hands play its opening position;
+    /// there is no other pre-game tick loop, and the eighty-tick warm start it
+    /// replaces is gone.
+    ///
+    /// The length is MEASURED, not round (ERAS.md § The opening position carries
+    /// the series): `haulage_measure 5 80 --per-tick`, pooled over five seeds,
+    /// shows the per-tick convoy dispatch count climb from zero and settle; this
+    /// is the first tick at which both its 4-tick and 8-tick trailing means sit
+    /// within 5% of the 80-tick level, so a longer run buys nothing the player
+    /// can see. It also covers the spawn floor's whole trailing window
+    /// (`k_spawn_trailing_quarters` = 8), so the seat is drawn on a full
+    /// viability read rather than a partial one.
+    static constexpr int validation_ticks = 12;
+    /// Validation ticks completed so far, or -1 when no validation run is in
+    /// progress. >= 0 marks the batched phase between generation finishing and
     /// play starting: poll_worldgen runs a time-boxed batch per call and the
-    /// loading screen draws its inner bar from it (2026-08-12, the hang fix).
-    int m_warm_ticks_done = -1;
-    /// True while the warm-start ticks run. step_economy suppresses the persona
-    /// counsel while set: measured at ~1.05 s per tick against ~80 ms for the
-    /// whole rest of the tick (2026-08-12), it was 93% of the stall, and its
-    /// output is advisory chat for pre-game quarters the player never saw.
-    bool m_warm_starting = false;
-    std::chrono::steady_clock::time_point m_warm_begin; ///< Warm-start wall-clock start, for the timing report.
+    /// loading screen draws its inner bar from it. Batched because a tick on a
+    /// searched landscape costs ~0.9 s in Release (2026-09-03), so the whole run
+    /// in one frame would trip the AppHangB1 kill (2026-08-12).
+    int m_validation_ticks_done = -1;
+    /// True while the validation ticks run. step_economy reads it for two
+    /// things: nobody is seated yet, so every corp is scorer-driven (BL-630);
+    /// and the persona counsel and battle dispatches are suppressed — advisory
+    /// chat for pre-game quarters the player never saw, and ~1.05 s/tick besides
+    /// (measured 2026-08-12).
+    bool m_validation_run = false;
+    std::chrono::steady_clock::time_point m_validation_begin; ///< Validation-run wall-clock start, for the timing report.
 
     ui_state        m_ui;
     ground_layer    m_ground;            ///< BL-732: baked painterly ground for the Planetary canvas.
@@ -732,10 +748,10 @@ private:
     std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
     std::unordered_map<entity_id, int> m_counsel_channel; ///< corp -> its lazily-created Counsel chat_channel index.
     uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
-    /// Count of step_economy() calls this campaign — warm start included — and
-    /// the value mirrored onto world::current_econ_tick before each step. The
-    /// cadence key (BL-568). On load it resumes at pre_game_ticks + envelope
-    /// econ_tick, so a loaded campaign rotates exactly as an unsaved one.
+    /// Count of step_economy() calls this campaign — validation run included —
+    /// and the value mirrored onto world::current_econ_tick before each step.
+    /// The cadence key (BL-568). On load it resumes at validation_ticks +
+    /// envelope econ_tick, so a loaded campaign rotates exactly as an unsaved one.
     uint64_t        m_econ_steps = 0;
     std::vector<float> m_balance_history;      ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
     std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds the Budget ledger's profit chart.
@@ -814,7 +830,7 @@ ui::frame_stats& frame_stats_instance();
 /// Process-lifetime per-phase accumulators for app::step_economy (ms):
 /// [0] convoys, [1] run_economy_step, [2] clear_markets, [3] apply_budget,
 /// [4] tech gates, [5] standings+credit, [6] agency comms, [7] persona counsel,
-/// [8] history recorders. Dumped by start_new_game's warm-start timing
+/// [8] history recorders. Dumped by finish_new_game's validation-run timing
 /// (the 2026-08-12 stall hunt).
 ///
 /// [9] and [10] SPLIT [7] into its two candidate halves (BL-398): the C++
