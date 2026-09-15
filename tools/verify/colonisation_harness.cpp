@@ -28,6 +28,8 @@
 //       reduction, and it never reaches zero
 //   C8  predation reads CURRENT population, so a sack re-wilds the ground
 //   C9  the field's size is bounded and stated
+//   C16 A RIVER IS A CORRIDOR: a cradle on a river reaches inland ground
+//       earlier than the same cradle with the river mask zeroed (BL-967)
 //
 // SYNTHETIC MAPS, ON PURPOSE, for C2-C4 and C6-C8. A generated world cannot
 // isolate "the long way round by the coast beat the short way over the
@@ -44,6 +46,7 @@
 #include "world/colonisation.hpp"
 #include "world/era_minus_one.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/hex_neighbors.hpp"
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
@@ -1252,6 +1255,185 @@ void case_settlement_seats(int seed_count)
 } // namespace
 
 // ---------------------------------------------------------------------------
+// C16 — A RIVER IS A CORRIDOR (BL-967)
+// ---------------------------------------------------------------------------
+//
+// COLONISATION.md § Surplus flows names river courses and the coastal shelf as
+// the cheap ground, and the walk prices both at `colonisation_corridor_pct`.
+// The coast's half of that claim is C3's; this is the river's, and it is built
+// from the REAL world rather than a synthetic map, because a river is an edge
+// the rivers pass traced downhill and a hand-drawn one would be testing the
+// harness's idea of a river rather than generation's.
+//
+// THE CONSTRUCTION. Take the first settled region whose anchor sits on or
+// beside a river edge, coin its package on the real ground, and run the walk
+// from that ONE source twice: once with the world's river raster, once with
+// the raster zeroed. Everything else — substrate, cover, landform, the shore —
+// is identical between the two runs, so any difference in arrival is the
+// river's and nothing else's.
+//
+// TWO ASSERTIONS. (a) No tile arrives LATER with the river than without: a
+// discount on a min-arrival flood can only bring ground forward, and a tile
+// that moved the other way would mean the walk is not the flood it claims to
+// be. (b) Some INLAND ground — land with no water neighbour, the shoreline
+// rule inverted, so the coast's own discount cannot be what moved it — arrives
+// strictly EARLIER. How much earlier, and how much ground, is printed and not
+// asserted: it is a magnitude, and magnitudes are `history_sweep`'s to argue.
+
+void case_river_corridor(int seed_count)
+{
+    std::printf("\n--- C16: a river is a corridor (BL-967) -------------------------\n");
+
+    int worlds = 0, worlds_earlier = 0;
+    long long later_total = 0;
+
+    for (int s = 0; s < seed_count; ++s)
+    {
+        world_params wp;
+        wp.seed = static_cast<uint32_t>(s);
+        wp.prehistory_years = 400;
+
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
+                                              nullptr, nullptr, &fx);
+        (void)w;
+        const generation_report::body_entry* k = kepler_of(rep);
+        if (k == nullptr || !fx.ran) continue;
+
+        const std::vector<terrain_substrate>& sub = fx.terrain.substrate;
+        const std::vector<terrain_cover>&     cov = fx.terrain.cover;
+        const std::vector<terrain_landform>&  lf  = fx.terrain.landform;
+        const std::vector<std::uint8_t>&      riv = fx.terrain.river;
+        const int gw = fx.gw, gh = fx.gh;
+        const std::size_t n = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+        if (sub.size() != n || riv.size() != n) continue;
+
+        // Raster index of neighbour `side` of (col,row), or -1 off the poles.
+        // East-west wraps: the body is a cylinder, exactly as the walk has it.
+        const auto neighbour_index = [&](int col, int row, int side) -> long {
+            const auto nb = hex_neighbors::neighbour(col, row, side);
+            if (nb.gy < 0 || nb.gy >= gh) return -1;
+            int nx = nb.gx % gw;
+            if (nx < 0) nx += gw;
+            return static_cast<long>(nb.gy) * gw + nx;
+        };
+        const auto is_inland = [&](std::size_t i) {
+            if (is_water(sub[i])) return false;
+            const int col = static_cast<int>(i % static_cast<std::size_t>(gw));
+            const int row = static_cast<int>(i / static_cast<std::size_t>(gw));
+            for (int side = 0; side < 6; ++side)
+            {
+                const long ni = neighbour_index(col, row, side);
+                if (ni >= 0 && is_water(sub[static_cast<std::size_t>(ni)])) return false;
+            }
+            return true;
+        };
+        const auto on_river = [&](int col, int row) {
+            const std::size_t i = static_cast<std::size_t>(row) * gw + col;
+            if (riv[i] != 0) return true;
+            for (int side = 0; side < 6; ++side)
+            {
+                const long ni = neighbour_index(col, row, side);
+                if (ni >= 0 && riv[static_cast<std::size_t>(ni)] != 0) return true;
+            }
+            return false;
+        };
+
+        // THE CRADLE: the first settled region on or beside a river. Region
+        // order is generation's own and deterministic.
+        const region* cradle = nullptr;
+        int cradle_ri = -1;
+        for (std::size_t ri = 0; ri < fx.settlement.regions.size(); ++ri)
+        {
+            const region& r = fx.settlement.regions[ri];
+            if (r.col < 0 || r.col >= gw || r.row < 0 || r.row >= gh) continue;
+            if (on_river(r.col, r.row)) { cradle = &r; cradle_ri = static_cast<int>(ri); break; }
+        }
+        if (cradle == nullptr)
+        {
+            std::printf("seed %u  no settled region on a river - skipped\n", wp.seed);
+            continue;
+        }
+        ++worlds;
+
+        std::vector<colonisation_source> src;
+        src.push_back(colonisation_source{
+            static_cast<int32_t>(cradle->row * gw + cradle->col), cradle_ri,
+            cradle->culture.plurality(), cradle->founded_year,
+            coin_package(sub, cov, lf, gw, gh, cradle->col, cradle->row, /*window_radius=*/6)});
+
+        const std::vector<std::uint8_t> no_river(n, 0u);
+
+        colonisation_input in;
+        in.substrate     = &sub;
+        in.cover         = &cov;
+        in.landform      = &lf;
+        in.gw            = gw;
+        in.gh            = gh;
+        in.boundary_year = 0;
+
+        in.river = &riv;
+        const colonisation_field with = run_colonisation(in, src);
+        in.river = &no_river;
+        const colonisation_field without = run_colonisation(in, src);
+
+        int inland = 0, inland_reached_with = 0, inland_reached_without = 0;
+        int earlier = 0, later = 0, newly_reached = 0;
+        long long lead_sum = 0;
+        int64_t first_with = colonisation_never_reached, first_without = colonisation_never_reached;
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const int64_t a = with.arrival_year[i];
+            const int64_t b = without.arrival_year[i];
+            // (a) MONOTONE, over every land tile, inland or not.
+            if (b != colonisation_never_reached && a != colonisation_never_reached && a > b) ++later;
+            if (b != colonisation_never_reached && a == colonisation_never_reached) ++later;
+
+            if (!is_inland(i)) continue;
+            ++inland;
+            if (a != colonisation_never_reached)
+            {
+                ++inland_reached_with;
+                if (a < first_with) first_with = a;
+            }
+            if (b != colonisation_never_reached)
+            {
+                ++inland_reached_without;
+                if (b < first_without) first_without = b;
+            }
+            if (a == colonisation_never_reached) continue;
+            if (b == colonisation_never_reached) { ++newly_reached; ++earlier; continue; }
+            if (a < b) { ++earlier; lead_sum += (b - a); }
+        }
+
+        later_total += later;
+        if (earlier > 0) ++worlds_earlier;
+
+        std::printf("seed %u  cradle region %d at (%d,%d)  inland tiles %d  reached with/without "
+                    "river %d/%d  earlier %d (newly reached %d)  later %d  mean lead %lld yr  "
+                    "first inland arrival with/without %lld/%lld\n",
+                    wp.seed, cradle_ri, cradle->col, cradle->row, inland,
+                    inland_reached_with, inland_reached_without, earlier, newly_reached, later,
+                    (earlier - newly_reached) > 0
+                        ? static_cast<long long>(lead_sum / (earlier - newly_reached)) : 0LL,
+                    first_with == colonisation_never_reached
+                        ? 0LL : static_cast<long long>(first_with),
+                    first_without == colonisation_never_reached
+                        ? 0LL : static_cast<long long>(first_without));
+    }
+
+    if (worlds == 0) { check(false, "C16 no world had a cradle on a river - the case is vacuous"); return; }
+    check(later_total == 0,
+          "C16a THE RIVER NEVER DELAYS: no tile arrives later with the river raster than "
+          "without it (the walk is a min-arrival flood)");
+    check(worlds_earlier == worlds,
+          "C16b A RIVER IS A CORRIDOR on every world with a river cradle: inland ground - "
+          "land with no water neighbour - arrives strictly earlier with the river than "
+          "with the mask zeroed");
+}
+
+// ---------------------------------------------------------------------------
 // C15 — THE SPLIT CENSUS (BL-918)
 // ---------------------------------------------------------------------------
 //
@@ -1348,6 +1530,7 @@ int main(int argc, char** argv)
     case_cradle_outcomes();
     case_real_worlds(seed_count);
     case_route_on_real_worlds(seed_count);
+    case_river_corridor(seed_count);
     case_founding_schedule(span_years);
     case_spawned_cultures(seed_count);
     case_sea_legs_crossing(seed_count);
