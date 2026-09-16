@@ -109,30 +109,6 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": "42",
-   "written": "2026-09-15",
-   "author": "Ben (2026-09-15, form on the wave-0 review calls); Claude (filed)",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "category": "UI",
-   "id": "BL-1000",
-   "short_name": "WIZARD_LEADERBOARD_POPULATION_SHARE",
-   "priority": "B",
-   "difficulty": 3,
-   "title": "The Empires round leaderboard ranks share of the world by population held, not regions held",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "files": [
-    "src/ui/history_lapse.cpp",
-    "src/ui/history_lapse.hpp",
-    "src/ui/startup_screens.cpp",
-    "docs/ui/STARTUP.md"
-   ],
-   "design": "RULED 2026-09-15 (Ben, NR-876): accept the arc's shape, and the wizard shows the population column. history_sweep now reads every share by population held beside region count (BL-970): by population the largest polities are 2-5 points MORE concentrated (median 10% vs 8%), and rose-and-fell counts drop three times, because most region-count risers were founding empty ground. The round-4 leaderboard (STARTUP.md sec Rounds 4 and 5: \"share of the world owned\") ranks by regions.\n\nWORK: the lapse leaderboard's share column reads polity_sample::population over the total population held at that sample (the BL-817 record already carries it); label the column \"people\" not \"land\"; the arc readout (BL-891/BL-916) uses the same column. Region share may stay as a second column if it fits the panel; the population one is the rank. Live click required (a UI requirement): open build_rel, run round 4, read the board.\n\nDONE WHEN: the board ranks by population share on a live run and the readout's peak figure matches history_sweep's peak_share_pop_q for the same seed.\n\nBUILT 2026-09-16, sprint 42 wave 1, and NOT closed: the board and the arc readout rank by share of people and the capture is on file, but the live click a UI requirement needs was denied when access was requested, and the item's own done-when (the readout equals history_sweep's peak_share_pop_q for one seed) is blocked by BL-1007 — the sweep generates with world_gen_config's struct defaults while the app loads the Lua config, so seed 0 is two different worlds (6479 battles against 9928). Closes when a session with access clicks round 4 and BL-1007 lands."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
    "sprint": null,
    "written": "2026-09-16",
    "author": "Claude (sprint 42 wave 1 measurements)",

@@ -64,11 +64,12 @@ Its input contract is `EXPLORATION.md` § What this phase hands digitisation, un
 
 ## Owed, in priority order
 
-`BL-1007` (measurement parity) · `BL-1009` (the digest cannot see treasuries — region treasury moved
-80% with every digest identical) · `BL-1000`'s live click (access was denied 2026-09-16; the board is
-built and captured) · `BL-1010` (era_world_harness's three reds pre-date the sprint) · `BL-1008` (six
-harnesses still simulate an 80-tick warm start) · `NR-879` (85% of coined cultures never hold ground)
-· `NR-881` (the seat viability floor reads eight quarters against a 12-tick settle).
+*(BL-1007 measurement parity and BL-1000's live click both landed on 2026-09-16 and are gone from this list.)*
+
+`BL-1009` (the digest cannot see treasuries — region treasury moved 80% with every digest identical)
+· `BL-1010` (era_world_harness's three reds pre-date the sprint) · `BL-1008` (six harnesses still
+simulate an 80-tick warm start) · `NR-879` (85% of coined cultures never hold ground) · `NR-881` (the
+seat viability floor reads eight quarters against a 12-tick settle).
 
 ## Standing hazards this sprint re-learned
 
