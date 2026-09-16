@@ -31,7 +31,7 @@
 // Run: .\build\player_seed_sweep.exe [seed_count] [warm_ticks]
 //      .\build\player_seed_sweep.exe --seat  [seed_count] [--fast]
 //      .\build\player_seed_sweep.exe --guard [seed_count] [--fast]
-//      .\build\player_seed_sweep.exe --guard --seeds 46,17,11 [--fast]
+//      .\build\player_seed_sweep.exe --guard --seeds 46,17,11 [--reproduce N] [--fast]
 //
 // BL-630 (2026-08-26) ADDED THE MODE THIS FILE NOW LEADS WITH. The two default
 // conditions above ("worth playing" == a processor, and solvent) were written
@@ -296,6 +296,8 @@ void warm_tick(world& w, const recipe_registry& reg, int t)
 /// both together.
 constexpr int k_seat_warm_ticks = 12;
 /// How many seeds get the two-independently-built-worlds treatment (S4).
+/// The default; `--reproduce N` overrides it, so a sweep split across processes
+/// (BL-1020 ran the sixteen curated seeds as three) does not pay it three times.
 constexpr int k_reproduce_seeds  = 4;
 
 struct seat_row
@@ -359,7 +361,7 @@ spawn_seat_result build_and_seat(uint32_t seed, const recipe_registry& reg,
 }
 
 int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, bool fast,
-             bool assert_mode)
+             bool assert_mode, int reproduce_seeds)
 {
     const int n_seeds = static_cast<int>(seeds.size());
     std::printf("player_seed_sweep %s — %d seeds, %d warm ticks in spectate, %s spawn\n",
@@ -432,7 +434,7 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
             // structural — an unordered walk or an unseeded stream would break
             // on the first seed, not the twentieth. The sample size is stated in
             // S4's own row so nobody reads it as a full sweep.
-            if (i < k_reproduce_seeds)
+            if (i < reproduce_seeds)
             {
                 world w2;
                 const spawn_seat_result res2 = build_and_seat(r.seed, reg, fast, w2);
@@ -616,7 +618,7 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
     std::snprintf(buf, sizeof buf,
                   "the draw is REPRODUCIBLE — same seed, two independently built worlds, "
                   "same seat (%d of the first %d seeds checked, %d disagreed)",
-                  reproduce_checked, k_reproduce_seeds, not_reproduced);
+                  reproduce_checked, reproduce_seeds, not_reproduced);
     all &= row("S4", reproduce_checked > 0 && not_reproduced == 0, buf);
 
     std::snprintf(buf, sizeof buf,
@@ -692,6 +694,10 @@ int main(int argc, char** argv)
         // (`node tools/session/seed_library.js`) is sixteen chosen seeds, not
         // 0..15. Otherwise the positional count sweeps 0..n-1 as it always has.
         std::vector<uint32_t> seeds;
+        int reproduce = k_reproduce_seeds;
+        for (int a = 2; a + 1 < argc; ++a)
+            if (std::string(argv[a]) == "--reproduce")
+                reproduce = std::max(1, std::atoi(argv[a + 1]));
         for (int a = 2; a + 1 < argc; ++a)
             if (std::string(argv[a]) == "--seeds")
             {
@@ -711,14 +717,14 @@ int main(int argc, char** argv)
         if (seeds.empty())
         {
             int g_seeds = 24;
-            if (argc > 2 && std::string(argv[2]) != "--fast" && std::string(argv[2]) != "--seeds")
+            if (argc > 2 && std::string(argv[2]).rfind("--", 0) != 0)
                 g_seeds = std::atoi(argv[2]);
             if (g_seeds <= 0)
                 g_seeds = 24;
             for (int i = 0; i < g_seeds; ++i)
                 seeds.push_back(static_cast<uint32_t>(i));
         }
-        return run_seat(seeds, reg, fast, guard_mode);
+        return run_seat(seeds, reg, fast, guard_mode, reproduce);
     }
 
     std::printf("player_seed_sweep — %d seeds, %d warm ticks (%.2f in-game years)\n\n",
