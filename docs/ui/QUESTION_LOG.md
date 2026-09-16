@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**55 surfaces** — 8 settled, 47 awaiting Ben's wording.
+**54 surfaces** — 8 settled, 46 awaiting Ben's wording.
 
 ---
 
@@ -148,21 +148,13 @@ alphabetical order.
 
 *Demanded by BL-468 · `src/core/battle_dispatch_text.cpp`, `src/core/session_history.cpp`, `src/ui/chat_panel.hpp` · id `field_channel`*
 
-### Generation Ledger - Body view (histograms, thresholds, profile echo)
+### Generation Ledger - one flat panel of collapsing sections (profile, thresholds, latitude bands, the three distributions) over a body selector
 
 **Answers:** What shape did this body's generation actually come out, and which input made it that shape?
 
-**Because:** A biome-balance question ('forest and wetland stay sparse on the homeworld') was previously answered by eyeballing the map, which cannot distinguish a bad tuning constant from an unlucky seed. Putting the composition/landform histograms, the ocean threshold against the profile's target, and the profile that drove them on ONE surface is what makes the answer traceable to an input rather than to an impression. It earns its space as a tuning instrument, not shipped chrome - it is the last rail slot for that reason.
+**Because:** A biome-balance question ('forest and wetland stay sparse on the homeworld') was previously answered by eyeballing the map, which cannot distinguish a bad tuning constant from an unlucky seed. Putting the composition/landform histograms, the ocean threshold against the profile's target, and the profile that drove them on ONE surface is what makes the answer traceable to an input rather than to an impression. It earns its space as a tuning instrument, not shipped chrome - it is the last rail slot for that reason. A sibling question - 'why is THIS tile what it is?', asked by a per-tile derivation breadcrumb in a Tile view - was retired with the ledger's tab strip (Ben, 2026-08-30): the six-pass pipeline discards its intermediates and nothing in the code or the design now rebuilds them per tile, so the body-level shape is the only question this surface asks.
 
 *Demanded by BL-303 · `src/ui/generation_ledger.cpp` · id `generation_ledger_body`*
-
-### Generation Ledger - Tile derivation breadcrumb
-
-**Answers:** Why is THIS tile what it is?
-
-**Because:** The six-pass pipeline discards its intermediates, so a surprising tile was previously unanswerable without a debugger: the heightmap, the sea score it was tested against, the moisture and the band all vanish before the tile exists. The breadcrumb names the input value and the rule that fired at each pass, which turns 'that looks wrong' into a specific pass to go and read. It is also the shared content builder the hover card and the Selection element are intended to wrap, so the space it earns is paid for more than once.
-
-*Demanded by BL-303 · `src/ui/generation_ledger.cpp` · id `generation_ledger_tile`*
 
 ### God-view corp/rival readouts (Selection facts column, rival Status rows, rival hover detail) + the survey tell on the Planetary canvas
 
