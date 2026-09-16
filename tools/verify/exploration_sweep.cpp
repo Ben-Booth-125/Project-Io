@@ -118,6 +118,43 @@ bool contact_exists(const std::vector<contact>& contacts, int a, int b)
     return false;
 }
 
+// BL-1016 -- READING 3 CLASSIFIES BY RANK, ON ONE SCALE. The two raw leans are
+// not commensurable: `consolidator_lean_q` is a PRODUCT (dominion x (1 - sea
+// legs)), so it is at most its smaller factor, while `expansion_lean_q` is a
+// MEAN (sea legs and zeal), so it is at least its smaller input. Comparing
+// them raw answers a question about arithmetic -- a middling culture (sea
+// 300, zeal 500, dominion 500) reads 350 against 400 and "is" expansionist
+// with nothing seafaring about it. The sim never compares them raw: BL-955
+// reads each lean only as a per-mille rank among the round's living, cultured
+// polities (`exploration_lean_ranks`). The sweep now does the same, off that
+// very function, and a realm is a consolidator when its consolidator rank
+// sits in the TOP THIRD by that lean, an expansionist likewise by expansion
+// rank. Each test is independent, so a realm may be both or neither.
+//
+// 667, not 666: the rank counts polities leaning STRICTLY lower (ties share
+// the lowest rank), so >= 667 per mille means more than two thirds of the
+// seed's other living polities lean lower than this one.
+constexpr int kLeanTopThirdRankQ = 667;
+
+bool reads_consolidator(int cons_rank_q) { return cons_rank_q >= kLeanTopThirdRankQ; }
+bool reads_expansionist(int expn_rank_q) { return expn_rank_q >= kLeanTopThirdRankQ; }
+
+/// "C" consolidator, "E" expansionist, "B" both, "-" neither (or no culture).
+const char* lean_tag_of(int cons_rank_q, int expn_rank_q)
+{
+    const bool c = reads_consolidator(cons_rank_q), e = reads_expansionist(expn_rank_q);
+    return c && e ? "B" : c ? "C" : e ? "E" : "-";
+}
+
+/// Nearest-rank-below percentile over an ASCENDING vector: index (n-1)*pct/100.
+/// Integer, so the printed face is a property of the values alone.
+int percentile_of(const std::vector<int>& sorted, int pct)
+{
+    if (sorted.empty()) return -1;
+    const std::size_t idx = (sorted.size() - 1) * static_cast<std::size_t>(pct) / 100u;
+    return sorted[idx];
+}
+
 // ---------------------------------------------------------------------------
 // ONE SEED'S READING.
 // ---------------------------------------------------------------------------
@@ -223,18 +260,35 @@ struct exploration_row
         int64_t treasury      = 0; ///< capital region's `treasury` at 1660.
         int     mean_supply_q = 0; ///< mean `network_supply_q` over held regions.
         int64_t regions       = 0; ///< held region count at 1660.
-        int     cons_q        = 0; ///< consolidator_lean_q of its culture.
-        int     expn_q        = 0; ///< expansion_lean_q of its culture.
+        int     cons_q        = 0; ///< consolidator_lean_q of its culture (-1: no culture).
+        int     expn_q        = 0; ///< expansion_lean_q of its culture (-1: no culture).
+        /// BL-1016: the per-mille RANK of each lean among the seed's living,
+        /// cultured polities at 1660 (`exploration_lean_ranks`), -1 with no
+        /// culture. The classification reads THESE, never the raw leans.
+        int     cons_rank_q   = -1;
+        int     expn_rank_q   = -1;
     };
+    /// BL-1016: one living, cultured polity at the traced re-run's 1660 close
+    /// -- the whole population reading 3 classifies against, not the top 3.
+    struct lean_point
+    {
+        int cons_q = 0, expn_q = 0;           ///< the raw leans (0-1000)
+        int cons_rank_q = 0, expn_rank_q = 0; ///< their per-mille ranks
+        int sea_q = 0, dominion_q = 0, zeal_q = 0; ///< the three inputs, each 0-1000
+    };
+    std::vector<lean_point> lean_population;
+    int64_t living_uncultured = 0; ///< living polities with no culture: unranked, never classified.
     bool strength_measured = false; ///< >= 2 living polities at the traced re-run's close.
     /// PRIMARY ranking (BL-951): capital treasury, tie-break mean supply.
     std::vector<strength_entry> top_by_treasury;
     bool top_has_consolidator = false;
     bool top_has_expansionist = false;
+    bool top_both_distinct    = false; ///< a consolidator AND a DIFFERENT expansionist realm (BL-1016).
     /// COMPARISON ranking: held region count (the pre-BL-951 metric).
     std::vector<strength_entry> top_by_regions;
     bool regions_top_has_consolidator = false;
     bool regions_top_has_expansionist = false;
+    bool regions_top_both_distinct    = false;
 
     // --- Reading 9: throughput, off generation's own (untraced) run ---------
     std::vector<int32_t> corridor_uses;
@@ -852,6 +906,12 @@ int main(int argc, char** argv)
                     supply_sum[static_cast<std::size_t>(r.nation)] += r.network_supply_q;
                 }
 
+            // BL-1016: the ranks the classification reads -- the sim's own
+            // function over the same 1660 close, so the sweep's scale is the
+            // scale BL-955's spend scorer reads.
+            std::vector<int> expn_rank, cons_rank;
+            exploration_lean_ranks(traced.polities, &cs_copy, expn_rank, cons_rank);
+
             std::vector<exploration_row::strength_entry> entries;
             for (std::size_t p = 0; p < np; ++p)
             {
@@ -869,10 +929,25 @@ int main(int argc, char** argv)
                     const culture& cu = cs_copy.cultures[static_cast<std::size_t>(q.culture)];
                     e.cons_q = consolidator_lean_q(cu);
                     e.expn_q = expansion_lean_q(cu);
+                    e.cons_rank_q = cons_rank[p];
+                    e.expn_rank_q = expn_rank[p];
+
+                    exploration_row::lean_point lp;
+                    lp.cons_q = e.cons_q;           lp.expn_q = e.expn_q;
+                    lp.cons_rank_q = e.cons_rank_q; lp.expn_rank_q = e.expn_rank_q;
+                    lp.sea_q = std::clamp(cu.sea_legs_q, 0, 1000);
+                    if (cu.pantheon.size() >= 2)
+                    {
+                        lp.dominion_q = std::clamp(cu.pantheon[1].dominion, 0, 10) * 100;
+                        lp.zeal_q     = std::clamp(cu.pantheon[1].zeal, 0, 10) * 100;
+                    }
+                    row.lean_population.push_back(lp);
                 }
                 else
                 {
-                    e.cons_q = e.expn_q = -1; // no culture: neither lean, excluded below
+                    // no culture: neither lean, never ranked, never classified
+                    e.cons_q = e.expn_q = -1;
+                    ++row.living_uncultured;
                 }
                 entries.push_back(e);
             }
@@ -883,7 +958,7 @@ int main(int argc, char** argv)
                 auto take_top = [&](std::vector<exploration_row::strength_entry> v,
                                     bool by_treasury,
                                     std::vector<exploration_row::strength_entry>& out,
-                                    bool& has_cons, bool& has_expn) {
+                                    bool& has_cons, bool& has_expn, bool& both_distinct) {
                     std::sort(v.begin(), v.end(), [&](const auto& a, const auto& b) {
                         if (by_treasury)
                         {
@@ -896,14 +971,22 @@ int main(int argc, char** argv)
                     for (std::size_t k = 0; k < top_n; ++k)
                     {
                         out.push_back(v[k]);
-                        if (v[k].cons_q > v[k].expn_q)      has_cons = true;
-                        else if (v[k].expn_q > v[k].cons_q) has_expn = true;
+                        if (reads_consolidator(v[k].cons_rank_q)) has_cons = true;
+                        if (reads_expansionist(v[k].expn_rank_q)) has_expn = true;
                     }
+                    // Both strategies in DIFFERENT realms: one realm reading as
+                    // both is not two ways to be strong.
+                    for (std::size_t a = 0; a < top_n; ++a)
+                        for (std::size_t b = 0; b < top_n; ++b)
+                            if (a != b && reads_consolidator(v[a].cons_rank_q)
+                                       && reads_expansionist(v[b].expn_rank_q))
+                                both_distinct = true;
                 };
                 take_top(entries, true,  row.top_by_treasury,
-                         row.top_has_consolidator, row.top_has_expansionist);
+                         row.top_has_consolidator, row.top_has_expansionist, row.top_both_distinct);
                 take_top(entries, false, row.top_by_regions,
-                         row.regions_top_has_consolidator, row.regions_top_has_expansionist);
+                         row.regions_top_has_consolidator, row.regions_top_has_expansionist,
+                         row.regions_top_both_distinct);
                 row.strength_measured = true;
             }
         }
@@ -1007,7 +1090,17 @@ int main(int argc, char** argv)
                 r7_violations = 0;
         // reading 3
         int64_t r3_measured = 0, r3_cons = 0, r3_expn = 0, r3_both = 0,
-                r3_reg_cons = 0, r3_reg_expn = 0, r3_reg_both = 0;
+                r3_reg_cons = 0, r3_reg_expn = 0, r3_reg_both = 0,
+                r3_both_distinct = 0, r3_reg_both_distinct = 0; // BL-1016
+        // BL-1016: the pooled lean population. pct[] is min, p10, p25, median,
+        // p75, p90, max; -1 throughout when nothing was measured.
+        int64_t r3_pop = 0, r3_uncultured = 0, r3_raw_cons_gt_expn = 0,
+                r3_class_c = 0, r3_class_e = 0, r3_class_b = 0, r3_class_none = 0;
+        int     r3_cons_pct[7] = {-1, -1, -1, -1, -1, -1, -1};
+        int     r3_expn_pct[7] = {-1, -1, -1, -1, -1, -1, -1};
+        int     r3_sea_pct[7]  = {-1, -1, -1, -1, -1, -1, -1};
+        int     r3_dom_pct[7]  = {-1, -1, -1, -1, -1, -1, -1};
+        int     r3_zeal_pct[7] = {-1, -1, -1, -1, -1, -1, -1};
         // reading 10
         int64_t r10_live_entries = 0, r10_entries = 0, r10_seeds_with_spread = 0;
         int     r10_w_min = 0, r10_w_median = 0, r10_w_max = 0;
@@ -1674,26 +1767,112 @@ int main(int argc, char** argv)
     // why region count cannot see a consolidator). The region-count ranking
     // is printed beside it for comparison; the verdict line reads the
     // treasury ranking.
+    //
+    // BL-1016 -- WHAT A REALM "IS" IS READ BY RANK. A consolidator is a realm
+    // whose consolidator lean ranks in the top third of its world's living,
+    // cultured polities; an expansionist likewise (see `kLeanTopThirdRankQ`
+    // for why the raw leans cannot be compared). The whole population behind
+    // the label is printed first, so the reader sees what "top third" meant on
+    // each seed, and the verdict reads a consolidator and an expansionist in
+    // DIFFERENT realms.
     // -----------------------------------------------------------------------
     std::printf("\n--- reading 3: both strategies pay (consolidator/expansionist, by creed) ---\n");
     std::printf("  metric: top-3 realms per seed ranked by CAPITAL TREASURY at 1660, tie-break mean "
                 "held-region network_supply_q, then polity id (region-count ranking shown for comparison)\n");
+    std::printf("  classifier (BL-1016): each lean as a per-mille RANK among the seed's living, cultured "
+                "polities at 1660 (exploration_lean_ranks -- the scale BL-955's spend scorer reads); a realm "
+                "is a consolidator when its consolidator rank >= %d (the top third by that lean), an "
+                "expansionist likewise by expansion rank, so a realm may be both or neither. The raw leans "
+                "are never compared: one is a product, the other a mean.\n", kLeanTopThirdRankQ);
     {
-        auto lean_tag = [](const exploration_row::strength_entry& e) {
-            return e.cons_q > e.expn_q ? "C" : (e.expn_q > e.cons_q ? "E" : "-");
+        // --- BL-1016: the population behind the label ----------------------
+        std::vector<int> all_cons, all_expn, all_sea, all_dom, all_zeal;
+        int64_t uncultured = 0, raw_cons_gt = 0, class_c = 0, class_e = 0, class_b = 0, class_none = 0;
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok || !r.strength_measured) continue;
+            uncultured += r.living_uncultured;
+            for (const exploration_row::lean_point& lp : r.lean_population)
+            {
+                all_cons.push_back(lp.cons_q); all_expn.push_back(lp.expn_q);
+                all_sea.push_back(lp.sea_q);   all_dom.push_back(lp.dominion_q);
+                all_zeal.push_back(lp.zeal_q);
+                if (lp.cons_q > lp.expn_q) ++raw_cons_gt;
+                const bool c = reads_consolidator(lp.cons_rank_q), e = reads_expansionist(lp.expn_rank_q);
+                if (c && e) ++class_b; else if (c) ++class_c; else if (e) ++class_e; else ++class_none;
+            }
+        }
+        const int pcts[7] = {0, 10, 25, 50, 75, 90, 100};
+        const auto fill_pct = [&](std::vector<int> v, int out[7]) {
+            std::sort(v.begin(), v.end());
+            for (int k = 0; k < 7; ++k) out[k] = percentile_of(v, pcts[k]);
         };
+        fill_pct(all_cons, face.r3_cons_pct); fill_pct(all_expn, face.r3_expn_pct);
+        fill_pct(all_sea, face.r3_sea_pct);   fill_pct(all_dom, face.r3_dom_pct);
+        fill_pct(all_zeal, face.r3_zeal_pct);
+        face.r3_pop = static_cast<int64_t>(all_cons.size()); face.r3_uncultured = uncultured;
+        face.r3_raw_cons_gt_expn = raw_cons_gt;
+        face.r3_class_c = class_c; face.r3_class_e = class_e; face.r3_class_b = class_b;
+        face.r3_class_none = class_none;
+
+        std::printf("  lean population, pooled: %lld living cultured polities at 1660 (%lld living with no "
+                    "culture, unranked)\n", static_cast<long long>(face.r3_pop), static_cast<long long>(uncultured));
+        const auto print_pct = [&](const char* label, const int v[7]) {
+            std::printf("    %-22s min=%4d p10=%4d p25=%4d med=%4d p75=%4d p90=%4d max=%4d\n",
+                        label, v[0], v[1], v[2], v[3], v[4], v[5], v[6]);
+        };
+        print_pct("consolidator_lean_q", face.r3_cons_pct);
+        print_pct("expansion_lean_q",    face.r3_expn_pct);
+        print_pct("  input sea_legs_q",  face.r3_sea_pct);
+        print_pct("  input dominion x100", face.r3_dom_pct);
+        print_pct("  input zeal x100",   face.r3_zeal_pct);
+        std::printf("    raw consolidator lean > raw expansion lean (the retired comparison): %lld of %lld\n",
+                    static_cast<long long>(raw_cons_gt), static_cast<long long>(face.r3_pop));
+        std::printf("    by rank: consolidator only=%lld  expansionist only=%lld  both=%lld  neither=%lld\n",
+                    static_cast<long long>(class_c), static_cast<long long>(class_e),
+                    static_cast<long long>(class_b), static_cast<long long>(class_none));
+
+        // Per seed: the raw lean a realm needed to read as top third.
+        const auto floor_of = [](const std::vector<exploration_row::lean_point>& pop, bool cons) {
+            int best = -1;
+            for (const exploration_row::lean_point& lp : pop)
+            {
+                const bool in = cons ? reads_consolidator(lp.cons_rank_q) : reads_expansionist(lp.expn_rank_q);
+                const int  v  = cons ? lp.cons_q : lp.expn_q;
+                if (in && (best < 0 || v < best)) best = v;
+            }
+            return best;
+        };
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok || !r.strength_measured) continue;
+            std::vector<int> c, e;
+            for (const exploration_row::lean_point& lp : r.lean_population)
+            { c.push_back(lp.cons_q); e.push_back(lp.expn_q); }
+            std::sort(c.begin(), c.end()); std::sort(e.begin(), e.end());
+            std::printf("    seed %u: n=%zu  cons p25/med/p75=%d/%d/%d top-third floor=%d  "
+                        "expn p25/med/p75=%d/%d/%d top-third floor=%d\n",
+                        r.seed, r.lean_population.size(),
+                        percentile_of(c, 25), percentile_of(c, 50), percentile_of(c, 75),
+                        floor_of(r.lean_population, true),
+                        percentile_of(e, 25), percentile_of(e, 50), percentile_of(e, 75),
+                        floor_of(r.lean_population, false));
+        }
+
         auto print_top = [&](const char* label, const std::vector<exploration_row::strength_entry>& v) {
             std::printf("    %-9s", label);
             for (const auto& e : v)
-                std::printf("  [p%d %s trs=%lld sup=%d reg=%lld cons=%d expn=%d]", e.id, lean_tag(e),
+                std::printf("  [p%d %s trs=%lld sup=%d reg=%lld cons=%d(r%d) expn=%d(r%d)]", e.id,
+                            lean_tag_of(e.cons_rank_q, e.expn_rank_q),
                             static_cast<long long>(e.treasury), e.mean_supply_q,
-                            static_cast<long long>(e.regions), e.cons_q, e.expn_q);
+                            static_cast<long long>(e.regions), e.cons_q, e.cons_rank_q,
+                            e.expn_q, e.expn_rank_q);
             std::printf("\n");
         };
 
         int64_t seeds_measured = 0, seeds_with_consolidator_top = 0,
-                seeds_with_expansionist_top = 0, seeds_with_both = 0;
-        int64_t reg_cons = 0, reg_expn = 0, reg_both = 0;
+                seeds_with_expansionist_top = 0, seeds_with_both = 0, seeds_both_distinct = 0;
+        int64_t reg_cons = 0, reg_expn = 0, reg_both = 0, reg_both_distinct = 0;
         for (const exploration_row& r : rows)
         {
             if (!r.ok || !r.strength_measured) continue;
@@ -1701,31 +1880,44 @@ int main(int argc, char** argv)
             if (r.top_has_consolidator) ++seeds_with_consolidator_top;
             if (r.top_has_expansionist) ++seeds_with_expansionist_top;
             if (r.top_has_consolidator && r.top_has_expansionist) ++seeds_with_both;
+            if (r.top_both_distinct) ++seeds_both_distinct;
             if (r.regions_top_has_consolidator) ++reg_cons;
             if (r.regions_top_has_expansionist) ++reg_expn;
             if (r.regions_top_has_consolidator && r.regions_top_has_expansionist) ++reg_both;
+            if (r.regions_top_both_distinct) ++reg_both_distinct;
 
-            std::printf("  seed %u (C = consolidator-leaning creed, E = expansionist, - = neither):\n", r.seed);
+            std::printf("  seed %u (C = consolidator by rank, E = expansionist, B = both, - = neither; "
+                        "(rN) = per-mille rank):\n", r.seed);
             print_top("treasury:", r.top_by_treasury);
             print_top("regions:",  r.top_by_regions);
         }
         face.r3_measured = seeds_measured; face.r3_cons = seeds_with_consolidator_top;
         face.r3_expn = seeds_with_expansionist_top; face.r3_both = seeds_with_both;
         face.r3_reg_cons = reg_cons; face.r3_reg_expn = reg_expn; face.r3_reg_both = reg_both;
-        std::printf("  seeds measured=%lld  top-3-by-TREASURY include a consolidator-leaning "
-                    "creed=%lld  include an expansionist-leaning creed=%lld  BOTH present=%lld\n",
+        face.r3_both_distinct = seeds_both_distinct; face.r3_reg_both_distinct = reg_both_distinct;
+        std::printf("  seeds measured=%lld  top-3-by-TREASURY include a consolidator=%lld  include an "
+                    "expansionist=%lld  BOTH present=%lld  BOTH in different realms=%lld\n",
                     static_cast<long long>(seeds_measured), static_cast<long long>(seeds_with_consolidator_top),
-                    static_cast<long long>(seeds_with_expansionist_top), static_cast<long long>(seeds_with_both));
-        std::printf("  (comparison) top-3-by-REGIONS include a consolidator-leaning creed=%lld  "
-                    "include an expansionist-leaning creed=%lld  BOTH present=%lld\n",
+                    static_cast<long long>(seeds_with_expansionist_top), static_cast<long long>(seeds_with_both),
+                    static_cast<long long>(seeds_both_distinct));
+        std::printf("  (comparison) top-3-by-REGIONS include a consolidator=%lld  include an expansionist=%lld  "
+                    "BOTH present=%lld  BOTH in different realms=%lld\n",
                     static_cast<long long>(reg_cons), static_cast<long long>(reg_expn),
-                    static_cast<long long>(reg_both));
-        std::printf("  %s\n", seeds_with_both > 0
-            ? "at least one seed's strongest realms include both a consolidator and an "
-              "expansionist, each traceable to its own creed."
-            : "no seed on this spread shows both strategies among its strongest realms -- "
-              "report to Ben rather than forcing the mapping (EXPLORATION.md sec Two ways to be "
-              "strong: if the creed axes do not separate them, the fix is upstream, not a flag here).");
+                    static_cast<long long>(reg_both), static_cast<long long>(reg_both_distinct));
+        // Two questions, answered separately (BL-1016): do the creed axes
+        // separate the POPULATION at all, and do both strategies stand among
+        // one world's strongest realms. Only the first failing is the case
+        // EXPLORATION.md sends upstream.
+        std::printf("  %s\n", class_c > 0 && class_e > 0
+            ? "the creed axes separate the population: some realms read consolidator and not "
+              "expansionist, others the reverse."
+            : "the creed axes do NOT separate the population -- report to Ben (EXPLORATION.md sec Two "
+              "ways to be strong: if they do not separate them, the fix is upstream, not a flag here).");
+        std::printf("  %s\n", seeds_both_distinct > 0
+            ? "at least one seed's strongest realms include a consolidator and a different "
+              "expansionist realm, each traceable to its own creed."
+            : "no seed on this spread shows a consolidator and a different expansionist among its "
+              "strongest realms -- report to Ben rather than forcing the mapping.");
     }
 
     // -----------------------------------------------------------------------
@@ -1891,11 +2083,13 @@ int main(int argc, char** argv)
                 {
                     const auto& e = v[k];
                     std::fprintf(f, "%s{\"id\": %d, \"lean\": \"%s\", \"treasury\": %lld, \"supply_q\": %d, "
-                                    "\"regions\": %lld, \"cons_q\": %d, \"expn_q\": %d}",
+                                    "\"regions\": %lld, \"cons_q\": %d, \"expn_q\": %d, "
+                                    "\"cons_rank_q\": %d, \"expn_rank_q\": %d}",
                                  k ? ", " : "", e.id,
-                                 e.cons_q > e.expn_q ? "C" : (e.expn_q > e.cons_q ? "E" : "-"),
+                                 lean_tag_of(e.cons_rank_q, e.expn_rank_q),
                                  static_cast<long long>(e.treasury), e.mean_supply_q,
-                                 static_cast<long long>(e.regions), e.cons_q, e.expn_q);
+                                 static_cast<long long>(e.regions), e.cons_q, e.expn_q,
+                                 e.cons_rank_q, e.expn_rank_q);
                 }
                 std::fprintf(f, "]");
             };
@@ -1946,14 +2140,37 @@ int main(int argc, char** argv)
             std::fprintf(f, "  \"conflict_persists\": {\"median_empire_rate_per_century\": %.4f, "
                             "\"median_exploration_rate_per_century\": %.4f},\n",
                          face.med_empire_rate, face.med_expl_rate);
-            std::fprintf(f, "  \"strategies\": {\"seeds_measured\": %lld, \"treasury_top_has_consolidator\": %lld, "
+            std::fprintf(f, "  \"strategies\": {\"classifier\": \"per-mille lean rank among living cultured polities, top third\", "
+                            "\"top_third_rank_q\": %d, \"seeds_measured\": %lld, \"treasury_top_has_consolidator\": %lld, "
                             "\"treasury_top_has_expansionist\": %lld, \"treasury_top_has_both\": %lld, "
+                            "\"treasury_top_has_both_distinct\": %lld, "
                             "\"regions_top_has_consolidator\": %lld, \"regions_top_has_expansionist\": %lld, "
-                            "\"regions_top_has_both\": %lld},\n",
+                            "\"regions_top_has_both\": %lld, \"regions_top_has_both_distinct\": %lld, ",
+                         kLeanTopThirdRankQ,
                          static_cast<long long>(face.r3_measured), static_cast<long long>(face.r3_cons),
                          static_cast<long long>(face.r3_expn), static_cast<long long>(face.r3_both),
+                         static_cast<long long>(face.r3_both_distinct),
                          static_cast<long long>(face.r3_reg_cons), static_cast<long long>(face.r3_reg_expn),
-                         static_cast<long long>(face.r3_reg_both));
+                         static_cast<long long>(face.r3_reg_both), static_cast<long long>(face.r3_reg_both_distinct));
+            {
+                const auto put_pct = [&](const char* key, const int v[7], const char* tail) {
+                    std::fprintf(f, "\"%s\": [%d, %d, %d, %d, %d, %d, %d]%s",
+                                 key, v[0], v[1], v[2], v[3], v[4], v[5], v[6], tail);
+                };
+                std::fprintf(f, "\"lean_population\": {\"_pct\": \"min, p10, p25, median, p75, p90, max\", "
+                                "\"polities\": %lld, \"uncultured\": %lld, \"raw_cons_gt_expn\": %lld, "
+                                "\"consolidator_only\": %lld, \"expansionist_only\": %lld, \"both\": %lld, "
+                                "\"neither\": %lld, ",
+                             static_cast<long long>(face.r3_pop), static_cast<long long>(face.r3_uncultured),
+                             static_cast<long long>(face.r3_raw_cons_gt_expn),
+                             static_cast<long long>(face.r3_class_c), static_cast<long long>(face.r3_class_e),
+                             static_cast<long long>(face.r3_class_b), static_cast<long long>(face.r3_class_none));
+                put_pct("consolidator_lean_q", face.r3_cons_pct, ", ");
+                put_pct("expansion_lean_q", face.r3_expn_pct, ", ");
+                put_pct("sea_legs_q", face.r3_sea_pct, ", ");
+                put_pct("dominion_x100", face.r3_dom_pct, ", ");
+                put_pct("zeal_x100", face.r3_zeal_pct, "}},\n");
+            }
             std::fprintf(f, "  \"treaty_depth\": {\"formed\": %lld, \"broken\": %lld, \"blocked_campaigns\": %lld, "
                             "\"standing_1660\": %lld, ",
                          static_cast<long long>(face.r4_formed), static_cast<long long>(face.r4_broken),
@@ -2085,12 +2302,17 @@ int main(int argc, char** argv)
                 }
                 // reading 3
                 std::fprintf(f, "   \"strength_measured\": %s, \"treasury_top_has_consolidator\": %s, "
-                                "\"treasury_top_has_expansionist\": %s, \"regions_top_has_consolidator\": %s, "
-                                "\"regions_top_has_expansionist\": %s, \"top_by_treasury\": ",
+                                "\"treasury_top_has_expansionist\": %s, \"treasury_top_both_distinct\": %s, "
+                                "\"regions_top_has_consolidator\": %s, "
+                                "\"regions_top_has_expansionist\": %s, \"regions_top_both_distinct\": %s, "
+                                "\"lean_polities\": %zu, \"lean_uncultured\": %lld, \"top_by_treasury\": ",
                              r.strength_measured ? "true" : "false",
                              r.top_has_consolidator ? "true" : "false", r.top_has_expansionist ? "true" : "false",
+                             r.top_both_distinct ? "true" : "false",
                              r.regions_top_has_consolidator ? "true" : "false",
-                             r.regions_top_has_expansionist ? "true" : "false");
+                             r.regions_top_has_expansionist ? "true" : "false",
+                             r.regions_top_both_distinct ? "true" : "false",
+                             r.lean_population.size(), static_cast<long long>(r.living_uncultured));
                 top3(r.top_by_treasury);
                 std::fprintf(f, ", \"top_by_regions\": ");
                 top3(r.top_by_regions);
