@@ -24,7 +24,7 @@
 // gen config PARSED and passed, priced-resource count printed in the manifest;
 // spawn order: make_hard_coded_world -> apply_shipped_landscape (harness_params.hpp:
 // load_economy's recipe pass, search_landscape with app.cpp's params, the WINNER
-// applied, the second recipe pass — BL-979); the tick is app::step_economy's order. Spectating stays TRUE for warm start AND the
+// applied, the second recipe pass — BL-979); the tick is app::step_economy's order. Spectating stays TRUE for the settle AND the
 // measured window — the field is the subject; nobody is seated.
 //
 // PARAMETER OVERRIDES take the demand_census --reach pattern (NR-763): applied
@@ -38,8 +38,12 @@
 // lines (a played player-corp never is a claimant — optimistic).
 //
 // Usage:
-//   campaign_lapse [--seed N] [--ticks N] [--warm N] [--fast] [--epoch Y]
+//   campaign_lapse [--seed N] [--ticks N] [--settle N] [--fast] [--epoch Y]
 //                  [--tag NAME] [--pop-scale F] [--bg-scale F] [--t0]
+//   --settle N   unlogged lead-in ticks before the measured window (default 12,
+//                the game's settle — app::validation_ticks). `--warm N` is the
+//                same flag under its older name, kept so the archived
+//                `--warm 0` / `--warm 80` commands still reproduce.
 //   --fast       zero the pre-epoch prehistory (NOT the shipped spawn; iteration
 //                only — the manifest says so).
 //   --pop-scale  multiply population_demand.demand_scale (override, echoed).
@@ -129,7 +133,15 @@ void check(bool ok, const char* row, const char* what)
 struct lapse_params
 {
     uint32_t    seed        = 0;
-    int         warm_ticks  = 80;    ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978) — a re-read this harness owes.
+    /// Unlogged lead-in before the measured window. Defaults to THE SETTLE —
+    /// phase 6's single validation run, mirroring `app::validation_ticks`
+    /// (restated: app.hpp brings SDL; if the app's number moves, this moves with
+    /// it) — so tick 1 of the measured window is the first quarter of play.
+    /// Re-read under BL-1008 (2026-09-16): nothing in the instrument needs a
+    /// longer lead-in — every trailing window (debt.csv's four ticks) is filled
+    /// inside the measured window, not the lead-in — so the default follows the
+    /// game. A longer or zero lead-in stays a flag, and is echoed in the manifest.
+    int         settle_ticks = 12;
     int         ticks       = 120;   ///< measured window (30 years of quarters).
     bool        prehistory  = true;  ///< the shipped spawn; --fast zeroes it.
     int         epoch_year  = 0;     ///< 0 = leave world_params' own default.
@@ -438,18 +450,18 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
                     "buildings_idle,corps,corps_in_debt,hostile_pairs,friend_pairs,"
                     "sell_orders,treasury_sum,state_purchase_qty,firm_exits\n";
 
-    const int total_ticks = lp.warm_ticks + lp.ticks;
+    const int total_ticks = lp.settle_ticks + lp.ticks;
     for (int t = 1; t <= total_ticks; ++t)
     {
         economy_report rep;
         std::map<entity_id, phase_deltas> phases;
         auto flows = tick(w, reg, t, rep, &phases);
-        if (t <= lp.warm_ticks)
+        if (t <= lp.settle_ticks)
         {
             prev_balance.clear();
             for (const entity_id id : sorted_corp_ids(w))
                 prev_balance[id] = w.corporations.at(id).balance;
-            continue;   // the warm start settles; the measured window logs
+            continue;   // the settle is unlogged; the measured window logs
         }
 
         // --- per-corp rows (rep.budgets is a std::map — already sorted) -----
@@ -753,8 +765,9 @@ int main(int argc, char** argv)
             lp.seed = static_cast<uint32_t>(std::strtoul(argv[++i], nullptr, 10));
         else if (std::strcmp(argv[i], "--ticks") == 0 && i + 1 < argc)
             lp.ticks = std::max(1, std::atoi(argv[++i]));
-        else if (std::strcmp(argv[i], "--warm") == 0 && i + 1 < argc)
-            lp.warm_ticks = std::max(0, std::atoi(argv[++i]));
+        else if ((std::strcmp(argv[i], "--settle") == 0 || std::strcmp(argv[i], "--warm") == 0)
+                 && i + 1 < argc)
+            lp.settle_ticks = std::max(0, std::atoi(argv[++i]));
         else if (std::strcmp(argv[i], "--epoch") == 0 && i + 1 < argc)
             lp.epoch_year = std::atoi(argv[++i]);
         else if (std::strcmp(argv[i], "--fast") == 0)
@@ -786,7 +799,7 @@ int main(int argc, char** argv)
         // ===================================================================
         lapse_params small = lp;
         small.prehistory = false;   // T0 is about the instrument, not the spawn
-        small.warm_ticks = 6;
+        small.settle_ticks = 6;
         small.ticks      = 8;
 
         data_layer d;
@@ -847,8 +860,8 @@ int main(int argc, char** argv)
 
     std::string manifest;
     appendf(manifest, "campaign_lapse manifest — BL-723\n");
-    appendf(manifest, "seed=%u\nwarm_ticks=%d\nmeasured_ticks=%d\nprehistory=%s\n",
-            lp.seed, lp.warm_ticks, lp.ticks,
+    appendf(manifest, "seed=%u\nsettle_ticks=%d\nmeasured_ticks=%d\nprehistory=%s\n",
+            lp.seed, lp.settle_ticks, lp.ticks,
             lp.prehistory ? "ON (the shipped spawn)" : "OFF (--fast, NOT the spawn)");
     // The band is NAMED, never implied: the world_params default epoch is 0
     // (the ancient 0 CE arc), and a whole session's sweeps once ran the wrong
