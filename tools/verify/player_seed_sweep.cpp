@@ -325,6 +325,11 @@ struct seat_row
     /// (BL-1020). Information, never a verdict.
     int       shortlisted_insolvent = 0;
     int       shortlisted_trail_neg = 0;
+    /// Specialists the RETIRED floor would have passed — solvent AND trailing
+    /// net >= 0, the exact test seat_player_corporation applied before BL-1020 —
+    /// over the same settled world. The before-and-after of the gate in one
+    /// run: the settle does not depend on the seat, so this IS the old shortlist.
+    int       retired_floor_passed  = 0;
     /// The smallest weight any shortlisted corp carried, over this seed. S3's
     /// input: it must never reach zero, or the bias has become a gate.
     float     min_shortlist_weight  = 0.0f;
@@ -365,8 +370,8 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
     std::printf("BL-1020. The floor reads phase 6's STATIC landscape score; balance and trail8 "
                 "are information.\n\n");
 
-    std::printf("seed  spec  short  land    proc  pop%%  weight   balance   trail8  unmet  seated\n");
-    std::printf("----  ----  -----  ------  ----  ----  ------  --------  -------  -----  ------\n");
+    std::printf("seed  spec  short  old  land    proc  pop%%  weight   balance   trail8  unmet  seated\n");
+    std::printf("----  ----  -----  ---  ------  ----  ----  ------  --------  -------  -----  ------\n");
 
     std::vector<seat_row> rows;
     rows.reserve(static_cast<std::size_t>(n_seeds));
@@ -404,6 +409,8 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
                     r.seat_trailing  = c.trailing_net;
                     r.seat_landscape = c.landscape;
                 }
+                if (c.solvent && c.trailing_net >= 0.0f)
+                    ++r.retired_floor_passed;
                 if (!c.shortlisted)
                     continue;
                 if (c.has_processor)          ++r.shortlisted_with_proc;
@@ -463,8 +470,9 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
         }
 
         if (!r.threw)
-            std::printf("%4u  %4d  %5d  %6.4f  %4s  %4.0f  %6.2f  %8.0f  %7.0f  %5s  %s%s\n",
-                        r.seed, r.specialists, r.shortlisted, r.seat_landscape,
+            std::printf("%4u  %4d  %5d  %3d  %6.4f  %4s  %4.0f  %6.2f  %8.0f  %7.0f  %5s  %s%s\n",
+                        r.seed, r.specialists, r.shortlisted, r.retired_floor_passed,
+                        r.seat_landscape,
                         r.seat_processor ? "YES" : "no",
                         static_cast<double>(r.seat_pop_share * 100.0f),
                         static_cast<double>(r.seat_weight),
@@ -484,6 +492,7 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
     int not_reproduced = 0, reproduce_checked = 0;
     int total_short = 0, total_short_proc = 0, total_short_pop = 0, total_spec = 0;
     int total_short_insolvent = 0, total_short_trail_neg = 0, empty_shortlist = 0;
+    int total_retired = 0, empty_retired = 0;
     float min_weight = 0.0f;
     bool  have_weight = false;
     for (const seat_row& r : rows)
@@ -498,6 +507,9 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
         total_short_trail_neg += r.shortlisted_trail_neg;
         if (r.shortlisted == 0)
             ++empty_shortlist;
+        total_retired += r.retired_floor_passed;
+        if (r.retired_floor_passed == 0)
+            ++empty_retired;
         if (!r.floor_unmet)
         {
             ++drawn;
@@ -551,6 +563,9 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
                 total_short_proc, total_short, pct(total_short_proc, total_short));
     std::printf("    of the shortlisted, near population .. %d/%d  (%.1f%%)\n",
                 total_short_pop, total_short, pct(total_short_pop, total_short));
+    std::printf("    the RETIRED floor (solvent, trail8 >= 0) would pass %d/%d, and be EMPTY on "
+                "%d/%d seeds\n",
+                total_retired, total_spec, empty_retired, done);
     std::printf("    of the shortlisted, balance <= 0 ..... %d/%d  (%.1f%%)   [information — the\n"
                 "    of the shortlisted, trail8 < 0 ....... %d/%d  (%.1f%%)    retired floor's inputs]\n",
                 total_short_insolvent, total_short, pct(total_short_insolvent, total_short),
