@@ -57,6 +57,19 @@ carries no tariff, which is a legitimate outcome rather than a gap.
 
 ---
 
+## The worlds to design against
+
+**Sixteen curated seeds are stored for this phase** (`seed_library.json`; query with
+`node tools/session/seed_library.js`). Generation is a pure function of the world descriptor, so a
+seed is the save: each entry carries the readings that made that world interesting and a fingerprint
+that says whether the world it still generates is the world described. They span the axes this phase
+forms companies on — a chest of 27 million against one of 245, 112 polities against fourteen, eight
+colonial subjects against none, thirty post roads against zero, 103 trade flows against thirteen.
+The floor case and the ceiling case are both deliberate: seed 17 hands this phase almost nothing,
+and seed 46 hands it everything.
+
+---
+
 ## Deliberately deferred
 
 - **A world war late in the span.** Ben, 2026-09-11: *"I am on the fence about simulating a world

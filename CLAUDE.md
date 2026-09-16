@@ -108,6 +108,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/generation/NATION_GENERATION.md` | Territory placement, resource profile, character, naming. |
 | `docs/generation/CORPORATION_GENERATION.md` | Nation assignment, focus, starting assets, finances. |
 | `docs/generation/GENERATION_LEDGER.md` | The why-did-this-tile-generate surface. |
+| `docs/generation/seed_library.json` | Sixteen curated worlds and what each one is for — a seed is the save. **Query it:** `node tools/session/seed_library.js [--for <tag>] [--seed N] [--check]`. |
 | `docs/generation/MILITARY_HISTORY.md` | **How force works inside the Era −1 sim** — `resolve_battle`, the band ladder, naval, the forage simplification, sea legs. A *generation* doc: its rules are what make a history cheap to generate, not claims about the game. `military/MILITARY.md` is its campaign-era sibling. |
 | `docs/lore/HISTORY.md` | The institutional ladder that drives the Era −1 sim. |
 | `docs/lore/CREEDS.md` | Pantheons per cradle-culture, generated tongues. |

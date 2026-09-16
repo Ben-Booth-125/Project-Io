@@ -41,6 +41,16 @@ Twenty-five items across two waves. The layer now has what it did not have on 20
    the constant tuned in sprint 41 is not discriminating. The implicated constants are the campaign
    threshold and the prize pricing for an unmet target.
 
+## Sixteen worlds to design against
+
+`docs/generation/seed_library.json`, queried with `node tools/session/seed_library.js`. Chosen off a
+48-seed parity sweep on 2026-09-16, one per question the next phase has to answer: the rich world
+(seed 46, a 27M median chest) and the quiet one (seed 17, fourteen polities and thirteen flows); the
+crowded (11) against the thin and rich (43); two colonial worlds (13, 41) against two that subjected
+nobody (37, 4); infrastructure without trade (32) against trade without roads (10). Seed 0 is in it
+because everything else is compared against it. A seed is the save — generation is a pure function of
+the descriptor — so the store holds the rationale and a fingerprint, not a snapshot.
+
 ## Digitisation, when it starts
 
 `docs/generation/DIGITISATION.md` is still the placeholder and its boundary is unchanged: companies,
