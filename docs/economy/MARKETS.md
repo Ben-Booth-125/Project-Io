@@ -925,9 +925,26 @@ it would widen the arbitrage margin only by cutting what an abundant producer re
 **The nearest-neighbour reading is no longer the whole requirement (Ben, 2026-09-15).** Trade
 now chases price over distance (`SUPPLY.md` § Dispatch trigger), and a sea leg is the cheapest
 per distance (`SUPPLY.md` § Logistical cost), so the haul that matters is not only to the nearest
-neighbour but to wherever a gap is. The ceiling still covers every nearest pair; what is owed
-beside it is a reading of the far pairs a seller actually reaches, taken after play has run, since
-a gap play erases in a year was never a working international market.
+neighbour but to wherever a gap is. The ceiling still covers every nearest pair; beside it sits a
+reading of the far pairs a seller actually reaches, taken after play has run, since a gap play
+erases in a year was never a working international market.
+
+**The far trade reading** (BL-1006, far trade reading) is `haulage_measure --far-trade`. It follows
+every convoy from dispatch to its first clear after arrival, on the world the app builds, in two
+windows of four quarterly dispatches — the first year of play, and the year after N years — and
+reads three things:
+
+- **(a)** volume delivered **and sold** at its destination, where that is not the market the source
+  pool clears at. A dispatch count is not this figure.
+- **(b)** the share of (a) whose destination is not the seller's **nearest** market — the market
+  other than home the dispatcher's own leg pricing reaches cheapest, so *nearest* means nearest
+  reachable.
+- **(c)** per good, the destination-minus-home price gap at dispatch and again at arrival, beside
+  the haul paid per unit, so a gap that play closes shows as closing.
+
+A sale is read from the exchange record and attributed **cargo-first** — the cargo is taken to sell
+before the pool's other stock — which is an upper bound, since goods are fungible inside a pool.
+Per-market pools, sea legs and the net-price dispatch rule are each judged against this reading.
 
 **Re-derive rather than trust.** Re-run `haulage_measure` whenever the logistics cost table
 (`logistics.base_cost_per_unit_distance`), the map scale (`body_km_per_tile`), or the
