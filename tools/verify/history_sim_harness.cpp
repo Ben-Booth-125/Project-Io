@@ -1957,6 +1957,176 @@ int main()
     }
 
     // -----------------------------------------------------------------
+    // BL-842 — SMALL GRUDGES DO NOT FREEZE.
+    //
+    // `score -= score * shed / 1000` truncates to a zero decrement once
+    // score < 1000/shed, so every grudge under that line sat still forever,
+    // never reached `grudge_floor`, and crossed the handoff as a permanent
+    // row. Asserted over EVERY score from floor+1 to cap at every step the
+    // default ladder and generation's clock use, against the one function the
+    // round loop calls, so the check cannot drift from the code it guards.
+    // -----------------------------------------------------------------
+    {
+        const history_sim_params gp; // struct defaults: decay 3/1000/yr, floor 4, cap 10000
+        const int steps[] = {1, 4, 5, 10, 20, 50, 100}; // default ladder + generation's 4
+        bool none_stationary = true, proportional_exact = true, all_erased = true;
+        int  stuck_step = -1, stuck_score = -1;
+        for (int st : steps)
+        {
+            const int shed = std::min(1000, gp.grudge_decay_per_year_q * st);
+            for (int s = gp.grudge_floor + 1; s <= gp.grudge_cap; ++s)
+            {
+                std::vector<grudge> v(1);
+                v[0].score = s;
+                v[0].peak  = s;
+                decay_grudges(v, gp, st);
+                const int after = v.empty() ? gp.grudge_floor : v[0].score;
+                if (after >= s && none_stationary)
+                {
+                    none_stationary = false;
+                    stuck_step = st;
+                    stuck_score = s;
+                }
+                // Above the truncation line the rate is untouched: the
+                // decrement is exactly the proportional one, never the floor.
+                const int prop = (s * shed) / 1000;
+                if (prop >= 1 && !v.empty() && s - v[0].score != prop) proportional_exact = false;
+            }
+            // Every border raid is eventually ERASED, not merely shrunk.
+            std::vector<grudge> raid(1);
+            raid[0].score = gp.grudge_border_raided;
+            for (int r = 0; r < 100000 && !raid.empty(); ++r) decay_grudges(raid, gp, st);
+            if (!raid.empty()) all_erased = false;
+        }
+        if (!none_stationary)
+            std::printf("      stationary: score %d at step %d\n", stuck_score, stuck_step);
+        check(none_stationary,
+              "BL842a no grudge score above grudge_floor is stationary across a round, at any step in use");
+        check(proportional_exact,
+              "BL842b above the truncation line the decrement is exactly the proportional rate");
+        check(all_erased,
+              "BL842c a single border raid decays through the floor and is erased at every step");
+
+        // THE HALF-LIFE AT THE BOTTOM, MEASURED (R2). Rounds until the score
+        // is at or below half its start, times the step; "gone" is rounds
+        // until the row is erased. Printed, not pinned: this is a reading of
+        // what the minimum decrement does, for Ben to weigh against the
+        // design's "half-life near 230 years".
+        std::printf("      grudge half-life by start score (years; erase in years):\n");
+        const int starts[] = {8, 30, 60, 83, 150, 300, 1000, 10000};
+        for (int st : {1, 4, 20, 100})
+        {
+            std::printf("        step %3d:", st);
+            for (int s0 : starts)
+            {
+                std::vector<grudge> v(1);
+                v[0].score = s0;
+                int rounds = 0, half = -1;
+                while (!v.empty() && rounds < 100000)
+                {
+                    decay_grudges(v, gp, st);
+                    ++rounds;
+                    if (half < 0 && (v.empty() || v[0].score * 2 <= s0)) half = rounds;
+                }
+                std::printf("  %d:%d;%d", s0, half * st, rounds * st);
+            }
+            std::printf("\n");
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // BL-841 — THE HOLDER'S SHARE IS ALWAYS NAMEABLE.
+    //
+    // THE FOUR-CULTURE PATH. Three named slots hold A, B and C; a fourth
+    // culture D takes the region. `shift_toward(D)` used to find no slot,
+    // fail the displacement test, and pour D's gain into the anonymous tail,
+    // where `share_of(D)` reads 0 — so the `w_cult` term charged D the full
+    // foreign discount forever and every unit it digested was stranded.
+    //
+    // Two regions, digested side by side at generation's own clock (a 4-year
+    // step): one with three foreign slots, one with a free slot. The design
+    // claim is that they digest at the SAME rate, and the invariant is that
+    // every unit the holder gains lands where `share_of` reads it back.
+    // -----------------------------------------------------------------
+    {
+        const history_sim_params ap;
+        const int shift_q = ap.assimilation_per_year_q * 4;
+        const int D = 3;
+
+        culture_shares full; // A 400 / B 300 / C 300, no free slot, no tail
+        full.id[0] = 0; full.weight_q[0] = 400;
+        full.id[1] = 1; full.weight_q[1] = 300;
+        full.id[2] = 2; full.weight_q[2] = 300;
+        full.other_q = 0;
+        culture_shares open; // A 500 / B 500, one free slot
+        open.id[0] = 0; open.weight_q[0] = 500;
+        open.id[1] = 1; open.weight_q[1] = 500;
+        open.other_q = 0;
+
+        const auto structurally_valid = [](const culture_shares& c) {
+            if (c.total_q() != 1000 || c.other_q < 0) return false;
+            for (int k = 0; k < culture_share_slots; ++k)
+            {
+                if (c.id[k] < 0) { if (c.weight_q[k] != 0) return false; continue; }
+                if (c.weight_q[k] <= 0) return false;
+                if (k > 0 && c.id[k - 1] >= 0 && c.weight_q[k - 1] < c.weight_q[k]) return false;
+                if (k > 0 && c.id[k - 1] < 0) return false; // named after an empty slot
+                for (int j = 0; j < k; ++j) if (c.id[j] == c.id[k]) return false;
+            }
+            return true;
+        };
+
+        bool readable = true, same_rate = true, valid = true;
+        int  worst_gap = 0;
+        for (int r = 1; r <= 100; ++r) // 400 years held
+        {
+            for (culture_shares* c : {&full, &open})
+            {
+                const int before = c->share_of(D);
+                const int gain   = ((1000 - before) * shift_q) / 1000;
+                c->shift_toward(D, shift_q);
+                if (c->share_of(D) != before + gain) readable = false;
+                if (!structurally_valid(*c)) valid = false;
+            }
+            const int gap = open.share_of(D) - full.share_of(D);
+            if (gap != 0) same_rate = false;
+            if (gap > worst_gap) worst_gap = gap;
+            if (r == 25 || r == 50 || r == 100)
+                std::printf("      after %3d years: holder share %d/1000 with three foreign slots, "
+                            "%d/1000 with a free one (stranded %d)\n",
+                            r * 4, full.share_of(D), open.share_of(D), gap);
+        }
+        check(readable,
+              "BL841a every unit the holder digests lands where share_of reads it back (four-culture path)");
+        check(same_rate && worst_gap == 0,
+              "BL841b a holder with three foreign slots digests at the same rate as one with a free slot");
+        check(valid,
+              "BL841c the shares keep their invariants: 1000 total, weight 0 exactly where unnamed, "
+              "sorted descending, no culture named twice");
+
+        // AND OVER A LONG, MIXED CHURN OF HOLDERS. Six cultures through three
+        // slots, the holder changing every few rounds — the frontier region
+        // that changes hands again and again (BL-835). Whoever is being
+        // shifted toward must read back its whole gain, every time.
+        culture_shares churn = culture_shares::pure(0);
+        bool churn_readable = true, churn_valid = true;
+        for (int step = 0; step < 4000; ++step)
+        {
+            const int who = ((step / 5) * 7 + step / 13) % 6;
+            const int amt = 1 + (step * 31 + step / 7) % 40;
+            const int before = churn.share_of(who);
+            const int gain   = ((1000 - before) * amt) / 1000;
+            churn.shift_toward(who, amt);
+            if (churn.share_of(who) != before + gain) churn_readable = false;
+            if (!structurally_valid(churn)) churn_valid = false;
+        }
+        check(churn_readable,
+              "BL841d across 4000 shifts of six cultures through three slots, no accrued share is unreadable");
+        check(churn_valid,
+              "BL841e ...and the share invariants hold after every one of them");
+    }
+
+    // -----------------------------------------------------------------
     // E1: BL-973 — every EMPIRE store effect reaches the sim through the
     //     generated table, and is either read or declared unread. The
     //     exploration twin is exploration_sim_harness T7.

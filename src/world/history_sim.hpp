@@ -255,6 +255,12 @@ struct history_sim_params
     /// would seed identical sentiment and the whole record would be a constant.
     /// 3/1000 is a half-life near 230 years: a single old wrong is gone by the
     /// epoch, a running feud is not.
+    ///
+    /// THAT HALF-LIFE HOLDS ONLY ABOVE THE TRUNCATION LINE (BL-842). Below
+    /// score 1000/(rate x step) the proportional decrement rounds to zero, so
+    /// `decay_grudges` sheds one unit a round instead: small grudges fade
+    /// linearly, faster than the exponential, and faster on a finer clock.
+    /// history_sim_harness BL842 prints the measured half-lives per step.
     int grudge_decay_per_year_q = 3;
 
     /// Ceiling on a single pair's score, so a millennium of border war does not
@@ -3542,6 +3548,14 @@ std::vector<uint16_t> owner_slice_at(const history_sim_state& s, int64_t year);
 /// The standing score @p from holds against @p to, or 0 where no entry exists.
 /// Binary search over the sorted sparse table.
 int grudge_between(const history_sim_state& s, int from, int to);
+
+/// One round of grudge decay at @p step_years (BL-827; BL-842). Each score
+/// sheds `grudge_decay_per_year_q x step` per-mille of itself, never less than
+/// ONE unit while it stands above `grudge_floor` -- so no score above the floor
+/// is ever stationary across a round -- and rows at or under the floor are
+/// erased, which is what keeps the table sparse. The round loop's only decay
+/// site; public so the harness asserts the same arithmetic the run performs.
+void decay_grudges(std::vector<grudge>& grudges, const history_sim_params& params, int step_years);
 
 /// The @p n strongest pairs, sorted descending by `score`, ties on `peak`, then
 /// on (from, to). A TOTAL order with an explicit tie-break, so the listing is
