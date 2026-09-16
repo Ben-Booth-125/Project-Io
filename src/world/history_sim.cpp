@@ -5280,10 +5280,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // BL-899 — SEA LEGS, asked of the staging holding execute
                 // actually chose, by the identical lambda the scorer used.
                 const int exec_ration = exec_forages ? 0 : sea_legs_ration(src);
+                // Read once and named (BL-1022) so the battle trace can record
+                // what this march would have drawn foraging. `campaign_supply`
+                // is a pure read of this round's reach and burden, so asking it
+                // here rather than inside each arm below changes no value.
+                const int exec_forage_supply = campaign_supply(ti, src);
                 const int atk_supply =
-                    exec_forages ? campaign_supply(ti, src)
+                    exec_forages ? exec_forage_supply
                                  : (exec_ration > 0
-                                        ? (campaign_supply(ti, src) * exec_ration) / 1000
+                                        ? (exec_forage_supply * exec_ration) / 1000
                                         : 0);
                 const int def_supply = 1000;
                 if (!exec_forages)
@@ -5508,6 +5513,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     bt.terrain_defence_q = terrain_defence(
                         sub_at(terrain, tgt.anchor), cov_at(terrain, tgt.anchor),
                         den_at(terrain, tgt.anchor), lf_at(terrain, tgt.anchor));
+                    bt.exec_dry        = exec_dry;          // BL-1022
+                    bt.exec_forages    = exec_forages;
+                    bt.ration_q        = exec_ration;
+                    bt.forage_supply_q = exec_forage_supply;
+                    bt.attacker_lost   = atk_lost;
+                    bt.defender_lost   = def_lost;
                     bt.attacker_won    = won_it;
                     bt.decisiveness    = bo.decisiveness;
                     bt.transfer_needed = needed;

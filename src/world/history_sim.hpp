@@ -2682,6 +2682,21 @@ struct battle_trace
     int      works_defence_q   = 0; ///< The works half of that, alone.
     int      terrain_defence_q = 0; ///< The term the scorer never sees.
 
+    // --- The route, and what the ration made of it (BL-1022) -------------
+    //
+    // WHY THESE EXIST. CREEDS.md § Sea legs rests on a claim nobody had
+    // measured: a crossing fed near full forage would make coastal ground
+    // CHEAPER to take than inland ground. Answering it needs the route a
+    // battle was reached by and what it cost both sides, per battle — the
+    // counters say how many crossings launched, never what they paid.
+    // Same footing as every field above: written once, read by nothing here.
+    bool     exec_dry          = false; ///< Staging hub reached the target overland — no sea in the line.
+    bool     exec_forages      = false; ///< The force fed normally: dry, or beside a shore its polity holds.
+    int      ration_q          = 0;     ///< Sea-legs ration paid on a crossing that could not forage; 0 = starved or foraged.
+    int      forage_supply_q   = 0;     ///< What the same march would have drawn foraging (`campaign_supply`).
+    int64_t  attacker_lost     = 0;     ///< Heads the attacker lost in this battle.
+    int64_t  defender_lost     = 0;     ///< Heads the defender lost in this battle.
+
     // --- What happened ---------------------------------------------------
     bool attacker_won   = false;
     int  decisiveness   = 0;
