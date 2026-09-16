@@ -1202,6 +1202,9 @@ set(IO_TEST_LONG_HARNESSES
 set(IO_TEST_SWEEP_HARNESSES
     history_sim_harness
     history_sweep
+    # CATEGORY (1), added 2026-09-16 (BL-982): a full shipped world plus the
+    # landscape search per curated seed, sixteen of them. Reports, never gates.
+    digitisation_sim_harness
 
     # CATEGORY (1), added 2026-09-08 with BL-825. history_span_cost prices the
     # Era -1 span: it builds a world per seed and then re-runs the era at 400 /
@@ -1351,6 +1354,10 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # ones — run from build/ it would measure a default registry and report a
     # spawn nobody plays.
     spawn_solvency
+    # ADDED 2026-09-16 (BL-982). Loads world_gen/works/recipes/economy and
+    # docs/generation/seed_library.json by relative path; from build/ it finds
+    # no seed library and FATALs.
+    digitisation_sim_harness
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})
