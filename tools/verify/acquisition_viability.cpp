@@ -156,6 +156,37 @@ void check_on_real_spawn(bool ok, const char* row, const char* what)
 /// (k_acquisition_trailing_quarters, 8) — fits inside the settle whole.
 /// Re-read under BL-1008, 2026-09-16 — see THE SETTLE RE-READ for what moved.
 constexpr int k_settle_ticks = 12;
+
+// ---------------------------------------------------------------------------
+// THE SETTLE RE-READ (BL-1008, 2026-09-16) — what moved when 80 became 12
+// ---------------------------------------------------------------------------
+// Same logic, 3 seeds from 0 (not the default 8 — a shared machine), prehistory
+// ON, default --search 60 / --after 20; the ONLY change is the settle length.
+// A reading, not a re-pin: no band was touched. On three seeds one seed flips a
+// majority, so read the rows as direction, not as a verdict.
+//
+//   row / figure                         80 ticks          12 ticks
+//   seated corp (seeds 0 / 1 / 2)        different on seeds 0 and 1; same on 2
+//   seat balance, mean                   3,198 cr          3,616 cr
+//   R1 accumulates (majority)            2/3  PASS         1/3  FAIL
+//   R2 gate A afforded                   3/3, 3 free       3/3, 2 free
+//   R2 gate B mean price                 31.6 cr           212.8 cr
+//   R3 still earning after the buy      3/3               2/3  (row PASS)
+//   rival solvency at the seat           31.4%             41.7%
+//   every other row                      PASS              PASS
+//
+// CAUSES. (1) The seat is drawn from the trailing returns the settle filed, so a
+// 12-quarter history draws a different specialist than an 80-quarter one on
+// two seeds of three. (2) Gate A fires in quarter 1 on every seed at both
+// lengths, so R1's "pre-buy segment" is ONE quarter; accumulation is then the
+// sign of one quarter's net, and the seats on seeds 0 and 2 run that quarter
+// at -18 and -20 cr. (3) Rivals at the seat have had 12 quarters, not 80, to
+// run their cash down (the R5 breakdown's cash term, mean -1,658 -> -408), so
+// fewer prices floor at zero: gate B's cheapest priced firm costs ~7x more,
+// and the profit term is 58% of the price's magnitude against 10%.
+// Whether R1 should read a pre-buy window longer than one quarter is this
+// harness's question, not the settle's; it is reported, not changed.
+
 constexpr int k_r1_window  = 8;   ///< Quarters R1 reads for its trend. Two years.
 
 /// BL-573: run_nation_step's template registry. Empty is correct — nothing in
