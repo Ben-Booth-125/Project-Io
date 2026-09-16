@@ -1040,8 +1040,22 @@ struct history_sim_params
 
     /// TRADE INCOME FROM THE NETWORK (BL-895; Ben, 2026-09-11: "we also need a
     /// simple cost for war, and this cost can be sourced by rich trade").
-    /// Materials yielded per YEAR by each roaded link between two held regions
-    /// that hold UNLIKE ground. Zero disables it.
+    /// Materials yielded per YEAR, per held region, per DISTINCT KIND OF
+    /// UNLIKE GROUND its realm reaches (BL-1021). Zero disables it.
+    ///
+    /// THE BASE IS KINDS REACHED, NOT PAIRS ROADED (BL-1021; Ben, 2026-09-16,
+    /// NR-827 option 2). BL-895 first paid this per walked corridor joining
+    /// unlike ground, and measured it at 0.25% of production: a per-link
+    /// income is bounded by a region's ADJACENCY, so it could never grow with a
+    /// realm the way industry does. Now every held region the realm's network
+    /// reaches (`network_supply_q` above `sustainable_settlement_floor_q`, the
+    /// floor that already means "a network that can carry ordinary trade")
+    /// trades with every KIND of ground the realm reaches that is unlike its
+    /// own. A KIND is `region_trade_class` in history_sim.cpp -- what the
+    /// ground is best at: farm, ore or port. An amicable neighbour's reached
+    /// ground joined by a walked corridor (BL-925) is ground the realm reaches.
+    /// The magnitude was NOT moved by the re-base (40 in era_minus_one.cpp);
+    /// only what it multiplies changed.
     ///
     /// NO MARKET, AND THAT IS THE WHOLE CONSTRAINT. `CIVILISATION.md` sec
     /// Materials are spent when something happens keeps this phase free of an
@@ -1060,10 +1074,12 @@ struct history_sim_params
     ///     collapse-by-network-failure its teeth: a realm whose roads fail
     ///     loses its income before it loses its ground.
     ///
-    /// A LINK COUNTS ONCE PER YEAR, from the lower-indexed region, so the pair
-    /// is not paid twice. The tier is read but not scaled on: a Track and a Road
-    /// both carry trade, they differ in what they do to REACH.
-    int trade_income_per_link = 0;
+    /// PAID TO THE REGION'S OWN SEAT, like industry. A realm that reaches one
+    /// kind of ground earns nothing however large it is -- only DIFFERENCE is
+    /// read, never a quantity -- and a region the network cannot reach neither
+    /// earns nor lends its kind to anyone else. Roads pay through REACH
+    /// (`rebuild_reach` discounts walked corridors), not per edge.
+    int trade_income_per_class = 0;
 
     /// TRADE CROSSES A BORDER, BETWEEN AMICABLE NEIGHBOURS (BL-925; Ben,
     /// 2026-09-11: "amicable neighbours trading"). Before this a realm's own
@@ -1075,10 +1091,11 @@ struct history_sim_params
     /// below `organise_opposition_bar_q`, the SAME bar Organise already
     /// refuses at -- AND NEITHER HOLDS A BITING GRUDGE against the other.
     /// A walked corridor joining UNLIKE ground across an amicable border
-    /// pays BOTH seats, at `trade_income_per_link` -- the identical constant,
-    /// so this is the same income extended across a new kind of edge, not a
-    /// second economy. No market, no price: the no-market ruling
-    /// (`trade_income_per_link`'s own comment) stands unchanged.
+    /// opens a link. Since BL-1021 the link pays nothing per edge: it makes
+    /// the far side's reached ground a KIND each realm reaches, so both seats
+    /// are paid through `trade_income_per_class` -- the same income extended
+    /// across a new kind of edge, not a second economy. No market, no price:
+    /// the no-market ruling (`trade_income_per_class`'s own comment) stands.
     ///
     /// A grudge raised on EITHER side closes the link until it decays below
     /// this bar again -- read both directions of `grudge_between`, since a
@@ -1196,9 +1213,10 @@ struct history_sim_params
     /// feeds this — no new event, and nothing scheduled.
     int universal_creed_humbled_cohesion_q = 0;
 
-    /// DENSITY, read as PAID TRADE LINKS. The realm must hold at least this
-    /// many unlike-ground pairs joined by a walked corridor — the same pairs
-    /// `trade_income_per_link` pays for, counted rather than banked.
+    /// DENSITY, read as TRADE LINKS. The realm must hold at least this many
+    /// unlike-ground pairs joined by a walked corridor — the pairs BL-895 first
+    /// paid on. BL-1021 moved the INCOME to kinds of ground reached; this gate
+    /// still counts corridors, because what it reads is CONTACT, not income.
     ///
     /// AN ANSWER FOR EVERYONE NEEDS EVERYONE TO BE IN CONTACT. The network is
     /// what carries a creed, so the density reading is the network measured
@@ -3198,6 +3216,27 @@ struct history_sim_state
     int64_t materials_produced           = 0;
     int64_t materials_spent_on_campaigns = 0;
     int64_t materials_from_trade = 0; ///< BL-895: of `materials_produced`, the share the network yielded.
+
+    /// BL-1021 -- BL-895's OWN "DONE WHEN", counted where it is decided: does a
+    /// polity connected to unlike ground sustain campaigns a disconnected one
+    /// cannot? Every array is indexed SIZE BAND x 4 + KINDS: the kinds are how
+    /// many DISTINCT KINDS of ground (0..3, `region_trade_class`) the acting
+    /// realm reached that year -- 0 or 1 is a realm with no trade income, 2 or
+    /// more is one connected to unlike ground -- and the size band is regions
+    /// held that year, 1 / 2-3 / 4-7 / 8+ (0..3), because a connected realm is
+    /// usually a larger one. Read the same whether `trade_income_per_class` is
+    /// on or off, so a zero-income control run classifies realms identically.
+    ///   - `realm_years_*`: living polity-years in the bucket (the denominator);
+    ///   - `campaigns_*`: campaigns launched, and their material COST against
+    ///     what the seat could actually SPEND (a shortfall marches understocked);
+    ///   - `upkeep_*`: standing-army upkeep DUE against upkeep PAID (the unpaid
+    ///     share walks home -- the strangling channel).
+    std::array<int64_t, 16> realm_years_by_trade_bucket{};
+    std::array<int64_t, 16> campaigns_by_trade_bucket{};
+    std::array<int64_t, 16> campaign_cost_by_trade_bucket{};
+    std::array<int64_t, 16> campaign_spent_by_trade_bucket{};
+    std::array<int64_t, 16> upkeep_due_by_trade_bucket{};
+    std::array<int64_t, 16> upkeep_paid_by_trade_bucket{};
 
     /// BL-895's TWO SINKS, as run totals on the same footing as
     /// `materials_spent_on_campaigns`. Before they existed a campaign was the

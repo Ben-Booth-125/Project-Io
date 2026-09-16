@@ -553,9 +553,9 @@ missing is where a polity gets them, and the answer is **rich trade**, with a ha
 this phase still has **no market**. § Materials are spent when something happens is unchanged —
 no order book, no firm, no building stack, no price.
 
-**So the income is a property of the NETWORK, not of a market.** A road joining ground that holds
-*different* things yields materials; a road joining two places that hold the same thing yields
-little. That is a crude trade model with a visible cause on the map, and it does three jobs at
+**So the income is a property of the NETWORK, not of a market.** A network joining ground that
+holds *different* things yields materials; a network joining places that all hold the same thing
+yields nothing. That is a crude trade model with a visible cause on the map, and it does three jobs at
 once:
 
 - it makes **roads worth building** for a reason other than reach;
@@ -563,6 +563,27 @@ once:
   in campaigning comes from without a term inside any actor;
 - it makes **network failure expensive**, so the collapse ruling above has teeth — a realm whose
   roads fail loses its income before it loses its ground.
+
+**TRADE IS PAID ON THE KINDS OF GROUND A REALM REACHES, NOT ON ROADED PAIRS (Ben, 2026-09-16,
+`NR-827`).** A per-link income is bounded by a region's adjacency, so it can never grow with a
+realm the way industry does. The base is therefore *how many different kinds of ground the realm
+can reach*:
+
+- **A KIND** is what a region is best at — farm ground, ore ground or a port. It is a class,
+  never a quantity.
+- **REACHED** means the network carries ordinary trade there: the region's reach from its
+  capital stands above the floor at which its towns can still grow. § The network is reach, not
+  the road graph applies — roads pay through reach, not per edge.
+- **ACROSS AN AMICABLE BORDER**, a walked corridor joining two realms' reached ground makes each
+  side's kind one the other reaches. Only the ground the corridor touches counts, never the
+  neighbour's whole realm.
+- **THE INCOME**: every reached region, every year, earns one fixed amount for each kind its realm
+  reaches that is unlike its own. It is paid at the region's seat, as industry is.
+
+So a realm of one kind earns nothing however large it grows, and a realm that reaches all three
+earns on every region it reaches. Ground the network cannot reach earns nothing and lends its
+kind to nobody — which is what makes network failure cost income as well as ground. The per-edge
+magnitude was carried over unchanged; only what it multiplies moved.
 
 **The resource reading stays abstract.** § What this phase hands the industrial era is explicit
 that resources become capital in pass 2 and that reading must not leak backwards. What this phase
@@ -613,12 +634,29 @@ heads the sinks claimed **63%** of production and **324** corridor promotions a 
 for want of materials — that is poverty governing the network, not a realm choosing. At **20** they
 claim **8%** with 43 refusals, and 2.7 million heads a world are still sent home unpaid.
 
-**TRADE IS STILL NOT WHAT PAYS FOR WAR, and this section does not pretend otherwise.** With both
-sinks live, network income is **281,280 of 113,922,140** produced — a quarter of one per cent. What
-makes war affordable is industry. A per-link constant is bounded by a realm's adjacency and so can
-never grow with a realm the way industry does, which is a shape problem rather than a magnitude
-one; raising the constant until the share looked right would be fitting a figure to a target.
-`NR-827` carries the open call.
+**TRADE IS STILL A MINOR INCOME, and this section does not pretend otherwise.** Paid per roaded
+pair, network income was **a quarter of one per cent** of production with both sinks live. Paid
+on kinds reached, at the same magnitude, it is **3.9%** — measured over 16 seeds at the 0 CE epoch
+on the shipped inputs: a median **71,424,160 of 1,846,370,504** produced per world, and **3.15%**
+pooled across all sixteen. The re-base multiplied trade twentyfold without touching the constant,
+because the shape changed rather than the figure. What makes war affordable is still mostly
+industry. Raising the constant until the share looked right would be fitting a figure to a target,
+and cutting industry's yield would make the same trade look larger without anything having
+changed; both were declined.
+
+**DOES A CONNECTED REALM SUSTAIN CAMPAIGNS A DISCONNECTED ONE CANNOT? PARTLY.** Measured on the
+same sweep, within size bands (a connected realm is usually a larger one), against a control run
+with the trade income set to zero:
+
+- **Keeping an army paid — yes.** A realm reaching two or more kinds meets more of its army's
+  upkeep than a same-sized realm reaching one, in every band. Trade widens that gap over the
+  control by 14 to 64 per mille, most for a lone city state.
+- **Paying for a campaign — no.** Connected realms of two or more regions already cover more of a
+  campaign's material cost with trade off. With trade on, that gap *narrows* in three of the four
+  bands. Mixed ground seems to carry the advantage through industry, not through trade.
+
+So trade feeds the strangling channel, not the war chest. The two runs are different worlds
+rather than one world with a single lever pulled, so these gaps compare shapes, not causes.
 
 **SUPPLY SITES ARE BOUGHT FROM THE STOCKPILE (Ben, 2026-09-11).** A realm does not only wait for
 a road to be walked into being; it can spend the materials stockpiled at its capital — *"gained
