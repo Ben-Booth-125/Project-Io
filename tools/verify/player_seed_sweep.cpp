@@ -14,7 +14,7 @@
 //     the chain-depth ladder (BL-428), alternate methods (BL-430) and the whole
 //     Method page are unreachable from the start position; the player can build
 //     one, but the opening reads as a strictly poorer game.
-//   * SOLVENT — the corp's balance after the warm start is positive AND it never
+//   * SOLVENT — the corp's balance after the settle is positive AND it never
 //     dipped below zero on the way. Ending up positive after a trip through
 //     insolvency is a different (worse) opening than never dipping, so both are
 //     reported separately rather than collapsed into one flag.
@@ -24,18 +24,18 @@
 // (backlog: starting-corp selection), and a sweep that silently enforced one
 // would be making that call by implication.
 //
-// Determinism: every seed is generated from world_params alone and the warm start
+// Determinism: every seed is generated from world_params alone and the settle
 // is the same fixed sequence pregame_balance_harness uses, so a rerun reproduces
 // the table exactly.
 //
-// Run: .\build\player_seed_sweep.exe [seed_count] [warm_ticks]
+// Run: .\build\player_seed_sweep.exe [seed_count] [settle_ticks]
 //      .\build\player_seed_sweep.exe --seat  [seed_count] [--fast]
 //      .\build\player_seed_sweep.exe --guard [seed_count] [--fast]
 //
 // BL-630 (2026-08-26) ADDED THE MODE THIS FILE NOW LEADS WITH. The two default
 // conditions above ("worth playing" == a processor, and solvent) were written
 // when the seed alone decided the player's corp. They no longer decide anything:
-// the player is SEATED after the warm start, on a corp drawn from a viability
+// the player is SEATED after the settle, on a corp drawn from a viability
 // shortlist with a bias toward processing and population. `--seat` measures what
 // that draw actually produces and `--guard` asserts the properties it must hold;
 // the original sweep is kept below because it still answers the question it was
@@ -117,7 +117,7 @@ bool playable(const seed_row& r)
 //     against a shape already known to be reachable, rather than the other way
 //     round.
 //
-// It deliberately does NOT run the warm start: these are the GENERATED openings,
+// It deliberately does NOT run the settle: these are the GENERATED openings,
 // which is what a player choosing before the first tick would be choosing between.
 struct corp_row
 {
@@ -264,12 +264,12 @@ int run_roster(uint32_t seed, const recipe_registry& reg)
 /// BL-573: run_nation_step's template registry. Empty is correct — nothing here
 /// asks a contract question, and an empty roster opens no contracts.
 
-/// The app's warm-start tick, composed as `app::step_economy` composes it, with
+/// The app's settle tick, composed as `app::step_economy` composes it, with
 /// the one difference that IS BL-630: `spectating = true`. Nobody is seated
-/// through the warm start, so the no-auto-act prohibition has no subject and
+/// through the settle, so the no-auto-act prohibition has no subject and
 /// every corp is scorer-driven (BL-409). A sweep that ran this false would
 /// measure a world one corp never acted in and call it the shipped spawn.
-void warm_tick(world& w, const recipe_registry& reg, int t)
+void settle_tick(world& w, const recipe_registry& reg, int t)
 {
     w.current_econ_tick = t;
     w.current_day_tick  = t;
@@ -286,7 +286,14 @@ void warm_tick(world& w, const recipe_registry& reg, int t)
     credit_arrived_convoys(w, t);
 }
 
-constexpr int k_seat_warm_ticks = 80; ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978), and this harness's own settle length is a re-read it owes.
+/// The settle: phase 6's single validation run, after which the app seats the
+/// player (ERAS.md § The opening position; app::poll_worldgen calls seat_player
+/// when it closes). Mirrors `app::validation_ticks`, restated because app.hpp
+/// brings SDL; if the app's number moves, this one moves with it. NOT a longer
+/// history by choice: the subject is the seat the game draws, and the one
+/// trailing window the draw reads (k_spawn_trailing_quarters, 8) fits inside the
+/// settle whole. Re-read under BL-1008, 2026-09-16 — see THE SETTLE RE-READ.
+constexpr int k_settle_ticks = 12;
 /// How many seeds get the two-independently-built-worlds treatment (S4).
 constexpr int k_reproduce_seeds  = 4;
 
@@ -318,7 +325,7 @@ struct seat_row
     bool      reproduce_checked = false;
 };
 
-/// Build one world, warm-start it, seat it. Returns the seat result plus the
+/// Build one world, settle it, seat it. Returns the seat result plus the
 /// world, because the caller needs both to describe what was seated.
 spawn_seat_result build_and_seat(uint32_t seed, const recipe_registry& reg,
                                  bool fast, world& out_world)
@@ -328,17 +335,17 @@ spawn_seat_result build_and_seat(uint32_t seed, const recipe_registry& reg,
     out_world = make_hard_coded_world(p);
     // The app's own ordering: the landscape-search WINNER applied over the loaded
     // registry (not the seed candidate — BL-979), the recipe authoring pass, then
-    // the warm start (app::start_new_game_prelude).
+    // the settle (app::start_new_game_prelude, then app::poll_worldgen).
     apply_shipped_landscape(out_world, reg, seed);
-    for (int t = 1; t <= k_seat_warm_ticks; ++t)
-        warm_tick(out_world, reg, t);
+    for (int t = 1; t <= k_settle_ticks; ++t)
+        settle_tick(out_world, reg, t);
     return seat_player_corporation(out_world, seed);
 }
 
 int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mode)
 {
-    std::printf("player_seed_sweep %s — %d seeds, %d warm ticks in spectate, %s spawn\n",
-                assert_mode ? "--guard" : "--seat", n_seeds, k_seat_warm_ticks,
+    std::printf("player_seed_sweep %s — %d seeds, %d settle ticks (app::validation_ticks) in spectate, %s spawn\n",
+                assert_mode ? "--guard" : "--seat", n_seeds, k_settle_ticks,
                 fast ? "FAST (prehistory OFF — iteration only, NOT the shipped spawn)"
                      : "the shipped");
     std::printf("BL-630. The floor filters; the draw over the shortlist is BIASED, never gated.\n\n");
@@ -396,7 +403,7 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
             // applied to a draw.
             //
             // SAMPLED, not exhaustive: a second world doubles the sweep's cost
-            // (~25 s of generation plus 80 warm ticks each), and the property is
+            // (generation, the landscape search and the settle each), and the property is
             // structural — an unordered walk or an unseeded stream would break
             // on the first seed, not the twentieth. The sample size is stated in
             // S4's own row so nobody reads it as a full sweep.
@@ -578,10 +585,10 @@ int main(int argc, char** argv)
         if (std::string(argv[a]) == "--fast")
             fast = true;
     const int n_seeds   = (!mode_arg && argc > 1) ? std::atoi(argv[1]) : 24;
-    const int warm_ticks = (!mode_arg && argc > 2) ? std::atoi(argv[2]) : 12;
-    if (!mode_arg && (n_seeds <= 0 || warm_ticks <= 0))
+    const int settle_ticks = (!mode_arg && argc > 2) ? std::atoi(argv[2]) : k_settle_ticks;
+    if (!mode_arg && (n_seeds <= 0 || settle_ticks <= 0))
     {
-        std::printf("usage: %s [seed_count] [warm_ticks]   (both positive)\n"
+        std::printf("usage: %s [seed_count] [settle_ticks] (both positive)\n"
                     "       %s --roster <seed>              (every corp's opening, one seed)\n"
                     "       %s --seat  [seed_count] [--fast] (REPORT the seat distribution)\n"
                     "       %s --guard [seed_count] [--fast] (assert what the seat holds)\n",
@@ -618,8 +625,8 @@ int main(int argc, char** argv)
         return run_seat(g_seeds > 0 ? g_seeds : 24, reg, fast, guard_mode);
     }
 
-    std::printf("player_seed_sweep — %d seeds, %d warm ticks (%.2f in-game years)\n\n",
-                n_seeds, warm_ticks, warm_ticks / 4.0);
+    std::printf("player_seed_sweep — %d seeds, %d settle ticks (%.2f in-game years)\n\n",
+                n_seeds, settle_ticks, settle_ticks / 4.0);
     std::printf("seed  proc  extr  other   opening      final  dipped  verdict\n");
     std::printf("----  ----  ----  -----  --------  ---------  ------  -------\n");
 
@@ -660,7 +667,7 @@ int main(int argc, char** argv)
                     }
                 }
                 r.opening = cit->second.balance;
-                for (int t = 1; t <= warm_ticks; ++t)
+                for (int t = 1; t <= settle_ticks; ++t)
                 {
                     tick(w, reg, t);
                     if (w.corporations[corp].balance < 0.0f)

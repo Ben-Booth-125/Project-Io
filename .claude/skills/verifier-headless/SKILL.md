@@ -323,8 +323,9 @@ in `tools/verify/README.md`.
   row C3 asserts a zero residual), its produced value, active / idle / limited / unstaffed /
   exhausted / building / mothballed counts, labour and mean supply factor; `debt.csv` has one
   row per corp that ENTERED debt in the window with its trailing-4-tick flows and the dominant
-  drain, summarised as a histogram at the end of the run. Run it unwarmed
-  (`--warm 0 --ticks 60`) to see where debt begins — the warm start hides it.
+  drain, summarised as a histogram at the end of the run. Run it with no lead-in
+  (`--settle 0 --ticks 60`; `--warm` is the same flag) to see where debt begins — the default
+  lead-in is the game's 12-tick settle, and its ticks are unlogged.
 - **`firm_exit_harness`** — BL-743 firm exit (2026-09-01): the insolvency wind-up. F1/F1b the
   trigger fires and the estate liquidates (building demolished, unit disbanded, pool lands WHOLE
   in market inventory — the conservation law); F2 the player is exempt absolutely; F3 a short
@@ -502,8 +503,8 @@ in `tools/verify/README.md`.
   this check for free. **18 named buildings carry an override, 0 offenders** as of 2026-08-24.
 - **`player_seed_sweep`** — Which seeds hand the PLAYER a corp worth playing? A live-Lua sweep (real
   `scripts/recipes.lua` + `economy.lua`, real economy ticks) that generates one world per seed and
-  reports, per seed, the player corp's buildings by type, its opening and post-warm-start balance,
-  and whether it ever dipped negative. `player_seed_sweep.exe [seed_count] [warm_ticks]`.
+  reports, per seed, the player corp's buildings by type, its opening and post-settle balance,
+  and whether it ever dipped negative. `player_seed_sweep.exe [seed_count] [settle_ticks]`.
 
   **A REPORTING tool, not a gate** — it exits 0 unless generation actually threw (that being
   `seed_sweep_probe`'s job). It deliberately does not filter seeds, resample, or carry a whitelist:
