@@ -859,6 +859,44 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         // overlapped its neighbour would double its alpha along the overlap.
         const float y0 = py(static_cast<float>(r));
         const float y1 = py(static_cast<float>(r + 1));
+
+        // THE ROUND BEFORE THIS ONE, UNDER EVERYTHING (Ben, 2026-09-16). The
+        // first cut painted the carried frame only under ground nobody held,
+        // which works for the Culture -> Empires hand-over (400 BCE is almost
+        // all unorganised culture ground) and is INVISIBLE for Empires ->
+        // Exploration, where every realm already holds its land at 1200 CE: the
+        // carry had nowhere to show, and the new round fading in over nothing
+        // just made the map dim. So the carried frame goes down first across the
+        // whole row and this round's own fill goes over it — two translucent
+        // tints over the same ground, one leaving as the other arrives.
+        if (carry_fade > 0.0f)
+        {
+            int k = 0;
+            while (k < gw)
+            {
+                const int32_t reg = h.tile_region[static_cast<std::size_t>(r * gw + k)];
+                const uint32_t col = (reg >= 0 && static_cast<std::size_t>(reg) < h.carry_colour.size())
+                                         ? h.carry_colour[static_cast<std::size_t>(reg)] : 0u;
+                int k2 = k + 1;
+                while (k2 < gw)
+                {
+                    const int32_t r2 = h.tile_region[static_cast<std::size_t>(r * gw + k2)];
+                    const uint32_t c2 = (r2 >= 0 && static_cast<std::size_t>(r2) < h.carry_colour.size())
+                                            ? h.carry_colour[static_cast<std::size_t>(r2)] : 0u;
+                    if (c2 != col) break;
+                    ++k2;
+                }
+                if (col != 0u)
+                {
+                    dl->AddRectFilled({px(static_cast<float>(k)), y0},
+                                      {px(static_cast<float>(k2)), y1},
+                                      with_alpha(static_cast<ImU32>(col),
+                                                 static_cast<int>(tint_alpha * carry_fade)));
+                    ++prims;
+                }
+                k = k2;
+            }
+        }
         int c = 0;
         while (c < gw)
         {
@@ -883,41 +921,6 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                                   with_alpha(owner_colour(h, o),
                                              static_cast<int>(tint_alpha * (1.0f - carry_fade))));
                 ++prims;
-            }
-            else if (key == -2 && carry_fade > 0.0f)
-            {
-                // THE ROUND BEFORE THIS ONE, under ground nobody holds yet.
-                // Only under UNCLAIMED land: over a holder it would be a second
-                // tint nobody could read, and the moment a city state organises
-                // its ground the old colour is gone there — which is the
-                // hand-over made visible rather than narrated. The run merged
-                // above is one owner key, not one region, so this walks the run
-                // and strokes each stretch of one carried colour.
-                int k = c;
-                while (k < e)
-                {
-                    const int32_t reg = h.tile_region[static_cast<std::size_t>(r * gw + k)];
-                    const uint32_t col = (reg >= 0 && static_cast<std::size_t>(reg) < h.carry_colour.size())
-                                             ? h.carry_colour[static_cast<std::size_t>(reg)] : 0u;
-                    int k2 = k + 1;
-                    while (k2 < e)
-                    {
-                        const int32_t r2 = h.tile_region[static_cast<std::size_t>(r * gw + k2)];
-                        const uint32_t c2 = (r2 >= 0 && static_cast<std::size_t>(r2) < h.carry_colour.size())
-                                                ? h.carry_colour[static_cast<std::size_t>(r2)] : 0u;
-                        if (c2 != col) break;
-                        ++k2;
-                    }
-                    if (col != 0u)
-                    {
-                        dl->AddRectFilled({px(static_cast<float>(k)), y0},
-                                          {px(static_cast<float>(k2)), y1},
-                                          with_alpha(static_cast<ImU32>(col),
-                                                     static_cast<int>(tint_alpha * carry_fade)));
-                        ++prims;
-                    }
-                    k = k2;
-                }
             }
             // The VERTICAL frontier: between this run and the one to its west.
             if (key >= -2 && c > 0)

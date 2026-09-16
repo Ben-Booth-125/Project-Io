@@ -239,9 +239,21 @@ The planetology rounds re-run their chain as a pure throwaway preview on every c
 move. **The pass rounds cannot**: the history sim is the most expensive pass in the
 project, and a live preview per keystroke is not affordable at any budget.
 
-So these rounds invert it. The player sets the leans, and the pass runs *inside the
-round* with its output drawn as it computes. The wait is not hidden behind a bar — it
-**is** the content. Accepting moves to the next round; rerolling runs it again.
+**THE WAIT IS A WAIT, AND THE LAPSE IS THE ROUND (Ben, 2026-09-16, reversing the earlier
+reading).** The pass was once drawn as it computed, on the argument that a watched wait needs
+no budget. Watching it decided otherwise: *"there is a clear phase where the simulation is done
+rapidly, and this sort of breaks the narrative flow of the time-lapse. Let us use that to our
+advantage, and separate each part with an otherwise completely blank Loading X Round. This way
+the player can see that they have to wait, and what they are watching is a time-lapse of that
+very fast calculation."*
+
+So a pass round is two moments, and they do not overlap. **The wait** is one centred line —
+*Loading the Culture round*, *Loading the Empires round*, *Loading the Exploration round* — and
+nothing else on the surface: no map, no board, no stage list, no year counter. **The lapse**
+begins when the record is whole and plays it from its first year at the pace the player chose.
+The calculation is fast and jerky; the lapse is paced and readable; showing the first as though
+it were the second made the second impossible to follow, and hid the hand-over between rounds
+entirely. Accepting moves to the next round; rerolling runs it again.
 
 **There is no Run button (Ben, 2026-09-09).** Arriving on the round IS the instruction
 to run it, so the press that moves onto a pass round starts its pass — it is already
@@ -254,7 +266,7 @@ seconds is worse than a bar, not better.
 **Rounds stay causal.** Rerolling a pass round invalidates the rounds below it, as
 rerolling a planetology round already re-draws the ones below it.
 
-**The render starts with the calculation and lags it at a constant rate (Ben, 2026-09-11).**
+**The render follows the calculation, it no longer races it (Ben, 2026-09-11, narrowed 2026-09-16).**
 A pass round does not compute its record and then play it back; the map begins drawing the
 moment the pass begins, and it advances in **fixed ticks** at one constant rate for the whole
 span, always **behind** the year the pass has reached and never ahead of it. The rate is set so

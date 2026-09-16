@@ -15876,6 +15876,48 @@
         "files",
         "design"
       ]
+    },
+    "BL-1014": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": null,
+      "written": "2026-09-16",
+      "author": "Ben (2026-09-16, watching the rounds)",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "UI",
+      "id": "BL-1014",
+      "short_name": "THE_WAIT_IS_A_WAIT",
+      "priority": "B",
+      "difficulty": 3,
+      "title": "A pass round waits on a blank Loading line, then plays its lapse from the first year",
+      "authority_doc": "docs/ui/STARTUP.md",
+      "files": [
+        "src/ui/startup_screens.cpp",
+        "src/ui/history_lapse.cpp",
+        "docs/ui/STARTUP.md"
+      ],
+      "design": "BEN, 2026-09-16: \"there is a clear phase where the simulation is done rapidly, and this sort of breaks the narrative flow of the time-lapse. Let us use that to our advantage, and separate each part with an otherwise completely blank Loading X Round. This way, the player can see that they have to wait, and what they are watching is a time-lapse of that very fast calculation.\" And, of the hand-over: \"I did not see the fade-out. It looks like that information was not passed through.\"\n\nTHE TWO WERE THE SAME DEFECT. BL-914 had the playhead follow the pass frontier, so a round began mid-calculation at whatever rate the sim could feed it — and a round that opens already chasing the frontier is past its own opening cross-fade before anyone can see it. The rapid phase and the missing fade were one thing.\n\nWHAT LANDED. The wait is one centred line and nothing else: no map, no board, no stage label, no year counter. The lapse starts when the record is whole, parked at its first year, at the chosen pace. This REVERSES \"the wait is the round\" for the pass rounds and STARTUP.md now says so in Ben's own words.\n\nAND THE CARRY WAS FIXED TWICE ON THE WAY. The first cut painted the predecessor's frame only under UNCLAIMED ground, which is right for Culture into Empires (400 BCE is nearly all unorganised culture ground) and invisible for Empires into Exploration, where every realm already holds its land at 1200 CE — there was nowhere for the carry to show, and the new round fading in over nothing merely dimmed the map. The carried frame now goes down across the whole map under this round's own fill. Separately, the same realm was changing COLOUR between rounds because polity_slot is a greedy graph colouring over one record's own adjacency; a shared polity id now inherits the slot it already had, so a realm keeps its colour across the boundary.\n\nVERIFIED LIVE: the Exploration round shows \"Loading the Exploration round\" alone while it recomputes, then opens at 1203 CE on the Empires map and is its own by 1233.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "blocked_on",
+        "parked",
+        "category",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design"
+      ]
     }
   }
 }
