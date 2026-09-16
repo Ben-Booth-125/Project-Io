@@ -1372,139 +1372,378 @@ point, not a spec) — both inside BL-334's remainder. The note's ~300-token-per
 was measured separately (BL-335, measure decision token cost): a minimal decision round is
 ~19–20K input tokens, a naive one ~26K, with output under 300 tokens; the compact encoding that
 brings a round to ~1.5–5K tokens is BL-481 (compact blackboard encoding).
-
-## 11. The grant register — what a rival may legally do
-
-The prohibition itself lives in `.claude/rules/io-standing-rules.md` § Determinism & data
-model, and is short: **no AI faction behaviour beyond the data-model minimum stub, and a new
-widening is raised, never assumed.** What follows is the register of every exception given,
-verbatim as it was recorded, in the order it was given.
-
-It sits here rather than in the always-on rules for one reason: it is load-bearing when work
-touches `src/world/corp_ai.cpp` or the corp-command seam, and inert otherwise, so a session
-doing anything else should not have to carry it. Moving it changes nothing about its force.
-
-Read it two ways. Forwards, it says what a rival may do. Backwards — and this is the reading
-that matters — it is a record of subjects that each needed their OWN grant: the corp, then the
-player's own corp, then hiring, then the spectated corp, then stance, then the nation, then
-the political action against a corp a human owns, then the network. None of those followed
-from the one before it. The constraints repeat in every entry because they are the terms, not
-boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a planner.
-
-- Do **not** build AI faction behaviour beyond the data-model minimum stub. **Scoped
-  exception (BL-079, landed 2026-07-07):** background (non-player) corporations may take
-  *narrow, local, deterministic* per-building actions from mechanical triggers — idle a
-  persistently loss-making building, switch a floored recipe, throttle extraction as a
-  deposit depletes. The player's own corp is never auto-acted on **strategically**.
-  See `src/world/economy_system.cpp` (run_economy_step § agency).
-  **Rival-corp strategic exception (BL-202/BL-203, landed 2026-08-01/02; widened by
-  BL-293, 2026-08-08):** background corporations run a **deterministic scored-utility**
-  layer over the corp-command seam — build, dial, survey, hire and sell decisions scored
-  each tick, plus predictive spending, **plus standing sell orders on the open market**
-  (`src/world/corp_ai.cpp`). Determinism is the binding constraint, not simplicity: the
-  scorer is pure, seeded and replayable, and it issues only legal `corp_command` verbs.
-  The trading grant is Ben's, 2026-08-07: *"Order book needs to be a background process,
-  the AI must be able to trade as a player does."* It is deliberately a grant of **reach,
-  not of skill** — a rival lists surplus stock above a hold threshold at a floor over the
-  market's rarity price, and that first-cut rule lives in `corp_ai_params` so tuning it is
-  a data change. What stays deferred is **nation** behaviour (backlog.json § BL-054) and
-  any planner that is not deterministic. Authority: `docs/ai/AI_OPPONENT.md`.
-  **Player-corp exception (BL-181, landed 2026-07-15):** the *workforce target* of a
-  player building may be auto-solved each tick to maximise that building's profit — a
-  **narrow, local, deterministic, opt-out** convenience for a single micromanagement dial,
-  not strategic agency. It is opt-out per building (`building_component.workforce_auto`; a
-  manual target pins it — from the management UI *or* from the `set_workforce` command verb,
-  which since BL-293 clears the flag exactly as the press always has), and the
-  `set_workforce_auto` verb hands the dial back. It never places, relocates, retargets,
-  or decommissions. This is the *only* sanctioned auto-action on the player's corp; anything
-  beyond this one dial stays prohibited. See `solve_workforce_target` in economy_system.cpp.
-  **Rival-corp hiring exception (BL-324, landed 2026-08-08):** background corporations may
-  raise units through the same `hire_unit` corp_verb the player uses — scored alongside
-  build/dial/survey/sell in `corp_ai.cpp`'s candidate list, capped at one hire per
-  evaluation, gated on the corp's own stockpile/market access (never on cash). A deliberate
-  widening of the BL-202/BL-203 exception, not a new category: hiring is one more legal verb
-  on the same deterministic scored-utility layer, not a planner of its own.
-  **"Never on cash" governs AVAILABILITY, not spend (Ben, 2026-08-13, ruling on NR-218).**
-  Which roster rows are offered is decided by stockpile and market access alone — a
-  cash-poor corp still sees every row it has the goods for. But since BL-394 gave
-  `hire_unit` a real credit cost, that cost is subject to the **solvency gate like every
-  other spend**: the scorer carries it in the candidate's `spend`, so a rival cannot hire
-  itself below its own reserve floor, and a hire reserves its cash against later candidates
-  in the same evaluation. Availability is cash-free; spending is not.
-  **Spectator mode has NO SUBJECT for this rule (BL-409, landed 2026-08-14).** Every
-  exception above widens *what may be done to a corp a human owns*. Spectator mode is
-  not another such widening — it removes the owner. Ben, 2026-08-14: *"In spectator
-  mode, there is no need to mark a corp as played by a human. 'Who plays your corp'
-  collapses as a question."* The prohibition protects a corp **because** a human owns
-  it, so under `corp_ai_params::spectating` its precondition is absent and every corp
-  evaluates on the same staggered cadence, `world::player_entity` included — that field
-  degrading to a camera/ledger anchor with no ownership meaning. Two properties keep
-  this honest, both asserted by `tools/verify/spectator_determinism.cpp`: the flag
-  **defaults false**, so an ordinary played session is byte-identical (verified against
-  the genuine pre-BL-409 build, `state_hash 3CBAD1D44EE71EDE` — that was the value AT
-  THE TIME; the golden has since been re-blessed as the world legitimately changed, and
-  `spectator_determinism` carries the dated provenance log, so read the harness for the
-  current constant and this line as the historical claim it is), and admitting one more
-  corp **shifts no rival's cadence slot**, since the index is over the sorted corp set.
-  Outside spectate the prohibition is unchanged and absolute. **These two properties are
-  what the harness guarantees — not RNG-stream-identical behaviour across a content
-  change (Ben, 2026-08-24, ruling on NR-596).** `spectator_determinism.cpp` also carried
-  a third, stricter check (a seated+spectated corp reaches every verb family it reached
-  as a rival) that a resource-roster widening (BL-586 slice 2) broke through simple
-  RNG-stream drift, unrelated to the new content. Bit-identical RNG-stream determinism
-  across a content change was ruled out of scope for this harness — saves carry the
-  actual world state, not a replay-from-seed, and occasional randomness is a deliberate
-  strategy lever, not a defect — so that check is retired, not the two properties above.
-  **Nation and polity behaviour is GRANTED (Ben, 2026-08-18, ruling 4 of NR-331), in the
-  BL-202/BL-203 shape.** This is the exception that BL-054 (nation behaviour) had deferred
-  indefinitely, and it is granted for **both** grains Ben named: Era −1 polities inside the
-  generation sim, and campaign-era nations. The binding constraints are unchanged and are the
-  whole basis of the grant — the behaviour must be **pure, seeded, deterministic and replayable**,
-  a scored-utility layer issuing only legal verbs, and **never a planner**. What it admits: a
-  polity choosing among its sim verbs; a nation holding a treasury, setting a tariff or tax rate,
+
+
+## 11. The grant register — what a rival may legally do
+
+
+
+The prohibition itself lives in `.claude/rules/io-standing-rules.md` § Determinism & data
+
+model, and is short: **no AI faction behaviour beyond the data-model minimum stub, and a new
+
+widening is raised, never assumed.** What follows is the register of every exception given,
+
+verbatim as it was recorded, in the order it was given.
+
+
+
+It sits here rather than in the always-on rules for one reason: it is load-bearing when work
+
+touches `src/world/corp_ai.cpp` or the corp-command seam, and inert otherwise, so a session
+
+doing anything else should not have to carry it. Moving it changes nothing about its force.
+
+
+
+Read it two ways. Forwards, it says what a rival may do. Backwards — and this is the reading
+
+that matters — it is a record of subjects that each needed their OWN grant: the corp, then the
+
+player's own corp, then hiring, then the spectated corp, then stance, then the nation, then
+
+the political action against a corp a human owns, then the network. None of those followed
+
+from the one before it. The constraints repeat in every entry because they are the terms, not
+
+boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+
+
+
+- Do **not** build AI faction behaviour beyond the data-model minimum stub. **Scoped
+
+
+  exception (BL-079, landed 2026-07-07):** background (non-player) corporations may take
+
+
+  *narrow, local, deterministic* per-building actions from mechanical triggers — idle a
+
+
+  persistently loss-making building, switch a floored recipe, throttle extraction as a
+
+
+  deposit depletes. The player's own corp is never auto-acted on **strategically**.
+
+
+  See `src/world/economy_system.cpp` (run_economy_step § agency).
+
+
+  **Rival-corp strategic exception (BL-202/BL-203, landed 2026-08-01/02; widened by
+
+
+  BL-293, 2026-08-08):** background corporations run a **deterministic scored-utility**
+
+
+  layer over the corp-command seam — build, dial, survey, hire and sell decisions scored
+
+
+  each tick, plus predictive spending, **plus standing sell orders on the open market**
+
+
+  (`src/world/corp_ai.cpp`). Determinism is the binding constraint, not simplicity: the
+
+
+  scorer is pure, seeded and replayable, and it issues only legal `corp_command` verbs.
+
+
+  The trading grant is Ben's, 2026-08-07: *"Order book needs to be a background process,
+
+
+  the AI must be able to trade as a player does."* It is deliberately a grant of **reach,
+
+
+  not of skill** — a rival lists surplus stock above a hold threshold at a floor over the
+
+
+  market's rarity price, and that first-cut rule lives in `corp_ai_params` so tuning it is
+
+
+  a data change. What stays deferred is **nation** behaviour (backlog.json § BL-054) and
+
+
+  any planner that is not deterministic. Authority: `docs/ai/AI_OPPONENT.md`.
+
+
+  **Player-corp exception (BL-181, landed 2026-07-15):** the *workforce target* of a
+
+
+  player building may be auto-solved each tick to maximise that building's profit — a
+
+
+  **narrow, local, deterministic, opt-out** convenience for a single micromanagement dial,
+
+
+  not strategic agency. It is opt-out per building (`building_component.workforce_auto`; a
+
+
+  manual target pins it — from the management UI *or* from the `set_workforce` command verb,
+
+
+  which since BL-293 clears the flag exactly as the press always has), and the
+
+
+  `set_workforce_auto` verb hands the dial back. It never places, relocates, retargets,
+
+
+  or decommissions. This is the *only* sanctioned auto-action on the player's corp; anything
+
+
+  beyond this one dial stays prohibited. See `solve_workforce_target` in economy_system.cpp.
+
+
+  **Rival-corp hiring exception (BL-324, landed 2026-08-08):** background corporations may
+
+
+  raise units through the same `hire_unit` corp_verb the player uses — scored alongside
+
+
+  build/dial/survey/sell in `corp_ai.cpp`'s candidate list, capped at one hire per
+
+
+  evaluation, gated on the corp's own stockpile/market access (never on cash). A deliberate
+
+
+  widening of the BL-202/BL-203 exception, not a new category: hiring is one more legal verb
+
+
+  on the same deterministic scored-utility layer, not a planner of its own.
+
+
+  **"Never on cash" governs AVAILABILITY, not spend (Ben, 2026-08-13, ruling on NR-218).**
+
+
+  Which roster rows are offered is decided by stockpile and market access alone — a
+
+
+  cash-poor corp still sees every row it has the goods for. But since BL-394 gave
+
+
+  `hire_unit` a real credit cost, that cost is subject to the **solvency gate like every
+
+
+  other spend**: the scorer carries it in the candidate's `spend`, so a rival cannot hire
+
+
+  itself below its own reserve floor, and a hire reserves its cash against later candidates
+
+
+  in the same evaluation. Availability is cash-free; spending is not.
+
+
+  **Spectator mode has NO SUBJECT for this rule (BL-409, landed 2026-08-14).** Every
+
+
+  exception above widens *what may be done to a corp a human owns*. Spectator mode is
+
+
+  not another such widening — it removes the owner. Ben, 2026-08-14: *"In spectator
+
+
+  mode, there is no need to mark a corp as played by a human. 'Who plays your corp'
+
+
+  collapses as a question."* The prohibition protects a corp **because** a human owns
+
+
+  it, so under `corp_ai_params::spectating` its precondition is absent and every corp
+
+
+  evaluates on the same staggered cadence, `world::player_entity` included — that field
+
+
+  degrading to a camera/ledger anchor with no ownership meaning. Two properties keep
+
+
+  this honest, both asserted by `tools/verify/spectator_determinism.cpp`: the flag
+
+
+  **defaults false**, so an ordinary played session is byte-identical (verified against
+
+
+  the genuine pre-BL-409 build, `state_hash 3CBAD1D44EE71EDE` — that was the value AT
+
+
+  THE TIME; the golden has since been re-blessed as the world legitimately changed, and
+
+
+  `spectator_determinism` carries the dated provenance log, so read the harness for the
+
+
+  current constant and this line as the historical claim it is), and admitting one more
+
+
+  corp **shifts no rival's cadence slot**, since the index is over the sorted corp set.
+
+
+  Outside spectate the prohibition is unchanged and absolute. **These two properties are
+
+
+  what the harness guarantees — not RNG-stream-identical behaviour across a content
+
+
+  change (Ben, 2026-08-24, ruling on NR-596).** `spectator_determinism.cpp` also carried
+
+
+  a third, stricter check (a seated+spectated corp reaches every verb family it reached
+
+
+  as a rival) that a resource-roster widening (BL-586 slice 2) broke through simple
+
+
+  RNG-stream drift, unrelated to the new content. Bit-identical RNG-stream determinism
+
+
+  across a content change was ruled out of scope for this harness — saves carry the
+
+
+  actual world state, not a replay-from-seed, and occasional randomness is a deliberate
+
+
+  strategy lever, not a defect — so that check is retired, not the two properties above.
+
+
+  **Nation and polity behaviour is GRANTED (Ben, 2026-08-18, ruling 4 of NR-331), in the
+
+
+  BL-202/BL-203 shape.** This is the exception that BL-054 (nation behaviour) had deferred
+
+
+  indefinitely, and it is granted for **both** grains Ben named: Era −1 polities inside the
+
+
+  generation sim, and campaign-era nations. The binding constraints are unchanged and are the
+
+
+  whole basis of the grant — the behaviour must be **pure, seeded, deterministic and replayable**,
+
+
+  a scored-utility layer issuing only legal verbs, and **never a planner**. What it admits: a
+
+
+  polity choosing among its sim verbs; a nation holding a treasury, setting a tariff or tax rate,
+
+
   and enacting a law; a polity carrying pair-state toward another. **A polity's colonial claim
   by PURCHASE (Ben, 2026-09-09) is recorded here as a new sim verb rather than read into the
   existing ones** — same actor, same grain, same constraints, raised because a verb that creates a
   relationship (a province bought, its customs kept) is the shape the prohibition says to raise;
-  `docs/generation/COLONIAL_ERA.md` § Two ways to claim ground across water owns it. What it does **not** admit:
-  anything whose timing, latency or ordering can vary the generated world (`docs/lore/HISTORY.md`
-  is the authority for what the ladder produces, not a licence to randomise it), and any cloud
-  model in the loop — the no-cloud invariant in `docs/ai/AI_OPPONENT.md` § 10 is untouched.
-  Reason for the grant: three of the four systems Ben's 2026-08-18 brief names — international
-  trade, logistics and diplomacy — are nation-grain, and `GENERATION_STRATEGY.md`'s economic
-  premise already assumes nations that act. See `docs/development/SPRINTS.md` § Sprints 26–33.
-  **A rival acting POLITICALLY against the player's corp is granted (Ben, 2026-08-22,
-  answering the design register), on the same terms as BL-450.** This is the newest widening
-  and the one whose subject is furthest from the original prohibition: a rival may **lobby**
-  a nation to shift its budget weights or its law (BL-539), and a nation's derived stance may
-  **gate the player's corp** out of a territory (BL-540) — both being consequences imposed on
-  a corp a human owns by an actor the player does not control. Same constraints, unchanged:
-  deterministic, seeded, scored-utility, legal verbs only, never a planner. It was raised
-  rather than assumed (NR-517) precisely because reading the 2026-08-18 nation grant as
-  already covering it would have set the quiet precedent this section exists to prevent.
-  What it does **not** admit: a rival *enacting* law (only a nation can), or influence
-  acquired outside the `lobby` verb.
-
-  **A rival scoring STANCE toward the player's corp is a separate, corp-grain widening
-  (BL-450, rivals score stance) and is GRANTED on the same terms and date.** It is called out
-  separately because every other widening above is dated and scoped, and because its subject is
-  the one actor this prohibition exists to protect: it is the first time a rival takes a
-  *relational* action against a corp a human owns. Same constraints — deterministic, seeded,
-  scored-utility, legal verbs only. Hostility remains a **declared state a corp opts into**
-  (Ben, 2026-08-17), so a rival may score and declare it, never acquire it ambiently.
-
-  **Rivals may EXTEND THE NETWORK, and direct convoys on it (Ben, 2026-08-24, the Sprint 18
-  design form).** Two verbs join the scorer's candidate list on the same terms as every grant
-  above — deterministic, seeded, scored-utility, legal verbs only, never a planner. (1)
-  `place_road`, plus port / inland-hub build candidates scored like any building: the
-  generator half of Logistic Points' constraint 5 (`docs/economy/LOGISTICS.md` § Logistic
-  Points — a rival must be able to build the generator), honouring Ben's 2026-08-22 "before
-  LP lands" ordering. (2) `dispatch_convoy` in its directed form, through the same
-  `price_convoy_leg`/`commit_convoy` seam auto-dispatch and the player use — a grant of reach
-  to the player's own verb, no fourth code path, its spend under the solvency gate like every
-  spend. Raised on the form rather than assumed (the NR-517 precedent); fresh authoring — the
-  purged BL-447 prose is reference only. Owners: BL-599 (rival roads and hubs), BL-600
-  (rival directed dispatch).
+  `docs/research/COLONIAL_ERA.md` § Two ways to claim ground across water owns it. What it does **not** admit:
+
+
+  anything whose timing, latency or ordering can vary the generated world (`docs/lore/HISTORY.md`
+
+
+  is the authority for what the ladder produces, not a licence to randomise it), and any cloud
+
+
+  model in the loop — the no-cloud invariant in `docs/ai/AI_OPPONENT.md` § 10 is untouched.
+
+
+  Reason for the grant: three of the four systems Ben's 2026-08-18 brief names — international
+
+
+  trade, logistics and diplomacy — are nation-grain, and `GENERATION_STRATEGY.md`'s economic
+
+
+  premise already assumes nations that act. See `docs/development/SPRINTS.md` § Sprints 26–33.
+
+
+  **A rival acting POLITICALLY against the player's corp is granted (Ben, 2026-08-22,
+
+
+  answering the design register), on the same terms as BL-450.** This is the newest widening
+
+
+  and the one whose subject is furthest from the original prohibition: a rival may **lobby**
+
+
+  a nation to shift its budget weights or its law (BL-539), and a nation's derived stance may
+
+
+  **gate the player's corp** out of a territory (BL-540) — both being consequences imposed on
+
+
+  a corp a human owns by an actor the player does not control. Same constraints, unchanged:
+
+
+  deterministic, seeded, scored-utility, legal verbs only, never a planner. It was raised
+
+
+  rather than assumed (NR-517) precisely because reading the 2026-08-18 nation grant as
+
+
+  already covering it would have set the quiet precedent this section exists to prevent.
+
+
+  What it does **not** admit: a rival *enacting* law (only a nation can), or influence
+
+
+  acquired outside the `lobby` verb.
+
+
+
+
+
+  **A rival scoring STANCE toward the player's corp is a separate, corp-grain widening
+
+
+  (BL-450, rivals score stance) and is GRANTED on the same terms and date.** It is called out
+
+
+  separately because every other widening above is dated and scoped, and because its subject is
+
+
+  the one actor this prohibition exists to protect: it is the first time a rival takes a
+
+
+  *relational* action against a corp a human owns. Same constraints — deterministic, seeded,
+
+
+  scored-utility, legal verbs only. Hostility remains a **declared state a corp opts into**
+
+
+  (Ben, 2026-08-17), so a rival may score and declare it, never acquire it ambiently.
+
+
+
+
+
+  **Rivals may EXTEND THE NETWORK, and direct convoys on it (Ben, 2026-08-24, the Sprint 18
+
+
+  design form).** Two verbs join the scorer's candidate list on the same terms as every grant
+
+
+  above — deterministic, seeded, scored-utility, legal verbs only, never a planner. (1)
+
+
+  `place_road`, plus port / inland-hub build candidates scored like any building: the
+
+
+  generator half of Logistic Points' constraint 5 (`docs/economy/LOGISTICS.md` § Logistic
+
+
+  Points — a rival must be able to build the generator), honouring Ben's 2026-08-22 "before
+
+
+  LP lands" ordering. (2) `dispatch_convoy` in its directed form, through the same
+
+
+  `price_convoy_leg`/`commit_convoy` seam auto-dispatch and the player use — a grant of reach
+
+
+  to the player's own verb, no fourth code path, its spend under the solvency gate like every
+
+
+  spend. Raised on the form rather than assumed (the NR-517 precedent); fresh authoring — the
+
+
+  purged BL-447 prose is reference only. Owners: BL-599 (rival roads and hubs), BL-600
+
+
+  (rival directed dispatch).
+
+
 
 
   **The Era −1 scorer may read the GRUDGE LEDGER, scoped to fear of annihilation (Ben,

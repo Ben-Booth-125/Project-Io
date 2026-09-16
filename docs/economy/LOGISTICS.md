@@ -261,7 +261,7 @@ nothing — the network's failure state remains insolvency, not decay.
 ### 4b. Sea lanes — the colonial ties, stamped FROM the colonial record
 
 **The water analogue of § 4a.** The colonial era
-(`docs/generation/COLONIAL_ERA.md` § The colonial tie is a sea lane) records every sea leg it walked — a purchase party's crossing, a
+(`../generation/EXPLORATION.md` § The colonial tie is a sea lane, and the map reads it) records every sea leg it walked — a purchase party's crossing, a
 campaign's sea supply, the standing traffic between a metropole and what it holds — and a pass
 after it stamps those legs onto the water as a **sea lane** tier that discounts the sea-leg
 traversal cost in § 1. Traffic earns the tier, as it earns a Road on land; a crossing made once is

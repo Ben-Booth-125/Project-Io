@@ -5,7 +5,9 @@
 > move without a cargo ever existing · how a want met by throughput becomes a flow between
 > polities, and why that flow is what a market earns · which campaign a want ranks · how the
 > treasury allocates its spend · what a treaty is as data and what it binds · what a colony
-> is and why it wants things of its own · how ports, navies and standing armies are paid for and
+> is and why it wants things of its own · the two ways ground is claimed across water and what
+> each costs · what a colonial tie is on the map and what reads it · how ports, navies and
+> standing armies are paid for and
 > how they decay · how an arms race buys quiet at home and opportunity abroad · the two ways to
 > be strong and how a creed decides which · how a good acquires a cultural preference · what the
 > phase hands digitisation.
@@ -281,7 +283,81 @@ a ranking (`CIVILISATION.md` § Some peoples gain the capacity to explore).
 
 ---
 
+## Two ways to claim ground across water
+
+*(Folded from `../research/COLONIAL_ERA.md` on 2026-09-16, NR-884. The subject is this phase's; the doc it
+came from claimed a span this one and `DIGITISATION.md` now own between them.)*
+
+A colonial claim is a polity verb on a target across a **sea leg**, staged from harbour works, and
+there are **two of them**. Both are the same actor at the same grain choosing among its sim verbs,
+and both sit inside the 2026-08-18 nation-and-polity grant on that grant's terms — pure, seeded,
+deterministic, scored-utility, never a planner (`../ai/AI_OPPONENT.md` § 11). The second verb was
+**raised** by Ben on 2026-09-09, not read into the first.
+
+**Purchase — the diplomatic claim.** *"Something like purchasing a province for the purpose of
+trade, and respecting local customs."* A polity pays for a province rather than taking it, out of
+the capital its seat already holds (§ Capital arrives, and it sits in the capital — the same
+currency, no second one). What it buys is *access*: the province's endowment becomes reachable to
+the buyer's network, and the buyer comes to want what it grows (§ A good acquires a cultural
+preference). What it does **not** buy is the people. **A purchased province keeps its culture
+shares**; nothing is digested, because nothing was conquered. That is what "respecting local
+customs" means as data.
+
+**Conquest — the military claim.** *"Military claims, and war for items such as gold."* The
+campaign verb `MILITARY_HISTORY.md` already resolves, played across a sea leg. The province changes
+hands, its people are digested over centuries, and the grudge ledger records who did it. A
+conquered province's endowment is the conqueror's outright, which is why a polity would fight for
+it: gold is worth a war in a way a cash crop's *access* is not.
+
+**The scorer chooses between them on the ground's terms**, never on a posture flag. A rich metal
+endowment behind a weak defence scores the campaign; a cash-crop province under a polity with a
+full treasury scores the purchase; a seller whose stores are empty is cheaper to buy from. The two
+verbs are one contest with two costs, which is what makes the map readable afterwards — a player
+can point at a colony and say *bought* or *taken*, and the culture shares and the grudge ledger
+will agree.
+
+**Both culminate as every major does.** The non-hegemony invariant is not relaxed for the sea; a
+metropole that overreaches fragments, and its colonies arrive at the epoch as nations with a
+grudge, a taste and a sea lane.
+
+---
+
+## The colonial tie is a sea lane, and the map reads it
+
+*(Folded from `../research/COLONIAL_ERA.md` on 2026-09-16, NR-884.)*
+
+**A tie is a force on the map, never a preference inside an actor.** An earlier design seeded the
+order book's preferred-seller relationships from ties; that half is superseded (Ben, 2026-09-09),
+because the buy side that would have read them is dormant in play, and a relationship nothing reads
+is not a force. What the design needed was the same thing the ancient roads gave the land.
+
+**Sea lanes are stamped FROM the record, exactly as roads are stamped from the empires'.** The span
+records every sea leg it walked — a purchase party's crossing, a campaign's sea supply, the
+standing traffic between a metropole and what it holds — and a pass immediately after stamps those
+legs onto the water as a **sea lane** tier that discounts sea-leg traversal cost, the water
+analogue of `../economy/LOGISTICS.md` § 4a. Traffic earns the tier; a crossing made once is no
+lane. Purely additive; land tiles are untouched.
+
+**What reads it is everything that reads traversal cost**, because traversal cost is one weight
+function (`../economy/LOGISTICS.md` § 1). A convoy between a colony's market and its metropole's
+is cheaper than one to a stranger's, so a colony's chains close through its metropole *first*
+without anyone naming a preferred seller — the landed price says so. The same discount widens
+**placement reach** across the lane, so a firm on one shore can legally hold a site on the other.
+That is a wider effect than a market preference and it is the intended one: a tie that only moved
+prices would be invisible to the search, and a search that cannot see roads cannot see lanes.
+
+**A lane is what a colony leaves behind when the metropole falls.** Ties outlive the polity that
+made them, as roads outlive the empire that paved them; the map carries lanes between nations that
+have not been one polity for a century, and that network is what `DIGITISATION.md` hands to the
+landscape search.
+
+---
+
 ## Force persists now, and persistence has a bill
+
+**SETTLED (Ben, 2026-09-16, NR-878): the actor has NO PURSE TERM, and poverty is the brake.** With the saturation caps replaced by a real per-head bill, a polity ranked above about 500 on either lean buys a stock step whenever one is affordable and the bill then drains what it bought with: over the span the per-seed MEDIAN polity treasury falls from 1.26M to **211**, the top decile loses about 3%, and roughly **14% of polity-rounds cannot pay the army bill**. Ben ruled that shape ACCEPTED: **a realm that over-builds is poor, and being poor is the consequence.** No solvency rule was added to a step's eligibility, and no cap came back.
+
+The reading is structural rather than a tuning miss, and the figures say so: at a tenth of the rate the median still ends at 181k, because a cap-sized army over 115 rounds costs about one median hoard. **The caps were hiding a 600x treasury spread** — so what looks like a new failure is an old one becoming visible, which is the whole point of putting the cost in the world. The visible consequence to watch is displacement: its median fell to 0.85 on this arm while the pooled figure held at 1.64. If a later reading shows the spent purse suppressing displacement rather than differentiating realms, that is the evidence that reopens this call.
 
 **SETTLED (Ben, 2026-09-11): `army_stock` CARRIES across the handoff; the navy is NEW and starts
 at zero, everywhere.** No polity inherits a fleet, which means the first ocean-capable power in a

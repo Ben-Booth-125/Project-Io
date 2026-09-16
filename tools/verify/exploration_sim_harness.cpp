@@ -565,15 +565,19 @@ int main()
                     static_cast<long long>(ex1.tribute_remitted),
                     static_cast<long long>(ex1.treaties_formed),
                     static_cast<long long>(ex1.treaties_broken), ex1.owner_changes.size());
-        // RE-PINNED 2026-09-15 (Ben, NR-875): BL-981 stopped the schism verb razing
-        // the seats that walk out with a breakaway realm, so the resumed span opens
-        // on a different 1200 world. 306/304/522/2174 -> 308/306/472/2196; the
-        // subjection, tribute and treaty counters did not move. Authorised against
-        // the described shape (seed 2: 116 seats where the razing world held 154).
-        check(ex1.battles == 308 && ex1.conquests == 306 && ex1.foundings == 472
-           && ex1.subjections_formed == 5 && ex1.subjections_freed == 1
-           && ex1.tribute_remitted == 134358620 && ex1.treaties_formed == 293
-           && ex1.treaties_broken == 2 && ex1.owner_changes.size() == 2196,
+        // RE-PINNED 2026-09-16 (Ben, NR-877): the sprint-42 wave-1 re-bless, one
+        // authorisation over five named causes -- deposits scaled by the interior's
+        // budget at the fossil epoch, a river step priced like a shore step, force
+        // upkeep paid per head from the treasury, every wired tree effect reaching
+        // the sim, and a nation opening with its folded polities' 1660 chest.
+        // 308/306/472/2196 -> 322/207/739/2410. The span is calmer and more
+        // commercial: fewer conquests, far more foundings, and subjection and
+        // tribute rise sharply as realms that can pay hold subjects instead of
+        // taking ground. Authorised against that shape, never against the hashes.
+        check(ex1.battles == 322 && ex1.conquests == 207 && ex1.foundings == 739
+           && ex1.subjections_formed == 65 && ex1.subjections_freed == 62
+           && ex1.tribute_remitted == 245920676 && ex1.treaties_formed == 479
+           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2410,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 

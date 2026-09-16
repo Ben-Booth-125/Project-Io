@@ -1,32 +1,32 @@
-# Project Io — The Colonial Era
+# The Colonial Era — the demand side generated as history (mechanism reference)
 
-> **Settles:** what the colonial span is, on which engine it runs, and what it is for · the two
-> ways a polity claims ground across water and what each costs · how a people comes to want a
-> luxury good it cannot grow · where a nation's opening wealth comes from · what a colonial tie
-> is on the map and what reads it · what this span hands the corporate search, and what it must
-> never compute itself · how the round that shows it is cut, and why it is a still.
-> **Not here:** the polity engine's verbs and battles (MILITARY_HISTORY) · the empires it
-> inherits (CIVILISATION) · how the search picks a corporate landscape (GENERATION_STRATEGY
-> § The eight phases) · what an endemic good is worth (../economy/RESOURCES) · the wizard's
-> screens (../ui/STARTUP).
-> **Confused with:** COLONISATION.md, CIVILISATION.md, GENERATION_STRATEGY.md.
+> **Proposes:** what a single colonial span would be, on which engine it would run, and what it
+> is for · the two ways a polity claims ground across water and what each costs · how a people
+> comes to want a luxury good it cannot grow · where a nation's opening wealth comes from · what a
+> colonial tie is on the map and what reads it · what such a span would hand the corporate search.
+> **Not here:** the authority for any of it — the two claim verbs and the sea lane are
+> `../generation/EXPLORATION.md` § Two ways to claim ground across water and § The colonial tie is
+> a sea lane; the search seed and the 1960 handoff are `../generation/DIGITISATION.md` § What
+> crosses into play; a good's cultural preference is `../generation/EXPLORATION.md` § A good
+> acquires a cultural preference; the opening treasury is § Capital arrives, and it sits in the
+> capital.
+> **Confused with:** generation/EXPLORATION.md, generation/DIGITISATION.md,
+> generation/CIVILISATION.md.
 
-> **MERGED LATE, AND ITS SPAN IS NO LONGER ITS OWN (2026-09-16).** This document was written on
-> 2026-09-09 on a branch that stayed unmerged for a week, during which sprints 40, 41 and 42 ran.
-> In that time the span it claims — **1560 → 1960** — was divided between two documents that are
-> now the authority for it: [`EXPLORATION.md`](EXPLORATION.md) owns **1200 → 1660** and is BUILT
-> (treasuries, treaties with a term, colonies as subjects, ports and navies that decay, trade
-> flows), and [`DIGITISATION.md`](DIGITISATION.md) owns **1660 → 1960** and carries its own
-> twenty filed items. The wizard rounds here are wrong too: round 5 is Exploration and round 6 is
-> Digitisation, both time-lapses, where this document specifies a single round 5 shown as a STILL.
+> **RETIRED TO RESEARCH — a mechanism reference, not authority (Ben, 2026-09-16, NR-884).** This
+> document was written on 2026-09-09 for a single **1560 → 1960** colonial span, on a branch that
+> stayed unmerged for a week while sprints 40, 41 and 42 ran. In that time the span was divided
+> between two documents that are now the authority for it: `../generation/EXPLORATION.md` owns
+> **1200 → 1660** and is BUILT, and `../generation/DIGITISATION.md` owns **1660 → 1960**. The
+> wizard rounds here are wrong too — round 5 is Exploration and round 6 is Digitisation, both
+> time-lapses, where this document specifies one round 5 shown as a STILL.
 >
-> **What is still worth reading, and why it was merged rather than dropped:** the SUBJECT. The
-> demand side generated as history — how a people comes to want a luxury it cannot grow, where a
-> nation's opening wealth is from, the two ways ground is claimed across water and what each
-> costs, and the ordering that the corporations come AFTER the demand they answer. None of that
-> was wrong; it was re-spanned. Read a claim here against the two documents above before acting
-> on it, and never cite this one as the authority for a date, a round number, or a span.
-
+> **Its live content has been folded out (2026-09-16).** The two claim verbs and the sea lane went
+> to `EXPLORATION.md`; the search seed went to `DIGITISATION.md`'s handoff. What remains here is
+> the reasoning behind them and the parts neither sibling took. **Never cite this document as the
+> authority for a date, a round number, a span, or a mechanism** — read the sibling section
+> instead, and treat a disagreement as this file being the stale one.
+>
 **We build logistics and set demands for goods — then we build companies on top of that.**
 
 `COLONISATION.md` is the peopling of an empty world and `CIVILISATION.md` is the empires that

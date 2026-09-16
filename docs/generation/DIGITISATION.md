@@ -536,6 +536,15 @@ The epoch's handoff, and nothing else:
 - **Standing war conditions** on provinces, with their patrons.
 - **Campaign tech state** per nation from the Industry tree mask.
 - **Per-nation Alarm** seeded from the span's wars, grudges and severed flows.
+- **Sea lanes**, a traffic count per sea leg stamped to a tier, discounting sea-leg
+  traversal cost for every consumer of it
+  (`EXPLORATION.md` § The colonial tie is a sea lane, and the map reads it).
+- **Network strength** — corridor traffic, sea-lane traffic and junction degree per region —
+  which is what places the landscape search's **seed candidate** (folded from
+  `../research/COLONIAL_ERA.md` on 2026-09-16, NR-884). The search refines that seed greedily and its
+  perturbation axes are unchanged; what stops being arbitrary is the starting point. A
+  junction three corridors and a lane meet at is a target; a rich province nothing reaches
+  is not, yet.
 - **Depleted reserves** from the retrofit formula.
 - **Grudges**, filtered over this span's dead, as sentiment.
 

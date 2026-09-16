@@ -25,8 +25,12 @@ per-minor findings — is kept verbatim at
 
 ## The two arcs (2026-08-12, NR-177)
 
-**Ancient — live.** A standalone commercial product set at 0 CE, with the player as a **mercenary
-company**, built on the campaign engine as it stands. Four rulings shape it: the space work is
+**Industrial — live (re-spanned 2026-09-16, NR-807).** A standalone commercial product set at the
+**1960 epoch**, with the player as a **mercenary company**, built on the campaign engine as it
+stands. It was specified at 0 CE until 2026-09-16; the 2026-09-08 calendar moved the epoch and
+CONCEPT.md § Eras now names the industrial arc as live. The ancient span was not dropped — it became
+the first of the generation passes that produce the 1960 world. The identity is unchanged by that
+move and is ruled separately. Four rulings shape it: the space work is
 **stashed, not re-anchored**; the mercenary company is the militia one era earlier (procure force,
 field it, be paid), so the 2026-08-10 identity is being *tested*, not replaced; the grain is **tile
 and fine tick**, with `history_sim` staying the *generator*; and the release bar is **commercial** —

@@ -103,7 +103,6 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/generation/CIVILISATION.md` | **How city states become empires** — the phase after migration: sparse settlements, materials spent on action, which creeds raise armies, what a civilisation is as distinct from a creed, and culture relations as the engine of conquest. Carries the DATA CONTRACT the Culture phase must satisfy. `COLONISATION.md` is its peaceful sibling. |
 | `docs/generation/EXPLORATION.md` | **The exploration age, 1200 → 1660** — the phase after Empires: capital as a per-polity treasury, treaties with a term, colonies as subjects with an overlord link, ports/navies/armies that decay, cultural preference for goods. Why conflict moves off the home coast. |
 | `docs/generation/DIGITISATION.md` | **1660 → 1960 — a PLACEHOLDER.** Owns only the boundary: which subjects are Digitisation's (companies, prices, tariffs) rather than Exploration's. |
-| `docs/generation/COLONIAL_ERA.md` | **A PRECURSOR, merged late 2026-09-16.** The demand side generated as history: claims across water by purchase or conquest, who came to want which luxury, where a nation's opening wealth is from, sea lanes, and what the span hands the corporate search. Written 2026-09-09 for a single **1560 → 1960** pass, a span `EXPLORATION.md` (1200 → 1660) and `DIGITISATION.md` (1660 → 1960) have since divided. Read it for the SUBJECT; the two of them own the span. |
 | `docs/generation/trees/TREES.md` → `COLONISATION_TREE.md`, `EMPIRE_TREE.md`, `EXPLORATION_TREE.md`, `INDUSTRY_TREE.md` | **The four pre-game technology trees** — one grammar (minor/major/milestone, the spire, the five adjacency rules, forks, diffusion by kind, the scorer shape) and one doc + one JSON store per tree. `tree_lint.js` holds doc and store together. **Query the stores; never hand-edit one without re-running the lint.** |
 | `docs/generation/PROVINCES.md` | The spatial unit of consequence: partition rules, three domains, walk order. |
 | `docs/generation/NATION_GENERATION.md` | Territory placement, resource profile, character, naming. |
@@ -123,7 +122,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/ai/LANGUAGE_POLICY_FEASIBILITY.md` | Research note: does a language-driven opponent compress and run locally. |
 | `docs/tech/TECH_FOUNDATIONS.md` | Settled technical decisions and the prototype scope/exclusions. Read before any code or architecture suggestion. |
 | `docs/multiplayer/MULTIPLAYER_PRINCIPLES.md` | Which settled decisions keep multiplayer cheap later. Non-binding. |
-| `docs/research/*.md` | Research scaffolding (tech effects, ancient ladder, Era 1 landscape, the retired collapse roster). Not authority. |
+| `docs/research/*.md` | Research scaffolding (tech effects, ancient ladder, Era 1 landscape, the retired collapse roster, the retired colonial era). Not authority. |
 
 ### UI
 | Doc | Owns |

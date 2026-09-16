@@ -504,14 +504,14 @@ That is the honest reading — protection is a response to an industrial competi
 without one has nothing to protect against.
 
 **The colony term is owed, not forgotten.** It has no input while a polity cannot claim ground across
-water; the colonial era's two claim verbs (`../generation/COLONIAL_ERA.md` § Two ways to claim
+water; the colonial era's two claim verbs (`../research/COLONIAL_ERA.md` § Two ways to claim
 ground across water; BL-832, colonial ties) are what give it one, and it lands as an addend on the
 same scalar. A purchased province counts as a colony exactly as a conquered one does — a metropole
 protects what it bought no less than what it took. A far-flung holding is a large empire, not an
 overseas one, so no proxy stands in for it meanwhile.
 
 **A nation's opening treasury is the same span's output.** The wealth scalar the colonial era derives
-per polity (`../generation/COLONIAL_ERA.md` § How wealthy a nation is) seeds the balance § 2 opens
+per polity (`../generation/EXPLORATION.md` § Capital arrives, and it sits in the capital) seeds the balance § 2 opens
 with — furnace timing, discoveries, purchases, spoils and lanes — so a rich nation is rich because
 its history was, and the spread across nations is reported rather than flattened.
 
