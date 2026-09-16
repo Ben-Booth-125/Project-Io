@@ -437,6 +437,7 @@ void draw_lapse_ticker(const history_lapse& h, int year, int max_rows = 6);
 /// and not of the frame clock. Never below one year.
 int lapse_marker_window_years(const history_lapse& h);
 
+
 /// BL-891 -- WHAT HAPPENED IN THIS WORLD, read off the record the round already
 /// holds. The scoreboard shows a SNAPSHOT that re-ranks as the centuries pass;
 /// this answers the different question a player rolling a world actually asks --

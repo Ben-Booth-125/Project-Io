@@ -15747,6 +15747,46 @@
         "files",
         "design"
       ]
+    },
+    "BL-1012": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": null,
+      "written": "2026-09-16",
+      "author": "Ben (2026-09-16, watching the lapse)",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "UI",
+      "id": "BL-1012",
+      "short_name": "LAPSE_CORRIDORS_TAKE_THE_SEAM",
+      "priority": "B",
+      "difficulty": 2,
+      "title": "A corridor across the east-west seam is drawn as the short hop it is, not across the whole map",
+      "authority_doc": "docs/ui/STARTUP.md",
+      "files": [
+        "src/ui/history_lapse.cpp"
+      ],
+      "design": "BEN, 2026-09-16: \"can you look at cases where roads cross the border outside our time-lapse render? We see these roads as wrapping around the whole view, when actually they are very small roads.\"\n\nTHE WORLD IS A CYLINDER AND THE BAKE FORGOT. Both corridor bakes (BL-917 roads, BL-925 trade links) stored the raw anchor columns of a corridor's two ends and the draw stroked a straight line between them. A corridor between column 5 and column 255 of a 261-wide world is ten columns long over the seam and 250 the other way, so every seam-crossing corridor was drawn as a line across the entire map. The river bake had already met this and dodged it by dropping seam edges outright (\"the wrap seam\"); the corridors had no such guard.\n\nIT WAS NOT ONLY THE LINE. The same raw columns fed the over-water sample (which walked the long way and answered about ground the corridor never crosses), the bridge test (which found river crossings along that bogus line) and the BL-943 exemplar's midpoint (which sat at the middle of the long way, usually in open sea).\n\nTHE FIX IS AT THE BAKE.  moves the far end by a world width when the seam is shorter, so the stored segment IS the corridor and every reader downstream is right for free. The draw strokes each corridor at its own columns and again a world width away, inside the map's clip rect, so the half that belongs on each edge appears and nothing escapes onto the panel; the exemplar's midpoint folds back into the raster.\n\nVERIFIED by re-running scripts/verify/history_lapse_empires.lua on seed 0 and comparing with the capture taken before the change: the two full-width lines at mid-map are gone, the board and the world are identical, expect_no_clipping still 0 failures.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "blocked_on",
+        "parked",
+        "category",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design"
+      ]
     }
   }
 }

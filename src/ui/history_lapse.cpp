@@ -142,6 +142,30 @@ constexpr int32_t lapse_exploration_epoch_year = 1200;
 /// rather than assuming every corridor is land. Majority-water along a
 /// handful of even samples, not "any water", because a bridge crossing one
 /// river tile is not a sea corridor.
+float lapse_unwrap_col(float c0, float c1, int gw)
+{
+    // THE MAP IS A CYLINDER AND A CORRIDOR IS THE SHORT WAY ROUND (Ben,
+    // 2026-09-16, watching the lapse: "we see these roads as wrapping around
+    // the whole view, when actually they are very small roads"). A corridor
+    // between anchors at column 5 and column 255 on a 261-wide world is ten
+    // columns long over the seam and 250 the other way; every reader here took
+    // the raw columns, so the drawn line, the water sample and the bridge test
+    // all described the long way — the one path the corridor is NOT.
+    //
+    // The fix is one function and it belongs at the BAKE, not the draw: this
+    // returns `c1` moved by a whole world width when that is the shorter run,
+    // so the stored segment is the real corridor and everything downstream of
+    // it — over_water, bridges, the exemplar's midpoint — reads the short path
+    // for free. The result can sit outside [0, gw); the draw handles that (a
+    // second, shifted copy, clipped to the map) and the water sample already
+    // folds a sampled column back into range.
+    if (gw <= 0) return c1;
+    const float w = static_cast<float>(gw);
+    if (c1 - c0 >  w * 0.5f) return c1 - w;
+    if (c1 - c0 < -w * 0.5f) return c1 + w;
+    return c1;
+}
+
 bool lapse_corridor_over_water(const std::vector<uint8_t>& band, int gw, int gh,
                                float c0, float r0, float c1, float r1)
 {
@@ -496,7 +520,7 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
             seg.region_b = b;
             seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
             seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
-            seg.c1 = static_cast<float>(h.region_col[b]) + 0.5f;
+            seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[b]) + 0.5f, gw);
             seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
             seg.year_track = e.year;
             if (e.polity >= 2) seg.year_road      = e.year; // robust to a corridor's first event already being Road
@@ -555,7 +579,7 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
             seg.region_b = b;
             seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
             seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
-            seg.c1 = static_cast<float>(h.region_col[b]) + 0.5f;
+            seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[b]) + 0.5f, gw);
             seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
             seg.over_water = lapse_corridor_over_water(band, gw, gh, seg.c0, seg.r0, seg.c1, seg.r1);
             h.trade_segs.push_back(std::move(seg));
@@ -897,15 +921,32 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    A promoted one draws faint at Track and thickens at Road; a bridge
     //    glyph marks every point its line crosses a river, but only once the
     //    corridor carrying it is actually drawn. ──
+    // A SEAM-CROSSING CORRIDOR IS DRAWN TWICE, ONCE OFF EACH EDGE. The bake
+    // stored the short way round (`lapse_unwrap_col`), so one end may sit at a
+    // negative column or past `gw`: drawing it once leaves the far half
+    // missing, and drawing it unclipped would paint over the panel beside the
+    // map. So each corridor is stroked at its own columns and again a world
+    // width away, inside the map's own clip rect — the half that belongs on
+    // each edge survives, and nothing escapes the map.
+    const float world_w = static_cast<float>(gw) * scale;
+    dl->PushClipRect({tl.x, tl.y}, {tl.x + static_cast<float>(gw) * scale,
+                                    tl.y + static_cast<float>(gh) * scale}, true);
     for (const lapse_road_seg& s : h.road_segs)
     {
         if (year < s.year_track) continue; // not promoted yet at this playhead
         const bool at_road = year >= s.year_road;
         const float w = at_road ? std::max(1.5f, scale * 0.30f)
                                 : std::max(1.0f, scale * 0.16f);
-        dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)},
-                   at_road ? col_road : col_road_track, w);
+        const ImU32 col = at_road ? col_road : col_road_track;
+        const bool  wrapped = s.c1 < 0.0f || s.c1 > static_cast<float>(gw);
+        const float shift   = s.c1 < 0.0f ? world_w : -world_w;
+        dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, col, w);
         ++prims;
+        if (wrapped)
+        {
+            dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)}, col, w);
+            ++prims;
+        }
         for (const lapse_bridge& br : s.bridges)
         {
             const ImVec2 at{px(br.col), py(br.row)};
@@ -931,7 +972,15 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         const float w = std::max(1.25f, scale * 0.22f);
         dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, col_trade_link, w);
         ++prims;
+        if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw)) // the seam, drawn off the other edge
+        {
+            const float shift = s.c1 < 0.0f ? world_w : -world_w;
+            dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)},
+                        col_trade_link, w);
+            ++prims;
+        }
     }
+    dl->PopClipRect();
 
     // ── 3d. FLEET AND CARAVAN EXEMPLARS (BL-943, EXPLORATION.md sec Goods move
     //    as throughput, never as cargo: "the visual is a filter on that
@@ -976,6 +1025,13 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 my = (it->r0 + it->r1) * 0.5f;
                 over_water = it->over_water;
             }
+
+            // The midpoint of a seam-crossing corridor sits off the map by
+            // construction (the bake stored the short way round), so fold it
+            // back into the raster before drawing: the exemplar belongs where
+            // the corridor actually runs, not past the edge.
+            if (mx < 0.0f)                            mx += static_cast<float>(gw);
+            else if (mx > static_cast<float>(gw))     mx -= static_cast<float>(gw);
 
             const float t = static_cast<float>(year - e.year) / static_cast<float>(window);
             const int   a = static_cast<int>(255.0f * (1.0f - t));
