@@ -723,6 +723,18 @@ in `tools/verify/README.md`.
   would meet. C3a found its own map to be a wrapped-Chebyshev TIE, so the proximity half of the
   route claim was asserting nothing while reading green.
 
+- **`digitisation_sim_harness`** — the thirteen readings `DIGITISATION.md` § What the phase is
+  judged on names (BL-982), over the curated seeds read from `docs/generation/seed_library.json`,
+  as a SPREAD and never a per-world verdict. **Lua builder** (`bash tools/verify/build_lua_harness.sh
+  digitisation_sim_harness`); run from the repo root; `--limit N` or `--seeds a,b,c` for a short
+  run. Each world is generated at shipped parity (world_gen/works/recipes/economy, era band from the
+  epoch, `apply_shipped_landscape`); the 12-tick validation run is not mirrored and the face says so.
+  **Report only.** Every reading prints MEASURED, PARTIAL or n/a — an n/a names the missing
+  mechanism and prints the count that proves its absence, and a PROXY line is labelled as not the
+  reading. Until the 1660 -> 1960 span exists, "at 1960" reads the world generation hands play
+  today: the 1660 Exploration handoff plus world setup and the searched landscape. Slow: a full world
+  and a landscape search per seed.
+
 - **`history_conquest_gap`** — WHY the Era −1 sim fights and never conquers (BL-384), measured on
   **the era generation actually runs** (BL-462, 2026-08-23). Takes an optional sweep width:
   `history_conquest_gap 32`. Instruments rather than re-asserts — `history_sim_harness`'s
