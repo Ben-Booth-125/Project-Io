@@ -288,6 +288,26 @@ struct history_lapse
     /// Culture -> its own position on the wheel, 0-1.
     std::vector<float> culture_hue;
 
+    // --- What the round before this one left (Ben, 2026-09-16) -------------
+    //
+    // CONTINUITY IS THE POINT: "after the culture round we should still render
+    // its output on the time-lapse for empires, and have it fade out, rather
+    // than just disappearing as soon as Next is pressed." The rounds are one
+    // continuous history — the Empires span opens ON the migration's ground,
+    // and BL-920 made that literal: at 400 BCE almost nothing is organised and
+    // the map is culture ground waiting for city states. Drawing that ground
+    // as empty threw away the one frame that says the two rounds are the same
+    // world.
+    //
+    // So a round may carry its predecessor's LAST frame as a colour per
+    // region, and paints it under ground nobody holds yet, fading out over the
+    // opening stretch of its own span. Colour rather than owner indices
+    // because the palettes differ (a culture's lineage hue against a polity's
+    // identity slot) and a stale index into the wrong palette would be a
+    // quietly wrong colour rather than an obviously missing one. Empty on the
+    // Culture round, which has nothing behind it.
+    std::vector<uint32_t> carry_colour;
+
     /// Culture -> generations below its root, 0 for a cradle culture.
     std::vector<int32_t> culture_depth;
 
@@ -391,6 +411,18 @@ void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent)
 /// widgets, so there is nothing here for a click to land on.
 void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     int year);
+
+/// The previous round's ground, still showing under unclaimed land at @p year:
+/// 1 at the round's first year, 0 once the opening stretch has passed. Public
+/// so the caller can tell whether it is worth building the carried colours.
+float lapse_carry_fade(const history_lapse& h, int year);
+
+/// The colour @p owner is drawn in on @p h — a culture's lineage hue on the
+/// Culture round, a polity's identity slot elsewhere. Public so one round can
+/// hand its final frame to the next as colours rather than as indices into a
+/// palette that round does not have (the carry above). ImU32 layout, kept as
+/// uint32_t so this header stays off imgui.
+uint32_t lapse_owner_colour(const history_lapse& h, uint16_t owner);
 
 /// The ordered, capped top-16 board.
 ///

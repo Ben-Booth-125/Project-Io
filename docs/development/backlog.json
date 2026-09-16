@@ -41,33 +41,6 @@
    "status": "designed",
    "glyph": "✓",
    "sprint": null,
-   "written": "2026-09-13",
-   "author": "Ben (2026-09-13, live review); Claude (itemised)",
-   "requires": [
-    "BL-946"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "category": "UI",
-   "id": "BL-948",
-   "short_name": "LAPSE_TIMELAPSE_SPEED_CONTROL",
-   "priority": "B",
-   "difficulty": 4,
-   "title": "A speed control (45s / 90s / 180s) on every lapse round's time-lapse, default 90 seconds",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "files": [
-    "src/ui/history_lapse.cpp",
-    "src/ui/history_lapse.hpp",
-    "src/ui/startup_screens.cpp",
-    "docs/ai/ACTIONS.json",
-    "docs/ui/question_log.json"
-   ],
-   "design": "BEN, 2026-09-13: time-lapses currently run too fast to observe what is happening. Target the FULL playback (start year to end year, unskipped) at 90 seconds by default, and add a speed-control element present in EVERY lapse round (Culture, Empires, and the new Exploration round from BL-946) offering three settings: 45 seconds, 90 seconds, 180 seconds -- the user can also already skip ahead or scrub via the existing playhead/scrubber, this control is about the AUTOPLAY rate, not a replacement for scrubbing.\n\nWHERE THE RATE LIVES TODAY. Find whatever currently drives year-per-frame or year-per-second in `history_lapse.cpp`'s playback (a fixed constant, most likely) and make it a function of (span length in years) / (chosen duration in seconds), recomputed whenever the round's span or the chosen duration changes -- a round with a longer span at the same duration setting must move faster per frame, not take longer wall-clock time, since the target is WALL-CLOCK duration, not years-per-second.\n\nTHE CONTROL ITSELF. Three-way selector (45s / 90s / 180s), same visual language as other wizard toggles (Sparse/Lean/Standard on the main menu is the nearest precedent for a three-way radio-style control). Persisted per-session is fine; it does not need to survive a restart unless that's trivial. Update `docs/ai/ACTIONS.json` for the new control and `docs/ui/question_log.json` for the surface it lives on.\n\nDONE WHEN: all three lapse rounds (Culture, Empires, Exploration) expose the same speed control; selecting 45s/90s/180s visibly changes the playback rate; the default is 90s; a live click confirms the control is reachable and does what it says."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": null,
    "written": "2026-09-14",
    "author": "Claude (sprint 41 T2 finding, BL-956)",
    "requires": [],

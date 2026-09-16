@@ -729,6 +729,26 @@ void assign_polity_colours(history_lapse& h, const std::vector<int32_t>* hue_fam
 // The map
 // ---------------------------------------------------------------------------
 
+uint32_t lapse_owner_colour(const history_lapse& h, uint16_t owner)
+{
+    return static_cast<uint32_t>(owner_colour(h, owner));
+}
+
+float lapse_carry_fade(const history_lapse& h, int year)
+{
+    // A TENTH OF THE ROUND'S OWN SPAN, so the hand-over reads the same however
+    // long the span is and however fast the viewer is playing it — tying it to
+    // seconds would make the 270-second pace show the old ground for a minute
+    // and the 90-second pace for twenty seconds, which is the sort of accident
+    // a reader would take for meaning.
+    if (h.carry_colour.empty() || h.lapse.years <= 0) return 0.0f;
+    const float over = static_cast<float>(h.lapse.years) * 0.10f;
+    const float gone = static_cast<float>(year - h.lapse.start_year);
+    if (gone <= 0.0f)  return 1.0f;
+    if (gone >= over)  return 0.0f;
+    return 1.0f - gone / over;
+}
+
 void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     int year)
 {
@@ -819,6 +839,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // Owner keys: -1 sea (nothing drawn, nothing bordered), -2 wild, else the
     // polity index. The frontier is drawn between any two DIFFERENT non-sea
     // keys, on both axes.
+    const float carry_fade = lapse_carry_fade(h, year);
     std::vector<int32_t> row(static_cast<std::size_t>(gw));
     std::vector<int32_t> above(static_cast<std::size_t>(gw), -1);
     std::vector<char>    present; // owner -> holds ground in this slice
@@ -849,10 +870,54 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 const uint16_t o = static_cast<uint16_t>(key);
                 if (present.size() <= o) present.resize(static_cast<std::size_t>(o) + 1, 0);
                 present[o] = 1;
+                // AND THE NEW ROUND FADES IN AS THE OLD ONE FADES OUT (Ben,
+                // 2026-09-16). One cross-fade, not a cut with an underlay: the
+                // carried ground is leaving at exactly the rate this round's
+                // own holders are arriving, so the opening reads as the same
+                // world changing hands rather than two surfaces swapping. A
+                // round with nothing behind it (the migration, and any round
+                // whose predecessor was never run) reads a fade of 0 from the
+                // first frame, so it draws at full strength as it always did.
                 dl->AddRectFilled({px(static_cast<float>(c)), y0},
                                   {px(static_cast<float>(e)), y1},
-                                  with_alpha(owner_colour(h, o), tint_alpha));
+                                  with_alpha(owner_colour(h, o),
+                                             static_cast<int>(tint_alpha * (1.0f - carry_fade))));
                 ++prims;
+            }
+            else if (key == -2 && carry_fade > 0.0f)
+            {
+                // THE ROUND BEFORE THIS ONE, under ground nobody holds yet.
+                // Only under UNCLAIMED land: over a holder it would be a second
+                // tint nobody could read, and the moment a city state organises
+                // its ground the old colour is gone there — which is the
+                // hand-over made visible rather than narrated. The run merged
+                // above is one owner key, not one region, so this walks the run
+                // and strokes each stretch of one carried colour.
+                int k = c;
+                while (k < e)
+                {
+                    const int32_t reg = h.tile_region[static_cast<std::size_t>(r * gw + k)];
+                    const uint32_t col = (reg >= 0 && static_cast<std::size_t>(reg) < h.carry_colour.size())
+                                             ? h.carry_colour[static_cast<std::size_t>(reg)] : 0u;
+                    int k2 = k + 1;
+                    while (k2 < e)
+                    {
+                        const int32_t r2 = h.tile_region[static_cast<std::size_t>(r * gw + k2)];
+                        const uint32_t c2 = (r2 >= 0 && static_cast<std::size_t>(r2) < h.carry_colour.size())
+                                                ? h.carry_colour[static_cast<std::size_t>(r2)] : 0u;
+                        if (c2 != col) break;
+                        ++k2;
+                    }
+                    if (col != 0u)
+                    {
+                        dl->AddRectFilled({px(static_cast<float>(k)), y0},
+                                          {px(static_cast<float>(k2)), y1},
+                                          with_alpha(static_cast<ImU32>(col),
+                                                     static_cast<int>(tint_alpha * carry_fade)));
+                        ++prims;
+                    }
+                    k = k2;
+                }
             }
             // The VERTICAL frontier: between this run and the one to its west.
             if (key >= -2 && c > 0)

@@ -258,12 +258,29 @@ rerolling a planetology round already re-draws the ones below it.
 A pass round does not compute its record and then play it back; the map begins drawing the
 moment the pass begins, and it advances in **fixed ticks** at one constant rate for the whole
 span, always **behind** the year the pass has reached and never ahead of it. The rate is set so
-the whole span plays in about **thirty seconds**; if the pass is slower than that the playhead
+the whole span plays in the duration the player has chosen; if the pass is slower than that the playhead
 waits at the computed frontier, so a longer round is acceptable and a playhead that overtakes
 the calculation is not. The sim publishes its growing record through a **write-only tap** — the
 same contract the market carve uses to fill the loading screen — so a watched run and an
 unwatched run are byte-identical, and the standing determinism rule is untouched. Once the pass
 has landed, the record stays: the round can be paused and scrubbed at the player's own pace. There is no Restart button on either pass round (Ben, 2026-09-11): a scrubber makes it redundant, and its row belongs to the ranking board.
+
+**THE PACE IS THE PLAYER'S (Ben, 2026-09-13, revised 2026-09-16).** A lapse that runs too
+fast to follow is a wait spent rather than watched, so every pass round carries the same
+three-way control beside its transport: **30 s, 1 m, 1 m 30 s of wall clock for the whole
+span**, a minute by default. It sets the WALL CLOCK, not years per second — a longer span at
+the same setting moves faster rather than taking longer, because what a viewer budgets is
+their own time. It changes the autoplay rate and nothing else; the scrubber still goes
+anywhere, and a live round still draws as fast as its pass computes.
+
+**A ROUND OPENS ON THE GROUND THE ROUND BEFORE IT LEFT (Ben, 2026-09-16).** The rounds are one
+continuous history and the surface says so: the previous round's final map is carried into the
+next and painted under ground nobody holds yet, fading out over the opening tenth of the new
+span while the new round's own holders fade in over the same stretch. It is a cross-fade, not a
+cut — the Empires round opens on the migration's peoples and watches city states organise them
+(BL-920 made that literally what happens), and the same carry runs Empires into Exploration and
+will run Exploration into Digitisation. A round whose predecessor was never run carries nothing
+and draws at full strength from its first frame.
 
 **The pass rounds draw the ground, not only the fill (Ben, 2026-09-11).** Rivers and the
 landform relief — mountains, highlands, the barriers the walk and the campaign both price — are

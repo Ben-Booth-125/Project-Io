@@ -367,6 +367,36 @@ void app::poll_wizard_history()
         }
         m_wiz_history[i] = std::move(landed);
 
+        // CONTINUITY (Ben, 2026-09-16): a round opens on the ground the round
+        // before it left. The predecessor's LAST frame is folded to one colour
+        // per region and handed over, and the map paints it under
+        // ground nobody holds yet, fading over the opening tenth of this span.
+        // Taken at LANDING rather than at draw time because the predecessor's
+        // own record is complete by then and never changes again — the carried
+        // frame is a fact about a finished round, not a second surface to keep
+        // in step. Round 3 has nothing behind it and carries nothing.
+        // NOT gated on the predecessor having SAMPLE steps: the migration's
+        // record carries ownership deltas and no polity samples at all (its
+        // board has no People column for exactly that reason), and gating on
+        // steps left the Culture round unable to hand anything over — the one
+        // hand-over this was built for. owner_slice_at reconstructs from the
+        // deltas, so a record with a span is enough.
+        if (i > 0 && m_wiz_history[i - 1].lapse.years > 0)
+        {
+            const ui::history_lapse& prev = m_wiz_history[i - 1];
+            const int prev_end = prev.lapse.start_year + prev.lapse.years;
+            const std::vector<uint16_t> last = owner_slice_at(prev.lapse, prev_end);
+            std::vector<uint32_t> cols(last.size(), 0u);
+            int held = 0;
+            for (std::size_t r = 0; r < last.size(); ++r)
+                if (last[r] != owner_none)
+                {
+                    cols[r] = static_cast<uint32_t>(ui::lapse_owner_colour(prev, last[r]));
+                    ++held;
+                }
+            if (held > 0) m_wiz_history[i].carry_colour = std::move(cols);
+        }
+
         // BL-914: LANDING NO LONGER RE-PARKS THE PLAYHEAD AT THE START. Under
         // the old design the future carried the whole record and this was the
         // first moment any of it was visible, so parking at the start was the
@@ -991,7 +1021,13 @@ void app::draw_generation_screen()
                 m_wiz_history_progress[lapse_index].sub_total.load(std::memory_order_relaxed);
             const float span = sub_total > 0 ? static_cast<float>(sub_total)
                                              : static_cast<float>(last - first);
-            constexpr float run_secs = 30.0f;
+            // BL-948: the viewer's own choice of wall clock for the whole span,
+            // not a fixed 30 s. The divisor is the only thing that changed; the
+            // "against the full span, never against how far it has got" rule
+            // above is what keeps a live round from slowing down as it runs.
+            const float run_secs = m_wiz_history_secs[lapse_index] > 0.0f
+                                       ? m_wiz_history_secs[lapse_index]
+                                       : wizard_lapse_secs_default;
             const float rate = span > 0.0f ? span / run_secs : 1.0f;
             m_wiz_history_carry[lapse_index] += ImGui::GetIO().DeltaTime * rate;
             const int whole = static_cast<int>(m_wiz_history_carry[lapse_index]);
@@ -1298,6 +1334,41 @@ void app::draw_generation_screen()
                     m_wiz_history_carry[lapse_index]   = 0.0f;
                     m_wiz_history_playing[lapse_index] = false;
                     m_wiz_history_paused[lapse_index]  = true;
+                }
+                // BL-948 — THE SPEED CONTROL, on every lapse round. Three
+                // rungs of WALL CLOCK for the whole span (Ben: the lapses run
+                // too fast to watch), in the wizard's own three-way idiom —
+                // the same radio row Sparse/Lean/Standard uses on the menu, so
+                // it needs no explaining. It changes the rate the playhead
+                // advances at and nothing else: the scrubber above still goes
+                // anywhere, and a live round still draws as fast as the pass
+                // computes.
+                {
+                    ImGui::TextUnformatted("Pace");
+                    ImGui::SameLine();
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        // Minutes read as minutes: "1m 30s", never "90s".
+                        char id[32];
+                        const int secs = static_cast<int>(wizard_lapse_secs[i]);
+                        if (secs < 60)
+                            std::snprintf(id, sizeof id, "%ds##wizhistpace%d", secs, i);
+                        else if (secs % 60 == 0)
+                            std::snprintf(id, sizeof id, "%dm##wizhistpace%d", secs / 60, i);
+                        else
+                            std::snprintf(id, sizeof id, "%dm %ds##wizhistpace%d",
+                                          secs / 60, secs % 60, i);
+                        if (i > 0) ImGui::SameLine();
+                        if (ImGui::RadioButton(id, m_wiz_history_secs[lapse_index]
+                                                       == wizard_lapse_secs[i]))
+                        {
+                            // The carry is fractional years at the OLD rate;
+                            // keeping it would hand the new rate a debt it
+                            // never ran up. The playhead itself does not move.
+                            m_wiz_history_secs[lapse_index]  = wizard_lapse_secs[i];
+                            m_wiz_history_carry[lapse_index] = 0.0f;
+                        }
+                    }
                 }
                 ImGui::Spacing();
 

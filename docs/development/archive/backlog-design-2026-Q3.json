@@ -15787,6 +15787,95 @@
         "files",
         "design"
       ]
+    },
+    "BL-948": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": null,
+      "written": "2026-09-13",
+      "author": "Ben (2026-09-13, live review); Claude (itemised)",
+      "requires": [
+        "BL-946"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "category": "UI",
+      "id": "BL-948",
+      "short_name": "LAPSE_TIMELAPSE_SPEED_CONTROL",
+      "priority": "B",
+      "difficulty": 4,
+      "title": "A speed control (45s / 90s / 180s) on every lapse round's time-lapse, default 90 seconds",
+      "authority_doc": "docs/ui/STARTUP.md",
+      "files": [
+        "src/ui/history_lapse.cpp",
+        "src/ui/history_lapse.hpp",
+        "src/ui/startup_screens.cpp",
+        "docs/ai/ACTIONS.json",
+        "docs/ui/question_log.json"
+      ],
+      "design": "BEN, 2026-09-13: time-lapses currently run too fast to observe what is happening. Target the FULL playback (start year to end year, unskipped) at 90 seconds by default, and add a speed-control element present in EVERY lapse round (Culture, Empires, and the new Exploration round from BL-946) offering three settings: 45 seconds, 90 seconds, 180 seconds -- the user can also already skip ahead or scrub via the existing playhead/scrubber, this control is about the AUTOPLAY rate, not a replacement for scrubbing.\n\nWHERE THE RATE LIVES TODAY. Find whatever currently drives year-per-frame or year-per-second in `history_lapse.cpp`'s playback (a fixed constant, most likely) and make it a function of (span length in years) / (chosen duration in seconds), recomputed whenever the round's span or the chosen duration changes -- a round with a longer span at the same duration setting must move faster per frame, not take longer wall-clock time, since the target is WALL-CLOCK duration, not years-per-second.\n\nTHE CONTROL ITSELF. Three-way selector (45s / 90s / 180s), same visual language as other wizard toggles (Sparse/Lean/Standard on the main menu is the nearest precedent for a three-way radio-style control). Persisted per-session is fine; it does not need to survive a restart unless that's trivial. Update `docs/ai/ACTIONS.json` for the new control and `docs/ui/question_log.json` for the surface it lives on.\n\nDONE WHEN: all three lapse rounds (Culture, Empires, Exploration) expose the same speed control; selecting 45s/90s/180s visibly changes the playback rate; the default is 90s; a live click confirms the control is reachable and does what it says.\n\nLANDED 2026-09-16, with the rungs retuned live. Ben chose 90/180/270 on the form, watched the 90-second pace and called it \"much slower than I imagined\": the rungs are 30 s / 1 m / 1 m 30 s, a minute by default (the old fixed rate was 30 s, which he had called too fast, so the default is twice that). One control per round beside the transport, in the wizard's three-way radio idiom; it divides the span by the chosen wall clock, so a longer span moves faster rather than taking longer. Changing it clears the sub-year carry so the new rate does not inherit a debt at the old one. ACTIONS.json NOT updated: the pre-game wizard is out of that dictionary's scope (Ben, 2026-09-09). Verified live: the Pace row reads 30s / 1m / 1m 30s with 1m selected on every lapse round.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "blocked_on",
+        "parked",
+        "category",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design"
+      ]
+    },
+    "BL-1013": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": null,
+      "written": "2026-09-16",
+      "author": "Ben (2026-09-16, watching the rounds hand over)",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "UI",
+      "id": "BL-1013",
+      "short_name": "LAPSE_ROUNDS_CROSS_FADE",
+      "priority": "B",
+      "difficulty": 3,
+      "title": "A lapse round opens on the ground the round before it left, and the two cross-fade",
+      "authority_doc": "docs/ui/STARTUP.md",
+      "files": [
+        "src/ui/history_lapse.cpp",
+        "src/ui/history_lapse.hpp",
+        "src/ui/startup_screens.cpp",
+        "docs/ui/STARTUP.md"
+      ],
+      "design": "BEN, 2026-09-16: \"I think we should ensure continuity is visible. By this I mean, after the culture round, we should still render its output on the time-lapse for empires, and have it fade out, rather than just disappearing as soon as Next is pressed.\" And, watching the first build: \"It also looks like we will want to fade in the Empires round. And this logic carries to Exploration and Digitisation when we come to them.\"\n\nWHY IT MATTERED. The rounds ARE one continuous history — the Empires span opens on the migration's ground, and BL-920 made that literal: at 400 BCE almost nothing is organised and the map is culture ground waiting for city states to rise on it. Drawing that ground as bare terrain threw away the one frame that says the two rounds are the same world, and made each round look freshly rolled.\n\nWHAT LANDED. A round carries its predecessor's LAST frame as one colour per region (colour, not owner index: the palettes differ — a culture's lineage hue against a polity's identity slot — and a stale index would be a quietly wrong colour rather than an obviously missing one). The map paints it under ground nobody holds yet and fades it out over the opening TENTH OF THE NEW SPAN, while the new round's own fill fades in over the same stretch. Tenth-of-span rather than seconds, so the hand-over reads the same at every pace setting. The carry is taken at landing, from a record that is complete and will not change again, and it generalises by construction: round n takes round n-1, so Empires carries the migration, Exploration carries Empires, and Digitisation joins when it becomes a round.\n\nONE TRAP WORTH RECORDING. The first cut gated the carry on the predecessor having polity SAMPLE steps. The migration record has none — its board has no People column for that very reason — so the one hand-over the item existed for was the one that could never fire. The guard is now the span, and owner_slice_at reconstructs the frame from the deltas.\n\nVERIFIED LIVE: at 400 BCE the Empires round shows the migration's peoples; at 329 BCE both layers sit at partial strength; by the fade's end only the round's own holders remain.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "blocked_on",
+        "parked",
+        "category",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design"
+      ]
     }
   }
 }

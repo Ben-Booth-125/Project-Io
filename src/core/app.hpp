@@ -476,6 +476,11 @@ private:
     /// stop_after_migration` / `stop_after_ancient_era` / `stop_after_exploration`.
     static constexpr int wizard_lapse_round_count = 3;
 
+    /// BL-948 — the three autoplay durations offered on every lapse round, in
+    /// seconds for the whole span, and the one selected by default.
+    static constexpr float wizard_lapse_secs[3]      = {30.0f, 60.0f, 90.0f};
+    static constexpr float wizard_lapse_secs_default = 60.0f;
+
     /// Which top-level screen is active. run() opens on the menu; "New Game" enters
     /// `generating` (the New World wizard, where the player takes the three rounds of
     /// Planetology preferences and then the three pass rounds) and the wizard's "Begin" hands over to play; run_verify() jumps
@@ -670,6 +675,18 @@ private:
     /// history of a world that is gone. Discarded on arrival rather than shown.
     bool  m_wiz_history_stale[wizard_lapse_round_count]   = {};
     float m_wiz_history_carry[wizard_lapse_round_count]   = {}; ///< Sub-year accumulator for the advance.
+
+    /// BL-948 — THE AUTOPLAY DURATION, per round, in seconds of wall clock for
+    /// the WHOLE span. Ben, 2026-09-13: the lapses run too fast to watch;
+    /// 2026-09-16: the rungs are 30 s, a minute and a minute and a half, after 90 /
+    /// 180 / 270 read as far slower than he had in mind. The rate the transport
+    /// advances at is (span in years) / this, so a longer span at the same
+    /// setting moves faster per second rather than taking longer to watch —
+    /// the setting is the wall clock, which is the thing a viewer budgets.
+    /// Per session and per round, deliberately: a viewer who slows the Empires
+    /// round down has said nothing about the migration.
+    float m_wiz_history_secs[wizard_lapse_round_count]{
+        wizard_lapse_secs_default, wizard_lapse_secs_default, wizard_lapse_secs_default};
     /// Start lapse round @p lapse_index's pass for the CURRENT pending params.
     /// Synchronous under `--verify` (a capture must never race a worker), exactly
     /// as the wizard's surface build already is.
