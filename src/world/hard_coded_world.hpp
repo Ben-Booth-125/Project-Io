@@ -399,6 +399,7 @@ inline const char* const generation_stage_labels[] = {
     "Laying roads",         // 10
     "Placing companies",    // 11
     "Finishing",            // 12
+    "Running the exploration age", // 13 — 1200 -> 1660, after the ancient era
 };
 inline constexpr int generation_stage_label_count =
     static_cast<int>(sizeof(generation_stage_labels) / sizeof(generation_stage_labels[0]));

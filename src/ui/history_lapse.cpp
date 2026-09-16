@@ -1073,29 +1073,21 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         dl->AddText(at, col_bright, label.c_str()); // fit-exempt: a year stamp sized by CalcTextSize
     }
 
-    // BL-916 -- THE EVENT MARKER. Every event inside the marker window behind
-    // the playhead draws a ring at its region that GROWS AND FADES with the
-    // playhead's distance past it: the pulse is a function of the year alone,
-    // so it is deterministic under --verify (where the year is script-set and
-    // nothing animates) and reads as a pulse in play, where the year advances
-    // ~span/30 a second. Nothing here is a widget; the no-input rule holds.
-    {
-        const int window = lapse_marker_window_years(h);
-        for (const lapse_event& e : h.lapse.events)
-        {
-            if (e.year > year) break;                // ascending by year
-            if (year - e.year >= window) continue;
-            if (e.region == lapse_event_none
-             || static_cast<std::size_t>(e.region) >= h.region_col.size()) continue;
-            const float t = static_cast<float>(year - e.year) / static_cast<float>(window);
-            const float cx = tl.x + (static_cast<float>(h.region_col[e.region]) + 0.5f) * scale;
-            const float cy = tl.y + (static_cast<float>(h.region_row[e.region]) + 0.5f) * scale;
-            const float r  = 4.0f + 14.0f * t;
-            const int   a  = static_cast<int>(255.0f * (1.0f - t));
-            dl->AddCircle({cx, cy}, r, IM_COL32(245, 240, 220, a), 0, 2.0f);
-            dl->AddCircleFilled({cx, cy}, 2.5f, IM_COL32(245, 240, 220, 255));
-        }
-    }
+    // NO EVENT PINGS ON THE MAP (Ben, 2026-09-16, watching round 4 run).
+    // BL-916 drew a white ring at every event inside the marker window, and it
+    // drew the SAME ring for all of them: a realm dying, a treaty taken and a
+    // trade route opening were one mark. Fifteen event kinds carry a region and
+    // the trade links alone fire several a year, so the map read as a snowstorm
+    // and — Ben's own words — pulled the eye off the border changes, which are
+    // the thing a time-lapse of who-held-what is for.
+    //
+    // THE BORDERS ARE THE STORY. What is gone is the RING, not the record: the
+    // events still cross in `lapse.events`, the ticker still names them with
+    // their year and place, the arc readout still counts them, and the road and
+    // trade-link overlays above still draw on the corridors they belong to --
+    // those are lines on a thing, not pulses over it. A future surface that
+    // wants a mark back should ask which kinds earn one rather than restore
+    // the blanket (STARTUP.md § Rounds 4 and 5).
 
     ImGui::Dummy(avail);
 }

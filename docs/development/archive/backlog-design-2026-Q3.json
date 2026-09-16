@@ -15704,6 +15704,49 @@
         "files",
         "design"
       ]
+    },
+    "BL-1011": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": null,
+      "written": "2026-09-16",
+      "author": "Ben (2026-09-16, watching round 4 run live)",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "UI",
+      "id": "BL-1011",
+      "short_name": "LAPSE_DROPS_THE_EVENT_PINGS",
+      "priority": "B",
+      "difficulty": 2,
+      "title": "The time-lapse map drops the event pings, and the wait names the span it is running",
+      "authority_doc": "docs/ui/STARTUP.md",
+      "files": [
+        "src/ui/history_lapse.cpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/hard_coded_world.hpp",
+        "docs/ui/question_log.json"
+      ],
+      "design": "BEN, 2026-09-16, watching the Empires round live: \"we should definitely reduce the threshold for a white ping to be displayed. This happens too often, drawing attention away from border changes, and it is too hard to follow everything happening at once... I would like to see generation without any of those events showing up.\" Ruled on the form the same minute: NO PINGS AT ALL, the borders are the story.\n\nWHAT WAS WRONG. BL-916 drew a white ring at every event inside a marker window of one screen-second, and the same ring for every kind: fifteen event kinds carry a region, and the trade links open and close several times a year, so a realm dying looked exactly like a trade route opening and the map read as a snowstorm over the borders the round exists to show.\n\nWHAT LANDED. The ring is gone from history_lapse.cpp. The record is untouched: the events still cross, the ticker still names them with year and place, the arc readout still counts them, and the road and trade-link overlays still draw on their corridors — lines on a thing rather than pulses over it. Verified live in build_rel: the map at 1200 CE shows borders, rivers, seats and corridors and nothing else.\n\nAND THE WAIT NAMES ITS SPAN. Found in the same session: the Exploration round read \"Running the ancient era — year 397 of 460\" because the stage label was last set at stage 8 and never moved, while the year counter belonged to whichever pass was running. A caption and a counter describing different spans are worse than either alone. A fourteenth stage label (\"Running the exploration age\") is published before the Exploration pass; the ancient pass now reads \"year 613 of 1600\", which is its real span. Verified live.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "requires",
+        "blocked_on",
+        "parked",
+        "category",
+        "id",
+        "short_name",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design"
+      ]
     }
   }
 }

@@ -1151,8 +1151,17 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // reads — so the wizard's new Exploration round gets the same
                 // "wait is the round" live map the Empires round has, rather
                 // than a silent hang followed by a populated map on landing.
+                //
+                // AND IT SAYS WHICH SPAN IT IS RUNNING (Ben, 2026-09-16). The
+                // label was last set to "Running the ancient era" at stage 8
+                // and never moved, so this pass counted ITS OWN 460 years
+                // under the previous pass's name — "year 397 of 460" while the
+                // line above said the ancient era, which is 1,600 years long.
+                // A counter and a caption that describe different spans are
+                // worse than either alone.
                 if (progress != nullptr)
                 {
+                    progress->label.store(13, std::memory_order_relaxed); // the exploration age
                     progress->sub_progress.store(0, std::memory_order_relaxed);
                     progress->sub_total.store(
                         static_cast<int>(ep.stop_year - ep.start_year),
