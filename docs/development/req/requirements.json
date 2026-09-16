@@ -4319,8 +4319,8 @@
    "difficulty": null,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "active",
-   "resolved": null,
+   "status": "partial",
+   "resolved": "2026-09-16",
    "promoted_from": "backlog.json BL-746 - Sprint 31",
    "batch": "sprint-31",
    "archived": false,
@@ -4357,15 +4357,16 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "cancelled",
      "requirement": "The field's mean supply factor climbs off the floor: power arrives where the network reaches (the generation bootstrap, NR-782 (c) held).",
      "verification": [
       "headless: campaign_lapse corps.csv supply_factor_mean trend"
      ],
      "notes": "Today ~0.57 - most buildings sit at the floor.",
-     "evidence": null
+     "evidence": "CANCELLED 2026-09-16, unbuilt. Its owner was purged on 2026-09-08. The reading it would have moved stands where stage 1 left it: mean supply factor ~0.57, most buildings sitting AT the floor because power still does not arrive. Whoever takes this up re-measures on campaign_lapse against BL-759's re-based baseline, not the pre-BL-747 figures on the cold row."
     }
-   ]
+   ],
+   "resolution": "CLOSED PARTIAL 2026-09-16. Stage 1 landed in full and is measured: R1 (the supply floor), R2 (no wire, no draw) and R3 (no building at factor 0 on the debt instrument) all carry their evidence. R4 is the stage-2 lever - \"no price, no draw\", ruled by Ben on 2026-09-06 - and it was never built: BL-746 was cancelled two days later in the 2026-09-08 backlog purge, which closed every item hanging off the abandoned sprint plans rather than judging the work wrong. The group is closed here so it stops reading as live work; the rule it would have built is in PRODUCTION.md as the third rung, and the whole design (including the done-when PAIR - mean supply factor climbing AND a real moving power price, because the first alone cannot tell the gate working from the gate silencing the draw) is on the cold BL-746 row. Re-author from there."
   },
   {
    "brief": "two-span-prehistory",
