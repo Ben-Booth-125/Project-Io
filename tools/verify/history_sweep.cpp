@@ -22,8 +22,10 @@
 #include "world/nation_generation.hpp" // BL-769: nation_params, the size floor
 #include "world/sim_terrain_build.hpp"
 #include "world/settlement.hpp"
+
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
+#include "scripting/lua_state.hpp"
 
 #include "culture_footprint.hpp" // BL-968 step 1: the cultures that never hold ground
 
@@ -57,6 +59,46 @@ const generation_report::body_entry* kepler_of(const generation_report& r)
 }
 
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// The shipped generation inputs (BL-1007)
+// ---------------------------------------------------------------------------
+// GENERATION TAKES TWO THINGS FROM THE DATA LAYER, and until this item the
+// sweeps handed it neither. `app::begin_new_game` loads scripts/world_gen.lua
+// into a `world_gen_config`, and `app::ensure_works_loaded` loads
+// scripts/works.lua into a `works_registry`; both are passed to
+// `make_hard_coded_world`. The sweeps passed `world_gen_config{}` — the C++
+// struct defaults, which world_gen_config.hpp's own header warns price 10 of 47
+// resources where the script authors 42 — and a null works pointer, which makes
+// the `build_work` verb a dead branch (history_sim.cpp: "works == nullptr ...
+// break"), so no polity ever raised a work in a swept world.
+//
+// The cost of that was measured on 2026-09-16: seed 0's Empires span fought
+// 6,479 battles in the sweep and 9,928 in the game. Every reading was
+// self-consistent and described a world nobody plays. These helpers are the one
+// place either sweep reads the data layer, and they mirror the app's own order.
+struct shipped_inputs
+{
+    lua_state        lua;
+    world_gen_config cfg{};
+    works_registry   works;
+};
+
+/// Load the data layer exactly as the app does, and say so on the face: a
+/// reading that cannot name the world it measured is the defect this closes.
+inline void load_shipped_inputs(shipped_inputs& in)
+{
+    in.lua.load("scripts/recipes.lua");
+    in.lua.load("scripts/economy.lua");
+    in.lua.load("scripts/world_gen.lua");
+    in.cfg.load_from_lua(in.lua);
+    in.lua.load("scripts/works.lua");
+    in.works.load_from_lua(in.lua);
+    std::printf("generation inputs: scripts/world_gen.lua + scripts/works.lua "
+                "(%zu works rows) — the shipped configuration (BL-1007)\n",
+                in.works.size());
+}
+
 // The works fixture (BL-321)
 // ---------------------------------------------------------------------------
 //
@@ -791,6 +833,9 @@ history_sim_params tuned_defaults()
 
 int main(int argc, char** argv)
 {
+    shipped_inputs shipped;
+    load_shipped_inputs(shipped);
+
     int seed_count = 16;
     int64_t epoch_year = 0;
     bool derive_from_generation = true;  // BL-900: generation's span is the default
@@ -1033,8 +1078,8 @@ int main(int argc, char** argv)
         era_minus_one_fixture fx;
         // Ask for the fixture only on the deriving path, so the default sweep
         // pays nothing for it and stays byte-for-byte the instrument it was.
-        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
-                                              /*progress=*/nullptr, /*works=*/nullptr,
+        const world w = make_hard_coded_world(wp, &rep, shipped.cfg,
+                                              /*progress=*/nullptr, &shipped.works,
                                               derive_from_generation ? &fx : nullptr);
 
         const generation_report::body_entry* k = kepler_of(rep);
@@ -3559,8 +3604,8 @@ int main(int argc, char** argv)
         // against the struct-default one and call the disagreement
         // non-determinism. That is the BL-757 defect reappearing inside the
         // check meant to catch it.
-        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
-                                              /*progress=*/nullptr, /*works=*/nullptr,
+        const world w = make_hard_coded_world(wp, &rep, shipped.cfg,
+                                              /*progress=*/nullptr, &shipped.works,
                                               derive_from_generation ? &fx : nullptr);
         const generation_report::body_entry* k = kepler_of(rep);
         settlement_state ss = (derive_from_generation && fx.ran) ? fx.settlement

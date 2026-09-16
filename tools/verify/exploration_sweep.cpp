@@ -61,8 +61,10 @@
 #include "world/history_sim.hpp"
 #include "world/sim_terrain_build.hpp"
 #include "world/settlement.hpp"
+
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
+#include "scripting/lua_state.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -330,8 +332,51 @@ double per_century(int64_t count, int64_t years)
 
 } // namespace
 
+
+// ---------------------------------------------------------------------------
+// The shipped generation inputs (BL-1007)
+// ---------------------------------------------------------------------------
+// GENERATION TAKES TWO THINGS FROM THE DATA LAYER, and until this item the
+// sweeps handed it neither. `app::begin_new_game` loads scripts/world_gen.lua
+// into a `world_gen_config`, and `app::ensure_works_loaded` loads
+// scripts/works.lua into a `works_registry`; both are passed to
+// `make_hard_coded_world`. The sweeps passed `world_gen_config{}` — the C++
+// struct defaults, which world_gen_config.hpp's own header warns price 10 of 47
+// resources where the script authors 42 — and a null works pointer, which makes
+// the `build_work` verb a dead branch (history_sim.cpp: "works == nullptr ...
+// break"), so no polity ever raised a work in a swept world.
+//
+// The cost of that was measured on 2026-09-16: seed 0's Empires span fought
+// 6,479 battles in the sweep and 9,928 in the game. Every reading was
+// self-consistent and described a world nobody plays. These helpers are the one
+// place either sweep reads the data layer, and they mirror the app's own order.
+struct shipped_inputs
+{
+    lua_state        lua;
+    world_gen_config cfg{};
+    works_registry   works;
+};
+
+/// Load the data layer exactly as the app does, and say so on the face: a
+/// reading that cannot name the world it measured is the defect this closes.
+inline void load_shipped_inputs(shipped_inputs& in)
+{
+    in.lua.load("scripts/recipes.lua");
+    in.lua.load("scripts/economy.lua");
+    in.lua.load("scripts/world_gen.lua");
+    in.cfg.load_from_lua(in.lua);
+    in.lua.load("scripts/works.lua");
+    in.works.load_from_lua(in.lua);
+    std::printf("generation inputs: scripts/world_gen.lua + scripts/works.lua "
+                "(%zu works rows) — the shipped configuration (BL-1007)\n",
+                in.works.size());
+}
+
 int main(int argc, char** argv)
 {
+    shipped_inputs shipped;
+    load_shipped_inputs(shipped);
+
     int seed_count = 8;
     bool want_override = false;
     int  want_override_q = 0;
@@ -393,11 +438,11 @@ int main(int argc, char** argv)
         // BL-958: STOP AT THE EXPLORATION CLOSE. Every reading reads the era
         // fixture, which is complete before this stop; nations, roads, firms and
         // markets (~90% of a whole world) are never read here.
-        world_gen_config gen_cfg;
+        world_gen_config gen_cfg = shipped.cfg; // BL-1007: the shipped data layer
         gen_cfg.stop_after_exploration = true;
         std::fprintf(stderr, "[sweep] seed %d generated to the Exploration close\n", i);
         const world w = make_hard_coded_world(wp, &rep, gen_cfg,
-                                              /*progress=*/nullptr, /*works=*/nullptr, &fx);
+                                              /*progress=*/nullptr, &shipped.works, &fx);
         (void)w;
 
         exploration_row row;
