@@ -699,6 +699,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     /// index — the same field, read at the one moment it still names a polity.
     std::vector<int> kepler_region_polity;
 
+    /// BL-975: indexed by POLITY id, the 1660 treasury each polity held —
+    /// `region::treasury` summed over the regions flying its flag at the
+    /// Exploration span's close. Empty when the span did not run, so a world
+    /// without it credits nothing and every nation starts on the floor.
+    std::vector<int64_t> kepler_polity_treasuries;
+
     nation_params kepler_np =
         nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 });
     {
@@ -1145,8 +1151,17 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // reads — so the wizard's new Exploration round gets the same
                 // "wait is the round" live map the Empires round has, rather
                 // than a silent hang followed by a populated map on landing.
+                //
+                // AND IT SAYS WHICH SPAN IT IS RUNNING (Ben, 2026-09-16). The
+                // label was last set to "Running the ancient era" at stage 8
+                // and never moved, so this pass counted ITS OWN 460 years
+                // under the previous pass's name — "year 397 of 460" while the
+                // line above said the ancient era, which is 1,600 years long.
+                // A counter and a caption that describe different spans are
+                // worse than either alone.
                 if (progress != nullptr)
                 {
+                    progress->label.store(13, std::memory_order_relaxed); // the exploration age
                     progress->sub_progress.store(0, std::memory_order_relaxed);
                     progress->sub_total.store(
                         static_cast<int>(ep.stop_year - ep.start_year),
@@ -1187,6 +1202,24 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 kepler_corridors  = kepler_exploration.surviving_corridors;
                 kepler_grudges    = kepler_exploration.grudges;
                 kepler_grudge_cap = static_cast<int32_t>(ep.grudge_cap);
+
+                // BL-975: THE TREASURIES CROSS TOO. Read off the handoff
+                // struct's own region table, not the live sim state, because
+                // this is on EXPLORATION.md's list of what the span hands
+                // forward (BL-956 named it first). Summed per polity over the
+                // regions it holds at 1660 — the chest is a fact about the
+                // ground and the flag over the ground owns it (settlement.hpp,
+                // `region::treasury`) — in ascending region order, as
+                // integers, so the sum is exact. `generate_nations` Pass 7
+                // converts it once (NATION_GENERATION.md § Pass 7).
+                for (const region& rg : kepler_exploration.regions)
+                {
+                    if (rg.nation < 0 || rg.treasury <= 0) continue;
+                    const std::size_t pol = static_cast<std::size_t>(rg.nation);
+                    if (pol >= kepler_polity_treasuries.size())
+                        kepler_polity_treasuries.resize(pol + 1, 0);
+                    kepler_polity_treasuries[pol] += rg.treasury;
+                }
 
                 if (fixture != nullptr)
                     fixture->exploration_handoff = kepler_exploration;
@@ -1333,6 +1366,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // sim wrote as it ran. Phase 5 folds a polity's regions into one nation
         // instead of growing an independent realm out of each anchor.
         kepler_np.seed_polities = settlement_seed_polities(kepler_settlement);
+
+        // BL-975 — THE HISTORY'S CHESTS CROSS WITH ITS MAP. Indexed by the
+        // same polity ids `seed_polities` just read, so Pass 2d can land each
+        // polity's 1660 treasury on the seed it folds to. Empty when the
+        // Exploration span did not run (opted out, or the wizard's Empires-
+        // round launch), which credits nothing.
+        kepler_np.polity_treasuries = kepler_polity_treasuries;
 
         // BL-898 — THE SAME READ, KEPT FOR THE SAME WINDOW. `seed_polities`
         // above is filtered to anchored regions because `generate_nations`
@@ -1502,6 +1542,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
     //
     // A world whose polities never industrialised enacts NOTHING here, and that
     // is a legitimate outcome rather than a gap — see `polity::protection_q`.
+    // THIS IS THE ENACTMENT SEAM, NOT THE DERIVATION (BL-976): the Era -1 sim
+    // writes `protection_q` only on the two-span arc, and Digitisation owns the
+    // derivation on the shipped arc (DIGITISATION.md § The boundary). The call
+    // stays so that whatever writes the field is read by one path.
     seed_national_tariffs(w, kepler_nations,
                           derive_national_protection(
                               kepler_settlement, static_cast<int>(kepler_nations.size())));
@@ -2299,6 +2343,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
                          era_minus_one_has_industrial_span(params) ? params.industrial_years : 0);
         }
     }
+
+    // BL-977: the record the landscape search's roster axis regenerates
+    // specialists from (world.hpp § gen_settlement). Its `history` was moved
+    // into the ladder above; regions, charter and the industrial median — all
+    // `generate_corporations` reads — are intact. Set whether or not a report
+    // was requested, so the harness tier and the app hand the search one thing.
+    w.gen_settlement = std::make_shared<const settlement_state>(kepler_settlement);
 
     return w;
 }

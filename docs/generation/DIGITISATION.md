@@ -73,6 +73,27 @@ and a market it can price against. Exploration produces all three and charters n
 **This phase inherits `EXPLORATION.md` § What this phase hands digitisation and nothing else.**
 That list is the contract: a struct, not a promise.
 
+**The tariff posture is derived here, from inputs that already cross.** Scarcity
+(`region::scarcity_q`), trade flows (`trade_flows`) and cultural preference (`culture_preference`)
+arrive in `exploration_output`; the derivation of `polity::protection_q` from them is owed to this
+phase (BL-976, tariff derivation hands to Digitisation), and `derive_national_protection` →
+`seed_national_tariffs` is the enactment seam that reads whatever this phase writes. The Era −1
+sim derives the scalar only on the two-span arc, from industrialisation timing; a single-span world
+carries no tariff, which is a legitimate outcome rather than a gap.
+
+---
+
+## The worlds to design against
+
+**Sixteen curated seeds are stored for this phase** (`seed_library.json`; query with
+`node tools/session/seed_library.js`). Generation is a pure function of the world descriptor, so a
+seed is the save: each entry carries the readings that made that world interesting and a fingerprint
+that says whether the world it still generates is the world described. They span the axes this phase
+forms companies on — a chest of 27 million against one of 245, 112 polities against fourteen, eight
+colonial subjects against none, thirty post roads against zero, 103 trade flows against thirteen.
+The floor case and the ceiling case are both deliberate: seed 17 hands this phase almost nothing,
+and seed 46 hands it everything.
+
 ---
 
 ## Part I — The world the campaign opens on

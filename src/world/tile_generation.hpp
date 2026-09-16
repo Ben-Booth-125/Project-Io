@@ -98,8 +98,11 @@ struct planetology_state;
 /// Generation is deterministic, so this is reproducible on demand rather than
 /// authoritative; the struct exists as the seam a future generation Ledger will
 /// read to explain *why* a tile turned out as it did (see docs/generation/GENERATION_LEDGER.md
-/// — "Generation Ledger"). It is filled only when a non-null record is passed to
-/// generate_body_tiles, so the common path pays nothing.
+/// — "Generation Ledger"). It is handed back only when a non-null record is
+/// passed to generate_body_tiles; the common path receives nothing. (Since
+/// BL-965 the record is also the seam between the generator's two halves, so
+/// one is always built internally; a null caller pays the seam's fill and
+/// nothing more.)
 struct generation_record
 {
     int gw = 0; ///< Grid width the record was captured at.
@@ -156,7 +159,95 @@ struct generation_record
     // this array comparable to itself across abundance levels.
     std::array<double, resource_count> body_phase_placed{};
     std::array<double, resource_count> life_phase_placed{};
+
+    // -----------------------------------------------------------------------
+    // BL-965 — THE BODY/LIFE SEAM
+    // -----------------------------------------------------------------------
+    //
+    // `generate_body_tiles` is two callable halves: `generate_body_surface`
+    // (Passes 1-5 and the BODY phase of Pass 6) and `generate_life_deposits_over`
+    // (the LIFE phase of Pass 6 and the ore-field pre-pass), and this record is
+    // what passes between them. The two arrays below are the only things the
+    // Life half cannot read off the tiles it is handed or recompute from the
+    // seed: the raw geological deposit per tile, and the endemic amounts the
+    // Body half drew. Both are written by the Body half and READ ONLY by the
+    // Life half, which is what lets the Life half run over the same record
+    // more than once.
+    //
+    // WHY THE ENDEMIC DRAW SITS ON THIS SIDE. An endemic good is biosphere
+    // output and is accounted in `life_phase_placed` — but its amount is drawn
+    // on `tile_rng`, BETWEEN the body deposit block and the environment jitter,
+    // and that stream cannot be re-cut without moving hazard and habitability
+    // on every tile of every world. So the Body half draws it (the stream stays
+    // exactly where it was) and the Life half places it (the accounting stays
+    // with the placement). Only draws that clear the `> 1` gate are kept, in
+    // raster order and then endemic order — the order the writes were made.
+
+    /// One endemic amount the Body half drew and the Life half places.
+    struct endemic_draw
+    {
+        int           idx;    ///< Raster index of the tile it was drawn for.
+        resource_type good;   ///< The endemic good.
+        float         amount; ///< Raw amount, before `deposit_scalar`.
+    };
+
+    /// [row*gw+col] the BODY phase's raw deposit per tile — `tile_deposits::geological`
+    /// as drawn, before every post-multiply. Zero on water.
+    std::vector<std::array<float, resource_count>> body_deposits;
+
+    /// The endemic draws, raster order then endemic order (see above).
+    std::vector<endemic_draw> endemic_draws;
 };
+
+/// The BODY half of `generate_body_tiles` (BL-965): Passes 1-5 (with 4b-4e) and
+/// the Body phase of Pass 6. Creates the tile entities with their three axes,
+/// water kind, height, hazard and habitability, and leaves both deposit arrays
+/// value-initialised for the Life half to write. Fills @p record — the seam —
+/// entirely, including `body_deposits` and `endemic_draws`.
+///
+/// Parameters as for `generate_body_tiles`, minus the three the Body half does
+/// not consume (`deposit_scalar`, `continents`; the record is required here
+/// rather than optional, since it IS the seam).
+///
+/// @return Tile entity IDs in raster order (index = row * gw + col).
+std::vector<entity_id> generate_body_surface(
+    world& w,
+    entity_id body_id,
+    int gw, int gh,
+    const body_profile& profile,
+    uint32_t seed,
+    const planetology_state* pl,
+    generation_record& record,
+    const std::vector<float>* continent_bias = nullptr,
+    const std::vector<uint8_t>* convergent = nullptr,
+    const continent_state* continents = nullptr);
+
+/// The LIFE half of `generate_body_tiles` (BL-965): the palaeo pre-pass, the
+/// ore-field pre-pass and the Life phase of Pass 6, run over a tile set the Body
+/// half built and the record it filled. Writes each tile's `resource_deposit`
+/// and `resource_remaining` and the record's `life_phase_placed`, and mutates
+/// nothing else — so it may be called AGAIN over the same tiles and record, and
+/// the result is the same as a fresh `generate_body_tiles` with the same
+/// arguments. That re-entry is the point: a Life-phase rule can be re-tuned
+/// over a cached Body half without paying for the passes above it.
+///
+/// @param tile_ids The raster-order ids `generate_body_surface` returned.
+/// @param record   The record `generate_body_surface` filled. Read for the
+///                 seam; only `life_phase_placed` is written.
+/// @param seed     The SAME seed the Body half was given — the Life phase's
+///                 per-tile stream and the rarity profile are derived from it.
+/// Remaining parameters as for `generate_body_tiles`. A record the Body half did
+/// not fill (sizes disagree with `gw*gh`) writes nothing.
+void generate_life_deposits_over(
+    world& w,
+    const std::vector<entity_id>& tile_ids,
+    generation_record& record,
+    const body_profile& profile,
+    uint32_t seed,
+    float deposit_scalar = 1.0f,
+    const planetology_state* pl = nullptr,
+    const std::vector<uint8_t>* convergent = nullptr,
+    const continent_state* continents = nullptr);
 
 /// Generate the full hex tile grid for one body and attach the tiles to @p w.
 ///

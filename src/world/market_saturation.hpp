@@ -183,6 +183,52 @@ std::vector<market_balance>
 fraction_in_band(world& w, const recipe_registry& reg, double ratio);
 
 // ===========================================================================
+// Reach quality — at what COST is a market's catchment crossed? (BL-977)
+// ===========================================================================
+//
+// THE FIFTH TERM'S READING (GENERATION_STRATEGY.md § What the objective is made
+// of, Ben 2026-09-08). Completeness and balance read reach as a BOOLEAN — is
+// this tile inside `max_logistics_reach` of an anchor — and a boolean saturates:
+// once a catchment covers every resource it will ever cover, cheaper ground
+// moves nothing, which is why every road tier scored bit-identically (NR-793).
+// This reading is the CONTINUOUS quantity the tier actually moves: the reach
+// cost itself, averaged over the catchment.
+//
+// TWO CANDIDATE READINGS answered the axis (the doc left the choice to
+// measurement): the MEAN REACH COST over the catchment, and the in-reach tile
+// COUNT rather than the boolean. Scored on candidates differing only in road
+// tier (2026-09-15, landscape_score_harness § C) the cost moved the composite
+// 8.7e-4 against the count's 6.2e-4, moved it monotonically with the tier
+// where the count did not, and told tiers 2 and 3 apart where the count all
+// but could not. `mean_cost` is the reading; `in_reach_tiles` stays on the
+// record only as the boolean the other terms consume, for a reader comparing
+// the two grains.
+//
+// "Reach cost" is the placement rule's own currency — weighted traversal cost
+// from a tile to its NEAREST SUPPLY ANCHOR (city, built port, built hub), the
+// field `body_reach_field` computes — not a path to the market tile. A market
+// is anchored at a population centre, so its catchment's anchors are what a
+// convoy actually starts from; reading the same field placement pays keeps the
+// term "how dearly can this ground be worked", not a second distance metric.
+//
+// Deterministic: sorted market walk, sorted tile walk (a double sum is not
+// associative — the rule `measure_market_balance` states).
+
+struct market_reach
+{
+    entity_id market          = null_entity;
+    entity_id body            = null_entity;
+    int       catchment_tiles = 0;    ///< tiles clearing against this market
+    int       reachable_tiles = 0;    ///< of those, with a FINITE reach cost (anchors count, at 0)
+    int       in_reach_tiles  = 0;    ///< of those, inside max_logistics_reach — the boolean, as context
+    double    mean_cost       = 0.0;  ///< THE READING: mean reach cost over reachable tiles; 0 when none
+};
+
+/// The reach-quality reading, per market. Builds the reach fields it needs.
+std::vector<market_reach>
+measure_market_reach(world& w, const recipe_registry& reg);
+
+// ===========================================================================
 // The other half of the question — does each part PAY?
 // ===========================================================================
 //

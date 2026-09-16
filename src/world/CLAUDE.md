@@ -31,7 +31,7 @@ this file holds only what every `world/*` session needs.
 | Tile pipeline, body profiles | `docs/generation/TILE_GENERATION.md` |
 | Plates / continents | `docs/generation/CONTINENTS.md` |
 | Planetology, nations, corps (gen) | `docs/generation/*.md` (per subject) |
-| Era −1 history sim | `docs/lore/HISTORY.md`, `docs/lore/COLLAPSE.md` |
+| Era −1 history sim | `docs/lore/HISTORY.md`, `docs/generation/CIVILISATION.md` |
 | Units, combat, muster | `docs/military/MILITARY.md` |
 | Corp AI, MCP, agent seams | `docs/ai/AI_OPPONENT.md` |
 | The command dictionary | `docs/ai/ACTIONS.json` — a changed `corp_command.hpp` verb

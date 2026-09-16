@@ -97,9 +97,9 @@ Works fork, charter reach, subject history and whether the polity fought a world
 `nation_component::treasury` is a float. It is zero the instant the field is constructed —
 deliberately, since a treasury that started full would be a balance change smuggled in as a
 field. **Generation itself is ruled to credit it before the campaign tick ever runs** (Ben,
-2026-08-24, NR-580) — see `docs/generation/NATION_GENERATION.md` § Pass 7 for the settled shape
-(a levy/tariff transfer, the same conservation-checked mechanism the campaign tick already uses,
-not yet implemented). The rule above is about the ONGOING campaign tick: nothing but the levy,
+2026-08-24, NR-580) — see `docs/generation/NATION_GENERATION.md` § Pass 7 for the settled shape:
+the Exploration span's 1660 polity treasury, folded across the handoff through one stated
+per-mille (BL-975, 2026-09-15). The rule above is about the ONGOING campaign tick: nothing but the levy,
 the tariff and the budget outflow may ever move this field once play starts.
 
 Two flows credit it; one pass debits it.

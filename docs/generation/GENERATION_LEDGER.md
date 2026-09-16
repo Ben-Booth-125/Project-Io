@@ -1,18 +1,16 @@
 # Project Io — Generation Ledger
 
-> **Settles:** how a tile's derivation is read back, pass by pass · what seam the per-pass
-> intermediates travel on · what a per-body summary is asked to report · how long that data
-> lives, and why it is regenerated rather than persisted · where the ledger surfaces, for
-> the developer tuning a pass and for the player.
+> **Settles:** what seam the per-pass intermediates travel on · what a per-body summary is
+> asked to report · how long that data lives, and why it is regenerated rather than
+> persisted · where the ledger surfaces, for the developer tuning a pass and for the player.
 > **Not here:** what any pass actually computes (TILE_GENERATION) · what a field overlay
 > renders (../ui/LENSES) · what a body profile means (PLANETOLOGY).
 > **Confused with:** TILE_GENERATION.md, ../ui/LENSES.md, PLANETOLOGY.md.
 
-A tuning-and-analysis surface that explains **why a tile generated as it did**. It
+A tuning-and-analysis surface that explains **why a body generated as it did**. It
 reads the per-pass intermediates of the deterministic tile-generation pipeline and
-presents them as a per-tile derivation breadcrumb and per-body summaries. Its
-audience is the developer tuning the procedural passes — plus the player, through
-the History slot's Chain view.
+presents them as per-body summaries. Its audience is the developer tuning the
+procedural passes — plus the player, through the History slot's Chain view.
 
 Design authority for the generator it inspects: [`TILE_GENERATION.md`](TILE_GENERATION.md)
 (the six-pass pipeline and the `generation_record` hook). This document is the
@@ -57,23 +55,18 @@ row; Landform has no such category, so including water only dilutes it. `is_wate
 (`components.hpp`) is the single definition, and it settles the question the ruling
 turned on: **coast is water**, with lake and ocean.
 
-**There is no per-tile derivation, here or anywhere.** The breadcrumb that explained a
-single tile pass by pass was retired with the Tile view (Ben, 2026-08-30). Its stated
-destination — a condensed frame in the hover card or the Selection element — had been
-written down since it was factored out and was never built, so the function outlived
-both the caller it had and the callers it was factored out for. Removed rather than
-kept dormant: a content builder nothing calls is a claim about a surface that does not
-exist.
+**There is no per-tile derivation, here or anywhere.** The ledger answers the
+**body-grain** question only. A breadcrumb explaining a single tile pass by pass was
+retired with the Tile view (Ben, 2026-08-30), and its design left this document with it
+(Ben, 2026-09-15): a design for a surface nothing carries is a claim about a surface
+that does not exist. If a tile-grain "why" comes back, it comes back as a Selection
+subject — a tile is already one — rather than as a ledger view.
 
-The **body-grain** question this ledger answers is unchanged. What is gone is the
-tile-grain one, and if it comes back it comes back as a Selection subject — a tile is
-already one — rather than as a ledger view.
-
-Two additive taps make this possible, both pure captures that leave the generated
+Two additive taps make the replay exact, both pure captures that leave the generated
 surface bit-for-bit identical:
 
 - `generation_record::ocean_score` — the latitude-biased height Pass 2 actually
-  compares against `ocean_threshold`. Without it the breadcrumb would have to
+  compares against `ocean_threshold`. Without it the ledger would have to
   re-derive the bias constant, and a second copy of a tuning constant is a copy that
   drifts. Filled only when a record is requested.
 - `generation_report::body_entry::tiles` — the arguments `generate_body_tiles` was
@@ -90,16 +83,13 @@ number-crunch** plus **post-generation advisory** on the resource/workforce stat
 exploration. This ledger (developer tuning) and the History slot (player advisory) share
 the same `generation_record` seam — see MENU.md for the History scope.
 
-See also: [`docs/ui/SELECTION.md`](../ui/SELECTION.md) — the per-tile breadcrumb
-is a natural section of a tile's rich card, so the content builder is shared (below).
-
 **Why this stays separate from the world history log.** Both this ledger and
 `src/world/history_log.{hpp,cpp}` (BL-208, world history log) answer the same instinct —
 explain what happened and why — and it would be reasonable to ask why they are not one
 mechanism. They differ on the axis that matters for storage: **lifetime**.
 
-- **The ledger is DISPOSABLE.** Per-tile derivation breadcrumbs — band, moisture,
-  composition, landform, deposits — regenerate on demand from `generate_body_tiles(..., &record)`
+- **The ledger is DISPOSABLE.** The per-pass intermediates — sea score, moisture,
+  band — regenerate on demand from `generate_body_tiles(..., &record)`
   (see § Data lifetime below); they are never persisted, scoped to **tuning**, and the developer
   (or the History slot's Chain view) recomputes them per body on open. Storing one per tile for
   every generated body would be pure bloat when a single deterministic call rebuilds it exactly.
@@ -107,7 +97,7 @@ mechanism. They differ on the axis that matters for storage: **lifetime**.
   **HEIGHT IS THE ONE EXCEPTION, and the exception has a rule.** Height would be in the list
   above except that a downstream system reads it: the province partition (BL-515, province
   partition) grows borders against elevation difference, which makes height an INPUT to the
-  partition rather than a breadcrumb explaining a past decision. A field a live system reads is
+  partition rather than an intermediate explaining a past decision. A field a live system reads is
   world state, whatever pass first computed it — so height is retained on `tile_component` and
   serialised (BL-517, retained height), and it leaves this bullet.
 
@@ -122,7 +112,7 @@ mechanism. They differ on the axis that matters for storage: **lifetime**.
   between agents (an oral history), which only works if it is real, serialised, communicated
   content, never something regenerable on demand from a seed.
 
-Merging them would force one lifetime onto both: either persisting per-tile breadcrumbs for every
+Merging them would force one lifetime onto both: either persisting per-tile intermediates for every
 tile of every body (the ledger deliberately refuses this), or making the narrative log
 regenerable-only (which defeats a history a player — or another agent — can actually be told
 about, past the point where the original seed and engine are still at hand). Same instinct,
@@ -154,58 +144,19 @@ composition → landform → deposits.
 
 **Two contributions the record does not attribute.** The **continent height bias**
 added into Pass 1 before normalisation (`run_continents` — `CONTINENTS.md`) is folded
-into `height` rather than carried as its own field, so the breadcrumb shows a
+into `height` rather than carried as its own field, so the record holds a
 heightmap that already contains the plate bias without separating it out. The
 **Pass 6 post-multiplies** (abundance scalar, planetology endowment, ore-province
 field — `TILE_GENERATION.md` § Post-multiplies) are likewise not in the record; the
-breadcrumb reads the endowment and the scalar from the `generation_report` entry
-instead and names them as known factors on the rolled figure. Both would be small
-additive fields if a pass ever needs them attributed per tile.
+ledger reads the endowment and the scalar from the `generation_report` entry
+instead. Both would be small additive fields if a pass ever needs them attributed
+per tile.
 
 ---
 
 ## What the ledger presents
 
-### Per-tile derivation breadcrumb
-
-> *Design, not a description of a surface.* This section says what a per-tile "why" presents
-> wherever a surface carries it. Which surface does — a ledger view, the hover card, the
-> Selection frame, or none — is an open call in `docs/development/NEEDS_REVIEW.json`; the Tile
-> view that once framed it was retired with the ledger's tab strip (Ben, 2026-08-30 — the
-> ruling is recorded in this document's opening section).
-
-For one selected tile, the causal chain that produced it, one row per pass, each
-row naming the input value and the rule that fired:
-
-1. **Height** — `height` value, and whether its `ocean_score` cleared `ocean_threshold`
-   (→ ocean) or not (→ land). This is the first fork.
-2. **Latitude band & moisture** — the `band` index (its `temperature_class`-shifted
-   width) and the `moisture` value that select the climate row.
-3. **Substrate & cover** — the resulting `terrain_substrate`, the `terrain_cover`
-   sitting on it and that cover's `cover_density`, and *which* branch chose each
-   (organic gated by `atmosphere_class`; volcanic scaled by `geological_activity`;
-   metallic under `composition_bias::metallic`).
-
-   **Two sub-steps, and the ledger shows both.** Pass 4a picks a *biome* from the
-   climate tables, and 4c/4d then DECOMPOSE that biome into the substrate/cover/density
-   triple with no draws at all (`TILE_GENERATION.md` § Pass 4). So the breadcrumb has an
-   intermediate worth surfacing: the biome the tables chose, then what it decomposed
-   into. A tile whose cover looks wrong is far easier to diagnose when you can see
-   whether the *table* or the *decomposition* put it there.
-4. **Landform** — the `terrain_landform`, and whether it came from a mountain-range
-   or rift-zone cluster seed (and the seed it belonged to) or the default.
-5. **Deposits** — the deposit profile rolled for that composition × landform, and
-   the ambient-resource guarantee, with the RNG-derived magnitudes and the
-   post-multiply factors applied to them.
-
-The breadcrumb is designed as one per-tile content builder that the **hover card** and
-the **Selection info element** would share to render a tile's "why" section (see
-SELECTION.md § Shared content builders): a ledger frame shows it full-height with the pass
-rules spelled out; a card frame shows a condensed form.
-
-### Per-body summaries
-
-For a whole body, the aggregate shape of the generation:
+Per-body summaries — for a whole body, the aggregate shape of the generation:
 
 - **Substrate and cover histograms** — two of them, not one: tile count per
   `terrain_substrate` (ocean / barren / rocky / sedimentary / volcanic / metallic /
@@ -254,19 +205,12 @@ Two complementary presentations, because the two questions differ:
   are tabular and belong in a ledger alongside the Tile Ledger, reached from the
   navigation rail. Body selector defaults to the current view's main body (mirrors
   the Tile Ledger default).
-- **Per-tile breadcrumb → both the ledger and a Planetary overlay lens.** In the
-  ledger it is the detail panel for the selected tile. As a **lens** (an
+- **The fields themselves → a Planetary overlay lens.** As a **lens** (an
   `overlay_mode` over the Planetary canvas, see [`docs/ui/LENSES.md`](../ui/LENSES.md))
-  it paints the *fields themselves* across the surface — heightmap, moisture, or band
-  as a gradient — so the spatial structure of a pass is visible at a glance. The lens
-  is how you see "the equatorial ocean bias is too strong"; the breadcrumb is how you
-  read one tile's exact numbers. The field lenses are BL-304 (field overlay lenses).
-
-The per-tile breadcrumb is designed to **share one content builder across the hover card,
-the Selection info element and any ledger frame** (SELECTION.md). The *frame* differs (ledger
-panel vs. tooltip vs. pinned panel); the *content* — the five-step causal chain — does not:
-one tile-derivation builder, wrapped by each caller. Whether any surface carries it is the open
-call § Per-tile derivation breadcrumb names.
+  the same `generation_record` seam paints heightmap, moisture, or band as a gradient
+  across the surface, so the spatial structure of a pass is visible at a glance. The
+  ledger gives one body's numbers; the lens is how you see "the equatorial ocean bias
+  is too strong". The field lenses are BL-304 (field overlay lenses).
 
 ---
 

@@ -280,7 +280,7 @@ void draw_generation_ledger(const world& w, ui_state& s,
     // that carried it, leaving the Body selector below as the only cross-cutting
     // control. The breadcrumb's builder (`draw_tile_derivation`) went with it —
     // ruled delete, Ben, 2026-08-30 — so nothing in src/ draws a per-tile
-    // derivation; GENERATION_LEDGER.md keeps the design.
+    // derivation, and the design left GENERATION_LEDGER.md too (Ben, 2026-09-15).
     //
     // With no tabs there is no active-tab press to close the ledger. That is the
     // Balance ledger's shape and needs no extra control: the rail slot toggles the

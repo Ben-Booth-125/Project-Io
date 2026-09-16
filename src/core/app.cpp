@@ -277,7 +277,8 @@ int app::run(autostart_mode autostart)
     m_screen = app_screen::menu;
 
     // --load <path>: open straight into a saved campaign, skipping the menu, the
-    // wizard and the ~25-38 s generation plus ~6 s warm start that follow it. THE
+    // wizard and the ~25-38 s generation plus the landscape search and the
+    // winner's validation run that follow it. THE
     // reason BL-536 was raised -- a capture run that iterates on one surface pays
     // that cold start on every launch, and this is what stops it. A failed load
     // falls through to the menu with the reason posted to the comms log, rather
@@ -558,32 +559,46 @@ void app::begin_new_game()
 
 void app::poll_worldgen()
 {
-    // Phase 2 — the warm start, sliced. One time-boxed batch of econ ticks per
-    // call: the loading screen calls this once per frame, so the window keeps
-    // repainting between batches. This is the fix for the AppHangB1 kills
-    // (2026-08-12): the tail used to run all 80 ticks inside one frame, the UI
-    // stopped pumping, the player clicked, and Windows closed the "hung" app —
-    // which read exactly like a crash at whatever the label last said.
-    if (m_warm_ticks_done >= 0)
+    // THE VALIDATION RUN (BL-978, warm start retired), in time-boxed batches.
+    // Phase 6 SELECTS a landscape statically; this is its "validate
+    // dynamically, once" (GENERATION_STRATEGY.md § Three passes):
+    // `validation_ticks` real econ ticks on the winner, and the balances,
+    // pools, returns and prices they leave are the opening position play
+    // receives (ERAS.md § The opening position).
+    //
+    // Still batched one slice per loading-screen frame, and that is a hard
+    // constraint rather than a leftover: an econ tick on a searched landscape
+    // measured ~0.9 s in the RELEASE build (2026-09-03, run_economy_step
+    // dominant), so even twelve ticks inside one frame would sit past the ~5 s
+    // at which Windows judges the app hung and kills it on the next click —
+    // the AppHangB1 stall of 2026-08-12. The window repaints between slices.
+    if (m_validation_ticks_done >= 0)
     {
         const auto slice_begin = std::chrono::steady_clock::now();
         constexpr auto slice_budget = std::chrono::milliseconds(50);
-        while (m_warm_ticks_done < pre_game_ticks &&
+        while (m_validation_ticks_done < validation_ticks &&
                std::chrono::steady_clock::now() - slice_begin < slice_budget)
         {
             step_economy();
-            ++m_warm_ticks_done;
-            m_worldgen_progress.sub_progress.store(m_warm_ticks_done,
+            ++m_validation_ticks_done;
+            m_worldgen_progress.sub_progress.store(m_validation_ticks_done,
                                                    std::memory_order_relaxed);
         }
-        if (m_warm_ticks_done >= pre_game_ticks)
+        if (m_validation_ticks_done >= validation_ticks)
         {
-            m_warm_ticks_done  = -1;
-            m_warm_starting    = false;
+            m_validation_ticks_done = -1;
+            m_validation_run        = false;
             m_worldgen_progress.sub_total.store(0, std::memory_order_relaxed);
-            // BL-630: the warm start is over, so the returns the floor reads now
-            // exist. Seat BEFORE finish_new_game, which is what flips to
-            // `in_game` — the first drawn frame must already have a player.
+            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - m_validation_begin).count();
+            char label[48];
+            std::snprintf(label, sizeof label, "validation_run_%d_ticks", validation_ticks);
+            std::printf("[start_new_game] %-24s %6lld ms\n", label,
+                        static_cast<long long>(ms));
+            std::fflush(stdout);
+            // BL-630: the validation run is over, so the returns the floor
+            // reads now exist. Seat BEFORE finish_new_game, which is what flips
+            // to `in_game` — the first drawn frame must already have a player.
             seat_player();
             finish_new_game();
         }
@@ -620,23 +635,26 @@ void app::poll_worldgen()
         std::fflush(stdout);
     }
 
-    // Phase 1 — the cheap main-thread tail (~20 ms measured): setup_world, the
-    // Lua economy load, background firms — then arm the sliced warm start.
+    // The main-thread tail: setup_world, the Lua economy load, the landscape
+    // search and its winner — then the winner's VALIDATION RUN, the seat, and
+    // play.
     //
     // BL-630 straightened this out. The old code branched here into the
     // starting-corp selection stage, which had to sit in this one frame because
     // corp_ai excluded the flagged corp and the pool had to be read before
-    // background firms existed. Both constraints are gone: the warm start runs
-    // under spectate with NOBODY seated, and the seat is drawn afterwards from
-    // the specialists (`is_background == false` names that pool explicitly, so
-    // it no longer depends on WHEN the list is read).
+    // background firms existed. Both constraints are gone: the validation run
+    // goes under spectate with NOBODY seated, and the seat is drawn afterwards
+    // from the specialists (`is_background == false` names that pool explicitly,
+    // so it no longer depends on WHEN the list is read).
     start_new_game_prelude();
-    m_warm_starting   = true;
-    m_warm_ticks_done = 0;
-    m_econ_steps      = 0; // BL-568: a new campaign's cadence starts at slot 0.
-    m_warm_begin      = std::chrono::steady_clock::now();
+
+    // Arm the validation run; the batches above run it from the next call.
+    m_validation_run        = true;
+    m_validation_ticks_done = 0;
+    m_econ_steps            = 0; // BL-568: a new campaign's cadence starts at slot 0.
+    m_validation_begin      = std::chrono::steady_clock::now();
     m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
-    m_worldgen_progress.sub_total.store(pre_game_ticks, std::memory_order_relaxed);
+    m_worldgen_progress.sub_total.store(validation_ticks, std::memory_order_relaxed);
     m_screen = app_screen::building;
 }
 
@@ -674,13 +692,14 @@ void app::draw_building_screen()
         ImGui::ProgressBar(frac, {420.0f, 18.0f}, "");
         ImGui::Dummy({420.0f, 6.0f});
 
-        // After generation the sliced warm start takes over the screen
-        // (m_warm_ticks_done >= 0): same bars, its own label and units.
-        const bool warming = (m_warm_ticks_done >= 0);
+        // After generation the winner's validation run (BL-978) takes over the
+        // screen (m_validation_ticks_done >= 0): same bars, its own label and
+        // units.
+        const bool validating = (m_validation_ticks_done >= 0);
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(150, 158, 172, 255));
-        ImGui::TextUnformatted(warming ? "Letting the dust settle"
-                                       : generation_stage_labels[li]);
-        if (!warming)
+        ImGui::TextUnformatted(validating ? "Proving the field"
+                                          : generation_stage_labels[li]);
+        if (!validating)
         {
             ImGui::SameLine();
             ImGui::Text("(%d/%d)", done, total);
@@ -689,7 +708,7 @@ void app::draw_building_screen()
 
         // The inner bar: progress WITHIN the current pass, drawn only while a
         // pass is reporting it (the ancient era during generation, then the
-        // warm start). Same honesty rule as the outer bar — it tracks the
+        // validation run). Same honesty rule as the outer bar — it tracks the
         // sim's own counter, not an animation.
         const int sub_total = m_worldgen_progress.sub_total.load(std::memory_order_relaxed);
         if (sub_total > 0)
@@ -700,8 +719,8 @@ void app::draw_building_screen()
             ImGui::Dummy({420.0f, 4.0f});
             ImGui::ProgressBar(sub_frac, {420.0f, 10.0f}, "");
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
-            if (warming)
-                ImGui::Text("year %d / %d", sub_done / 4, sub_total / 4);
+            if (validating)
+                ImGui::Text("quarter %d / %d", sub_done, sub_total);
             else
                 ImGui::Text("%d / %d years", sub_done, sub_total);
             ImGui::PopStyleColor();
@@ -709,8 +728,8 @@ void app::draw_building_screen()
 
         ImGui::Dummy({420.0f, 8.0f});
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
-        ImGui::TextUnformatted(warming
-            ? "Twenty years of commerce settle the markets."
+        ImGui::TextUnformatted(validating
+            ? "Three years of commerce prove the chosen landscape."
             : "Four hundred years of history are being lived through.");
         ImGui::PopStyleColor();
 
@@ -902,7 +921,7 @@ void app::draw_building_carve()
 // picked from a screen. The mechanism lives in world/spawn_seat.cpp so the
 // headless sweep and the app read one implementation; this function is the
 // app-side half — call it, log it, and repair the player-scoped UI caches the
-// warm start filled against the provisional pick.
+// validation run filled against the provisional pick.
 //
 // Authority: CORPORATION_GENERATION.md § The spawn shortlist, and the seat.
 
@@ -910,7 +929,7 @@ void app::seat_player()
 {
     m_seat_result = seat_player_corporation(m_world, m_active_world_params.seed);
 
-    // The player-scoped history caches were filled through the warm start
+    // The player-scoped history caches were filled through the validation run
     // against whichever corp the GENERATOR provisionally flagged, so at this
     // instant they belong to somebody else. Rebuild the balance series from the
     // seated corp's own filed returns (BL-626 made those world state, which is
@@ -987,43 +1006,53 @@ void app::start_new_game_prelude()
     // is loaded (their measured stop condition reads real recipe outputs, which
     // setup_world's world-gen pass — run before load_economy — cannot see; see
     // generate_background_firms' own header comment for the full ordering
-    // rationale). Run BEFORE the pre-game warm start below so the new firms'
+    // rationale). Run BEFORE the validation run below (BL-978) so the new firms'
     // opening balances/pools get the same simulated operating history every
     // other generated corp receives.
     // BL-770 PHASE 6 — the landscape is SEARCHED, not simply generated.
     //
     // This is the caller `landscape_score` never had: until now it existed only
-    // inside its own harness, which is why BL-772 (retire the warm start) and
-    // BL-773 (the budget) were both blocked on an item that had already
+    // inside its own harness, which is why the warm start's retirement (now
+    // BL-978) and the budget were both blocked on an item that had already
     // "landed". Phase 6 scores candidate landscapes statically — no clock, no
     // ticks — and applies the winner by a deterministic argmax
     // (GENERATION_STRATEGY.md § The eight phases).
     //
-    // WHAT VARIES HERE IS NARROWER THAN THE HARNESS, and the reason is a hard
-    // constraint rather than a choice. `generate_corporations` APPENDS and has
-    // already run inside make_hard_coded_world by this point, so re-running it
-    // would double every specialist — `regenerate_specialists = false` keeps the
-    // world-gen roster and searches over the BACKGROUND economy's placement and
-    // the road tier instead. Widening it to the roster axis means moving the
-    // specialist pass behind the registry load, which is BL-772's restructure
-    // and not this wiring's.
+    // ALL THREE AXES ARE LIVE HERE (BL-977). The roster axis used to be a no-op
+    // at this seam — `generate_corporations` appends and had already run inside
+    // make_hard_coded_world, so `regenerate_specialists` was held false and a
+    // third of every round proposed a roster nobody could apply. Every candidate
+    // now REPLACES the world-gen specialists (`remove_specialist_roster`, then
+    // `generate_corporations` from `world::gen_settlement`, the same record
+    // world-gen read) and lays its background firms; the winner is applied the
+    // same way. The road axis is likewise live now that term 5 reads reach COST
+    // rather than the coverage boolean NR-793 showed never flips.
     //
-    // The seed is the same one the bare pass used, so a single-candidate search
-    // reproduces the old world exactly.
+    // The seat is drawn AFTER this (seat_player, from the surviving specialists),
+    // so replacing the roster here orphans nothing. What the loading screen's
+    // ledger listed during generation was the world-gen roster; the one the
+    // player meets is the winner's.
+    //
+    // The seed is the same one the bare pass used. Mirrored by
+    // tools/verify/harness_params.hpp `shipped_search_params` — change both.
     {
         landscape_search_params sp;
-        sp.regenerate_specialists = false;
-        sp.seed                   = m_active_world_params.seed ^ 0x8A21F00Du;
-        sp.start.placement_seed   = sp.seed;
-        // MEASURED 2026-09-07: 1 candidate 70.8 s of startup, 19 candidates
-        // 90.8 s — so the search costs ~20 s, about 1.1 s per evaluation. That
-        // is affordable against BL-773's 3-6 minute budget and is a REGRESSION
-        // until BL-772 removes the 72 s warm start it sits beside. Note also
-        // that a third of those evaluations are the ROAD axis, which NR-793
-        // measured as provably inert on a live ten-market world — resolving
-        // that entry gets this cost down without touching anything else.
+        sp.regenerate_specialists  = true;
+        sp.seed                    = m_active_world_params.seed ^ 0x8A21F00Du;
+        sp.start.placement_seed    = sp.seed;
+        sp.start.corporation_count = m_worldgen_cfg.corporation_count;
+        // MEASURED 2026-09-07 (placement + tier only): ~20 s for 19 evaluations,
+        // ~1.1 s each. The per-round lines the search prints are the live
+        // measurement now that the roster axis regenerates specialists per
+        // candidate; BL-977's report carries the before/after.
         const landscape_search_result r = search_landscape(m_world, m_registry, sp);
-        apply_landscape_candidate(m_world, m_registry, r.winner, false);
+        apply_landscape_candidate(m_world, m_registry, r.winner, true);
+        std::printf("[landscape_search] winner corps=%d placement=%08X tier=%u  "
+                    "accepted roster=%d placement=%d road_tier=%d of %d rounds\n",
+                    r.winner.corporation_count, r.winner.placement_seed,
+                    static_cast<unsigned>(r.winner.road_tier),
+                    r.accepted_by_axis[0], r.accepted_by_axis[1], r.accepted_by_axis[2],
+                    sp.rounds);
     }
     mark("background_firms");
 
@@ -1037,37 +1066,15 @@ void app::start_new_game_prelude()
     // remaining 11.3%. Idempotent, so running it twice costs one map walk.
     assign_default_recipes(m_world, m_registry);
 
-    // Pre-game warm start ([C3] pre-game profit): seed the balance history with the
-    // opening capital, then run the real economy loop forward a notional operating
-    // history before the first frame, so every corp opens onto non-empty pools,
-    // moved balances, and live market figures rather than a cold zero state. Run
-    // here (after load_economy) so it reuses the loaded registry rather than a
-    // duplicated one; run_verify stays deterministically cold and does not warm up.
+    // Seed the balance history with the opening capital. The winner's
+    // validation run (poll_worldgen; `validation_ticks` in app.hpp) appends to
+    // it from here, so every corp opens onto moved balances, non-empty pools
+    // and live market figures rather than a cold zero state. run_verify stays
+    // deterministically cold and never runs the validation ticks.
     //
-    // 20 in-game years of quarterly econ ticks (Ben, 2026-08-10). The previous
-    // figure was 12 (~3 years), chosen defensively — "short enough not to diverge
-    // under the prototype's un-tuned economy". That fear was measured and did not
-    // hold: `pregame_balance_harness 80` shows the player corp's balance growing
-    // linearly (~5,530 cr/tick) to tick 23, decelerating through a knee at ~tick 24,
-    // and PLATEAUING from ~tick 47 at ~185k cr, where it oscillates ±60 cr and drifts
-    // very slightly down. It converges rather than diverging, all five economy
-    // assertions still pass, and determinism holds.
-    //
-    // The plateau is the point: 12 ticks stops on the straight part of the curve, so
-    // the opening world is still accelerating and reads as mid-transient. 80 stops
-    // well past the knee, on a settled economy — which is what "let the dust settle"
-    // asks for. Cost is ~3.5 ms/tick on the real generated world, so ~240 ms of extra
-    // startup; the tick cost, not the count, is what the saturation work will move.
-    //
-    // NOTE this does NOT move the campaign calendar. The clock is rebased in
-    // finish_new_game, so the warm start consumes no in-game time and play still
-    // opens at `epoch_year`. Making the warm start span the calendar is a
-    // separate, unfiled decision — see docs/development/pending/.
-    //
-    // The 80 ticks themselves do NOT run here (2026-08-12): poll_worldgen runs
-    // them in time-boxed slices, one per loading-screen frame, so the UI keeps
-    // pumping — see `m_warm_ticks_done` in app.hpp. This function only seeds
-    // the balance history the warm ticks then append to.
+    // This does NOT move the campaign calendar. The clock is rebased in
+    // finish_new_game, so the run consumes no in-game time and play still opens
+    // at `epoch_year` (ERAS.md § The opening position has no calendar meaning).
     {
         const auto pit = m_world.corporations.find(m_world.player_entity);
         ui::push_capped(m_balance_history,
@@ -1078,25 +1085,22 @@ void app::start_new_game_prelude()
 void app::finish_new_game()
 {
     {
-        const auto warm_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - m_warm_begin).count();
-        std::printf("[start_new_game] %-24s %6lld ms\n", "warm_start_80_ticks",
-                    static_cast<long long>(warm_ms));
-        // The last two are the BL-398 split of persona_counsel; they are
-        // sub-totals of it, not additional phases, hence the indented names.
+        // The validation run's per-phase split (poll_worldgen printed its
+        // total). The last two are the BL-398 split of persona_counsel; they
+        // are sub-totals of it, not additional phases, hence the indented names.
         static const char* const phase_names[11] = {
             "convoys", "run_economy_step", "clear_markets", "apply_budget",
             "tech_gates", "standings_credit", "agency_comms", "persona_counsel",
             "history_recorders", "  ..bb_export", "  ..pack_eval" };
         const auto& acc = step_economy_phase_ms();
         for (std::size_t i = 0; i < acc.size(); ++i)
-            std::printf("[warm phases] %-18s %9.1f ms\n", phase_names[i], acc[i]);
+            std::printf("[validation phases] %-18s %9.1f ms\n", phase_names[i], acc[i]);
         std::fflush(stdout);
     }
 
     // Rebase the clock one last time. sim_loop measures from construction, so without
-    // this the wall-clock cost of building the world and running the warm start would
-    // land as elapsed in-game days on the first frame of play.
+    // this the wall-clock cost of building the world and running the validation run
+    // would land as elapsed in-game days on the first frame of play.
     {
         const int speed = m_sim_loop.speed();
         m_sim_loop = sim_loop();
@@ -1209,8 +1213,8 @@ void app::load_economy()
 
 void app::step_economy()
 {
-    // Per-phase accumulators over the process lifetime, dumped by the warm-start
-    // timing in start_new_game. File-local plumbing for the 2026-08-12 stall
+    // Per-phase accumulators over the process lifetime, dumped by the
+    // validation-run timing in finish_new_game. File-local plumbing for the 2026-08-12 stall
     // hunt; costs two clock reads per phase when nothing reads the totals.
     using clk = std::chrono::steady_clock;
     auto& acc = step_economy_phase_ms();
@@ -1224,7 +1228,7 @@ void app::step_economy()
 
     // BL-568: the cadence key. The day tick (mirrored each frame) is 90n at a
     // quarter boundary and rotates only half the corp_ai slots; this counter
-    // advances by exactly one per step across warm start, live play and
+    // advances by exactly one per step across the validation run, live play and
     // --verify, which is the schedule every harness already certifies.
     m_world.current_econ_tick = static_cast<int>(m_econ_steps++);
 
@@ -1244,13 +1248,13 @@ void app::step_economy()
     // ordinary played session runs exactly as before.
     //
     // BL-630 adds the SECOND case with no human seat, and it is the same case
-    // rather than a new exception: through the pre-game warm start nobody has
-    // been seated yet (the seat is drawn from what these ticks produce), so the
-    // prohibition this flag lifts has no subject to protect. Every corp is
-    // scorer-driven for all 80 ticks and every corp files real returns — which
-    // is what makes a viability read possible at all.
+    // rather than a new exception: through the winner's validation run nobody
+    // has been seated yet (the seat is drawn from what these ticks produce), so
+    // the prohibition this flag lifts has no subject to protect. Every corp is
+    // scorer-driven for every validation tick and every corp files real returns
+    // — which is what makes a viability read possible at all.
     m_last_econ_report = run_economy_step(m_world, m_registry,
-                                          m_ui.spectating || m_warm_starting,
+                                          m_ui.spectating || m_validation_run,
                                           &tick_lp_pools);
     lap(1); // economy step (production + corp AI)
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
@@ -1295,17 +1299,17 @@ void app::step_economy()
         session_history::post_nation_agency_comms(m_world, m_last_econ_report, m_chat, day);
         lap(6); // agency comms
         // BL-468: battle traffic to the Field channel. Suppressed through the
-        // warm start for the same reason counsel is — a pre-game battle would
-        // post lines the player never saw, all stamped on the same day.
-        if (!m_warm_starting)
+        // validation run for the same reason counsel is — a pre-game battle
+        // would post lines the player never saw, all stamped on the same day.
+        if (!m_validation_run)
             session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
-        // Persona counsel is suppressed through the pre-game warm start
-        // (2026-08-12): measured at ~1.05 s/tick — 93% of the AppHangB1 stall —
-        // against ~80 ms for everything else combined, and what it buys there
-        // is advisory chat for quarters the player never saw, all stamped on
-        // the same pre-game day. Live play keeps it (and inherits its cost;
-        // NR-210 records the open in-game hitch).
-        if (!m_warm_starting)
+        // Persona counsel is suppressed through the validation run (2026-08-12,
+        // under the warm start it replaces): measured at ~1.05 s/tick — 93% of
+        // the AppHangB1 stall — against ~80 ms for everything else combined,
+        // and what it buys there is advisory chat for quarters the player never
+        // saw, all stamped on the same pre-game day. Live play keeps it (and
+        // inherits its cost; NR-210 records the open in-game hitch).
+        if (!m_validation_run)
             session_history::post_persona_counsel(m_world, m_persona_bench,
                                                   m_counsel_channel, m_chat, day);
         lap(7); // persona counsel
@@ -1761,9 +1765,9 @@ bool app::load_game_from(const std::string& path)
     // it here means the activity fog reads the right age on the FIRST frame
     // after a load rather than on the second.
     m_world.current_day_tick = static_cast<int>(env.day_tick);
-    // The cadence counter resumes where an unsaved campaign would be: the warm
-    // start's steps plus every live quarter since (BL-568).
-    m_econ_steps = static_cast<uint64_t>(pre_game_ticks) + env.econ_tick;
+    // The cadence counter resumes where an unsaved campaign would be: the
+    // validation run's steps plus every live quarter since (BL-568).
+    m_econ_steps = static_cast<uint64_t>(validation_ticks) + env.econ_tick;
     m_world.current_econ_tick = static_cast<int>(m_econ_steps);
 
     m_balance_history     = std::move(env.balance_history);

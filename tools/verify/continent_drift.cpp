@@ -394,6 +394,63 @@ int main()
         }
     check(stationary, "P6   a stagnant lid's ground sat where it sits, at every epoch");
 
+    // --- P7: the FRAME is the query, gw*gh times (BL-963) --------------------
+    // Pass 3 now reads its present band raster from `paleo_frame_at` at epoch 0
+    // and the Life phase reads the fossil epochs from the same function, so the
+    // frame carries the load the per-tile query used to. Two things must hold
+    // and are held separately: at EVERY epoch the frame agrees with the query
+    // tile for tile (P7 — the raster form adds nothing and loses nothing), and
+    // at epoch 0 the frame's band IS band_for_row's (P7b — the generator's
+    // present did not move when Pass 3 changed what it reads).
+    bool frame_agrees = true, frame_present = true;
+    int  frame_band_moved_deep = 0;
+    for (int e = 0; e <= continent_drift_epochs && frame_agrees; ++e)
+    {
+        const paleo_frame f = paleo_frame_at(cs, gw, gh, e, k_temp, &moist);
+        if (f.epochs_back != e
+            || f.band.size()     != static_cast<std::size_t>(gw) * gh
+            || f.latitude.size() != static_cast<std::size_t>(gw) * gh
+            || f.moisture.size() != static_cast<std::size_t>(gw) * gh
+            || f.on_grid.size()  != static_cast<std::size_t>(gw) * gh)
+        {
+            frame_agrees = false;
+            break;
+        }
+        for (int row = 0; row < gh && frame_agrees; ++row)
+            for (int col = 0; col < gw; ++col)
+            {
+                const std::size_t i = static_cast<std::size_t>(col + row * gw);
+                const paleo_tile_state s = paleo_tile_at(cs, gw, gh, col, row, e, k_temp, &moist);
+                if (f.band[i] != s.band || f.latitude[i] != s.latitude
+                    || f.moisture[i] != s.moisture || (f.on_grid[i] != 0) != s.on_grid)
+                {
+                    frame_agrees = false;
+                    break;
+                }
+                if (e == 0 && f.band[i] != band_for_row(row, gh, k_temp)) frame_present = false;
+                if (e == continent_drift_epochs && f.band[i] != band_for_row(row, gh, k_temp))
+                    ++frame_band_moved_deep;
+            }
+    }
+    check(frame_agrees, "P7   the frame at every epoch is the query tile for tile — "
+                        "band, latitude, moisture, on_grid");
+    check(frame_present, "P7b  the frame at epoch 0 IS Pass 3's band raster (band_for_row), "
+                         "tile for tile — the present did not move");
+    check(frame_band_moved_deep == band_moved,
+          "P7c  the frame at the deepest epoch moves exactly the tiles the query moves "
+          "(P3b's count) — the raster form is not a third answer");
+
+    // The frame's cost, informational: the generator builds three per body
+    // (Pass 3 at epoch 0, the Life phase at the two fossil epochs), so this is
+    // what BL-963 added to a generation. Best-of-3, same reason C6 gives.
+    const double frame_ms = best_of_3([&] {
+        (void)paleo_frame_at(cs, gw, gh, 0, k_temp);
+        (void)paleo_frame_at(cs, gw, gh, continent_drift_epochs / 2, k_temp, &moist);
+        (void)paleo_frame_at(cs, gw, gh, continent_drift_epochs, k_temp, &moist);
+    });
+    std::printf("     three frames on %dx%d (the generator's per-body count): %.2f ms\n",
+                gw, gh, frame_ms);
+
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");
     return g_failures == 0 ? 0 : 1;

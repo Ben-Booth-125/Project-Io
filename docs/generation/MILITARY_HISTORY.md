@@ -9,9 +9,9 @@
 > simplification *of* · how sea legs produce colonisation, and where a Settle may found.
 > **Not here:** how force works in the **campaign** — `resolve_campaign_battle`, muster and
 > hire, march, upkeep, and the roster table itself — all `../military/MILITARY.md`, a
-> **sibling and not a parent** · why a polity chooses to fight (../lore/COLLAPSE).
+> **sibling and not a parent** · why a polity chooses to fight, and how it falls (CIVILISATION).
 > **Confused with:** `../military/MILITARY.md` above all — the two resolvers are constantly
-> mistaken for one another; also ../lore/HISTORY.md, ../lore/COLLAPSE.md.
+> mistaken for one another; also ../lore/HISTORY.md, CIVILISATION.md.
 
 **How force works INSIDE THE ERA −1 SIM**, which is a generation pass and not the game. This
 document owns the ancient half of the military model: the nation-scale resolver the sim runs
@@ -31,7 +31,7 @@ defend about the real thing. **Historically, nations supplied overseas perfectly
 **This document lives in `docs/generation/` on purpose.** It is a generation doc that happens to be
 about force, not a military doc that happens to be about the past. Its neighbours are
 [`../lore/HISTORY.md`](../lore/HISTORY.md) — the institutional ladder that drives the sim — and
-[`../lore/COLLAPSE.md`](../lore/COLLAPSE.md), the polity strategies and culminating events.
+[`CIVILISATION.md`](CIVILISATION.md), how an empire rises, reaches and falls.
 
 ---
 

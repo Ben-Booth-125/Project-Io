@@ -40,7 +40,10 @@
 // Writes: exploration_sweep.json in the working directory (BL-971) — one row
 // per seed over all eleven readings plus the spread face, checked in at the
 // repo root from a 16-seed run at generation's own constants. A tuning run
-// (any override flag) writes exploration_sweep.tuning.json instead.
+// (any override flag) writes exploration_sweep.tuning.json instead. Every
+// HELD seed on readings 1-2 also carries a named cause (BL-999): printed in
+// its own section and written per seed as `held_cause` with the facts it
+// was read off (`held_cause_facts`, written for every ran seed).
 //
 //   --w_want_q=N  BL-953 TUNING ONLY: re-runs the traced span with the want
 //                 lean at N instead of generation's own value. Readings 1, 2,
@@ -58,8 +61,10 @@
 #include "world/history_sim.hpp"
 #include "world/sim_terrain_build.hpp"
 #include "world/settlement.hpp"
+
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
+#include "scripting/lua_state.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -199,7 +204,15 @@ struct exploration_row
     std::vector<int64_t> standing_per_region;
     std::vector<int64_t> garrison_per_region;
     int64_t standing_holders = 0; ///< living polities with any paid standing heads at 1660.
-    int64_t army_saturated   = 0; ///< of those, realm paid heads above the saturation cap.
+    /// BL-972: the BILL replaces the scorer caps. Polity-rounds on which the
+    /// army/navy bill went short, treasury paid in upkeep over the span, and
+    /// the levy drawn from / returned to the manpower pools.
+    int64_t army_unpaid_rounds = 0;
+    int64_t navy_unpaid_rounds = 0;
+    int64_t spent_army_upkeep  = 0;
+    int64_t spent_navy_upkeep  = 0;
+    int64_t levy_raised        = 0;
+    int64_t levy_returned      = 0;
     int64_t standing_invariant_violations = 0; ///< must be 0 (BL-955 F3).
 
     // --- Reading 3: both strategies pay -------------------------------------
@@ -244,6 +257,32 @@ struct exploration_row
     int64_t flows_without_clause  = 0; ///< must be 0: every flow stands on a trade_access clause.
     int64_t trade_bound_pairs     = 0; ///< distinct pairs holding trade_access at 1660.
     std::vector<int64_t> pair_volume; ///< one per trade_access-bound pair, zero-flow pairs included.
+
+    // --- BL-999: the held-seed cause census, off the traced re-run ---------
+    // Every quantity here is captured for EVERY ran seed (so a displaced
+    // seed's numbers sit beside a held one's for comparison) and read only
+    // when readings 1-2 call the seed HELD.
+    /// `campaign_class_trace` copied whole: [class][gate], class 0 = met
+    /// before the span (a neighbour), 1 = met during it, 2 = unmet; gate 0 =
+    /// examined, 1 = treaty-blocked, 2 = water-illegal, 3 = reach-denied,
+    /// 4 = cleared the score threshold, 5 = chosen. Candidate-grain, summed
+    /// over the whole span.
+    int64_t campaign_class[3][6] = {};
+    /// Pairs at 1660 by contact class, and how many of each hold a
+    /// non-aggression clause at the close.
+    int64_t near_pairs = 0, near_bound = 0, far_pairs = 0, far_bound = 0;
+    /// Of the near pairs, those where EITHER side reads a positive
+    /// `deterrence_alarm_q` at the close (a snapshot, not a span integral —
+    /// the sim keeps no cumulative alarm counter), and the largest such read.
+    int64_t near_pairs_alarmed = 0;
+    int     near_alarm_max_q   = 0;
+    /// Polities holding the exploration tree's rim node at the close: alive,
+    /// and ever (the mask is never cleared, so a dead holder still reads).
+    int64_t rim_holders_alive = 0, rim_holders_ever = 0;
+    /// The directed want table derived at the close: entries, those whose
+    /// holder sits on ANOTHER landmass from the wanter's capital (the doc's
+    /// own "outward, across water"), and those whose pair met during the span.
+    int64_t wants_total = 0, wants_outward = 0, wants_frontier = 0;
 };
 
 /// LANDMASS IDENTITY for reading 11. `region::domain` only says land /
@@ -293,8 +332,51 @@ double per_century(int64_t count, int64_t years)
 
 } // namespace
 
+
+// ---------------------------------------------------------------------------
+// The shipped generation inputs (BL-1007)
+// ---------------------------------------------------------------------------
+// GENERATION TAKES TWO THINGS FROM THE DATA LAYER, and until this item the
+// sweeps handed it neither. `app::begin_new_game` loads scripts/world_gen.lua
+// into a `world_gen_config`, and `app::ensure_works_loaded` loads
+// scripts/works.lua into a `works_registry`; both are passed to
+// `make_hard_coded_world`. The sweeps passed `world_gen_config{}` — the C++
+// struct defaults, which world_gen_config.hpp's own header warns price 10 of 47
+// resources where the script authors 42 — and a null works pointer, which makes
+// the `build_work` verb a dead branch (history_sim.cpp: "works == nullptr ...
+// break"), so no polity ever raised a work in a swept world.
+//
+// The cost of that was measured on 2026-09-16: seed 0's Empires span fought
+// 6,479 battles in the sweep and 9,928 in the game. Every reading was
+// self-consistent and described a world nobody plays. These helpers are the one
+// place either sweep reads the data layer, and they mirror the app's own order.
+struct shipped_inputs
+{
+    lua_state        lua;
+    world_gen_config cfg{};
+    works_registry   works;
+};
+
+/// Load the data layer exactly as the app does, and say so on the face: a
+/// reading that cannot name the world it measured is the defect this closes.
+inline void load_shipped_inputs(shipped_inputs& in)
+{
+    in.lua.load("scripts/recipes.lua");
+    in.lua.load("scripts/economy.lua");
+    in.lua.load("scripts/world_gen.lua");
+    in.cfg.load_from_lua(in.lua);
+    in.lua.load("scripts/works.lua");
+    in.works.load_from_lua(in.lua);
+    std::printf("generation inputs: scripts/world_gen.lua + scripts/works.lua "
+                "(%zu works rows) — the shipped configuration (BL-1007)\n",
+                in.works.size());
+}
+
 int main(int argc, char** argv)
 {
+    shipped_inputs shipped;
+    load_shipped_inputs(shipped);
+
     int seed_count = 8;
     bool want_override = false;
     int  want_override_q = 0;
@@ -325,6 +407,10 @@ int main(int argc, char** argv)
             else if (kv.first == "deterrence_alarm_weight_q")    hp.deterrence_alarm_weight_q = static_cast<int>(kv.second);
             else if (kv.first == "treaty_far_penalty_q")         hp.treaty_far_penalty_q = static_cast<int>(kv.second);
             else if (kv.first == "visible_capability_reference") hp.visible_capability_reference = kv.second;
+            // BL-972: the bill and the levy bound, for tuning runs.
+            else if (kv.first == "standing_army_upkeep_per_1000_heads_year_q") hp.standing_army_upkeep_per_1000_heads_year_q = kv.second;
+            else if (kv.first == "navy_upkeep_per_1000_units_year_q")          hp.navy_upkeep_per_1000_units_year_q = kv.second;
+            else if (kv.first == "standing_army_levy_per_mille_q")             hp.standing_army_levy_per_mille_q = static_cast<int>(kv.second);
             else { std::printf("unknown --set %s\n", kv.first.c_str()); std::exit(2); }
         }
     };
@@ -352,11 +438,11 @@ int main(int argc, char** argv)
         // BL-958: STOP AT THE EXPLORATION CLOSE. Every reading reads the era
         // fixture, which is complete before this stop; nations, roads, firms and
         // markets (~90% of a whole world) are never read here.
-        world_gen_config gen_cfg;
+        world_gen_config gen_cfg = shipped.cfg; // BL-1007: the shipped data layer
         gen_cfg.stop_after_exploration = true;
         std::fprintf(stderr, "[sweep] seed %d generated to the Exploration close\n", i);
         const world w = make_hard_coded_world(wp, &rep, gen_cfg,
-                                              /*progress=*/nullptr, /*works=*/nullptr, &fx);
+                                              /*progress=*/nullptr, &shipped.works, &fx);
         (void)w;
 
         exploration_row row;
@@ -515,6 +601,50 @@ int main(int argc, char** argv)
             int64_t navies = 0, ports = 0;
             for (const polity& q : traced.polities) if (q.alive && q.navy_stock > 0) ++navies;
             for (const region& r : ss_copy.regions) if (r.port_stock_q > 0) ++ports;
+
+            // BL-999: the same counters onto the row, plus the rim, the alarm
+            // read and the want table, so the held-seed census below reads
+            // `rows` like every other section.
+            for (int k = 0; k < 3; ++k)
+                for (int g = 0; g < 6; ++g) row.campaign_class[k][g] = ct[k][g];
+            row.near_pairs = near_pairs; row.near_bound = near_bound;
+            row.far_pairs  = far_met;    row.far_bound  = far_bound;
+            for (const contact& c : traced.contacts)
+            {
+                if (c.from >= c.to || c.first.year >= ep2.start_year) continue;
+                const int aa = deterrence_alarm_q(ss_copy.regions, traced, ep2, c.from, c.to);
+                const int ab = deterrence_alarm_q(ss_copy.regions, traced, ep2, c.to, c.from);
+                const int m  = std::max(aa, ab);
+                if (m > 0) ++row.near_pairs_alarmed;
+                row.near_alarm_max_q = std::max(row.near_alarm_max_q, m);
+            }
+            for (const polity& q : traced.polities)
+            {
+                if (!polity_holds_exploration_rim(q)) continue;
+                ++row.rim_holders_ever;
+                if (q.alive) ++row.rim_holders_alive;
+            }
+            {
+                const std::vector<int32_t> mass_w =
+                    label_landmasses(fx.terrain.substrate, fx.gw, fx.gh);
+                const auto mass_of = [&](int pid) -> int32_t {
+                    if (pid < 0 || static_cast<std::size_t>(pid) >= traced.polities.size()) return -1;
+                    const int cap = traced.polities[static_cast<std::size_t>(pid)].capital;
+                    if (cap < 0 || static_cast<std::size_t>(cap) >= ss_copy.regions.size()) return -1;
+                    const region& rg = ss_copy.regions[static_cast<std::size_t>(cap)];
+                    if (rg.col < 0 || rg.row < 0 || rg.col >= fx.gw || rg.row >= fx.gh) return -1;
+                    return mass_w[static_cast<std::size_t>(rg.row * fx.gw + rg.col)];
+                };
+                const std::vector<want> wants =
+                    derive_wants(ss_copy.regions, traced.contacts, traced.polities);
+                row.wants_total = static_cast<int64_t>(wants.size());
+                for (const want& w : wants)
+                {
+                    const int32_t mf = mass_of(w.from), mt = mass_of(w.to);
+                    if (mf >= 0 && mt >= 0 && mf != mt) ++row.wants_outward;
+                    if (contact_first_year(traced, w.from, w.to) >= ep2.start_year) ++row.wants_frontier;
+                }
+            }
             std::printf("  diag seed %d: cand[near ex=%lld blk=%lld wet=%lld rch=%lld clr=%lld ch=%lld]"
                         " [met-in-span ex=%lld blk=%lld wet=%lld rch=%lld clr=%lld ch=%lld]"
                         " [unmet ex=%lld blk=%lld wet=%lld rch=%lld clr=%lld ch=%lld]"
@@ -691,9 +821,14 @@ int main(int argc, char** argv)
                 row.standing_per_region.push_back(standing[p] / held[p]);
                 row.garrison_per_region.push_back(garrison[p] / held[p]);
                 if (standing[p] > 0) ++row.standing_holders;
-                if (standing[p] > ep2.army_saturation_per_region * held[p]) ++row.army_saturated;
             }
             row.standing_invariant_violations = traced.standing_army_invariant_violations;
+            row.army_unpaid_rounds = traced.army_upkeep_unpaid_rounds;
+            row.navy_unpaid_rounds = traced.navy_upkeep_unpaid_rounds;
+            row.spent_army_upkeep  = traced.treasury_spent_on_army_upkeep;
+            row.spent_navy_upkeep  = traced.treasury_spent_on_navy_upkeep;
+            row.levy_raised        = traced.levy_heads_raised;
+            row.levy_returned      = traced.levy_heads_returned;
         }
 
         // --- Reading 3 capture, off the traced re-run's 1660 close ---------
@@ -845,6 +980,9 @@ int main(int argc, char** argv)
         int     seeds_ran = 0, seeds_silent = 0, seeds_displaced = 0, seeds_displaced_no_nb = 0, seeds_held = 0;
         double  med_empire_rate = 0.0, med_expl_rate = 0.0;
         int     ambiguous_total = 0;
+        // BL-999 held-seed cause census: NO FRONTIER, NO EXPLORER, TREATY-CALM,
+        // DETERRENCE-INERT, UNCLASSIFIED.
+        int     held_cause[5] = {0, 0, 0, 0, 0};
         // reading 8
         int64_t r8_polities = 0, r8_treasury_min = 0, r8_treasury_max = 0;
         double  r8_treasury_mean = 0.0, r8_corr = 0.0;
@@ -863,7 +1001,9 @@ int main(int argc, char** argv)
         // reading 7
         int64_t r7_navy_holders = 0, r7_spent_ports = 0, r7_spent_navies = 0, r7_spent_armies = 0,
                 r7_navy_top = 0, r7_navy_bottom = 0, r7_port_steps = 0, r7_navy_steps = 0,
-                r7_army_steps = 0, r7_lapsed = 0, r7_standing_holders = 0, r7_saturated = 0,
+                r7_army_steps = 0, r7_lapsed = 0, r7_standing_holders = 0,
+                r7_army_unpaid = 0, r7_navy_unpaid = 0, r7_army_upkeep = 0, r7_navy_upkeep = 0,
+                r7_levy_raised = 0, r7_levy_returned = 0, // BL-972
                 r7_violations = 0;
         // reading 3
         int64_t r3_measured = 0, r3_cons = 0, r3_expn = 0, r3_both = 0,
@@ -941,6 +1081,7 @@ int main(int argc, char** argv)
         int64_t     total   = 0;     ///< nb + fr, the seed's traced conflict volume.
         double      ratio   = -1.0;  ///< fr/nb; -1 when nb == 0.
         const char* verdict = "";    ///< SILENT | displaced | displaced(no-nb) | held
+        const char* cause   = nullptr; ///< BL-999: set on held seeds only (see the census below).
     };
     std::vector<displacement_seed> disp;
 
@@ -1071,6 +1212,130 @@ int main(int argc, char** argv)
     face.silent_floor = kSilentFloorBattles;
     face.seeds_ran = seeds_ran; face.seeds_silent = seeds_silent; face.seeds_displaced = seeds_displaced;
     face.seeds_displaced_no_nb = seeds_displaced_no_nb; face.seeds_held = seeds_held;
+
+    // -----------------------------------------------------------------------
+    // THE HELD-SEED CAUSE CENSUS (BL-999, Ben's ruling 2026-09-15, NR-873):
+    // every seed readings 1-2 call HELD carries a NAMED CAUSE before any
+    // constant moves. Report only; nothing here asserts.
+    //
+    // WHAT EACH COLUMN IS. Deterrence in this sim acts through ONE channel:
+    // near-home Alarm raises `treaty_value_q`, a bound pair holds a
+    // non-aggression clause, and a campaign against a bound owner is
+    // treaty-blocked at the funnel's first gate. So "refused by deterrence"
+    // is read as NEAR-class candidates (owner met before the span) that the
+    // clause blocked, against those allowed past it. The FRONTIER is two
+    // classes, printed apart because the sim makes them differently: a
+    // contact is raised ONLY by a campaign crossing onto the other's ground
+    // (`raise_contact`'s two call sites) or inherited from a conquest, so the
+    // MET-IN-SPAN class exists only after an UNMET candidate was chosen once
+    // -- the first crossing. "In reach" is what cleared the treaty, water and
+    // reach gates and was actually scored. The rim is the exploration tree's
+    // rim node. The want table is derived at the close; its outward share is
+    // the doc's own "outward, across water" -- holder on another landmass
+    // from the wanter's capital. The alarm read is a 1660 snapshot: the sim
+    // keeps no cumulative alarm counter. GRAINS DIFFER along the funnel, as
+    // `campaign_class_trace`'s own comment says: examined / blocked / wet /
+    // reach-denied are candidate-grain, "cleared" is SEASON-grain (up to two
+    // scores per candidate, so it can exceed "in reach"), "chosen" is
+    // round-grain (one per round Campaign won, by the winner's class).
+    //
+    // THE LADDER, in the item's order, with its report thresholds
+    // (thresholds on the READING, like kSilentFloorBattles -- moving them
+    // changes what a seed is called, never what happened):
+    //   NO FRONTIER       the span raised fewer than kFrontierPairsFloor new
+    //                     contact pairs -- nothing was met to displace to;
+    //   NO EXPLORER       no polity ever held the rim;
+    //   TREATY-CALM       neighbours bound (>= kBoundShareCalm of near
+    //                     candidates treaty-blocked) and fewer than
+    //                     kFrontierReachFloor met-in-span candidates in reach;
+    //   DETERRENCE-INERT  met-in-span candidates in reach at or over the floor
+    //                     and neighbours NOT bound -- Alarm did not quiet them.
+    // A seed with a reachable frontier AND bound neighbours that is still
+    // held fits none of the four -- its remaining unbound near pairs carry
+    // the war -- and is printed UNCLASSIFIED rather than forced into one.
+    constexpr int64_t kFrontierPairsFloor = 2;    ///< met-in-span pairs at 1660.
+    constexpr int64_t kFrontierReachFloor = 100;  ///< met-in-span candidates scored over the span.
+    constexpr double  kBoundShareCalm     = 0.5;  ///< near candidates treaty-blocked / examined.
+
+    struct held_cause_census { int no_frontier = 0, no_explorer = 0, treaty_calm = 0,
+                                   deterrence_inert = 0, unclassified = 0; } census;
+    std::printf("\n--- held-seed causes (BL-999) -- report thresholds: NO FRONTIER under %lld met-in-span pairs, "
+                "frontier reach floor %lld scored met-in-span candidates, neighbours bound at >= %.0f%% blocked ---\n",
+                static_cast<long long>(kFrontierPairsFloor), static_cast<long long>(kFrontierReachFloor),
+                kBoundShareCalm * 100.0);
+    for (displacement_seed& d : disp)
+    {
+        if (std::strcmp(d.verdict, "held") != 0) continue;
+        const exploration_row* rp = nullptr;
+        for (const exploration_row& r : rows) if (r.ok && r.seed == d.seed) { rp = &r; break; }
+        if (!rp) continue;
+        const exploration_row& r = *rp;
+        const int64_t* near_c  = r.campaign_class[0];
+        const int64_t* met_c   = r.campaign_class[1];
+        const int64_t* unmet_c = r.campaign_class[2];
+        const auto in_reach = [](const int64_t* c) { return c[0] - c[1] - c[2] - c[3]; };
+        const int64_t near_allowed  = near_c[0] - near_c[1];
+        const int64_t near_in_reach = in_reach(near_c);
+        const int64_t met_in_reach  = in_reach(met_c);
+        const int64_t unmet_in_reach = in_reach(unmet_c);
+        const auto pct = [](int64_t num, int64_t den) {
+            return den > 0 ? 100.0 * static_cast<double>(num) / static_cast<double>(den) : 0.0;
+        };
+        const double blocked_share  = pct(near_c[1], near_c[0]) / 100.0;
+        const bool neighbours_bound   = blocked_share >= kBoundShareCalm;
+        const bool frontier_reachable = met_in_reach >= kFrontierReachFloor;
+
+        if      (r.far_pairs < kFrontierPairsFloor)          { d.cause = "NO FRONTIER";      ++census.no_frontier; }
+        else if (r.rim_holders_ever == 0)                   { d.cause = "NO EXPLORER";      ++census.no_explorer; }
+        else if (!frontier_reachable && neighbours_bound)   { d.cause = "TREATY-CALM";      ++census.treaty_calm; }
+        else if (!frontier_reachable)                       { d.cause = "NO FRONTIER";      ++census.no_frontier; }
+        else if (!neighbours_bound)                         { d.cause = "DETERRENCE-INERT"; ++census.deterrence_inert; }
+        else                                                { d.cause = "UNCLASSIFIED";     ++census.unclassified; }
+
+        std::printf("  seed %-3u nb=%lld fr=%lld  %s%s\n",
+                    d.seed, static_cast<long long>(d.nb), static_cast<long long>(d.fr), d.cause,
+                    std::strcmp(d.cause, "UNCLASSIFIED") == 0
+                        ? " (frontier reachable AND neighbours bound; the unbound near pairs carry the war)" : "");
+        std::printf("    neighbour campaigns: examined %lld, refused by deterrence (treaty-blocked) %lld (%.1f%%), "
+                    "allowed %lld -> in reach %lld -> cleared %lld -> chosen %lld\n",
+                    static_cast<long long>(near_c[0]), static_cast<long long>(near_c[1]), pct(near_c[1], near_c[0]),
+                    static_cast<long long>(near_allowed), static_cast<long long>(near_in_reach),
+                    static_cast<long long>(near_c[4]), static_cast<long long>(near_c[5]));
+        std::printf("    pairs at 1660: near %lld, bound %lld (%.1f%%), unbound %lld; met-in-span %lld, bound %lld (%.1f%%); "
+                    "near pairs reading alarm > 0: %lld/%lld (max alarm %d)\n",
+                    static_cast<long long>(r.near_pairs), static_cast<long long>(r.near_bound),
+                    pct(r.near_bound, r.near_pairs), static_cast<long long>(r.near_pairs - r.near_bound),
+                    static_cast<long long>(r.far_pairs), static_cast<long long>(r.far_bound),
+                    pct(r.far_bound, r.far_pairs),
+                    static_cast<long long>(r.near_pairs_alarmed), static_cast<long long>(r.near_pairs),
+                    r.near_alarm_max_q);
+        std::printf("    explorer rim: %lld polities ever held it (%lld alive at 1660)\n",
+                    static_cast<long long>(r.rim_holders_ever), static_cast<long long>(r.rim_holders_alive));
+        std::printf("    frontier, met-in-span: examined %lld, treaty-blocked %lld, water-illegal %lld, reach-denied %lld, "
+                    "IN REACH %lld, cleared %lld, chosen %lld\n",
+                    static_cast<long long>(met_c[0]), static_cast<long long>(met_c[1]), static_cast<long long>(met_c[2]),
+                    static_cast<long long>(met_c[3]), static_cast<long long>(met_in_reach),
+                    static_cast<long long>(met_c[4]), static_cast<long long>(met_c[5]));
+        std::printf("    frontier, unmet (the first crossing): examined %lld, water-illegal %lld, reach-denied %lld, "
+                    "IN REACH %lld, cleared %lld, chosen %lld\n",
+                    static_cast<long long>(unmet_c[0]), static_cast<long long>(unmet_c[2]),
+                    static_cast<long long>(unmet_c[3]), static_cast<long long>(unmet_in_reach),
+                    static_cast<long long>(unmet_c[4]), static_cast<long long>(unmet_c[5]));
+        std::printf("    want table at 1660: %lld wants, outward (across water) %lld (%.1f%%), "
+                    "pointing at a met-in-span polity %lld (%.1f%%)\n",
+                    static_cast<long long>(r.wants_total), static_cast<long long>(r.wants_outward),
+                    pct(r.wants_outward, r.wants_total),
+                    static_cast<long long>(r.wants_frontier), pct(r.wants_frontier, r.wants_total));
+    }
+    if (seeds_held == 0)
+        std::printf("  no held seed on this spread.\n");
+    else
+        std::printf("  census: NO FRONTIER=%d NO EXPLORER=%d TREATY-CALM=%d DETERRENCE-INERT=%d UNCLASSIFIED=%d\n",
+                    census.no_frontier, census.no_explorer, census.treaty_calm,
+                    census.deterrence_inert, census.unclassified);
+    face.held_cause[0] = census.no_frontier;      face.held_cause[1] = census.no_explorer;
+    face.held_cause[2] = census.treaty_calm;      face.held_cause[3] = census.deterrence_inert;
+    face.held_cause[4] = census.unclassified;
 
     double med_empire = 0.0, med_expl = 0.0;
     if (!empire_rates.empty())
@@ -1354,27 +1619,40 @@ int main(int argc, char** argv)
                     static_cast<long long>(lapsed));
         {
             std::vector<int64_t> st, ga;
-            int64_t holders = 0, saturated = 0, living = 0, violations = 0;
+            int64_t holders = 0, living = 0, violations = 0;
+            int64_t army_unpaid = 0, navy_unpaid = 0, army_upkeep = 0, navy_upkeep = 0,
+                    levy_raised = 0, levy_returned = 0; // BL-972
             for (const exploration_row& r : rows)
             {
                 if (!r.ok) continue;
                 st.insert(st.end(), r.standing_per_region.begin(), r.standing_per_region.end());
                 ga.insert(ga.end(), r.garrison_per_region.begin(), r.garrison_per_region.end());
-                holders   += r.standing_holders;
-                saturated += r.army_saturated;
+                holders    += r.standing_holders;
                 violations += r.standing_invariant_violations;
+                army_unpaid += r.army_unpaid_rounds; navy_unpaid += r.navy_unpaid_rounds;
+                army_upkeep += r.spent_army_upkeep;  navy_upkeep += r.spent_navy_upkeep;
+                levy_raised += r.levy_raised;        levy_returned += r.levy_returned;
             }
             living = static_cast<int64_t>(st.size());
-            face.r7_standing_holders = holders; face.r7_saturated = saturated; face.r7_violations = violations;
+            face.r7_standing_holders = holders; face.r7_violations = violations;
+            face.r7_army_unpaid = army_unpaid; face.r7_navy_unpaid = navy_unpaid;
+            face.r7_army_upkeep = army_upkeep; face.r7_navy_upkeep = navy_upkeep;
+            face.r7_levy_raised = levy_raised; face.r7_levy_returned = levy_returned;
             const auto pct = [](std::vector<int64_t> v, int p) -> long long {
                 if (v.empty()) return 0;
                 std::sort(v.begin(), v.end());
                 return static_cast<long long>(v[(v.size() - 1) * static_cast<std::size_t>(p) / 100]);
             };
             std::printf("  paid standing army at 1660, heads per held region over %lld living polities: "
-                        "p50=%lld p75=%lld p90=%lld max=%lld  (holders=%lld, realm above cap=%lld)\n",
+                        "p50=%lld p75=%lld p90=%lld max=%lld  (holders=%lld)\n",
                         static_cast<long long>(living), pct(st, 50), pct(st, 75), pct(st, 90),
-                        pct(st, 100), static_cast<long long>(holders), static_cast<long long>(saturated));
+                        pct(st, 100), static_cast<long long>(holders));
+            // BL-972: the bill is the observable that replaced the cap.
+            std::printf("  upkeep (BL-972): army bill paid=%lld navy bill paid=%lld  polity-rounds short: "
+                        "army=%lld navy=%lld  levy raised=%lld returned=%lld heads\n",
+                        static_cast<long long>(army_upkeep), static_cast<long long>(navy_upkeep),
+                        static_cast<long long>(army_unpaid), static_cast<long long>(navy_unpaid),
+                        static_cast<long long>(levy_raised), static_cast<long long>(levy_returned));
             std::printf("  paid standing army invariant violations (every round + close): %lld\n",
                         static_cast<long long>(violations));
             std::printf("  garrison_target per held region: p50=%lld p75=%lld p90=%lld max=%lld\n",
@@ -1660,7 +1938,11 @@ int main(int argc, char** argv)
                     if (std::strcmp(d.verdict, "SILENT") == 0)
                     { std::fprintf(f, "%s%u", first ? "" : ", ", d.seed); first = false; }
             }
-            std::fprintf(f, "], \"ambiguous_battles\": %d},\n", face.ambiguous_total);
+            std::fprintf(f, "], \"ambiguous_battles\": %d, \"held_cause_census\": {\"NO FRONTIER\": %d, "
+                            "\"NO EXPLORER\": %d, \"TREATY-CALM\": %d, \"DETERRENCE-INERT\": %d, "
+                            "\"UNCLASSIFIED\": %d}},\n",
+                         face.ambiguous_total, face.held_cause[0], face.held_cause[1],
+                         face.held_cause[2], face.held_cause[3], face.held_cause[4]);
             std::fprintf(f, "  \"conflict_persists\": {\"median_empire_rate_per_century\": %.4f, "
                             "\"median_exploration_rate_per_century\": %.4f},\n",
                          face.med_empire_rate, face.med_expl_rate);
@@ -1696,13 +1978,19 @@ int main(int argc, char** argv)
                             "\"spent_standing_armies\": %lld, \"navy_holders_expn_top\": %lld, "
                             "\"navy_holders_expn_bottom\": %lld, \"port_steps\": %lld, \"navy_steps\": %lld, "
                             "\"army_steps\": %lld, \"navies_lapsed\": %lld, \"standing_holders\": %lld, "
-                            "\"army_saturated\": %lld, \"standing_invariant_violations\": %lld},\n",
+                            "\"army_unpaid_rounds\": %lld, \"navy_unpaid_rounds\": %lld, "
+                            "\"spent_army_upkeep\": %lld, \"spent_navy_upkeep\": %lld, "
+                            "\"levy_raised\": %lld, \"levy_returned\": %lld, "
+                            "\"standing_invariant_violations\": %lld},\n",
                          static_cast<long long>(face.r7_navy_holders), static_cast<long long>(face.r7_spent_ports),
                          static_cast<long long>(face.r7_spent_navies), static_cast<long long>(face.r7_spent_armies),
                          static_cast<long long>(face.r7_navy_top), static_cast<long long>(face.r7_navy_bottom),
                          static_cast<long long>(face.r7_port_steps), static_cast<long long>(face.r7_navy_steps),
                          static_cast<long long>(face.r7_army_steps), static_cast<long long>(face.r7_lapsed),
-                         static_cast<long long>(face.r7_standing_holders), static_cast<long long>(face.r7_saturated),
+                         static_cast<long long>(face.r7_standing_holders),
+                         static_cast<long long>(face.r7_army_unpaid), static_cast<long long>(face.r7_navy_unpaid),
+                         static_cast<long long>(face.r7_army_upkeep), static_cast<long long>(face.r7_navy_upkeep),
+                         static_cast<long long>(face.r7_levy_raised), static_cast<long long>(face.r7_levy_returned),
                          static_cast<long long>(face.r7_violations));
             std::fprintf(f, "  \"treasury_spread\": {\"polities\": %lld, \"treasury_min\": %lld, \"treasury_max\": %lld, "
                             "\"treasury_mean\": %.4f, \"corr_treasury_corridor_touch\": %.4f},\n",
@@ -1764,6 +2052,37 @@ int main(int argc, char** argv)
                 put_d("expl_rate_per_century", true, per_century(r.expl_battles, r.expl_years), ", ");
                 put_d("displacement_ratio", d && d->ratio >= 0.0, d ? d->ratio : 0.0, ", ");
                 std::fprintf(f, "\"displacement_verdict\": \"%s\",\n", d ? d->verdict : "");
+                // BL-999: the named cause (held seeds only; null otherwise) and
+                // the facts it was read off, for every ran seed. The three
+                // campaign classes are written apart (near / met-in-span /
+                // unmet) because the census reads them apart.
+                if (d && d->cause) std::fprintf(f, "   \"held_cause\": \"%s\", ", d->cause);
+                else               std::fprintf(f, "   \"held_cause\": null, ");
+                {
+                    const auto put_class = [&](const char* prefix, const int64_t* c, const char* tail) {
+                        std::fprintf(f, "\"%s_examined\": %lld, \"%s_treaty_blocked\": %lld, \"%s_water_illegal\": %lld, "
+                                        "\"%s_reach_denied\": %lld, \"%s_in_reach\": %lld, \"%s_cleared\": %lld, "
+                                        "\"%s_chosen\": %lld%s",
+                                     prefix, static_cast<long long>(c[0]), prefix, static_cast<long long>(c[1]),
+                                     prefix, static_cast<long long>(c[2]), prefix, static_cast<long long>(c[3]),
+                                     prefix, static_cast<long long>(c[0] - c[1] - c[2] - c[3]),
+                                     prefix, static_cast<long long>(c[4]), prefix, static_cast<long long>(c[5]), tail);
+                    };
+                    std::fprintf(f, "\"held_cause_facts\": {");
+                    put_class("near",  r.campaign_class[0], ", ");
+                    put_class("met",   r.campaign_class[1], ", ");
+                    put_class("unmet", r.campaign_class[2], ", ");
+                    std::fprintf(f, "\"near_pairs\": %lld, \"near_pairs_bound\": %lld, \"met_pairs\": %lld, "
+                                    "\"met_pairs_bound\": %lld, \"near_pairs_alarmed\": %lld, \"near_alarm_max_q\": %d, "
+                                    "\"rim_holders_ever\": %lld, \"rim_holders_alive\": %lld, \"wants\": %lld, "
+                                    "\"wants_outward\": %lld, \"wants_frontier\": %lld},\n",
+                                 static_cast<long long>(r.near_pairs), static_cast<long long>(r.near_bound),
+                                 static_cast<long long>(r.far_pairs), static_cast<long long>(r.far_bound),
+                                 static_cast<long long>(r.near_pairs_alarmed), r.near_alarm_max_q,
+                                 static_cast<long long>(r.rim_holders_ever), static_cast<long long>(r.rim_holders_alive),
+                                 static_cast<long long>(r.wants_total), static_cast<long long>(r.wants_outward),
+                                 static_cast<long long>(r.wants_frontier));
+                }
                 // reading 3
                 std::fprintf(f, "   \"strength_measured\": %s, \"treasury_top_has_consolidator\": %s, "
                                 "\"treasury_top_has_expansionist\": %s, \"regions_top_has_consolidator\": %s, "
@@ -1797,14 +2116,19 @@ int main(int argc, char** argv)
                 std::fprintf(f, "   \"navy_holders\": %lld, \"navy_holders_expn_top\": %lld, \"navy_holders_expn_bottom\": %lld, "
                                 "\"spent_navies\": %lld, \"spent_ports\": %lld, \"spent_standing_armies\": %lld, "
                                 "\"port_steps\": %lld, \"navy_steps\": %lld, \"army_steps\": %lld, \"navies_lapsed\": %lld, "
-                                "\"standing_holders\": %lld, \"army_saturated\": %lld, \"standing_invariant_violations\": %lld, ",
+                                "\"standing_holders\": %lld, \"army_unpaid_rounds\": %lld, \"navy_unpaid_rounds\": %lld, "
+                                "\"spent_army_upkeep\": %lld, \"spent_navy_upkeep\": %lld, "
+                                "\"levy_raised\": %lld, \"levy_returned\": %lld, \"standing_invariant_violations\": %lld, ",
                              static_cast<long long>(r.navy_holders), static_cast<long long>(r.navy_holders_expn_top),
                              static_cast<long long>(r.navy_holders_expn_bottom),
                              static_cast<long long>(r.treasury_spent_on_navies), static_cast<long long>(r.treasury_spent_on_ports),
                              static_cast<long long>(r.treasury_spent_on_standing_armies),
                              static_cast<long long>(r.port_steps), static_cast<long long>(r.navy_steps),
                              static_cast<long long>(r.army_steps), static_cast<long long>(r.navies_lapsed),
-                             static_cast<long long>(r.standing_holders), static_cast<long long>(r.army_saturated),
+                             static_cast<long long>(r.standing_holders),
+                             static_cast<long long>(r.army_unpaid_rounds), static_cast<long long>(r.navy_unpaid_rounds),
+                             static_cast<long long>(r.spent_army_upkeep), static_cast<long long>(r.spent_navy_upkeep),
+                             static_cast<long long>(r.levy_raised), static_cast<long long>(r.levy_returned),
                              static_cast<long long>(r.standing_invariant_violations));
                 put_mmm("standing_per_region", r.standing_per_region, ", ");
                 put_mmm("garrison_per_region", r.garrison_per_region, ",\n");

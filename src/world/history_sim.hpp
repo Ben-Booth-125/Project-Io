@@ -1889,21 +1889,56 @@ struct history_sim_params
     int64_t navy_build_cost_q      = 600;
     int64_t navy_build_step_q      = 400;
     int     navy_min_port_stock_q  = 200;
-    /// Per-mille of standing `navy_stock` lost per YEAR, UNCONDITIONALLY —
-    /// "a fleet is a running cost, not a purchase," so this fires whether or
-    /// not the round also funded growth.
+    /// Per-mille of the UNPAID share of `navy_stock` lost per YEAR (BL-972).
+    /// "A fleet is a running cost, not a purchase": the cost is
+    /// `navy_upkeep_per_1000_units_year_q` below, and this decay is what
+    /// happens to the hulls the purse could not pay for this round. A fleet
+    /// whose bill is met in full does not decay.
     int     navy_decay_per_mille_year_q = 30;
 
     /// Treasury cost to add `standing_army_build_step_q` heads to the
     /// capital's `region::army_stock`, on top of whatever muster alone holds
-    /// there, one decision round's worth.
+    /// there, one decision round's worth. BL-972: the heads are a LEVY drawn
+    /// from the seat's `manpower_stock` (`standing_army_levy_per_mille_q`),
+    /// never conjured — a paid soldier is a civilian who left the pool.
     int64_t standing_army_build_cost_q = 500;
     int64_t standing_army_build_step_q = 300;
-    /// Per-mille of the PAID standing heads (`region::standing_army`) that
-    /// revert to ordinary men per YEAR on any round the army step was not
-    /// funded (BL-955) — "falls back toward what muster alone provides": the
-    /// reverted men are then the muster's to disband like any excess garrison.
+    /// Per-mille of the UNPAID share of the PAID standing heads
+    /// (`region::standing_army`) that go home per YEAR (BL-972; the rate is
+    /// BL-955's). "Falls back toward what muster alone provides": the men
+    /// leave `army_stock` and return to the `manpower_stock` of the ground
+    /// they stand on, capped at its ceiling exactly as `muster_garrison`'s
+    /// own disband is. A realm whose bill is met in full loses none.
     int     standing_army_decay_per_mille_year_q = 60;
+
+    // --- BL-972: force persists, and persistence has a BILL -----------------
+    // EXPLORATION.md sec Force persists now: "a polity that over-builds is
+    // poorer every round afterwards ... a cost in the world rather than a
+    // handicap in the scorer." Every round, after EARN and before the one
+    // scored purchase, each living polity is billed for the paid heads
+    // standing anywhere in its realm and for its fleet, from the CAPITAL'S
+    // `region::treasury`. The army is billed first (the garrison at home
+    // before the hulls), then the navy. A bill the purse cannot meet in full
+    // is paid for as many heads/units as it covers, and the UNPAID share
+    // decays at the two rates above — treasury 0 is exactly BL-955's decay.
+    //
+    // DEFAULTS: the raising price, per year. A paid step buys 300 heads for
+    // 500 (1667 per 1000) and 400 hull-units for 600 (1500 per 1000); a
+    // standing soldier's pay over a year is of the order of what it cost to
+    // raise him (real history supplies the mechanism: pay, not kit, is the
+    // running cost of a standing force). MEASURED, not targeted — see the
+    // BL-972 sweep report for what these defaults do on 16 seeds. Zero
+    // disables a bill, and a stock with no bill never decays.
+    int64_t standing_army_upkeep_per_1000_heads_year_q = 1667;
+    int64_t navy_upkeep_per_1000_units_year_q          = 1500;
+    /// The LEVY BOUND: a paid army step may draw at most this per-mille of
+    /// the seat's banked `manpower_stock` in one round, and the step is
+    /// all-or-nothing (same shape as every other purchase here), so the army
+    /// option is not eligible when the pool cannot lend a whole step. This is
+    /// the physical limit that replaces the scorer's old per-region cap: the
+    /// muster and the paid levy now draw on the SAME pool of eligible
+    /// civilians (GENERATION_STRATEGY.md sec Population is civilian).
+    int     standing_army_levy_per_mille_q = 500;
 
     // --- BL-955: spend is ALLOCATED, not bought whenever affordable ----------
     // EXPLORATION.md sec Force persists now ("Spend is ALLOCATED"). Once a
@@ -1928,14 +1963,14 @@ struct history_sim_params
     int     spend_hold_base_q           = 250;
     /// Weight of the CONSOLIDATOR rank in hold (weighted below the army's).
     int     spend_w_hold_consolidator_q = 200;
-    /// A fleet SATURATES: the navy score is 0 once `navy_stock` exceeds this
-    /// many units per held region.
-    int64_t navy_saturation_per_region  = 400;
-    /// A standing army SATURATES the same way: the army score is 0 once the
-    /// capital's PAID standing army (`standing_army_heads(seat)`, the heads
-    /// the army step adds and the muster never disbands) exceeds this many
-    /// heads per held region.
-    int64_t army_saturation_per_region  = 300;
+    // BL-972 REMOVED the two saturation caps BL-955 first cut carried here
+    // (`navy_saturation_per_region` 400, `army_saturation_per_region` 300:
+    // a score of 0 past N units/heads per held region). They were a handicap
+    // in the scorer standing in for a cost in the world; the per-head bill
+    // above (`standing_army_upkeep_per_1000_heads_year_q`,
+    // `navy_upkeep_per_1000_units_year_q`) and the levy bound
+    // (`standing_army_levy_per_mille_q`) are the forces that now limit a
+    // stock, and both are visible in the world rather than inside the actor.
 };
 
 // ---------------------------------------------------------------------------
@@ -2018,6 +2053,18 @@ struct exploration_upkeep_spend
     int64_t army_steps      = 0;
     /// BL-955: polity indices whose navy decayed to zero this call.
     std::vector<uint16_t> navies_lapsed;
+    /// BL-972: the BILL. Treasury actually paid this call for paid standing
+    /// heads and for hulls, and how many living polities' bills went short
+    /// (paid for fewer heads/units than stand), for each stock.
+    int64_t army_upkeep     = 0;
+    int64_t navy_upkeep     = 0;
+    int64_t army_unpaid     = 0; ///< polities whose army bill was not met in full
+    int64_t navy_unpaid     = 0; ///< polities whose navy bill was not met in full
+    /// BL-972: the LEVY. Heads drawn from a seat's `manpower_stock` by an
+    /// army step this call, and heads returned to a region's pool by the
+    /// unpaid decay this call.
+    int64_t levy_raised     = 0;
+    int64_t levy_returned   = 0;
 };
 
 struct history_sim_state;       // defined further down
@@ -2240,6 +2287,11 @@ struct polity
     /// far-flung holding is a large empire, not an overseas one), the term is
     /// left out and recorded as owed. It is an addend on this scalar when
     /// BL-749 lands, not a restructure.
+    ///
+    /// WRITTEN ON THE TWO-SPAN ARC ONLY (BL-976). The single-span arc runs no
+    /// industrial span, so the sim leaves this at zero there and the
+    /// derivation is Digitisation's (DIGITISATION.md § The boundary);
+    /// `seed_national_tariffs` reads it on both arcs as the enactment seam.
     int protection_q = 0;
 
     /// True for a seeded great power (BL-299). Majors start with more ground
@@ -2374,6 +2426,30 @@ struct polity
     /// readable by a third party without a second ledger: `treaty_value_q`
     /// reads the COUNTERPART's copy of this field, never the decider's own.
     int32_t treaties_broken = 0;
+
+    // -----------------------------------------------------------------------
+    // BL-973 — THE TREE EFFECT SURFACE, folded from the masks above.
+    // -----------------------------------------------------------------------
+    //
+    // DERIVED, NEVER AUTHORED: `apply_tree_effects` rewrites both fields
+    // from `empire_mask` and `exploration_mask` at the top of every round
+    // and again the instant a node is bought, walking the generated
+    // `effects[]` tables (tree_effect.hpp is the vocabulary). Nothing else
+    // writes them, and nothing in the sim names a node — a reader asks for
+    // a TERM or a KEY, never for "node 11". NOT SERIALISED, same footing as
+    // the masks: recomputable from them, and this struct does not cross the
+    // save seam.
+
+    /// Per-term sum of held `modifier` effects' per-mille, both trees,
+    /// indexed by `io::tree_modifier_term`. A term with no reader in the
+    /// sim is still summed here (the surface is generic); which terms are
+    /// read is `tree_effect_reader_of`'s to say.
+    int32_t tree_mod_q[io::tree_modifier_term_count] = {};
+
+    /// Bit `k` set iff some held node carries an effect with
+    /// `key == io::tree_effect_key(k)`. The identity reads (sea legs, post
+    /// roads) test this and nothing else.
+    uint32_t tree_keys = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -2471,17 +2547,76 @@ inline bool polity_holds_exploration_rim(const polity& q)
     return (q.exploration_mask & (1ULL << io::exploration_tree::rim_node_index)) != 0;
 }
 
+// ---------------------------------------------------------------------------
+// The tree effect surface (BL-973) — one fold, generic readers, an honest
+// unread list
+// ---------------------------------------------------------------------------
+//
+// TREES.md sec Effects: "a node whose effect nothing in the sim reads is not
+// authored." Before this item the generated tables carried topology only and
+// the sim read three nodes by hand (a counted rim index, `index 11` for sea
+// legs, a strcmp on "EX-WY-1a"). Now every store effect reaches the sim
+// through ONE fold, and what the sim does with each kind is stated here in
+// code, so the harness can hold the store to it.
+
+/// Fold `q.empire_mask` and `q.exploration_mask` into `q.tree_mod_q[]` and
+/// `q.tree_keys`, walking both generated `effects[]` tables in their fixed
+/// authored order. Pure in the masks; idempotent; cheap (≈140 rows).
+void apply_tree_effects(polity& q);
+
+/// Does a held node carry an effect keyed `k`? Reads the folded surface.
+inline bool polity_holds_tree_key(const polity& q, io::tree_effect_key k)
+{
+    return (q.tree_keys & (1u << static_cast<unsigned>(k))) != 0;
+}
+
+/// The polity's summed per-mille for one modifier term (0 when nothing held).
+inline int tree_mod_q(const polity& q, io::tree_modifier_term t)
+{
+    const int i = static_cast<int>(t);
+    return (i >= 0 && i < io::tree_modifier_term_count) ? q.tree_mod_q[i] : 0;
+}
+
 /// BL-934 — THE ASYMMETRY THAT PERMITS SUBJECTION, AS A NODE, NEVER A RANK
-/// (EXPLORATION.md sec Where subjects come from: "nothing reads size"). Index
-/// 11, `EX-HL-3a` "Oceanic Navigation": "a crossing to unmet ground no longer
-/// requires an adjacent shore" — the exact capability a far, unmet continent's
-/// contact requires, read straight off `exploration_mask` exactly as
-/// `polity_holds_exploration_rim` reads its own bit.
-inline constexpr int exploration_sea_legs_node_index = 11;
+/// (EXPLORATION.md sec Where subjects come from: "nothing reads size"): the
+/// store effect keyed `sea_legs` ("a crossing to unmet ground no longer
+/// requires an adjacent shore"), whichever node carries it.
 inline bool polity_holds_exploration_sea_legs(const polity& q)
 {
-    return (q.exploration_mask & (1ULL << exploration_sea_legs_node_index)) != 0;
+    return polity_holds_tree_key(q, io::tree_effect_key::sea_legs);
 }
+
+/// Which sim surface consumes an effect. `unread` is the honest gap: the
+/// effect is folded (a modifier still sums into `tree_mod_q`) but nothing
+/// downstream reads it yet.
+enum class tree_effect_reader : uint8_t
+{
+    unread = 0,
+    ring_gate,        ///< open "ring N": `*_node_available`'s ring lock
+    tree_gate,        ///< open "<tree> tree": `polity_holds_*_rim`
+    sea_legs_gate,    ///< key sea_legs: the subjection block
+    post_roads_gate,  ///< key post_roads: the treasury-bought third road rung
+    modifier_defence,     ///< the defender's readiness (campaign pricing and resolution)
+    modifier_industrial,  ///< the materials ladder's pull-forward
+    modifier_cohesion,    ///< Consolidate's recovery rate
+    modifier_research,    ///< both trees' research flow
+};
+tree_effect_reader tree_effect_reader_of(const io::tree_effect& e);
+
+/// THE STATED UNREAD LIST. True for exactly the effects the sim does not
+/// consume today: kinds `unlock`, `upgrade`, `retire`, `access`, `reach`,
+/// `intel`, `institution`, `doctrine`, `resource` when they carry no key
+/// (works and unit rows still gate on the derived band — TREES.md's open
+/// question; the rest are prose the sim has no term for), and modifier
+/// terms `carrying_capacity`, `manpower`, `stores`, `assimilation`, `plague`,
+/// `forage`, `muster_cost` (their consumers read region fields or do not
+/// exist in this sim) plus `reach`, which HAS a surface and is withheld on
+/// a measured finding (the authored magnitudes collapse the BL-872 distance
+/// fixtures — see the holdings-supply site in run_history_sim). A harness
+/// asserts every store effect is either read or on this list, and never
+/// both, so authoring a new kind or term into a store without a reader
+/// fails loudly instead of doing nothing.
+bool tree_effect_declared_unread(const io::tree_effect& e);
 
 /// What the scorer chose for one polity in one year — kept for the harness and
 /// for the History Log, so a run can be read back as decisions rather than as
@@ -3123,6 +3258,17 @@ struct history_sim_state
     int64_t treasury_spent_on_ports          = 0;
     int64_t treasury_spent_on_navies         = 0;
     int64_t treasury_spent_on_standing_armies = 0;
+    /// BL-972: the BILL, summed over every decision round -- treasury paid
+    /// for paid standing heads and for hulls, and the polity-rounds on which
+    /// each bill went short. The observable for "a cost in the world binds".
+    int64_t treasury_spent_on_army_upkeep = 0;
+    int64_t treasury_spent_on_navy_upkeep = 0;
+    int64_t army_upkeep_unpaid_rounds     = 0;
+    int64_t navy_upkeep_unpaid_rounds     = 0;
+    /// BL-972: the LEVY -- heads drawn from seats' manpower pools by army
+    /// steps, and heads sent home to a pool by the unpaid decay, all rounds.
+    int64_t levy_heads_raised   = 0;
+    int64_t levy_heads_returned = 0;
 
     /// BL-955: stock steps bought this run, by kind — with the allocation a
     /// polity buys at most one per round, so these count CHOICES made.
@@ -3539,9 +3685,15 @@ struct exploration_spend_facts
     int     port_window_q       = 0; ///< the seat's `port_q` endowment window.
     int     port_stock_q        = 0; ///< the seat's built port, 0-1000.
     int64_t navy_stock          = 0;
-    /// The capital's PAID standing army: `standing_army_heads(seat)`, >= 0.
+    /// The realm's PAID standing army (every held region's
+    /// `standing_army_heads`), >= 0. Read by nothing in the scorer since
+    /// BL-972 removed the cap; carried so a caller can print what the bill
+    /// stood on.
     int64_t standing_army       = 0;
-    int64_t held_regions        = 0;
+    /// BL-972: the heads the seat's `manpower_stock` can lend this round
+    /// (`manpower_stock * standing_army_levy_per_mille_q / 1000`). The army
+    /// step is eligible only when this covers a whole step.
+    int64_t levy_room           = 0;
 };
 
 /// Each option's score and whether it may be taken at all.
@@ -3554,13 +3706,15 @@ struct exploration_spend_scores
 /// The scores (0-1000 each, integer):
 ///   outward = (expansion_rank * w_expansion + water_want * w_water_want) / 1000
 ///   port    = outward * (1000 - port_stock) / 1000
-///   navy    = outward, or 0 once navy_stock > navy_saturation_per_region * max(1, held)
-///   army    = (consolidator_rank * w_consolidator + alarm * w_alarm) / 1000,
-///             or 0 once standing_army > army_saturation_per_region * max(1, held)
+///   navy    = outward
+///   army    = (consolidator_rank * w_consolidator + alarm * w_alarm) / 1000
 ///   hold    = hold_base + consolidator_rank * w_hold_consolidator / 1000
+/// No score saturates (BL-972): what limits a stock is its bill, paid before
+/// this choice is made, and the levy bound below.
 /// Eligibility: port needs a cost > 0 the treasury covers, a port window and
 /// port_stock < 1000; navy a cost > 0 the treasury covers and port_stock >=
-/// `navy_min_port_stock_q`; army a cost > 0 the treasury covers. Hold always.
+/// `navy_min_port_stock_q`; army a cost > 0 the treasury covers AND
+/// `levy_room >= standing_army_build_step_q`. Hold always.
 exploration_spend_scores score_exploration_spend(const history_sim_params&    p,
                                                  const exploration_spend_facts& f);
 

@@ -147,7 +147,16 @@ inline constexpr uint32_t save_game_magic =
 /// written by `w_report` after the Exploration counters -- the two handoff
 /// validators' verdict on the shipped path. Same strict-equality refusal: a
 /// v14 stream has no bytes there.
-inline constexpr uint32_t save_game_version = 15; // BL-969, the handoff validators' verdict
+/// Bumped to 16 by BL-961 (the thermal series): `planetology_state` gains
+/// `thermal_series` — a float vector, `continent_drift_epochs + 1` long, written
+/// by `w_planetology_state` between `core_exposed` and the body profile, in
+/// declaration order. A MID-RECORD gap in every body's planetology record (and
+/// its `undrawn` twin), so a v15 stream misreads the profile and everything
+/// after it — refused whole on the same strict-equality contract as every prior
+/// bump. Serialised at all because the Generation Ledger replays a body's tiles
+/// from the saved record, and the Life phase's palaeo pre-pass now reads the
+/// series; a replay without it would place coal and petroleum from the present.
+inline constexpr uint32_t save_game_version = 16; // BL-961, the thermal series
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

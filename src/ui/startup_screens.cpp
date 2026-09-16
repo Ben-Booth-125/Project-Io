@@ -367,6 +367,59 @@ void app::poll_wizard_history()
         }
         m_wiz_history[i] = std::move(landed);
 
+        // CONTINUITY (Ben, 2026-09-16): a round opens on the ground the round
+        // before it left. The predecessor's LAST frame is folded to one colour
+        // per region and handed over, and the map paints it under
+        // ground nobody holds yet, fading over the opening tenth of this span.
+        // Taken at LANDING rather than at draw time because the predecessor's
+        // own record is complete by then and never changes again — the carried
+        // frame is a fact about a finished round, not a second surface to keep
+        // in step. Round 3 has nothing behind it and carries nothing.
+        // NOT gated on the predecessor having SAMPLE steps: the migration's
+        // record carries ownership deltas and no polity samples at all (its
+        // board has no People column for exactly that reason), and gating on
+        // steps left the Culture round unable to hand anything over — the one
+        // hand-over this was built for. owner_slice_at reconstructs from the
+        // deltas, so a record with a span is enough.
+        if (i > 0 && m_wiz_history[i - 1].lapse.years > 0)
+        {
+            const ui::history_lapse& prev = m_wiz_history[i - 1];
+            const int prev_end = prev.lapse.start_year + prev.lapse.years;
+            const std::vector<uint16_t> last = owner_slice_at(prev.lapse, prev_end);
+            std::vector<uint32_t> cols(last.size(), 0u);
+            int held = 0;
+            for (std::size_t r = 0; r < last.size(); ++r)
+                if (last[r] != owner_none)
+                {
+                    cols[r] = static_cast<uint32_t>(ui::lapse_owner_colour(prev, last[r]));
+                    ++held;
+                }
+            if (held > 0) m_wiz_history[i].carry_colour = std::move(cols);
+
+            // AND THE REALMS KEEP THEIR COLOURS ACROSS THE HAND-OVER (Ben,
+            // 2026-09-16: the Exploration round "looks like it actually carried
+            // over from culture"). It had not: the carry was right and the
+            // PALETTE was not.  is a greedy graph colouring over
+            // one record's own adjacency, so the Empires record and the
+            // Exploration record — different spans, different neighbour sets —
+            // gave the same realm different slots, and a realm that changed
+            // colour at the round boundary read as a different world. The
+            // polity ids are the same table (one generation, one seed, the
+            // spans continue), so a shared id keeps the slot it already had
+            // and only realms the predecessor never saw take a fresh one.
+            //
+            // Polity rounds only: the migration's owners are CULTURES in their
+            // own id space and its lineage palette is a different thing
+            // entirely, so nothing is inherited across that boundary.
+            if (prev.culture_colour.empty() && !prev.polity_slot.empty())
+            {
+                std::vector<int32_t>& slot = m_wiz_history[i].polity_slot;
+                const std::size_t n = std::min(slot.size(), prev.polity_slot.size());
+                for (std::size_t p = 0; p < n; ++p)
+                    if (prev.polity_slot[p] >= 0) slot[p] = prev.polity_slot[p];
+            }
+        }
+
         // BL-914: LANDING NO LONGER RE-PARKS THE PLAYHEAD AT THE START. Under
         // the old design the future carried the whole record and this was the
         // first moment any of it was visible, so parking at the start was the
@@ -378,10 +431,16 @@ void app::poll_wizard_history()
         // range, and only fall back to its start_year for a round that was
         // never live-drawn at all (the `--verify`/adopted paths, whose year is
         // still the launch-time sentinel).
+        // PARKED AT THE FIRST YEAR (Ben, 2026-09-16). BL-914 kept whatever
+        // year the live phase had reached, because snapping back would have
+        // looked like the transport lurching. There is no live phase any more —
+        // the wait is a wait — so the record plays from its beginning, which is
+        // also the only way its hand-over cross-fade is ever seen.
         const int lstart = m_wiz_history[i].lapse.start_year;
         const int lend   = lstart + m_wiz_history[i].lapse.years;
-        if (m_wiz_history_year[i] < lstart) m_wiz_history_year[i] = lstart;
-        if (m_wiz_history_year[i] > lend)   m_wiz_history_year[i] = lend;
+        m_wiz_history_year[i]  = lstart;
+        m_wiz_history_carry[i] = 0.0f;
+        if (m_wiz_history_year[i] > lend) m_wiz_history_year[i] = lend;
 
         // It plays the moment it lands (or keeps playing, if the live phase
         // already had it going): the run was the wait, and the playback is
@@ -945,6 +1004,7 @@ void app::draw_generation_screen()
     // future lands" into "has a growing record from the first publish on".
     if (lapse_round) poll_wizard_history_tap(lapse_index);
     std::vector<uint16_t> hist_slice, hist_lagged;
+    int hist_lagged_year = INT32_MIN; // the year `hist_lagged` was taken at (BL-1000)
     if (lapse_round && !m_wiz_history[lapse_index].empty())
     {
         // The land mask comes from the wizard's OWN packed surface — the same
@@ -990,7 +1050,13 @@ void app::draw_generation_screen()
                 m_wiz_history_progress[lapse_index].sub_total.load(std::memory_order_relaxed);
             const float span = sub_total > 0 ? static_cast<float>(sub_total)
                                              : static_cast<float>(last - first);
-            constexpr float run_secs = 30.0f;
+            // BL-948: the viewer's own choice of wall clock for the whole span,
+            // not a fixed 30 s. The divisor is the only thing that changed; the
+            // "against the full span, never against how far it has got" rule
+            // above is what keeps a live round from slowing down as it runs.
+            const float run_secs = m_wiz_history_secs[lapse_index] > 0.0f
+                                       ? m_wiz_history_secs[lapse_index]
+                                       : wizard_lapse_secs_default;
             const float rate = span > 0.0f ? span / run_secs : 1.0f;
             m_wiz_history_carry[lapse_index] += ImGui::GetIO().DeltaTime * rate;
             const int whole = static_cast<int>(m_wiz_history_carry[lapse_index]);
@@ -1021,7 +1087,8 @@ void app::draw_generation_screen()
         // far enough that a rank move means something, near enough that the marks
         // are not permanently lit.
         const int lag = std::max(1, (last - first) / 12);
-        hist_lagged = owner_slice_at(rec.lapse, year - lag);
+        hist_lagged_year = year - lag;
+        hist_lagged = owner_slice_at(rec.lapse, hist_lagged_year);
     }
 
     const wizard_round_head wr       = wizard_round_head_at(m_wiz_round);
@@ -1158,6 +1225,11 @@ void app::draw_generation_screen()
         const float footer_h = 34.0f * 2.0f + style.ItemSpacing.y * 3.0f;
         ImGui::BeginChild("##wiz_charts", {0.0f, -(decide_h + footer_h)}, false,
                           ImGuiWindowFlags_NoBackground);
+        // BL-1000: the lapse rounds' board, ticker and arc readout live in THIS
+        // child, and at 1080p the arc readout sits below its fold — so
+        // verify.scroll_panel("wizard_charts", ...) needs a scroller of its own
+        // to reach it, exactly as "wizard" reaches the outer column.
+        ui::foldout_scroll_child("##wiz_charts");
 
         // The player still watches the chain work link by link — they have just
         // stopped clicking between the links. Each stage measures its own column
@@ -1190,34 +1262,34 @@ void app::draw_generation_screen()
             ui::history_lapse& rec = m_wiz_history[lapse_index];
             if (m_wiz_history_future[lapse_index].valid())
             {
-                // The wait, with its own content. A frozen pane for ninety seconds
-                // is worse than a bar, not better (STARTUP.md § The wait is the
-                // round) — so the pass says which link it is on, and the era
-                // reports its own year counter while it runs.
-                ImGui::BeginDisabled();
-                ImGui::Button(lapse_index == 0 ? "Running the migration..."
-                              : lapse_index == 1 ? "Running the history..."
-                                                 : "Running the exploration...",
-                              {ImGui::GetContentRegionAvail().x, 30.0f});
-                ImGui::EndDisabled();
-                ImGui::Spacing();
-
-                const generation_progress& prog = m_wiz_history_progress[lapse_index];
-                int li = prog.label.load(std::memory_order_relaxed);
-                if (li < 0 || li >= generation_stage_label_count) li = 0;
-                dim_text(generation_stage_labels[li]);
-
-                const int sub_total = prog.sub_total.load(std::memory_order_relaxed);
-                if (sub_total > 0)
+                // THE WAIT IS A WAIT, AND SAYS SO (Ben, 2026-09-16): "separate each
+                // part with an otherwise completely blank Loading X Round. This way,
+                // the player can see that they have to wait, and what they are
+                // watching is a time-lapse of that very fast calculation." One
+                // centred line, and no map beside it: the pass stages and the year
+                // counter went with it, because a reader who has been told to wait
+                // does not also need to be told which of twelve links the wait is on.
+                //
+                // THIS REVERSES BL-914 for the pass rounds, deliberately. "The wait
+                // is the round" put the sim frontier on screen as it computed; the
+                // calculation is fast and jerky where the lapse is paced and whole,
+                // so showing the first as if it were the second made the second
+                // unreadable — and a round that opened already chasing the frontier
+                // was past its hand-over cross-fade before anyone could see it.
                 {
-                    const int sub_done = prog.sub_progress.load(
-                        std::memory_order_relaxed);
-                    ImGui::ProgressBar(
-                        std::clamp(static_cast<float>(sub_done)
-                                       / static_cast<float>(sub_total), 0.0f, 1.0f),
-                        {ImGui::GetContentRegionAvail().x, 10.0f}, "");
-                    std::snprintf(buf, sizeof buf, "year %d of %d", sub_done, sub_total);
-                    dim_text(buf);
+                    static const char* const k_loading[wizard_lapse_round_count] = {
+                        "Loading the Culture round",
+                        "Loading the Empires round",
+                        "Loading the Exploration round",
+                    };
+                    const char* const label = k_loading[lapse_index];
+                    const float w  = ImGui::GetContentRegionAvail().x;
+                    const float h2 = ImGui::GetContentRegionAvail().y;
+                    const ImVec2 sz = ImGui::CalcTextSize(label);
+                    ImGui::Dummy({w, std::max(0.0f, h2 * 0.40f)});
+                    if (w > sz.x)
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - sz.x) * 0.5f);
+                    ImGui::TextUnformatted(label);
                 }
             }
             else if (rec.empty())
@@ -1292,6 +1364,41 @@ void app::draw_generation_screen()
                     m_wiz_history_playing[lapse_index] = false;
                     m_wiz_history_paused[lapse_index]  = true;
                 }
+                // BL-948 — THE SPEED CONTROL, on every lapse round. Three
+                // rungs of WALL CLOCK for the whole span (Ben: the lapses run
+                // too fast to watch), in the wizard's own three-way idiom —
+                // the same radio row Sparse/Lean/Standard uses on the menu, so
+                // it needs no explaining. It changes the rate the playhead
+                // advances at and nothing else: the scrubber above still goes
+                // anywhere, and a live round still draws as fast as the pass
+                // computes.
+                {
+                    ImGui::TextUnformatted("Pace");
+                    ImGui::SameLine();
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        // Minutes read as minutes: "1m 30s", never "90s".
+                        char id[32];
+                        const int secs = static_cast<int>(wizard_lapse_secs[i]);
+                        if (secs < 60)
+                            std::snprintf(id, sizeof id, "%ds##wizhistpace%d", secs, i);
+                        else if (secs % 60 == 0)
+                            std::snprintf(id, sizeof id, "%dm##wizhistpace%d", secs / 60, i);
+                        else
+                            std::snprintf(id, sizeof id, "%dm %ds##wizhistpace%d",
+                                          secs / 60, secs % 60, i);
+                        if (i > 0) ImGui::SameLine();
+                        if (ImGui::RadioButton(id, m_wiz_history_secs[lapse_index]
+                                                       == wizard_lapse_secs[i]))
+                        {
+                            // The carry is fractional years at the OLD rate;
+                            // keeping it would hand the new rate a debt it
+                            // never ran up. The playhead itself does not move.
+                            m_wiz_history_secs[lapse_index]  = wizard_lapse_secs[i];
+                            m_wiz_history_carry[lapse_index] = 0.0f;
+                        }
+                    }
+                }
                 ImGui::Spacing();
 
                 std::snprintf(buf, sizeof buf, "%s  -  %lld battles, %lld conquests, "
@@ -1304,7 +1411,8 @@ void app::draw_generation_screen()
                 ImGui::Separator();
 
                 ui::draw_lapse_scoreboard(rec, hist_slice, hist_lagged,
-                                          m_wiz_history_year[lapse_index]);
+                                          m_wiz_history_year[lapse_index],
+                                          hist_lagged_year);
                 // BL-916: the ticker — the named moments at or before the
                 //         playhead, the newest of which is the marker on the map.
                 ui::draw_lapse_ticker(rec, m_wiz_history_year[lapse_index]);
@@ -1530,7 +1638,14 @@ void app::draw_generation_screen()
             //    stalls at a strait reads as a stall on a map and as foreshortening
             //    on a sphere. It inherits the globe's no-input rule: nothing here is
             //    a widget. ──
-            if (m_wiz_history[lapse_index].empty())
+            // NOTHING BESIDE A WAIT (Ben, 2026-09-16). While the pass is still
+            // computing, this pane stays empty: the left column says "Loading the
+            // ... round" and that is the whole of the surface. Drawing the sim's
+            // own frontier here is what BL-914 did and what this reverses — the
+            // map appears when there is a finished record to play, and plays it
+            // from its first year.
+            if (m_wiz_history_future[lapse_index].valid()) { /* the wait draws nothing */ }
+            else if (m_wiz_history[lapse_index].empty())
             {
                 ImGui::Dummy({0.0f, ImGui::GetContentRegionAvail().y * 0.45f});
                 ImGui::PushStyleColor(ImGuiCol_Text, col_dim);

@@ -142,6 +142,30 @@ constexpr int32_t lapse_exploration_epoch_year = 1200;
 /// rather than assuming every corridor is land. Majority-water along a
 /// handful of even samples, not "any water", because a bridge crossing one
 /// river tile is not a sea corridor.
+float lapse_unwrap_col(float c0, float c1, int gw)
+{
+    // THE MAP IS A CYLINDER AND A CORRIDOR IS THE SHORT WAY ROUND (Ben,
+    // 2026-09-16, watching the lapse: "we see these roads as wrapping around
+    // the whole view, when actually they are very small roads"). A corridor
+    // between anchors at column 5 and column 255 on a 261-wide world is ten
+    // columns long over the seam and 250 the other way; every reader here took
+    // the raw columns, so the drawn line, the water sample and the bridge test
+    // all described the long way — the one path the corridor is NOT.
+    //
+    // The fix is one function and it belongs at the BAKE, not the draw: this
+    // returns `c1` moved by a whole world width when that is the shorter run,
+    // so the stored segment is the real corridor and everything downstream of
+    // it — over_water, bridges, the exemplar's midpoint — reads the short path
+    // for free. The result can sit outside [0, gw); the draw handles that (a
+    // second, shifted copy, clipped to the map) and the water sample already
+    // folds a sampled column back into range.
+    if (gw <= 0) return c1;
+    const float w = static_cast<float>(gw);
+    if (c1 - c0 >  w * 0.5f) return c1 - w;
+    if (c1 - c0 < -w * 0.5f) return c1 + w;
+    return c1;
+}
+
 bool lapse_corridor_over_water(const std::vector<uint8_t>& band, int gw, int gh,
                                float c0, float r0, float c1, float r1)
 {
@@ -496,7 +520,7 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
             seg.region_b = b;
             seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
             seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
-            seg.c1 = static_cast<float>(h.region_col[b]) + 0.5f;
+            seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[b]) + 0.5f, gw);
             seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
             seg.year_track = e.year;
             if (e.polity >= 2) seg.year_road      = e.year; // robust to a corridor's first event already being Road
@@ -555,7 +579,7 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
             seg.region_b = b;
             seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
             seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
-            seg.c1 = static_cast<float>(h.region_col[b]) + 0.5f;
+            seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[b]) + 0.5f, gw);
             seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
             seg.over_water = lapse_corridor_over_water(band, gw, gh, seg.c0, seg.r0, seg.c1, seg.r1);
             h.trade_segs.push_back(std::move(seg));
@@ -705,6 +729,26 @@ void assign_polity_colours(history_lapse& h, const std::vector<int32_t>* hue_fam
 // The map
 // ---------------------------------------------------------------------------
 
+uint32_t lapse_owner_colour(const history_lapse& h, uint16_t owner)
+{
+    return static_cast<uint32_t>(owner_colour(h, owner));
+}
+
+float lapse_carry_fade(const history_lapse& h, int year)
+{
+    // A TENTH OF THE ROUND'S OWN SPAN, so the hand-over reads the same however
+    // long the span is and however fast the viewer is playing it — tying it to
+    // seconds would make the 270-second pace show the old ground for a minute
+    // and the 90-second pace for twenty seconds, which is the sort of accident
+    // a reader would take for meaning.
+    if (h.carry_colour.empty() || h.lapse.years <= 0) return 0.0f;
+    const float over = static_cast<float>(h.lapse.years) * 0.10f;
+    const float gone = static_cast<float>(year - h.lapse.start_year);
+    if (gone <= 0.0f)  return 1.0f;
+    if (gone >= over)  return 0.0f;
+    return 1.0f - gone / over;
+}
+
 void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     int year)
 {
@@ -795,6 +839,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // Owner keys: -1 sea (nothing drawn, nothing bordered), -2 wild, else the
     // polity index. The frontier is drawn between any two DIFFERENT non-sea
     // keys, on both axes.
+    const float carry_fade = lapse_carry_fade(h, year);
     std::vector<int32_t> row(static_cast<std::size_t>(gw));
     std::vector<int32_t> above(static_cast<std::size_t>(gw), -1);
     std::vector<char>    present; // owner -> holds ground in this slice
@@ -814,6 +859,44 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         // overlapped its neighbour would double its alpha along the overlap.
         const float y0 = py(static_cast<float>(r));
         const float y1 = py(static_cast<float>(r + 1));
+
+        // THE ROUND BEFORE THIS ONE, UNDER EVERYTHING (Ben, 2026-09-16). The
+        // first cut painted the carried frame only under ground nobody held,
+        // which works for the Culture -> Empires hand-over (400 BCE is almost
+        // all unorganised culture ground) and is INVISIBLE for Empires ->
+        // Exploration, where every realm already holds its land at 1200 CE: the
+        // carry had nowhere to show, and the new round fading in over nothing
+        // just made the map dim. So the carried frame goes down first across the
+        // whole row and this round's own fill goes over it — two translucent
+        // tints over the same ground, one leaving as the other arrives.
+        if (carry_fade > 0.0f)
+        {
+            int k = 0;
+            while (k < gw)
+            {
+                const int32_t reg = h.tile_region[static_cast<std::size_t>(r * gw + k)];
+                const uint32_t col = (reg >= 0 && static_cast<std::size_t>(reg) < h.carry_colour.size())
+                                         ? h.carry_colour[static_cast<std::size_t>(reg)] : 0u;
+                int k2 = k + 1;
+                while (k2 < gw)
+                {
+                    const int32_t r2 = h.tile_region[static_cast<std::size_t>(r * gw + k2)];
+                    const uint32_t c2 = (r2 >= 0 && static_cast<std::size_t>(r2) < h.carry_colour.size())
+                                            ? h.carry_colour[static_cast<std::size_t>(r2)] : 0u;
+                    if (c2 != col) break;
+                    ++k2;
+                }
+                if (col != 0u)
+                {
+                    dl->AddRectFilled({px(static_cast<float>(k)), y0},
+                                      {px(static_cast<float>(k2)), y1},
+                                      with_alpha(static_cast<ImU32>(col),
+                                                 static_cast<int>(tint_alpha * carry_fade)));
+                    ++prims;
+                }
+                k = k2;
+            }
+        }
         int c = 0;
         while (c < gw)
         {
@@ -825,9 +908,18 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 const uint16_t o = static_cast<uint16_t>(key);
                 if (present.size() <= o) present.resize(static_cast<std::size_t>(o) + 1, 0);
                 present[o] = 1;
+                // AND THE NEW ROUND FADES IN AS THE OLD ONE FADES OUT (Ben,
+                // 2026-09-16). One cross-fade, not a cut with an underlay: the
+                // carried ground is leaving at exactly the rate this round's
+                // own holders are arriving, so the opening reads as the same
+                // world changing hands rather than two surfaces swapping. A
+                // round with nothing behind it (the migration, and any round
+                // whose predecessor was never run) reads a fade of 0 from the
+                // first frame, so it draws at full strength as it always did.
                 dl->AddRectFilled({px(static_cast<float>(c)), y0},
                                   {px(static_cast<float>(e)), y1},
-                                  with_alpha(owner_colour(h, o), tint_alpha));
+                                  with_alpha(owner_colour(h, o),
+                                             static_cast<int>(tint_alpha * (1.0f - carry_fade))));
                 ++prims;
             }
             // The VERTICAL frontier: between this run and the one to its west.
@@ -897,15 +989,32 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    A promoted one draws faint at Track and thickens at Road; a bridge
     //    glyph marks every point its line crosses a river, but only once the
     //    corridor carrying it is actually drawn. ──
+    // A SEAM-CROSSING CORRIDOR IS DRAWN TWICE, ONCE OFF EACH EDGE. The bake
+    // stored the short way round (`lapse_unwrap_col`), so one end may sit at a
+    // negative column or past `gw`: drawing it once leaves the far half
+    // missing, and drawing it unclipped would paint over the panel beside the
+    // map. So each corridor is stroked at its own columns and again a world
+    // width away, inside the map's own clip rect — the half that belongs on
+    // each edge survives, and nothing escapes the map.
+    const float world_w = static_cast<float>(gw) * scale;
+    dl->PushClipRect({tl.x, tl.y}, {tl.x + static_cast<float>(gw) * scale,
+                                    tl.y + static_cast<float>(gh) * scale}, true);
     for (const lapse_road_seg& s : h.road_segs)
     {
         if (year < s.year_track) continue; // not promoted yet at this playhead
         const bool at_road = year >= s.year_road;
         const float w = at_road ? std::max(1.5f, scale * 0.30f)
                                 : std::max(1.0f, scale * 0.16f);
-        dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)},
-                   at_road ? col_road : col_road_track, w);
+        const ImU32 col = at_road ? col_road : col_road_track;
+        const bool  wrapped = s.c1 < 0.0f || s.c1 > static_cast<float>(gw);
+        const float shift   = s.c1 < 0.0f ? world_w : -world_w;
+        dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, col, w);
         ++prims;
+        if (wrapped)
+        {
+            dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)}, col, w);
+            ++prims;
+        }
         for (const lapse_bridge& br : s.bridges)
         {
             const ImVec2 at{px(br.col), py(br.row)};
@@ -931,7 +1040,15 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         const float w = std::max(1.25f, scale * 0.22f);
         dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, col_trade_link, w);
         ++prims;
+        if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw)) // the seam, drawn off the other edge
+        {
+            const float shift = s.c1 < 0.0f ? world_w : -world_w;
+            dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)},
+                        col_trade_link, w);
+            ++prims;
+        }
     }
+    dl->PopClipRect();
 
     // ── 3d. FLEET AND CARAVAN EXEMPLARS (BL-943, EXPLORATION.md sec Goods move
     //    as throughput, never as cargo: "the visual is a filter on that
@@ -976,6 +1093,13 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 my = (it->r0 + it->r1) * 0.5f;
                 over_water = it->over_water;
             }
+
+            // The midpoint of a seam-crossing corridor sits off the map by
+            // construction (the bake stored the short way round), so fold it
+            // back into the raster before drawing: the exemplar belongs where
+            // the corridor actually runs, not past the edge.
+            if (mx < 0.0f)                            mx += static_cast<float>(gw);
+            else if (mx > static_cast<float>(gw))     mx -= static_cast<float>(gw);
 
             const float t = static_cast<float>(year - e.year) / static_cast<float>(window);
             const int   a = static_cast<int>(255.0f * (1.0f - t));
@@ -1073,29 +1197,21 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
         dl->AddText(at, col_bright, label.c_str()); // fit-exempt: a year stamp sized by CalcTextSize
     }
 
-    // BL-916 -- THE EVENT MARKER. Every event inside the marker window behind
-    // the playhead draws a ring at its region that GROWS AND FADES with the
-    // playhead's distance past it: the pulse is a function of the year alone,
-    // so it is deterministic under --verify (where the year is script-set and
-    // nothing animates) and reads as a pulse in play, where the year advances
-    // ~span/30 a second. Nothing here is a widget; the no-input rule holds.
-    {
-        const int window = lapse_marker_window_years(h);
-        for (const lapse_event& e : h.lapse.events)
-        {
-            if (e.year > year) break;                // ascending by year
-            if (year - e.year >= window) continue;
-            if (e.region == lapse_event_none
-             || static_cast<std::size_t>(e.region) >= h.region_col.size()) continue;
-            const float t = static_cast<float>(year - e.year) / static_cast<float>(window);
-            const float cx = tl.x + (static_cast<float>(h.region_col[e.region]) + 0.5f) * scale;
-            const float cy = tl.y + (static_cast<float>(h.region_row[e.region]) + 0.5f) * scale;
-            const float r  = 4.0f + 14.0f * t;
-            const int   a  = static_cast<int>(255.0f * (1.0f - t));
-            dl->AddCircle({cx, cy}, r, IM_COL32(245, 240, 220, a), 0, 2.0f);
-            dl->AddCircleFilled({cx, cy}, 2.5f, IM_COL32(245, 240, 220, 255));
-        }
-    }
+    // NO EVENT PINGS ON THE MAP (Ben, 2026-09-16, watching round 4 run).
+    // BL-916 drew a white ring at every event inside the marker window, and it
+    // drew the SAME ring for all of them: a realm dying, a treaty taken and a
+    // trade route opening were one mark. Fifteen event kinds carry a region and
+    // the trade links alone fire several a year, so the map read as a snowstorm
+    // and — Ben's own words — pulled the eye off the border changes, which are
+    // the thing a time-lapse of who-held-what is for.
+    //
+    // THE BORDERS ARE THE STORY. What is gone is the RING, not the record: the
+    // events still cross in `lapse.events`, the ticker still names them with
+    // their year and place, the arc readout still counts them, and the road and
+    // trade-link overlays above still draw on the corridors they belong to --
+    // those are lines on a thing, not pulses over it. A future surface that
+    // wants a mark back should ask which kinds earn one rather than restore
+    // the blanket (STARTUP.md § Rounds 4 and 5).
 
     ImGui::Dummy(avail);
 }
@@ -1115,40 +1231,10 @@ namespace {
 struct board_row
 {
     uint16_t owner   = owner_none;
-    int32_t  land    = 0; ///< Tiles held.
+    int32_t  land    = 0;  ///< Tiles held.
     int      regions = 0;
+    int64_t  people  = -1; ///< Population held at the sampled step; -1 = no sample.
 };
-
-/// Total the land each polity holds in one slice, ordered by it.
-///
-/// SHARE OF LAND is the ordering metric, and it is the honest default for a round
-/// about borders (BL-830): it is the one quantity the ownership record alone can
-/// answer, and share of LAND rather than of surface — an ocean nobody can hold
-/// would otherwise compress every polity into the bottom of the axis.
-std::vector<board_row> rank_slice(const history_lapse& h,
-                                  const std::vector<uint16_t>& slice)
-{
-    std::vector<board_row> rows;
-    for (std::size_t r = 0; r < slice.size() && r < h.region_area.size(); ++r)
-    {
-        const uint16_t o = slice[r];
-        if (o == owner_none) continue;
-        auto it = std::find_if(rows.begin(), rows.end(),
-                               [&](const board_row& b) { return b.owner == o; });
-        if (it == rows.end()) { rows.push_back({o, 0, 0}); it = rows.end() - 1; }
-        it->land += h.region_area[r];
-        ++it->regions;
-    }
-    // Deterministic: land descending, then polity index, so two equal holders do
-    // not swap places frame to frame.
-    std::sort(rows.begin(), rows.end(), [](const board_row& a, const board_row& b) {
-        if (a.land != b.land) return a.land > b.land;
-        return a.owner < b.owner;
-    });
-    return rows;
-}
-
-constexpr int k_board_rows = 16;
 
 /// The recorded step at or before @p year, or -1 before the first. `steps` is
 /// ascending by year, so this is one binary search.
@@ -1163,6 +1249,82 @@ int step_at_or_before(const era_timelapse& t, int year)
     }
     return best;
 }
+
+/// The sample one polity has at a recorded step, or nullptr when it has none.
+/// Linear in the step's samples: a few dozen living polities, called per row.
+const polity_sample* sample_at_step(const history_lapse& h, int step, uint16_t polity)
+{
+    if (step < 0 || static_cast<std::size_t>(step) >= h.lapse.steps.size()) return nullptr;
+    const timelapse_step& st = h.lapse.steps[static_cast<std::size_t>(step)];
+    for (int i = 0; i < st.sample_count; ++i)
+    {
+        const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
+        if (k < h.lapse.samples.size() && h.lapse.samples[k].polity == polity)
+            return &h.lapse.samples[k];
+    }
+    return nullptr;
+}
+
+/// Every living polity's population summed at a recorded step — the "people"
+/// share's denominator, taken over the STEP'S samples exactly as
+/// `history_sweep`'s `pop_slice_at` takes it, so the board and the sweep divide
+/// by the same number. 0 before the first step.
+int64_t people_held_at_step(const history_lapse& h, int step)
+{
+    if (step < 0 || static_cast<std::size_t>(step) >= h.lapse.steps.size()) return 0;
+    const timelapse_step& st = h.lapse.steps[static_cast<std::size_t>(step)];
+    int64_t total = 0;
+    for (int i = 0; i < st.sample_count; ++i)
+    {
+        const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
+        if (k < h.lapse.samples.size()) total += h.lapse.samples[k].population;
+    }
+    return total;
+}
+
+/// Total the land and the people each polity holds in one slice, ordered by it.
+///
+/// SHARE OF PEOPLE is the ordering metric (Ben, 2026-09-15, NR-876 / BL-1000).
+/// Share of LAND was the honest default while the ownership record was all
+/// there was (BL-830), but it measures founding as much as conquest: read by
+/// population instead, the largest realms are two to five points MORE
+/// concentrated and most region-count "risers" were founding empty ground.
+/// The population is `polity_sample::population` at the recorded step at or
+/// before @p year — the sum of held regions' headcounts (history_sim.cpp,
+/// `record_step`) — and a polity with no sample at that step (the opening
+/// years, before the first recorded step; every polity on the Culture round,
+/// whose record carries no samples) ranks as holding no one, so the board
+/// falls back to land order exactly where people are unmeasured.
+std::vector<board_row> rank_slice(const history_lapse& h,
+                                  const std::vector<uint16_t>& slice, int year)
+{
+    std::vector<board_row> rows;
+    for (std::size_t r = 0; r < slice.size() && r < h.region_area.size(); ++r)
+    {
+        const uint16_t o = slice[r];
+        if (o == owner_none) continue;
+        auto it = std::find_if(rows.begin(), rows.end(),
+                               [&](const board_row& b) { return b.owner == o; });
+        if (it == rows.end()) { rows.push_back({o, 0, 0, -1}); it = rows.end() - 1; }
+        it->land += h.region_area[r];
+        ++it->regions;
+    }
+    const int step = step_at_or_before(h.lapse, year);
+    for (board_row& b : rows)
+        if (const polity_sample* s = sample_at_step(h, step, b.owner)) b.people = s->population;
+
+    // Deterministic: people descending, then land descending, then polity index,
+    // so two equal holders do not swap places frame to frame.
+    std::sort(rows.begin(), rows.end(), [](const board_row& a, const board_row& b) {
+        const int64_t pa = std::max<int64_t>(0, a.people), pb = std::max<int64_t>(0, b.people);
+        if (pa != pb) return pa > pb;
+        if (a.land != b.land) return a.land > b.land;
+        return a.owner < b.owner;
+    });
+    return rows;
+}
+
+constexpr int k_board_rows = 16;
 
 /// A headcount in the width a board column can afford.
 void fmt_population(char* buf, std::size_t n, int64_t pop)
@@ -1196,26 +1358,17 @@ const char* polity_name_of(const history_lapse& h, uint16_t polity)
 void draw_lapse_scoreboard(const history_lapse& h,
                            const std::vector<uint16_t>& slice,
                            const std::vector<uint16_t>& lagged,
-                           int year)
+                           int year, int lagged_year)
 {
-    const std::vector<board_row> now  = rank_slice(h, slice);
-    const std::vector<board_row> then = rank_slice(h, lagged);
+    const std::vector<board_row> now  = rank_slice(h, slice, year);
+    const std::vector<board_row> then = rank_slice(h, lagged, lagged_year);
 
-    // BL-916 on BL-817: the sample this instant's Population and Might columns
+    // BL-916 on BL-817: the sample this instant's People, Pop and Might columns
     // read. The step AT OR BEFORE the playhead, so the board never shows a
-    // number from a future the map has not reached.
-    const int step = step_at_or_before(h.lapse, year);
-    const auto sample_for = [&](uint16_t polity) -> const polity_sample* {
-        if (step < 0) return nullptr;
-        const timelapse_step& st = h.lapse.steps[static_cast<std::size_t>(step)];
-        for (int i = 0; i < st.sample_count; ++i)
-        {
-            const std::size_t k = static_cast<std::size_t>(st.first_sample + i);
-            if (k < h.lapse.samples.size() && h.lapse.samples[k].polity == polity)
-                return &h.lapse.samples[k];
-        }
-        return nullptr;
-    };
+    // number from a future the map has not reached. `people_total` is the
+    // sweep's own denominator — every living polity's sample summed at the step.
+    const int     step         = step_at_or_before(h.lapse, year);
+    const int64_t people_total = people_held_at_step(h, step);
 
     int32_t held = 0;
     for (const board_row& b : now) held += b.land;
@@ -1234,10 +1387,15 @@ void draw_lapse_scoreboard(const history_lapse& h,
     ImGui::PopStyleColor();
     ImGui::Spacing();
 
-    // POPULATION and MIGHT are read off BL-817's per-polity sample series at the
-    // step this instant falls in (BL-916). Still ORDERED BY LAND: share of ground
-    // is the round's subject, and the two columns qualify a row rather than rank
-    // it. Might is the military capacity band, 1-6, exactly as the sim holds it.
+    // PEOPLE, POPULATION and MIGHT are read off BL-817's per-polity sample series
+    // at the step this instant falls in (BL-916). ORDERED BY PEOPLE (BL-1000):
+    // the share of everyone held that this polity holds, which is the rank; the
+    // share of LAND stays as the second column because a realm that is large and
+    // empty is a different thing from one that is small and full, and the pair
+    // says which. The region COUNT that used to sit here is gone — it measured
+    // the placement pass more than the ground anybody held, and its width is
+    // what pays for the second share. Might is the military capacity band, 1-6,
+    // exactly as the sim holds it.
     //
     // A RESEARCH COLUMN DOES NOT GO HERE, and that is a standing refusal rather
     // than a deferral: research points accrue from population (BL-822), so the
@@ -1247,16 +1405,16 @@ void draw_lapse_scoreboard(const history_lapse& h,
                            ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
         return;
 
-    // "Rgn", not "Regions": the header is drawn by ImGui's own TableHeadersRow,
-    // which neither elides nor reports, so a header wider than its column simply
-    // clips ("Re...") with nothing recording that it did. "Pop" and "Mt" for the
-    // same reason.
-    ImGui::TableSetupColumn("#",    ImGuiTableColumnFlags_WidthFixed, 22.0f);
-    ImGui::TableSetupColumn("Seat", ImGuiTableColumnFlags_WidthStretch);
-    ImGui::TableSetupColumn("Land", ImGuiTableColumnFlags_WidthFixed, 48.0f);
-    ImGui::TableSetupColumn("Rgn",  ImGuiTableColumnFlags_WidthFixed, 30.0f);
-    ImGui::TableSetupColumn("Pop",  ImGuiTableColumnFlags_WidthFixed, 46.0f);
-    ImGui::TableSetupColumn("Mt",   ImGuiTableColumnFlags_WidthFixed, 24.0f);
+    // Short headers throughout: the header is drawn by ImGui's own
+    // TableHeadersRow, which neither elides nor reports, so a header wider than
+    // its column simply clips ("Popul...") with nothing recording that it did.
+    // "People" is the rank column and reads as a share; "Pop" is the headcount.
+    ImGui::TableSetupColumn("#",      ImGuiTableColumnFlags_WidthFixed, 22.0f);
+    ImGui::TableSetupColumn("Seat",   ImGuiTableColumnFlags_WidthStretch);
+    ImGui::TableSetupColumn("People", ImGuiTableColumnFlags_WidthFixed, 48.0f);
+    ImGui::TableSetupColumn("Land",   ImGuiTableColumnFlags_WidthFixed, 48.0f);
+    ImGui::TableSetupColumn("Pop",    ImGuiTableColumnFlags_WidthFixed, 46.0f);
+    ImGui::TableSetupColumn("Mt",     ImGuiTableColumnFlags_WidthFixed, 24.0f);
     ImGui::TableHeadersRow();
 
     const int shown = std::min(k_board_rows, static_cast<int>(now.size()));
@@ -1322,17 +1480,31 @@ void draw_lapse_scoreboard(const history_lapse& h,
             if (entered) ImGui::PopStyleColor();
         }
 
+        // The rank column: this polity's share of everyone held at the step.
+        // Per-mille integer arithmetic, the sweep's `share_q_of`, so a figure
+        // read off the board is the figure the sweep would print. A polity with
+        // no sample at this step — the record starts on the first decision
+        // round, so the opening years have none — draws a dim dash rather than
+        // a zero it never measured.
+        const polity_sample* smp = sample_at_step(h, step, b.owner);
         ImGui::TableSetColumnIndex(2);
+        if (smp != nullptr && people_total > 0)
+        {
+            const int q = static_cast<int>((smp->population * 1000) / people_total);
+            ImGui::Text("%d.%d%%", q / 10, q % 10);
+        }
+        else
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+            ImGui::TextUnformatted("-");
+            ImGui::PopStyleColor();
+        }
+
+        ImGui::TableSetColumnIndex(3);
         ImGui::Text("%.1f%%", 100.0f * static_cast<float>(b.land)
                                      / static_cast<float>(held));
 
-        ImGui::TableSetColumnIndex(3);
-        ImGui::Text("%d", b.regions);
-
-        // The two sampled columns. A polity with no sample at this step — the
-        // record starts on the first decision round, so the opening years have
-        // none — draws a dim dash rather than a zero it never measured.
-        const polity_sample* smp = sample_for(b.owner);
+        // The two remaining sampled columns, dashed on the same rule.
         ImGui::TableSetColumnIndex(4);
         if (smp != nullptr)
         {
@@ -1475,6 +1647,39 @@ lapse_arc summarise_lapse_arc(const history_lapse& h)
     }
     out.biggest_end_q = (biggest_end * 1000) / stride;
     out.smallest_end  = smallest_end;
+
+    // THE SAME PEAK BY PEOPLE (BL-1000), and it is history_sweep's
+    // `peak_share_pop_q` ARITHMETIC EXACTLY, not a per-step maximum: the sweep
+    // walks the span a century at a time from its first year, reads the step
+    // at or before each mark, and takes the largest polity's population over
+    // every living polity's at that step (`pop_slice_at` / `share_q_of`). A
+    // per-step walk would find a higher peak between two marks and the panel
+    // and the sweep would then disagree about the same world — which is the
+    // one thing this readout must never do. The end share is the sweep's
+    // `top_share_pop_q`: the closing year's own step.
+    if (!h.lapse.steps.empty())
+    {
+        const int first = h.lapse.start_year;
+        const int last  = h.lapse.start_year + h.lapse.years;
+        const auto share_at = [&](int y) -> int {
+            const int si = step_at_or_before(h.lapse, y);
+            if (si < 0) return 0;
+            const timelapse_step& st = h.lapse.steps[static_cast<std::size_t>(si)];
+            int64_t total = 0, top = 0;
+            for (int k = 0; k < st.sample_count; ++k)
+            {
+                const std::size_t idx = static_cast<std::size_t>(st.first_sample + k);
+                if (idx >= h.lapse.samples.size()) break;
+                const int64_t p = h.lapse.samples[idx].population;
+                total += p;
+                if (p > top) top = p;
+            }
+            return total > 0 ? static_cast<int>((top * 1000) / total) : 0;
+        };
+        for (int y = first; y <= last; y += 100)
+            out.peak_share_pop_q = std::max(out.peak_share_pop_q, share_at(y));
+        out.end_share_pop_q = share_at(last);
+    }
     return out;
 }
 
@@ -1489,7 +1694,15 @@ void draw_lapse_arc(const history_lapse& h)
     // STATED AS PROSE, NOT A TABLE. The player is deciding whether to keep this
     // world, which is a judgement about SHAPE; a table of six numbers makes them
     // do the reading. The numbers are still all present.
-    if (a.eliminated == 0 && a.rose_and_fell == 0 && a.peak_share_q < 100)
+    //
+    // THE SHARES ARE OF PEOPLE, the board's rank column (BL-1000), so the
+    // sentence and the board agree about who was largest. The region figures
+    // stay as the fallback for a record that carries no samples, so the
+    // readout never goes silent on a world it can still describe.
+    const bool by_people = a.peak_share_pop_q > 0;
+    const int  peak_q    = by_people ? a.peak_share_pop_q : a.peak_share_q;
+    const int  end_q     = by_people ? a.end_share_pop_q  : a.biggest_end_q;
+    if (a.eliminated == 0 && a.rose_and_fell == 0 && peak_q < 100)
     {
         ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
         ImGui::TextWrapped("A quiet age. %d peoples held ground and none of them "
@@ -1499,11 +1712,13 @@ void draw_lapse_arc(const history_lapse& h)
     else
     {
         ImGui::Text("%d polities, %d destroyed.", a.polities, a.eliminated);
-        ImGui::Text("The largest empire held %d%% of the world; %d rose and fell back.",
-                    a.peak_share_q / 10, a.rose_and_fell);
+        // Wrapped, not Text: "people" made this line the column's longest, and
+        // an unwrapped line clips at the column edge with nothing recording it.
+        ImGui::TextWrapped("The largest empire held %d%% of the world's %s; %d rose and fell back.",
+                           peak_q / 10, by_people ? "people" : "land", a.rose_and_fell);
         ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
         ImGui::TextWrapped("At the end the greatest holds %d%%, the least %d region%s.",
-                           a.biggest_end_q / 10, a.smallest_end,
+                           end_q / 10, a.smallest_end,
                            a.smallest_end == 1 ? "" : "s");
         ImGui::PopStyleColor();
     }

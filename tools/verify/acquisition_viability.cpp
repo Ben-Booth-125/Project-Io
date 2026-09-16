@@ -145,7 +145,7 @@ void check_on_real_spawn(bool ok, const char* row, const char* what)
     check(ok, row, what);
 }
 
-constexpr int k_warm_ticks = 80;  ///< app::pre_game_ticks.
+constexpr int k_warm_ticks = 80;  ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978), and this harness's own settle length is a re-read it owes.
 constexpr int k_r1_window  = 8;   ///< Quarters R1 reads for its trend. Two years.
 
 /// BL-573: run_nation_step's template registry. Empty is correct — nothing in

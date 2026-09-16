@@ -274,8 +274,8 @@ int app::run_autostart()
     // Headless coverage for the path --verify has never reached.
     //
     // run_verify (below) calls setup_world + load_economy and stops. It never
-    // calls start_new_game, so generate_background_firms and the pre-game warm
-    // start have NO automated coverage — which is how a crash in "placing
+    // calls start_new_game, so the landscape search and the winner's validation
+    // run have NO automated coverage — which is how a crash in "placing
     // companies" reached a player build. This runs the real interactive tail,
     // headlessly, and reports which step it died on.
     // run() loads init.lua before anything else; start_new_game reads `config`
@@ -307,7 +307,7 @@ int app::run_autostart()
     while (m_screen != app_screen::in_game && std::chrono::steady_clock::now() < deadline)
     {
         // BL-630: no fork to take. poll_worldgen drives generation, then the
-        // warm start, then the seat, and lands on in_game by itself.
+        // winner's validation run, then the seat, and lands on in_game by itself.
         poll_worldgen();
         std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 Hz, as the app polls
     }
@@ -1170,6 +1170,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                                    + m_wiz_history[i].lapse.years);
     });
 
+    // BL-1000: the arc readout's share figures on the CURRENT lapse round, in
+    // per-mille — (peak share of PEOPLE, closing share of people, peak share of
+    // regions). The first is the number the readout prints as "the largest
+    // empire held N% of the world's people", computed by `summarise_lapse_arc`
+    // exactly as history_sweep computes `peak_share_pop_q`; a script reads it
+    // here so the panel and the sweep can be held to one figure for one seed
+    // without a human reading a capture. Zeros with no record.
+    v.set_function("history_arc", [this]() {
+        const int i = wizard_lapse_index();
+        if (m_wiz_history[i].empty()) return std::make_tuple(0, 0, 0);
+        const ui::lapse_arc a = ui::summarise_lapse_arc(m_wiz_history[i]);
+        return std::make_tuple(a.peak_share_pop_q, a.end_share_pop_q, a.peak_share_q);
+    });
+
     v.set_function("show_panel", [this](const std::string& name, bool open) {
         if (name == "construction")      m_ui.show_construction_panel = open;
         else if (name == "tile")         m_ui.show_tile_ledger = open;
@@ -1449,6 +1463,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // column had scrolled below the fold. `foldout_scroll_child` matches on
         // the id string alone, so naming the child here is enough.
         else if (name == "wizard")               target = "##wiz_left";
+        // BL-1000: the pass rounds' chart child inside that column — the lapse
+        // board, ticker and arc readout scroll HERE, not in the outer column.
+        else if (name == "wizard_charts")        target = "##wiz_charts";
         else if (name.empty())                   target = ""; // the documented "clear" call
 
         if (target == nullptr)

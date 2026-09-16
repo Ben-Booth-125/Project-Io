@@ -60,11 +60,11 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 // ---------------------------------------------------------------------------
 // app::start_new_game_prelude does not spawn the background economy with a bare
 // generate_background_firms call any more. Since BL-770 phase 6 it SEARCHES:
-// setup_world + load_economy, then `search_landscape` over the placement and
-// road-tier axes with the specialist roster held (regenerate_specialists =
-// false — generate_corporations APPENDS and has already run inside
-// make_hard_coded_world), then `apply_landscape_candidate(winner)`, then a
-// second assign_default_recipes.
+// setup_world + load_economy, then `search_landscape` over all three axes —
+// roster, placement and road tier, every candidate REPLACING the world-gen
+// specialists (BL-977: `remove_specialist_roster` then `generate_corporations`
+// from `world::gen_settlement`) — then `apply_landscape_candidate(winner)`,
+// then a second assign_default_recipes.
 //
 // Nine instruments kept the bare call after the search landed, so every one of
 // them measured the SEED CANDIDATE — the walk's starting point — rather than
@@ -76,10 +76,10 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 // It MIRRORS; it does not re-implement. The search params are the ones app.cpp
 // passes (read them there before changing these) and the search itself is
 // src/world/landscape_search.cpp. A single-candidate walk (`search = false`)
-// reproduces the old bare call exactly — applying the seed candidate is
-// assign_default_recipes + generate_background_firms(seed) and nothing else —
-// so an instrument that deliberately wants the seed candidate says so with the
-// flag rather than by calling generate_background_firms itself.
+// applies the seed candidate unsearched — the specialist roster regenerated at
+// the seed's count and placement, plus generate_background_firms(seed) — so an
+// instrument that deliberately wants the seed candidate says so with the flag
+// rather than by calling generate_background_firms itself.
 //
 // COST. The search is ~19 evaluations at ~1 s each on a live world (app.cpp's
 // 2026-09-07 measurement), so a harness that builds N worlds pays ~20 s x N
@@ -98,19 +98,28 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 struct shipped_landscape
 {
     landscape_search_result search;   ///< the walk; `winner` is what was applied
-    std::vector<entity_id>  firms;    ///< corporations the applied candidate ADDED, ascending id
+    /// BACKGROUND firms the applied candidate laid, ascending id. Specialists
+    /// are in `specialists`: since BL-977 the candidate replaces that roster
+    /// too, and an instrument asking "which are the companies" must not be
+    /// handed the corporations as well.
+    std::vector<entity_id>  firms;
+    std::vector<entity_id>  specialists;  ///< the candidate's specialist roster, ascending id
     bool                    searched = true;  ///< false: the seed candidate was applied unsearched
 };
 
 /// The search params app.cpp passes, keyed from the world seed exactly as it
-/// keys them. `regenerate_specialists = false` is a hard constraint there, not a
-/// preference — see landscape_search_params for why.
-inline landscape_search_params shipped_search_params(std::uint32_t world_seed)
+/// keys them. `regenerate_specialists = true` since BL-977; the start's
+/// corporation count is `world_gen_config::corporation_count`, which every
+/// shipped config leaves at its default — pass the parsed value where an
+/// instrument has one.
+inline landscape_search_params shipped_search_params(std::uint32_t world_seed,
+                                                     int corporation_count = 8)
 {
     landscape_search_params sp;
-    sp.regenerate_specialists = false;
-    sp.seed                   = world_seed ^ 0x8A21F00Du;
-    sp.start.placement_seed   = sp.seed;
+    sp.regenerate_specialists  = true;
+    sp.seed                    = world_seed ^ 0x8A21F00Du;
+    sp.start.placement_seed    = sp.seed;
+    sp.start.corporation_count = corporation_count;
     return sp;
 }
 
@@ -145,7 +154,7 @@ inline shipped_landscape apply_shipped_landscape(world& w, const recipe_registry
         out.search.seed_candidate = sp.start;
         out.search.winner         = sp.start;
     }
-    apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/false);
+    apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true);
 
     // app.cpp's second pass, and not belt-and-braces: without it every processor
     // a background firm authored keeps `no_recipe` for the whole campaign.
@@ -156,8 +165,11 @@ inline shipped_landscape apply_shipped_landscape(world& w, const recipe_registry
     for (const auto& kv : w.corporations)
         after.push_back(kv.first);
     std::sort(after.begin(), after.end());
+    std::vector<entity_id> added;
     std::set_difference(after.begin(), after.end(), before.begin(), before.end(),
-                        std::back_inserter(out.firms));
+                        std::back_inserter(added));
+    for (const entity_id cid : added)
+        (w.corporations.at(cid).is_background ? out.firms : out.specialists).push_back(cid);
     return out;
 }
 

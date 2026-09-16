@@ -363,24 +363,56 @@ settlement-density description with no consumer. The pass requires population ce
 exist — which is why `generate_population_centres` runs before `generate_nations` in
 `hard_coded_world.cpp` (see § Settlement generation below).
 
-### Pass 7 — Starting treasury *(Ben, 2026-08-24)*
+### Pass 7 — Starting treasury *(Ben, 2026-08-24; the source ruled BL-975, 2026-09-15)*
 
-`nation_component::treasury` is zero at generation by NATIONS.md's existing design — deliberate,
-since a treasury that started full would be a balance change smuggled in as a field. That rule
-still holds for the ONGOING campaign; what it does not settle is generation itself, and Sprint 16
-hit the gap from two directions at once (BL-571's garrison sizing, BL-572's contract-offer
-funding both scale off treasury, so both flatten to their floor in a freshly generated world).
+`nation_component::treasury` opens on **what the history banked, not what the campaign has yet
+earned**. NATIONS.md's rule — a treasury nothing has credited is zero, and a treasury that started
+full would be a balance change smuggled in as a field — still holds for the ONGOING campaign; it
+never settled generation, and two consumers hit the gap at once (garrison sizing and contract-offer
+funding both scale off treasury, so both flattened to their floor in a freshly generated world).
+Ruled 2026-08-24 that generation credits a treasury of its own; ruled 2026-09-15 that the credit is
+the **Exploration span's 1660 treasury folded across the handoff**, not a levy re-run at world
+creation — the history already wrote the number, and a nation that inherited an empire's chest
+should open richer than one that inherited a city state's.
 
-**Ruled: generation runs a starting levy or tariff of its own**, crediting every nation's
-treasury via the SAME conservation-checked transfer `apply_budget`'s levy already uses
-(NATIONS.md § 2 — a transfer, not a mint; someone's balance debits exactly what the treasury
-credits), before `seed_nation_garrisons` (`hard_coded_world.cpp`) and before any contract-offer
-derivation can run. This
-is a generation-time pass, not a campaign-tick one — it fires once, at world creation, using
-whatever a nation's own resource/territory profile already earns it that first quarter, so a rich
-nation still starts richer without any new authored number. Owner: a future backlog item against
-this pass; not yet implemented (see `docs/development/backlog.json` for the open item this design
-promotes into).
+**The rule.** `EXPLORATION.md` § Where the treasury sits puts one treasury per polity at its
+capital seat, as a fact about the ground (`region::treasury`): the flag over that ground at 1660
+owns the chest. Pass 2d folds a polity's anchored regions into ONE nation, and the polity's whole
+1660 treasury — summed over every region flying its flag, so a water-seated capital still counts —
+lands on that nation, once. A seed the size floor (Pass 2c) absorbs hands its chest to the realm
+that absorbed it, the same way it hands over its ground. A nation with **no folded polity** — a
+Voronoi cell the history never held, or any body without a settlement pass — opens on the
+**floor: 0 credits**, NATIONS.md's own zero for a treasury nothing has credited.
+
+**The one stated conversion.** The sim's treasury is in its material currency; the campaign's is
+credits. The conversion is a per-mille, and it is named here and nowhere else:
+
+    treasury_credits = Σ region::treasury (1660, over the folded polities) × 0.01 ‰
+
+that is, **0.01 per mille — one credit per 100,000 units of material**
+(`nation_params::treasury_credit_per_mille`). Chosen against two scales the campaign already has,
+measured on the reference seed:
+
+- **The first quarter's budget.** Every nation's extraction levy (NATIONS.md § 3) is its whole
+  quarterly income at the open; on the reference seed the 38 levies sum to ~284 credits in quarter
+  one, ~7.5 credits per nation. The 1660 median polity chest is ~10 million material, so 0.01 ‰
+  opens the median nation on ~100 credits — about **thirteen quarters (three years) of its own
+  levy**, a reserve, not a hoard. Ten times more (0.1 ‰) would be thirty years of income.
+- **The corporate economy it faces.** Opening corporate cash on the reference seed is ~1,000
+  credits per firm, ~92,000 across the field. At 0.01 ‰ the 38 treasuries sum to ~15,300 credits
+  and the richest realm opens on ~3,800 — four firms' worth, a state that can fund a line or two
+  of its budget (NATIONS.md § 1) without becoming the economy's largest buyer on tick one. At
+  0.1 ‰ the treasuries alone would exceed every firm's cash combined.
+
+Garrison sizing (`seed_nation_garrisons`, MILITARY.md § Nation garrisons) reads the result and
+differentiates on it: the reference seed's poorest realms hold the 20-head floor, its median ~25,
+its richest the 200-head ceiling. The spread is log-heavy because the 1660 chests are — a
+consequence of the span's own endowment and trade income, not a distribution authored here.
+
+**What this pass is not.** It is not a mint inside the campaign: it runs once, at world creation,
+as the fold of a stock the history already held, on the same footing as a corporation's opening
+capital (`CORPORATION_GENERATION.md`). It says nothing about what the treasury is *spent on* —
+NATIONS.md § 1 owns the budget, and Digitisation owns whatever the 1660 → 1960 span adds to it.
 
 ---
 

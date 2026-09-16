@@ -8,7 +8,8 @@
 // testing pillar rather than decaying into prose.
 //
 // It checks, per story:
-//   FAIL  dead backlog trace     — a traces.backlog id not present in backlog.json
+//   FAIL  dead backlog trace     — a traces.backlog id present in NEITHER the hot backlog
+//                                  nor the archive (see the union note at backlogIds)
 //   FAIL  dead requirement trace — a traces.requirements slug not a brief in requirements.json
 //   FAIL  unroutable             — coverage != planned but surfaces/backlog/requirements empty
 //   FAIL  dishonest mode         — testing.mode auto|mixed but no linked brief carries runnable
@@ -21,11 +22,12 @@
 //   --commands  print only the shell/verify commands for the auto+mixed set (for a runner)
 // EXIT:   0 = clean or warnings only;  1 = one or more FAILs.
 //
-// Zero dependencies (fs only). Companion to backlog_lint.js.
+// Depends on archive_store.js for the hot+cold union. Companion to backlog_lint.js.
 
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const A = require('./archive_store');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const P = (rel) => path.join(ROOT, rel);
@@ -49,7 +51,14 @@ const reqs = loadJson(REQUIREMENTS);
 if (!stories || !backlog || !reqs) report();
 
 // ---- indexes ----
-const backlogIds = new Set((backlog.items || []).map((it) => it.id));
+// THE UNION, NOT THE HOT FILE. A story traces the work that built it, and that work is
+// finished — so its ids are exactly the ones archive_landed.js has evicted to
+// docs/development/archive/. Reading backlog.json alone made "this story was delivered"
+// indistinguishable from "this trace is a typo": 53 of the 55 failures this tool reported
+// on 2026-09-16 were live stories pointing at real, closed items (US-013 -> BL-123, the
+// Selection element's resize, which backlog_query.js finds without trouble). A dead trace
+// must mean an id that never existed.
+const backlogIds = new Set(A.allItems(backlog, A.ROOT).map((it) => it.id));
 
 // brief slug -> { verifications: [strings], runnable: bool, scripts: [lua paths] }
 const briefs = new Map();

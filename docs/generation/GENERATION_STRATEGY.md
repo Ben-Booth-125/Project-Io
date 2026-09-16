@@ -385,7 +385,7 @@ standing preference for systemic forces over agent handicaps):
 | **Cultures in a region** | Ground of a foreign culture costs cohesion to hold and assimilates slowly, so conquest buys unrest rather than strength. | Partly built — `w_cult` and a per-region culture index exist in `history_sim.hpp`. |
 | **Simple logistics** | Reach falls with distance from the seat along real terrain, so a campaign past reach cannot be sustained. This is what makes a strait or a mountain stall a frontier without special-casing either. | Owed. |
 | **Communication** | Before a communication rung is reached, a polity cannot act on ground it cannot hear from — which bounds early growth by geography rather than by a cap. | Owed; it is also the second rung of Ben's own arc. |
-| **Succession** | A large polity fractures on a leadership transition, weighted by cohesion. This is the dark-age rung, and `../lore/COLLAPSE.md` already owns culmination. | Partly owned by COLLAPSE.md. |
+| **Succession** | A large polity fractures on a leadership transition, weighted by cohesion. This is the dark-age rung, and `CIVILISATION.md` § How an empire actually falls owns the fall as network failure. | Owned by CIVILISATION.md. |
 | **Strain** | Growth raises strain and strain caps growth; the accumulators already cross the pass 1 → pass 2 handoff. | Built. |
 | **Balancing coalitions** | Neighbours' stance moves against the largest polity. | Owed, and the most dangerous of the six — it is one step from an agent handicap. It is admissible only as a **stance the player can read on the map** (`../politics/RELATIONS.md`), never as a hidden coefficient on the leader. |
 
@@ -700,13 +700,14 @@ beat one with a well-served core and an expensive frontier at the same mean. The
 therefore a **per-market reading whose spread is scored**, exactly like terms 1 and 2, never a
 single global number added to the composite.
 
-**What the term reads is left open, deliberately, and settled by measurement rather than by
-argument.** Two candidates answer the axis: the mean traversal cost from a market to the tiles
-in its catchment, and the in-reach tile **count** rather than the coverage boolean. Both are
-continuous and both move when a tier does. The first slice's job is the one § The first slice is
-the scorer already states — score candidates that differ only in road tier and ask whether the
-chosen reading **discriminates between them at all**. A reading that does not is not worth
-keeping, and finding that out is cheaper than building the rest on it.
+**What the term reads was settled by measurement, not by argument (BL-977, search axes live and
+reach term).** Two candidates answered the axis — the mean traversal cost from a market to the
+tiles in its catchment, and the in-reach tile **count** — and the test was the one § The first
+slice is the scorer states: score candidates that differ only in road tier and ask whether the
+reading **discriminates between them at all**. The mean cost does, monotonically across three
+tiers; the count does not (two tiers apart by parts in a billion), so the term reads the **mean
+reach cost per market**, and its spread across markets is what the composite scores, as an equal
+third spread beside completeness and balance. The level never enters the composite.
 
 **Why the fourth term is not optional, and why the first three could not do its job.** Terms 1–3
 are computed from tiles, markets and population — none of which a candidate changes. Phase 6
@@ -801,7 +802,7 @@ target.
 bands and the unit roster is era-keyed, so the second span is the first span continued with more
 rows offered, not a second mechanism. What pass 2 adds is **reach across water** — a campaign or
 settle target across a sea leg, staged from harbour works — because colonisation by a major is
-the Metropole strategy played overseas, and it culminates as every major does (`../lore/COLLAPSE.md`).
+reach played overseas, and it falls as every major does (`CIVILISATION.md` § How an empire actually falls).
 The epoch still arrives multipolar; the non-hegemony invariant is not relaxed for the sea.
 
 **The boundary year is a parameter with a default, not a fact.** The default is 400 years before
@@ -929,8 +930,8 @@ why on the map.
 
 **The cost question is open and is measured first.** Pass 1 is already the most expensive pass;
 pass 2 doubles it and pass 3 lengthens the warm start. The budget is the generating screen's wait,
-and the affordability rungs in `../lore/COLLAPSE.md` § The 4000-year problem become load-bearing
-in the order that document gives. Whether the shape can be had cheaply is the sprint's question,
+and the affordability rungs in `CIVILISATION.md` § The long run is paid for by the table become
+load-bearing in the order that section gives. Whether the shape can be had cheaply is the sprint's question,
 not this document's.
 
 ## Open cross-doc items

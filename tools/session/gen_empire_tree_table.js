@@ -69,7 +69,8 @@ function generate(tree)
     out += `// Regenerate: node tools/session/gen_empire_tree_table.js ${tree}\n`;
     out += `// Lint first: node tools/session/tree_lint.js ${tree}\n`;
     out += '#pragma once\n\n';
-    out += '#include <cstdint>\n\n';
+    out += '#include <cstdint>\n';
+    out += '#include "tree_effect.hpp" // the shared effect vocabulary (BL-973)\n\n';
     out += `namespace ${NAMESPACE} {\n\n`;
     out += `inline constexpr int node_count = ${nodes.length};\n\n`;
     out += 'enum class node_kind : uint8_t { minor = 0, major = 1, milestone = 2 };\n';
@@ -92,22 +93,96 @@ function generate(tree)
     out += '    uint64_t    requires_mask;   ///< milestones: AND set (rule 4)\n';
     out += '    int8_t      requires_fork_a; ///< milestones: fork pair, EITHER satisfies (-1 if none)\n';
     out += '    int8_t      requires_fork_b;\n';
+    out += '    uint8_t     effects_begin;   ///< first row of this node\'s run in `effects[]` (BL-973)\n';
+    out += '    uint8_t     effects_n;       ///< rows in that run (never 0: the lint refuses an effectless node)\n';
     out += '};\n\n';
 
     out += `inline constexpr int branch_count = ${doc.branches.length};\n`;
     out += `inline constexpr const char* branch_names[branch_count] = { ${doc.branches.map(b => cppStr(b.key)).join(', ')} };\n\n`;
 
-    // THE RIM MILESTONE, FOUND RATHER THAN NAMED: the highest-ring milestone in the
-    // spire branch ("SP"). Confirmed against both trees at generalisation time (BL-930)
-    // — empire's EM-SP-4m at ring 4 and exploration's EX-SP-3m at ring 3 both fall out
-    // of this rule, so a per-tree hard-coded id (the old empire-only script's approach)
-    // is not needed and would only be one more thing to keep in sync by hand.
-    const spireMilestones = nodes
-        .map((n, i) => ({ n, i }))
-        .filter(({ n }) => n.kind === 'milestone' && n.branch === 'SP');
-    if (spireMilestones.length === 0) throw new Error(`no spire (SP) milestone found in ${STORE}`);
-    const rim = spireMilestones.reduce((a, b) => (b.n.ring > a.n.ring ? b : a));
-    out += `inline constexpr int rim_node_index = ${rim.i}; ///< ${rim.n.id}, "${rim.n.name}"\n\n`;
+    // THE EFFECTS TABLE (BL-973): every node's effects, flattened into one
+    // contiguous array in node order, each node keeping (begin, n) into it.
+    // The vocabulary is io::tree_effect_kind / tree_modifier_term /
+    // tree_effect_key (src/world/tree_effect.hpp), the same closed sets
+    // tree_lint.js validates the store against — a store value outside them
+    // is a lint failure before it is a generator one. Change the three lists
+    // here, in the lint, and in tree_effect.hpp together.
+    const EFFECT_KINDS = ['unlock', 'upgrade', 'retire', 'modifier', 'access', 'reach', 'intel',
+        'institution', 'doctrine', 'resource', 'open'];
+    const MOD_TERMS = ['reach', 'carrying_capacity', 'manpower', 'defence', 'industrial', 'stores',
+        'cohesion', 'assimilation', 'plague', 'research', 'forage', 'muster_cost'];
+    const EFFECT_KEYS = ['none', 'sea_legs', 'post_roads'];
+    const effectRows = [];   // { cpp, comment }
+    const effectRange = [];  // per node: [begin, n]
+    let rimIndex = -1;
+    for (let i = 0; i < nodes.length; ++i)
+    {
+        const n = nodes[i];
+        const begin = effectRows.length;
+        for (const e of n.effects || [])
+        {
+            if (!EFFECT_KINDS.includes(e.kind)) throw new Error(`${n.id}: effect kind ${e.kind} not in vocabulary`);
+            let term = 'none', perMille = 0, key = 'none', openRing = 0, openTree = false;
+            if (e.kind === 'modifier')
+            {
+                if (!MOD_TERMS.includes(e.target)) throw new Error(`${n.id}: modifier target ${e.target} not a sim term`);
+                term = e.target;
+                perMille = e.per_mille | 0;
+            }
+            if (e.key != null)
+            {
+                if (e.kind === 'modifier') throw new Error(`${n.id}: a modifier carries no key`);
+                if (!EFFECT_KEYS.includes(e.key) || e.key === 'none')
+                    throw new Error(`${n.id}: effect key ${e.key} not in vocabulary`);
+                key = e.key;
+            }
+            if (e.kind === 'open')
+            {
+                const ring = /^ring (\d+)$/.exec(e.target);
+                if (ring) openRing = parseInt(ring[1], 10);
+                else if (/^[a-z]+ tree$/.test(e.target))
+                {
+                    if (rimIndex >= 0)
+                        throw new Error(`${n.id}: a second node opens the next tree (first: ${nodes[rimIndex].id})`);
+                    openTree = true;
+                    rimIndex = i;
+                }
+                else throw new Error(`${n.id}: open target "${e.target}" is neither "ring N" nor "<tree> tree"`);
+            }
+            effectRows.push({
+                cpp: `{ io::tree_effect_kind::${e.kind}, io::tree_modifier_term::${term}, ${perMille}, `
+                   + `io::tree_effect_key::${key}, ${openRing}, ${openTree ? 'true' : 'false'}, ${cppStr(e.target)} }`,
+                comment: `${effectRows.length}: ${n.id}`,
+            });
+        }
+        effectRange.push([begin, effectRows.length - begin]);
+    }
+    if (effectRows.length > 255) throw new Error(`${STORE}: more than 255 effect rows (uint8_t ranges)`);
+
+    // THE RIM, READ OFF THE STORE'S OWN EFFECT rather than counted: the one
+    // node whose `open` effect targets the NEXT TREE ("exploration tree",
+    // "industry tree"). TREES.md sec Milestones: "the last milestone unlocks
+    // the next tree" — so it must also be the highest-ring spire milestone,
+    // and the generator refuses a store where the two disagree. Before
+    // BL-973 this was found structurally (highest SP milestone) and the
+    // open effect itself was emitted nowhere.
+    if (rimIndex < 0) throw new Error(`no node opens the next tree in ${STORE}`);
+    const rim = { n: nodes[rimIndex], i: rimIndex };
+    {
+        const spireMilestones = nodes
+            .map((n, i) => ({ n, i }))
+            .filter(({ n }) => n.kind === 'milestone' && n.branch === 'SP');
+        if (spireMilestones.length === 0) throw new Error(`no spire (SP) milestone found in ${STORE}`);
+        const top = spireMilestones.reduce((a, b) => (b.n.ring > a.n.ring ? b : a));
+        if (top.i !== rimIndex)
+            throw new Error(`${rim.n.id} opens the next tree but ${top.n.id} is the highest spire milestone`);
+    }
+    out += `inline constexpr int rim_node_index = ${rim.i}; ///< ${rim.n.id}, "${rim.n.name}" — the node carrying the open-next-tree effect\n\n`;
+
+    out += `inline constexpr int effect_count = ${effectRows.length};\n`;
+    out += 'inline constexpr io::tree_effect effects[effect_count] = {\n';
+    for (const r of effectRows) out += `    ${r.cpp}, // ${r.comment}\n`;
+    out += '};\n\n';
 
     out += 'inline constexpr node nodes[node_count] = {\n';
     for (let i = 0; i < nodes.length; ++i)
@@ -138,7 +213,7 @@ function generate(tree)
         const isRoot = isRootNode(n);
         out += `    { ${cppStr(n.id)}, node_kind::${kindName}, ${n.ring}, ${branchIndex.get(n.branch)}, `
              + `gate_atom::${gateName}, ${excludes}, ${isRoot ? 'true' : 'false'}, ${neighMask}ULL, `
-             + `${reqMask}ULL, ${forkA}, ${forkB} }, // ${i}: ${n.name}\n`;
+             + `${reqMask}ULL, ${forkA}, ${forkB}, ${effectRange[i][0]}, ${effectRange[i][1]} }, // ${i}: ${n.name}\n`;
     }
     out += '};\n\n';
 
@@ -156,7 +231,8 @@ function generate(tree)
 
     out += `} // namespace ${NAMESPACE}\n`;
 
-    return { text: out, nodeCount: nodes.length, branchCount: doc.branches.length, rimId: rim.n.id };
+    return { text: out, nodeCount: nodes.length, branchCount: doc.branches.length, rimId: rim.n.id,
+             effectCount: effectRows.length };
 }
 
 // THE ROOT DERIVATION, in one place: a node is the tree's root iff its OWN declared `links`
@@ -174,5 +250,5 @@ if (require.main === module)
     const OUT = headerPath(TREE);
     const r = generate(TREE);
     fs.writeFileSync(OUT, r.text);
-    console.log(`wrote ${OUT} (${r.nodeCount} nodes, ${r.branchCount} branches, rim=${r.rimId})`);
+    console.log(`wrote ${OUT} (${r.nodeCount} nodes, ${r.branchCount} branches, ${r.effectCount} effects, rim=${r.rimId})`);
 }

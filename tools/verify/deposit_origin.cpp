@@ -29,6 +29,13 @@
 //       the present), must place coal and petroleum DIFFERENTLY. If it does not,
 //       the palaeo query is wired in but not consumed, which is the failure mode
 //       a seam like this actually has.
+//   D6b the fossil half reads the PAST INTERIOR too (BL-961). Same body, same
+//       seed, drift record present both times, but the second run has
+//       Planetology's thermal series withheld — so the palaeo pre-pass reads
+//       today's subsidence instead of the epoch's. The coal and petroleum
+//       MAGNITUDES must differ somewhere. Presence is not asked to move: the
+//       series moves by about a percent over the record's depth and says so
+//       honestly, and a presence test would only pass by inflating it.
 //   D7  the world still feeds itself. This is BL-762's deferred half: it stopped
 //       because deleting the biological rows from the Body phase left a world
 //       with no food, and survey_endowment reads agricultural_produce as a
@@ -88,9 +95,11 @@ struct run
     std::array<double, resource_count> on_tiles{};
     /// Per-tile presence in raster order, for D6.
     std::vector<char> coal_map, oil_map;
+    /// Per-tile magnitude in raster order, for D6b.
+    std::vector<float> coal_val, oil_val;
 };
 
-run generate(uint32_t campaign_seed, bool with_drift = true)
+run generate(uint32_t campaign_seed, bool with_drift = true, bool with_thermal = true)
 {
     run out;
     const resolved_world rw = resolve_preferences(world_preferences{}, campaign_seed);
@@ -100,6 +109,10 @@ run generate(uint32_t campaign_seed, bool with_drift = true)
     const uint32_t body_seed = campaign_seed ^ prototype_body_seed(1);
     out.st = run_planetology(home, rw.params, body_seed);
     const continent_state cs = run_continents(out.st, gw, gh, body_seed ^ 0xC0117E57u);
+    // D6b: withhold the thermal series and nothing else. The pre-pass treats an
+    // empty series as "read the present", the same degraded answer a withheld
+    // drift record gives, so this isolates the one term the series adds.
+    if (!with_thermal) out.st.thermal_series.clear();
 
     world w;
     const entity_id body = w.create_entity();
@@ -118,6 +131,8 @@ run generate(uint32_t campaign_seed, bool with_drift = true)
         // ids come back in raster order, so this vector is position-stable.
         out.coal_map.push_back(t.resource_deposit[static_cast<std::size_t>(resource_type::coal)] > 0.0f);
         out.oil_map.push_back(t.resource_deposit[static_cast<std::size_t>(resource_type::petroleum)] > 0.0f);
+        out.coal_val.push_back(t.resource_deposit[static_cast<std::size_t>(resource_type::coal)]);
+        out.oil_val.push_back(t.resource_deposit[static_cast<std::size_t>(resource_type::petroleum)]);
     }
     return out;
 }
@@ -249,6 +264,34 @@ int main(int argc, char** argv)
                     drift.on_tiles[static_cast<std::size_t>(resource_type::petroleum)]);
         check(coal_moved > 0 || oil_moved > 0,
               "D6   the fossil half reads the PAST — withholding the drift record moves it");
+
+        // --- D6b: and the past INTERIOR (BL-961) ------------------------------
+        // Drift kept both times; only the thermal series is withheld. Magnitudes
+        // are compared, not presence — see the header for why.
+        {
+            const run cold = generate(seed, /*with_drift=*/true, /*with_thermal=*/false);
+            int coal_scaled = 0, oil_scaled = 0;
+            const std::size_t m = std::min(drift.coal_val.size(), cold.coal_val.size());
+            for (std::size_t i = 0; i < m; ++i)
+            {
+                if (drift.coal_val[i] != cold.coal_val[i]) ++coal_scaled;
+                if (drift.oil_val[i]  != cold.oil_val[i])  ++oil_scaled;
+            }
+            const double c_with = drift.on_tiles[static_cast<std::size_t>(resource_type::coal)];
+            const double c_sans = cold.on_tiles[static_cast<std::size_t>(resource_type::coal)];
+            const double o_with = drift.on_tiles[static_cast<std::size_t>(resource_type::petroleum)];
+            const double o_sans = cold.on_tiles[static_cast<std::size_t>(resource_type::petroleum)];
+            std::printf("     thermal series vs present interior: coal magnitude differs on %d tiles,"
+                        " petroleum on %d\n", coal_scaled, oil_scaled);
+            std::printf("     coal total %.1f -> %.1f (x%.5f), petroleum %.1f -> %.1f (x%.5f)"
+                        " (present -> epoch)\n",
+                        c_sans, c_with, c_sans > 0.0 ? c_with / c_sans : 0.0,
+                        o_sans, o_with, o_sans > 0.0 ? o_with / o_sans : 0.0);
+            check(coal_scaled > 0 || oil_scaled > 0,
+                  "D6b  the fossil half reads the past INTERIOR — withholding the thermal series moves it");
+            check(drift.coal_map == cold.coal_map && drift.oil_map == cold.oil_map,
+                  "D6b  ...as magnitude, not presence: WHERE the seams are is the drift record's call");
+        }
 
         // --- D7 / D8: BL-762's deferred half -------------------------------
         const double produce = drift.on_tiles[static_cast<std::size_t>(resource_type::agricultural_produce)];

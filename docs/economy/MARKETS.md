@@ -413,7 +413,7 @@ gameplay that good produces.
   constructing them, so the draw never fires during the opening years, and stone and timber have a
   construction sink on paper with no pull in practice. Two halves: make the opening years build,
   and make **centres draw materials as they grow**, which is the half that does not decay after the
-  warm start. An ancient economy's largest material sink is building.
+  pre-game settle. An ancient economy's largest material sink is building.
 - **Infrastructure** (BL-643, network upkeep draws materials). The `logistics_maintenance` budget
   line already exists and names exactly this. A road network that consumes stone and timber to stay
   standing is a permanent sink scaled by geography rather than by population — and it gives the
@@ -487,7 +487,10 @@ corporations).
 
 **The background economy is the landscape phase 6 selected** — not a separate injection pass bolted
 on after generation. The settle that hands play its opening position is phase 6's single
-validation run of the winner (`../economy/ERAS.md`; BL-978, warm start retired, owns the work). Generation scores candidate corporate landscapes
+validation run of the winner — twelve quarterly econ ticks, `app::validation_ticks`, a length
+measured on the per-tick convoy dispatch count rather than chosen (`../economy/ERAS.md` § The
+opening position; BL-978, warm start retired, owns the work). There is no other pre-game tick
+loop: the prices play opens on are the ones those twelve clearings leave. Generation scores candidate corporate landscapes
 — rosters, placements and road tiers — statically against the finished world, and the winning
 candidate's firms *are* the background economy: real buildings, on real tiles, with
 `corporation_component.is_background = true`. Placement mechanics are

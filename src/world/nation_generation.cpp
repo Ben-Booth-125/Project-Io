@@ -1046,6 +1046,14 @@ std::vector<entity_id> generate_nations(
     // settlement pass carves exactly as it did before this item.
     std::vector<int> fold(static_cast<std::size_t>(seed_count));
     for (int si = 0; si < seed_count; ++si) fold[static_cast<std::size_t>(si)] = si;
+    // BL-975 — THE CHEST CROSSES WITH THE FLAG. Parallel to `seeds`: the 1660
+    // treasury (sim material currency, unconverted) each seed carries into
+    // nationhood. Only a polity's REPRESENTATIVE seed carries anything, and it
+    // carries the polity's whole sum once — the other seeds of the same polity
+    // fold under it, so crediting each of them would count the chest per
+    // region. Integer until the one conversion below, so the sum is exact and
+    // order-free. Zero everywhere on a body with no settlement pass.
+    std::vector<int64_t> seed_credit(static_cast<std::size_t>(seed_count), 0);
     {
         int max_polity = -1;
         for (std::size_t si = 0; si < seed_polity.size(); ++si)
@@ -1071,6 +1079,19 @@ std::vector<entity_id> generate_nations(
                 const int ni = owner_map[static_cast<std::size_t>(idx)];
                 if (ni >= 0 && ni < seed_count)
                     owner_map[static_cast<std::size_t>(idx)] = fold[static_cast<std::size_t>(ni)];
+            }
+
+            // BL-975: each polity's 1660 treasury lands on its representative
+            // seed. A polity with an entry but no anchored seed (all its
+            // ground unanchored) has no nation to credit and its chest is
+            // lost with it — the history's own outcome, not a leak to patch.
+            for (int pol = 0; pol <= max_polity; ++pol)
+            {
+                const int rep = first_seed[static_cast<std::size_t>(pol)];
+                if (rep < 0) continue;
+                if (static_cast<std::size_t>(pol) >= params.polity_treasuries.size()) continue;
+                const int64_t t = params.polity_treasuries[static_cast<std::size_t>(pol)];
+                if (t > 0) seed_credit[static_cast<std::size_t>(rep)] += t;
             }
         }
     }
@@ -1121,6 +1142,33 @@ std::vector<entity_id> generate_nations(
 
         nation_data[static_cast<std::size_t>(ni)].tiles.push_back(tid);
         // tile_to_nation is written below once we have the entity IDs.
+    }
+
+    // --- Pass 7: starting treasury (BL-975) ----------------------------------
+    // The per-seed credits Pass 2d placed, gathered onto the nation each seed
+    // ENDED UP in — `owner_map[seeds[si]]`, the same read Pass 5 uses for a
+    // nation's tongue and capital — so a seed the size-floor merge absorbed
+    // hands its chest to its absorber rather than to nobody. Summed as
+    // integers in ascending seed order, converted ONCE per nation through the
+    // one stated per-mille (NATION_GENERATION.md § Pass 7 owns the figure),
+    // and floored: a nation no polity's chest reached starts on
+    // `treasury_floor`. This is what `seed_nation_garrisons` reads.
+    {
+        std::vector<int64_t> nation_credit(static_cast<std::size_t>(nation_count), 0);
+        for (std::size_t si = 0; si < seeds.size(); ++si)
+        {
+            const int ni = owner_map[static_cast<std::size_t>(seeds[si])];
+            if (ni < 0 || ni >= nation_count) continue;
+            nation_credit[static_cast<std::size_t>(ni)] += seed_credit[si];
+        }
+        for (int ni = 0; ni < nation_count; ++ni)
+        {
+            const double credited =
+                static_cast<double>(nation_credit[static_cast<std::size_t>(ni)])
+                * static_cast<double>(params.treasury_credit_per_mille) / 1000.0;
+            nation_data[static_cast<std::size_t>(ni)].treasury =
+                std::max(params.treasury_floor, static_cast<float>(credited));
+        }
     }
 
     // --- Pass 3: resource profile derivation ---
@@ -1358,12 +1406,11 @@ void seed_nation_garrisons(world& w, const nation_garrison_params& params)
 
         // --- Sizing: treasury-scaled against the value anchor (BL-543) ------
         // See nation_garrison_params' own comments for why `count_per_credit`
-        // is a placeholder rather than a measured figure, and BL-571's report
-        // for the flag: EVERY nation's treasury is 0.0 at generation
-        // (NATIONS.md — "zero at generation, deliberately"), so every
-        // garrison lands on `min_count` today; the scaling only starts to
-        // differentiate nations once something credits a treasury before
-        // this pass runs, which nothing in the generation chain does yet.
+        // is a placeholder rather than a measured figure. The treasury read
+        // here is REAL since BL-975: `generate_nations` Pass 7 credits each
+        // nation with its folded polities' 1660 chest (NATION_GENERATION.md
+        // § Pass 7), so a realm that arrived rich garrisons more than one
+        // that arrived on the floor.
         const int count = std::clamp(
             params.min_count
                 + static_cast<int>(std::lround(nc.treasury * params.count_per_credit)),

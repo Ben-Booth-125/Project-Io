@@ -68,9 +68,9 @@ tech gate is a predicate plus an effect. **An event is a predicate plus an effec
   the repo for events: *"A supernova is the first cause that is NOT about the world: it arrives from
   outside, it is nobody's fault, and it is the only mechanism in the design that could make two
   otherwise-identical worlds diverge."*
-- **`docs/lore/COLLAPSE.md`** — culminating events for the Era −1 collapse metagame. Research
-  scaffolding, generation-side. **This document is the campaign-era counterpart**, and the two
-  share a vocabulary rather than inventing one each.
+- **`docs/generation/CIVILISATION.md` § How an empire actually falls** — how a realm breaks in
+  the Era −1 sim: network failure, secession, schism. Generation-side. **This document is the
+  campaign-era counterpart**, and the two share a vocabulary rather than inventing one each.
 
 ---
 
@@ -274,7 +274,7 @@ event record carries a successor and a chain-grain cooldown.
 | The trigger | the economy tick, once per scope in sorted order |
 
 **Related authorities.** [`META_LAYER.md`](META_LAYER.md) (two thirds of an event),
-[`PEOPLE.md`](PEOPLE.md) (the personal family), [`lore/COLLAPSE.md`](lore/COLLAPSE.md)
+[`PEOPLE.md`](PEOPLE.md) (the personal family), [`generation/CIVILISATION.md`](generation/CIVILISATION.md)
 (the Era −1 counterpart, which shares this vocabulary),
 [`ui/CHAT.md`](ui/CHAT.md) (where an event is told), [`economy/LOGISTICS.md`](economy/LOGISTICS.md)
 (§ Interdiction, the cautionary precedent for a consequence with no message).

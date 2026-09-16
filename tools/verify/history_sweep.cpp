@@ -22,8 +22,12 @@
 #include "world/nation_generation.hpp" // BL-769: nation_params, the size floor
 #include "world/sim_terrain_build.hpp"
 #include "world/settlement.hpp"
+
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
+#include "scripting/lua_state.hpp"
+
+#include "culture_footprint.hpp" // BL-968 step 1: the cultures that never hold ground
 
 #include <algorithm>
 #include <bit>
@@ -55,6 +59,46 @@ const generation_report::body_entry* kepler_of(const generation_report& r)
 }
 
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// The shipped generation inputs (BL-1007)
+// ---------------------------------------------------------------------------
+// GENERATION TAKES TWO THINGS FROM THE DATA LAYER, and until this item the
+// sweeps handed it neither. `app::begin_new_game` loads scripts/world_gen.lua
+// into a `world_gen_config`, and `app::ensure_works_loaded` loads
+// scripts/works.lua into a `works_registry`; both are passed to
+// `make_hard_coded_world`. The sweeps passed `world_gen_config{}` — the C++
+// struct defaults, which world_gen_config.hpp's own header warns price 10 of 47
+// resources where the script authors 42 — and a null works pointer, which makes
+// the `build_work` verb a dead branch (history_sim.cpp: "works == nullptr ...
+// break"), so no polity ever raised a work in a swept world.
+//
+// The cost of that was measured on 2026-09-16: seed 0's Empires span fought
+// 6,479 battles in the sweep and 9,928 in the game. Every reading was
+// self-consistent and described a world nobody plays. These helpers are the one
+// place either sweep reads the data layer, and they mirror the app's own order.
+struct shipped_inputs
+{
+    lua_state        lua;
+    world_gen_config cfg{};
+    works_registry   works;
+};
+
+/// Load the data layer exactly as the app does, and say so on the face: a
+/// reading that cannot name the world it measured is the defect this closes.
+inline void load_shipped_inputs(shipped_inputs& in)
+{
+    in.lua.load("scripts/recipes.lua");
+    in.lua.load("scripts/economy.lua");
+    in.lua.load("scripts/world_gen.lua");
+    in.cfg.load_from_lua(in.lua);
+    in.lua.load("scripts/works.lua");
+    in.works.load_from_lua(in.lua);
+    std::printf("generation inputs: scripts/world_gen.lua + scripts/works.lua "
+                "(%zu works rows) — the shipped configuration (BL-1007)\n",
+                in.works.size());
+}
+
 // The works fixture (BL-321)
 // ---------------------------------------------------------------------------
 //
@@ -505,6 +549,17 @@ struct sweep_row
     int culture_depth  = -1; ///< Longest `parent` chain, roots at 0.
     int cultures_root  = -1; ///< Cultures with no parent.
 
+    /// BL-968 step 1 -- the cultures that never hold ground. -1 = no creeds.
+    /// `culture_footprint.hpp` is the one reading both this sweep and
+    /// `colonisation_harness` C15 print; REPORTED, not gated, and no rule is
+    /// chosen off it here (fold-back vs gate-coining is Ben's call).
+    int cultures_coined            = -1; ///< == `cultures`; carried under the item's own key.
+    int cultures_holding_boundary  = -1; ///< Plurality on >= 1 region at 400 BCE (the sim's opening map).
+    int cultures_holding_close     = -1; ///< Plurality on >= 1 region at the sim's close (1200 CE).
+    int cultures_empty_leaves      = -1; ///< Empty at the boundary and childless.
+    int cultures_empty_interior    = -1; ///< Empty at the boundary with >= 1 child.
+    std::vector<int> cultures_empty_leaf_depth; ///< Empty leaves by depth below a cradle.
+
     int64_t foundings_scheduled = 0;
     int64_t foundings_settled   = 0;
     int64_t civilisations       = 0;
@@ -778,6 +833,9 @@ history_sim_params tuned_defaults()
 
 int main(int argc, char** argv)
 {
+    shipped_inputs shipped;
+    load_shipped_inputs(shipped);
+
     int seed_count = 16;
     int64_t epoch_year = 0;
     bool derive_from_generation = true;  // BL-900: generation's span is the default
@@ -1020,8 +1078,8 @@ int main(int argc, char** argv)
         era_minus_one_fixture fx;
         // Ask for the fixture only on the deriving path, so the default sweep
         // pays nothing for it and stays byte-for-byte the instrument it was.
-        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
-                                              /*progress=*/nullptr, /*works=*/nullptr,
+        const world w = make_hard_coded_world(wp, &rep, shipped.cfg,
+                                              /*progress=*/nullptr, &shipped.works,
                                               derive_from_generation ? &fx : nullptr);
 
         const generation_report::body_entry* k = kepler_of(rep);
@@ -1863,6 +1921,19 @@ int main(int argc, char** argv)
                     { at = cu[static_cast<std::size_t>(at)].parent; ++depth; }
                     if (depth > row.culture_depth) row.culture_depth = depth;
                 }
+
+                // BL-968 step 1: the boundary is the settlement the sim was
+                // HANDED (`fx.settlement`, 400 BCE); the close is `ss`, which
+                // `run_history_sim` mutated in place to the stop year (1200 CE
+                // on this single-span run). Same reading as C15.
+                const culture_footprint cf =
+                    measure_culture_footprint(cu, fx.settlement.regions, &ss.regions);
+                row.cultures_coined           = cf.coined;
+                row.cultures_holding_boundary = cf.holding_boundary;
+                row.cultures_holding_close    = cf.holding_close;
+                row.cultures_empty_leaves     = cf.empty_leaves;
+                row.cultures_empty_interior   = cf.empty_interior;
+                row.cultures_empty_leaf_depth = cf.empty_leaf_depth;
             }
 
             row.arc_name  = derive_from_generation ? "generation" : "struct-default";
@@ -3259,6 +3330,73 @@ int main(int argc, char** argv)
                         static_cast<long long>(rows.front().city_states_step));
         }
 
+        // BL-968 step 1 -- THE CULTURES THAT NEVER HOLD GROUND. Per seed:
+        // coined, holding >= 1 region (plurality) at the Culture/Empires
+        // boundary (400 BCE) and at the close (1200 CE), the ratio, and
+        // where the empty names sit in the tree (leaves vs interior nodes,
+        // leaves by depth). REPORTED, NOT GATED: the rule -- fold an empty
+        // culture back into its parent, or gate coining on a footprint -- is
+        // Ben's call once these numbers are on the table.
+        std::printf("\n--- BL-968.1  THE CULTURES THAT NEVER HOLD GROUND (report-only) ---\n");
+        std::printf("  seed   coined   hold@boundary   hold@close   ratio   "
+                    "empty: leaves / interior   empty leaves by depth\n");
+        {
+            std::vector<int64_t> coined, hold_b, hold_c, ratio, leaves, interior;
+            for (const sweep_row& r : rows)
+            {
+                if (r.cultures_coined < 0)
+                {
+                    std::printf("  %4u   (no creeds -- struct-default path)\n", r.seed);
+                    continue;
+                }
+                const int pm = r.cultures_coined > 0
+                    ? static_cast<int>((static_cast<int64_t>(r.cultures_holding_boundary) * 1000)
+                                       / r.cultures_coined)
+                    : 0;
+                std::printf("  %4u   %6d   %13d   %10d   %3d.%d%%   %6d / %-8d   ",
+                            r.seed, r.cultures_coined, r.cultures_holding_boundary,
+                            r.cultures_holding_close, pm / 10, pm % 10,
+                            r.cultures_empty_leaves, r.cultures_empty_interior);
+                culture_footprint cf;
+                cf.empty_leaf_depth = r.cultures_empty_leaf_depth;
+                print_empty_leaf_depths(cf);
+                std::printf("\n");
+                coined.push_back(r.cultures_coined);
+                hold_b.push_back(r.cultures_holding_boundary);
+                hold_c.push_back(r.cultures_holding_close);
+                ratio.push_back(pm);
+                leaves.push_back(r.cultures_empty_leaves);
+                interior.push_back(r.cultures_empty_interior);
+            }
+            if (!coined.empty())
+            {
+                int64_t sum_coined = 0, sum_hold_b = 0, sum_hold_c = 0, sum_leaves = 0, sum_interior = 0;
+                for (std::size_t i = 0; i < coined.size(); ++i)
+                {
+                    sum_coined += coined[i]; sum_hold_b += hold_b[i]; sum_hold_c += hold_c[i];
+                    sum_leaves += leaves[i]; sum_interior += interior[i];
+                }
+                const int64_t pooled_pm = sum_coined > 0 ? (sum_hold_b * 1000) / sum_coined : 0;
+                std::printf("\n  COINED                 median %lld per world   pooled %lld\n",
+                            static_cast<long long>(median_of(coined)), static_cast<long long>(sum_coined));
+                std::printf("  HOLDING @ boundary     median %lld   pooled %lld  (%lld.%lld%% of coined; "
+                            "per-seed median ratio %lld.%lld%%)\n",
+                            static_cast<long long>(median_of(hold_b)), static_cast<long long>(sum_hold_b),
+                            static_cast<long long>(pooled_pm / 10), static_cast<long long>(pooled_pm % 10),
+                            static_cast<long long>(median_of(ratio) / 10),
+                            static_cast<long long>(median_of(ratio) % 10));
+                std::printf("  HOLDING @ close        median %lld   pooled %lld\n",
+                            static_cast<long long>(median_of(hold_c)), static_cast<long long>(sum_hold_c));
+                std::printf("  EMPTY                  leaves pooled %lld   interior pooled %lld  "
+                            "(an empty INTERIOR node is a name the tree cannot drop without re-parenting)\n",
+                            static_cast<long long>(sum_leaves), static_cast<long long>(sum_interior));
+                std::printf("  (holding = plurality on >= 1 region, the same test run_history_sim seeds a\n"
+                            "   polity from. Boundary = the settlement the sim was handed; close = the\n"
+                            "   in-place state at its stop year. REPORTED, not gated -- BL-968 step 2 is\n"
+                            "   Ben's call: fold-back into the parent, or gate coining on a footprint.)\n");
+            }
+        }
+
         // BL-920 -- ground taken by ORGANISE beside ground taken by
         // CONQUEST, and the count of city states that ROSE (crossed
         // `city_state_population_threshold` on unorganised ground) rather
@@ -3359,10 +3497,14 @@ int main(int argc, char** argv)
             std::fprintf(f,
                 "],\n"
                 "   \"cultures\": %d, \"cultures_root\": %d, \"culture_depth\": %d,\n"
+                "   \"cultures_coined\": %d, \"cultures_holding_boundary\": %d, "
+                "\"cultures_holding_close\": %d, \"cultures_empty_leaves\": %d,\n"
                 "   \"foundings_scheduled\": %lld, \"foundings_settled\": %lld, "
                 "\"civilisations\": %lld,\n"
                 "   \"city_states_step\": %lld, \"city_states_series\": [",
                 r.cultures, r.cultures_root, r.culture_depth,
+                r.cultures_coined, r.cultures_holding_boundary,
+                r.cultures_holding_close, r.cultures_empty_leaves,
                 static_cast<long long>(r.foundings_scheduled),
                 static_cast<long long>(r.foundings_settled),
                 static_cast<long long>(r.civilisations),
@@ -3462,8 +3604,8 @@ int main(int argc, char** argv)
         // against the struct-default one and call the disagreement
         // non-determinism. That is the BL-757 defect reappearing inside the
         // check meant to catch it.
-        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
-                                              /*progress=*/nullptr, /*works=*/nullptr,
+        const world w = make_hard_coded_world(wp, &rep, shipped.cfg,
+                                              /*progress=*/nullptr, &shipped.works,
                                               derive_from_generation ? &fx : nullptr);
         const generation_report::body_entry* k = kepler_of(rep);
         settlement_state ss = (derive_from_generation && fx.ran) ? fx.settlement

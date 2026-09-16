@@ -479,6 +479,60 @@ fraction_in_band(world& w, const recipe_registry& reg, double ratio)
                                   ratio);
 }
 
+std::vector<market_reach>
+measure_market_reach(world& w, const recipe_registry& reg)
+{
+    const std::vector<entity_id> mids = sorted_market_ids(w);
+    std::vector<market_reach> rows(mids.size());
+    std::unordered_map<entity_id, std::size_t> slot;
+    for (std::size_t i = 0; i < mids.size(); ++i)
+    {
+        rows[i].market = mids[i];
+        rows[i].body   = w.markets.at(mids[i]).body;
+        slot[mids[i]]  = i;
+    }
+
+    build_reach_fields(w, mids);
+
+    // Sorted for the same reason the balance walk is: `+=` on a double.
+    std::vector<entity_id> tile_ids;
+    tile_ids.reserve(w.tiles.size());
+    for (const auto& kv : w.tiles)
+        tile_ids.push_back(kv.first);
+    std::sort(tile_ids.begin(), tile_ids.end());
+
+    const float max_reach = reg.construction().max_logistics_reach;
+
+    std::vector<double> cost_sum(mids.size(), 0.0);
+    for (const entity_id tid : tile_ids)
+    {
+        const auto it = slot.find(market_for_tile(w, tid));
+        if (it == slot.end())
+            continue;
+        market_reach& m = rows[it->second];
+        ++m.catchment_tiles;
+
+        // An anchor IS the origin: its cost is 0 by construction (the Dijkstra
+        // seeds there), stated explicitly so the exemption `tile_in_reach`
+        // grants anchors is the same one this reading grants them.
+        float cost = is_supply_anchor(w, tid) ? 0.0f : tile_reach_cost(w, tid);
+        if (cost < 0.0f)
+            continue;                     // no field for this body: nothing to read
+        if (!std::isfinite(cost))
+            continue;                     // cut off from every anchor: not crossed at any price
+        ++m.reachable_tiles;
+        cost_sum[it->second] += static_cast<double>(cost);
+        if (max_reach < 0.0f || cost <= max_reach)
+            ++m.in_reach_tiles;
+    }
+
+    for (std::size_t s = 0; s < rows.size(); ++s)
+        rows[s].mean_cost = rows[s].reachable_tiles > 0
+                          ? cost_sum[s] / static_cast<double>(rows[s].reachable_tiles)
+                          : 0.0;
+    return rows;
+}
+
 margin_eval evaluate_margin(double revenue, double inputs, double wage_pb,
                   double units_per_tick, double wages_pt, double fixed,
                   double floor_mult, double k)
