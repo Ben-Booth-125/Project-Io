@@ -10,33 +10,40 @@ DEVLOG entry for its session, its requirement group, and the archived backlog ro
 - **Post-sprint-40 review block** (opened 2026-09-13). Its last open task was the lapse pace
   control, which landed 2026-09-16 at 30 s / 1 m / 1 m 30 s after Ben watched the first cut.
 - **Sprint 42 wave 0** (COMPLETE 2026-09-15). Instruments and gates; re-blessed on NR-875.
+- **Sprint 42 wave 1** (COMPLETE 2026-09-16). Sixteen items; re-blessed on NR-877 the same day.
 
-## Sprint 42 — wave 1, the batch (opened 2026-09-15) — COMPLETE 2026-09-16; re-bless gated on NR-877, BL-1000 open on its live click
+## Backlog wave A (opened 2026-09-16)
 
-Sixteen items, one worktree agent each, merged in dependency order: docs and instruments first
-(BL-1002, BL-1001, BL-976, BL-999, BL-968), then the physical stages (BL-965 before BL-961 and
-BL-963), then the history movers (BL-967, BL-972, BL-973, BL-998, BL-975), then the seam (BL-977,
-BL-978), then the UI (BL-1000, live click). Every world-mover measures its own before/after in its
-worktree; the sweeps are regenerated once on the final integrated tree; ONE re-bless at the close,
-with N named causes, authorised by Ben.
+Ben, 2026-09-16: "switch to delivery mode and build each item, attempting to work in parallel where
+possible." Twelve worktree lanes, sixteen items: every item with no open prerequisite that is NOT a
+wall-clock measurement. Timing items (BL-1024 region count, BL-1025 held world, BL-983 span cost)
+wait for a quiet machine, because twelve concurrent /O2 builds and sweeps make a timing meaningless.
+Every world-mover measures its own before/after in its worktree; the sweeps are regenerated once on
+the integrated tree; ONE re-bless at the close, with N named causes, authorised by Ben.
 
-- [x] **BL-965** (TILE_PASS_REENTRY) — split at the Body/Life boundary, bit-identical. Satisfies: R1, R2.
-- [x] **BL-961** (PLANETOLOGY_THERMAL_SERIES) — per-epoch thermal series; Life samples it. Satisfies: R1–R3.
-- [x] **BL-963** (TILES_RIDE_PLATES) — measure cost first; slice or stop on the ceiling. Satisfies: R1–R3.
-- [x] **BL-967** (RIVERS_PRICED_IN_WALK) — river edges take the coastal discount. Satisfies: R1, R2.
-- [x] **BL-968** (EPHEMERAL_CULTURES_MEASURED) — step 1 only: the reading, then Ben's call. Satisfies: R1, R2.
-- [x] **BL-972** (FORCE_UPKEEP_IN_THE_WORLD) — per-head upkeep; caps removed once it binds. Satisfies: R1, R2.
-- [x] **BL-973** (TREE_EFFECTS_GENERATED) — effects table generated; generic apply; hand-wired nodes gone. Satisfies: R1, R2.
-- [x] **BL-976** (TARIFF_DERIVATION_HANDS_TO_DIGITISATION) — single-span derivation retired. Satisfies: R1, R2.
-- [x] **BL-975** (NATION_TREASURY_FROM_EXPLORATION) — 1660 treasuries credit nations at the fold. Satisfies: R1, R2.
-- [ ] **BL-977** (SEARCH_AXES_LIVE_AND_REACH_TERM) — reach-quality term; roster regenerates. Satisfies: R1, R2.
-- [x] **BL-978** (WARM_START_RETIRED) — validation run replaces pre_game_ticks. Satisfies: R1, R2.
-- [x] **BL-998** (CONSOLIDATION_FOLDS_EVERY_SEAT) — every held seat folds at 1200. Satisfies: R1, R2.
-- [x] **BL-999** (HELD_SEEDS_CAUSE_MEASURED) — four causes on the face. Satisfies: R1, R2.
-- [ ] **BL-1000** (WIZARD_LEADERBOARD_POPULATION_SHARE) — board by population; live click. Satisfies: R1.
-- [x] **BL-1001** (COLLAPSE_DOC_FOLDED_AND_RETIRED) — fold, move to research, repoint. Satisfies: R1.
-- [x] **BL-1002** (BREADCRUMB_DROPPED) — section removed, citations repointed. Satisfies: R1.
+- [ ] **BL-1006** (FAR_TRADE_READING) - lane A1, economy-dev. Satisfies: R1-R2.
+- [ ] **BL-996** (STRATUM_DEMAND_LADDER) - lane A2, economy-dev. Satisfies: R1-R5.
+- [ ] **BL-1008** (HARNESSES_READ_THE_VALIDATION_RUN) - lane A3, economy-dev. Satisfies: R1-R2.
+- [ ] **BL-1009** (DIGEST_SEES_THE_MONEY) - lane A4, generation-dev. Satisfies: R1-R3.
+- [ ] **BL-842** (SMALL_GRUDGES_FREEZE) - lane A5, generation-dev. Satisfies: R1-R3.
+- [ ] **BL-841** (ASSIMILATION_LOST_TO_THE_TAIL) - lane A5, generation-dev (after BL-842, same lane). Satisfies: R1-R2.
+- [ ] **BL-1018** (ALARM_STOPS_SATURATING) - lane A6, generation-dev. Satisfies: R1-R4.
+- [ ] **BL-1019** (THE_FIRST_CROSSING) - lane A6, generation-dev (after BL-1018, same lane). Satisfies: R1-R4.
+- [ ] **BL-1021** (TRADE_REBASED_ON_WHAT_A_REALM_REACHES) - lane A7, generation-dev. Satisfies: R1-R4.
+- [ ] **BL-1017** (EMPTY_CULTURES_FOLD_INTO_PARENT) - lane A8, generation-dev. Satisfies: R1-R4.
+- [ ] **BL-982** (DIGITISATION_READINGS) - lane A9, generation-dev. Satisfies: R1-R2.
+- [ ] **BL-1023** (FOREST_IS_THE_FIFTH_BRANCH) - lane A10, generation-dev. Satisfies: R1-R3.
+- [ ] **BL-1016** (CREED_CLASSIFIER_COMPARES_ONE_SCALE) - lane A10, generation-dev (after BL-1023, same lane). Satisfies: R1-R3.
+- [ ] **BL-1010** (ERA_WORLD_THREE_REDS) - lane A11, generation-dev. Satisfies: R1-R1.
+- [ ] **BL-1022** (IS_COASTAL_GROUND_CHEAPER_TO_TAKE) - lane A11, generation-dev (after BL-1010, same lane). Satisfies: R1-R2.
+- [ ] **BL-1020** (SEAT_FLOOR_READS_THE_STATIC_SCORE) - lane A12, ui-dev. Satisfies: R1-R3.
 
-Collision map (file layer): history_sim.cpp is shared by BL-972, BL-973, BL-998 (and BL-968's
-sweep read); tile_generation.cpp by BL-965, BL-961, BL-963; landscape_* by BL-977 and BL-978;
-CIVILISATION.md by BL-1001 and BL-968's reading. Worktrees absorb it; merge order above.
+Collision map (file layer): history_sim.cpp is shared by A5 (BL-842), A6, A7 and A8; settlement.cpp
+by A5 (BL-841) alone; exploration_sweep.cpp by A6 and A10 (BL-1016); history_sweep.cpp by A7, A8 and
+A11 (BL-1022); economy.lua and market_clearing.cpp by A2 alone; haulage_measure.cpp by A1 alone.
+Merge order: instruments and docs first (A4, A1, A3, A9, A10, A11), then the history movers (A5, A6,
+A7, A8), then the economy mover (A2), then the UI (A12, live click).
+
+Waves after this one, by prerequisite: B - BL-983, BL-1004, BL-1003, BL-875, BL-822, BL-878, BL-945,
+BL-1024, BL-1025 (the timing items, on a quiet machine); C - BL-984, BL-987, BL-994, BL-997, BL-876,
+BL-1005, BL-995; D - BL-985, BL-990, BL-986, BL-992, BL-991, BL-993, BL-989, BL-988.

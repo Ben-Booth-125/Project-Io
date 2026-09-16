@@ -6073,6 +6073,668 @@
      "result_metric": "the section, its banner and the per-tile half of Surfacing are gone; the ledger header no longer names two views; header_graph dangling 80 -> 79"
     }
    ]
+  },
+  {
+   "brief": "far-trade-reading",
+   "title": "BL-1006 - One reading measures delivered volume sold at its destination and the share that skipped the seller's nearest market, after a year of play",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1006 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: haulage_measure / campaign_lapse"
+     ],
+     "requirement": "On the landscape-search winner over a seed spread, at the epoch and after a year of play, the reading prints (a) volume DELIVERED and SOLD at a market other than the source pool's, (b) the share of it whose destination is not the seller's nearest market, (c) the price gap per delivered good at dispatch and at arrival.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: haulage_measure"
+     ],
+     "requirement": "On today's tree the reading reports same-body delivered volume honestly (expected ~0 under per-body pools) and names why.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "stratum-demand-ladder",
+   "title": "BL-996 - Household demand follows headcount up cumulative stratum rungs, upper rungs scaled by qualification, and an unmet top rung blocks promotion",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-996 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census"
+     ],
+     "requirement": "Household volume = heads / heads_per_demand_unit x basket[r] x elasticity, with heads_per_demand_unit DERIVED from the generated centre distribution and its derivation recorded.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census"
+     ],
+     "requirement": "Cumulative industrial rungs as ruled (1 staples; 2 clean water, medical supplies; 3 consumer goods; 4 refined fuel; 5 electronics); qualification scales rungs 4-5 only, normalised to the world mean.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: population_dynamics"
+     ],
+     "requirement": "An unmet top rung blocks promotion.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census"
+     ],
+     "requirement": "inject_background_demand no longer multiplies with market count or counts razed centres; electronics leaves it; the stopgap goods are labelled; demand_census before/after recorded.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "harnesses-read-the-validation-run",
+   "title": "BL-1008 - Six harnesses simulate an 80-tick warm start the game no longer runs",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1008 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: the six harnesses"
+     ],
+     "requirement": "No harness names the retired 80-tick warm start; each is re-read against the 12-tick settle and says whether its subject needs a longer history.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: the six harnesses"
+     ],
+     "requirement": "Every band that moved is recorded with its cause; nothing is re-pinned silently.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "digest-sees-the-money",
+   "title": "BL-1009 - The determinism digest covers everything generation moves that play reads: seeded sentiment, road tiers, region and nation treasuries, and the Exploration stocks",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1009 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "The deep digest folds seeded sentiment (sorted pairs and values), road tiers, region and nation treasuries, the Exploration stocks (port, navy, standing army) and corridor tier counts.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism (local, uncommitted)"
+     ],
+     "requirement": "A deliberate one-field perturbation of EACH newly covered field fails world_determinism.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "Digest values before and after recorded; the world itself is unchanged; the re-bless waits for Ben.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "small-grudges-freeze",
+   "title": "BL-842 - Integer truncation freezes small grudges forever, falsifying both decay and sparsity",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-842 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness"
+     ],
+     "requirement": "No grudge score above grudge_floor is stationary across a round at any step_years.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "The half-life at the bottom of the range is measured and reported, not assumed.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "assimilation-lost-to-the-tail",
+   "title": "BL-841 - A holder with no free culture slot loses its assimilation into the anonymous tail",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-841 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness"
+     ],
+     "requirement": "A holder's own assimilation gain is never lost to the anonymous tail: on the four-culture path the holder's share is nameable and nothing already gained is stranded.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "alarm-stops-saturating",
+   "title": "BL-1018 - visible_capability_reference is re-scaled so alarm discriminates between near pairs instead of reading 1000 everywhere",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1018 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "visible_capability_reference is set from the MEASURED distribution of visible capability, and the derivation is recorded.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "Alarm across near pairs has a spread rather than a mode at 1000, and the sweep reports it.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "The sprint-41 arms-race reading is re-taken through the unsaturated signal and recorded, whatever it says.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "the-first-crossing",
+   "title": "BL-1019 - Why four of six held seeds meet exactly one polity in 460 years, and what opens a frontier",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1019 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "The sweep reports first-contact count per seed.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "A seed meeting one polity in 460 years is either explained as correct for its geography or is no longer the common case, with the measured cause named.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "The held-seed label set covers seed 12's shape (a fifth label or a widened DETERRENCE-INERT).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "trade-rebased-on-reach",
+   "title": "BL-1021 - Trade income is paid on the distinct unlike classes a realm can reach, not on roaded pairs",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1021 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness"
+     ],
+     "requirement": "Era -1 trade income is paid on the count of distinct unlike trade classes a realm can reach, not on roaded pairs, and reads only difference.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "A polity connected to unlike ground sustains campaigns a disconnected one cannot - measured.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "The re-measured trade share of production is recorded whatever it is.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "empty-cultures-fold-into-parent",
+   "title": "BL-1017 - An empty culture folds back into its parent at the boundary, keeping the lineage link",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1017 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: colonisation_harness"
+     ],
+     "requirement": "At the Colonisation/Empires boundary a culture holding no ground folds into its parent, keeping the lineage link.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: colonisation_harness"
+     ],
+     "requirement": "Empty interior nodes are re-parented and no culture is orphaned (asserted).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "The post-fold holding fraction is reported.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "digitisation-readings",
+   "title": "BL-982 - The thirteen Digitisation readings are instrumented over a seed spread before any mechanism lands",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-982 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness"
+     ],
+     "requirement": "A harness prints all thirteen DIGITISATION.md readings over a 16-seed sweep as a spread, not a per-world verdict.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness"
+     ],
+     "requirement": "Each reading prints n/a honestly until the mechanism it reads exists; none is weakened to pass.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "forest-is-the-fifth-branch",
+   "title": "BL-1023 - A fifth Colonisation branch, Forest, teaches woodland and boreal; arid and stone stay hostile country",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1023 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "doc: tree_lint"
+     ],
+     "requirement": "A fifth Colonisation branch, Forest, teaches woodland and boreal, at about seven nodes, with rule-4 breadth and milestone requires_any sets updated.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "doc: COLONISATION_TREE.md"
+     ],
+     "requirement": "A table names which branch each of the twelve farm classes teaches; arid and stone are stated as hostile country that teaches nothing, deliberately.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "doc: tree_lint"
+     ],
+     "requirement": "tree_lint is green on doc and store together; the highland gate atom decision is recorded either way.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "creed-classifier-one-scale",
+   "title": "BL-1016 - The sweep's creed classifier compares a product against a mean, so consolidators cannot win",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1016 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "The consolidator/expansionist lean distribution is measured over ALL living polities on the 16-seed parity sweep.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "The classifier compares the two leans on one scale (per-mille rank among the round's living polities, as BL-955 does in the sim).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "Reading 3 is re-taken and recorded, whatever it says.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "era-world-three-reds",
+   "title": "BL-1010 - era_world_harness has three failing rows on main and no record says why",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1010 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: era_world_harness"
+     ],
+     "requirement": "Each of R1, R2, R5 is diagnosed; the harness is green on main or each remaining red is named as a baseline in its own header and in DEVELOPMENT_PRACTICES.md with its cause.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "coastal-ground-cheaper",
+   "title": "BL-1022 - Measure the cost of taking coastal ground against inland ground before any sea-legs magnitude moves",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1022 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "The cost of taking coastal ground is compared against inland ground across the sweep.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "doc: CREEDS.md"
+     ],
+     "requirement": "The outcome is recorded: if coastal is not cheaper, CREEDS.md says the floor's redundancy with the port gate is legitimate; if it is, a number goes to Ben. No magnitude moves.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "seat-floor-reads-static-score",
+   "title": "BL-1020 - The seat viability floor reads the static landscape score, not eight quarters of trailing net",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1020 - backlog wave A (2026-09-16)",
+   "batch": "backlog-wave-a",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep / corp_selection"
+     ],
+     "requirement": "The seat shortlist gates and orders on the static landscape score phase 6 computed for each seat, not on trailing net.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep --guard"
+     ],
+     "requirement": "The shortlist is non-empty on all 16 curated seeds.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: live click"
+     ],
+     "requirement": "The seat card shows trailing figures as information; a live Release run seats from a non-empty shortlist (main session, live click).",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
