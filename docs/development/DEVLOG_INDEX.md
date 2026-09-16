@@ -21,88 +21,88 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-09-11 | [Sprint 38 closes for real: the whole closure contract wired, twelve items, and the phase pronounced too lively](DEVLOG.md) | BL-480 BL-891 BL-901 BL-902 BL-903 BL-904 BL-905 BL-906 BL-907 BL-908 BL-909 BL-910 BL-911 BL-912 | DEVLOG.md |
 | 2026-09-11 | [Sprint 38 closes the phase: seven items, five agents, and a lever that refuses nothing](DEVLOG.md) | BL-817 BL-823 BL-827 BL-830 BL-838 BL-839 BL-887 BL-891 BL-893 BL-895 BL-896 BL-897 BL-898 BL-899 BL-904 BL-905 | DEVLOG.md |
 | 2026-09-01 | [Sprint 27 block 2: two scale-blind selections, and two instruments that were lying](DEVLOG.md) | BL-417 BL-434 BL-440 BL-642 BL-709 BL-710 BL-711 BL-712 | DEVLOG.md |
-| 2026-08-29 | [Sprint 24a: every ledger rebuilt, and three deletions that took a ruling with them](DEVLOG.md) | BL-176 BL-591 BL-683 BL-693 | DEVLOG.md |
-| 2026-08-28 | [Sprint 23 closes: a lens becomes a question, and the answer stops disagreeing with itself](DEVLOG.md) | BL-636 BL-660 BL-664 BL-665 BL-666 BL-667 BL-668 BL-669 BL-670 BL-671 BL-672 BL-673 | DEVLOG.md |
-| 2026-08-26 | [Sprint 20 closes: the loop closes, and the instruments were measuring a different world](DEVLOG.md) | BL-627 BL-630 BL-632 BL-634 BL-635 BL-641 BL-654 BL-655 BL-656 BL-657 | DEVLOG.md |
-| 2026-08-26 | [The ledger, the buyout, and the discovery that the demand side was never built](DEVLOG.md) | BL-433 BL-626 BL-627 BL-628 BL-631 BL-633 BL-635 BL-637 BL-638 BL-648 BL-649 BL-650 BL-651 BL-652 | DEVLOG.md |
-| 2026-08-25 | [The warm-start stall found and killed; settlements become visible (flood-field pathfinding; BL-625; NR-645)](DEVLOG.md) | BL-599 BL-619 BL-621 BL-623 BL-625 | DEVLOG.md |
-| 2026-08-25 | [Population design settles, Sprint 19 opens and lands both build waves (BL-610–BL-618, BL-620; NR-628–NR-641)](DEVLOG.md) | BL-070 BL-086 BL-376 BL-514 BL-596 BL-597 BL-598 BL-601 BL-603 BL-604 BL-610 BL-611 BL-612 BL-613 BL-614 BL-615 BL-616 BL-617 BL-618 BL-619 BL-620 | DEVLOG.md |
-| 2026-08-24 | [Sprint 17 designed, delivered end to end, and cut as v0.1.17 (BL-585–BL-594)](DEVLOG.md) | BL-409 BL-429 BL-585 BL-586 BL-587 BL-588 BL-589 BL-590 BL-591 BL-592 BL-593 BL-594 | DEVLOG.md |
-| 2026-08-23 | [Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575)](DEVLOG.md) | BL-348 BL-349 BL-436 BL-569 BL-570 BL-571 BL-572 BL-573 BL-574 BL-575 BL-576 BL-577 BL-578 BL-579 BL-594 BL-595 | DEVLOG.md |
-| 2026-08-23 | [The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575)](DEVLOG.md) | BL-569 BL-570 BL-571 BL-572 BL-573 BL-574 BL-575 BL-576 BL-577 BL-578 | DEVLOG.md |
-| 2026-08-23 | [Housekeeping, and the nation spines go live (BL-568, Sprint N3 slice 1; NR-566–NR-572)](DEVLOG.md) | BL-462 BL-537 BL-542 BL-555 BL-556 BL-558 BL-559 BL-568 | DEVLOG.md |
-| 2026-08-21 | [Ownership separates from identity: the syndicate tier (BL-524–BL-530, NR-491–NR-497)](DEVLOG.md) | BL-094 BL-218 BL-219 BL-350 BL-365 BL-409 BL-524 BL-525 BL-526 BL-527 BL-528 BL-529 BL-530 BL-531 | DEVLOG.md |
-| 2026-08-21 | [Tiles gain a third axis, and a fight finally happens (NR-438/439, BL-519, BL-521, BL-520, BL-516, BL-467; Sprints P1 closed + C3)](DEVLOG.md) | BL-467 BL-516 BL-519 BL-520 BL-521 | DEVLOG.md |
-| 2026-08-20 | [The province becomes a thing you can see (BL-458, BL-513, BL-511, BL-466, BL-515, BL-517, BL-392, BL-463; Sprints 27/B2/B3/C3/D4 + P1)](DEVLOG.md) | BL-392 BL-458 BL-463 BL-466 BL-511 BL-513 BL-514 BL-515 BL-516 BL-517 BL-518 BL-519 BL-520 | DEVLOG.md |
-| 2026-08-20 | [the corpus gets delegated: saved roles and scoped instructions (BL-497)](DEVLOG.md) | BL-497 BL-498 BL-503 | DEVLOG.md |
-| 2026-08-20 | [COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-483–BL-496, BL-504–BL-510)](DEVLOG.md) | BL-325 BL-422 BL-464 BL-476 BL-483 BL-494 BL-495 BL-496 BL-504 BL-510 | DEVLOG.md |
-| 2026-08-19 | [The watch + meta open: an AI plays the rendered game (BL-412, BL-408, BL-411, BL-479, BL-480, BL-335; Sprints W1/D1/D3)](DEVLOG.md) | BL-087 BL-306 BL-335 BL-408 BL-411 BL-412 BL-437 BL-439 BL-443 BL-476 BL-477 BL-478 BL-479 BL-480 BL-481 BL-482 BL-504 | DEVLOG.md |
-| 2026-08-17 | [Sprint 25a: armies get something to eat (BL-457, BL-455, BL-452/453, BL-456, BL-454/459)](DEVLOG.md) | BL-325 BL-340 BL-350 BL-444 BL-452 BL-454 BL-455 BL-456 BL-457 BL-458 | DEVLOG.md |
-| 2026-08-17 | [the score was never the reason (BL-417 step 1, BL-439)](DEVLOG.md) | BL-388 BL-406 BL-417 BL-422 BL-428 BL-435 BL-436 BL-439 | DEVLOG.md |
-| 2026-08-16 | [the shelf stops carrying goods nobody sold (BL-422)](DEVLOG.md) | BL-160 BL-351 BL-386 BL-409 BL-422 BL-436 | DEVLOG.md |
-| 2026-08-16 | [the roster invariants land, and the roster shrinks (BL-432, NR-243, NR-257)](DEVLOG.md) | BL-409 BL-428 BL-430 BL-432 | DEVLOG.md |
-| 2026-08-16 | [chain depth becomes the growth gate (BL-428 slice 2), Method-page fix, seed sweep](DEVLOG.md) | BL-215 BL-428 BL-429 BL-431 BL-432 BL-435 | DEVLOG.md |
-| 2026-08-16 | [building Selection card playtest, sub-facility groups (BL-431, BL-434)](DEVLOG.md) | BL-429 BL-430 BL-431 BL-434 BL-436 | DEVLOG.md |
-| 2026-08-15 | [BL-429 slice 3: the ancient roster gets glyphs](DEVLOG.md) | BL-429 BL-430 BL-431 | DEVLOG.md |
-| 2026-08-15 | [BL-429 slice 2: the ancient roster gets names](DEVLOG.md) | BL-428 BL-429 BL-430 BL-431 | DEVLOG.md |
-| 2026-08-14 | [Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden demotion](DEVLOG.md) | BL-402 BL-415 BL-416 BL-423 BL-424 BL-425 BL-426 BL-427 | DEVLOG.md |
-| 2026-08-14 | [Seam batch: the money printer closed and the word interface given a door](DEVLOG.md) | BL-351 BL-386 BL-387 BL-396 BL-397 BL-416 BL-422 | DEVLOG.md |
-| 2026-08-14 | [Doc-system weight: requirements hot/cold split + DEVLOG rollover](DEVLOG.md) | BL-421 | DEVLOG.md |
-| 2026-08-13 | [AI gameplay: the word interface made runnable, and the rival's idle/resume oscillation measured](DEVLOG.md) | BL-049 BL-079 BL-094 BL-193 BL-202 BL-203 BL-278 BL-293 BL-315 BL-324 BL-350 BL-366 BL-377 BL-381 BL-384 BL-386 BL-387 BL-388 BL-389 BL-390 BL-393 BL-394 | DEVLOG.md |
-| 2026-08-11 | [BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing](DEVLOG.md) | BL-078 BL-095 BL-130 BL-253 BL-263 BL-365 BL-366 BL-368 | DEVLOG.md |
-| 2026-08-11 | [BL-263 lands: BL-365's blocker chain, first link](DEVLOG.md) | BL-089 BL-096 BL-130 BL-263 BL-365 BL-366 BL-368 | DEVLOG.md |
-| 2026-08-11 | [BL-368 lands: Sprint 10's second foundation, and a stale bug claim corrected](DEVLOG.md) | BL-078 BL-130 BL-132 BL-190 BL-365 BL-366 BL-367 BL-368 BL-369 BL-370 BL-371 | DEVLOG.md |
-| 2026-08-11 | [BL-366 lands: Sprint 10's first foundation, the living world resumed](DEVLOG.md) | BL-130 BL-132 BL-193 BL-253 BL-365 BL-366 BL-367 BL-368 BL-369 | DEVLOG.md |
-| 2026-08-10 | [The warm start converges, and the substrate is condemned](DEVLOG.md) | BL-107 BL-112 BL-130 BL-132 BL-193 BL-253 BL-293 BL-340 BL-350 BL-365 BL-366 BL-367 BL-368 BL-369 | DEVLOG.md |
-| 2026-08-10 | [Hygiene wave 2: app.cpp halves, and the review barrier earns its place](DEVLOG.md) | BL-257 BL-348 BL-354 BL-361 BL-362 BL-363 | DEVLOG.md |
-| 2026-08-10 | [The hygiene audit that became a batch: four reviewers, thirteen items, ten landed](DEVLOG.md) | BL-266 BL-325 BL-351 BL-352 BL-353 BL-354 BL-355 BL-356 BL-357 BL-358 BL-359 BL-360 BL-361 BL-362 BL-363 | DEVLOG.md |
-| 2026-08-10 | [Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases](DEVLOG.md) | BL-094 BL-155 BL-156 BL-182 BL-186 BL-212 BL-218 BL-253 BL-280 BL-314 BL-315 BL-325 BL-331 BL-332 BL-342 BL-343 BL-344 | DEVLOG.md |
-| 2026-08-10 | [Cut v0.1.10: three items whose own diagnosis was wrong, and a green gate that lied](DEVLOG.md) | BL-079 BL-181 BL-218 BL-257 BL-283 BL-284 BL-290 BL-338 BL-346 BL-347 | DEVLOG.md |
-| 2026-08-09 | [Cut v0.1.9: five worktree agents, and three of them branched from a base that had already moved](DEVLOG.md) | BL-193 BL-216 BL-227 BL-229 BL-247 BL-250 BL-253 BL-260 BL-266 BL-281 BL-312 BL-338 BL-347 | DEVLOG.md |
-| 2026-08-09 | [Cut v0.1.8: ten test failures, one real defect, and a tool that had been lying since it was written](DEVLOG.md) | BL-285 BL-288 BL-291 BL-302 BL-322 BL-326 BL-333 BL-338 BL-341 | DEVLOG.md |
-| 2026-08-09 | [Cut v0.1.1: the word interface ships, and the retrofit that made it uncuttable is undone](DEVLOG.md) | BL-150 BL-154 BL-194 BL-198 BL-206 BL-214 BL-215 BL-228 BL-230 BL-247 BL-248 BL-262 BL-266 BL-267 BL-270 BL-276 BL-278 BL-293 BL-310 BL-312 BL-313 BL-319 | DEVLOG.md |
-| 2026-08-09 | [Cut v0.1.2: the buildings rework ships, and the roadmap gets its first per-minor done-definition](DEVLOG.md) | BL-266 BL-323 BL-340 | DEVLOG.md |
-| 2026-08-09 | [Build-heavy v0.1.1 batch: BL-215, BL-266, and the XS sweep, three worktree agents](DEVLOG.md) | BL-215 BL-262 BL-266 BL-294 BL-295 BL-339 | DEVLOG.md |
-| 2026-08-08 | [The order book stops being a picture and starts being state](DEVLOG.md) | BL-204 BL-293 BL-323 BL-325 | DEVLOG.md |
-| 2026-08-08 | [Two of NR-094's footnotes promoted to their own backlog items](DEVLOG.md) | BL-207 BL-278 BL-334 BL-335 BL-336 | DEVLOG.md |
-| 2026-08-08 | [Ruling on NR-094: Stage C takes the dialogue layer, the scorer keeps the action seam](DEVLOG.md) | BL-278 BL-279 BL-334 | DEVLOG.md |
-| 2026-08-08 | [C-route feasibility: both gates pass, and Cicero says the model is on the wrong layer](DEVLOG.md) | BL-278 BL-279 | DEVLOG.md |
-| 2026-08-08 | [Critique batch delivered: build ledger grouping, construction glyph, reach-circle retirement, military start](DEVLOG.md) | BL-323 BL-326 BL-327 BL-328 BL-329 BL-330 | DEVLOG.md |
-| 2026-08-08 | [Live critique: seven items filed, the building-selection bypass fixed](DEVLOG.md) | BL-087 BL-223 BL-323 BL-326 BL-327 BL-328 BL-329 BL-330 BL-331 BL-332 BL-333 | DEVLOG.md |
-| 2026-08-08 | [Military base S1: the muster building lands](DEVLOG.md) | BL-323 BL-325 | DEVLOG.md |
-| 2026-08-08 | [Reach-rule hardening: three S2 defects ruled and fixed, and the military-base design settled](DEVLOG.md) | BL-068 BL-288 BL-323 BL-324 BL-325 | DEVLOG.md |
-| 2026-08-08 | [Buildings rework, first slice: extraction padding, site-dependent build time, construction legibility](DEVLOG.md) | BL-323 | DEVLOG.md |
-| 2026-08-08 | [landing the uncommitted generation-preview / Era -1 terrain work](DEVLOG.md) | BL-256 BL-265 BL-316 BL-321 BL-323 | DEVLOG.md |
-| 2026-08-08 | [military design thread + BL-324 batch delivery](DEVLOG.md) | BL-079 BL-157 BL-181 BL-202 BL-280 BL-305 BL-324 | DEVLOG.md |
-| 2026-08-08 | [audit note: uncommitted generation-preview / Era -1 terrain work found in the tree](DEVLOG.md) | BL-274 BL-316 BL-320 BL-321 BL-323 | DEVLOG.md |
-| 2026-08-08 | [Roadmap extension: v0.1.x retrofitted, the Era −1 arc given a home, v1.0.0 named](DEVLOG.md) | BL-054 BL-087 BL-094 BL-157 BL-160 BL-203 BL-204 BL-205 BL-207 BL-222 BL-262 BL-271 BL-280 BL-315 | DEVLOG.md |
-| 2026-08-05 | [The Era -1 arc's second day: Ages view, sweep verdict, review, and the fixes](DEVLOG.md) | BL-224 BL-271 BL-274 BL-275 BL-277 BL-299 | DEVLOG.md |
-| 2026-08-05 | [Red herrings and the rupture: making Era 1 failure a skill test](DEVLOG.md) | BL-223 | DEVLOG.md |
-| 2026-08-05 | [The Era 1 tree, first draft: keystones opened by deeds](DEVLOG.md) | — | DEVLOG.md |
-| 2026-08-05 | [Effects: what a tech actually does, mapped to real buildings](DEVLOG.md) | BL-087 BL-149 BL-155 BL-156 BL-157 | DEVLOG.md |
-| 2026-08-05 | [The industrial neighbourhood: the second worked region of the tech web](DEVLOG.md) | BL-273 BL-296 | DEVLOG.md |
-| 2026-08-04 | [Roster bands become a partition, and the Era -1 sim lands](DEVLOG.md) | BL-271 BL-277 | DEVLOG.md |
-| 2026-08-04 | [A world that begins at 0 CE](DEVLOG.md) | BL-271 | DEVLOG.md |
-| 2026-08-04 | [The arena comes home: text-only Rival, the diplomacy battery, and the RTS that lived for an hour](DEVLOG.md) | BL-278 BL-296 BL-306 BL-307 BL-308 BL-309 BL-310 | DEVLOG.md |
-| 2026-08-04 | [The ancient tech ladder, mocked up](DEVLOG.md) | BL-087 BL-271 BL-274 BL-275 BL-296 | DEVLOG.md |
-| 2026-08-04 | [The earth-like battery, generation retuned, and a sky](DEVLOG.md) | BL-054 BL-094 BL-157 BL-202 BL-223 BL-224 BL-233 BL-240 BL-272 BL-273 BL-274 BL-277 BL-280 BL-287 BL-288 BL-289 | DEVLOG.md |
-| 2026-08-04 | [Documentation retrofit: seven audits, and what the corpus was lying about](DEVLOG.md) | BL-094 BL-272 BL-290 BL-291 BL-295 | DEVLOG.md |
-| 2026-08-04 | [BL-287: one world layer instead of forty-four, and the three bugs it flushed out](DEVLOG.md) | BL-217 BL-286 BL-287 BL-288 | DEVLOG.md |
-| 2026-08-04 | [Earth-like generation: the three-instrument battery, S6's epoch bug, and bands from measurement](DEVLOG.md) | BL-167 BL-275 BL-276 | DEVLOG.md |
-| 2026-08-03 | [Io MCP server: BL-278 built and landed](DEVLOG.md) | BL-206 BL-278 BL-279 | DEVLOG.md |
-| 2026-08-03 | [two direction points: invented names, and the governing body](DEVLOG.md) | BL-094 BL-155 BL-156 BL-157 BL-158 BL-271 BL-277 | DEVLOG.md |
-| 2026-08-03 | [clearing the review queue: 14 decisions, six of them overturning what shipped](DEVLOG.md) | BL-054 BL-087 BL-206 BL-208 BL-219 BL-229 BL-262 BL-270 BL-278 BL-279 BL-280 BL-281 BL-282 BL-283 BL-284 BL-285 | DEVLOG.md |
-| 2026-08-03 | [LLM grand strategy: the public field, MCP, and the small-local-model direction](DEVLOG.md) | BL-206 BL-270 BL-278 BL-279 | DEVLOG.md |
-| 2026-08-03 | [Mediterranean rift sea: measure, mechanism, gate (BL-276)](DEVLOG.md) | BL-276 | DEVLOG.md |
-| 2026-08-02 | [filing the Era −1 sim: Rome as sandbox, units instead of scalars](DEVLOG.md) | BL-054 BL-155 BL-210 BL-218 BL-223 BL-224 BL-271 BL-272 BL-273 BL-274 BL-275 | DEVLOG.md |
-| 2026-08-02 | [documentation compression: the backlog sheds 42%, and the reading order gets measured](DEVLOG.md) | BL-270 | DEVLOG.md |
-| 2026-08-02 | [the history backend: provinces, gods on the ground, and a record that can be burned](DEVLOG.md) | BL-053 BL-054 BL-170 BL-210 BL-217 BL-218 BL-219 BL-252 | DEVLOG.md |
-| 2026-08-02 | [the action dictionary: 114 controls, five agents, one afternoon](DEVLOG.md) | BL-159 BL-248 BL-270 | DEVLOG.md |
-| 2026-08-02 | ["the engine is thrashing": measured, diagnosed, and fixed in one pass](DEVLOG.md) | BL-077 BL-170 BL-249 BL-267 BL-268 BL-269 | DEVLOG.md |
-| 2026-08-02 | [the world history log: the project's first serialisation seam](DEVLOG.md) | BL-079 BL-107 BL-166 BL-170 BL-208 BL-217 BL-218 BL-219 | DEVLOG.md |
-| 2026-08-02 | [the design-owed sweep: thirty items settled, and three recovered from a merge](DEVLOG.md) | BL-054 BL-087 BL-094 BL-098 BL-131 BL-155 BL-157 BL-158 BL-171 BL-189 BL-210 BL-217 BL-218 BL-223 BL-225 BL-229 BL-262 BL-263 | DEVLOG.md |
-| 2026-08-01 | [the disclosure spine: one fold idiom, and the surfaces stop inventing their own](DEVLOG.md) | BL-214 BL-215 BL-233 BL-247 BL-248 BL-252 BL-254 BL-259 | DEVLOG.md |
-| 2026-08-01 | [the last four v0.1.0 items, and the goldens finally have one truth value](DEVLOG.md) | BL-162 BL-203 BL-221 BL-233 BL-252 BL-254 BL-255 BL-256 BL-257 BL-258 | DEVLOG.md |
+| 2026-08-29 | [Sprint 24a: every ledger rebuilt, and three deletions that took a ruling with them](archive/DEVLOG-2026.md) | BL-176 BL-591 BL-683 BL-693 | DEVLOG-2026.md |
+| 2026-08-28 | [Sprint 23 closes: a lens becomes a question, and the answer stops disagreeing with itself](archive/DEVLOG-2026.md) | BL-636 BL-660 BL-664 BL-665 BL-666 BL-667 BL-668 BL-669 BL-670 BL-671 BL-672 BL-673 | DEVLOG-2026.md |
+| 2026-08-26 | [Sprint 20 closes: the loop closes, and the instruments were measuring a different world](archive/DEVLOG-2026.md) | BL-627 BL-630 BL-632 BL-634 BL-635 BL-641 BL-654 BL-655 BL-656 BL-657 | DEVLOG-2026.md |
+| 2026-08-26 | [The ledger, the buyout, and the discovery that the demand side was never built](archive/DEVLOG-2026.md) | BL-433 BL-626 BL-627 BL-628 BL-631 BL-633 BL-635 BL-637 BL-638 BL-648 BL-649 BL-650 BL-651 BL-652 | DEVLOG-2026.md |
+| 2026-08-25 | [The warm-start stall found and killed; settlements become visible (flood-field pathfinding; BL-625; NR-645)](archive/DEVLOG-2026.md) | BL-599 BL-619 BL-621 BL-623 BL-625 | DEVLOG-2026.md |
+| 2026-08-25 | [Population design settles, Sprint 19 opens and lands both build waves (BL-610–BL-618, BL-620; NR-628–NR-641)](archive/DEVLOG-2026.md) | BL-070 BL-086 BL-376 BL-514 BL-596 BL-597 BL-598 BL-601 BL-603 BL-604 BL-610 BL-611 BL-612 BL-613 BL-614 BL-615 BL-616 BL-617 BL-618 BL-619 BL-620 | DEVLOG-2026.md |
+| 2026-08-24 | [Sprint 17 designed, delivered end to end, and cut as v0.1.17 (BL-585–BL-594)](archive/DEVLOG-2026.md) | BL-409 BL-429 BL-585 BL-586 BL-587 BL-588 BL-589 BL-590 BL-591 BL-592 BL-593 BL-594 | DEVLOG-2026.md |
+| 2026-08-23 | [Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575)](archive/DEVLOG-2026.md) | BL-348 BL-349 BL-436 BL-569 BL-570 BL-571 BL-572 BL-573 BL-574 BL-575 BL-576 BL-577 BL-578 BL-579 BL-594 BL-595 | DEVLOG-2026.md |
+| 2026-08-23 | [The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575)](archive/DEVLOG-2026.md) | BL-569 BL-570 BL-571 BL-572 BL-573 BL-574 BL-575 BL-576 BL-577 BL-578 | DEVLOG-2026.md |
+| 2026-08-23 | [Housekeeping, and the nation spines go live (BL-568, Sprint N3 slice 1; NR-566–NR-572)](archive/DEVLOG-2026.md) | BL-462 BL-537 BL-542 BL-555 BL-556 BL-558 BL-559 BL-568 | DEVLOG-2026.md |
+| 2026-08-21 | [Ownership separates from identity: the syndicate tier (BL-524–BL-530, NR-491–NR-497)](archive/DEVLOG-2026.md) | BL-094 BL-218 BL-219 BL-350 BL-365 BL-409 BL-524 BL-525 BL-526 BL-527 BL-528 BL-529 BL-530 BL-531 | DEVLOG-2026.md |
+| 2026-08-21 | [Tiles gain a third axis, and a fight finally happens (NR-438/439, BL-519, BL-521, BL-520, BL-516, BL-467; Sprints P1 closed + C3)](archive/DEVLOG-2026.md) | BL-467 BL-516 BL-519 BL-520 BL-521 | DEVLOG-2026.md |
+| 2026-08-20 | [The province becomes a thing you can see (BL-458, BL-513, BL-511, BL-466, BL-515, BL-517, BL-392, BL-463; Sprints 27/B2/B3/C3/D4 + P1)](archive/DEVLOG-2026.md) | BL-392 BL-458 BL-463 BL-466 BL-511 BL-513 BL-514 BL-515 BL-516 BL-517 BL-518 BL-519 BL-520 | DEVLOG-2026.md |
+| 2026-08-20 | [the corpus gets delegated: saved roles and scoped instructions (BL-497)](archive/DEVLOG-2026.md) | BL-497 BL-498 BL-503 | DEVLOG-2026.md |
+| 2026-08-20 | [COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-483–BL-496, BL-504–BL-510)](archive/DEVLOG-2026.md) | BL-325 BL-422 BL-464 BL-476 BL-483 BL-494 BL-495 BL-496 BL-504 BL-510 | DEVLOG-2026.md |
+| 2026-08-19 | [The watch + meta open: an AI plays the rendered game (BL-412, BL-408, BL-411, BL-479, BL-480, BL-335; Sprints W1/D1/D3)](archive/DEVLOG-2026.md) | BL-087 BL-306 BL-335 BL-408 BL-411 BL-412 BL-437 BL-439 BL-443 BL-476 BL-477 BL-478 BL-479 BL-480 BL-481 BL-482 BL-504 | DEVLOG-2026.md |
+| 2026-08-17 | [Sprint 25a: armies get something to eat (BL-457, BL-455, BL-452/453, BL-456, BL-454/459)](archive/DEVLOG-2026.md) | BL-325 BL-340 BL-350 BL-444 BL-452 BL-454 BL-455 BL-456 BL-457 BL-458 | DEVLOG-2026.md |
+| 2026-08-17 | [the score was never the reason (BL-417 step 1, BL-439)](archive/DEVLOG-2026.md) | BL-388 BL-406 BL-417 BL-422 BL-428 BL-435 BL-436 BL-439 | DEVLOG-2026.md |
+| 2026-08-16 | [the shelf stops carrying goods nobody sold (BL-422)](archive/DEVLOG-2026.md) | BL-160 BL-351 BL-386 BL-409 BL-422 BL-436 | DEVLOG-2026.md |
+| 2026-08-16 | [the roster invariants land, and the roster shrinks (BL-432, NR-243, NR-257)](archive/DEVLOG-2026.md) | BL-409 BL-428 BL-430 BL-432 | DEVLOG-2026.md |
+| 2026-08-16 | [chain depth becomes the growth gate (BL-428 slice 2), Method-page fix, seed sweep](archive/DEVLOG-2026.md) | BL-215 BL-428 BL-429 BL-431 BL-432 BL-435 | DEVLOG-2026.md |
+| 2026-08-16 | [building Selection card playtest, sub-facility groups (BL-431, BL-434)](archive/DEVLOG-2026.md) | BL-429 BL-430 BL-431 BL-434 BL-436 | DEVLOG-2026.md |
+| 2026-08-15 | [BL-429 slice 3: the ancient roster gets glyphs](archive/DEVLOG-2026.md) | BL-429 BL-430 BL-431 | DEVLOG-2026.md |
+| 2026-08-15 | [BL-429 slice 2: the ancient roster gets names](archive/DEVLOG-2026.md) | BL-428 BL-429 BL-430 BL-431 | DEVLOG-2026.md |
+| 2026-08-14 | [Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden demotion](archive/DEVLOG-2026.md) | BL-402 BL-415 BL-416 BL-423 BL-424 BL-425 BL-426 BL-427 | DEVLOG-2026.md |
+| 2026-08-14 | [Seam batch: the money printer closed and the word interface given a door](archive/DEVLOG-2026.md) | BL-351 BL-386 BL-387 BL-396 BL-397 BL-416 BL-422 | DEVLOG-2026.md |
+| 2026-08-14 | [Doc-system weight: requirements hot/cold split + DEVLOG rollover](archive/DEVLOG-2026.md) | BL-421 | DEVLOG-2026.md |
+| 2026-08-13 | [AI gameplay: the word interface made runnable, and the rival's idle/resume oscillation measured](archive/DEVLOG-2026.md) | BL-049 BL-079 BL-094 BL-193 BL-202 BL-203 BL-278 BL-293 BL-315 BL-324 BL-350 BL-366 BL-377 BL-381 BL-384 BL-386 BL-387 BL-388 BL-389 BL-390 BL-393 BL-394 | DEVLOG-2026.md |
+| 2026-08-11 | [BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing](archive/DEVLOG-2026.md) | BL-078 BL-095 BL-130 BL-253 BL-263 BL-365 BL-366 BL-368 | DEVLOG-2026.md |
+| 2026-08-11 | [BL-263 lands: BL-365's blocker chain, first link](archive/DEVLOG-2026.md) | BL-089 BL-096 BL-130 BL-263 BL-365 BL-366 BL-368 | DEVLOG-2026.md |
+| 2026-08-11 | [BL-368 lands: Sprint 10's second foundation, and a stale bug claim corrected](archive/DEVLOG-2026.md) | BL-078 BL-130 BL-132 BL-190 BL-365 BL-366 BL-367 BL-368 BL-369 BL-370 BL-371 | DEVLOG-2026.md |
+| 2026-08-11 | [BL-366 lands: Sprint 10's first foundation, the living world resumed](archive/DEVLOG-2026.md) | BL-130 BL-132 BL-193 BL-253 BL-365 BL-366 BL-367 BL-368 BL-369 | DEVLOG-2026.md |
+| 2026-08-10 | [The warm start converges, and the substrate is condemned](archive/DEVLOG-2026.md) | BL-107 BL-112 BL-130 BL-132 BL-193 BL-253 BL-293 BL-340 BL-350 BL-365 BL-366 BL-367 BL-368 BL-369 | DEVLOG-2026.md |
+| 2026-08-10 | [Hygiene wave 2: app.cpp halves, and the review barrier earns its place](archive/DEVLOG-2026.md) | BL-257 BL-348 BL-354 BL-361 BL-362 BL-363 | DEVLOG-2026.md |
+| 2026-08-10 | [The hygiene audit that became a batch: four reviewers, thirteen items, ten landed](archive/DEVLOG-2026.md) | BL-266 BL-325 BL-351 BL-352 BL-353 BL-354 BL-355 BL-356 BL-357 BL-358 BL-359 BL-360 BL-361 BL-362 BL-363 | DEVLOG-2026.md |
+| 2026-08-10 | [Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases](archive/DEVLOG-2026.md) | BL-094 BL-155 BL-156 BL-182 BL-186 BL-212 BL-218 BL-253 BL-280 BL-314 BL-315 BL-325 BL-331 BL-332 BL-342 BL-343 BL-344 | DEVLOG-2026.md |
+| 2026-08-10 | [Cut v0.1.10: three items whose own diagnosis was wrong, and a green gate that lied](archive/DEVLOG-2026.md) | BL-079 BL-181 BL-218 BL-257 BL-283 BL-284 BL-290 BL-338 BL-346 BL-347 | DEVLOG-2026.md |
+| 2026-08-09 | [Cut v0.1.9: five worktree agents, and three of them branched from a base that had already moved](archive/DEVLOG-2026.md) | BL-193 BL-216 BL-227 BL-229 BL-247 BL-250 BL-253 BL-260 BL-266 BL-281 BL-312 BL-338 BL-347 | DEVLOG-2026.md |
+| 2026-08-09 | [Cut v0.1.8: ten test failures, one real defect, and a tool that had been lying since it was written](archive/DEVLOG-2026.md) | BL-285 BL-288 BL-291 BL-302 BL-322 BL-326 BL-333 BL-338 BL-341 | DEVLOG-2026.md |
+| 2026-08-09 | [Cut v0.1.1: the word interface ships, and the retrofit that made it uncuttable is undone](archive/DEVLOG-2026.md) | BL-150 BL-154 BL-194 BL-198 BL-206 BL-214 BL-215 BL-228 BL-230 BL-247 BL-248 BL-262 BL-266 BL-267 BL-270 BL-276 BL-278 BL-293 BL-310 BL-312 BL-313 BL-319 | DEVLOG-2026.md |
+| 2026-08-09 | [Cut v0.1.2: the buildings rework ships, and the roadmap gets its first per-minor done-definition](archive/DEVLOG-2026.md) | BL-266 BL-323 BL-340 | DEVLOG-2026.md |
+| 2026-08-09 | [Build-heavy v0.1.1 batch: BL-215, BL-266, and the XS sweep, three worktree agents](archive/DEVLOG-2026.md) | BL-215 BL-262 BL-266 BL-294 BL-295 BL-339 | DEVLOG-2026.md |
+| 2026-08-08 | [The order book stops being a picture and starts being state](archive/DEVLOG-2026.md) | BL-204 BL-293 BL-323 BL-325 | DEVLOG-2026.md |
+| 2026-08-08 | [Two of NR-094's footnotes promoted to their own backlog items](archive/DEVLOG-2026.md) | BL-207 BL-278 BL-334 BL-335 BL-336 | DEVLOG-2026.md |
+| 2026-08-08 | [Ruling on NR-094: Stage C takes the dialogue layer, the scorer keeps the action seam](archive/DEVLOG-2026.md) | BL-278 BL-279 BL-334 | DEVLOG-2026.md |
+| 2026-08-08 | [C-route feasibility: both gates pass, and Cicero says the model is on the wrong layer](archive/DEVLOG-2026.md) | BL-278 BL-279 | DEVLOG-2026.md |
+| 2026-08-08 | [Critique batch delivered: build ledger grouping, construction glyph, reach-circle retirement, military start](archive/DEVLOG-2026.md) | BL-323 BL-326 BL-327 BL-328 BL-329 BL-330 | DEVLOG-2026.md |
+| 2026-08-08 | [Live critique: seven items filed, the building-selection bypass fixed](archive/DEVLOG-2026.md) | BL-087 BL-223 BL-323 BL-326 BL-327 BL-328 BL-329 BL-330 BL-331 BL-332 BL-333 | DEVLOG-2026.md |
+| 2026-08-08 | [Military base S1: the muster building lands](archive/DEVLOG-2026.md) | BL-323 BL-325 | DEVLOG-2026.md |
+| 2026-08-08 | [Reach-rule hardening: three S2 defects ruled and fixed, and the military-base design settled](archive/DEVLOG-2026.md) | BL-068 BL-288 BL-323 BL-324 BL-325 | DEVLOG-2026.md |
+| 2026-08-08 | [Buildings rework, first slice: extraction padding, site-dependent build time, construction legibility](archive/DEVLOG-2026.md) | BL-323 | DEVLOG-2026.md |
+| 2026-08-08 | [landing the uncommitted generation-preview / Era -1 terrain work](archive/DEVLOG-2026.md) | BL-256 BL-265 BL-316 BL-321 BL-323 | DEVLOG-2026.md |
+| 2026-08-08 | [military design thread + BL-324 batch delivery](archive/DEVLOG-2026.md) | BL-079 BL-157 BL-181 BL-202 BL-280 BL-305 BL-324 | DEVLOG-2026.md |
+| 2026-08-08 | [audit note: uncommitted generation-preview / Era -1 terrain work found in the tree](archive/DEVLOG-2026.md) | BL-274 BL-316 BL-320 BL-321 BL-323 | DEVLOG-2026.md |
+| 2026-08-08 | [Roadmap extension: v0.1.x retrofitted, the Era −1 arc given a home, v1.0.0 named](archive/DEVLOG-2026.md) | BL-054 BL-087 BL-094 BL-157 BL-160 BL-203 BL-204 BL-205 BL-207 BL-222 BL-262 BL-271 BL-280 BL-315 | DEVLOG-2026.md |
+| 2026-08-05 | [The Era -1 arc's second day: Ages view, sweep verdict, review, and the fixes](archive/DEVLOG-2026.md) | BL-224 BL-271 BL-274 BL-275 BL-277 BL-299 | DEVLOG-2026.md |
+| 2026-08-05 | [Red herrings and the rupture: making Era 1 failure a skill test](archive/DEVLOG-2026.md) | BL-223 | DEVLOG-2026.md |
+| 2026-08-05 | [The Era 1 tree, first draft: keystones opened by deeds](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
+| 2026-08-05 | [Effects: what a tech actually does, mapped to real buildings](archive/DEVLOG-2026.md) | BL-087 BL-149 BL-155 BL-156 BL-157 | DEVLOG-2026.md |
+| 2026-08-05 | [The industrial neighbourhood: the second worked region of the tech web](archive/DEVLOG-2026.md) | BL-273 BL-296 | DEVLOG-2026.md |
+| 2026-08-04 | [Roster bands become a partition, and the Era -1 sim lands](archive/DEVLOG-2026.md) | BL-271 BL-277 | DEVLOG-2026.md |
+| 2026-08-04 | [A world that begins at 0 CE](archive/DEVLOG-2026.md) | BL-271 | DEVLOG-2026.md |
+| 2026-08-04 | [The arena comes home: text-only Rival, the diplomacy battery, and the RTS that lived for an hour](archive/DEVLOG-2026.md) | BL-278 BL-296 BL-306 BL-307 BL-308 BL-309 BL-310 | DEVLOG-2026.md |
+| 2026-08-04 | [The ancient tech ladder, mocked up](archive/DEVLOG-2026.md) | BL-087 BL-271 BL-274 BL-275 BL-296 | DEVLOG-2026.md |
+| 2026-08-04 | [The earth-like battery, generation retuned, and a sky](archive/DEVLOG-2026.md) | BL-054 BL-094 BL-157 BL-202 BL-223 BL-224 BL-233 BL-240 BL-272 BL-273 BL-274 BL-277 BL-280 BL-287 BL-288 BL-289 | DEVLOG-2026.md |
+| 2026-08-04 | [Documentation retrofit: seven audits, and what the corpus was lying about](archive/DEVLOG-2026.md) | BL-094 BL-272 BL-290 BL-291 BL-295 | DEVLOG-2026.md |
+| 2026-08-04 | [BL-287: one world layer instead of forty-four, and the three bugs it flushed out](archive/DEVLOG-2026.md) | BL-217 BL-286 BL-287 BL-288 | DEVLOG-2026.md |
+| 2026-08-04 | [Earth-like generation: the three-instrument battery, S6's epoch bug, and bands from measurement](archive/DEVLOG-2026.md) | BL-167 BL-275 BL-276 | DEVLOG-2026.md |
+| 2026-08-03 | [Io MCP server: BL-278 built and landed](archive/DEVLOG-2026.md) | BL-206 BL-278 BL-279 | DEVLOG-2026.md |
+| 2026-08-03 | [two direction points: invented names, and the governing body](archive/DEVLOG-2026.md) | BL-094 BL-155 BL-156 BL-157 BL-158 BL-271 BL-277 | DEVLOG-2026.md |
+| 2026-08-03 | [clearing the review queue: 14 decisions, six of them overturning what shipped](archive/DEVLOG-2026.md) | BL-054 BL-087 BL-206 BL-208 BL-219 BL-229 BL-262 BL-270 BL-278 BL-279 BL-280 BL-281 BL-282 BL-283 BL-284 BL-285 | DEVLOG-2026.md |
+| 2026-08-03 | [LLM grand strategy: the public field, MCP, and the small-local-model direction](archive/DEVLOG-2026.md) | BL-206 BL-270 BL-278 BL-279 | DEVLOG-2026.md |
+| 2026-08-03 | [Mediterranean rift sea: measure, mechanism, gate (BL-276)](archive/DEVLOG-2026.md) | BL-276 | DEVLOG-2026.md |
+| 2026-08-02 | [filing the Era −1 sim: Rome as sandbox, units instead of scalars](archive/DEVLOG-2026.md) | BL-054 BL-155 BL-210 BL-218 BL-223 BL-224 BL-271 BL-272 BL-273 BL-274 BL-275 | DEVLOG-2026.md |
+| 2026-08-02 | [documentation compression: the backlog sheds 42%, and the reading order gets measured](archive/DEVLOG-2026.md) | BL-270 | DEVLOG-2026.md |
+| 2026-08-02 | [the history backend: provinces, gods on the ground, and a record that can be burned](archive/DEVLOG-2026.md) | BL-053 BL-054 BL-170 BL-210 BL-217 BL-218 BL-219 BL-252 | DEVLOG-2026.md |
+| 2026-08-02 | [the action dictionary: 114 controls, five agents, one afternoon](archive/DEVLOG-2026.md) | BL-159 BL-248 BL-270 | DEVLOG-2026.md |
+| 2026-08-02 | ["the engine is thrashing": measured, diagnosed, and fixed in one pass](archive/DEVLOG-2026.md) | BL-077 BL-170 BL-249 BL-267 BL-268 BL-269 | DEVLOG-2026.md |
+| 2026-08-02 | [the world history log: the project's first serialisation seam](archive/DEVLOG-2026.md) | BL-079 BL-107 BL-166 BL-170 BL-208 BL-217 BL-218 BL-219 | DEVLOG-2026.md |
+| 2026-08-02 | [the design-owed sweep: thirty items settled, and three recovered from a merge](archive/DEVLOG-2026.md) | BL-054 BL-087 BL-094 BL-098 BL-131 BL-155 BL-157 BL-158 BL-171 BL-189 BL-210 BL-217 BL-218 BL-223 BL-225 BL-229 BL-262 BL-263 | DEVLOG-2026.md |
+| 2026-08-01 | [the disclosure spine: one fold idiom, and the surfaces stop inventing their own](archive/DEVLOG-2026.md) | BL-214 BL-215 BL-233 BL-247 BL-248 BL-252 BL-254 BL-259 | DEVLOG-2026.md |
+| 2026-08-01 | [the last four v0.1.0 items, and the goldens finally have one truth value](archive/DEVLOG-2026.md) | BL-162 BL-203 BL-221 BL-233 BL-252 BL-254 BL-255 BL-256 BL-257 BL-258 | DEVLOG-2026.md |
 | 2026-07-31 | [Lens-cycle fix: supply_routes was unreachable](archive/DEVLOG-2026.md) | BL-011 BL-014 BL-093 BL-226 BL-233 | DEVLOG-2026.md |
 | 2026-07-31 | [closing the v0.1.0 cut set: terrain combat, font glyphs, and the three audit instruments](archive/DEVLOG-2026.md) | BL-162 BL-210 BL-226 BL-230 BL-233 BL-234 BL-249 BL-252 BL-253 BL-254 BL-255 | DEVLOG-2026.md |
 | 2026-07-31 | [BL-214/BL-247/BL-248 (drill-through UI): narrow-by-default disclosure design, and a mid-session tree wipe](archive/DEVLOG-2026.md) | BL-196 BL-214 BL-247 BL-248 | DEVLOG-2026.md |
