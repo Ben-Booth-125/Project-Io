@@ -204,6 +204,11 @@ struct culture_shares
     /// redistributed deterministically (largest component first, ties on the
     /// lower slot, tail last), so the total is conserved to the unit and the
     /// result cannot depend on iteration order.
+    ///
+    /// @p c ALWAYS ENDS NAMED when it gained anything (BL-841): with every slot
+    /// held by another people it claims the smallest, demoting that people into
+    /// the tail, so `share_of(c)` reads back every unit it has digested. A share
+    /// the sim is accruing is never written where `share_of` cannot see it.
     void shift_toward(int c, int amount_q);
 
     bool operator==(const culture_shares& o) const
