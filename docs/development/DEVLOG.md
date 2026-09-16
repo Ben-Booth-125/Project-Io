@@ -10,6 +10,68 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-16 — Sprint 42 wave 1: sixteen items, five that moved the world, and the measurements that outran them
+
+**Runtime:** Full / Batch Delivery, continuing the same session. Sixteen worktree agents, one per item,
+merged in dependency order on `sprint-42-wave-1`; every branch base-checked and every agent's claim
+independently re-run in the main session before its merge was trusted. Two agents were stopped
+mid-flight by a usage limit and were finished here from their own commits and snapshotted diffs.
+
+**What landed.** The physical stages: the tile pipeline splits at the Body/Life boundary so the Life
+half re-runs over a cached record (the 120-seed census re-runs in 13% of the time), planetology keeps
+a per-epoch thermal series the fossil pass samples, and Pass 3 bands from the plate-carried position
+so the present is the frame's epoch 0 rather than a lookup proved equal to it. The history stages:
+rivers take the same corridor discount as the coast, fleets and standing armies pay a per-head bill
+from the treasury, every node of the two wired trees now does something through one generic apply,
+and every seat a polity holds folds its stores into the capital at 1200. The seam: nations open with
+the money their history banked, the landscape search sees road tiers and rosters, and the warm start
+is retired in favour of the search's own 12-tick validation run. Plus the readings — the held-seed
+census, the ephemeral-culture count — and two doc items, one of which retired `COLLAPSE.md`.
+
+**Five causes moved the world, each measured alone**, and `NR-877` asks Ben to authorise them as one
+act: the thermal series (fossil magnitudes about a percent), the river discount (the migration reaches
+inland 4,000-11,000 tiles earlier per world), the upkeep bill, the tree effects, and the nation
+treasuries. Digests `457483363D79D700 / 728607C66CE6A4BE / F9BF05466A631FF9 / 851FE345B2E37618`
+become `983298AE413B0A8E / F2A66ACE583F1784 / 5346EB2A9C4E1144 / 82EE79155BA2F47D`. The shape, over
+16 seeds: the Empires span ends with more and smaller realms (powers 49 -> 55, largest share by people
+110 -> 100 per mille) and slightly more fighting; the Exploration round is half as violent
+(55.9 -> 28.7 battles per century) with displacement's median up (1.35 -> 1.70) and its pooled ratio
+down (1.68 -> 1.28).
+
+**Three measurements outran their items, and they are the session's real output.**
+
+1. **Nothing in the scorer reads the purse** (`NR-878`). With the saturation caps gone the median
+   polity ends the span with a treasury of 211 against 1.26M before, and 14% of polity-rounds cannot
+   pay their army bill. At a tenth of the rate the median still collapses, so it is structural: the
+   caps were hiding a 600x treasury spread.
+2. **Four of the six held seeds have no frontier at all** (`NR-880`). They meet one polity across a
+   landmass in 460 years, because the first crossing almost never happens. And alarm saturates at
+   1000 on essentially every near pair, so the deterrence weight tuned in sprint 41 is acting as a
+   flat constant.
+3. **The sweeps and the app generate different worlds** (`BL-1007`). `history_sweep` builds with
+   `world_gen_config`'s struct defaults while the app loads the Lua config: seed 0 fights 6,479
+   battles in the sweep and 9,928 in the game. Every figure this sprint argued from is internally
+   consistent and describes a world the player never gets.
+
+**Gates on the integrated tree:** `world_determinism`, `pass_one_handoff`, `colonisation_harness`,
+`deposit_origin`, `planetology_harness`, `continent_drift`, `tile_height_retention`,
+`survey_endowment_harness` (34/0), `earthlike_tile_census` (120 seeds, 0 fail), `tree_lint` (four
+stores, both headers fresh), `landscape_score`/`search`, `haulage_measure` (2035 / 1627 against the
+1055/802 baseline), `demand_census` — all green. `history_sim_harness` sits at its 2-failure baseline.
+Two reds stand deliberately: the exploration R3b pin, which is what NR-877 re-blesses, and
+`era_world_harness`'s R1/R2/R5, which fail at the wave base too and are now filed (`BL-1010`).
+
+**One integration break worth recording.** The Body/Life split and the plate-carried frame landed in
+the same function from two worktrees; the merge was clean and the build was not, because Pass 3 now
+needed a continents pointer the Body half's new signature did not carry. Caught by the gate run, not
+by the merge.
+
+**Owed:** BL-1000's live click (access was denied when requested, so the visual row stays open),
+`BL-1007` measurement parity, `BL-1008` six harnesses still simulating an 80-tick warm start,
+`BL-1009` the digest's blind spots — region treasury moved by 80% with every digest identical.
+
+---
+
 ## 2026-09-15 — Sprint 42 wave 0: instruments before mechanisms, and the harness that paid for itself the same day
 
 **Runtime:** Full / Batch Delivery, the same session as the audit below. Nine worktree agents,
