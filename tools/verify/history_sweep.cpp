@@ -201,6 +201,33 @@ uint32_t masks_of(const settlement_state& ss)
     return all;
 }
 
+/// BL-1022 — WHAT TAKING GROUND COST, summed over one class of battle.
+///
+/// "Cost of taking" is read off what the sim actually CHARGES a conqueror,
+/// and only that: the battles it must fight (each one a levy marched and
+/// materials spent per head raised) and the heads those battles kill. There is
+/// no separate forage-loss channel — the ration acts THROUGH the attacker's
+/// supply inside `resolve_battle` — so supply is recorded beside the cost as
+/// the cause, never added to it.
+struct take_cost
+{
+    int64_t battles    = 0;
+    int64_t conquests  = 0;
+    int64_t atk_men    = 0; ///< Attacker heads committed.
+    int64_t atk_lost   = 0; ///< Attacker heads killed.
+    int64_t def_men    = 0; ///< Defender heads standing on the ground.
+    int64_t def_lost   = 0;
+    int64_t supply_sum = 0; ///< Attacker supply actually fought on, summed.
+    int64_t forage_sum = 0; ///< What those marches would have drawn foraging.
+
+    void add(const take_cost& o)
+    {
+        battles += o.battles; conquests += o.conquests; atk_men += o.atk_men;
+        atk_lost += o.atk_lost; def_men += o.def_men; def_lost += o.def_lost;
+        supply_sum += o.supply_sum; forage_sum += o.forage_sum;
+    }
+};
+
 /// One world's row. Every field is a metric BL-275 named at filing.
 struct sweep_row
 {
@@ -255,6 +282,14 @@ struct sweep_row
     int64_t illegal_campaigns = 0; ///< Refused on traversal legality (BL-778).
     int64_t starved_campaigns = 0; ///< Fought at zero supply, could not forage.
     int64_t sea_legs_fed      = 0; ///< BL-899: crossings fed on the reduced ration.
+    /// BL-1022: cost of taking, by ROUTE — [0] dry march, [1] crossing that
+    /// foraged off a held shore, [2] crossing fed on the sea-legs ration,
+    /// [3] crossing that starved.
+    take_cost take_route[4];
+    /// BL-1022: cost of taking, by route (dry / any crossing) x the TARGET's
+    /// ground (inland / coastal: its anchor tile touches sea).
+    take_cost take_ground[2][2];
+    int       ration_max_q = 0; ///< Highest sea-legs ration any fed crossing drew.
     // --- BL-889: WHY a campaign did not happen, by reason ------------------
     // The sim already counts every one of these; the sweep reported two of
     // them. 812,424 refusals across 16 worlds with a single named reason is
@@ -1273,6 +1308,55 @@ int main(int argc, char** argv)
         row.illegal_campaigns = sim.illegal_campaigns;
         row.starved_campaigns = sim.starved_campaigns;
         row.sea_legs_fed      = sim.sea_legs_fed_campaigns;
+
+        // BL-1022 — THE COST OF TAKING GROUND, per battle, classed two ways.
+        // ROUTE is what the sim itself decided at execute (the trace records
+        // it). GROUND is a terrain fact about the TARGET, read here: its anchor
+        // tile touches sea (8-neighbourhood, columns wrapping — the grid's own
+        // convention) or it is a water-seated region. `port_q` is NOT used: a
+        // region the run founds inherits a decayed copy of its parent's, so it
+        // is not a fact about the daughter's own ground.
+        //
+        // `ss` is read AFTER the run: region indices are stable (the run only
+        // appends), and `col`/`row`/`domain` never change once a region exists.
+        {
+            const auto touches_sea = [&](const region& p) {
+                if (p.domain != region_domain::land) return true;
+                for (int dr = -1; dr <= 1; ++dr)
+                    for (int dc = -1; dc <= 1; ++dc)
+                    {
+                        const int r = p.row + dr;
+                        if (r < 0 || r >= home_grid_height) continue;
+                        const int c = ((p.col + dc) % home_grid_width + home_grid_width) % home_grid_width;
+                        const std::size_t idx = static_cast<std::size_t>(r) * home_grid_width + c;
+                        if (idx < terr.substrate.size() && is_sea(terr.substrate[idx])) return true;
+                    }
+                return false;
+            };
+            for (const battle_trace& bt : sim.battle_traces)
+            {
+                take_cost one;
+                one.battles    = 1;
+                one.conquests  = bt.conquered ? 1 : 0;
+                one.atk_men    = bt.attacker_men;
+                one.atk_lost   = bt.attacker_lost;
+                one.def_men    = bt.defender_men;
+                one.def_lost   = bt.defender_lost;
+                one.supply_sum = bt.attacker_supply_q;
+                one.forage_sum = bt.forage_supply_q;
+
+                const int route = bt.exec_dry       ? 0
+                                : bt.exec_forages   ? 1
+                                : bt.ration_q > 0   ? 2
+                                                    : 3;
+                row.take_route[route].add(one);
+                if (route == 2 && bt.ration_q > row.ration_max_q) row.ration_max_q = bt.ration_q;
+
+                const std::size_t ti = bt.region;
+                const int coastal = (ti < ss.regions.size() && touches_sea(ss.regions[ti])) ? 1 : 0;
+                row.take_ground[bt.exec_dry ? 0 : 1][coastal].add(one);
+            }
+        }
         row.reach_denied      = sim.reach_denied_campaigns;
         row.mat_trade         = sim.materials_from_trade;
         row.mat_total         = sim.materials_produced;
@@ -2719,6 +2803,92 @@ int main(int argc, char** argv)
                                                    ? (sl_tot * 100) / (sl_tot + st_tot) : 0));
                 std::printf("  (SOME peoples cross fed and MOST do not is the design. A 100%%\n"
                             "   share means the floor is too low. REPORTED, not gated.)\n");
+            }
+
+            // BL-1022 -- IS COASTAL GROUND CHEAPER TO TAKE THAN INLAND GROUND?
+            // CREEDS.md § Sea legs: "if a crossing foraged normally, coastal
+            // ground would be CHEAPER to take than inland ground". The ration
+            // tops out at 900, near full forage, so the inversion is measured
+            // here rather than assumed absent (Ben, NR-828: measure first,
+            // tune nothing). A READING -- no magnitude is set from it.
+            //
+            // COST OF TAKING, as the sim charges it: BATTLES PER CONQUEST (each
+            // a levy marched and materials spent per head) and ATTACKER HEADS
+            // LOST PER CONQUEST (every battle's dead, the failed ones included,
+            // over the ground actually taken). Heads lost per 1000 defenders
+            // faced normalises for how big the target's garrison was. Supply
+            // is the CAUSE column: fought-on beside would-have-foraged.
+            {
+                const auto print_cost = [](const char* label, const take_cost& c) {
+                    const auto per = [](int64_t num, int64_t den, int64_t scale) -> long long {
+                        return den > 0 ? static_cast<long long>((num * scale) / den) : -1;
+                    };
+                    std::printf("  %-34s %7lld %6lld  %8lld  %9lld  %9lld  %8lld  %6lld / %-6lld\n",
+                                label,
+                                static_cast<long long>(c.battles),
+                                static_cast<long long>(c.conquests),
+                                per(c.battles, c.conquests, 100),
+                                per(c.atk_lost, c.conquests, 1),
+                                per(c.atk_lost, c.def_men, 1000),
+                                per(c.atk_lost, c.atk_men, 1000),
+                                per(c.supply_sum, c.battles, 1),
+                                per(c.forage_sum, c.battles, 1));
+                };
+                take_cost route_tot[4], ground_tot[2][2];
+                int ration_max = 0;
+                for (const sweep_row& r : rows)
+                {
+                    for (int k = 0; k < 4; ++k) route_tot[k].add(r.take_route[k]);
+                    for (int a = 0; a < 2; ++a)
+                        for (int b = 0; b < 2; ++b) ground_tot[a][b].add(r.take_ground[a][b]);
+                    ration_max = std::max(ration_max, r.ration_max_q);
+                }
+                std::printf("\n--- BL-1022  IS COASTAL GROUND CHEAPER TO TAKE? (all seeds, pooled) ---\n");
+                std::printf("  %-34s %7s %6s  %8s  %9s  %9s  %8s  %s\n",
+                            "class", "battles", "taken", "btl/100tk", "atk lost/tk",
+                            "lost/1k def", "loss pm", "supply / forage");
+                std::printf("  by ROUTE (what execute chose)\n");
+                print_cost("dry march", route_tot[0]);
+                print_cost("crossing, foraged off held shore", route_tot[1]);
+                print_cost("crossing, fed on sea-legs ration", route_tot[2]);
+                print_cost("crossing, starved", route_tot[3]);
+                std::printf("  by TARGET GROUND (anchor touches sea) x route\n");
+                print_cost("inland ground, dry march", ground_tot[0][0]);
+                print_cost("coastal ground, dry march", ground_tot[0][1]);
+                print_cost("inland ground, by crossing", ground_tot[1][0]);
+                print_cost("coastal ground, by crossing", ground_tot[1][1]);
+                {
+                    take_cost inland = ground_tot[0][0], coastal = ground_tot[0][1];
+                    inland.add(ground_tot[1][0]);
+                    coastal.add(ground_tot[1][1]);
+                    print_cost("INLAND ground, any route", inland);
+                    print_cost("COASTAL ground, any route", coastal);
+                }
+                std::printf("  highest ration any fed crossing drew: %d per-mille\n", ration_max);
+
+                // PER SEED, never only pooled: one world's many crossings can
+                // carry the pooled figure on its own.
+                std::printf("  per seed: [inland dry] btl/100tk atk-lost/tk  |  [crossing fed] btl/100tk atk-lost/tk (battles)  |  [coastal any] btl/100tk atk-lost/tk\n");
+                for (const sweep_row& r : rows)
+                {
+                    const auto per = [](int64_t num, int64_t den, int64_t scale) -> long long {
+                        return den > 0 ? static_cast<long long>((num * scale) / den) : -1;
+                    };
+                    take_cost coastal = r.take_ground[0][1];
+                    coastal.add(r.take_ground[1][1]);
+                    const take_cost& in = r.take_ground[0][0];
+                    const take_cost& fed = r.take_route[2];
+                    std::printf("  %4u  %6lld %8lld  |  %6lld %8lld (%4lld)  |  %6lld %8lld\n",
+                                r.seed,
+                                per(in.battles, in.conquests, 100), per(in.atk_lost, in.conquests, 1),
+                                per(fed.battles, fed.conquests, 100), per(fed.atk_lost, fed.conquests, 1),
+                                static_cast<long long>(fed.battles),
+                                per(coastal.battles, coastal.conquests, 100), per(coastal.atk_lost, coastal.conquests, 1));
+                }
+                std::printf("  (-1 = no conquest in that class. btl/100tk = battles per 100 conquests;\n"
+                            "   atk lost/tk = attacker heads killed per conquest; lost/1k def = attacker\n"
+                            "   heads killed per 1000 defenders faced; loss pm = attacker loss per-mille of\n"
+                            "   heads committed. REPORTED, not gated.)\n");
             }
 
             // BL-896 -- DID EMPIRES FRAGMENT, AND DID THE PIECES DIFFER?
