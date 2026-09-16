@@ -805,10 +805,12 @@ target_compile_options(recipe_margin PRIVATE ${IO_WARNING_FLAGS})
 # between adjacent markets, which is the authored logistics cost table times the
 # terrain-weighted A* cost in the real generated world. It exists so the widened
 # price ceiling is a derived number rather than a guess, and so it can be
-# re-derived later rather than trusted.
+# re-derived later rather than trusted. works_registry.cpp since BL-1006: the
+# --far-trade reading generates the app's world, and works.lua is an input to it.
 add_executable(haulage_measure
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/haulage_measure.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
 )

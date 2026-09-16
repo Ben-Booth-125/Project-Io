@@ -123,6 +123,24 @@ in `tools/verify/README.md`.
   **Re-run it whenever the logistics cost table, the map scale, or `base_price`
   changes**, and re-derive the ceiling in `scripts/economy.lua` from what it prints.
   Live-Lua, hand-declared in `CMakeLists.txt`, runs from the repo root.
+  **`--far-trade` is the far trade reading (BL-1006)** — the gate reading for per-market
+  pools (BL-1003), sea legs (BL-1004) and trade that reaches for price (BL-995). The
+  default sections count DISPATCHES; this follows every convoy from dispatch to its first
+  clear after arrival, on the app's world (Lua gen config + works, era from `--epoch`,
+  default 1960, full pre-history unless `--fast`, the landscape-search winner, the 12
+  validation ticks, spectated), in two windows of four quarterly dispatches: the first year
+  of play and the year after `--years N`. It prints (a) volume delivered AND sold at its
+  destination where that is not the source pool's clearing market, (b) the share of (a)
+  whose destination is not the seller's nearest reachable market (priced by
+  `price_convoy_leg`), (c) per good the destination-minus-home price gap at dispatch and
+  at arrival beside the haul paid per unit, and a same-body line that says why it reads
+  zero under (corp, body) pools. Sales are read from the exchange record, cargo-first (an
+  upper bound). Report-only; guards are non-vacuity only (parsed config, a dispatch and a
+  delivery per window, no exchange-ring overflow). Build:
+  `bash tools/verify/build_lua_harness.sh haulage_measure`; run
+  `./build_gen/verify/haulage_measure.exe --far-trade [--seeds N] [--first-seed S]
+  [--years N] [--epoch Y] [--tail N] [--fast]` from the repo root. Output is
+  byte-identical run to run apart from the landscape search's own `ms` lines.
 - **`price_band_harness`** — the price band as data (BL-442 step 1). The band
   `[0.25×, 4×]` around `base_price` is read by **two** call sites — `resolve_price`
   (`market_clearing.cpp`, the real clearing clamp) and `wf_target_price`
