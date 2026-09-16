@@ -286,6 +286,18 @@ never be produced off-world, so it is the highest-margin cargo in the system —
 that becomes the reason early off-world runs pay for themselves, before the industrial chain reaches
 out there.
 
+### Taste is a fact of history
+
+**Which nation wants which endemic good is decided by who reached it (Ben, 2026-09-09).** The
+endemic trade channel (`MARKETS.md` § Demand channels) injects a wealth-scaled, character-flavoured
+want; its per-nation weights come from the colonial era rather than from national character alone.
+A polity **discovers** a good when its network first reaches a region carrying that good's source —
+by purchase, by conquest, or by supply reach — and the nation that inherits it carries the taste.
+**The colony grows it; the metropole wants it.** A nation whose history reached no cash crop wants
+none, which is a fact the player can read rather than a penalty.
+The derivation is the colonial era's (`docs/generation/COLONIAL_ERA.md` § Who discovered what —
+taste is a fact of history); this section owns what the good is worth once it is wanted.
+
 ---
 
 ## Tier 2 — Refined goods

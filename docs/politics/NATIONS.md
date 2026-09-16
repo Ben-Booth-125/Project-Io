@@ -503,9 +503,17 @@ special-cased: with no furnace nobody is strictly ahead of anybody and the share
 That is the honest reading — protection is a response to an industrial competitor, and a world
 without one has nothing to protect against.
 
-**The colony term is owed, not forgotten.** It has no input while a polity cannot take ground across
-water; BL-749 (sea-leg campaign) is what gives it one, and it lands as an addend on the same scalar.
-A far-flung holding is a large empire, not an overseas one, so no proxy stands in for it meanwhile.
+**The colony term is owed, not forgotten.** It has no input while a polity cannot claim ground across
+water; the colonial era's two claim verbs (`../generation/COLONIAL_ERA.md` § Two ways to claim
+ground across water; BL-832, colonial ties) are what give it one, and it lands as an addend on the
+same scalar. A purchased province counts as a colony exactly as a conquered one does — a metropole
+protects what it bought no less than what it took. A far-flung holding is a large empire, not an
+overseas one, so no proxy stands in for it meanwhile.
+
+**A nation's opening treasury is the same span's output.** The wealth scalar the colonial era derives
+per polity (`../generation/COLONIAL_ERA.md` § How wealthy a nation is) seeds the balance § 2 opens
+with — furnace timing, discoveries, purchases, spoils and lanes — so a rich nation is rich because
+its history was, and the spread across nations is reported rather than flattened.
 
 **Rates are banded, blanket, and first-cut.** Three ad-valorem bands above a floor, so the report can
 show *how hard* a history protects and not merely *whether* — a single threshold yields one number

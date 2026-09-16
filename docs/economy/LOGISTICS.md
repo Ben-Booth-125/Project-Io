@@ -258,6 +258,29 @@ half the repair budget buys half the materials, and an underfunded quarter is a 
 fill, never a banked lump. Consistent with the binary ruling above, an unfunded draw degrades
 nothing — the network's failure state remains insolvency, not decay.
 
+### 4b. Sea lanes — the colonial ties, stamped FROM the colonial record
+
+**The water analogue of § 4a.** The colonial era
+(`docs/generation/COLONIAL_ERA.md` § The colonial tie is a sea lane) records every sea leg it walked — a purchase party's crossing, a
+campaign's sea supply, the standing traffic between a metropole and what it holds — and a pass
+after it stamps those legs onto the water as a **sea lane** tier that discounts the sea-leg
+traversal cost in § 1. Traffic earns the tier, as it earns a Road on land; a crossing made once is
+no lane. **Purely additive and purely water**: land tiles are untouched, and the § 4a rule that a
+corridor crossing open ocean is not stamped as road is unchanged — the crossing becomes a lane
+instead.
+
+**A tie is therefore a force on the map, never a preference inside an actor.** Because § 1 is one
+weight function, a lane is read by everything that reads traversal cost: a convoy between a
+colony's market and its metropole's lands cheaper than one to a stranger's, so a colony's chains
+close through its metropole *first* without any preferred seller being named — and **placement
+reach widens across the lane** (§ 3), so a firm on one shore may legally hold a site on the other.
+That second effect is wider than a market preference and it is intended: a tie only prices could
+see would be invisible to the corporate search, which reads reach cost (BL-812, phase 6 sees roads).
+
+**A lane outlives the polity that made it**, as a road outlives the empire that paved it. Whether
+a lane *decays* when its traffic stops is open in `COLONIAL_ERA.md` § Open questions; roads do not
+(§ 4a), but the sea is not a roadbed.
+
 ### 5. Physical scale and travel time (Ben, 2026-08-12)
 
 **A tile has a physical size, and it is derived rather than authored.** Planetology generates

@@ -328,6 +328,29 @@
     "docs/economy/PRODUCTION.md"
    ],
    "ask": "Do any of the nine details need overturning — especially the rung assignment?"
+  },
+  {
+   "id": "NR-884",
+   "title": "COLONIAL_ERA.md merged a week late and claims a span two other docs now own",
+   "raised": "2026-09-16",
+   "kind": "decision",
+   "status": "open",
+   "source": "The four-branch merge at the 2026-09-16 session close.",
+   "what": "docs/generation/COLONIAL_ERA.md was written 2026-09-09 on claude/sprint-39-market-design-a7936b and sat unmerged for a week. It owns \"the span after the dark age: 1560 -> 1960\" and specifies the wizard's round 5 as a STILL. Since it was written, EXPLORATION.md has taken 1200 -> 1660 and been BUILT (treasuries, treaties with a term, colonies as subjects, decaying ports and navies, trade flows), DIGITISATION.md has taken 1660 -> 1960 and carries twenty filed items, and both wizard rounds are time-lapses, not stills. Merged with a banner saying all of this rather than dropped, because the SUBJECT it owns is not superseded: the demand side generated as history - how a people comes to want a luxury it cannot grow, where a nation's opening wealth is from, the two ways ground is claimed across water and what each costs, and the ordering that corporations come AFTER the demand they answer. It also brought 21 backlog items (BL-812, BL-818..843, BL-874..880), each stamped with the same warning in its design field.",
+   "why_it_matters": "Three documents now describe overlapping centuries and only two of them are true about the code. A doc that is wrong about a date but right about a mechanism is the most expensive kind to leave alone, because the next reader takes the date with the mechanism. It is also the exact shape the standing rules warn about: a ruling lands in its owning doc and a sibling keeps asserting the overturned claim. Digitisation is the next phase, so this gets read soon.",
+   "options": [
+    "Fold the demand-side content into DIGITISATION.md and EXPLORATION.md where each half belongs, then retire COLONIAL_ERA.md to docs/research/ - the same treatment COLLAPSE.md got on 2026-09-16.",
+    "Keep it as its own authority and re-span it to whatever is left that neither sibling owns, which may be nothing.",
+    "Leave it with the banner: it is honest about its own staleness and costs nothing until somebody reads it."
+   ],
+   "recommendation": "The first, and it is the same call Ben already made once this week on COLLAPSE.md: fold the parts the live docs lack into them and retire the rest. The 21 items it brought want the same pass - several are likely duplicates of the Digitisation block (a cultural-demand item exists on both sides), and that is cheaper to settle in one reading than one item at a time. Not done here because merging a branch and re-writing three authority docs are different acts, and the second is a design session.",
+   "files": [
+    "docs/generation/COLONIAL_ERA.md",
+    "docs/generation/EXPLORATION.md",
+    "docs/generation/DIGITISATION.md",
+    "docs/development/backlog.json"
+   ],
+   "resolution": null
   }
  ]
 }

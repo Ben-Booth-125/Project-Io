@@ -928,11 +928,18 @@ is high on the real road and sea network; ties, because history routed a colony'
 its metropole. A local firm's early sales are sheltered by the same three, and a player can read
 why on the map.
 
-**The cost question is open and is measured first.** Pass 1 is already the most expensive pass;
-pass 2 doubles it and pass 3 lengthens the warm start. The budget is the generating screen's wait,
-and the affordability rungs in `CIVILISATION.md` § The long run is paid for by the table become
-load-bearing in the order that section gives. Whether the shape can be had cheaply is the sprint's question,
-not this document's.
+**The cost is measured, and the second pass is not the expensive half (2026-09-09, `/O2`).** The
+polity engine runs 400 years in 0.9 s and 4,000 in 66 s at the region counts of the day, so pass 1
+is the expensive pass and a second pass on the same engine runs in the low seconds. What remains
+expensive is the unwatched post-era bar. The affordability rungs in `CIVILISATION.md` § The long run
+is paid for by the table apply to pass 1 and to the region count NR-809 measured, not to the shape of
+the passes; the roster half of that reasoning moved to `../research/COLLAPSE_ROSTER.md` when
+`COLLAPSE.md` was retired on 2026-09-16.
+
+Merged late (2026-09-16): this paragraph was measured on 2026-09-09 against a design with ONE pass
+after the dark age. Two ran in its place — Exploration and Digitisation — so read "pass 2" as "a
+span on the polity engine", and take the 0.9 s / 66 s figures as the engine's rate at that region
+count, not as a budget for either round.
 
 ## Open cross-doc items
 
