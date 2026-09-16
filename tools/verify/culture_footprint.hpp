@@ -4,11 +4,12 @@
 // About 95% of coined cultures never hold a region (DEVLOG 2026-09-11). The
 // split census counts them as diversity, the Empires round and the lineage
 // palette inherit their names, and `culture_kinship_years` walks a tree most
-// of whose leaves are empty. Before any rule is chosen (fold an empty culture
-// back into its parent, or gate coining on a footprint — Ben's call, NOT
-// built here) the number has to be on the table, and both `history_sweep`
-// and `colonisation_harness` have to read it the SAME way. This header is
-// that one reading.
+// of whose leaves are empty. Ben ruled on the number (NR-879, 2026-09-16):
+// FOLD an empty culture back into its parent at the boundary rather than
+// gate coining, and `run_settlement` does so (BL-1017). Both `history_sweep`
+// and `colonisation_harness` read the empty mass AND the folded tree the SAME
+// way, and this header is that one reading. The empty mass is read on the
+// LINEAGE (`coined_from`), so it is the same number before and after the fold.
 //
 // REPORT-ONLY. Nothing here mutates a world or a culture list; it is a pure
 // fold over what the fixture already carries. Determinism is untouched: the
@@ -44,12 +45,29 @@ struct culture_footprint
     int empty_interior    = 0; ///< Empty at the boundary AND at least one child does.
     /// Empty leaves by depth (generations below a cradle); index 0 = a
     /// cradle that never held ground. Sized to the deepest empty leaf + 1.
+    /// Depth is read on the LINEAGE (`coined_from`), so it describes where the
+    /// migration coined the empty name, before or after the fold.
     std::vector<int> empty_leaf_depth;
+
+    // --- BL-1017: the boundary fold, read off the same list -----------------
+    int living          = 0; ///< The tree's size: cultures that kept their name (`folded_into` -1).
+    int folded          = 0; ///< `coined - living`.
+    int reparented      = 0; ///< Living cultures whose `parent` is not the one they were coined from.
+    int deepest_living  = 0; ///< Deepest descent on the living tree, in generations below a cradle.
+    /// Living cultures NOT holding plurality at the boundary: a cradle that
+    /// never held ground, or a people whose only ground is a scheduled
+    /// founding. The whole gap between `living` and `holding_boundary`.
+    int living_without_plurality = 0;
 
     /// Per-mille of coined cultures holding ground at the boundary; 0 if none coined.
     int holding_boundary_permille() const
     {
         return coined > 0 ? static_cast<int>((static_cast<int64_t>(holding_boundary) * 1000) / coined) : 0;
+    }
+    /// BL-1017: per-mille of the FOLDED tree holding ground at the boundary.
+    int holding_living_permille() const
+    {
+        return living > 0 ? static_cast<int>((static_cast<int64_t>(holding_boundary) * 1000) / living) : 0;
     }
 };
 
@@ -75,10 +93,30 @@ inline culture_footprint measure_culture_footprint(const std::vector<culture>& c
             const int c = p.culture.plurality();
             if (c >= 0 && static_cast<std::size_t>(c) < n) held_c[static_cast<std::size_t>(c)] = 1u;
         }
+    // THE LINEAGE, not the living tree (BL-1017): "empty leaf vs interior" is
+    // a question about the tree the migration COINED, so it must read the same
+    // before the fold as after it. `coined_from` where recorded, else `parent`.
+    const auto coined_parent = [&](std::size_t i) {
+        return cultures[i].coined_from >= 0 ? cultures[i].coined_from : cultures[i].parent;
+    };
     for (std::size_t i = 0; i < n; ++i)
     {
-        const int par = cultures[i].parent;
+        const int par = coined_parent(i);
         if (par >= 0 && static_cast<std::size_t>(par) < n) has_child[static_cast<std::size_t>(par)] = 1u;
+    }
+
+    // The fold, as the list carries it.
+    std::vector<int> living_depth(n, 0);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        const culture& c = cultures[i];
+        if (c.folded_into >= 0) { ++f.folded; continue; }
+        ++f.living;
+        if (!held_b[i]) ++f.living_without_plurality;
+        if (c.coined_from >= 0 && c.parent != c.coined_from) ++f.reparented;
+        if (c.parent >= 0 && static_cast<std::size_t>(c.parent) < i)
+            living_depth[i] = living_depth[static_cast<std::size_t>(c.parent)] + 1;
+        if (living_depth[i] > f.deepest_living) f.deepest_living = living_depth[i];
     }
 
     f.holding_close = close != nullptr ? 0 : -1;
@@ -94,9 +132,9 @@ inline culture_footprint measure_culture_footprint(const std::vector<culture>& c
         int depth = 0;
         int at = static_cast<int>(i);
         while (at >= 0 && static_cast<std::size_t>(at) < n
-               && cultures[static_cast<std::size_t>(at)].parent >= 0
-               && cultures[static_cast<std::size_t>(at)].parent < at)
-        { at = cultures[static_cast<std::size_t>(at)].parent; ++depth; }
+               && coined_parent(static_cast<std::size_t>(at)) >= 0
+               && coined_parent(static_cast<std::size_t>(at)) < at)
+        { at = coined_parent(static_cast<std::size_t>(at)); ++depth; }
         if (static_cast<std::size_t>(depth) >= f.empty_leaf_depth.size())
             f.empty_leaf_depth.resize(static_cast<std::size_t>(depth) + 1, 0);
         ++f.empty_leaf_depth[static_cast<std::size_t>(depth)];

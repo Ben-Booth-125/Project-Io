@@ -559,6 +559,10 @@ struct sweep_row
     int cultures_empty_leaves      = -1; ///< Empty at the boundary and childless.
     int cultures_empty_interior    = -1; ///< Empty at the boundary with >= 1 child.
     std::vector<int> cultures_empty_leaf_depth; ///< Empty leaves by depth below a cradle.
+    /// BL-1017 -- the boundary fold. -1 = no creeds.
+    int cultures_living            = -1; ///< The tree's size after the fold (names that outlived the round).
+    int cultures_reparented        = -1; ///< Living cultures re-parented past a folded mother.
+    int cultures_living_depth      = -1; ///< Deepest descent on the living tree.
 
     int64_t foundings_scheduled = 0;
     int64_t foundings_settled   = 0;
@@ -1910,15 +1914,21 @@ int main(int argc, char** argv)
                 row.cultures = static_cast<int>(cu.size());
                 row.cultures_root = 0;
                 row.culture_depth = 0;
+                // ON THE LINEAGE (BL-1017): the coined tree, so this column
+                // reads the same before and after the boundary fold; the
+                // living tree's depth is `cultures_living_depth`.
+                const auto up_of = [&](int at) {
+                    const culture& c = cu[static_cast<std::size_t>(at)];
+                    return c.coined_from >= 0 ? c.coined_from : c.parent;
+                };
                 for (std::size_t ci = 0; ci < cu.size(); ++ci)
                 {
                     if (cu[ci].parent < 0) ++row.cultures_root;
                     int depth = 0;
                     int at = static_cast<int>(ci);
                     while (at >= 0 && static_cast<std::size_t>(at) < cu.size()
-                           && cu[static_cast<std::size_t>(at)].parent >= 0
-                           && cu[static_cast<std::size_t>(at)].parent < at)
-                    { at = cu[static_cast<std::size_t>(at)].parent; ++depth; }
+                           && up_of(at) >= 0 && up_of(at) < at)
+                    { at = up_of(at); ++depth; }
                     if (depth > row.culture_depth) row.culture_depth = depth;
                 }
 
@@ -1934,6 +1944,9 @@ int main(int argc, char** argv)
                 row.cultures_empty_leaves     = cf.empty_leaves;
                 row.cultures_empty_interior   = cf.empty_interior;
                 row.cultures_empty_leaf_depth = cf.empty_leaf_depth;
+                row.cultures_living           = cf.living;
+                row.cultures_reparented       = cf.reparented;
+                row.cultures_living_depth     = cf.deepest_living;
             }
 
             row.arc_name  = derive_from_generation ? "generation" : "struct-default";
@@ -3392,8 +3405,56 @@ int main(int argc, char** argv)
                             static_cast<long long>(sum_leaves), static_cast<long long>(sum_interior));
                 std::printf("  (holding = plurality on >= 1 region, the same test run_history_sim seeds a\n"
                             "   polity from. Boundary = the settlement the sim was handed; close = the\n"
-                            "   in-place state at its stop year. REPORTED, not gated -- BL-968 step 2 is\n"
-                            "   Ben's call: fold-back into the parent, or gate coining on a footprint.)\n");
+                            "   in-place state at its stop year. REPORTED, not gated. Empty is read on the\n"
+                            "   lineage, so these rows are the same numbers before and after the fold.)\n");
+            }
+        }
+
+        // BL-1017 -- THE BOUNDARY FOLD (Ben, NR-879 option A). The same list,
+        // read as the Empires round receives it: the tree's size once every
+        // empty name has folded into its nearest living ancestor, and the
+        // holding fraction OF THAT TREE. Living without a present region =
+        // a cradle that never held ground, or a people whose only ground is a
+        // scheduled founding (the fold never renames ground the sim will found).
+        std::printf("\n--- BL-1017  THE BOUNDARY FOLD (report-only) ---\n");
+        std::printf("  seed   coined   tree   folded   re-parented   hold@boundary   of tree   "
+                    "living w/o region   depth coined -> living\n");
+        {
+            int64_t sum_coined = 0, sum_living = 0, sum_hold = 0, sum_rep = 0;
+            std::vector<int64_t> living_v, pm_v;
+            for (const sweep_row& r : rows)
+            {
+                if (r.cultures_living < 0) continue;
+                const int pm = r.cultures_living > 0
+                    ? static_cast<int>((static_cast<int64_t>(r.cultures_holding_boundary) * 1000)
+                                       / r.cultures_living)
+                    : 0;
+                std::printf("  %4u   %6d   %4d   %6d   %11d   %13d   %3d.%d%%   %17d   %d -> %d\n",
+                            r.seed, r.cultures_coined, r.cultures_living,
+                            r.cultures_coined - r.cultures_living, r.cultures_reparented,
+                            r.cultures_holding_boundary, pm / 10, pm % 10,
+                            r.cultures_living - r.cultures_holding_boundary,
+                            r.culture_depth, r.cultures_living_depth);
+                sum_coined += r.cultures_coined; sum_living += r.cultures_living;
+                sum_hold += r.cultures_holding_boundary; sum_rep += r.cultures_reparented;
+                living_v.push_back(r.cultures_living);
+                pm_v.push_back(pm);
+            }
+            if (!living_v.empty())
+            {
+                const int64_t shrink_pm = sum_coined > 0 ? ((sum_coined - sum_living) * 1000) / sum_coined : 0;
+                const int64_t hold_pm   = sum_living > 0 ? (sum_hold * 1000) / sum_living : 0;
+                std::printf("\n  TREE                   median %lld per world   pooled %lld of %lld coined "
+                            "(shrinks %lld.%lld%%)\n",
+                            static_cast<long long>(median_of(living_v)), static_cast<long long>(sum_living),
+                            static_cast<long long>(sum_coined),
+                            static_cast<long long>(shrink_pm / 10), static_cast<long long>(shrink_pm % 10));
+                std::printf("  HOLDING @ boundary     pooled %lld.%lld%% of the tree   per-seed median %lld.%lld%%   "
+                            "re-parented pooled %lld\n",
+                            static_cast<long long>(hold_pm / 10), static_cast<long long>(hold_pm % 10),
+                            static_cast<long long>(median_of(pm_v) / 10),
+                            static_cast<long long>(median_of(pm_v) % 10),
+                            static_cast<long long>(sum_rep));
             }
         }
 
@@ -3499,12 +3560,15 @@ int main(int argc, char** argv)
                 "   \"cultures\": %d, \"cultures_root\": %d, \"culture_depth\": %d,\n"
                 "   \"cultures_coined\": %d, \"cultures_holding_boundary\": %d, "
                 "\"cultures_holding_close\": %d, \"cultures_empty_leaves\": %d,\n"
+                "   \"cultures_living\": %d, \"cultures_reparented\": %d, "
+                "\"cultures_living_depth\": %d,\n"
                 "   \"foundings_scheduled\": %lld, \"foundings_settled\": %lld, "
                 "\"civilisations\": %lld,\n"
                 "   \"city_states_step\": %lld, \"city_states_series\": [",
                 r.cultures, r.cultures_root, r.culture_depth,
                 r.cultures_coined, r.cultures_holding_boundary,
                 r.cultures_holding_close, r.cultures_empty_leaves,
+                r.cultures_living, r.cultures_reparented, r.cultures_living_depth,
                 static_cast<long long>(r.foundings_scheduled),
                 static_cast<long long>(r.foundings_settled),
                 static_cast<long long>(r.civilisations),

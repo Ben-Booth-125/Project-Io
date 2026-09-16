@@ -495,7 +495,8 @@ survived.
 | Which provinces each polity holds | `pass_one_output::holdings` | **carried** |
 | Directed grudges | `pass_one_output::grudges` | **carried** |
 | Region endowment (farm / ore / energy / port) | `region` | **carried** |
-| **Culture PARENTAGE — the family tree** | `culture::parent` (`creeds.hpp`) — index of the mother culture, −1 at a cradle; a daughter always sits above her mother, so the walk to the root cannot loop | **carried** |
+| **Culture PARENTAGE — the family tree** | `culture::parent` (`creeds.hpp`) — index of the mother culture, −1 at a cradle; a daughter always sits above her mother, so the walk to the root cannot loop. The LIVING tree: after the boundary fold it names only cultures that kept their name | **carried** |
+| **The lineage and the fold** — who a people split from, and whether its name outlived the migration | `culture::coined_from` (never rewritten) and `culture::folded_into` (−1, or the ancestor that absorbed it) — § Empty cultures fold into their parent | **carried** |
 | **The farm class a culture was coined on** | `culture::origin_farm_class` — the opposition half of culture relations | **carried** |
 | **The year a culture was coined** — the kinship clock | `culture::coined_year` — read by `culture_kinship_years` | **carried** |
 | Settlement seats and hinterland pointers | `region::is_seat`, `region::seat_region` (`settlement.hpp`) — one seat per polity at its capital, every hinterland region pointing at its seat | **carried** |
@@ -507,6 +508,35 @@ the family tree; the origin class is the opposition half of culture relations (a
 floodplain and a people of the highlands want different ground); the coining year is what makes
 kinship a years-since-common-ancestor measure rather than an adjacency, and kinship in years is
 worth nothing without the years.
+
+### Empty cultures fold into their parent
+
+**Ben, 2026-09-16 (NR-879, option A): a culture holding no ground at the Colonisation/Empires
+boundary FOLDS BACK INTO ITS PARENT, and the lineage link is kept.** The migration coins far more
+peoples than ever settle — measured over 16 seeds, 5,453 coined against 790 holding ground when
+the Empires round opens — and almost all of the empty ones are first-generation daughters. The
+coining rule is untouched: the split census and the migration's own record still see every split
+that happened. What shrinks is only the set of names that outlive the round.
+
+- **Holding ground** means any record the Empires round will read names the culture: a share or
+  the founding culture of a region on the map, **or of a region the founding schedule will place
+  during the span**. A people whose stream lands after the boundary is a name somebody will live
+  under, and folding it would rename ground the sim is about to found.
+- **A folded culture folds into its nearest ancestor that holds ground.** It keeps its row and its
+  index — nothing names it, so nothing needs remapping — and records both the people it was coined
+  from (`coined_from`) and the name that absorbed it (`folded_into`).
+- **An empty interior node's living daughters are re-parented** onto that same nearest living
+  ancestor. No daughter is orphaned: `parent` never names a folded culture, and re-parenting only
+  ever moves up the lineage.
+- **A cradle never folds.** It has no parent to fold into.
+- **Every reader of the tree walks the living tree** — kinship years, culture opposition, the
+  lineage palette, and the Empires round's polity seeding. Two daughters of a folded mother
+  therefore date their kinship from the nearest ancestor that kept its name. The migration's split
+  events read the lineage instead, because a split is a fact about who a people split from.
+
+The fold's shape is checked on the shipped path: both handoff validators reject a folded culture
+with no recorded lineage, an orphaned living culture, and any region share, founding or polity that
+names a folded culture.
 
 **The two settlement rows are the city-state unit** (§ The unit is the city state, § Materials
 are spent): a seat is a fact about the ground, so conquest changes who governs from it and never

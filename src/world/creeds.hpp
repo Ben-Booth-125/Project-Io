@@ -130,6 +130,11 @@ struct culture
     /// is ALWAYS at a lower index than the daughter — ids are handed out in
     /// arrival order — so a walk toward the root strictly decreases and cannot
     /// loop.
+    ///
+    /// THE LIVING TREE after the boundary fold (BL-1017, below): a daughter
+    /// whose mother folded is re-parented onto the nearest ancestor that kept
+    /// its name, so this never names a folded culture. The as-coined link is
+    /// `coined_from`.
     int parent = -1;
 
     /// The `farm_class` this people was coined on, as a plain integer so
@@ -149,6 +154,37 @@ struct culture
     /// that measure is worthless without the years themselves (BL-873). Read by
     /// `culture_kinship_years` (BL-870) below.
     int64_t coined_year = INT64_MIN;
+
+    // --- The boundary fold (BL-1017) -----------------------------------------
+    //
+    // Ben, 2026-09-16 (NR-879, option A): A CULTURE HOLDING NO GROUND WHEN THE
+    // COLONISATION ROUND HANDS THE MAP TO THE EMPIRES ROUND FOLDS BACK INTO ITS
+    // PARENT. The coining rule is untouched, so the split census and the
+    // migration's own record still see every split that happened; what shrinks
+    // is only the set of names that outlive the round. Measured before the
+    // ruling: 5,453 coined over 16 seeds, 790 holding ground at the boundary.
+    //
+    // TWO LINKS, BECAUSE THEY ANSWER TWO QUESTIONS. `parent` above is THE LIVING
+    // TREE — what kinship, opposition and the palette walk — and after the fold
+    // it names the nearest ancestor that still carries a name. `coined_from` is
+    // THE LINEAGE — who this people actually split from — and is never
+    // rewritten, so a re-parented daughter still reads as a descent through the
+    // name that folded. They are equal everywhere the fold changed nothing.
+    //
+    // IDS ARE STABLE. A folded culture keeps its row and its index; nothing that
+    // stores a culture id is remapped, because at the boundary nothing names a
+    // folded culture — "holds no ground" is exactly "no region's shares, no
+    // founding and no scheduled founding name it" (settlement.cpp).
+
+    /// The culture this one was COINED from, never rewritten; -1 at a cradle.
+    /// Always lower-indexed than this culture, like `parent`.
+    int coined_from = -1;
+
+    /// -1 for a name somebody lives under at the boundary. Otherwise the culture
+    /// whose name absorbed this one: its nearest ancestor on the `coined_from`
+    /// chain that held ground. A folded culture's `parent` equals this, so no
+    /// walk up `parent` from anywhere ever lands on a folded name.
+    int folded_into = -1;
 };
 
 /// What the creeds pass computed for one body.
@@ -212,6 +248,11 @@ void record_globalisation(creed_state& cs, const world& w, entity_id body_id);
 /// of the two — NR-816's measure of kinship, chosen over a hop count because
 /// two cultures nine `parent` hops apart may have parted four centuries ago or
 /// four thousand years ago, and only the calendar distinguishes them.
+///
+/// THE LIVING TREE (BL-1017): it walks `parent`, which after the boundary fold
+/// names only cultures that held ground, so two daughters of a mother that
+/// folded date their kinship from the nearest ancestor that kept its name —
+/// not from the folded mother's coining year. `coined_from` is never read.
 ///
 /// Walks both `parent` chains toward the root. BOUNDED AND CANNOT LOOP: ids
 /// are handed out in arrival order, so a parent is always lower-indexed than

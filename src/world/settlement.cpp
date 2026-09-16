@@ -569,6 +569,8 @@ culture derive_daughter_culture(const culture& parent, int parent_id, int8_t ori
     // discarded, because kinship is what the empire phase reads for how alike
     // two peoples are (CIVILISATION.md § Culture relations).
     d.parent            = parent_id;
+    d.coined_from       = parent_id; // BL-1017: the lineage, never rewritten by the fold.
+    d.folded_into       = -1;        // Copied from the parent above; a new people has not folded.
     d.origin_farm_class = origin_class;
     d.coined_year       = coined_year;
     rng r(seed, static_cast<uint32_t>(0xDA05u + spawn_index));
@@ -602,6 +604,67 @@ culture derive_daughter_culture(const culture& parent, int parent_id, int8_t ori
         d.sea_legs_q = clampi(parent.sea_legs_q + culture::sea_legs_crossing_bonus, 0, 1000);
 
     return d;
+}
+
+/// THE BOUNDARY FOLD (BL-1017; Ben, 2026-09-16, NR-879 option A). Run once, as
+/// the Colonisation round hands its map on: every daughter culture that holds
+/// no ground folds into its nearest ancestor that does, and a living daughter
+/// of a folded one is re-parented onto that ancestor (`fold_empty_cultures`).
+///
+/// WHAT "HOLDS GROUND" MEANS HERE, AND WHY IT IS WIDER THAN PLURALITY. A
+/// culture holds ground if ANY record the Empires round will read names it: a
+/// share slot or the founding culture of a region already on the map, OR of a
+/// region the founding schedule will place during the span
+/// (`pending_foundings`). The last clause is the one that matters: a people
+/// whose stream lands after 400 BCE is not yet on the map but is a name
+/// somebody WILL live under, and folding it would mean renaming ground the sim
+/// is about to found. Reading every record rather than plurality alone is also
+/// what keeps ids stable — once nothing names a folded culture, nothing needs
+/// remapping.
+///
+/// WRITES ONLY THE DAUGHTERS. The cradles are `creed_state`'s, held by const
+/// reference, and a root never folds, so there is nothing to write on them.
+/// The caller appends these daughters to the roster already folded
+/// (hard_coded_world.cpp), which is why the fold has exactly one writer.
+///
+/// THE CENSUS ABOVE IS NOT RE-READ: it is the migration's own record of every
+/// split, and the fold leaves it alone (only the `fold_*` fields are its).
+void fold_cultures_at_boundary(settlement_state& out, int cradle_count)
+{
+    const std::size_t cradles = static_cast<std::size_t>(cradle_count > 0 ? cradle_count : 0);
+    const std::size_t n       = cradles + out.spawned_cultures.size();
+
+    std::vector<int32_t> coined(n, -1);
+    for (std::size_t k = 0; k < out.spawned_cultures.size(); ++k)
+        coined[cradles + k] = static_cast<int32_t>(out.spawned_cultures[k].coined_from);
+
+    std::vector<uint8_t> holds(n, 0u);
+    const auto mark = [&](const region& p) {
+        if (p.founding_culture >= 0 && static_cast<std::size_t>(p.founding_culture) < n)
+            holds[static_cast<std::size_t>(p.founding_culture)] = 1u;
+        for (int k = 0; k < culture_share_slots; ++k)
+        {
+            const int c = p.culture.id[k];
+            if (c >= 0 && static_cast<std::size_t>(c) < n && p.culture.weight_q[k] > 0)
+                holds[static_cast<std::size_t>(c)] = 1u;
+        }
+    };
+    for (const region& p : out.regions)           mark(p);
+    for (const region& p : out.pending_foundings) mark(p);
+
+    const culture_fold f = fold_empty_cultures(coined, holds);
+    for (std::size_t k = 0; k < out.spawned_cultures.size(); ++k)
+    {
+        culture& c    = out.spawned_cultures[k];
+        c.parent      = f.parent[cradles + k];
+        c.folded_into = f.folded_into[cradles + k];
+    }
+
+    settlement_state::culture_census& cc = out.census;
+    cc.fold_folded     = f.folded;
+    cc.fold_interior   = f.folded_interior;
+    cc.fold_reparented = f.reparented;
+    cc.fold_living     = static_cast<int32_t>(n) - f.folded;
 }
 
 } // namespace
@@ -947,7 +1010,11 @@ settlement_state run_settlement(const planetology_state& pl,
     }
 
     if (out.regions.empty())
+    {
+        // Nothing holds ground, so every daughter folds into its cradle (BL-1017).
+        fold_cultures_at_boundary(out, static_cast<int>(cs.cultures.size()));
         return out;
+    }
 
     // --- Score the endowments against the world's own means --------------------
     {
@@ -1238,6 +1305,10 @@ settlement_state run_settlement(const planetology_state& pl,
             "The " + p.name + " is settled under the same gods as its cradle.",
             std::string("-> ") + class_word(p.dominant) + " country; the ground was there first" });
     }
+
+    // THE ROUND CLOSES (BL-1017). Last, so both halves of "holds ground" are
+    // final: the map the antiquity stop left and the founding schedule it cut.
+    fold_cultures_at_boundary(out, static_cast<int>(cs.cultures.size()));
 
     return out;
 }
