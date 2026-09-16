@@ -5,10 +5,12 @@
 #include "world/hard_coded_world.hpp" // generation_progress — the BL-305 tap
 
 #include "world/economy_system.hpp"
+#include "world/logistics.hpp"      // invalidate_logistics_caches — remove_specialist_roster
 #include "world/placement_rules.hpp"
 #include "world/settlement.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <map>
 #include <array>
 #include <cmath>
@@ -2039,6 +2041,61 @@ std::vector<entity_id> generate_corporations(
 }
 
 // ---------------------------------------------------------------------------
+// BL-977 — remove_specialist_roster
+// ---------------------------------------------------------------------------
+
+int remove_specialist_roster(world& w)
+{
+    std::vector<entity_id> gone;
+    for (const auto& kv : w.corporations)
+        if (!kv.second.is_background)
+            gone.push_back(kv.first);
+    std::sort(gone.begin(), gone.end());
+    if (gone.empty())
+        return 0;
+
+    for (const entity_id cid : gone)
+    {
+        const corporation_component& cc = w.corporations.at(cid);
+        for (const entity_id bid : cc.assets)
+        {
+            w.buildings.erase(bid);
+            w.stockpiles.erase(bid);
+        }
+        if (cc.hq_building != null_entity)
+        {
+            w.buildings.erase(cc.hq_building);   // always among the assets; stated anyway
+            w.stockpiles.erase(cc.hq_building);
+        }
+
+        for (auto it = w.corp_body_pools.begin(); it != w.corp_body_pools.end();)
+            it = (it->first.first == cid) ? w.corp_body_pools.erase(it) : std::next(it);
+
+        // Units are keyed by their own id; collect then erase so the map is not
+        // mutated under its iterator. Order-insensitive: every erase is by key.
+        std::vector<entity_id> owned;
+        for (const auto& kv : w.units)
+            if (kv.second.owner == cid)
+                owned.push_back(kv.first);
+        for (const entity_id uid : owned)
+            w.units.erase(uid);
+
+        w.earned_techs.erase(cid);
+        w.corp_modifiers.erase(cid);
+        w.corp_embargo_conditions.erase(cid);
+
+        if (w.player_entity == cid)
+            w.player_entity = null_entity;
+        w.corporations.erase(cid);
+    }
+
+    // A specialist port or inland hub was a supply anchor; the reach field that
+    // still counts it would let a candidate score ground nobody can now reach.
+    invalidate_logistics_caches(w);
+    return static_cast<int>(gone.size());
+}
+
+// ---------------------------------------------------------------------------
 // BL-365 — generate_background_firms
 // ---------------------------------------------------------------------------
 
@@ -2068,12 +2125,14 @@ std::vector<entity_id> generate_background_firms(
     std::sort(body_ids.begin(), body_ids.end());
     body_ids.erase(std::unique(body_ids.begin(), body_ids.end()), body_ids.end());
 
-    // clearing_fraction — the exact figure the deleted BL-078 substrate model
-    // used (economy.substrate.clearing_fraction, 0.90) to preserve the "live,
-    // fillable opportunity gap" invariant BL-078/BL-112 depend on: real
-    // background production covers most, not all, of demand, leaving room for
-    // the player to fill the rest.
-    constexpr float target_ratio           = 0.90f;
+    // THERE IS NO PRODUCTION-TO-DEMAND TARGET (CORPORATION_GENERATION.md § Pass 6;
+    // Ben's ruling, 2026-08-26). This loop once stopped on a 0.90 basket-weighted
+    // production/demand ratio inherited from the deleted BL-078 substrate model
+    // (economy.substrate.clearing_fraction). Measured, it never bound on any
+    // generated world: the per-resource cap below binds on every demanded
+    // resource, so the caps are the design and the ratio is gone. The ratio is
+    // still READABLE — measure_production_ratio, the seam at the end of this
+    // file — it is just not a stop.
     // TWO-LEVEL FIRM BUDGET (Ben, 2026-08-20: "we should have two levels, per
     // resource caps, and per province caps").
     //
@@ -2192,11 +2251,6 @@ std::vector<entity_id> generate_background_firms(
                 body_construction_demand(w, reg, body_id);
             for (std::size_t r = 0; r < resource_count; ++r)
                 demand[r] += construction_need[r];
-
-            // MEASURED stop condition — real production vs real demand, not a
-            // firm-count target.
-            if (production_ratio(production, demand) >= target_ratio)
-                break;
 
             // PER-RESOURCE CAP. Mask out every resource that has already taken
             // its share of this body's firms, then ask for the biggest remaining
@@ -2450,11 +2504,12 @@ void assign_default_recipes(world& w, const recipe_registry& reg)
 // ---------------------------------------------------------------------------
 // Measurement seam (2026-08-20)
 // ---------------------------------------------------------------------------
-// `generate_background_firms` stops on a MEASURED condition — basket-weighted
-// production/demand >= target_ratio — or on `max_firms_per_body`, whichever comes
-// first. Which of those two actually fires is the whole question behind "do
-// markets open with the goods they need", and until now nothing outside this file
-// could ask it: the three helpers are file-private.
+// `generate_background_firms` stops on its caps — per resource, per province and
+// the anti-runaway `max_firms_per_body` — never on a coverage target (the 0.90
+// ratio it once tested never bound; CORPORATION_GENERATION.md § Pass 6). The
+// basket-weighted production/demand ratio is still the reading behind "do
+// markets open with the goods they need", and until now nothing outside this
+// file could ask it: the three helpers are file-private.
 //
 // These wrappers expose the shipped arithmetic rather than inviting a harness to
 // re-implement it. That re-implementation is the hand-mirrored-table drift this

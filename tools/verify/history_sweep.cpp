@@ -22,8 +22,12 @@
 #include "world/nation_generation.hpp" // BL-769: nation_params, the size floor
 #include "world/sim_terrain_build.hpp"
 #include "world/settlement.hpp"
+
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
+#include "scripting/lua_state.hpp"
+
+#include "culture_footprint.hpp" // BL-968 step 1: the cultures that never hold ground
 
 #include <algorithm>
 #include <bit>
@@ -55,6 +59,46 @@ const generation_report::body_entry* kepler_of(const generation_report& r)
 }
 
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// The shipped generation inputs (BL-1007)
+// ---------------------------------------------------------------------------
+// GENERATION TAKES TWO THINGS FROM THE DATA LAYER, and until this item the
+// sweeps handed it neither. `app::begin_new_game` loads scripts/world_gen.lua
+// into a `world_gen_config`, and `app::ensure_works_loaded` loads
+// scripts/works.lua into a `works_registry`; both are passed to
+// `make_hard_coded_world`. The sweeps passed `world_gen_config{}` — the C++
+// struct defaults, which world_gen_config.hpp's own header warns price 10 of 47
+// resources where the script authors 42 — and a null works pointer, which makes
+// the `build_work` verb a dead branch (history_sim.cpp: "works == nullptr ...
+// break"), so no polity ever raised a work in a swept world.
+//
+// The cost of that was measured on 2026-09-16: seed 0's Empires span fought
+// 6,479 battles in the sweep and 9,928 in the game. Every reading was
+// self-consistent and described a world nobody plays. These helpers are the one
+// place either sweep reads the data layer, and they mirror the app's own order.
+struct shipped_inputs
+{
+    lua_state        lua;
+    world_gen_config cfg{};
+    works_registry   works;
+};
+
+/// Load the data layer exactly as the app does, and say so on the face: a
+/// reading that cannot name the world it measured is the defect this closes.
+inline void load_shipped_inputs(shipped_inputs& in)
+{
+    in.lua.load("scripts/recipes.lua");
+    in.lua.load("scripts/economy.lua");
+    in.lua.load("scripts/world_gen.lua");
+    in.cfg.load_from_lua(in.lua);
+    in.lua.load("scripts/works.lua");
+    in.works.load_from_lua(in.lua);
+    std::printf("generation inputs: scripts/world_gen.lua + scripts/works.lua "
+                "(%zu works rows) — the shipped configuration (BL-1007)\n",
+                in.works.size());
+}
+
 // The works fixture (BL-321)
 // ---------------------------------------------------------------------------
 //
@@ -175,6 +219,26 @@ struct sweep_row
     /// Regions held by the WEAKEST surviving power at the epoch — how close
     /// the model gets to eliminating anyone (BL-308).
     int  smallest_holding = 0;
+
+    // --- BL-970: THE SAME READINGS BY POPULATION HELD -----------------------
+    //
+    // Every share above divides REGIONS held by regions live, and regions_end
+    // runs 2x-6x regions_start because polities FOUND new ground inside the run
+    // (seed 0: 209 -> 1340). A "share of the map" is therefore a share of a map
+    // that grew four times under the reading, and a newly founded empty region
+    // weighs the same as a captured city. NR-809 already records that region
+    // count is not the grain provinces will use. So each reading is taken a
+    // second time over POPULATION HELD -- the sum of `region::population` over
+    // a polity's regions at the sample -- and the two columns print side by
+    // side. The source is the sim's own playback record (`polity_sample::
+    // population`, BL-817), which the sim writes and never reads, so the column
+    // costs the run nothing, moves no decision and no digest, and needs no new
+    // field on the sim. The region column stays; nothing legacy is renamed.
+    int     top_share_pop_q      = 0;  ///< Largest polity's share of held population at the epoch, per-mille.
+    int     peak_share_pop_q     = 0;  ///< The highest such share at any century sample.
+    int64_t hegemony_year_pop    = -1; ///< First century a polity held the threshold share of population, or -1.
+    int64_t smallest_holding_pop = 0;  ///< Population held by the weakest surviving power at the epoch.
+    bool    pop_recorded         = false; ///< False when the run carried no playback record (column reads 0).
 
     int64_t battles   = 0;
     int64_t conquests = 0;
@@ -360,6 +424,14 @@ struct sweep_row
     /// live at that sample, per-mille. The "how big did the biggest empire
     /// actually get" figure, distinct from `peak_share_q` only in its sampling.
     int shape_top_peak_q = 0;
+    /// BL-970: the same four, with a polity's size read as its SHARE of all
+    /// held population rather than its region count. Shares, not heads, on
+    /// purpose: the body's population grows across the span, so an absolute-
+    /// heads rule would call every polity that merely kept its ground a riser.
+    int shape_rose_pop       = 0;
+    int shape_fell_pop       = 0;
+    int shape_rpf_pop        = 0;
+    int shape_top_peak_pop_q = 0;
 
     // --- BL-750: THE TARIFF DISTRIBUTION, off the GENERATED WORLD -----------
     //
@@ -440,6 +512,11 @@ struct sweep_row
         /// `polity::parent` (BL-926 hook) -- the realm it broke away from, or -1.
         int     parent      = -1;
         bool    alive       = false;
+        /// BL-970: the polity's highest share of held POPULATION at any
+        /// recorded step, per-mille, and the heads it held there. Read off the
+        /// playback record's step cadence, not the exact change replay above.
+        int     peak_pop_share_q = 0;
+        int64_t peak_pop         = 0;
     };
     std::vector<polity_arc> arcs; ///< ALL polities that ever held ground, by id.
     int polities_ever_held = 0;
@@ -471,6 +548,17 @@ struct sweep_row
     int cultures       = -1;
     int culture_depth  = -1; ///< Longest `parent` chain, roots at 0.
     int cultures_root  = -1; ///< Cultures with no parent.
+
+    /// BL-968 step 1 -- the cultures that never hold ground. -1 = no creeds.
+    /// `culture_footprint.hpp` is the one reading both this sweep and
+    /// `colonisation_harness` C15 print; REPORTED, not gated, and no rule is
+    /// chosen off it here (fold-back vs gate-coining is Ben's call).
+    int cultures_coined            = -1; ///< == `cultures`; carried under the item's own key.
+    int cultures_holding_boundary  = -1; ///< Plurality on >= 1 region at 400 BCE (the sim's opening map).
+    int cultures_holding_close     = -1; ///< Plurality on >= 1 region at the sim's close (1200 CE).
+    int cultures_empty_leaves      = -1; ///< Empty at the boundary and childless.
+    int cultures_empty_interior    = -1; ///< Empty at the boundary with >= 1 child.
+    std::vector<int> cultures_empty_leaf_depth; ///< Empty leaves by depth below a cradle.
 
     int64_t foundings_scheduled = 0;
     int64_t foundings_settled   = 0;
@@ -536,6 +624,70 @@ void slice_shape(const std::vector<uint16_t>& slice, int& powers, int& top_share
         for (int c : counts) if (small == 0 || c < small) small = c;
         *smallest_out = small;
     }
+}
+
+/// BL-970: the recorded step at or before `year`. Steps are ascending by year,
+/// so this is one binary search. A year BEFORE the first recorded step reads the
+/// first step -- the opening standing -- rather than an empty map, which is what
+/// the region walk reads at the start year off the seeding changes. -1 only
+/// when the run carried no playback record at all.
+int step_at_or_before(const history_sim_state& s, int64_t year)
+{
+    if (s.steps.empty()) return -1;
+    int lo = 0, hi = static_cast<int>(s.steps.size()) - 1, best = -1;
+    while (lo <= hi)
+    {
+        const int mid = lo + (hi - lo) / 2;
+        if (static_cast<int64_t>(s.steps[static_cast<std::size_t>(mid)].year) <= year)
+        {
+            best = mid; lo = mid + 1;
+        }
+        else hi = mid - 1;
+    }
+    return best < 0 ? 0 : best;
+}
+
+/// BL-970: what one recorded step holds, by POPULATION. The playback record's
+/// `polity_sample::population` is the sum of `region::population` over the
+/// polity's held regions at that step (history_sim.cpp, `record_step`), which is
+/// exactly the quantity the region-weighted readings should have been dividing.
+struct pop_slice
+{
+    int64_t total    = 0;     ///< Population over every held region.
+    int64_t regions  = 0;     ///< Regions held, summed over living polities.
+    int64_t top      = 0;     ///< The largest single polity's population.
+    int64_t smallest = 0;     ///< The smallest living polity's population.
+    int     powers   = 0;     ///< Living polities at the step.
+    bool    recorded = false; ///< False when the run carried no record.
+};
+
+/// `pop`, when given, is resized to the polity table and filled with each
+/// polity's held population at the step.
+pop_slice pop_slice_at(const history_sim_state& s, int64_t year, std::vector<int64_t>* pop)
+{
+    pop_slice out;
+    if (pop) pop->assign(s.polities.size(), 0);
+    const int si = step_at_or_before(s, year);
+    if (si < 0) return out;
+    const timelapse_step& st = s.steps[static_cast<std::size_t>(si)];
+    out.recorded = true;
+    for (int k = 0; k < st.sample_count; ++k)
+    {
+        const polity_sample& smp = s.samples[static_cast<std::size_t>(st.first_sample + k)];
+        out.total   += smp.population;
+        out.regions += smp.regions;
+        ++out.powers;
+        if (smp.population > out.top) out.top = smp.population;
+        if (out.powers == 1 || smp.population < out.smallest) out.smallest = smp.population;
+        if (pop && smp.polity < pop->size()) (*pop)[smp.polity] += smp.population;
+    }
+    return out;
+}
+
+/// Per-mille of `part` in `whole`, 0 on an empty whole.
+int share_q_of(int64_t part, int64_t whole)
+{
+    return whole > 0 ? static_cast<int>((part * 1000) / whole) : 0;
 }
 
 /// Median of a copy — the sweep reports medians rather than means because a
@@ -681,6 +833,9 @@ history_sim_params tuned_defaults()
 
 int main(int argc, char** argv)
 {
+    shipped_inputs shipped;
+    load_shipped_inputs(shipped);
+
     int seed_count = 16;
     int64_t epoch_year = 0;
     bool derive_from_generation = true;  // BL-900: generation's span is the default
@@ -923,8 +1078,8 @@ int main(int argc, char** argv)
         era_minus_one_fixture fx;
         // Ask for the fixture only on the deriving path, so the default sweep
         // pays nothing for it and stays byte-for-byte the instrument it was.
-        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
-                                              /*progress=*/nullptr, /*works=*/nullptr,
+        const world w = make_hard_coded_world(wp, &rep, shipped.cfg,
+                                              /*progress=*/nullptr, &shipped.works,
                                               derive_from_generation ? &fx : nullptr);
 
         const generation_report::body_entry* k = kepler_of(rep);
@@ -1304,7 +1459,7 @@ int main(int argc, char** argv)
         // what the stamp pass in generation now reads, so this measures what
         // generation actually produces.
         {
-            const pass_one_output o = make_pass_one_output(ss, sim, /*culture_count=*/0);
+            const pass_one_output o = make_pass_one_output(ss, sim, /*cs=*/nullptr);
             row.surv_corridors = static_cast<int64_t>(o.surviving_corridors.size());
 
             std::vector<int64_t> per_polity(o.polities.size(), 0);
@@ -1457,6 +1612,106 @@ int main(int argc, char** argv)
             }
         }
 
+        // --- BL-970: THE SAME ARC BY POPULATION HELD ------------------------
+        //
+        // The three walks the region column takes -- the epoch slice, the
+        // century walk and the 40-sample shape walk -- taken again over the
+        // playback record's population. A sample year reads the last recorded
+        // step at or before it (steps are >= record_interval_years apart, 20
+        // by default, against the 40-year shape step); the epoch reads the
+        // closing step the sim always writes at stop_year. See the row
+        // struct's BL-970 block for why the region column alone misreads.
+        std::vector<int>     peak_pop_share_of;
+        std::vector<int64_t> peak_pop_of;
+        {
+            const int n_pol = static_cast<int>(sim.polities.size());
+            peak_pop_share_of.assign(static_cast<std::size_t>(n_pol), 0);
+            peak_pop_of.assign(static_cast<std::size_t>(n_pol), 0);
+            std::vector<int64_t> pop;
+
+            // The epoch, as `top_share_q` / `smallest_holding` take it.
+            const pop_slice e = pop_slice_at(sim, params.stop_year, &pop);
+            row.pop_recorded         = e.recorded;
+            row.top_share_pop_q      = share_q_of(e.top, e.total);
+            row.smallest_holding_pop = e.smallest;
+
+            // The century walk, as `peak_share_q` / `hegemony_year` take it.
+            for (int64_t y = params.start_year; y <= params.stop_year; y += 100)
+            {
+                const pop_slice c = pop_slice_at(sim, y, nullptr);
+                const int share = share_q_of(c.top, c.total);
+                if (share > row.peak_share_pop_q) row.peak_share_pop_q = share;
+                if (row.hegemony_year_pop < 0 && share >= hegemony_threshold_q)
+                    row.hegemony_year_pop = y;
+            }
+
+            // The 40-sample shape walk, per polity, in per-mille of held
+            // population. ROSE mirrors the region rule exactly: at least
+            // doubled, and by at least three AVERAGE REGIONS' worth of share
+            // at the first sample (the region rule's "+3 regions", in the same
+            // currency as the share). FELL: ended at or under 60% of its peak.
+            const int64_t step = std::max<int64_t>(1, span / 40);
+            std::vector<int> start_q(static_cast<std::size_t>(n_pol), 0);
+            std::vector<int> peak_q(static_cast<std::size_t>(n_pol), 0);
+            std::vector<int> end_q(static_cast<std::size_t>(n_pol), 0);
+            int  unit_q       = 0;
+            bool first_sample = true;
+            for (int64_t y = params.start_year; y <= params.stop_year; y += step)
+            {
+                const pop_slice c = pop_slice_at(sim, y, &pop);
+                if (first_sample)
+                    unit_q = c.regions > 0 ? static_cast<int>(3000 / c.regions) : 0;
+                for (int i = 0; i < n_pol; ++i)
+                {
+                    const std::size_t ui = static_cast<std::size_t>(i);
+                    const int q = share_q_of(pop[ui], c.total);
+                    if (first_sample) start_q[ui] = q;
+                    if (q > peak_q[ui]) peak_q[ui] = q;
+                    if (q > row.shape_top_peak_pop_q) row.shape_top_peak_pop_q = q;
+                }
+                first_sample = false;
+            }
+            {
+                const pop_slice c = pop_slice_at(sim, params.stop_year, &pop);
+                for (int i = 0; i < n_pol; ++i)
+                {
+                    const std::size_t ui = static_cast<std::size_t>(i);
+                    end_q[ui] = share_q_of(pop[ui], c.total);
+                }
+            }
+            for (int i = 0; i < n_pol; ++i)
+            {
+                const std::size_t ui = static_cast<std::size_t>(i);
+                const bool rose = peak_q[ui] > 0
+                               && peak_q[ui] >= 2 * start_q[ui]
+                               && peak_q[ui] >= start_q[ui] + unit_q;
+                const bool fell = peak_q[ui] > 0 && end_q[ui] * 1000 <= peak_q[ui] * 600;
+                if (rose) ++row.shape_rose_pop;
+                if (fell) ++row.shape_fell_pop;
+                if (rose && fell) ++row.shape_rpf_pop;
+            }
+
+            // Every recorded step, for the arc table's per-polity peak.
+            for (const timelapse_step& st : sim.steps)
+            {
+                int64_t total = 0;
+                for (int k = 0; k < st.sample_count; ++k)
+                    total += sim.samples[static_cast<std::size_t>(st.first_sample + k)].population;
+                if (total <= 0) continue;
+                for (int k = 0; k < st.sample_count; ++k)
+                {
+                    const polity_sample& smp = sim.samples[static_cast<std::size_t>(st.first_sample + k)];
+                    if (smp.polity >= static_cast<uint16_t>(n_pol)) continue;
+                    const int q = share_q_of(smp.population, total);
+                    if (q > peak_pop_share_of[smp.polity])
+                    {
+                        peak_pop_share_of[smp.polity] = q;
+                        peak_pop_of[smp.polity]       = smp.population;
+                    }
+                }
+            }
+        }
+
         // --- BL-767 R2: the rise-peak-fall shape, per polity ---------------
         //
         // A SEPARATE, FINER WALK than the century sampler above, deliberately.
@@ -1606,6 +1861,8 @@ int main(int argc, char** argv)
                 const std::size_t ui = static_cast<std::size_t>(i);
                 if (!ever[ui]) continue;
                 arcs[ui].end_hold = count[ui];
+                arcs[ui].peak_pop_share_q = peak_pop_share_of[ui]; // BL-970
+                arcs[ui].peak_pop         = peak_pop_of[ui];
                 ++row.polities_ever_held;
                 if (!arcs[ui].alive) ++row.polities_dead_gross;
                 row.arcs.push_back(arcs[ui]);
@@ -1664,6 +1921,19 @@ int main(int argc, char** argv)
                     { at = cu[static_cast<std::size_t>(at)].parent; ++depth; }
                     if (depth > row.culture_depth) row.culture_depth = depth;
                 }
+
+                // BL-968 step 1: the boundary is the settlement the sim was
+                // HANDED (`fx.settlement`, 400 BCE); the close is `ss`, which
+                // `run_history_sim` mutated in place to the stop year (1200 CE
+                // on this single-span run). Same reading as C15.
+                const culture_footprint cf =
+                    measure_culture_footprint(cu, fx.settlement.regions, &ss.regions);
+                row.cultures_coined           = cf.coined;
+                row.cultures_holding_boundary = cf.holding_boundary;
+                row.cultures_holding_close    = cf.holding_close;
+                row.cultures_empty_leaves     = cf.empty_leaves;
+                row.cultures_empty_interior   = cf.empty_interior;
+                row.cultures_empty_leaf_depth = cf.empty_leaf_depth;
             }
 
             row.arc_name  = derive_from_generation ? "generation" : "struct-default";
@@ -1747,20 +2017,26 @@ int main(int argc, char** argv)
     }
 
     // --- The table ---------------------------------------------------------
-    std::printf("seed  prov(0>epoch)  powers(0>epoch)  top%%  hegem  battles  conq  "
+    // BL-970: every share prints TWICE -- regions held / population held.
+    std::printf("seed  prov(0>epoch)  powers(0>epoch)  top%% reg/pop  weakest reg/pop(k)  hegem reg/pop  battles  conq  "
                 "peak pop (yr)      epoch pop     ms   works(prov)\n");
-    std::printf("----  -------------  ---------------  ----  -----  -------  ----  "
+    std::printf("----  -------------  ---------------  ------------  ------------------  -------------  -------  ----  "
                 "-----------------  ------------  ----  -----------\n");
     for (const sweep_row& r : rows)
     {
-        char heg[16];
+        char heg[16], hegp[16];
         if (r.hegemony_year < 0) std::snprintf(heg, sizeof heg, "  -  ");
         else                     std::snprintf(heg, sizeof heg, "%5lld",
                                                static_cast<long long>(r.hegemony_year));
-        std::printf("%4u  %5d > %5d  %6d > %6d  %3d%%  %3d  %s  %7lld  %4lld  %11lld (%4lld)  %12lld  %4lld  %5lld (%4d)\n",
+        if (r.hegemony_year_pop < 0) std::snprintf(hegp, sizeof hegp, "  -  ");
+        else                         std::snprintf(hegp, sizeof hegp, "%5lld",
+                                                   static_cast<long long>(r.hegemony_year_pop));
+        std::printf("%4u  %5d > %5d  %6d > %6d  %4d%%/%4d%%   %5d/%9lldk    %s/%s  %7lld  %4lld  %11lld (%4lld)  %12lld  %4lld  %5lld (%4d)\n",
                     r.seed, r.regions_start, r.regions_end,
                     r.powers_start, r.powers_end,
-                    r.top_share_q / 10, r.smallest_holding, heg,
+                    r.top_share_q / 10, r.top_share_pop_q / 10,
+                    r.smallest_holding, static_cast<long long>(r.smallest_holding_pop / 1000),
+                    heg, hegp,
                     static_cast<long long>(r.battles), static_cast<long long>(r.conquests),
                     static_cast<long long>(r.peak_population), static_cast<long long>(r.peak_year),
                     static_cast<long long>(r.epoch_population),
@@ -1946,31 +2222,61 @@ int main(int argc, char** argv)
             // Reading 2 -- STRENGTH SPREAD. Surviving realms of unequal size,
             // off the SAME top_share_q / smallest_holding this report already
             // takes at stop_year (the epoch), never a private re-slice.
+            //
+            // BL-970: the ASSERTION reads the POPULATION-weighted column
+            // (`top_share_pop_q` / `smallest_holding_pop`); the region-weighted
+            // column stays printed beside it. See the row struct for why a
+            // share of regions on a map that grew 2x-6x under the reading is
+            // not a share of the world.
             {
-                std::vector<int64_t> tops, smalls2, survivors;
+                std::vector<int64_t> tops, smalls2, survivors, tops_p, smalls_p;
+                int pop_unrec = 0; // rows whose population column is 0 because no playback record existed
                 for (const auto& r : rows)
                 {
                     tops.push_back(r.top_share_q);
                     smalls2.push_back(r.smallest_holding);
                     survivors.push_back(r.powers_end);
+                    tops_p.push_back(r.top_share_pop_q);
+                    if (!r.pop_recorded) ++pop_unrec;
+                    smalls_p.push_back(r.smallest_holding_pop);
                 }
                 const int64_t top_med   = median_of(tops);
                 const int64_t small_med = median_of(smalls2);
                 const int64_t surv_med  = median_of(survivors);
+                const int64_t top_pmed  = median_of(tops_p);
+                const int64_t small_pmed = median_of(smalls_p);
                 std::sort(tops.begin(), tops.end());
                 std::sort(smalls2.begin(), smalls2.end());
-                std::printf("  2. strength spread     surviving polities/world: median %lld"
-                            "  |  largest holder share (per-mille): min %lld, median %lld, max %lld"
-                            "  |  smallest survivor's regions: min %lld, median %lld, max %lld\n",
+                std::sort(tops_p.begin(), tops_p.end());
+                std::sort(smalls_p.begin(), smalls_p.end());
+                std::printf("  2. strength spread     surviving polities/world: median %lld\n"
+                            "       by REGIONS held     largest holder share (per-mille): min %lld, median %lld, max %lld"
+                            "  |  smallest survivor's regions: min %lld, median %lld, max %lld\n"
+                            "       by POPULATION held  largest holder share (per-mille): min %lld, median %lld, max %lld"
+                            "  |  smallest survivor's heads: min %lld, median %lld, max %lld   <- asserted (BL-970)\n",
                             static_cast<long long>(surv_med),
                             static_cast<long long>(tops.empty() ? 0 : tops.front()),
                             static_cast<long long>(top_med),
                             static_cast<long long>(tops.empty() ? 0 : tops.back()),
                             static_cast<long long>(smalls2.empty() ? 0 : smalls2.front()),
                             static_cast<long long>(small_med),
-                            static_cast<long long>(smalls2.empty() ? 0 : smalls2.back()));
+                            static_cast<long long>(smalls2.empty() ? 0 : smalls2.back()),
+                            static_cast<long long>(tops_p.empty() ? 0 : tops_p.front()),
+                            static_cast<long long>(top_pmed),
+                            static_cast<long long>(tops_p.empty() ? 0 : tops_p.back()),
+                            static_cast<long long>(smalls_p.empty() ? 0 : smalls_p.front()),
+                            static_cast<long long>(small_pmed),
+                            static_cast<long long>(smalls_p.empty() ? 0 : smalls_p.back()));
+                // Both columns are asserted: the population column is the reading, the
+                // region column stays as the guard that cannot go vacuous, and a row
+                // whose population column was never recorded fails rather than reads 0
+                // (cold review of sprint-42 wave 0, finding 5).
+                check(pop_unrec == 0,
+                      "BL-907.2 every seed carried a playback record, so the population column is a reading and not a zero");
                 check(!tops.empty() && tops.back() < 1000,
-                      "BL-907.2 at least some seeds show unequal strength (largest holder < 100%)");
+                      "BL-907.2 at least some seeds show unequal strength (largest holder < 100% of regions held)");
+                check(!tops_p.empty() && tops_p.back() < 1000,
+                      "BL-907.2 at least some seeds show unequal strength (largest holder < 100% of population held)");
             }
 
             // Reading 3 -- CONTACT. At least one pair unmet, so there is
@@ -2150,30 +2456,44 @@ int main(int argc, char** argv)
     std::printf("\n--- distributions over %d worlds ---\n", static_cast<int>(rows.size()));
     if (!rows.empty())
     {
-        std::vector<int64_t> powers, tops, battles, conq, ends;
-        int hegemonies = 0, eliminations = 0;
+        std::vector<int64_t> powers, tops, tops_pop, peaks_pop, battles, conq, ends;
+        int hegemonies = 0, hegemonies_pop = 0, eliminations = 0, unrecorded = 0;
         for (const sweep_row& r : rows)
         {
             powers.push_back(r.powers_end);
             tops.push_back(r.top_share_q);
+            tops_pop.push_back(r.top_share_pop_q);
+            peaks_pop.push_back(r.peak_share_pop_q);
             battles.push_back(r.battles);
             conq.push_back(r.conquests);
             ends.push_back(r.regions_end);
             if (r.hegemony_year >= 0) ++hegemonies;
+            if (r.hegemony_year_pop >= 0) ++hegemonies_pop;
             if (r.powers_end < r.powers_start) ++eliminations;
+            if (!r.pop_recorded) ++unrecorded;
         }
         auto span = [](std::vector<int64_t> v) {
             std::sort(v.begin(), v.end());
             return std::pair<int64_t, int64_t>{v.front(), v.back()};
         };
         const auto ps = span(powers), ts = span(tops), bs = span(battles);
+        const auto tps = span(tops_pop), pps = span(peaks_pop);
 
         std::printf("  powers at epoch      median %lld   range %lld..%lld\n",
                     static_cast<long long>(median_of(powers)),
                     static_cast<long long>(ps.first), static_cast<long long>(ps.second));
-        std::printf("  largest share        median %lld%%   range %lld%%..%lld%%\n",
+        std::printf("  largest share        median %lld%%   range %lld%%..%lld%%   (of REGIONS held)\n",
                     static_cast<long long>(median_of(tops) / 10),
                     static_cast<long long>(ts.first / 10), static_cast<long long>(ts.second / 10));
+        std::printf("  largest share (pop)  median %lld%%   range %lld%%..%lld%%   (of POPULATION held -- BL-970)\n",
+                    static_cast<long long>(median_of(tops_pop) / 10),
+                    static_cast<long long>(tps.first / 10), static_cast<long long>(tps.second / 10));
+        std::printf("  peak share (pop)     median %lld%%   range %lld%%..%lld%%   (highest at any century)\n",
+                    static_cast<long long>(median_of(peaks_pop) / 10),
+                    static_cast<long long>(pps.first / 10), static_cast<long long>(pps.second / 10));
+        if (unrecorded > 0)
+            std::printf("  (BL-970: %d world(s) carried NO playback record; their population column reads 0)\n",
+                        unrecorded);
         std::printf("  battles per world    median %lld   range %lld..%lld\n",
                     static_cast<long long>(median_of(battles)),
                     static_cast<long long>(bs.first), static_cast<long long>(bs.second));
@@ -2635,16 +2955,28 @@ int main(int argc, char** argv)
                         "   conquests without ever moving the political map. REPORTED, not gated.)\n");
         }
 
-        std::printf("\n  HEGEMONY RATE        %d / %d worlds reached %d%% single-power share\n",
+        std::printf("\n  HEGEMONY RATE        %d / %d worlds reached %d%% single-power share of REGIONS\n",
                     hegemonies, static_cast<int>(rows.size()), hegemony_threshold_q / 10);
-        std::vector<int64_t> smalls;
-        for (const sweep_row& r : rows) smalls.push_back(r.smallest_holding);
-        const auto ss_ = span(smalls);
-        std::printf("  ELIMINATION RATE     %d / %d worlds lost even one power\n",
-                    eliminations, static_cast<int>(rows.size()));
+        std::printf("  HEGEMONY RATE (pop)  %d / %d worlds reached %d%% single-power share of POPULATION\n",
+                    hegemonies_pop, static_cast<int>(rows.size()), hegemony_threshold_q / 10);
+        std::vector<int64_t> smalls, smalls_pop;
+        int eliminations_gross = 0;
+        for (const sweep_row& r : rows)
+        {
+            smalls.push_back(r.smallest_holding);
+            smalls_pop.push_back(r.smallest_holding_pop);
+            if (r.polities_dead_gross > 0) ++eliminations_gross;
+        }
+        const auto ss_ = span(smalls), sp_ = span(smalls_pop);
+        std::printf("  ELIMINATION RATE     %d / %d worlds lost even one power (net)   %d / %d (gross: any polity that ever held ground died)\n",
+                    eliminations, static_cast<int>(rows.size()),
+                    eliminations_gross, static_cast<int>(rows.size()));
         std::printf("  WEAKEST POWER holds  median %lld regions   range %lld..%lld\n",
                     static_cast<long long>(median_of(smalls)),
                     static_cast<long long>(ss_.first), static_cast<long long>(ss_.second));
+        std::printf("  WEAKEST POWER (pop)  median %lld heads     range %lld..%lld\n",
+                    static_cast<long long>(median_of(smalls_pop)),
+                    static_cast<long long>(sp_.first), static_cast<long long>(sp_.second));
         std::printf("\n  (Both rates are REPORTED, not asserted — BL-224's non-hegemony becomes a\n"
                     "   tuning target read off this spread, not a construction guarantee.)\n");
 
@@ -2724,36 +3056,51 @@ int main(int argc, char** argv)
         // A world with no empire stays legitimate (BL-224's non-hegemony
         // invariant, the 2026-07-30 emergent-nation-count ruling), so nothing
         // below is asserted and no term anywhere forces the shape.
-        std::printf("\n--- BL-767  RISE / PEAK / FALL, per world ---\n");
-        std::printf("  seed   polities   rose   fell   rose+fell   biggest peak share\n");
+        std::printf("\n--- BL-767  RISE / PEAK / FALL, per world  (BL-970: regions held | population held) ---\n");
+        std::printf("  seed   polities   rose   fell   rose+fell   biggest peak share  |  rose   fell   rose+fell   biggest peak share (pop)\n");
         for (const sweep_row& r : rows)
-            std::printf("  %4u   %8d   %4d   %4d   %9d   %16d%%\n",
+            std::printf("  %4u   %8d   %4d   %4d   %9d   %16d%%  |  %4d   %4d   %9d   %22d%%\n",
                         r.seed, r.polities_total, r.shape_rose, r.shape_fell,
-                        r.shape_rpf, r.shape_top_peak_q / 10);
+                        r.shape_rpf, r.shape_top_peak_q / 10,
+                        r.shape_rose_pop, r.shape_fell_pop, r.shape_rpf_pop,
+                        r.shape_top_peak_pop_q / 10);
         {
-            int worlds_with_shape = 0;
-            std::vector<int64_t> rpf, rose, peaks;
+            int worlds_with_shape = 0, worlds_with_shape_pop = 0;
+            std::vector<int64_t> rpf, rose, peaks, rpf_p, rose_p, peaks_p;
             for (const sweep_row& r : rows)
             {
                 if (r.shape_rpf > 0) ++worlds_with_shape;
+                if (r.shape_rpf_pop > 0) ++worlds_with_shape_pop;
                 rpf.push_back(r.shape_rpf);
                 rose.push_back(r.shape_rose);
                 peaks.push_back(r.shape_top_peak_q);
+                rpf_p.push_back(r.shape_rpf_pop);
+                rose_p.push_back(r.shape_rose_pop);
+                peaks_p.push_back(r.shape_top_peak_pop_q);
             }
-            const auto pk = span(peaks);
-            std::printf("\n  WORLDS SHOWING THE SHAPE     %d / %d   "
+            const auto pk = span(peaks), pkp = span(peaks_p);
+            std::printf("\n                               regions held          population held\n");
+            std::printf("  WORLDS SHOWING THE SHAPE     %d / %d                %d / %d   "
                         "(at least one polity rose, peaked and fell)\n",
-                        worlds_with_shape, static_cast<int>(rows.size()));
-            std::printf("  polities that ROSE           median %lld per world\n",
-                        static_cast<long long>(median_of(rose)));
-            std::printf("  polities that ROSE AND FELL  median %lld per world\n",
-                        static_cast<long long>(median_of(rpf)));
-            std::printf("  BIGGEST PEAK SHARE reached   median %lld%%   range %lld%%..%lld%%\n",
+                        worlds_with_shape, static_cast<int>(rows.size()),
+                        worlds_with_shape_pop, static_cast<int>(rows.size()));
+            std::printf("  polities that ROSE           median %lld per world   median %lld per world\n",
+                        static_cast<long long>(median_of(rose)),
+                        static_cast<long long>(median_of(rose_p)));
+            std::printf("  polities that ROSE AND FELL  median %lld per world   median %lld per world\n",
+                        static_cast<long long>(median_of(rpf)),
+                        static_cast<long long>(median_of(rpf_p)));
+            std::printf("  BIGGEST PEAK SHARE reached   median %lld%% (%lld%%..%lld%%)   median %lld%% (%lld%%..%lld%%)\n",
                         static_cast<long long>(median_of(peaks) / 10),
                         static_cast<long long>(pk.first / 10),
-                        static_cast<long long>(pk.second / 10));
+                        static_cast<long long>(pk.second / 10),
+                        static_cast<long long>(median_of(peaks_p) / 10),
+                        static_cast<long long>(pkp.first / 10),
+                        static_cast<long long>(pkp.second / 10));
             std::printf("  (ROSE = peak at least double the start and +3 regions. FELL = ended at\n"
-                        "   or under 60%% of its own peak. Both are reporting definitions.)\n");
+                        "   or under 60%% of its own peak. Both are reporting definitions. The\n"
+                        "   population column reads a polity's SHARE of all held population, with\n"
+                        "   +3 average regions' worth of share in place of +3 regions -- BL-970.)\n");
         }
 
         // --- BL-750: THE TARIFF DISTRIBUTION ------------------------------
@@ -2894,7 +3241,7 @@ int main(int argc, char** argv)
         for (const sweep_row& r : rows)
         {
             std::printf("  seed %u:\n", r.seed);
-            std::printf("    id    born    peak  (share)   peak yr    end    died      killer   parent\n");
+            std::printf("    id    born    peak  (share)   peak yr    end    died      killer   parent   pop peak (share)\n");
             for (std::size_t i = 0; i < r.arcs.size() && i < static_cast<std::size_t>(arc_table_n); ++i)
             {
                 const sweep_row::polity_arc& a = r.arcs[i];
@@ -2905,9 +3252,10 @@ int main(int argc, char** argv)
                 else              std::snprintf(killer, sizeof killer, "%d", a.killer);
                 if (a.parent < 0) std::snprintf(parent, sizeof parent, "-");
                 else              std::snprintf(parent, sizeof parent, "%d", a.parent);
-                std::printf("    %3d  %6lld  %6d  (%3d%%)   %7lld  %5d  %s   %6s   %6s\n",
+                std::printf("    %3d  %6lld  %6d  (%3d%%)   %7lld  %5d  %s   %6s   %6s   %10lld (%3d%%)\n",
                             a.id, static_cast<long long>(a.born), a.peak, a.peak_share_q / 10,
-                            static_cast<long long>(a.peak_year), a.end_hold, died, killer, parent);
+                            static_cast<long long>(a.peak_year), a.end_hold, died, killer, parent,
+                            static_cast<long long>(a.peak_pop), a.peak_pop_share_q / 10);
             }
         }
 
@@ -2982,6 +3330,73 @@ int main(int argc, char** argv)
                         static_cast<long long>(rows.front().city_states_step));
         }
 
+        // BL-968 step 1 -- THE CULTURES THAT NEVER HOLD GROUND. Per seed:
+        // coined, holding >= 1 region (plurality) at the Culture/Empires
+        // boundary (400 BCE) and at the close (1200 CE), the ratio, and
+        // where the empty names sit in the tree (leaves vs interior nodes,
+        // leaves by depth). REPORTED, NOT GATED: the rule -- fold an empty
+        // culture back into its parent, or gate coining on a footprint -- is
+        // Ben's call once these numbers are on the table.
+        std::printf("\n--- BL-968.1  THE CULTURES THAT NEVER HOLD GROUND (report-only) ---\n");
+        std::printf("  seed   coined   hold@boundary   hold@close   ratio   "
+                    "empty: leaves / interior   empty leaves by depth\n");
+        {
+            std::vector<int64_t> coined, hold_b, hold_c, ratio, leaves, interior;
+            for (const sweep_row& r : rows)
+            {
+                if (r.cultures_coined < 0)
+                {
+                    std::printf("  %4u   (no creeds -- struct-default path)\n", r.seed);
+                    continue;
+                }
+                const int pm = r.cultures_coined > 0
+                    ? static_cast<int>((static_cast<int64_t>(r.cultures_holding_boundary) * 1000)
+                                       / r.cultures_coined)
+                    : 0;
+                std::printf("  %4u   %6d   %13d   %10d   %3d.%d%%   %6d / %-8d   ",
+                            r.seed, r.cultures_coined, r.cultures_holding_boundary,
+                            r.cultures_holding_close, pm / 10, pm % 10,
+                            r.cultures_empty_leaves, r.cultures_empty_interior);
+                culture_footprint cf;
+                cf.empty_leaf_depth = r.cultures_empty_leaf_depth;
+                print_empty_leaf_depths(cf);
+                std::printf("\n");
+                coined.push_back(r.cultures_coined);
+                hold_b.push_back(r.cultures_holding_boundary);
+                hold_c.push_back(r.cultures_holding_close);
+                ratio.push_back(pm);
+                leaves.push_back(r.cultures_empty_leaves);
+                interior.push_back(r.cultures_empty_interior);
+            }
+            if (!coined.empty())
+            {
+                int64_t sum_coined = 0, sum_hold_b = 0, sum_hold_c = 0, sum_leaves = 0, sum_interior = 0;
+                for (std::size_t i = 0; i < coined.size(); ++i)
+                {
+                    sum_coined += coined[i]; sum_hold_b += hold_b[i]; sum_hold_c += hold_c[i];
+                    sum_leaves += leaves[i]; sum_interior += interior[i];
+                }
+                const int64_t pooled_pm = sum_coined > 0 ? (sum_hold_b * 1000) / sum_coined : 0;
+                std::printf("\n  COINED                 median %lld per world   pooled %lld\n",
+                            static_cast<long long>(median_of(coined)), static_cast<long long>(sum_coined));
+                std::printf("  HOLDING @ boundary     median %lld   pooled %lld  (%lld.%lld%% of coined; "
+                            "per-seed median ratio %lld.%lld%%)\n",
+                            static_cast<long long>(median_of(hold_b)), static_cast<long long>(sum_hold_b),
+                            static_cast<long long>(pooled_pm / 10), static_cast<long long>(pooled_pm % 10),
+                            static_cast<long long>(median_of(ratio) / 10),
+                            static_cast<long long>(median_of(ratio) % 10));
+                std::printf("  HOLDING @ close        median %lld   pooled %lld\n",
+                            static_cast<long long>(median_of(hold_c)), static_cast<long long>(sum_hold_c));
+                std::printf("  EMPTY                  leaves pooled %lld   interior pooled %lld  "
+                            "(an empty INTERIOR node is a name the tree cannot drop without re-parenting)\n",
+                            static_cast<long long>(sum_leaves), static_cast<long long>(sum_interior));
+                std::printf("  (holding = plurality on >= 1 region, the same test run_history_sim seeds a\n"
+                            "   polity from. Boundary = the settlement the sim was handed; close = the\n"
+                            "   in-place state at its stop year. REPORTED, not gated -- BL-968 step 2 is\n"
+                            "   Ben's call: fold-back into the parent, or gate coining on a footprint.)\n");
+            }
+        }
+
         // BL-920 -- ground taken by ORGANISE beside ground taken by
         // CONQUEST, and the count of city states that ROSE (crossed
         // `city_state_population_threshold` on unorganised ground) rather
@@ -3019,7 +3434,9 @@ int main(int argc, char** argv)
     {
         std::fprintf(f, "{\n \"_note\": \"%s\",\n \"threshold_q\": %d,\n \"worlds\": [\n",
                      json_escape("BL-275 history sweep. Reported, not gated — see the harness "
-                                 "header. One row per seed; shares are per-mille.").c_str(),
+                                 "header. One row per seed; shares are per-mille. BL-970: every "
+                                 "share is carried twice, by regions held (legacy key) and by "
+                                 "population held (*_pop / *_pop_q sibling).").c_str(),
                      hegemony_threshold_q);
         for (std::size_t i = 0; i < rows.size(); ++i)
         {
@@ -3046,11 +3463,17 @@ int main(int argc, char** argv)
             // and enough of the funnel/churn/secession/creed figures that two
             // runs can be diffed off disk.
             std::fprintf(f,
+                "   \"top_share_pop_q\": %d, \"peak_share_pop_q\": %d, \"hegemony_year_pop\": %lld, "
+                "\"smallest_holding_pop\": %lld, \"pop_recorded\": %s,\n"
                 "   \"arc\": \"%s\", \"arc_start\": %lld, \"arc_stop\": %lld,\n"
                 "   \"polities_ever_held\": %d, \"polities_alive\": %d, \"polities_dead_gross\": %d, "
                 "\"net_loss\": %d,\n"
                 "   \"breakdowns\": %lld, \"secessions\": %lld, \"regions_seceded\": %lld, "
                 "\"piece_sizes\": [",
+                r.top_share_pop_q, r.peak_share_pop_q,
+                static_cast<long long>(r.hegemony_year_pop),
+                static_cast<long long>(r.smallest_holding_pop),
+                r.pop_recorded ? "true" : "false",
                 json_escape(r.arc_name).c_str(),
                 static_cast<long long>(r.arc_start), static_cast<long long>(r.arc_stop),
                 r.polities_ever_held, r.polities_alive, r.polities_dead_gross,
@@ -3074,10 +3497,14 @@ int main(int argc, char** argv)
             std::fprintf(f,
                 "],\n"
                 "   \"cultures\": %d, \"cultures_root\": %d, \"culture_depth\": %d,\n"
+                "   \"cultures_coined\": %d, \"cultures_holding_boundary\": %d, "
+                "\"cultures_holding_close\": %d, \"cultures_empty_leaves\": %d,\n"
                 "   \"foundings_scheduled\": %lld, \"foundings_settled\": %lld, "
                 "\"civilisations\": %lld,\n"
                 "   \"city_states_step\": %lld, \"city_states_series\": [",
                 r.cultures, r.cultures_root, r.culture_depth,
+                r.cultures_coined, r.cultures_holding_boundary,
+                r.cultures_holding_close, r.cultures_empty_leaves,
                 static_cast<long long>(r.foundings_scheduled),
                 static_cast<long long>(r.foundings_settled),
                 static_cast<long long>(r.civilisations),
@@ -3089,6 +3516,8 @@ int main(int argc, char** argv)
                 "],\n"
                 "   \"shape_rose\": %d, \"shape_fell\": %d, \"shape_rpf\": %d, "
                 "\"shape_top_peak_q\": %d,\n"
+                "   \"shape_rose_pop\": %d, \"shape_fell_pop\": %d, \"shape_rpf_pop\": %d, "
+                "\"shape_top_peak_pop_q\": %d,\n"
                 "   \"campaign_contacts\": %lld, \"campaign_scored\": %lld, "
                 "\"campaign_cleared\": %lld, \"campaign_chosen\": %lld, "
                 "\"illegal_campaigns\": %lld, \"starved_campaigns\": %lld, \"reach_denied\": %lld,\n"
@@ -3100,6 +3529,7 @@ int main(int argc, char** argv)
                 "   \"fear_leaned\": %lld, \"fear_targets\": %lld,\n"
                 "   \"polities\": [",
                 r.shape_rose, r.shape_fell, r.shape_rpf, r.shape_top_peak_q,
+                r.shape_rose_pop, r.shape_fell_pop, r.shape_rpf_pop, r.shape_top_peak_pop_q,
                 static_cast<long long>(r.campaign_contacts), static_cast<long long>(r.campaign_scored),
                 static_cast<long long>(r.campaign_cleared), static_cast<long long>(r.campaign_chosen),
                 static_cast<long long>(r.illegal_campaigns), static_cast<long long>(r.starved_campaigns),
@@ -3115,13 +3545,13 @@ int main(int argc, char** argv)
                 std::fprintf(f,
                     "%s\n    {\"id\": %d, \"born\": %lld, \"peak\": %d, \"peak_year\": %lld, "
                     "\"peak_share_q\": %d, \"end_hold\": %d, \"alive\": %s, \"died\": %s, "
-                    "\"killer\": %d, \"parent\": %d}",
+                    "\"killer\": %d, \"parent\": %d, \"peak_pop_share_q\": %d, \"peak_pop\": %lld}",
                     k ? "," : "", a.id, static_cast<long long>(a.born), a.peak,
                     static_cast<long long>(a.peak_year), a.peak_share_q, a.end_hold,
                     a.alive ? "true" : "false",
                     (a.alive || a.died == INT64_MIN) ? "null"
                         : std::to_string(static_cast<long long>(a.died)).c_str(),
-                    a.killer, a.parent);
+                    a.killer, a.parent, a.peak_pop_share_q, static_cast<long long>(a.peak_pop));
             }
             std::fprintf(f, "\n   ]}%s\n", (i + 1 < rows.size()) ? "," : "");
         }
@@ -3174,8 +3604,8 @@ int main(int argc, char** argv)
         // against the struct-default one and call the disagreement
         // non-determinism. That is the BL-757 defect reappearing inside the
         // check meant to catch it.
-        const world w = make_hard_coded_world(wp, &rep, world_gen_config{},
-                                              /*progress=*/nullptr, /*works=*/nullptr,
+        const world w = make_hard_coded_world(wp, &rep, shipped.cfg,
+                                              /*progress=*/nullptr, &shipped.works,
                                               derive_from_generation ? &fx : nullptr);
         const generation_report::body_entry* k = kepler_of(rep);
         settlement_state ss = (derive_from_generation && fx.ran) ? fx.settlement

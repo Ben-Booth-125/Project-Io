@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>      // BL-969: the handoff validators assert in debug builds
 #include <chrono>       // BL-754: the generation budget, MEASURED not asserted
 #include <cmath>
 #include <cstddef>
@@ -698,6 +699,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     /// index — the same field, read at the one moment it still names a polity.
     std::vector<int> kepler_region_polity;
 
+    /// BL-975: indexed by POLITY id, the 1660 treasury each polity held —
+    /// `region::treasury` summed over the regions flying its flag at the
+    /// Exploration span's close. Empty when the span did not run, so a world
+    /// without it credits nothing and every nation starts on the floor.
+    std::vector<int64_t> kepler_polity_treasuries;
+
     nation_params kepler_np =
         nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 });
     {
@@ -1036,7 +1043,41 @@ world make_hard_coded_world(world_params params, generation_report* report,
             // took it by reference and wrote every ownership change into it in
             // place, so by this line it already holds the map at the epoch.
             const pass_one_output kepler_pass_one = make_pass_one_output(
-                kepler_settlement, hs, static_cast<int>(kepler_creeds.cultures.size()));
+                kepler_settlement, hs, &kepler_creeds);
+
+            // BL-969: THE VALIDATOR RUNS HERE, NOT ONLY IN A HARNESS. Until
+            // this line both validators were thorough and called from two
+            // harnesses only, so the shipped path folded the struct and
+            // trusted it -- GENERATION_STRATEGY.md § What crosses each handoff
+            // says "a validator checks them rather than a reader trusting the
+            // sentence", and a check that runs off the shipped path is the
+            // sentence. Against `kepler_creeds`, the live table the fold read,
+            // so the copy in the struct and the table consumers still read
+            // are proven to agree at the fold.
+            //
+            // A violation is RECORDED, never repaired: onto the report so a
+            // harness can assert it stays false; one line to stderr so a
+            // release build is not silent; an assert so a debug build stops
+            // on it. Generation continues on the value as folded -- there is
+            // no "fixed" value to substitute, and inventing one here would be
+            // exactly the clamp this layer refuses.
+            const auto record_handoff_violation = [&](const char* which, const std::string& why) {
+                const std::string msg = std::string(which) + ": " + why;
+                if (report != nullptr)
+                {
+                    report->handoff_invalid = true;
+                    if (!report->handoff_violation.empty()) report->handoff_violation += "; ";
+                    report->handoff_violation += msg;
+                }
+                std::fprintf(stderr, "make_hard_coded_world: handoff validator failed -- %s\n",
+                             msg.c_str());
+                assert(false && "a handoff validator failed on the shipped path (BL-969)");
+            };
+            {
+                std::string why;
+                if (!pass_one_output_valid(kepler_pass_one, &why, &kepler_creeds))
+                    record_handoff_violation("pass_one_output", why);
+            }
 
             // BL-768/BL-911: the corridors the history walked, filtered to the
             // ones a surviving polity still holds an end of (§ The network is
@@ -1045,14 +1086,23 @@ world make_hard_coded_world(world_params params, generation_report* report,
             kepler_corridors = kepler_pass_one.surviving_corridors;
 
             // BL-898: the directed grudge table, out of the block with the
-            // corridors. Copied for the same reason — `hs` is const and dies
-            // here — and it is sparse, so the copy is a few dozen rows.
-            kepler_grudges    = hs.grudges;
+            // corridors. READ FROM THE STRUCT (BL-969), not `hs.grudges`: the
+            // struct is the whole of what crosses, and a consumer that reached
+            // past it into the live sim state was the drift the validator
+            // above exists to catch. Sparse, so the copy is a few dozen rows.
+            kepler_grudges    = kepler_pass_one.grudges;
             kepler_grudge_cap = static_cast<int32_t>(hp.grudge_cap);
 
             // The sim narrates through the same history_event shape the other
             // generation passes use, so its wars join the world log without a
             // new case anywhere.
+            //
+            // A DELIBERATE `hs.` READ PAST THE FOLD (BL-969): the narrative
+            // log is not on the doc's list of what crosses the handoff -- it
+            // is the biography the ledgers print, joined to the settlement
+            // record here for presentation, and nothing downstream computes
+            // from it. Carrying it in the struct would widen the contract to
+            // a table no consumer reads as data.
             kepler_settlement.history.insert(kepler_settlement.history.end(),
                                              hs.history.begin(), hs.history.end());
 
@@ -1066,18 +1116,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
             // round wants only the Empires history and must not pay for a
             // span it discards a few lines below.
             //
-            // WHAT DOES NOT HAPPEN HERE, AND WHY. `kepler_corridors` /
-            // `kepler_grudges` above stay the EMPIRES round's own — this
-            // span's grudges/corridors are folded into
-            // `kepler_exploration_hs` alone, not re-derived into a second
-            // pass-1-style handoff. Building that handoff (a
-            // `pass_one_output`-shaped record at 1660, with its own
-            // surviving-network filter over THIS span's dead) is real work
-            // BL-931 does not scope: this item's job is that the span RUNS,
-            // on the shared engine, with the two honest additions
-            // (EXPLORATION.md sec The engine is shared) — not that
-            // everything downstream of the Empires handoff now reads a
-            // second one.
+            // BL-956: WHEN THE SPAN RUNS, IT HANDS FORWARD ITS OWN VALUE.
+            // The span is folded into `exploration_output` right after it
+            // closes, and `kepler_corridors` / `kepler_grudges` above are
+            // REPLACED by that value's 1660 grudges and surviving network
+            // (filtered over THIS span's dead) — EXPLORATION.md § What this
+            // phase hands digitisation: "A campaign that opens on the 1660
+            // political map must not open on 1200's resentments and 1200's
+            // roads." When the span does not run, the Empires values stand.
             if (exploration_sim_enabled(params) && !kepler_pass_one.polities.empty()
                 && !gen_cfg.stop_after_ancient_era)
             {
@@ -1105,8 +1151,17 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // reads — so the wizard's new Exploration round gets the same
                 // "wait is the round" live map the Empires round has, rather
                 // than a silent hang followed by a populated map on landing.
+                //
+                // AND IT SAYS WHICH SPAN IT IS RUNNING (Ben, 2026-09-16). The
+                // label was last set to "Running the ancient era" at stage 8
+                // and never moved, so this pass counted ITS OWN 460 years
+                // under the previous pass's name — "year 397 of 460" while the
+                // line above said the ancient era, which is 1,600 years long.
+                // A counter and a caption that describe different spans are
+                // worse than either alone.
                 if (progress != nullptr)
                 {
+                    progress->label.store(13, std::memory_order_relaxed); // the exploration age
                     progress->sub_progress.store(0, std::memory_order_relaxed);
                     progress->sub_total.store(
                         static_cast<int>(ep.stop_year - ep.start_year),
@@ -1128,10 +1183,57 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                                  kepler_exploration_hs.history.begin(),
                                                  kepler_exploration_hs.history.end());
 
+                // BL-956: fold the 1660 handoff while `kepler_exploration_hs`
+                // and the now-final `kepler_settlement` ownership are both
+                // live, then let world setup read ITS grudges and corridors.
+                const exploration_output kepler_exploration = make_exploration_output(
+                    kepler_settlement, kepler_exploration_hs, &kepler_creeds);
+
+                // BL-969: validated on the shipped path, against the live
+                // table, same discipline as the Empires fold above. The span
+                // wrote `kepler_creeds` in place, so the struct's copy is the
+                // 1660 table and this is the check that it is.
+                {
+                    std::string why;
+                    if (!exploration_output_valid(kepler_exploration, &why, &kepler_creeds))
+                        record_handoff_violation("exploration_output", why);
+                }
+
+                kepler_corridors  = kepler_exploration.surviving_corridors;
+                kepler_grudges    = kepler_exploration.grudges;
+                kepler_grudge_cap = static_cast<int32_t>(ep.grudge_cap);
+
+                // BL-975: THE TREASURIES CROSS TOO. Read off the handoff
+                // struct's own region table, not the live sim state, because
+                // this is on EXPLORATION.md's list of what the span hands
+                // forward (BL-956 named it first). Summed per polity over the
+                // regions it holds at 1660 — the chest is a fact about the
+                // ground and the flag over the ground owns it (settlement.hpp,
+                // `region::treasury`) — in ascending region order, as
+                // integers, so the sum is exact. `generate_nations` Pass 7
+                // converts it once (NATION_GENERATION.md § Pass 7).
+                for (const region& rg : kepler_exploration.regions)
+                {
+                    if (rg.nation < 0 || rg.treasury <= 0) continue;
+                    const std::size_t pol = static_cast<std::size_t>(rg.nation);
+                    if (pol >= kepler_polity_treasuries.size())
+                        kepler_polity_treasuries.resize(pol + 1, 0);
+                    kepler_polity_treasuries[pol] += rg.treasury;
+                }
+
+                if (fixture != nullptr)
+                    fixture->exploration_handoff = kepler_exploration;
+
                 // BL-937: hand the sweep harness the span's real input and
                 // output, on the same capture-not-re-derive footing as the
                 // Empires block above. Costs nothing when no fixture was
                 // asked for.
+                //
+                // DELIBERATE `kepler_exploration_hs` READS PAST THE FOLD
+                // (BL-969): the fixture IS a capture of the live sim state --
+                // that is what a harness re-running the span against
+                // generation's own outcome needs -- so it takes the sim's
+                // state by design, beside the handoff value it also holds.
                 if (fixture != nullptr)
                 {
                     fixture->exploration_ran    = true;
@@ -1144,6 +1246,15 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // BL-946: THE RECORDED RECORD, same discipline as `hs` a few
                 // lines below -- recorded once, here, at the one call site
                 // that ran it, rather than re-derived by a consumer.
+                //
+                // DELIBERATE `kepler_exploration_hs` READS PAST THE FOLD
+                // (BL-969): the four counters and the time-lapse are the
+                // RECORD OF THE RUN for the generation screen and the Ages
+                // view, not items on EXPLORATION.md's list of what the span
+                // hands forward, and no world-setup consumer computes from
+                // them. `exploration_output` carries no time-lapse for that
+                // reason; widening it to carry one would put a presentation
+                // artefact inside the contract.
                 if (report != nullptr)
                 {
                     report->exploration_years     = kepler_exploration_hs.years;
@@ -1162,6 +1273,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
             // that silently produced a peaceful world would otherwise look
             // identical to one that was never called — which is exactly how
             // this sim went unwired for so long.
+            //
+            // DELIBERATE `hs.` READS PAST THE FOLD (BL-969): the four counters
+            // are the record of the run, not items on the doc's list of what
+            // crosses, and nothing at world setup computes from them. The
+            // time-lapse, by contrast, IS on the struct (`pass_one_output::
+            // timelapse`, folded from this same `hs`), so it is read there.
             if (report != nullptr)
             {
                 report->prehistory_battles   = hs.battles;
@@ -1178,11 +1295,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 // the view reads empty as "never settled".
                 for (generation_report::body_entry& be : report->bodies)
                     if (be.id == kepler)
-                        be.prehistory_timelapse = as_timelapse(hs);
+                        be.prehistory_timelapse = kepler_pass_one.timelapse;
             }
 
             // The same four counts into the fixture, so a harness holding one
             // can bind its re-run against them without also needing a report.
+            // (`hs.` reads by design, as the exploration fixture block above:
+            // a fixture captures the live sim state, BL-969.)
             if (fixture != nullptr)
             {
                 fixture->battles   = hs.battles;
@@ -1247,6 +1366,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // sim wrote as it ran. Phase 5 folds a polity's regions into one nation
         // instead of growing an independent realm out of each anchor.
         kepler_np.seed_polities = settlement_seed_polities(kepler_settlement);
+
+        // BL-975 — THE HISTORY'S CHESTS CROSS WITH ITS MAP. Indexed by the
+        // same polity ids `seed_polities` just read, so Pass 2d can land each
+        // polity's 1660 treasury on the seed it folds to. Empty when the
+        // Exploration span did not run (opted out, or the wizard's Empires-
+        // round launch), which credits nothing.
+        kepler_np.polity_treasuries = kepler_polity_treasuries;
 
         // BL-898 — THE SAME READ, KEPT FOR THE SAME WINDOW. `seed_polities`
         // above is filtered to anchored regions because `generate_nations`
@@ -1353,6 +1479,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // is whichever nation holds the most of its regions, ties to the lowest
     // nation index — an ascending walk over a vector, so the answer cannot
     // depend on a container's layout.
+    //
+    // BL-956: the table read here is the 1660 one whenever the Exploration
+    // span ran (see the span's block above); the fixture records exactly what
+    // this site was handed.
+    if (fixture != nullptr) fixture->setup_grudges = kepler_grudges;
     if (!kepler_grudges.empty() && !kepler_nations.empty()
         && kepler_region_polity.size() == kepler_settlement.regions.size())
     {
@@ -1411,6 +1542,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
     //
     // A world whose polities never industrialised enacts NOTHING here, and that
     // is a legitimate outcome rather than a gap — see `polity::protection_q`.
+    // THIS IS THE ENACTMENT SEAM, NOT THE DERIVATION (BL-976): the Era -1 sim
+    // writes `protection_q` only on the two-span arc, and Digitisation owns the
+    // derivation on the shipped arc (DIGITISATION.md § The boundary). The call
+    // stays so that whatever writes the field is read by one path.
     seed_national_tariffs(w, kepler_nations,
                           derive_national_protection(
                               kepler_settlement, static_cast<int>(kepler_nations.size())));
@@ -1552,7 +1687,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // whole national MST off the ancient corridors' cheapened ground.
     //
     // No-op when the era did not run — `kepler_corridors` is empty, and every
-    // harness declaring `no_prehistory()` takes exactly that path.
+    // harness declaring `no_prehistory()` takes exactly that path. BL-956: the
+    // set is the Exploration span's 1660 surviving network whenever it ran.
+    if (fixture != nullptr) fixture->setup_corridors = kepler_corridors;
     if (!kepler_corridors.empty())
     {
         std::vector<history_road_node> road_nodes;
@@ -2206,6 +2343,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
                          era_minus_one_has_industrial_span(params) ? params.industrial_years : 0);
         }
     }
+
+    // BL-977: the record the landscape search's roster axis regenerates
+    // specialists from (world.hpp § gen_settlement). Its `history` was moved
+    // into the ladder above; regions, charter and the industrial median — all
+    // `generate_corporations` reads — are intact. Set whether or not a report
+    // was requested, so the harness tier and the app hand the search one thing.
+    w.gen_settlement = std::make_shared<const settlement_state>(kepler_settlement);
 
     return w;
 }

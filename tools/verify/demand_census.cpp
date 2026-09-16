@@ -563,17 +563,13 @@ struct spread_stats
 // measure_market_completeness() — PROMOTED to world/market_saturation.hpp (BL-775), so
 // generation and this census share one implementation rather than two that can drift.
 
-spread_stats summarise_spread(const std::vector<market_completeness>& rows)
+spread_stats summarise_spread(std::vector<double> v)
 {
     spread_stats st;
-    st.n = static_cast<int>(rows.size());
+    st.n = static_cast<int>(v.size());
     if (st.n == 0)
         return st;
 
-    std::vector<double> v;
-    v.reserve(rows.size());
-    for (const market_completeness& r : rows)
-        v.push_back(r.completeness);
     std::sort(v.begin(), v.end());
 
     auto rank = [&v](double q) {
@@ -683,6 +679,15 @@ struct band_result
     std::vector<std::string>         terminal_goods;
     spread_stats                     spread;
     float                            reach_budget = -1.0f;  ///< echoed from the registry
+
+    // BL-979 — the OTHER half of saturation: per market, the fraction of priced
+    // resources whose static supply:demand ratio sits inside the pin band. The
+    // number landscape_score's term 2 scores on, read off the same
+    // implementation (market_saturation::fraction_in_band). REPORTED, not
+    // gated — the band is Ben's to set.
+    std::vector<market_balance> balance;
+    spread_stats                balance_spread;
+    double                      pin_ratio = 0.0;   ///< the band the fraction was read at
 };
 
 band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
@@ -701,12 +706,12 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     if (!prehistory)
         p = no_prehistory(p);   // preserves seed and epoch_year
 
-    // app::setup_world -> load_economy -> generate_background_firms ->
-    // assign_default_recipes, in that order (app.cpp § start_new_game_prelude).
+    // app::setup_world -> load_economy -> search_landscape -> apply the WINNER
+    // -> assign_default_recipes, in that order (app.cpp § BL-770 PHASE 6). The
+    // background economy is the search winner, not the seed candidate (BL-979;
+    // apply_shipped_landscape in harness_params.hpp mirrors the app's sequence).
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
-    assign_default_recipes(w, reg);
-    generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
-    assign_default_recipes(w, reg);
+    print_shipped_landscape(apply_shipped_landscape(w, reg, seed));
 
     // 2026-09-01, found by BL-711: the app calls init_survey_states at campaign
     // start (app.cpp) and this census never did, so EVERY body - home included -
@@ -1059,7 +1064,27 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     // stays here, which is why it no longer takes an out-param for the names.
     for (const std::size_t tr : terminal_resources(out.cls))
         out.terminal_goods.emplace_back(rname(tr));
-    out.spread       = summarise_spread(out.completeness);
+    {
+        std::vector<double> v;
+        v.reserve(out.completeness.size());
+        for (const market_completeness& m : out.completeness)
+            v.push_back(m.completeness);
+        out.spread = summarise_spread(std::move(v));
+    }
+
+    // BL-979: the balance half of saturation — what the search scores on as its
+    // term 2 — off the same implementation, printed beside R5. Reported, never
+    // gated. Reads the reach fields R5 just built (memoised), so it perturbs no
+    // measurement either.
+    out.pin_ratio = k_balance_pin_ratio;
+    out.balance   = fraction_in_band(w, reg, out.pin_ratio);
+    {
+        std::vector<double> v;
+        v.reserve(out.balance.size());
+        for (const market_balance& m : out.balance)
+            v.push_back(m.fraction);
+        out.balance_spread = summarise_spread(std::move(v));
+    }
 
     return out;
 }
@@ -1214,22 +1239,58 @@ void print_band(const band_result& b)
     std::printf("  terminal set (%zu goods, the denominator for EVERY market): %s\n",
                 b.terminal_goods.size(), join(b.terminal_goods).c_str());
 
-    std::printf("\n  %-10s %-8s | %9s %9s %9s | %6s | %6s %6s | %s\n",
+    // BL-979: the in-band columns sit beside completeness, joined by market id
+    // (both measures walk sorted_market_ids, but a join is cheaper than an
+    // assumption).
+    std::map<entity_id, const market_balance*> by_market;
+    for (const market_balance& m : b.balance)
+        by_market[m.market] = &m;
+
+    std::printf("\n  %-10s %-8s | %9s %9s %9s | %6s | %6s %6s | %-12s | %6s %6s | %s\n",
                 "market", "body", "catchment", "in reach", "heads",
-                "raws", "closed", "of", "completeness");
-    std::printf("  %-10s %-8s | %9s %9s %9s | %6s | %6s %6s | %s\n",
+                "raws", "closed", "of", "completeness", "inband", "rated", "in band");
+    std::printf("  %-10s %-8s | %9s %9s %9s | %6s | %6s %6s | %-12s | %6s %6s | %s\n",
                 "----------", "--------", "---------", "---------", "---------",
-                "------", "------", "------", "------------");
+                "------", "------", "------", "------------", "------", "------", "-------");
     for (const market_completeness& m : b.completeness)
-        std::printf("  %-10llu %-8llu | %9d %9d %9lld | %6d | %6d %6d | %.4f\n",
+    {
+        const auto bit = by_market.find(m.market);
+        const market_balance* mb = (bit == by_market.end()) ? nullptr : bit->second;
+        std::printf("  %-10llu %-8llu | %9d %9d %9lld | %6d | %6d %6d | %-12.4f | %6d %6d | %.4f\n",
                     static_cast<unsigned long long>(m.market),
                     static_cast<unsigned long long>(m.body),
                     m.catchment_tiles, m.in_reach_tiles, m.heads,
                     m.raws_in_reach, m.terminals_closed, m.terminals_total,
-                    m.completeness);
+                    m.completeness,
+                    mb ? mb->balanced : 0, mb ? mb->rated : 0,
+                    mb ? mb->fraction : 0.0);
+    }
+
+    // --- BL-979: FRACTION IN BAND, per market and as a spread. REPORTED, not gated.
+    {
+        const spread_stats& bs = b.balance_spread;
+        int any_in_band = 0, rated_sum = 0, balanced_sum = 0;
+        for (const market_balance& m : b.balance)
+        {
+            if (m.balanced > 0)
+                ++any_in_band;
+            rated_sum    += m.rated;
+            balanced_sum += m.balanced;
+        }
+        std::printf("\n  FRACTION IN BAND (BL-979): of a market's PRICED resources with any signal, the share\n"
+                    "  whose static supply:demand ratio sits inside [1/%.1f, %.1f] — landscape_score's\n"
+                    "  term 2, read off market_saturation::fraction_in_band. A REPORT: no row gates on it;\n"
+                    "  where the band belongs is Ben's call.\n",
+                    b.pin_ratio, b.pin_ratio);
+        std::printf("  SPREAD over %d markets: min %.4f  median %.4f  max %.4f   (p25 %.4f  p75 %.4f  mean %.4f  sd %.4f)\n",
+                    bs.n, bs.min, bs.median, bs.max, bs.p25, bs.p75, bs.mean, bs.sd);
+        std::printf("  markets with ANY priced good in band: %d of %d;  pooled: %d of %d rated (%.4f)\n",
+                    any_in_band, bs.n, balanced_sum, rated_sum,
+                    rated_sum > 0 ? static_cast<double>(balanced_sum) / rated_sum : 0.0);
+    }
 
     const spread_stats& s = b.spread;
-    std::printf("\n  SPREAD over %d markets: min %.4f  p25 %.4f  median %.4f  p75 %.4f  max %.4f\n",
+    std::printf("\n  COMPLETENESS SPREAD over %d markets: min %.4f  p25 %.4f  median %.4f  p75 %.4f  max %.4f\n",
                 s.n, s.min, s.p25, s.median, s.p75, s.max);
     std::printf("           range %.4f   mean %.4f   sd %.4f   distinct scores %d of %d markets\n",
                 s.range, s.mean, s.sd, s.distinct, s.n);

@@ -278,8 +278,9 @@ void draw_generation_ledger(const world& w, ui_state& s,
     // ONE FLAT PANEL OF STACKED SECTIONS, not a tab strip (Ben, 2026-08-30). The
     // Tile view - the per-tile derivation breadcrumb - was retired with the strip
     // that carried it, leaving the Body selector below as the only cross-cutting
-    // control. The breadcrumb itself survives as `draw_tile_derivation`; see the
-    // note on its declaration in generation_ledger.hpp.
+    // control. The breadcrumb's builder (`draw_tile_derivation`) went with it —
+    // ruled delete, Ben, 2026-08-30 — so nothing in src/ draws a per-tile
+    // derivation, and the design left GENERATION_LEDGER.md too (Ben, 2026-09-15).
     //
     // With no tabs there is no active-tab press to close the ledger. That is the
     // Balance ledger's shape and needs no extra control: the rail slot toggles the
@@ -408,11 +409,11 @@ void draw_generation_ledger(const world& w, ui_state& s,
     // Histograms over the LIVE tiles: the record holds the intermediates, the
     // world holds the outcome, and the outcome is what a balance question is about.
     //
-    // EVERY DENOMINATOR IS NAMED IN ITS HEADER, and it is the same one for all
-    // three: the whole grid, ocean included. That matters most on Landform, where
-    // water carries `plains` and so inflates the plains share far above its share
-    // of LAND. Naming the denominator does not fix that - it makes it visible,
-    // which is the least a tuning surface owes its reader.
+    // EVERY DENOMINATOR IS NAMED IN ITS HEADER, and they do not all share one:
+    // Substrate and Cover are taken over the whole grid, ocean included; Landform
+    // over land alone (see the note at that section). Naming the denominator is
+    // the least a tuning surface owes its reader - a share is only an answer once
+    // the reader knows what it is a share of.
     const std::vector<entity_id> tiles = raster_index(w, subject, rec->gw, rec->gh);
     // BL-519: two histograms where there was one. Collapsing them back into a
     // single 12-row table is exactly the overloading the axis split undid.

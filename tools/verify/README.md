@@ -41,12 +41,15 @@ drain) — plus `ws2_32` on Windows. Still SDL/Lua/ImGui-free; it proves the liv
 seam's two contracts headless (socket schedule ≡ in-process schedule by `state_hash`, transcript
 replays to the same hash; out-of-domain commands rejected whole with the hash untouched).
 
-**`build_gen_harness.bat <name>`** (repo root) is the CMake-free route for any world-superset
-harness: it derives its TU list by globbing `src\world\*.cpp` minus the four sol2/Lua TUs, exactly
-as `io_world_obj` does, so unlike the hand-written `cl` recipes below it **cannot drift stale**.
-Output lands in `build_gen\verify\<name>.exe` with the compiler log beside it. Use it when a
-worktree has no configured `build\` tree and a full CMake configure (SDL + Lua FetchContent) is not
-worth paying for one harness.
+**`node tools/verify/build_harness.js <name> [--run] [--debug] [--clean]`** is the CMake-free
+route for any world-superset harness: it derives its TU list by globbing `src\world\*.cpp` minus
+the sol2/Lua TUs, exactly as `io_world_obj` does, so unlike the hand-written `cl` recipes below it
+**cannot drift stale**. The world set compiles **once per configuration** into
+`build_gen\verify\_world\<release|debug>\` and every harness links the cached objects (BL-960); a
+TU recompiles only when its source or a header under `src\` is newer, and `--clean` drops the
+cache. Output lands in `build_gen\verify\<name>.exe`. Use it when a worktree has no configured
+`build\` tree and a full CMake configure (SDL + Lua FetchContent) is not worth paying for one
+harness. (`build_gen_harness.bat`, which this replaced, no longer exists.)
 
 `road_reach_census` (Sprint B2) is the road-network reach instrument: it counts, over the 8-seed
 census set, how many nations end generation with **no roaded tile in their territory**, splits that
@@ -763,7 +766,7 @@ Links the world superset; CMake target via the generic glob.
 
 ```
 cmake --build build --target unit_march_harness   # from a vcvars shell
-build_gen_harness.bat unit_march_harness          # or the CMake-free route
+node tools/verify/build_harness.js unit_march_harness   # or the CMake-free route
 ctest --test-dir build -R unit_march_harness
 ```
 
@@ -1030,8 +1033,12 @@ node tools/verify/build_harness.js deposit_origin --run
 ./build_gen/verify/deposit_origin.exe [seeds]      # default 4
 ```
 
-It does **not** claim the life half is derived from the past — it is still drawn from present cover.
-That is the seam, not the crossing of it.
+D6 is the crossing of the seam: the same body generated with the drift record withheld must place
+coal and petroleum **elsewhere** (presence moves). **D6b** (BL-961) is its interior twin: with the
+drift record kept and only Planetology's `thermal_series` withheld, the fossil **magnitudes** must
+differ while presence does not — the series moves by about a percent over the record's depth and
+the check is sized to that honestly rather than to a swing the physics does not give. D7/D8 hold
+the world to still feeding and fuelling itself after the split.
 
 ## continent_drift — BL-763/BL-764, the drift time axis and the Lagrangian frame
 

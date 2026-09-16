@@ -57,7 +57,7 @@ argument of `../EXPLORATION.md` read as technology.
 | EX-SP-3m | **The Long Reckoning** | milestone | 3 | SP-3a | — | — | opens the Industry tree | *spire* — requires GD-3a, HL-3a, and either side of the Ways fork |
 
 Links are written without the `EX-` prefix in the tables for width; the store carries them in full,
-each edge once from the lower id.
+each edge once on the node farther from the root (the root's own list is empty).
 
 **The spire is the phase's economic argument in three steps.** A realm that can only spend what
 each seat holds; a realm with one purse; a realm with an institution that can promise past a reign.

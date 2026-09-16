@@ -110,6 +110,35 @@ struct nation_params
     ///
     /// False disables the exemption and every undersized realm merges as before.
     bool keep_city_states = true;
+
+    /// BL-975 — THE 1660 TREASURIES CROSS THE FOLD.
+    ///
+    /// Indexed by POLITY ID (the same ids `seed_polities` carries): the
+    /// treasury each polity held at the Exploration span's close, in the sim's
+    /// material currency, summed over every region flying its flag
+    /// (`region::treasury` sits on the ground, and the flag over the ground at
+    /// 1660 owns the chest — settlement.hpp's own transfer-by-ownership rule).
+    /// Pass 2d credits each polity's whole sum ONCE, to the seed it folds to,
+    /// and the credit follows that seed through the size-floor merge, so a
+    /// realm absorbed for being small hands its chest to the realm that
+    /// absorbed it. Converted by `treasury_credit_per_mille` below.
+    ///
+    /// Empty (the default) credits nothing: every nation starts on
+    /// `treasury_floor`, exactly as before this item, and a body with no
+    /// settlement pass is unchanged bit-for-bit.
+    std::vector<int64_t> polity_treasuries;
+
+    /// BL-975 — THE ONE STATED CONVERSION, sim material currency -> campaign
+    /// credits, expressed per mille: credits = material x per_mille / 1000.
+    /// Named in docs/generation/NATION_GENERATION.md § Pass 7 and nowhere
+    /// else; the doc owns the figure and the reasoning, this field only
+    /// carries it.
+    float treasury_credit_per_mille = 0.01f;
+
+    /// BL-975 — where a nation with NO folded polity starts (a Voronoi cell
+    /// the history never held, or a body with no settlement pass): the same
+    /// zero NATIONS.md names for a treasury nothing has credited.
+    float treasury_floor = 0.0f;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.
@@ -173,10 +202,9 @@ std::vector<entity_id> generate_nations(
 struct nation_garrison_params
 {
     /// Floor a garrison never falls below, however poor the nation — "a poor
-    /// one a token one" (MILITARY.md), never nothing. Also the count every
-    /// nation currently gets, because `nation_component::treasury` is 0.0 at
-    /// generation for every nation (NATIONS.md: "zero at generation,
-    /// deliberately") — see the flag above.
+    /// one a token one" (MILITARY.md), never nothing. The count a nation on
+    /// `nation_params::treasury_floor` gets (BL-975: a Voronoi cell the
+    /// history never held; every nation before that item).
     int min_count = 20;
 
     /// Additional garrison head per credit of `nation_component::treasury`.

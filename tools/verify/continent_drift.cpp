@@ -20,6 +20,7 @@
 #include "world/continents.hpp"
 #include "world/planetology.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -44,6 +45,80 @@ planetology_state mobile_body(float theta)
     pl.theta      = theta;
     return pl;
 }
+
+// --- The drift digest (BL-964) ------------------------------------------
+// FNV-1a over the whole drift record of the reference seed, in the same style
+// world_determinism's deep_digest uses. What it folds, in order: the present
+// plate set; the present surface (height_bias, convergent, divergent — the
+// three consumer-facing rasters CONTINENTS.md § Outputs and contracts names,
+// in raster order); then for EVERY epoch on the clock, 0..continent_drift_epochs,
+// the wound-back plate set and the epoch's plate_id raster. One constant pins
+// all of it: a change to the Voronoi tie-break, the drift table, the boundary
+// classification, the epoch length, the depth, or the winding arithmetic moves
+// the digest, and nothing else in this harness would necessarily notice.
+
+constexpr uint64_t fnv_basis = 14695981039346656037ull;
+constexpr uint64_t fnv_prime = 1099511628211ull;
+
+void fold_bytes(uint64_t& h, const void* p, std::size_t n)
+{
+    const auto* b = static_cast<const unsigned char*>(p);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        h ^= static_cast<uint64_t>(b[i]);
+        h *= fnv_prime;
+    }
+}
+
+void fold_i32(uint64_t& h, int32_t v) { fold_bytes(h, &v, sizeof v); }
+void fold_i64(uint64_t& h, int64_t v) { fold_bytes(h, &v, sizeof v); }
+void fold_f32(uint64_t& h, float v)   { fold_bytes(h, &v, sizeof v); }
+void fold_u8 (uint64_t& h, uint8_t v) { fold_bytes(h, &v, sizeof v); }
+
+void fold_plates(uint64_t& h, const std::vector<tectonic_plate>& plates)
+{
+    fold_i32(h, static_cast<int32_t>(plates.size()));
+    for (const tectonic_plate& p : plates)
+    {
+        fold_f32(h, p.seed_col);
+        fold_f32(h, p.seed_row);
+        fold_f32(h, p.drift_col);
+        fold_f32(h, p.drift_row);
+        fold_u8 (h, p.oceanic ? 1 : 0);
+    }
+}
+
+uint64_t drift_digest(const continent_state& cs, int gw, int gh)
+{
+    uint64_t h = fnv_basis;
+
+    fold_plates(h, cs.plates);
+    fold_i32(h, static_cast<int32_t>(cs.height_bias.size()));
+    for (float v : cs.height_bias) fold_f32(h, v);
+    fold_i32(h, static_cast<int32_t>(cs.convergent.size()));
+    for (uint8_t v : cs.convergent) fold_u8(h, v);
+    fold_i32(h, static_cast<int32_t>(cs.divergent.size()));
+    for (uint8_t v : cs.divergent) fold_u8(h, v);
+
+    for (int e = 0; e <= continent_drift_epochs; ++e)
+    {
+        const continent_snapshot s = continent_snapshot_at(cs, e, gw, gh);
+        fold_i32(h, s.epochs_back);
+        fold_i64(h, s.years_before_present);
+        fold_plates(h, s.plates);
+        fold_i32(h, static_cast<int32_t>(s.plate_id.size()));
+        for (int v : s.plate_id) fold_i32(h, v);
+    }
+    return h;
+}
+
+/// The blessed drift digest for seed 0xC0117E57 on the 261x121 home grid,
+/// theta 0.85, mobile lid — 21 epochs at 5 My. Blessed ONCE, 2026-09-15, from
+/// `node tools/verify/build_harness.js continent_drift --run` (BL-964). A
+/// world-independent curated golden: it moves only when the drift record's
+/// content legitimately changes, and then the delta is reported and re-blessed
+/// with authorisation, never quietly.
+constexpr uint64_t k_drift_digest = 0x481BDCA5300AF14Full;
 
 } // namespace
 
@@ -127,24 +202,56 @@ int main()
     check(sl.plates.size() == 1 && all_zero,
           "C5   a stagnant lid owns everything at every epoch — nothing drifted");
 
-    // --- C6: the cost, REPORTED ---------------------------------------------
+    // --- C6: the cost, against a CEILING (BL-964) ---------------------------
     // R4's constraint is that the expensive half of the pass — the rift-basin
-    // search — is NOT re-run per epoch. This measures what a snapshot actually
-    // costs against a full run_continents, which is the observable form of it.
-    const auto t0 = std::chrono::steady_clock::now();
-    for (int e = 0; e <= continent_drift_epochs; ++e)
-        (void)continent_snapshot_at(cs, e, gw, gh);
-    const auto t1 = std::chrono::steady_clock::now();
-    (void)run_continents(pl, gw, gh, 0xC0117E57u);
-    const auto t2 = std::chrono::steady_clock::now();
-
-    const double snaps_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-    const double full_ms  = std::chrono::duration<double, std::milli>(t2 - t1).count();
-    std::printf("\n     %d snapshots %.1f ms (%.2f ms each) | one full run_continents %.1f ms\n",
+    // search — is NOT re-run per epoch. This measures what the whole 21-epoch
+    // snapshot set costs against one full run_continents, which is the
+    // observable form of it. Best-of-3 on each side so a scheduler hiccup does
+    // not decide the row; a RATIO rather than a millisecond figure so the
+    // ceiling holds on any machine.
+    //
+    // Measured 2026-09-15 (release harness build): 21 snapshots 4.8 ms, one full
+    // pass 3.1 ms — a ratio of ~1.5. The ceiling is 4x the full pass, which is
+    // generous by design: a snapshot that re-ran the basin search would cost
+    // ~21x, so 4x separates "not re-running it" from "re-running it" with room
+    // and does not turn timer noise into a red row. The full pass is floored at
+    // 0.5 ms before scaling so a spuriously fast timer read cannot fail it.
+    auto best_of_3 = [](auto&& fn) {
+        double best = 1e9;
+        for (int k = 0; k < 3; ++k)
+        {
+            const auto a = std::chrono::steady_clock::now();
+            fn();
+            const auto b = std::chrono::steady_clock::now();
+            best = std::min(best, std::chrono::duration<double, std::milli>(b - a).count());
+        }
+        return best;
+    };
+    const double snaps_ms = best_of_3([&] {
+        for (int e = 0; e <= continent_drift_epochs; ++e)
+            (void)continent_snapshot_at(cs, e, gw, gh);
+    });
+    const double full_ms = best_of_3([&] { (void)run_continents(pl, gw, gh, 0xC0117E57u); });
+    constexpr double k_cost_ceiling_ratio = 4.0;
+    const double ceiling_ms = k_cost_ceiling_ratio * std::max(full_ms, 0.5);
+    std::printf("\n     %d snapshots %.1f ms (%.2f ms each) | one full run_continents %.1f ms"
+                " | ceiling %.1f ms (4x)\n",
                 continent_drift_epochs + 1, snaps_ms,
-                snaps_ms / (continent_drift_epochs + 1), full_ms);
-    std::printf("     REPORTED, not asserted: a snapshot must be cheaper than the full pass,\n"
-                "     which is what shows the basin search is not being re-run.\n");
+                snaps_ms / (continent_drift_epochs + 1), full_ms, ceiling_ms);
+    check(snaps_ms <= ceiling_ms,
+          "C6   the whole snapshot set costs under 4x one full pass (measured ~1.5x, 2026-09-15) — "
+          "the basin search is not re-run per epoch");
+
+    // --- C7: the drift record is PINNED (BL-964) -----------------------------
+    // Every row above checks a property of the record; none pins its content.
+    // One digest over the reference seed's whole 21-epoch snapshot set does.
+    const uint64_t digest = drift_digest(cs, gw, gh);
+    std::printf("     drift digest %016llX (blessed %016llX)\n",
+                static_cast<unsigned long long>(digest),
+                static_cast<unsigned long long>(k_drift_digest));
+    check(digest == k_drift_digest,
+          "C7   the reference seed's 21-epoch drift record matches the blessed digest "
+          "(2026-09-15) — plates, height_bias, convergent, divergent, every epoch's plate_id");
 
     // =======================================================================
     // BL-764 slice 1 — TILES RIDE PLATES
@@ -286,6 +393,63 @@ int main()
                       && s.band == band_for_row(row, gh, k_temp);
         }
     check(stationary, "P6   a stagnant lid's ground sat where it sits, at every epoch");
+
+    // --- P7: the FRAME is the query, gw*gh times (BL-963) --------------------
+    // Pass 3 now reads its present band raster from `paleo_frame_at` at epoch 0
+    // and the Life phase reads the fossil epochs from the same function, so the
+    // frame carries the load the per-tile query used to. Two things must hold
+    // and are held separately: at EVERY epoch the frame agrees with the query
+    // tile for tile (P7 — the raster form adds nothing and loses nothing), and
+    // at epoch 0 the frame's band IS band_for_row's (P7b — the generator's
+    // present did not move when Pass 3 changed what it reads).
+    bool frame_agrees = true, frame_present = true;
+    int  frame_band_moved_deep = 0;
+    for (int e = 0; e <= continent_drift_epochs && frame_agrees; ++e)
+    {
+        const paleo_frame f = paleo_frame_at(cs, gw, gh, e, k_temp, &moist);
+        if (f.epochs_back != e
+            || f.band.size()     != static_cast<std::size_t>(gw) * gh
+            || f.latitude.size() != static_cast<std::size_t>(gw) * gh
+            || f.moisture.size() != static_cast<std::size_t>(gw) * gh
+            || f.on_grid.size()  != static_cast<std::size_t>(gw) * gh)
+        {
+            frame_agrees = false;
+            break;
+        }
+        for (int row = 0; row < gh && frame_agrees; ++row)
+            for (int col = 0; col < gw; ++col)
+            {
+                const std::size_t i = static_cast<std::size_t>(col + row * gw);
+                const paleo_tile_state s = paleo_tile_at(cs, gw, gh, col, row, e, k_temp, &moist);
+                if (f.band[i] != s.band || f.latitude[i] != s.latitude
+                    || f.moisture[i] != s.moisture || (f.on_grid[i] != 0) != s.on_grid)
+                {
+                    frame_agrees = false;
+                    break;
+                }
+                if (e == 0 && f.band[i] != band_for_row(row, gh, k_temp)) frame_present = false;
+                if (e == continent_drift_epochs && f.band[i] != band_for_row(row, gh, k_temp))
+                    ++frame_band_moved_deep;
+            }
+    }
+    check(frame_agrees, "P7   the frame at every epoch is the query tile for tile — "
+                        "band, latitude, moisture, on_grid");
+    check(frame_present, "P7b  the frame at epoch 0 IS Pass 3's band raster (band_for_row), "
+                         "tile for tile — the present did not move");
+    check(frame_band_moved_deep == band_moved,
+          "P7c  the frame at the deepest epoch moves exactly the tiles the query moves "
+          "(P3b's count) — the raster form is not a third answer");
+
+    // The frame's cost, informational: the generator builds three per body
+    // (Pass 3 at epoch 0, the Life phase at the two fossil epochs), so this is
+    // what BL-963 added to a generation. Best-of-3, same reason C6 gives.
+    const double frame_ms = best_of_3([&] {
+        (void)paleo_frame_at(cs, gw, gh, 0, k_temp);
+        (void)paleo_frame_at(cs, gw, gh, continent_drift_epochs / 2, k_temp, &moist);
+        (void)paleo_frame_at(cs, gw, gh, continent_drift_epochs, k_temp, &moist);
+    });
+    std::printf("     three frames on %dx%d (the generator's per-body count): %.2f ms\n",
+                gw, gh, frame_ms);
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");

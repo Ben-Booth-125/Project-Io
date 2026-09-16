@@ -510,7 +510,27 @@ The target is the *heuristic*, not a hard goal: a manual tier chosen in the buil
 
 ## Stockpile and output flow
 
-Extraction and processing outputs accrue into a shared stockpile pool held per `(corporation, body)` (a world-level map, not the per-building `stockpile_component`, which the economy does not use). At the economy tick boundary:
+Extraction and processing outputs accrue into a shared stockpile pool held per **`(corporation, market)`** (a world-level map, not the per-building `stockpile_component`, which the economy does not use). At the economy tick boundary:
+
+**POOLS ARE PER MARKET, NOT PER BODY (Ben, 2026-09-15).** A building's output enters the pool of
+the market whose catchment holds the building's tile (`market_for_tile`), and its inputs draw from
+that same pool and that market's inventory. A corporation with works in two catchments on one body
+therefore holds two pools, and moving goods between them is a haul.
+
+**Why, and what it fixed.** Keyed per body, a convoy between two markets on the same body debited
+and credited one pool: the corp paid the haul, waited the travel time, and sold the goods back at
+its home market. Every same-body market-to-market haul was a cost with no effect, and a seller
+could not reach a better-priced market on its own continent at any price. A pool at the market
+makes the delivery real — an arrived convoy credits the destination market's pool, and the
+ordinary auto-surplus sells it *there* (`SUPPLY.md` § Convoy entity).
+
+**What it costs, stated.** A firm whose works straddle a catchment line no longer feeds a
+processor from a mine in the neighbouring catchment for free; it hauls, or it buys. Generation
+anchors a firm's holdings within about a tile of its home region, so most firms sit in one
+catchment, but the landscape search must now score a straddling roster as the logistics problem it
+is. Labour pools stay per `(corp, body)` (`POPULATION.md` § The labour pool) — people commute
+within a body; goods do not teleport within one. A body with no market yet keeps one body-level
+pool until its first building completes and spawns one. The pool key is save-format state.
 
 1. **Supply** is the goods each corporation lists for sale — its surplus above what its own processors will consume that tick (auto-surplus), plus its standing sell orders.
 2. **Demand** is what processing buildings and construction sites set out to buy this tick (the *want*, net of the corp's own pool — MARKETS.md § Want and fill), plus population and background demand.

@@ -290,20 +290,10 @@ bool touches_ocean(const world& w, const std::vector<entity_id>& ids,
     return false;
 }
 
-/// The ANCIENT endowment under a region — surveyed once, over the window the
-/// region's people would have walked. These deposits predate everyone; what
-/// changes across a campaign is who ends up standing on them.
-///
-/// Held as RAW per-tile-mean richness in thousandths, not as a 0-1000 score:
-/// the four classes live on completely different absolute scales (a rich coal
-/// window and a rich grain window are nowhere near the same number), so an
-/// absolute gain either saturates one class or never fires another. The scores
-/// are computed later, against the world's own means — see `score_endowments`.
-struct endowment
-{
-    int farm = 0, ore = 0, energy = 0, water = 0; ///< Per-tile mean × 1000.
-};
+} // namespace
 
+// `endowment` and this survey are declared in settlement.hpp (BL-966): a harness
+// reads them, so they sit outside the anonymous namespace. Nothing else moved.
 endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
                            int col, int row, int gw, int gh)
 {
@@ -342,6 +332,8 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
     e.water  = (water * 1000) / n;
     return e;
 }
+
+namespace {
 
 /// Score one class against the world's own mean for that class: an average
 /// region scores 500, twice the average scores 1000.
@@ -2140,10 +2132,15 @@ void muster_garrison(region& p, int garrison_fraction_q,
                      int muster_rate_q, int disband_rate_q)
 {
     const int64_t target = garrison_target(p, garrison_fraction_q);
+    // BL-955: the muster reads only the men it raised. A paid standing army
+    // (`standing_army_heads`, 0 throughout the Empire span) is neither
+    // counted toward the target nor disbanded as excess.
+    const int64_t standing = standing_army_heads(p);
+    const int64_t ordinary = p.army_stock - standing;
 
-    if (p.army_stock < target)
+    if (ordinary < target)
     {
-        const int64_t gap  = target - p.army_stock;
+        const int64_t gap  = target - ordinary;
         const int64_t want = (gap * clampi(muster_rate_q, 0, 1000)) / 1000;
         // THE COST, and the only place it is charged: bodies come out of the
         // recruitable pool. `raise_manpower` is self-limiting, so a region
@@ -2153,9 +2150,9 @@ void muster_garrison(region& p, int garrison_fraction_q,
         return;
     }
 
-    if (p.army_stock > target)
+    if (ordinary > target)
     {
-        const int64_t excess = p.army_stock - target;
+        const int64_t excess = ordinary - target;
         const int64_t home   = (excess * clampi(disband_rate_q, 0, 1000)) / 1000;
         p.army_stock -= home;
         // Discharged, back to the pool they were raised from — NOT to

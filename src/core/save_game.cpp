@@ -212,6 +212,7 @@ void w_planetology_state(std::ostream& o, const planetology_state& s)
     w_f32(o, s.cold_traps);
     w_bool(o, s.mobile_lid);
     w_bool(o, s.core_exposed);
+    w_floats(o, s.thermal_series); // save_game_version 16 (BL-961) -- keep r_planetology_state in step.
     w_body_profile(o, s.profile);
     w_f32_array(o, s.endowment);
     w_vec(o, s.endemics, w_endemic);
@@ -229,7 +230,9 @@ bool r_planetology_state(std::istream& i, planetology_state& s)
         && r_f32(i, s.eclipse_ratio_perigee) && r_f32(i, s.ferruginous_gyr)
         && r_f32(i, s.marine_anoxia_gyr) && r_f32(i, s.land_burial_gyr)
         && r_f32(i, s.arable_share) && r_f32(i, s.drawdown) && r_f32(i, s.cold_traps)
-        && r_bool(i, s.mobile_lid) && r_bool(i, s.core_exposed) && r_body_profile(i, s.profile)
+        && r_bool(i, s.mobile_lid) && r_bool(i, s.core_exposed)
+        && r_floats(i, s.thermal_series) // save_game_version 16 (BL-961)
+        && r_body_profile(i, s.profile)
         && r_f32_array(i, s.endowment) && r_vec(i, s.endemics, r_endemic)
         && r_vec(i, s.history, r_history_event) && r_vec(i, s.checkpoints, r_checkpoint);
 }
@@ -596,6 +599,9 @@ void w_report(std::ostream& o, const generation_report& g)
     w_i64(o, g.exploration_battles);
     w_i64(o, g.exploration_conquests);
     w_i64(o, g.exploration_foundings);
+    // save_game_version 15 (BL-969, the handoff validators' verdict) -- keep r_report in step.
+    w_bool(o, g.handoff_invalid);
+    w_str(o, g.handoff_violation);
 }
 
 bool r_report(std::istream& i, generation_report& g)
@@ -611,7 +617,9 @@ bool r_report(std::istream& i, generation_report& g)
         && r_i64(i, g.markets_from_trade)
         // save_game_version 14 (BL-946) -- keep w_report in step.
         && r_i64(i, g.exploration_years) && r_i64(i, g.exploration_battles)
-        && r_i64(i, g.exploration_conquests) && r_i64(i, g.exploration_foundings);
+        && r_i64(i, g.exploration_conquests) && r_i64(i, g.exploration_foundings)
+        // save_game_version 15 (BL-969) -- keep w_report in step.
+        && r_bool(i, g.handoff_invalid) && r_str(i, g.handoff_violation);
 }
 
 // ---------------------------------------------------------------------------

@@ -183,8 +183,15 @@ reaching 1200 CE without that shape has failed even if every number is plausible
 
 On the left, where the planetology rounds stack their charts, round 4 keeps a
 **leaderboard** — how cultures grew and fell, on four metrics: **military might**,
-**research speed**, **population**, and **share of the world owned**. It is the round's
-chart surface, and it moves with the map.
+**research speed**, **population**, and **share of the world's people held**. It is the
+round's chart surface, and it moves with the map. **The board ranks by people, not
+ground (Ben, 2026-09-15, NR-876):** a polity's share is its held population over the
+population every living polity holds at that instant — the same arithmetic
+`history_sweep` reads its own share by — with share of land as a second, qualifying
+column. Share of land measures founding as much as conquest: read by population the
+largest realms come out two to five points *more* concentrated, and most region-count
+risers turn out to have been founding empty ground. The arc readout under the board
+("the largest empire held N% of the world's people") prints its peak on the same column.
 
 **Round 5 — Exploration (BL-946, Ben 2026-09-13).** The span **1200 → 1660 CE**, four
 hundred and sixty years, on the same shared engine as round 4 — its authority is
@@ -198,14 +205,24 @@ same terrain base, same seat dots, same frontier — with its own battle/conques
 counters rather than round 4's. `world_params::exploration_sim_enabled` defaults **true**
 (BL-946; it was opt-in and invisible to the player before).
 
-**Round 6 — Digitisation.** The same globe, at the epoch, gaining four things in
-order: **metros growing** out of the population centres the history sacked and grew,
-**colonial reach across water**, **firm markers with their charters**, and the
-**market carve with its price field**. This is phase 6's search made watchable — the
-player sees the landscape that was selected, not every candidate that was scored.
-Renamed from Industrialisation (BL-946, Ben 2026-09-13) as the honest label for
-everything after 1660 CE; still the same labelled placeholder BL-914 built — its own
-content is not BL-946's scope.
+**Round 6 — Digitisation.** The span **1660 → 1960 CE**, three hundred years, and its
+authority is [`DIGITISATION.md`](../generation/DIGITISATION.md). **A time-lapse that ends
+on the seeded map (Ben, 2026-09-15)** — not the still globe this round was first specified
+as, because its three beats are things that happen across a span, and a globe shows a
+state. It draws on the same 2D map as rounds 3–5, over the same terrain base, and shows
+the phase's three beats as they occur:
+
+- **Industrialisation** — large cities light and accumulate industry points; rail spreads
+  along the corridors they pay for.
+- **Mass migration** — people stream from countryside into cities and across borders, and
+  the cities' culture tint turns mixed as they arrive.
+- **Decolonisation** — subjects refuse renewal and stand as their own polities; wars over
+  empire flare, and on some worlds one becomes general.
+
+**The round closes on the epoch's opening map.** When the playhead reaches 1960 the firms
+the search chartered from each city's budget draw in place, with the market carve and its
+price field — the landscape that was selected, never the candidates that were scored. The
+player's last sight before Begin is the map they will play on.
 
 **Each pass round is rerollable, and rerolling re-runs the pass** rather than re-drawing
 a cached one (Ben, 2026-09-08) — which is the whole reason § The wait is the round has to
@@ -232,9 +249,21 @@ The planetology rounds re-run their chain as a pure throwaway preview on every c
 move. **The pass rounds cannot**: the history sim is the most expensive pass in the
 project, and a live preview per keystroke is not affordable at any budget.
 
-So these rounds invert it. The player sets the leans, and the pass runs *inside the
-round* with its output drawn as it computes. The wait is not hidden behind a bar — it
-**is** the content. Accepting moves to the next round; rerolling runs it again.
+**THE WAIT IS A WAIT, AND THE LAPSE IS THE ROUND (Ben, 2026-09-16, reversing the earlier
+reading).** The pass was once drawn as it computed, on the argument that a watched wait needs
+no budget. Watching it decided otherwise: *"there is a clear phase where the simulation is done
+rapidly, and this sort of breaks the narrative flow of the time-lapse. Let us use that to our
+advantage, and separate each part with an otherwise completely blank Loading X Round. This way
+the player can see that they have to wait, and what they are watching is a time-lapse of that
+very fast calculation."*
+
+So a pass round is two moments, and they do not overlap. **The wait** is one centred line —
+*Loading the Culture round*, *Loading the Empires round*, *Loading the Exploration round* — and
+nothing else on the surface: no map, no board, no stage list, no year counter. **The lapse**
+begins when the record is whole and plays it from its first year at the pace the player chose.
+The calculation is fast and jerky; the lapse is paced and readable; showing the first as though
+it were the second made the second impossible to follow, and hid the hand-over between rounds
+entirely. Accepting moves to the next round; rerolling runs it again.
 
 **There is no Run button (Ben, 2026-09-09).** Arriving on the round IS the instruction
 to run it, so the press that moves onto a pass round starts its pass — it is already
@@ -247,16 +276,33 @@ seconds is worse than a bar, not better.
 **Rounds stay causal.** Rerolling a pass round invalidates the rounds below it, as
 rerolling a planetology round already re-draws the ones below it.
 
-**The render starts with the calculation and lags it at a constant rate (Ben, 2026-09-11).**
+**The render follows the calculation, it no longer races it (Ben, 2026-09-11, narrowed 2026-09-16).**
 A pass round does not compute its record and then play it back; the map begins drawing the
 moment the pass begins, and it advances in **fixed ticks** at one constant rate for the whole
 span, always **behind** the year the pass has reached and never ahead of it. The rate is set so
-the whole span plays in about **thirty seconds**; if the pass is slower than that the playhead
+the whole span plays in the duration the player has chosen; if the pass is slower than that the playhead
 waits at the computed frontier, so a longer round is acceptable and a playhead that overtakes
 the calculation is not. The sim publishes its growing record through a **write-only tap** — the
 same contract the market carve uses to fill the loading screen — so a watched run and an
 unwatched run are byte-identical, and the standing determinism rule is untouched. Once the pass
 has landed, the record stays: the round can be paused and scrubbed at the player's own pace. There is no Restart button on either pass round (Ben, 2026-09-11): a scrubber makes it redundant, and its row belongs to the ranking board.
+
+**THE PACE IS THE PLAYER'S (Ben, 2026-09-13, revised 2026-09-16).** A lapse that runs too
+fast to follow is a wait spent rather than watched, so every pass round carries the same
+three-way control beside its transport: **30 s, 1 m, 1 m 30 s of wall clock for the whole
+span**, a minute by default. It sets the WALL CLOCK, not years per second — a longer span at
+the same setting moves faster rather than taking longer, because what a viewer budgets is
+their own time. It changes the autoplay rate and nothing else; the scrubber still goes
+anywhere, and a live round still draws as fast as its pass computes.
+
+**A ROUND OPENS ON THE GROUND THE ROUND BEFORE IT LEFT (Ben, 2026-09-16).** The rounds are one
+continuous history and the surface says so: the previous round's final map is carried into the
+next and painted under ground nobody holds yet, fading out over the opening tenth of the new
+span while the new round's own holders fade in over the same stretch. It is a cross-fade, not a
+cut — the Empires round opens on the migration's peoples and watches city states organise them
+(BL-920 made that literally what happens), and the same carry runs Empires into Exploration and
+will run Exploration into Digitisation. A round whose predecessor was never run carries nothing
+and draws at full strength from its first frame.
 
 **The pass rounds draw the ground, not only the fill (Ben, 2026-09-11).** Rivers and the
 landform relief — mountains, highlands, the barriers the walk and the campaign both price — are
@@ -272,17 +318,20 @@ The wizard's "Begin", and the one and only generation call:
 2. `setup_world(m_pending_world_params)` — build the world; fills
    `m_generation_report` (presentation artefact, off the serialisation seam).
 3. `load_economy()` — recipes + economy constants from Lua.
-4. **Pre-game warm start** ([C3]): seed the balance history, then run
-   `app::pre_game_ticks` (**80**) quarterly econ ticks, sliced across loading-screen
-   frames, so every corp opens onto non-empty pools and live markets rather than a
-   cold zero state. It runs **in spectate** — `corp_ai_params::spectating`, no corp
-   seated — because the seat is decided from what the warm start produces.
-   `run_verify` stays cold.
+4. **The winner's validation run** (BL-978, warm start retired): seed the balance
+   history, search the landscape (phase 6), then run `app::validation_ticks`
+   quarterly econ ticks on the winner — the length and its measurement are
+   `../economy/ERAS.md` § The opening position — so every corp opens onto non-empty
+   pools and live markets rather than a cold zero state. Batched across
+   loading-screen frames (a tick on a searched landscape is ~0.9 s in Release, so
+   the run in one frame would trip Windows' hang kill). It runs **in spectate** —
+   `corp_ai_params::spectating`, no corp seated — because the seat is decided from
+   what the run produces. `run_verify` stays cold.
 5. **Seat the player**: shortlist the specialists whose filed returns clear the
    viability floor, draw one against the world seed, and re-point `is_player` /
    `world::player_entity` onto it. Owned by CORPORATION_GENERATION.md § The spawn
    shortlist, and the seat.
-6. Rebase the clock again (generation + warm-start wall time must not become
+6. Rebase the clock again (generation + validation-run wall time must not become
    in-game days), then `m_screen = in_game`.
 
 Play opens on the corporation's home planet — the Planetary rung, home body

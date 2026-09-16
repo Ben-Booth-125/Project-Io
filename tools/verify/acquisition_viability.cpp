@@ -43,10 +43,12 @@
 //
 //   1. make_hard_coded_world(params, nullptr, gen_cfg)   — with the config.
 //   2. assign_default_recipes                             — load_economy's pass.
-//   3. generate_background_firms                          — app.cpp:912.
-//   4. assign_default_recipes                             — app.cpp:923, and NOT
-//      belt-and-braces: without it every processor a background firm authored
-//      keeps `no_recipe` for the whole campaign.
+//   3. search_landscape + apply_landscape_candidate(winner) — app.cpp § BL-770
+//      PHASE 6; the background economy is the SEARCH WINNER, not the seed
+//      candidate (BL-979: apply_shipped_landscape in harness_params.hpp).
+//   4. assign_default_recipes                             — app.cpp's second pass,
+//      and NOT belt-and-braces: without it every processor a background firm
+//      authored keeps `no_recipe` for the whole campaign.
 //   5. 80 warm ticks with `spectating = TRUE`. Nobody is seated yet, so the
 //      no-auto-act prohibition has no subject (BL-409's rule, BL-630's second
 //      case) and every corp is scorer-driven. A warm start run false would
@@ -143,7 +145,7 @@ void check_on_real_spawn(bool ok, const char* row, const char* what)
     check(ok, row, what);
 }
 
-constexpr int k_warm_ticks = 80;  ///< app::pre_game_ticks.
+constexpr int k_warm_ticks = 80;  ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978), and this harness's own settle length is a re-read it owes.
 constexpr int k_r1_window  = 8;   ///< Quarters R1 reads for its trend. Two years.
 
 /// BL-573: run_nation_step's template registry. Empty is correct — nothing in
@@ -533,11 +535,10 @@ seed_row run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
         p = no_prehistory(p);
 
     // THE SHIPPED SPAWN'S OWN ORDER — see the header. The gen_cfg is the third
-    // argument and it is parsed, not merely loaded.
+    // argument and it is parsed, not merely loaded. The background economy is the
+    // landscape-search WINNER, not the seed candidate (BL-979).
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
-    assign_default_recipes(w, reg);
-    generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
-    assign_default_recipes(w, reg);
+    print_shipped_landscape(apply_shipped_landscape(w, reg, seed));
 
     for (const auto& kv : w.corporations)
         r.field_holdings_gen += static_cast<int>(kv.second.assets.size());

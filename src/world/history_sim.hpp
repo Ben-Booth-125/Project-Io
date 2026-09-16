@@ -61,6 +61,7 @@
 #include <atomic>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -661,14 +662,22 @@ struct history_sim_params
 
     /// Treasury spent (BL-932's `region::treasury`, NEVER `material_stock`)
     /// to promote one corridor from Road (tier 2) to Post Road (tier 3), once
-    /// the spending polity holds EX-WY-1a. A FIRST CUT on the same footing as
-    /// the treasury income weights above — a measurement owed from
-    /// `exploration_sweep`, not a guess dressed up as one. Read only when
+    /// the spending polity holds EX-WY-1a. MEASURED (BL-949, exploration_sweep
+    /// 16 seeds, 2026-09-14, after a resumed span began seeding its live
+    /// corridor counts): seeds with a post road / total bought at 3,000 15/69,
+    /// 100,000 15/69, 1,000,000 15/67, 3,000,000 15/61, 10,000,000 15/46,
+    /// 30,000,000 12/28, 100,000,000 9/15, 300,000,000 3/3. Up to 10M the
+    /// treasury gates nothing -- the purchase is decided by holding EX-WY-1a
+    /// and an internal Road, and the price is noise against capital
+    /// treasuries in the tens of millions. 30M is the first swept value at
+    /// which the bill refuses a real share of would-be builders while a clear
+    /// majority of worlds still buy one (median living capital treasury at
+    /// the close is ~1-8M, so only a rich seat affords it). Read only when
     /// `exploration_upkeep_enabled` is set (BL-931's own default-off
     /// discipline), so the Empire span and every fixture that never opts in
     /// is untouched regardless of this field's value; zero disables the
     /// purchase even where upkeep runs.
-    int64_t post_road_treasury_cost = 3000;
+    int64_t post_road_treasury_cost = 30000000;
 
     /// BL-942 — TWO WAYS TO BE STRONG. Per-mille weight applied to the creed-
     /// derived lean (`consolidator_lean_q`/`expansion_lean_q`, history_sim.cpp)
@@ -1316,6 +1325,24 @@ struct history_sim_params
     /// a value that already exists, never a new term added beside the score.
     int w_fear_q = 0;
 
+    /// A WANT POINTS A CAMPAIGN OUTWARD (BL-953; EXPLORATION.md sec A want
+    /// points a campaign outward). Per-mille pull on the campaign prize by the
+    /// DECIDER's own want for the target region's dominant good
+    /// (`polity_good_want_q`): `value += value * w_want_q * want_q / 10^6`,
+    /// applied once, outside the season loop, only to a positive prize -- a
+    /// want RANKS winnable campaigns, it never makes an unwinnable one
+    /// attractive. The same want ranks which native a sea-legged power
+    /// subjects first (stable tie-break on the lower id).
+    ///
+    /// Read only while `exploration_upkeep_enabled` is set (the scarcity
+    /// signal it reads exists only then). ZERO IS THE STRUCT DEFAULT AND THE
+    /// IDENTITY: at 0 neither the scorer nor subjection moves, so the Empires
+    /// span is byte-identical; only `exploration_sim_params` sets it.
+    ///
+    /// NOT A NEW AI GRANT: it leans the existing campaign/subjection verbs'
+    /// scored utility with a richer input, same idiom as `w_fear_q`/`w_aggr_q`.
+    int w_want_q = 0;
+
     /// The grudge total, summed across D's aggrieved kin, that counts as FULL
     /// fear -- the denominator that turns an unbounded ledger sum into the
     /// 0-1000 currency every other lean in this file speaks.
@@ -1707,10 +1734,29 @@ struct history_sim_params
     /// to. A rate, scaled by the step.
     int treasury_corridor_income_q = 6;
 
-    /// Flat capital earned per decision round while the capital itself
-    /// carries a market (`region::has_market`, BL-910). A rate, scaled by
-    /// the step; zero for a polity whose seat never stood a market.
-    int treasury_market_income_q = 50;
+    /// BL-954 -- A MARKET EARNS BY WHAT FLOWS THROUGH IT, NOT BY STANDING
+    /// (EXPLORATION.md sec Capital arrives). There is no flat per-market
+    /// term: every `trade_flow` credits BOTH the seller's and the buyer's
+    /// capital `volume_q * this * step_years / 1000` (a rate, scaled by the
+    /// step). A market with no trade crossing it earns nothing from trade.
+    /// MEASURED (exploration_sweep, 3 seeds): at 100 the spread's summed
+    /// trade income per round (~36.5k volume x 2 ends x 100 x 4 / 1000 ~ 29k)
+    /// matches the summed flat market income it replaced (~139 market seats
+    /// x 50 x 4 ~ 28k), so removing the allowance redistributes capital to
+    /// busy lines rather than draining it. 20 was also measured (~5.7k per
+    /// round); neither moved reading 8, which consolidation dominates.
+    int treasury_trade_income_q = 100;
+
+    /// BL-954 -- per-mille of the TRADE VALUE a pair's trade-access clause
+    /// WOULD open (the marginal volume, both directions, every good --
+    /// `pair_trade_value_q`) added to `treaty_value_q`, near home and far
+    /// alike (EXPLORATION.md sec Trade is a want met by throughput: "only
+    /// trade can make a stranger worth a promise"). FIRST CUT, measured
+    /// against 0 (exploration_sweep, 3 seeds): at 100 a few more pairs bind
+    /// (1371 vs 1365 formed) and one seed's span battles fall 53 -> 9; at 0
+    /// that seed matches the pre-trade baseline. The effect is real, not
+    /// cosmetic -- tune from the sweep, never by re-guessing.
+    int treaty_trade_weight_q = 100;
 
     // --- BL-933: treaties ---------------------------------------------------
     // EXPLORATION.md sec Diplomacy becomes real.
@@ -1757,8 +1803,23 @@ struct history_sim_params
     /// Per-mille of the OTHER side's visible capability added to
     /// `treaty_value_q`, NEAR HOME ONLY — "a neighbour that reads high
     /// visible capability should be more likely to form/maintain a
-    /// non-aggression treaty with that polity." FIRST CUT, UNMEASURED.
-    int deterrence_alarm_weight_q = 400;
+    /// non-aggression treaty with that polity."
+    ///
+    /// MEASURED WITH `treaty_far_penalty_q` (BL-950, exploration_sweep 16
+    /// seeds, traced, 2026-09-14; displacement median / battle-rate median /
+    /// summed neighbour and frontier rates, per century). At 400/350: 0.06 /
+    /// 98.0 / 1339 / 366. Alarm alone makes BOTH halves fall -- 700/350 1.34 /
+    /// 18.7 / 180 / 296; 1000/350 1.00 / 14.4 / 117 / 291; 550/350 0.50 /
+    /// 35.2 / 297 / 331 -- which is the failure the doc names. With the far
+    /// penalty at 700: 500 0.84 / 44.4 / 391 / 466; 525 1.33 / 43.5 / 312 /
+    /// 492; 550 1.33 / 43.5 / 314 / 473; 575 1.34 / 44.8 / 298 / 536; 600
+    /// 1.59 / 35.0 / 245 / 499; 1000 1.72 / 18.7 / 117 / 463.
+    ///
+    /// 525, AUTHORISED (Ben, 2026-09-14, NR-867): 575 had the most frontier war
+    /// in the 525-575 plateau but left four of sixteen seeds under five battles
+    /// a century; 525 halves that for ~9% less frontier war. A frozen map is
+    /// the failure EXPLORATION.md names, so the gentler end of the plateau wins.
+    int deterrence_alarm_weight_q = 525;
 
     /// Flat penalty on `treaty_value_q` for a pair that met only DURING this
     /// span (a frontier contact, `contact::first.year >= start_year`) — the
@@ -1767,8 +1828,17 @@ struct history_sim_params
     /// bind a non-aggression clause as readily as a long-known neighbour.
     /// Named directly by NR-851: without this every contacted pair, near or
     /// far, scored identically and a funded port's cheap crossing got
-    /// treatied over before it was ever used. FIRST CUT, UNMEASURED.
-    int treaty_far_penalty_q = 350;
+    /// treatied over before it was ever used.
+    ///
+    /// MEASURED (BL-950, see `deterrence_alarm_weight_q` for the joint
+    /// table): at alarm 400, 350 -> 700 lifts the summed frontier rate 366 ->
+    /// 490 with neighbour war unmoved (1339 -> 1363), displacement 0.06 ->
+    /// 0.19. 700 and 1000 are byte-identical on 16 seeds: at 700 no frontier
+    /// pair clears the formation bar except on the trade a clause would open
+    /// (`treaty_trade_weight_q`), so the penalty is saturated there. It is the
+    /// half of the mechanism that GROWS frontier war; the alarm weight is the
+    /// half that quiets neighbours.
+    int treaty_far_penalty_q = 700;
 
     // --- BL-934: colonies ----------------------------------------------------
     // EXPLORATION.md sec A colony is a subject, and it wants things of its own.
@@ -1819,20 +1889,88 @@ struct history_sim_params
     int64_t navy_build_cost_q      = 600;
     int64_t navy_build_step_q      = 400;
     int     navy_min_port_stock_q  = 200;
-    /// Per-mille of standing `navy_stock` lost per YEAR, UNCONDITIONALLY —
-    /// "a fleet is a running cost, not a purchase," so this fires whether or
-    /// not the round also funded growth.
+    /// Per-mille of the UNPAID share of `navy_stock` lost per YEAR (BL-972).
+    /// "A fleet is a running cost, not a purchase": the cost is
+    /// `navy_upkeep_per_1000_units_year_q` below, and this decay is what
+    /// happens to the hulls the purse could not pay for this round. A fleet
+    /// whose bill is met in full does not decay.
     int     navy_decay_per_mille_year_q = 30;
 
     /// Treasury cost to add `standing_army_build_step_q` heads to the
     /// capital's `region::army_stock`, on top of whatever muster alone holds
-    /// there, one decision round's worth.
+    /// there, one decision round's worth. BL-972: the heads are a LEVY drawn
+    /// from the seat's `manpower_stock` (`standing_army_levy_per_mille_q`),
+    /// never conjured — a paid soldier is a civilian who left the pool.
     int64_t standing_army_build_cost_q = 500;
     int64_t standing_army_build_step_q = 300;
-    /// Per-mille of the EXCESS over `garrison_target(seat, ...)` (never the
-    /// muster baseline itself) lost per YEAR when the round's build was
-    /// refused — "falls back toward what muster alone provides," not below it.
+    /// Per-mille of the UNPAID share of the PAID standing heads
+    /// (`region::standing_army`) that go home per YEAR (BL-972; the rate is
+    /// BL-955's). "Falls back toward what muster alone provides": the men
+    /// leave `army_stock` and return to the `manpower_stock` of the ground
+    /// they stand on, capped at its ceiling exactly as `muster_garrison`'s
+    /// own disband is. A realm whose bill is met in full loses none.
     int     standing_army_decay_per_mille_year_q = 60;
+
+    // --- BL-972: force persists, and persistence has a BILL -----------------
+    // EXPLORATION.md sec Force persists now: "a polity that over-builds is
+    // poorer every round afterwards ... a cost in the world rather than a
+    // handicap in the scorer." Every round, after EARN and before the one
+    // scored purchase, each living polity is billed for the paid heads
+    // standing anywhere in its realm and for its fleet, from the CAPITAL'S
+    // `region::treasury`. The army is billed first (the garrison at home
+    // before the hulls), then the navy. A bill the purse cannot meet in full
+    // is paid for as many heads/units as it covers, and the UNPAID share
+    // decays at the two rates above — treasury 0 is exactly BL-955's decay.
+    //
+    // DEFAULTS: the raising price, per year. A paid step buys 300 heads for
+    // 500 (1667 per 1000) and 400 hull-units for 600 (1500 per 1000); a
+    // standing soldier's pay over a year is of the order of what it cost to
+    // raise him (real history supplies the mechanism: pay, not kit, is the
+    // running cost of a standing force). MEASURED, not targeted — see the
+    // BL-972 sweep report for what these defaults do on 16 seeds. Zero
+    // disables a bill, and a stock with no bill never decays.
+    int64_t standing_army_upkeep_per_1000_heads_year_q = 1667;
+    int64_t navy_upkeep_per_1000_units_year_q          = 1500;
+    /// The LEVY BOUND: a paid army step may draw at most this per-mille of
+    /// the seat's banked `manpower_stock` in one round, and the step is
+    /// all-or-nothing (same shape as every other purchase here), so the army
+    /// option is not eligible when the pool cannot lend a whole step. This is
+    /// the physical limit that replaces the scorer's old per-region cap: the
+    /// muster and the paid levy now draw on the SAME pool of eligible
+    /// civilians (GENERATION_STRATEGY.md sec Population is civilian).
+    int     standing_army_levy_per_mille_q = 500;
+
+    // --- BL-955: spend is ALLOCATED, not bought whenever affordable ----------
+    // EXPLORATION.md sec Force persists now ("Spend is ALLOCATED"). Once a
+    // round's EARN is in, each living polity makes ONE scored choice among
+    // {port step, navy step, standing-army step, hold}
+    // (`score_exploration_spend` / `choose_exploration_spend`). Every score is
+    // on a 0-1000 integer scale; the leans enter as per-mille RANKS over the
+    // round's living, cultured polities (`exploration_lean_ranks`), never as
+    // the raw leans, whose scales are incommensurable (NR-864). The decays
+    // above are untouched: only the purchases are chosen. FIRST CUT; see the
+    // BL-955 sweep report for the measurement these defaults stand on.
+
+    /// Weight of the EXPANSION rank in the port and navy scores.
+    int     spend_w_expansion_q         = 600;
+    /// Weight of the across-water want (0-1000) in the port and navy scores.
+    int     spend_w_water_want_q        = 400;
+    /// Weight of the CONSOLIDATOR rank in the standing-army score.
+    int     spend_w_consolidator_q      = 600;
+    /// Weight of the near-home Alarm (0-1000) in the standing-army score.
+    int     spend_w_alarm_q             = 400;
+    /// The flat value of keeping the purse — hold's floor.
+    int     spend_hold_base_q           = 250;
+    /// Weight of the CONSOLIDATOR rank in hold (weighted below the army's).
+    int     spend_w_hold_consolidator_q = 200;
+    // BL-972 REMOVED the two saturation caps BL-955 first cut carried here
+    // (`navy_saturation_per_region` 400, `army_saturation_per_region` 300:
+    // a score of 0 past N units/heads per held region). They were a handicap
+    // in the scorer standing in for a cost in the world; the per-head bill
+    // above (`standing_army_upkeep_per_1000_heads_year_q`,
+    // `navy_upkeep_per_1000_units_year_q`) and the levy bound
+    // (`standing_army_levy_per_mille_q`) are the forces that now limit a
+    // stock, and both are visible in the world rather than inside the actor.
 };
 
 // ---------------------------------------------------------------------------
@@ -1862,12 +2000,33 @@ struct dated_object
 /// never a roll.
 void expire_dated_objects(std::vector<dated_object>& objects, int64_t year);
 
+// ---------------------------------------------------------------------------
+// BL-954 — TRADE IS A WANT MET BY THROUGHPUT (EXPLORATION.md sec Trade is a
+// want met by throughput). Declared here, ahead of the upkeep step that
+// rebuilds them; the functions that size a flow sit beside the scarcity
+// signal further down, once `region`/`polity` are in scope.
+// ---------------------------------------------------------------------------
+
+/// ONE NUMBER PER SELLER, BUYER AND GOOD — not a cargo, not a route, not a
+/// price. A fact in the same family as `grudge`/`contact`: a named, directed
+/// pair plus what joined them. `good` is a `scarcity_good_index` (farm=0,
+/// ore=1, energy=2, port=3). `volume_q` is always > 0 in a stored entry.
+/// Rebuilt every decision round of the Exploration span; the vector is
+/// sorted ascending by (seller, buyer, good).
+struct trade_flow
+{
+    uint16_t seller   = 0;
+    uint16_t buyer    = 0;
+    uint8_t  good     = 0;
+    int32_t  volume_q = 0;
+};
+
 /// THE UPKEEP STEP ITSELF (BL-931/BL-932), called once per decision round
 /// when `history_sim_params::exploration_upkeep_enabled` is set. "Earn, then
 /// pay stocks, then invest" (EXPLORATION.md sec The engine is shared) — this
 /// item builds EARN: every living polity's capital seat (`region::treasury`)
 /// draws income from its held ground's endowment, the inherited corridor
-/// network, and a standing market (`history_sim_params::treasury_*_income_q`),
+/// network, and the trade flowing through its market (BL-954; `history_sim_params::treasury_*_income_q`),
 /// and — ONCE, on the round at @p year == @p params.start_year, the phase's
 /// visible opening act — the seat's accumulated `material_stock` is folded
 /// into it (EXPLORATION.md sec Capital arrives: "material becomes capital").
@@ -1886,15 +2045,77 @@ struct exploration_upkeep_spend
     int64_t ports           = 0;
     int64_t navies          = 0;
     int64_t standing_armies = 0;
+    /// BL-955: stock STEPS bought this call (one per polity per call at most,
+    /// across all three) — the observable for "a fully funded polity still
+    /// builds at most one stock per round".
+    int64_t port_steps      = 0;
+    int64_t navy_steps      = 0;
+    int64_t army_steps      = 0;
+    /// BL-955: polity indices whose navy decayed to zero this call.
+    std::vector<uint16_t> navies_lapsed;
+    /// BL-972: the BILL. Treasury actually paid this call for paid standing
+    /// heads and for hulls, and how many living polities' bills went short
+    /// (paid for fewer heads/units than stand), for each stock.
+    int64_t army_upkeep     = 0;
+    int64_t navy_upkeep     = 0;
+    int64_t army_unpaid     = 0; ///< polities whose army bill was not met in full
+    int64_t navy_unpaid     = 0; ///< polities whose navy bill was not met in full
+    /// BL-972: the LEVY. Heads drawn from a seat's `manpower_stock` by an
+    /// army step this call, and heads returned to a region's pool by the
+    /// unpaid decay this call.
+    int64_t levy_raised     = 0;
+    int64_t levy_returned   = 0;
 };
 
+struct history_sim_state;       // defined further down
+struct culture_good_preference; // defined further down
+
+/// BL-955 — WHAT THE ALLOCATION READS beyond the region/polity tables. Every
+/// pointer may be null, and a null reads as "no signal" rather than an error:
+///   - @c state   : its `contacts` give the near-home Alarm (contacts whose
+///                  first year predates `params.start_year`, read through
+///                  `deterrence_alarm_q`). Its `polities` MUST be the same
+///                  vector the upkeep call mutates (as `run_history_sim`
+///                  passes it); the Alarm is read in a pre-pass before any
+///                  stock moves, so the read never sees this round's buys.
+///   - @c creeds  : the cultures the leans are ranked from. Null ranks every
+///                  polity 0 on both leans.
+///   - @c prefs   : the round's live culture preference, weighting the
+///                  across-water want (`polity_good_want_q`). Null or empty
+///                  weights every good at 0 preference.
+struct exploration_spend_context
+{
+    const history_sim_state*                    state  = nullptr;
+    const creed_state*                          creeds = nullptr;
+    const std::vector<culture_good_preference>* prefs  = nullptr;
+};
+
+///
+/// BL-954 — THE ROUND'S ORDER IS: refresh the raw signal, compute every
+/// trade flow a bound `trade_access` clause in @p treaties opens (written,
+/// sorted, into @p flows_out), relieve each buyer's signal by its inbound
+/// volume, EARN (endowment, corridor touch, and each flow crediting BOTH
+/// capitals — no flat market income), then pay and invest. @p treaties null
+/// means no clause binds anyone, so no flow forms; @p flows_out null discards
+/// the flows after they have relieved and earned.
+///
+/// BL-955 — PAY and INVEST are split: every DECAY runs exactly as BL-935 set
+/// it (a port silts on any round it is not built, a navy decays every round,
+/// a standing army falls back on any round it is not funded), but the
+/// PURCHASE is one scored choice per polity per round
+/// (`score_exploration_spend`/`choose_exploration_spend`), fed from
+/// @p spend_ctx. A null @p spend_ctx still runs the choice, on no leans, no
+/// Alarm and unweighted wants.
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
                             const history_sim_params&             params,
                             int64_t                                year,
                             int                                    step_years,
-                            exploration_upkeep_spend*              spend = nullptr);
+                            exploration_upkeep_spend*              spend = nullptr,
+                            const std::vector<dated_object>*       treaties = nullptr,
+                            std::vector<trade_flow>*               flows_out = nullptr,
+                            const exploration_spend_context*       spend_ctx = nullptr);
 
 // ---------------------------------------------------------------------------
 // Actors
@@ -2066,6 +2287,11 @@ struct polity
     /// far-flung holding is a large empire, not an overseas one), the term is
     /// left out and recorded as owed. It is an addend on this scalar when
     /// BL-749 lands, not a restructure.
+    ///
+    /// WRITTEN ON THE TWO-SPAN ARC ONLY (BL-976). The single-span arc runs no
+    /// industrial span, so the sim leaves this at zero there and the
+    /// derivation is Digitisation's (DIGITISATION.md § The boundary);
+    /// `seed_national_tariffs` reads it on both arcs as the enactment seam.
     int protection_q = 0;
 
     /// True for a seeded great power (BL-299). Majors start with more ground
@@ -2200,6 +2426,30 @@ struct polity
     /// readable by a third party without a second ledger: `treaty_value_q`
     /// reads the COUNTERPART's copy of this field, never the decider's own.
     int32_t treaties_broken = 0;
+
+    // -----------------------------------------------------------------------
+    // BL-973 — THE TREE EFFECT SURFACE, folded from the masks above.
+    // -----------------------------------------------------------------------
+    //
+    // DERIVED, NEVER AUTHORED: `apply_tree_effects` rewrites both fields
+    // from `empire_mask` and `exploration_mask` at the top of every round
+    // and again the instant a node is bought, walking the generated
+    // `effects[]` tables (tree_effect.hpp is the vocabulary). Nothing else
+    // writes them, and nothing in the sim names a node — a reader asks for
+    // a TERM or a KEY, never for "node 11". NOT SERIALISED, same footing as
+    // the masks: recomputable from them, and this struct does not cross the
+    // save seam.
+
+    /// Per-term sum of held `modifier` effects' per-mille, both trees,
+    /// indexed by `io::tree_modifier_term`. A term with no reader in the
+    /// sim is still summed here (the surface is generic); which terms are
+    /// read is `tree_effect_reader_of`'s to say.
+    int32_t tree_mod_q[io::tree_modifier_term_count] = {};
+
+    /// Bit `k` set iff some held node carries an effect with
+    /// `key == io::tree_effect_key(k)`. The identity reads (sea legs, post
+    /// roads) test this and nothing else.
+    uint32_t tree_keys = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -2297,17 +2547,76 @@ inline bool polity_holds_exploration_rim(const polity& q)
     return (q.exploration_mask & (1ULL << io::exploration_tree::rim_node_index)) != 0;
 }
 
+// ---------------------------------------------------------------------------
+// The tree effect surface (BL-973) — one fold, generic readers, an honest
+// unread list
+// ---------------------------------------------------------------------------
+//
+// TREES.md sec Effects: "a node whose effect nothing in the sim reads is not
+// authored." Before this item the generated tables carried topology only and
+// the sim read three nodes by hand (a counted rim index, `index 11` for sea
+// legs, a strcmp on "EX-WY-1a"). Now every store effect reaches the sim
+// through ONE fold, and what the sim does with each kind is stated here in
+// code, so the harness can hold the store to it.
+
+/// Fold `q.empire_mask` and `q.exploration_mask` into `q.tree_mod_q[]` and
+/// `q.tree_keys`, walking both generated `effects[]` tables in their fixed
+/// authored order. Pure in the masks; idempotent; cheap (≈140 rows).
+void apply_tree_effects(polity& q);
+
+/// Does a held node carry an effect keyed `k`? Reads the folded surface.
+inline bool polity_holds_tree_key(const polity& q, io::tree_effect_key k)
+{
+    return (q.tree_keys & (1u << static_cast<unsigned>(k))) != 0;
+}
+
+/// The polity's summed per-mille for one modifier term (0 when nothing held).
+inline int tree_mod_q(const polity& q, io::tree_modifier_term t)
+{
+    const int i = static_cast<int>(t);
+    return (i >= 0 && i < io::tree_modifier_term_count) ? q.tree_mod_q[i] : 0;
+}
+
 /// BL-934 — THE ASYMMETRY THAT PERMITS SUBJECTION, AS A NODE, NEVER A RANK
-/// (EXPLORATION.md sec Where subjects come from: "nothing reads size"). Index
-/// 11, `EX-HL-3a` "Oceanic Navigation": "a crossing to unmet ground no longer
-/// requires an adjacent shore" — the exact capability a far, unmet continent's
-/// contact requires, read straight off `exploration_mask` exactly as
-/// `polity_holds_exploration_rim` reads its own bit.
-inline constexpr int exploration_sea_legs_node_index = 11;
+/// (EXPLORATION.md sec Where subjects come from: "nothing reads size"): the
+/// store effect keyed `sea_legs` ("a crossing to unmet ground no longer
+/// requires an adjacent shore"), whichever node carries it.
 inline bool polity_holds_exploration_sea_legs(const polity& q)
 {
-    return (q.exploration_mask & (1ULL << exploration_sea_legs_node_index)) != 0;
+    return polity_holds_tree_key(q, io::tree_effect_key::sea_legs);
 }
+
+/// Which sim surface consumes an effect. `unread` is the honest gap: the
+/// effect is folded (a modifier still sums into `tree_mod_q`) but nothing
+/// downstream reads it yet.
+enum class tree_effect_reader : uint8_t
+{
+    unread = 0,
+    ring_gate,        ///< open "ring N": `*_node_available`'s ring lock
+    tree_gate,        ///< open "<tree> tree": `polity_holds_*_rim`
+    sea_legs_gate,    ///< key sea_legs: the subjection block
+    post_roads_gate,  ///< key post_roads: the treasury-bought third road rung
+    modifier_defence,     ///< the defender's readiness (campaign pricing and resolution)
+    modifier_industrial,  ///< the materials ladder's pull-forward
+    modifier_cohesion,    ///< Consolidate's recovery rate
+    modifier_research,    ///< both trees' research flow
+};
+tree_effect_reader tree_effect_reader_of(const io::tree_effect& e);
+
+/// THE STATED UNREAD LIST. True for exactly the effects the sim does not
+/// consume today: kinds `unlock`, `upgrade`, `retire`, `access`, `reach`,
+/// `intel`, `institution`, `doctrine`, `resource` when they carry no key
+/// (works and unit rows still gate on the derived band — TREES.md's open
+/// question; the rest are prose the sim has no term for), and modifier
+/// terms `carrying_capacity`, `manpower`, `stores`, `assimilation`, `plague`,
+/// `forage`, `muster_cost` (their consumers read region fields or do not
+/// exist in this sim) plus `reach`, which HAS a surface and is withheld on
+/// a measured finding (the authored magnitudes collapse the BL-872 distance
+/// fixtures — see the holdings-supply site in run_history_sim). A harness
+/// asserts every store effect is either read or on this list, and never
+/// both, so authoring a new kind or term into a store without a reader
+/// fails loudly instead of doing nothing.
+bool tree_effect_declared_unread(const io::tree_effect& e);
 
 /// What the scorer chose for one polity in one year — kept for the harness and
 /// for the History Log, so a run can be read back as decisions rather than as
@@ -2576,6 +2885,12 @@ struct history_sim_state
     ///   - scored > 0 but `campaign_chosen` 0 -> the scorer sees war and prefers
     ///     something else every time. That is a threshold/weighting question.
     int64_t campaign_contacts = 0; ///< (own region, foreign-owned neighbour) pairs examined.
+    /// BL-950 DIAGNOSTIC, trace only: campaign candidates by the target owner's
+    /// contact class -- [0] met before the span, [1] met during it, [2] unmet --
+    /// and by gate: [0] examined, [1] treaty-blocked, [2] water-illegal,
+    /// [3] reach-denied, [4] season scores clearing the threshold, [5] chosen.
+    /// Read by nothing in the sim.
+    int64_t campaign_class_trace[3][6] = {};
     int64_t campaign_scored   = 0; ///< Candidates that reached the score comparison.
     int64_t campaign_chosen   = 0; ///< Rounds where Campaign won the verb choice.
 
@@ -2705,6 +3020,14 @@ struct history_sim_state
     /// nothing in this item's scope does either; this is the seam BL-933's
     /// treaty objects land in.
     std::vector<dated_object> dated_objects;
+
+    /// BL-954 — THE ROUND'S TRADE (EXPLORATION.md sec Trade is a want met by
+    /// throughput). Every flow a bound `trade_access` clause opened on the
+    /// most recent decision round, sorted ascending by (seller, buyer, good);
+    /// rebuilt, not accumulated, so at the span's close it is the 1660 state.
+    /// Empty throughout the Empire span. GENERATION SCRATCH, NOT SAVED, same
+    /// footing as `dated_objects` above.
+    std::vector<trade_flow> trade_flows;
 
     int      region_stride = 0; ///< Final region count (slice width for replay).
     int64_t  years           = 0; ///< Years simulated.
@@ -2907,6 +3230,10 @@ struct history_sim_state
     /// EX-WY-1a in this seed", the same split `supply_sites_upgraded` makes.
     int64_t post_roads_built           = 0;
     int64_t treasury_spent_on_roads    = 0;
+    /// BL-949: post roads bought per polity id (grown on demand, so a polity
+    /// past the end bought none). Lets a sweep ask whether the spend tracks
+    /// the polities that built rather than only the world total.
+    std::vector<int32_t> post_roads_by_polity;
 
     // --- BL-933/934/935 sweep counters --------------------------------------
 
@@ -2931,6 +3258,32 @@ struct history_sim_state
     int64_t treasury_spent_on_ports          = 0;
     int64_t treasury_spent_on_navies         = 0;
     int64_t treasury_spent_on_standing_armies = 0;
+    /// BL-972: the BILL, summed over every decision round -- treasury paid
+    /// for paid standing heads and for hulls, and the polity-rounds on which
+    /// each bill went short. The observable for "a cost in the world binds".
+    int64_t treasury_spent_on_army_upkeep = 0;
+    int64_t treasury_spent_on_navy_upkeep = 0;
+    int64_t army_upkeep_unpaid_rounds     = 0;
+    int64_t navy_upkeep_unpaid_rounds     = 0;
+    /// BL-972: the LEVY -- heads drawn from seats' manpower pools by army
+    /// steps, and heads sent home to a pool by the unpaid decay, all rounds.
+    int64_t levy_heads_raised   = 0;
+    int64_t levy_heads_returned = 0;
+
+    /// BL-955: stock steps bought this run, by kind — with the allocation a
+    /// polity buys at most one per round, so these count CHOICES made.
+    int64_t port_steps_bought  = 0;
+    int64_t navy_steps_bought  = 0;
+    int64_t army_steps_bought  = 0;
+    /// BL-955: one flag per polity index, set once that polity's navy has
+    /// decayed from a standing fleet to zero at least once this run ("at
+    /// least one allowed to decay", reading 7). GENERATION SCRATCH, NOT SAVED,
+    /// same footing as `trade_flows`.
+    std::vector<uint8_t> navy_lapsed;
+    /// BL-955: regions found breaking the paid standing army's raw invariant
+    /// (`standing_army_invariant_holds`), summed over every decision round's
+    /// check and the close. Must be 0. Exploration span only; not saved.
+    int64_t standing_army_invariant_violations = 0;
 
     /// BL-896 -- how many successor realms the dark age produced, and how much
     /// ground walked away with them. The pair is the item's "done when": an
@@ -3257,10 +3610,17 @@ int64_t contact_first_year(const history_sim_state& s, int from, int to);
 /// instead — the same purchase meets no deterrent and should not bind as
 /// readily, which is what keeps a funded port's cheap crossing from being
 /// treatied away before it is ever used (NR-851).
+///
+/// BL-954 ADDS TRADE. @p trade_value_q is the MARGINAL volume the pair's
+/// trade-access clause WOULD open beyond what other partners already carry,
+/// both directions, every good (`pair_trade_value_q`), weighted by `treaty_trade_weight_q` per mille and
+/// added NEAR HOME AND FAR ALIKE — the one term that can make a distant pair
+/// worth a promise. The partner is worth more alive.
 int treaty_value_q(const history_sim_params& p,
                     int grudge_against_other_q, int grudge_from_other_q,
                     int counterpart_treaties_broken, int decider_aggression_q,
-                    int alarm_from_other_q, bool near_home);
+                    int alarm_from_other_q, bool near_home,
+                    int trade_value_q);
 
 /// BL-941 — VISIBLE CAPABILITY, 0-1000. What a neighbour reads of
 /// `polity_id`'s capital `region::army_stock` plus its own `polity::navy_stock`,
@@ -3280,6 +3640,87 @@ int visible_capability_q(const std::vector<region>& regions, const history_sim_s
 /// that has never met it). 0 where the two have not met.
 int deterrence_alarm_q(const std::vector<region>& regions, const history_sim_state& s,
                         const history_sim_params& p, int self, int other);
+
+// ---------------------------------------------------------------------------
+// BL-955 — spend is ALLOCATED (EXPLORATION.md sec Force persists now)
+// ---------------------------------------------------------------------------
+
+/// The lean RANKS the allocation reads (NR-864). Over the LIVING polities whose
+/// `culture` indexes @p cs, each one's per-mille rank of its
+/// `expansion_lean_q` and of its `consolidator_lean_q`:
+///     rank = (count with a STRICTLY lower lean) * 1000 / max(1, n - 1)
+/// so ties share a rank, the lowest reads 0 and the highest 1000. Both output
+/// vectors are sized to @p polities; a dead or culture-less polity (or every
+/// polity, when @p cs is null) reads 0 on both. Pure; computed once per round.
+void exploration_lean_ranks(const std::vector<polity>& polities, const creed_state* cs,
+                            std::vector<int>& expansion_rank_q,
+                            std::vector<int>& consolidator_rank_q);
+
+/// The campaign scorer's estimate of the men a target will field: its
+/// `army_stock` plus the defence levy `muster_garrison` (called with
+/// `defence_levy_q`) would raise before the fight. The levy reads the ORDINARY
+/// men only, as the muster does, so paid standing heads never suppress it.
+/// Models the levy half only; the muster's disband of excess ordinary men is
+/// not priced, as before BL-955.
+int64_t defender_levy_estimate(const region& tgt, const history_sim_params& params);
+
+/// The four options, in TIE-BREAK order: an exact score tie goes to the
+/// lower enumerator (hold, then army, then port, then navy).
+enum class exploration_spend_option : uint8_t
+{
+    hold      = 0,
+    army_step = 1,
+    port_step = 2,
+    navy_step = 3,
+};
+
+/// Everything one polity's choice reads, already reduced to integers.
+struct exploration_spend_facts
+{
+    int     expansion_rank_q    = 0; ///< `exploration_lean_ranks`, 0-1000.
+    int     consolidator_rank_q = 0; ///< `exploration_lean_ranks`, 0-1000.
+    int     water_want_q        = 0; ///< across-water want, 0-1000 (see the upkeep).
+    int     alarm_q             = 0; ///< max near-home `deterrence_alarm_q`, 0-1000.
+    int64_t treasury            = 0; ///< the capital seat's treasury after EARN.
+    int     port_window_q       = 0; ///< the seat's `port_q` endowment window.
+    int     port_stock_q        = 0; ///< the seat's built port, 0-1000.
+    int64_t navy_stock          = 0;
+    /// The realm's PAID standing army (every held region's
+    /// `standing_army_heads`), >= 0. Read by nothing in the scorer since
+    /// BL-972 removed the cap; carried so a caller can print what the bill
+    /// stood on.
+    int64_t standing_army       = 0;
+    /// BL-972: the heads the seat's `manpower_stock` can lend this round
+    /// (`manpower_stock * standing_army_levy_per_mille_q / 1000`). The army
+    /// step is eligible only when this covers a whole step.
+    int64_t levy_room           = 0;
+};
+
+/// Each option's score and whether it may be taken at all.
+struct exploration_spend_scores
+{
+    int  hold_q = 0, army_q = 0, port_q = 0, navy_q = 0;
+    bool army_eligible = false, port_eligible = false, navy_eligible = false;
+};
+
+/// The scores (0-1000 each, integer):
+///   outward = (expansion_rank * w_expansion + water_want * w_water_want) / 1000
+///   port    = outward * (1000 - port_stock) / 1000
+///   navy    = outward
+///   army    = (consolidator_rank * w_consolidator + alarm * w_alarm) / 1000
+///   hold    = hold_base + consolidator_rank * w_hold_consolidator / 1000
+/// No score saturates (BL-972): what limits a stock is its bill, paid before
+/// this choice is made, and the levy bound below.
+/// Eligibility: port needs a cost > 0 the treasury covers, a port window and
+/// port_stock < 1000; navy a cost > 0 the treasury covers and port_stock >=
+/// `navy_min_port_stock_q`; army a cost > 0 the treasury covers AND
+/// `levy_room >= standing_army_build_step_q`. Hold always.
+exploration_spend_scores score_exploration_spend(const history_sim_params&    p,
+                                                 const exploration_spend_facts& f);
+
+/// Argmax over a TOTAL order: the higher score wins; an exact tie goes to
+/// hold, then army, then port, then navy. Ineligible options never win.
+exploration_spend_option choose_exploration_spend(const exploration_spend_scores& s);
 
 // ---------------------------------------------------------------------------
 // The directed want table (BL-909)
@@ -3389,6 +3830,111 @@ int market_scarcity_q(const std::vector<region>& regions, const history_sim_stat
                        int viewer_polity, int market_region, region_class good);
 
 // ---------------------------------------------------------------------------
+// Trade flows (BL-954) — EXPLORATION.md sec Trade is a want met by throughput.
+// "A flow needs three things at once, and each is already in the world": a
+// WANT (the buyer market's raw signal), a HOLDER (the seller's ground dominant
+// in the good), a LINE (held corridors on land, a built port and a navy across
+// water). The volume is the smallest of the three.
+// ---------------------------------------------------------------------------
+
+/// The per-round reads every flow in a round shares, folded ONCE so sizing a
+/// flow costs a lookup rather than a walk of every region and corridor.
+/// Built by `build_trade_context` off the same round's regions, polities and
+/// corridors; stale the moment ground changes hands, so never kept across a
+/// round.
+struct trade_context
+{
+    /// Per polity (indexed by id), per good: per-mille share of the polity's
+    /// held regions whose `dominant` is the good. 0 for a polity holding
+    /// nothing.
+    std::vector<std::array<int32_t, 4>> holding_q;
+
+    /// LAND LINES, one per unordered polity pair a supply corridor joins
+    /// (one endpoint held by each): (lo, hi, line_q), sorted by (lo, hi).
+    /// `line_q` is the best such corridor's min(`network_supply_q`) over its
+    /// two endpoints — each side's own reach from its seat to the shared
+    /// border, which is where the goods change hands.
+    struct land_line
+    {
+        uint16_t lo = 0, hi = 0;
+        int32_t  line_q = 0;
+    };
+    std::vector<land_line> land_lines;
+};
+
+trade_context build_trade_context(const std::vector<region>&           regions,
+                                  const std::vector<polity>&           polities,
+                                  const std::vector<history_corridor>& corridors);
+
+/// THE VOLUME ONE DIRECTED (seller, buyer, good) FLOW WOULD CARRY, ignoring
+/// the clause gate: min(buyer capital's `scarcity_raw_q[good]`, seller's
+/// `holding_q[good]`, line_q), where line_q = max(land, sea); land is the
+/// pair's `land_line` (0 without one) and sea is min(seller seat
+/// `port_stock_q`, buyer seat `port_stock_q`) while the seller holds a navy
+/// (`navy_stock > 0`), else 0. 0 for a dead or out-of-range party, the same
+/// polity on both sides, a capital out of range, or @p good outside 0..3.
+int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& regions,
+                        const std::vector<polity>& polities,
+                        int seller, int buyer, int good);
+
+/// THE MARGINAL TRADE A BINDING WOULD OPEN, ignoring the clause gate —
+/// computable before the pair binds, which is what `treaty_value_q` needs.
+/// Summed over both directions (seller -> buyer) and all four goods:
+/// min(`trade_flow_volume_q`, max(0, buyer's raw want less the volume OTHER
+/// sellers already bring it in @p flows), max(0, seller's holding less the
+/// volume it already sends OTHER buyers in @p flows)). Flows between @p a
+/// and @p b themselves count against neither remainder. @p flows is the
+/// current round's (`compute_trade_flows`). Pure.
+int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regions,
+                       const std::vector<polity>& polities, int a, int b,
+                       const std::vector<trade_flow>& flows);
+
+/// Every flow the bound `trade_access` clauses in @p treaties open this
+/// round: per bound pair, both directions, every good with volume > 0.
+/// ONLY THE CLAUSE OPENS A FLOW — contact alone never does. One want is
+/// shared across a buyer's sellers (spent fattest line first, ties to the
+/// lower seller), then one holding across a seller's buyers (fattest flow
+/// first, ties to the lower buyer). Sorted ascending by (seller, buyer, good).
+/// Pure; reads the RAW signal, never the relieved one.
+std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx,
+                                            const std::vector<region>&       regions,
+                                            const std::vector<polity>&       polities,
+                                            const std::vector<dated_object>& treaties);
+
+// ---------------------------------------------------------------------------
+// A want points a campaign outward (BL-953) — EXPLORATION.md sec A want
+// points a campaign outward.
+// ---------------------------------------------------------------------------
+
+/// @p polity_id's WANT for @p good, 0-1000: its OWN capital's `scarcity_q`
+/// for the good (0 when the capital has no market, the good has no scarcity
+/// index, or the id/capital is out of range), weighted by its people's
+/// preference for it — `scarcity * (500 + weight_q / 2) / 1000`. "Its
+/// people" is the capital region's plurality culture (the grain
+/// `derive_culture_preference` keys on), falling back to the polity's
+/// founding culture where the capital carries no share. A good with no
+/// preference entry weighs at the 500 floor: an unmet want still counts,
+/// preference only sharpens it. @p prefs must be sorted ascending by culture,
+/// as `derive_culture_preference` produces it. Pure.
+int polity_good_want_q(const std::vector<region>& regions, const std::vector<polity>& polities,
+                       const std::vector<culture_good_preference>& prefs,
+                       int polity_id, region_class good);
+
+/// The campaign prize @p value leaned by a want: `value + value * w_want_q *
+/// want_q / 10^6`, integer arithmetic. A NON-POSITIVE prize is returned
+/// unchanged (a want ranks winnable campaigns, never rescues a loss), and the
+/// result is never below 0. Pure; the scorer's one call site and the harness
+/// both go through this.
+int want_leaned_campaign_value(int value, int w_want_q, int want_q);
+
+/// Subjection's pick among ELIGIBLE natives, each given as (native polity id,
+/// the arriving power's want for that native capital's dominant good): the
+/// highest want wins, ties to the LOWER id; -1 when @p candidates is empty.
+/// With every want 0 this is exactly "the lowest eligible id", the id-order
+/// walk it replaces. Pure and order-independent in its input.
+int choose_subjection_native(const std::vector<std::pair<int, int>>& candidates);
+
+// ---------------------------------------------------------------------------
 // The turbulence lean, resolved (BL-839)
 // ---------------------------------------------------------------------------
 //
@@ -3446,6 +3992,7 @@ struct polity_holdings
 /// than inferred:
 ///   - the region table          -> `regions`
 ///   - cultures                  -> `region::culture` (shares) + `culture_count`
+///                                  + `cultures` (the table itself, BL-969)
 ///   - works                     -> `region::works_built` and the five
 ///                                  `work_*_mod` fields, plus `works_by_span_band`
 ///   - the strain accumulators   -> `region::contest_q` and `polity::cohesion_q`
@@ -3463,8 +4010,25 @@ struct pass_one_output
     std::vector<polity> polities;
 
     /// How many cultures the shares above index into. Carried so a consumer can
-    /// bound-check a share without holding a `creed_state`.
+    /// bound-check a share without holding a `creed_state`. Always equals
+    /// `cultures.size()` on a value the fold produced; the validator checks it.
     int culture_count = 0;
+
+    /// THE CULTURE TABLE ITSELF (BL-969) -- a copy of `creed_state::cultures`
+    /// as it stood at the fold. The doc's list names "cultures" as crossing,
+    /// and until this field the shares crossed here while the table they
+    /// index into (pantheon, tongue, aggression, parentage, coining year)
+    /// crossed OUT OF BAND through the live `creed_state` -- so "the struct
+    /// is the whole of what crosses" was false for the largest row of the
+    /// contract. The sim DOES write that table (a coined civilisation, a
+    /// schism), so a copy at the close is a real record, not a duplicate of
+    /// the migration's.
+    ///
+    /// Consumers keep reading `creed_state`; what this field buys is the
+    /// CHECK. `pass_one_output_valid` compares it against the live table it
+    /// is handed, so the two channels are proven to agree at the fold rather
+    /// than assumed to.
+    std::vector<culture> cultures;
 
     /// Works raised, cross-tabulated [span][band] exactly as the sim counts them.
     std::array<std::array<int64_t, roster_band_count>, 2> works_by_span_band{};
@@ -3515,15 +4079,162 @@ struct pass_one_output
 };
 
 /// Fold the live sim state and settlement state into the handoff value.
-/// @param culture_count Cultures the shares index into; 0 when unknown.
+/// @param cs The culture table at the fold, copied into `cultures` and
+///           sizing `culture_count`; null leaves both empty/0 ("unknown"),
+///           which disables the share range check exactly as a 0 count did.
+///           One source for the count and the table, so they cannot disagree.
 pass_one_output make_pass_one_output(const settlement_state&  ss,
                                      const history_sim_state& hs,
-                                     int                      culture_count);
+                                     const creed_state*       cs);
 
 /// The enforcement half of the struct above. Checks what the doc's clause
 /// actually claims: every region's shares sum to exactly 1000 and name only
 /// cultures in range; every holding names a living polity and an existing
 /// region, with no region held twice; every grudge names polities in range and
 /// carries at least one event; every contact names polities in range and
-/// carries the event that joined it. Writes the first failure into @p why.
-bool pass_one_output_valid(const pass_one_output& o, std::string* why);
+/// carries the event that joined it; the culture table's size equals
+/// `culture_count`, every parent index is in range and below its child, every
+/// coining year is at or before `stop_year` -- and, when @p live is given, the
+/// table EQUALS the live `creed_state`'s row for row (BL-969), which is what
+/// makes "the struct is the whole of what crosses" a checked claim rather
+/// than a sentence. Writes the first failure into @p why.
+bool pass_one_output_valid(const pass_one_output& o, std::string* why,
+                           const creed_state* live = nullptr);
+
+// ---------------------------------------------------------------------------
+// The Exploration -> Digitisation handoff (BL-956)
+// ---------------------------------------------------------------------------
+
+/// THE WHOLE OF WHAT THE EXPLORATION SPAN HANDS FORWARD, AND NOTHING ELSE
+/// (BL-956). EXPLORATION.md § What this phase hands digitisation names the
+/// list and says "The list is a struct, and it has readers before
+/// Digitisation exists" — this is that struct, on exactly the footing of
+/// `pass_one_output` above: a VALUE (copies, never views of live sim state),
+/// folded by `make_exploration_output` and held to its list by
+/// `exploration_output_valid`.
+///
+/// ITS FIRST READER IS WORLD SETUP, not Digitisation: wherever the span ran,
+/// sentiment is seeded from `grudges` and roads are stamped from
+/// `surviving_corridors` here, so a campaign opening on the 1660 political
+/// map does not open on 1200's resentments and 1200's roads.
+///
+/// WHERE EACH ITEM ON THE DOC'S LIST LIVES, so the mapping is explicit rather
+/// than inferred:
+///   - Treasuries                -> `region::treasury` on each polity's
+///                                  capital seat, in `regions`
+///   - Scarcity signals          -> `region::scarcity_q` on each market
+///                                  region, in `regions`
+///   - Trade flows               -> `trade_flows`
+///   - Corridor throughput       -> `surviving_corridors::uses` (traffic, the
+///                                  walks) and `surviving_corridors::tier`
+///                                  (the road ladder rung, 0-3, the sim's
+///                                  own live rung at the close). Read the
+///                                  rung off `tier`, NEVER off `uses` against
+///                                  `history_sim_params::road_tier{1,2,3}_uses`:
+///                                  a bought post road sets the live count to
+///                                  `road_tier3_uses` while adding one walk,
+///                                  so the two legitimately differ. A resumed
+///                                  span seeds its live counts from
+///                                  `resume_corridors` (BL-949), so an
+///                                  inherited Road opens the span as a Road.
+///   - Cultural good preference  -> `culture_preference`
+///   - The overlord graph        -> `polity::overlord` / `polity::subject_kind`
+///                                  in `polities`; tribute terms in
+///                                  `dated_objects` (`treaty_clause::tribute`)
+///   - Standing treaties and their remaining terms
+///                               -> `dated_objects` (remaining years =
+///                                  `expires_year - stop_year`)
+///   - Ports, navies, standing armies
+///                               -> `region::port_stock_q` / `region::army_stock`
+///                                  in `regions`, `polity::navy_stock` in
+///                                  `polities`
+///   - The contact and want tables -> `contacts`, `wants`
+///   - Exploration tree masks    -> `polity::exploration_mask` in `polities`
+///   - The grudge table and the surviving network
+///                               -> `grudges`, `surviving_corridors`
+///   - (the political map, as a set) -> `holdings`
+///   - (the culture table, BL-969) -> `cultures`, on the footing
+///                                  `pass_one_output::cultures` sets
+struct exploration_output
+{
+    /// The region table at the span's close — carries treasury, scarcity_q,
+    /// port_stock_q, army_stock, culture shares and `nation` ownership.
+    std::vector<region> regions;
+
+    /// The polities at the span's close — carries navy_stock, overlord,
+    /// subject_kind and exploration_mask.
+    std::vector<polity> polities;
+
+    /// How many cultures the shares and `culture_preference` index into.
+    /// Always equals `cultures.size()` on a folded value; validated.
+    int culture_count = 0;
+
+    /// The culture table at the 1660 close (BL-969) -- a copy of
+    /// `creed_state::cultures`, on exactly the footing and for exactly the
+    /// reason `pass_one_output::cultures` gives: the span writes the table,
+    /// so the close is a record, and the validator proves the copy equals the
+    /// live table it is handed. Consumers keep reading `creed_state`.
+    std::vector<culture> cultures;
+
+    /// Treaty clauses (and tribute) STILL STANDING at `stop_year`: every
+    /// object whose term ended at or before `stop_year` is expired out by
+    /// `expire_dated_objects`, the same rule the sim's own rounds apply.
+    /// Sorted ascending by (a, b, kind, expires_year).
+    std::vector<dated_object> dated_objects;
+
+    /// The directed contact table (BL-908), grown across the span.
+    std::vector<contact> contacts;
+
+    /// The directed want table (BL-909), re-derived over the 1660 state by
+    /// `derive_wants`.
+    std::vector<want> wants;
+
+    /// Cultural good preference (BL-936), derived over the 1660 state by
+    /// `derive_culture_preference`. Ascending (culture, good index).
+    std::vector<culture_good_preference> culture_preference;
+
+    /// The directed grudge table (BL-827), grown across the span.
+    std::vector<grudge> grudges;
+
+    /// Which provinces each polity holds at `stop_year`, one entry per polity
+    /// holding ground, ascending polity id — same derivation as
+    /// `pass_one_output::holdings`.
+    std::vector<polity_holdings> holdings;
+
+    /// The span's corridor record filtered over THIS span's dead, by exactly
+    /// the rule `pass_one_output::surviving_corridors` applies: a corridor
+    /// survives when at least one endpoint region is held, at `stop_year`, by
+    /// a polity `alive` in `polities`. Sorted ascending by (a, b).
+    std::vector<history_corridor> surviving_corridors;
+
+    /// The span's final decision round's trade flows (BL-954) STILL STANDING
+    /// at `stop_year`: kept only where the pair holds a trade_access clause
+    /// among `dated_objects` above and both parties are alive in `polities`.
+    /// Sorted ascending by (seller, buyer, good).
+    std::vector<trade_flow> trade_flows;
+
+    int64_t start_year = 0;
+    int64_t stop_year  = 0;
+};
+
+/// Fold the Exploration span's closing sim state and settlement state into
+/// the handoff value. @param cs The culture table at the close, copied into
+/// `cultures` and sizing `culture_count`; null leaves both empty/0.
+exploration_output make_exploration_output(const settlement_state&  ss,
+                                           const history_sim_state& hs,
+                                           const creed_state*       cs);
+
+/// The enforcement half of `exploration_output`: every table sorted, every id
+/// in range, no self-pairs; every holding matches region ownership (and every
+/// owned region is held); every surviving corridor has a living holder at one
+/// end; every overlord id valid and never self, with `subject_kind` set iff an
+/// overlord is; every standing dated object still inside its term; no
+/// negative treasury, army or navy stock and every `port_stock_q` on 0-1000;
+/// every trade flow sorted, between two distinct living polities, a known
+/// good at positive volume, on a pair holding a standing trade_access clause;
+/// the culture table sized to `culture_count`, parents in range and below
+/// their child, coining years at or before `stop_year`, and -- when @p live
+/// is given -- equal row for row to the live `creed_state` (BL-969).
+/// Writes the first failure into @p why.
+bool exploration_output_valid(const exploration_output& o, std::string* why,
+                              const creed_state* live = nullptr);

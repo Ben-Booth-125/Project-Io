@@ -47,8 +47,9 @@ struct corporation_params
     /// **400 (Ben, 2026-08-26), superseding the 0 of 2026-07-06.** The zero was a
     /// deliberate "model every corp as a new charter — capital is *earned*, not
     /// granted" steer, and the earning half of it still holds: the opening balance
-    /// is still overwhelmingly the pre-game warm start's doing (`app::pre_game_ticks`
-    /// = **80** quarters, ~20 in-game years, against the generation-time asset
+    /// is still overwhelmingly the pre-game ticks' doing (the eighty-quarter warm
+    /// start when this was measured; now the winner's validation run,
+    /// `app::validation_ticks`, BL-978 — against the generation-time asset
     /// placement). What the zero did NOT anticipate is what a zero buffer does when
     /// combined with compounding debt interest.
     ///
@@ -120,6 +121,29 @@ std::vector<entity_id> generate_corporations(
     uint32_t seed,
     const struct settlement_state* settle = nullptr,
     struct generation_progress* progress = nullptr);
+
+/// BL-977 — strip the SPECIALIST roster so a candidate can lay a fresh one.
+///
+/// `generate_corporations` APPENDS, and has already run inside
+/// `make_hard_coded_world` by the time the landscape search sees the world; a
+/// second call would double every specialist. This is the inverse the roster
+/// axis needs: every corporation with `is_background == false` goes, with its
+/// asset buildings and their stockpiles, its body pools, any units it owns and
+/// its per-corp tech/modifier rows; `player_entity` is cleared when it named
+/// one of them (the seat is drawn afterwards, from the roster that survives).
+/// BACKGROUND FIRMS ARE UNTOUCHED — they are laid by the candidate's own
+/// placement pass and belong to it, not to the world-gen roster.
+///
+/// Walks corporations in ascending id, so the erase order — and the entity ids
+/// the regenerated roster then draws — is the same on every standard library.
+/// Invalidates the logistics caches: a removed port or hub was a supply anchor.
+///
+/// What it does NOT undo: the market carving already read where the world-gen
+/// roster clustered (`corps_in_nation`), and markets are settled by the end of
+/// phase 4 — the search moves rosters over fixed markets by design.
+///
+/// @return The number of corporations removed.
+int remove_specialist_roster(world& w);
 
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631)
@@ -252,11 +276,11 @@ std::vector<entity_id> generate_background_firms(
 /// author a processor (`generate_corporations`, `generate_background_firms`).
 void assign_default_recipes(world& w, const recipe_registry& reg);
 
-/// Measurement seam (2026-08-20) — the SHIPPED background-firm stop condition,
-/// readable from outside. `generate_background_firms` stops when the basket-
-/// weighted production/demand ratio reaches its target (0.90) OR when it hits
-/// `max_firms_per_body`; which one fires decides whether a body's markets open
-/// stocked or thin, and nothing outside that file could previously ask.
+/// Measurement seam (2026-08-20) — the SHIPPED coverage arithmetic, readable
+/// from outside. `generate_background_firms` stops on its caps (per resource,
+/// per province, `max_firms_per_body`), never on a coverage target; the basket-
+/// weighted production/demand ratio is what says whether a body's markets open
+/// stocked or thin, and nothing outside that file could previously ask it.
 ///
 /// Exported rather than re-derived on purpose: a harness that re-implements a
 /// generation rule drifts from it, which has now cost this project four wrong

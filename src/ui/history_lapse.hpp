@@ -288,6 +288,26 @@ struct history_lapse
     /// Culture -> its own position on the wheel, 0-1.
     std::vector<float> culture_hue;
 
+    // --- What the round before this one left (Ben, 2026-09-16) -------------
+    //
+    // CONTINUITY IS THE POINT: "after the culture round we should still render
+    // its output on the time-lapse for empires, and have it fade out, rather
+    // than just disappearing as soon as Next is pressed." The rounds are one
+    // continuous history — the Empires span opens ON the migration's ground,
+    // and BL-920 made that literal: at 400 BCE almost nothing is organised and
+    // the map is culture ground waiting for city states. Drawing that ground
+    // as empty threw away the one frame that says the two rounds are the same
+    // world.
+    //
+    // So a round may carry its predecessor's LAST frame as a colour per
+    // region, and paints it under ground nobody holds yet, fading out over the
+    // opening stretch of its own span. Colour rather than owner indices
+    // because the palettes differ (a culture's lineage hue against a polity's
+    // identity slot) and a stale index into the wrong palette would be a
+    // quietly wrong colour rather than an obviously missing one. Empty on the
+    // Culture round, which has nothing behind it.
+    std::vector<uint32_t> carry_colour;
+
     /// Culture -> generations below its root, 0 for a cradle culture.
     std::vector<int32_t> culture_depth;
 
@@ -392,22 +412,46 @@ void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent)
 void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     int year);
 
+/// The previous round's ground, still showing under unclaimed land at @p year:
+/// 1 at the round's first year, 0 once the opening stretch has passed. Public
+/// so the caller can tell whether it is worth building the carried colours.
+float lapse_carry_fade(const history_lapse& h, int year);
+
+/// The colour @p owner is drawn in on @p h — a culture's lineage hue on the
+/// Culture round, a polity's identity slot elsewhere. Public so one round can
+/// hand its final frame to the next as colours rather than as indices into a
+/// palette that round does not have (the carry above). ImU32 layout, kept as
+/// uint32_t so this header stays off imgui.
+uint32_t lapse_owner_colour(const history_lapse& h, uint16_t owner);
+
 /// The ordered, capped top-16 board.
 ///
 /// ORDERED AND CAPPED IS THE DESIGN, not a display convenience (BL-830): sixteen
 /// rows re-ranking as the centuries pass is the surface that shows RISE AND FALL,
 /// and an uncapped list of everything would show none of it.
 ///
-/// @param lagged  The same slice taken a few centuries earlier. It is what makes
-///                an ENTRY or an EXIT visible: a row that was not on the board
-///                then is marked, and the rank delta is drawn against it.
-/// @param year    The playhead year, for the Population and Might columns: they
-///                read the recorded step AT OR BEFORE it (BL-916 on BL-817's
-///                series), so the board and the map show the same instant.
+/// RANKED BY SHARE OF PEOPLE (BL-1000; Ben, 2026-09-15, NR-876): each polity's
+/// sampled population over every living polity's at the recorded step at or
+/// before the playhead — `history_sweep`'s own arithmetic, so a figure on the
+/// board is the figure the sweep prints. Share of land is the second column
+/// and the tie-break; where a step has no samples (the opening years; the whole
+/// Culture round) every row holds no one and the board orders by land.
+///
+/// @param lagged       The same slice taken a few centuries earlier. It is what
+///                     makes an ENTRY or an EXIT visible: a row that was not on
+///                     the board then is marked, and the rank delta is drawn
+///                     against it.
+/// @param year         The playhead year: the People, Pop and Might columns
+///                     read the recorded step AT OR BEFORE it (BL-916 on
+///                     BL-817's series), so the board and the map show the
+///                     same instant.
+/// @param lagged_year  The year @p lagged was taken at, so the lagged board is
+///                     ranked by the same rule and a rank delta means a move
+///                     on one axis rather than a change of axis.
 void draw_lapse_scoreboard(const history_lapse& h,
                            const std::vector<uint16_t>& slice,
                            const std::vector<uint16_t>& lagged,
-                           int year);
+                           int year, int lagged_year);
 
 /// BL-916 -- one event as a line of prose, with its region's generated name and
 /// the year. Never an Earth name: every noun here comes off the region table.
@@ -424,6 +468,7 @@ void draw_lapse_ticker(const history_lapse& h, int year, int max_rows = 6);
 /// transport's rate is (span / 30 s), so the marker is a property of the record
 /// and not of the frame clock. Never below one year.
 int lapse_marker_window_years(const history_lapse& h);
+
 
 /// BL-891 -- WHAT HAPPENED IN THIS WORLD, read off the record the round already
 /// holds. The scoreboard shows a SNAPSHOT that re-ranks as the centuries pass;
@@ -449,14 +494,25 @@ int lapse_marker_window_years(const history_lapse& h);
 /// four to six times inside the run, so an early empire read a quarter of its
 /// true share. `eliminated` now counts `realm_ended` events, and the peak share
 /// is taken against the regions that EXISTED at the peak's own step.
+///
+/// THE SHARE THE READOUT PRINTS IS OF PEOPLE (BL-1000; Ben, 2026-09-15, NR-876),
+/// the same column the board ranks by: `peak_share_pop_q` is `history_sweep`'s
+/// `peak_share_pop_q` arithmetic exactly — a century walk from the record's
+/// first year, the largest polity's sampled population over every living
+/// polity's at the step at or before each mark — and `end_share_pop_q` is its
+/// `top_share_pop_q`, so the panel and the sweep print one figure for one
+/// world. The region-share fields stay, as the fallback for a record that
+/// carries no samples and for the shape test, whose definition is the sweep's.
 struct lapse_arc
 {
-    int polities        = 0; ///< Distinct polities ever seen holding ground.
-    int eliminated      = 0; ///< Realms ended -- the `realm_ended` event count.
-    int peak_share_q    = 0; ///< Largest share any one polity ever held, per-mille of the regions live at that step.
-    int rose_and_fell   = 0; ///< ...that doubled and then fell back under 60% of peak.
-    int biggest_end_q   = 0; ///< Largest share still held at the end, per-mille.
-    int smallest_end    = 0; ///< Regions held by the smallest surviving polity.
+    int polities         = 0; ///< Distinct polities ever seen holding ground.
+    int eliminated       = 0; ///< Realms ended -- the `realm_ended` event count.
+    int peak_share_q     = 0; ///< Largest share of REGIONS any one polity ever held, per-mille of the regions live at that step.
+    int rose_and_fell    = 0; ///< ...that doubled and then fell back under 60% of peak.
+    int biggest_end_q    = 0; ///< Largest share of regions still held at the end, per-mille.
+    int smallest_end     = 0; ///< Regions held by the smallest surviving polity.
+    int peak_share_pop_q = 0; ///< Largest share of PEOPLE any one polity held at a century mark, per-mille; 0 with no samples.
+    int end_share_pop_q  = 0; ///< Largest share of people held at the closing step, per-mille.
 };
 
 /// Walks the replay record once. Cheap: linear in `samples`.

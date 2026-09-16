@@ -316,6 +316,19 @@ int predation_capacity_mult_q(int predation_q);
 /// of the histories it produces, not a harness.
 inline constexpr int32_t colonisation_base_centiyears = 1200;
 
+/// THE CORRIDOR PRICE — percent of the base a stream pays on the routes people
+/// actually followed: the coastal shelf and a river course (BL-857, BL-967).
+///
+/// ONE CONSTANT FOR BOTH, BY DESIGN. COLONISATION.md § Surplus flows names
+/// "river courses and coastal shelf" as one tier of cheap ground, not two, and
+/// the coast's discount is the one BL-857 argued STEEP enough that a coastal
+/// route beats an inland one over any comparable distance (Ben, 2026-09-09).
+/// A river takes the same price rather than a dial of its own: downstream-
+/// cheaper-than-upstream, or a river cheaper than a shore, would be a second
+/// claim the design does not yet make, and a second number `history_sweep`
+/// would have to argue separately.
+inline constexpr int32_t colonisation_corridor_pct = 30;
+
 /// Impassable. Open ocean, and any tile no stream may enter.
 inline constexpr int32_t colonisation_impassable = INT32_MAX;
 
@@ -557,16 +570,15 @@ inline constexpr int colonisation_cradle_window = 6;
 /// open ocean impassable. Nothing about who is crossing, nothing about what
 /// they carry, and nothing that could be spent.
 ///
-/// RIVERS ARE OWED AND THE OMISSION IS RECORDED RATHER THAN PAPERED OVER.
-/// COLONISATION.md names river courses as the cheapest ground of all, and a
-/// river in this codebase is an EDGE on `tile_component::river_edges`, not a
-/// tile property — and `sim_terrain_view` carries substrate, cover, density and
-/// landform, with no river array among them. So this function prices the
-/// coastal shelf and cannot yet price a river, and `colonisation_field` takes
-/// an OPTIONAL river raster for the caller that has one. Until a caller passes
-/// it, the cheapest route in the model is the coast. That is a real gap against
-/// the design, not a simplification: it is the difference between a history
-/// whose corridors are rivers and one whose corridors are shorelines.
+/// RIVERS ARE CORRIDORS, PRICED AS THE COAST IS (BL-967). A river in this
+/// codebase is an EDGE on `tile_component::river_edges`, not a tile property,
+/// so the walk reads it through a one-byte raster — non-zero where any river
+/// edge touches the tile — that every caller builds from the mask
+/// (`run_settlement` directly; the sim through `sim_terrain_view::river`). A
+/// tile on a river takes `colonisation_corridor_pct`, the SAME discount as the
+/// shoreline, so a history's corridors are its rivers as much as its shores.
+/// Direction is not priced: a stream walks a river's bank, and which way the
+/// water flows is not a claim COLONISATION.md makes about that walk.
 int32_t tile_year_cost(terrain_substrate s, terrain_cover c, terrain_landform lf,
                        bool shoreline, bool river);
 
@@ -669,9 +681,10 @@ struct colonisation_input
     const std::vector<terrain_cover>*     cover     = nullptr; ///< Optional; `none` when absent.
     const std::vector<terrain_landform>*  landform  = nullptr; ///< Optional; `plains` when absent.
 
-    /// OPTIONAL RIVER RASTER — non-zero where a river edge touches the tile.
-    /// Null today from every caller; see `tile_year_cost` for why that is a
-    /// recorded gap rather than a simplification.
+    /// OPTIONAL RIVER RASTER — non-zero where a river edge touches the tile,
+    /// built from `tile_component::river_edges` by the caller (BL-967). Null
+    /// prices every tile as riverless, which a synthetic map may want; the
+    /// real callers always pass one.
     const std::vector<uint8_t>*           river     = nullptr;
 
     int gw = 0;

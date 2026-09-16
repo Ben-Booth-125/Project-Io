@@ -184,8 +184,12 @@ from `H` remain land and receive valley or canyon landforms in Pass 5.
 
 ### Pass 3 — Latitude band assignment
 
-Divide the grid rows into named temperature bands. Band boundaries are shifted by
-`temperature_class`:
+Divide the grid rows into named temperature bands. The band raster is read from each
+tile's **plate-carried position at epoch 0** through the palaeo frame
+([CONTINENTS.md](CONTINENTS.md) § The Lagrangian frame) — the same frame the Life
+phase reads the fossil epochs from — and at epoch 0 that position is the raster row,
+so the row-percent table below is exactly what every tile receives. Band boundaries
+are shifted by `temperature_class`:
 
 | Band | Temperate row % | Scorching row % | Cold row % |
 |---|---|---|---|
@@ -428,7 +432,7 @@ extractable resource.
 | Timber | Life | Forest or marsh cover | 15–40 |
 | Sand | Body | Barren (plains/canyon landform) | 10–25 |
 | Clay | Body | Marsh cover, any valley landform | 8–20 |
-| Peat | Life | Marsh cover | 5–15 |
+| Peat | Life | Scrub cover on sedimentary substrate, plains or valley landform — the pair rule, `RESOURCES.md` § Ambient goods | 5–15 |
 
 **Calibrated subset deposit table** — the seven-resource subset, authored on the
 per-tile `tile_rng` stream. These values are hand-calibrated and the economy is
@@ -483,8 +487,9 @@ world keeps its coal and loses its forests
 row reads.
 
 **Living resources read the PRESENT.** Timber follows forest and marsh cover, peat
-the marsh itself, agricultural produce and fibre the cover on sedimentary ground —
-because that is where they are, not where they were.
+the scrub-on-sedimentary pair on plains or valley (the rule `RESOURCES.md` § Ambient goods
+authors — a marsh-only reading narrows it and is not the design), agricultural produce and
+fibre the cover on sedimentary ground — because that is where they are, not where they were.
 
 | Cover (on sedimentary) | Resource | Base range | Valley mod |
 |---|---|---|---|
@@ -525,6 +530,17 @@ chain too and is binding: marine anoxia opens at oxygenation and land burial onl
 after land is colonised, so the oil epoch is never shallower than the coal epoch on
 the same body. Depth is **clamped** at the record's stated span rather than
 extrapolated past it (CONTINENTS.md § The drift clock).
+
+**The interior is read at the epoch too.** The basin half of the coal term and the
+shelf half of the oil term are both subsidence, and subsidence is driven by the thermal
+budget — S7 spends that budget on the coal window as a present-day scalar. The pre-pass
+scales each belt term by the epoch's budget relative to today's, read from
+`planetology_state::thermal_series` at the coal and oil epochs
+([PLANETOLOGY.md](PLANETOLOGY.md) § The thermal series). Heat only falls, so the factor
+is ≥ 1 and small — about a percent across the record's depth — and it is a
+**magnitude** term, never a presence one: *where* the seams are is the drift record's
+call, *how much* stacked there is the interior's. A missing series reads the present,
+exactly as a missing drift record does.
 
 **A body with no drift history reads the present, and that is the correct answer**
 rather than a degraded one. A stagnant lid never moved, and a body generated with no
@@ -720,7 +736,22 @@ identity.
 
 `generate_body_tiles()` takes an optional `generation_record*`. When non-null it
 captures the per-pass intermediates (heightmap, ocean score and threshold, moisture,
-latitude bands). The common path passes `nullptr` and pays nothing. Generation is
+latitude bands). The common path passes `nullptr` and receives nothing. Generation is
 deterministic, so this is the seam the **Generation Ledger**
 (`GENERATION_LEDGER.md`) reads to explain *why* a tile turned out as it did; what the
 record does and does not attribute is in GENERATION_LEDGER.md § The data seam.
+
+**The record is also the seam between the generator's two halves** (BL-965, the
+Body/Life split). `generate_body_tiles()` is `generate_body_surface()` — Passes 1–5
+with 4b–4e and the Body phase of Pass 6, which creates the tiles — followed by
+`generate_life_deposits_over()` — the palaeo pre-pass, the ore-field pre-pass and the
+Life phase of Pass 6, which writes the deposit arrays. The whole is bit-identical to
+running them as one function. The record carries what the Life half can neither read
+off a tile nor re-derive from the seed: the Body phase's raw deposit per tile and the
+endemic amounts it drew. The endemic draw sits on the Body side of the cut for the
+reason § Pass 6 gives — it is taken on `tile_rng` between the deposit block and the
+environment jitter, and that stream cannot be re-cut — so the Body half *draws* it and
+the Life half *places* it. The Life half reads its inputs and writes only the two
+deposit arrays and `life_phase_placed`, so it can be re-run over the same tiles and
+record as often as a Life-phase rule changes; the census harness's `--life-only` mode
+is that loop, in-process, with no on-disk form of the seam.

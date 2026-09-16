@@ -286,10 +286,6 @@
    "Nav rail, slot 10 (plate/continent glyph)"
   ],
   [
-   "ledger.generation_view_tab",
-   "Generation Ledger, view tab strip"
-  ],
-  [
    "ledger.generation_body_selector",
    "Generation Ledger, 'Body' combo"
   ],

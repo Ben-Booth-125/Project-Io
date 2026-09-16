@@ -6,8 +6,8 @@
 > **Not here:** which names each generation pass draws from a tongue, and on what terms
 > (../generation/NATION_GENERATION § Pass 5 — Naming, the register of naming sites) · the
 > stage ladder this pass interleaves with (HISTORY) · how a polity narrates its doom
-> (COLLAPSE).
-> **Confused with:** HISTORY.md, COLLAPSE.md, ../generation/NATION_GENERATION.md.
+> (../generation/CIVILISATION § How a fall is told).
+> **Confused with:** HISTORY.md, ../generation/CIVILISATION.md, ../generation/NATION_GENERATION.md.
 
 > **The tongue is coined here and CONSUMED elsewhere.** This doc owns the phonology and the
 > lexicon; it does not own the naming sites. Which passes draw on a tongue — and the one
@@ -103,9 +103,8 @@ conquered region records its founders in `founding_culture` and its
 conquerors in `culture`, which is the pair a religion or diplomacy layer
 needs to describe a grievance. The Population lens and the diplomacy layer
 are that pair's intended readers; a live religion mechanic — creed axes that
-bias which culmination a strained polity falls toward, and the myth bank that
-tells it — is BL-487 (polity creed axes) and BL-300 (myth/theology), designed
-in `COLLAPSE.md` § Telling the story.
+bias which way a strained polity breaks, and the myth bank that tells it — is
+designed in `../generation/CIVILISATION.md` § How a fall is told.
 
 ## A creed that spans cultures — the universalising turn (Ben, 2026-09-11)
 
@@ -264,6 +263,13 @@ gathers every region a realm still holds that has REASSERTED (`region::creed_hol
 whose `creed_residue_culture` is not the realm's own, and groups THOSE by the residue culture they
 share, regardless of where they sit on the map. Enough of one people's ground answering together is
 what breaks a realm along faith; a single region dipping below the bind floor for a round is not.
+
+**A SCHISM MOVES SEATS; IT DOES NOT RAZE THEM (Ben, 2026-09-15, NR-874).** Every seat that walks
+out with the block stays a seat under the new realm, which holds as many seats as left with it; a
+block region keeps its seat pointer if that seat came along and otherwise points at the new realm's
+seat; ground the parent still holds whose seat left points at the parent's capital. The alternative —
+demote every seat but one and re-point everything — would raze a settlement over a faith fracture and
+strand its stores on a non-seat. BL-981 (colonisation D1/D3 regression) owns the fix.
 The break is recorded under its own cause (a `faith_sundered` grudge, a `schism` timelapse event,
 its own `schisms`/`regions_sundered` counters) precisely so the two readings never blend.
 

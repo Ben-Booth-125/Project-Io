@@ -1,48 +1,42 @@
 # REFINED — active worklist
 
-Post-sprint-40 review block opens 2026-09-13, Delivery — Full. Ben live-reviewed the sprint-40
-NEEDS_REVIEW queue and answered nine open calls (nine NR entries resolved), then asked for three
-more things while looking at the live build: a Culture-round bug diagnosed and fixed, the
-Exploration span wired into the wizard with a Digitisation placeholder, and a speed control on
-every lapse round's time-lapse.
+## Drained 2026-09-16
 
-## Wave A — sim tuning (independent of the wizard work, disjoint files)
+Three finished blocks were cleared at the session close; each one's record lives in the
+DEVLOG entry for its session, its requirement group, and the archived backlog rows.
 
-- [ ] **BL-949** (POST_ROAD_RUNG_ACTUALLY_FIRES) — lower the treasury cost/threshold so the road
-      ladder's third rung fires on a sweep.
-- [ ] **BL-950** (DISPLACEMENT_CLEARS_THE_BAR) — strengthen BL-941's near/far deterrence split so
-      the median displacement ratio clears 1.0 on a 16-seed sweep.
-- [ ] **BL-951** (STRENGTH_METRIC_READS_STRATEGY_FAIRLY) — reading 3's "strongest realms" metric
-      moves from region count to treasury/throughput rank.
+- **Sprint 41 — Exploration trade** (COMPLETE 2026-09-14). Nine items; world shape authorised
+  at Alarm 525. Plan and collision map in `cacd27dc`.
+- **Post-sprint-40 review block** (opened 2026-09-13). Its last open task was the lapse pace
+  control, which landed 2026-09-16 at 30 s / 1 m / 1 m 30 s after Ben watched the first cut.
+- **Sprint 42 wave 0** (COMPLETE 2026-09-15). Instruments and gates; re-blessed on NR-875.
 
-All three live in `history_sim.cpp`/`exploration_sweep.cpp` only — bundle into one worktree agent,
-same pattern as sprint 40's waves 2-4.
+## Sprint 42 — wave 1, the batch (opened 2026-09-15) — COMPLETE 2026-09-16; re-bless gated on NR-877, BL-1000 open on its live click
 
-## Wave B — the wizard restructure (bigger, UI + generation, sequenced internally)
+Sixteen items, one worktree agent each, merged in dependency order: docs and instruments first
+(BL-1002, BL-1001, BL-976, BL-999, BL-968), then the physical stages (BL-965 before BL-961 and
+BL-963), then the history movers (BL-967, BL-972, BL-973, BL-998, BL-975), then the seam (BL-977,
+BL-978), then the UI (BL-1000, live click). Every world-mover measures its own before/after in its
+worktree; the sweeps are regenerated once on the final integrated tree; ONE re-bless at the close,
+with N named causes, authorised by Ben.
 
-- [x] **BL-946** (EXPLORATION_ROUND_WIRED_INTO_WIZARD) — commit `e18ab370`. LANDED 2026-09-14. The
-      wizard walks 6 rounds now (System, Life, Culture, Empires, Exploration, Digitisation); round
-      5 runs its own pass and shows a real populated time-lapse (treaties forming, non-zero
-      battles/conquests/foundings, its own 1200-1660 CE span stated on screen — confirmed by a
-      live click, not just harnesses). Golden flip's digests reproduced exactly independently.
-      save_roundtrip/save_envelope_roundtrip clean despite the version bump (13→14). Archived.
-- [x] **BL-947** (CULTURE_ROUND_COASTS_TO_400BCE) — commit `fdc445fb`. LANDED 2026-09-13. Displayed
-      span now `max(true migration end, Empires opening year)`, never clamped backward — an
-      overrun (measured at 6/60 seeds, 10%) shows honestly instead of being papered over.
-      Independently rebuilt and reverified (121/121 on the new harness, `world_determinism`
-      digest unchanged from the BL-944 baseline — a pure display fix). NR-860 records the 10%
-      overrun rate for Ben; a second identical bug site in `startup_screens.cpp`'s golden-dir
-      reuse path was found but not fixed (flagged, needs a UI build to verify). Archived.
-- [ ] **BL-948** (LAPSE_TIMELAPSE_SPEED_CONTROL) — 45s/90s/180s control on every lapse round,
-      default 90s. Requires BL-946 (must cover the new Exploration round too, not just Culture/
-      Empires) — land last in this wave.
+- [x] **BL-965** (TILE_PASS_REENTRY) — split at the Body/Life boundary, bit-identical. Satisfies: R1, R2.
+- [x] **BL-961** (PLANETOLOGY_THERMAL_SERIES) — per-epoch thermal series; Life samples it. Satisfies: R1–R3.
+- [x] **BL-963** (TILES_RIDE_PLATES) — measure cost first; slice or stop on the ceiling. Satisfies: R1–R3.
+- [x] **BL-967** (RIVERS_PRICED_IN_WALK) — river edges take the coastal discount. Satisfies: R1, R2.
+- [x] **BL-968** (EPHEMERAL_CULTURES_MEASURED) — step 1 only: the reading, then Ben's call. Satisfies: R1, R2.
+- [x] **BL-972** (FORCE_UPKEEP_IN_THE_WORLD) — per-head upkeep; caps removed once it binds. Satisfies: R1, R2.
+- [x] **BL-973** (TREE_EFFECTS_GENERATED) — effects table generated; generic apply; hand-wired nodes gone. Satisfies: R1, R2.
+- [x] **BL-976** (TARIFF_DERIVATION_HANDS_TO_DIGITISATION) — single-span derivation retired. Satisfies: R1, R2.
+- [x] **BL-975** (NATION_TREASURY_FROM_EXPLORATION) — 1660 treasuries credit nations at the fold. Satisfies: R1, R2.
+- [ ] **BL-977** (SEARCH_AXES_LIVE_AND_REACH_TERM) — reach-quality term; roster regenerates. Satisfies: R1, R2.
+- [x] **BL-978** (WARM_START_RETIRED) — validation run replaces pre_game_ticks. Satisfies: R1, R2.
+- [x] **BL-998** (CONSOLIDATION_FOLDS_EVERY_SEAT) — every held seat folds at 1200. Satisfies: R1, R2.
+- [x] **BL-999** (HELD_SEEDS_CAUSE_MEASURED) — four causes on the face. Satisfies: R1, R2.
+- [ ] **BL-1000** (WIZARD_LEADERBOARD_POPULATION_SHARE) — board by population; live click. Satisfies: R1.
+- [x] **BL-1001** (COLLAPSE_DOC_FOLDED_AND_RETIRED) — fold, move to research, repoint. Satisfies: R1.
+- [x] **BL-1002** (BREADCRUMB_DROPPED) — section removed, citations repointed. Satisfies: R1.
 
-BL-947 can run in parallel with BL-946 (touches `settlement.cpp`/`hard_coded_world.cpp`'s round-3
-block, not the round-count/tap machinery BL-946 touches) but both land in `hard_coded_world.cpp`,
-so watch for a real merge on that file even though the sections shouldn't overlap.
-
-## Bookkeeping
-
-Nine NR entries resolved this pass (NR-847, 848, 849, 850, 852, 854, 855, 856, 857); NR-851
-superseded by NR-855. `docs/development/NEEDS_REVIEW.md` has the readable list of what remains
-(pre-existing debt from before sprint 40, not this session's to resolve).
+Collision map (file layer): history_sim.cpp is shared by BL-972, BL-973, BL-998 (and BL-968's
+sweep read); tile_generation.cpp by BL-965, BL-961, BL-963; landscape_* by BL-977 and BL-978;
+CIVILISATION.md by BL-1001 and BL-968's reading. Worktrees absorb it; merge order above.

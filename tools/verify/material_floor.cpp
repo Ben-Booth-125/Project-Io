@@ -167,7 +167,7 @@ void check(bool ok, const char* row, const char* what)
         ++g_failures;
 }
 
-constexpr int k_warm_ticks = 80;   ///< app::pre_game_ticks.
+constexpr int k_warm_ticks = 80;   ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978), and this harness's own settle length is a re-read it owes.
 constexpr int k_window     = 8;    ///< Trailing quarters averaged (FINANCE.md's figure).
 constexpr int k_dead_run   = 20;   ///< Trailing ticks of zero output that read as "dead".
 
@@ -421,9 +421,9 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
     // load_from_lua; a harness must too. Loading world_gen.lua into the Lua state
     // is NOT sufficient — the table has to be parsed into this object and passed.
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
-    assign_default_recipes(w, reg);
-    generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
-    assign_default_recipes(w, reg);
+    // The landscape-search WINNER, as the app applies it — not the seed candidate
+    // (BL-979; apply_shipped_landscape in harness_params.hpp).
+    print_shipped_landscape(apply_shipped_landscape(w, reg, seed));
 
     std::map<entity_id, btrack> track;   // ordered: the walk below must be stable
     std::map<entity_id, int> dry_run;    // running consecutive-zero-output counter

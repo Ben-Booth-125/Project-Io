@@ -54,7 +54,7 @@ phase read as technology.
 | EM-SP-4m | **The Enforceable Promise** | milestone | 4 | SP-4a | — | — | opens the Exploration tree | *spire* — requires PE-4a, RD-4b |
 
 Links are written without the `EM-` prefix in the tables for width; the store carries them in
-full, each edge once from the lower id.
+full, each edge once on the node farther from the root (the root's own list is empty).
 
 ---
 

@@ -49,6 +49,7 @@ by the cycle without a literal being kept in step by hand.
 | `reach` | Planetary key listing the active body's trade-route endpoints by recency |
 | `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
 | `throughput` | Planetary reach-cost field (far → at an anchor) + an active-LP ring on every supply anchor + gradient key |
+| `culture` | Planetary province fill in the primary culture's lineage hue; a checker of the second culture where it is close + culture key |
 
 Identity colours live in `presentation.hpp`; the corporation-identity helper is
 `palette::corp_colour`.
@@ -564,6 +565,38 @@ key reads the same labour multiplier the marks show. Tooltip "Workforce efficien
 
 **Interaction notes.** Planetary-only, single-select, no selector (the whole-body efficiency
 surface needs no resource pick). Verified by `scripts/verify/population_lens.lua`.
+
+## Culture lens
+
+**Intent (Ben, 2026-09-15).** *Who lives here, and so what does this market want?* The lens shows
+the peoples on the ground at province grain. It is the legible cause of a market's cultural demand
+weight (`../economy/MARKETS.md` § Three properties the set has to hold, property 5 as amended), so a
+player can read why a good is dear in one city and cheap in the next.
+
+**Data definition.** A province's culture shares are **derived**, never stored on the province: its
+region's rural shares blended with the shares of each population centre inside it, weighted by
+population (`../generation/PROVINCES.md` § What a province is). Migration fills the centres, so
+cities read mixed and countryside reads plain (`../generation/DIGITISATION.md` § Beat 2).
+
+**Surface.** Two layers on the province:
+
+- **Primary fill** — the leading culture's colour from the lineage palette (BL-919, the same
+  derivation the Culture round uses), blended across province vertices like every fill lens.
+- **Secondary checker** — where the second culture's share is **at least 95% of the first's**
+  (Ben, 2026-09-15: the relative reading — 42% and 40% checker, 42% and 38% do not), the province
+  carries a hard checker of the two colours. It is **not** blended; it is the one exception to
+  § Every lens blends across provinces, as the border band is. Only the top two cultures draw.
+
+**Why the checker is not plaid.** The plaid refusal (`STARTUP.md` § Rounds) is about many identity
+colours competing everywhere. The checker appears only on genuinely contested provinces, and kin
+cultures share a hue family, so a checker between siblings reads quietly and one between strangers
+reads loudly — which is the information.
+
+**Legend.** A key of the cultures present on the body, grouped by lineage family, with the checker
+swatch explained once.
+
+**Interaction notes.** Planetary-only, single-select, no selector. Hides the border band like every
+lens; nation borders are not what this lens asks.
 
 ## Scarcity lens
 

@@ -241,6 +241,15 @@ the roster), a verb target class (`access` — a sea leg, a river crossing), or 
 tree (`open`, milestones only). **Magnitudes are authored by judgement and are placeholders**,
 exactly as the works magnitudes are; the sweep re-prices them.
 
+**How the sim reads an effect.** The generated table (`gen_empire_tree_table.js`) carries every
+node's effects, and one generic fold (`apply_tree_effects`) turns a polity's held masks into its
+effect surface each round: every `modifier` sums per term into `polity::tree_mod_q`; an `open`
+gates the ring or the next tree; a non-modifier effect the sim gates a verb on carries a machine
+`key` (`sea_legs`, `post_roads`) beside its prose target and is read by that key alone. **No node
+is ever named inside the sim** — not by index, not by id. A kind or term the sim carries no
+surface for is declared unread in code (`tree_effect_declared_unread`) and a harness holds the
+store to that declaration, so a new kind cannot be authored into a store and silently do nothing.
+
 ---
 
 ## Sizes
@@ -287,14 +296,18 @@ nodes[]
   kind          minor | major | milestone
   ring          1..n
   branch        branch key
-  links         ids of neighbours at ring−1..ring+1 (undirected; list each edge once, from the lower id)
+  links         ids of neighbours at ring−1..ring+1 (undirected; list each edge once, on the node
+                farther from the root — the root lists none, and that empty list is how the
+                generated table derives `is_root`; the lint holds exactly one per tree)
   gate          null | one of gate_atoms  (majors only)
   diffusion     practice | artifact | capacity   (majors only; minors are practice, milestones capacity)
   excludes      null | id   (a fork; symmetric)
   requires      [ids]       (milestones only: majors at this ring from ≥2 branches, all held)
   requires_fork [a, b]      (milestones only, optional: a fork pair at this ring, EITHER side held)
   requires_any  {count, of} (milestones only, optional: ANY `count` of the majors in `of`, all at this ring)
-  effects       [{ kind, target, per_mille }]
+  effects       [{ kind, target, per_mille, key }]   key: optional, non-modifier only — the machine name
+                the sim reads the effect by (sea_legs, post_roads); an `open` target is "ring N" or
+                "<tree> tree"
   pursued_when  { term, situation }   (invested trees only — the scorer's per-node specification)
   earth_ref     calibration only, reader-facing
 ```

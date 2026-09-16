@@ -323,10 +323,12 @@ int32_t tile_year_cost(terrain_substrate s, terrain_cover c, terrain_landform lf
     // comparable distance. An inland-first map is the tell that this is
     // mispriced.
     //
-    // A river course is cheaper still: it is a shoreline that also points
-    // somewhere.
-    if (river)          cost = (cost * 22) / 100;
-    else if (shoreline) cost = (cost * 30) / 100;
+    // A RIVER COURSE IS THE SAME ROAD (BL-967): one corridor price for the
+    // shore and the river bank, because COLONISATION.md names them as one tier
+    // of cheap ground and a second number would be a second claim. The first
+    // cut priced a river at 22% against the coast's 30% — a preference the
+    // design never stated, retired with the constant.
+    if (river || shoreline) cost = (cost * colonisation_corridor_pct) / 100;
 
     // Barrier terrain is DEAR, and this is where three centuries of mountain
     // come from. Multiplicative on the base so a forested mountain is worse

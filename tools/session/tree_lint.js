@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// tree_lint.js — the five adjacency rules and the store/doc cross-check for the three
+// tree_lint.js — the five adjacency rules and the store/doc cross-check for the four
 // pre-game technology trees (docs/generation/trees/TREES.md § The five rules).
 //
 // Run: node tools/session/tree_lint.js [colonisation|empire|exploration|industry|all]   (default: all)
@@ -17,10 +17,17 @@
 //   both majors, sharing a linked minor; effect kinds / gate atoms / diffusion classes stay in
 //   vocabulary; minors carry exactly one modifier; milestones carry exactly one `open`;
 //   invested trees carry `pursued_when` on every node; every node id in the doc exists in the
-//   store and vice versa.
+//   store and vice versa;
+//   exactly one node per tree derives as ROOT by the generator's own rule (its OWN `links` is
+//   empty) and it is the spire's ring-1 major — so each edge is declared once, on the node
+//   farther from the root (BL-974);
+//   where a generated header exists on disk (src/world/<tree>_tree_data.hpp), the table
+//   regenerated in memory from the store matches it byte for byte, line endings normalised —
+//   a stale header is a failure naming the regeneration command (BL-974).
 
 const fs = require('fs');
 const path = require('path');
+const gen = require('./gen_empire_tree_table.js');
 
 const root = path.resolve(__dirname, '..', '..');
 const dir = path.join(root, 'docs', 'generation', 'trees');
@@ -38,6 +45,10 @@ const GATE_ATOMS = new Set(['ore_q', 'fuel', 'arable', 'coastal', 'grassland']);
 const DIFFUSION = new Set(['practice', 'artifact', 'capacity']);
 const MOD_TERMS = new Set(['reach', 'carrying_capacity', 'manpower', 'defence', 'industrial', 'stores',
   'cohesion', 'assimilation', 'plague', 'research', 'forage', 'muster_cost']);
+// The machine keys a non-modifier effect may carry when the sim reads it by identity
+// (TREES.md § Effects; src/world/tree_effect.hpp `tree_effect_key` is the C++ twin, and
+// gen_empire_tree_table.js carries the same list — change all three together, BL-973).
+const EFFECT_KEYS = new Set(['sea_legs', 'post_roads']);
 const KINDS = new Set(['minor', 'major', 'milestone']);
 const CAP = 64;
 
@@ -98,6 +109,12 @@ function lintTree(name, spec) {
       if (!EFFECT_KINDS.has(e.kind)) fail(`${n.id}: effect kind ${e.kind} not in vocabulary`);
       if (e.kind === 'modifier' && !MOD_TERMS.has(e.target)) fail(`${n.id}: modifier target ${e.target} not a sim term`);
       if (e.kind === 'modifier' && typeof e.per_mille !== 'number') fail(`${n.id}: modifier needs per_mille`);
+      if (e.key != null) {
+        if (e.kind === 'modifier') fail(`${n.id}: a modifier effect carries no key (its target is the term)`);
+        if (!EFFECT_KEYS.has(e.key)) fail(`${n.id}: effect key ${e.key} not in vocabulary`);
+      }
+      if (e.kind === 'open' && !/^ring \d+$/.test(e.target) && !/^[a-z]+ tree$/.test(e.target))
+        fail(`${n.id}: open target must be "ring N" or "<tree> tree", got "${e.target}"`);
     }
     if (n.kind === 'minor' && !(effects.length === 1 && effects[0].kind === 'modifier'))
       fail(`${n.id}: a minor carries exactly one modifier`);
@@ -231,6 +248,43 @@ function lintTree(name, spec) {
     for (const n of nodes) if (!seen.has(n.id)) fail(`${n.id}: unreachable from the root ${rootNode.id}`);
   }
 
+  // The root by DERIVATION, not by reachability. The generated table (and the sim's rule-2
+  // skip) call a node the root iff its OWN declared `links` is empty — gen.isRootNode is that
+  // one rule. So the store must declare each edge once, on the node farther from the root:
+  // every other node then declares at least the edge toward the root, and only the root is
+  // empty. A store that declares edges outward from the lower id instead derives every leaf
+  // as a root and the true root as none — an unlockable tree in C++ (BL-930's defect, latent
+  // in the other stores until BL-974).
+  const derivedRoots = nodes.filter(n => gen.isRootNode(n)).map(n => n.id);
+  if (derivedRoots.length !== 1)
+    fail(`root: ${derivedRoots.length} node(s) derive as root by empty links (${derivedRoots.join(', ') || 'none'}); exactly one expected — declare each edge once, on the node farther from the root`);
+  else if (rootNode && derivedRoots[0] !== rootNode.id)
+    fail(`root: ${derivedRoots[0]} derives as root by empty links, but the spire's ring-1 major is ${rootNode.id}`);
+
+  // The generated header, where one exists on disk: regenerate the table in memory through
+  // the generator's own function and compare. Nothing else in the loop (edit JSON → lint →
+  // regenerate → rebuild) checks that the regeneration happened; a stale header silently runs
+  // the old tree. Line endings are normalised because git may check the header out as CRLF
+  // while the generator writes LF.
+  let headerChecked = false;
+  const headerPath = gen.headerPath(name);
+  if (fs.existsSync(headerPath)) {
+    headerChecked = true;
+    const norm = s => s.replace(/\r\n/g, '\n');
+    try {
+      const expected = norm(gen.generate(name).text);
+      const actual = norm(fs.readFileSync(headerPath, 'utf8'));
+      if (expected !== actual) {
+        const e = expected.split('\n'), a = actual.split('\n');
+        let i = 0; while (i < e.length && i < a.length && e[i] === a[i]) i++;
+        const show = x => x === undefined ? '<eof>' : JSON.stringify(x);
+        fail(`header stale: src/world/${path.basename(headerPath)} differs from the store at line ${i + 1} (header: ${show(a[i])}; store: ${show(e[i])}) — regenerate: node tools/session/gen_empire_tree_table.js ${name}`);
+      }
+    } catch (e) {
+      fail(`header: could not regenerate the table from the store: ${e.message}`);
+    }
+  }
+
   // Doc cross-check.
   if (!fs.existsSync(docPath)) fail(`doc missing: ${spec.doc}`);
   else {
@@ -243,7 +297,7 @@ function lintTree(name, spec) {
   const counts = { minor: 0, major: 0, milestone: 0 };
   for (const n of nodes) if (counts[n.kind] != null) counts[n.kind]++;
   const forks = nodes.filter(n => n.excludes != null).length / 2;
-  console.log(`${failures ? 'FAIL' : 'OK  '} ${name}: ${nodes.length}/${CAP} nodes — ${counts.major} major, ${counts.minor} minor, ${counts.milestone} milestone, ${forks} fork(s), ${rings} rings, ${branches.size - 1} branches + spire${failures ? `, ${failures} failure(s)` : ''}`);
+  console.log(`${failures ? 'FAIL' : 'OK  '} ${name}: ${nodes.length}/${CAP} nodes — ${counts.major} major, ${counts.minor} minor, ${counts.milestone} milestone, ${forks} fork(s), ${rings} rings, ${branches.size - 1} branches + spire${headerChecked ? ', header checked' : ''}${failures ? `, ${failures} failure(s)` : ''}`);
   return failures;
 }
 

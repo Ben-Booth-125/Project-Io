@@ -205,6 +205,49 @@ paleo_tile_state paleo_tile_at(const continent_state& cs, int gw, int gh,
     return out;
 }
 
+// ---------------------------------------------------------------------------
+// BL-963 — the frame: the query, gw*gh times
+// ---------------------------------------------------------------------------
+paleo_frame paleo_frame_at(const continent_state& cs, int gw, int gh,
+                           int epochs_back, temperature_class temp,
+                           const std::vector<float>* moisture)
+{
+    paleo_frame out;
+    out.epochs_back          = epochs_back < 0 ? 0 : epochs_back;
+    out.years_before_present = static_cast<int64_t>(out.epochs_back) * continent_epoch_years;
+    if (gw <= 0 || gh <= 0)
+        return out;
+
+    const std::size_t total = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+    const bool sample_moisture = moisture && moisture->size() == total;
+    out.latitude.resize(total);
+    out.band.resize(total);
+    out.on_grid.resize(total);
+    if (sample_moisture)
+        out.moisture.resize(total);
+
+    // Raster order, and NOTHING the per-tile query does not do: the frame is
+    // the query's answers laid side by side, so a row of the harness can hold
+    // the two to each other tile for tile at every epoch.
+    for (int row = 0; row < gh; ++row)
+    {
+        for (int col = 0; col < gw; ++col)
+        {
+            const std::size_t idx = static_cast<std::size_t>(col)
+                                  + static_cast<std::size_t>(row) * static_cast<std::size_t>(gw);
+            const paleo_tile_state s =
+                paleo_tile_at(cs, gw, gh, col, row, out.epochs_back, temp,
+                              sample_moisture ? moisture : nullptr);
+            out.latitude[idx] = s.latitude;
+            out.band[idx]     = s.band;
+            out.on_grid[idx]  = s.on_grid ? 1u : 0u;
+            if (sample_moisture)
+                out.moisture[idx] = s.moisture;
+        }
+    }
+    return out;
+}
+
 continent_state run_continents(const planetology_state& pl, int gw, int gh, uint32_t seed)
 {
     continent_state out;

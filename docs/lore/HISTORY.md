@@ -5,11 +5,11 @@
 > settlement interleave · what drives the Era −1 sim · what the works roster is, what a row
 > does, and where its effect lands · why the campaign world ends up market-based and
 > non-hegemonic.
-> **Not here:** how a polity plays against its own doom, and how that doom resolves
-> (COLLAPSE) · how a battle in that sim is settled, what domain a region carries, and what
+> **Not here:** how an empire falls, what its successors inherit, and how the fall is told
+> (../generation/CIVILISATION) · how a battle in that sim is settled, what domain a region carries, and what
 > that gates (../generation/MILITARY_HISTORY) · what precedes the civilisation gate
 > (../generation/PLANETOLOGY) · what a pantheon is (CREEDS).
-> **Confused with:** COLLAPSE.md, ../generation/MILITARY_HISTORY.md, ../generation/NATION_GENERATION.md.
+> **Confused with:** ../generation/CIVILISATION.md, ../generation/MILITARY_HISTORY.md, ../generation/NATION_GENERATION.md.
 
 Why the campaign world is market-based and non-hegemonic, told as a stage ladder the
 generation stack hangs dated history lines off. Companion to `../generation/PLANETOLOGY.md`
@@ -64,9 +64,9 @@ tick) pairs whose struct default is Ben's (2026-08-12) — 100 → 50 → 20 →
 years, with boundaries chosen so resolution concentrates near the epoch, 136 decision rounds
 against 4000 on a flat tick. Generation's configuration flattens it to **one 4-year band
 over `prehistory_years = 400`** — 100 rounds. The 4000-year ladder is the target (Ben, 2026-08-20:
-the 400-year band is a placeholder, and the four allegories of `COLLAPSE.md` need the long run to
-chain); making it affordable is BL-494 (four-thousand-year ladder) and `COLLAPSE.md` § The
-4000-year problem. A settle-dominated run is the intended shape (NR-205, ruled 2026-08-12), at
+the 400-year band is a placeholder, and the long arcs need the long run to chain); making it
+affordable is `../generation/CIVILISATION.md` § The long run is paid for by the table, not the
+fighting. A settle-dominated run is the intended shape (NR-205, ruled 2026-08-12), at
 either span.
 
 ## Purpose
@@ -229,9 +229,10 @@ economics survive on their own merits only as a restatement of `GENERATION_STRAT
 The replacement — the bloc structure the threat produces, the diplomacy origin, the seizure cost
 of Stage 3, and the reconciliation of where the rupture sits across `docs/CONCEPT.md` (the Era 1
 exit) and `docs/research/ERA1_TECH_LANDSCAPE.md` (a visible countdown) — is **owned by BL-223
-(averted rupture, diplomacy origin)**. `COLLAPSE.md` supplies the mechanism the pre-epoch version
-of the same idea runs on: strain, culminations, and the reach-fed slow strain that BL-510 makes
-Stage 5's parameterisation rather than a second system. The compact thesis's closing corollary
+(averted rupture, diplomacy origin)**. `../generation/CIVILISATION.md` § How an empire actually falls
+supplies the mechanism the pre-epoch version of the same idea runs on: network failure — a realm
+that can no longer reach itself secedes — so Stage 5 is a parameterisation of reach rather than a
+second system. The compact thesis's closing corollary
 ("learned this one catastrophe earlier than Earth did") is BL-223's to restate.
 
 ---
@@ -358,8 +359,9 @@ religion or diplomacy layer needs to describe a grievance.
 revolution — `resolve_historical_ruptures`) are a second checkpoint class, drawing through
 `resolve_checkpoint` with eligibility as a filter and never a weight (BL-217's mechanism, reused
 unchanged). They are bounded to the six most-contested nations, so their count is a property of
-the design rather than of the map size. Under an ancient epoch the sim's culminations
-(`COLLAPSE.md`) are the ruptures.
+the design rather than of the map size. Under an ancient epoch the sim's own breaks — secession
+(`../generation/CIVILISATION.md` § How an empire actually falls) and schism (`CREEDS.md` § The
+schism verb) — are the ruptures.
 
 **Calibration is the sweep's, not the harness's.** A green harness means the pass is
 self-consistent, deterministic and wired into the political map — *not* that its dates or
@@ -382,8 +384,9 @@ Consolidate, and Build Work — priced in one shared currency (the round each co
 by a deterministic scored-utility layer under the 2026-08-18 nation grant: pure, seeded,
 replayable, never a planner. Its objective weights (`w_farm`, `w_ore`, `w_port`, …) live in
 `history_sim_params`. Breadth costs: a polity is charged supply for every region held past
-`free_holdings` (`holdings_burden_q`, the burden of breadth), and the strain that burden feeds,
-how it resolves, and the strategies that play it are `COLLAPSE.md`'s. Region demography
+`free_holdings` (`holdings_burden_q`, the burden of breadth), and how a realm fails — network
+failure, secession, schism — is `../generation/CIVILISATION.md`'s (§ How an empire actually falls);
+the strategy roster once drawn against it is a mechanism reference, `../research/COLLAPSE_ROSTER.md`. Region demography
 (BL-273), era-keyed unit rosters (BL-274) and the sweep (BL-275) are its siblings.
 
 Two of those verbs are gated by the ground's domain — where a Settle may found, and what a
@@ -528,8 +531,8 @@ to state.
 - Does Kepler get a nuclear-equivalent deterrence ceiling explicitly, or is the threat's memory
   alone the ceiling? (Affects Era 1+ conflict design.)
 - How much of this ladder surfaces to the player — a codex, generated history lines only, or
-  ambient flavour in quest text? `COLLAPSE.md`'s ruling that the story surfaces in the history
-  tab, quietly, answers the pre-epoch half.
+  ambient flavour in quest text? `../generation/CIVILISATION.md` § How a fall is told rules that the story surfaces in the
+  history tab, quietly, which answers the pre-epoch half.
 - Does the Charter Age line name the player company's home-nation legal tradition? The Charter
   Act names the charter cradle's nation; whether the player's company is bound to it depends on
   the player-identity question `docs/CONCEPT.md` owns.

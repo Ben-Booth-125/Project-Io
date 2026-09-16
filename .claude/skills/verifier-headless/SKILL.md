@@ -606,6 +606,12 @@ in `tools/verify/README.md`.
   Body phase places geological deposits and the Life phase places biological ones; this asserts the
   Body phase places **no** biological deposit. Nothing else can see that invariant.
 
+- **`survey_endowment_harness`** — **The first harness on `survey_endowment`** (BL-966), the
+  per-region farm/ore/energy read that drives cradle placement, region class and corporate focus.
+  On the reference seed's homeworld: determinism, ordering (the richest window by an independent
+  tile read outscores the barrenest, and the shipped `region::*_q` agree), the endowment-zero rule
+  on a body with the channel at 0.0, and a non-flat per-region spread (IQR above a measured floor).
+
 - **`landscape_score_harness`** — **The only thing that can tell whether phase 6 has anything to
   search on** (BL-770). Scores candidate landscapes on the four terms of
   `GENERATION_STRATEGY.md` § What the objective is made of and reports the **relative range** of
@@ -960,8 +966,14 @@ only when building outside the CMake tree.
 0. **No configured build tree? Use the one-line builder** (Ben, 2026-08-23, ruling on NR-392):
 
    ```
-   node tools/verify/build_harness.js <name> [--run] [--debug]
+   node tools/verify/build_harness.js <name> [--run] [--debug] [--clean]
    ```
+
+   **The world set is cached (BL-960, 2026-09-15).** The 62 world TUs compile once per
+   configuration into `build_gen/verify/_world/<release|debug>/` (about 22 s cold) and every
+   harness links the cached objects (about 5 s). A TU recompiles only when its source or any
+   header under `src/` is newer than its object, or when the flags change; `--clean` drops the
+   cache. Objects are linked directly, never archived, so every world TU still reaches the link.
 
    This is the path for a **worktree agent**, a **fresh clone**, or any session whose network
    policy refuses FetchContent — `cmake -B build` pulls SDL3, Lua, sol2 and ImGui from

@@ -5,11 +5,13 @@
 > and which peoples raise them · what a civilisation is, as distinct from a creed · how two
 > cultures come to be similar or opposed, and why that is the engine of conquest · what the
 > Culture phase must hand forward for any of it to work · what the phase hands the exploration
-> age at its CLOSURE, and the readings that contract is judged on.
+> age at its CLOSURE, and the readings that contract is judged on · how a fall is told, and why
+> the sim reads that story back · what makes a long run affordable.
 > **Not here:** how people came to live where they live (COLONISATION) · how force resolves
 > once two polities contest ground (MILITARY_HISTORY) · what a pantheon is or how a tongue is
 > coined (../lore/CREEDS) · the stage ladder this phase sits inside (../lore/HISTORY) · what a
-> centre consumes once the campaign starts (../economy/POPULATION).
+> centre consumes once the campaign starts (../economy/POPULATION) · the retired roster of polity
+> strategies and culminations, a mechanism reference only (../research/COLLAPSE_ROSTER).
 > **Confused with:** COLONISATION.md, ../lore/HISTORY.md, MILITARY_HISTORY.md.
 
 **How city states become empires.**
@@ -294,6 +296,13 @@ This is the phase's **outcome shape**, and it is what every mechanism above is u
 answerable to. `GENERATION_STRATEGY.md` § The asymmetry is POLITICAL as well as
 economic owns the full statement; what belongs here is what it demands of *this* phase.
 
+**Every share reading is by POPULATION HELD, not regions held (Ben, 2026-09-15, NR-876).** The map
+grows several times over inside the run as polities found new ground, so a share of regions counts
+founded emptiness the same as a captured city; by population the largest realms are more concentrated
+than region count shows and far fewer polities genuinely rise and fall. The region column stays as a
+guard beside it, and the wizard's leaderboard ranks by the population column (BL-1000, wizard
+leaderboard population share).
+
 **Conquest must COMPOUND.** Territory changing hands is necessary and nowhere near sufficient. A
 transfer that leaves the winner no better placed to win the next one produces churn — a map that
 moves constantly and ends the shape it started. The arc needs holding ground to make the next
@@ -486,18 +495,22 @@ survived.
 | Which provinces each polity holds | `pass_one_output::holdings` | **carried** |
 | Directed grudges | `pass_one_output::grudges` | **carried** |
 | Region endowment (farm / ore / energy / port) | `region` | **carried** |
-| **Culture PARENTAGE — the family tree** | `colonisation_field::spawns` | **DISCARDED — the gap** |
-| **The farm class a culture was coined on** | `front_entry::origin_class` | **DISCARDED** |
-| **The year a culture was coined** — the kinship clock | `front_entry` / arrival order | **DISCARDED** |
-| Settlement seats and hinterland pointers | `region::centres` (dense today) | **owed, § The unit is the city state** |
-| Material stores at the seat | — | **owed, § Materials are spent** |
+| **Culture PARENTAGE — the family tree** | `culture::parent` (`creeds.hpp`) — index of the mother culture, −1 at a cradle; a daughter always sits above her mother, so the walk to the root cannot loop | **carried** |
+| **The farm class a culture was coined on** | `culture::origin_farm_class` — the opposition half of culture relations | **carried** |
+| **The year a culture was coined** — the kinship clock | `culture::coined_year` — read by `culture_kinship_years` | **carried** |
+| Settlement seats and hinterland pointers | `region::is_seat`, `region::seat_region` (`settlement.hpp`) — one seat per polity at its capital, every hinterland region pointing at its seat | **carried** |
+| Material stores at the seat | `region::material_stock` — accumulates only where `is_seat`, falls with the seat | **carried** |
 
-**Three of those are discarded facts the migration already computed**, and all three are cheap to
-retain — parentage, origin farm class, and now the coining year that § The calls makes the kinship
-measure. Everything else is either carried today or is honest new work.
+**The three culture rows are facts the migration computes and the contract keeps** — parentage,
+origin farm class, and the coining year that § The calls makes the kinship measure. Parentage is
+the family tree; the origin class is the opposition half of culture relations (a people of the
+floodplain and a people of the highlands want different ground); the coining year is what makes
+kinship a years-since-common-ancestor measure rather than an adjacency, and kinship in years is
+worth nothing without the years.
 
-**The coining year is the newest of the three and it is owed by a ruling, not by an oversight.**
-Kinship in years is worth nothing without the years.
+**The two settlement rows are the city-state unit** (§ The unit is the city state, § Materials
+are spent): a seat is a fact about the ground, so conquest changes who governs from it and never
+whether it is one; the stores sit at the seat and fall with it.
 
 ---
 
@@ -937,6 +950,142 @@ those two, not of a network outrunning itself.
 conquest consumes; the reading of ground as capital belongs to the economy pass and must not leak
 backwards into a phase that has no price
 (`../economy/MARKETS.md`, and § Materials are spent when something happens).
+
+---
+
+## How a fall is told — the ideological axis
+
+**A collapse the player only sees as border changes is half a collapse (Ben, 2026-08-20).** The
+story of a fall is told with a dual focus: the **material** side — supply, roads, war, the region
+that could no longer be reached — *and* the way the people involved **told it to themselves**.
+Real cultures narrated their own doom in a handful of recurring ways, and those narrative moves
+transfer under the naming rule exactly as institutions do: the **mechanism** crosses, the
+**noun** never does (`.claude/rules/io-standing-rules.md` § Terms & docs). The seeded template
+banks that name a polity also mint its self-story, from the library below.
+
+This axis was folded here out of the retired collapse roster; the fold is owned by
+`BL-1001 (COLLAPSE doc folded and retired)`, and the roster itself — six polity strategies,
+seven culminations, a pairing matrix — is a mechanism reference in
+`../research/COLLAPSE_ROSTER.md`, not authority.
+
+### The exits a story can attach to
+
+A fall in this phase has three causes, each recorded under its own name, and a story is seated on
+one of them:
+
+- **Secession** — ground the realm can no longer reach walks away as city states (§ How an empire
+  actually falls). Recorded as ground taken, parent → successor.
+- **Schism** — ground of another people's faith answers together and leaves along kinship rather
+  than distance (`../lore/CREEDS.md` § The schism verb). Recorded as faith sundered.
+- **Conquest** — a seat taken by a rival's campaign. Recorded as ground taken, loser → conqueror.
+
+There is no voluntary release, no regime reset that leaves the map unchanged, and no exodus: a
+realm that breaks always breaks on the map. A story pattern with no exit to seat on stays in the
+research roster until the design grows one.
+
+### The pattern library — how a people narrates its doom
+
+Each names the narrative move, then its seat: what generation writes it onto, and what the sim
+reads back.
+
+- **Translation of empire.** The centre is not destroyed, it *moves* — every successor claims to
+  BE the continuation, not the replacement. *Seat:* the successor's creed after a secession; a
+  restoration grudge ("we are the true heir") aimed at sibling successors and not only at the
+  parent.
+- **The declinist mirror.** A culture narrates its own fall in advance — lost virtue, a corrupt
+  centre — for generations before the material break. *Seat:* the narrated history line. Supply
+  under a floor is readable before the cut lands, so the chronicle can say "their own writers
+  wrote of decay" years before the secession; the player should be able to read the doom coming
+  the way the culture's own writers did.
+- **The mandate withdrawn.** Legitimacy is a grant from the cosmos, and disaster is evidence the
+  grant has moved — regime change thinkable without cultural death. *Seat:* the parent's account
+  of what it lost. Under this design it narrates a surviving core, since no exit re-founds a
+  realm in place.
+- **The golden age behind us.** The material regression is real; the story of greatness is kept
+  losslessly. This is the twin of the ladder rule that capacity burns and awareness never does
+  (§ How an empire actually falls — what a successor inherits). *Seat:* the restoration creed of
+  any successor, and the legitimising claim of whoever later gathers the fragments.
+- **The chosen remnant.** A people who walked out narrate smallness as election — purity proved by
+  departure. *Seat:* the realm a schism founds; its grudge is faith sundered, and the myth
+  outlives any realistic hope of return.
+- **The apocalypse reframed as test.** Imminent doom read as trial: a people who expect the end
+  can march *through* it. *Seat:* a creed lean that holds ground under strain at the price of
+  never letting any of it go — the last stand a realm fights for a region its supply cannot hold.
+- **The garden given away.** Release retold as maturity, ties of kinship replacing ties of rule.
+  *No seat:* it needs a voluntary release, which this design does not have; it lives in the
+  research roster.
+
+### The sim reads the story back
+
+The patterns are not flavour. Two returns:
+
+1. **The creed already chooses the exit.** Which cause a realm breaks under is a property of its
+   people, not a roll: ground of the realm's own culture leaves by secession when supply fails,
+   ground of another faith leaves by schism when it reasserts. Same strain, different people,
+   different ending — which is how the real cases diverged, and it is deterministic throughout.
+2. **The story is the inherited character.** Posture, creed and grudge are exactly "the way the
+   culture tells its story" carried to the handoff (§ What the dark age must leave, § What the
+   closure is judged on). A generated nation does not only have a name; it has an account of
+   itself, traceable to a break the player can find in the history log.
+
+**Every break carries its own narrated line.** A secession and a schism are recorded under
+different causes so the two readings never blend, and each is told: a realm that lost a third of
+its ground in silence reads as a bug, not as a dark age.
+
+**The story surfaces in the history tab, quietly (Ben, 2026-08-20).** Telling it is secondary to
+*seeing* it: creed data and the recorded causes are sim substance; narration is a history-tab
+layer and the playback, never chrome pushed at the player. Deep-dig is optional, for the players
+who want it. The discipline is `../lore/HISTORY.md`'s — **driven, not narrated**: the story is
+emitted by what happened, never scripted over it.
+
+### A break travels along the network
+
+Contagion needs no second mechanism. Supply is priced from the capital over the ground the realm
+holds (§ How an empire actually falls — the capital is the strategic headquarters), so a region
+that secedes takes with it the corridor every region beyond it was supplied through. One cut can
+therefore become a cascade, and a whole system of realms can fail in one breath — but only where
+the map made them rest on the same ground. That is systemic collapse read as a consequence of the
+network rather than as an event of its own, and it is asserted by sweep, never scripted.
+
+---
+
+## The long run is paid for by the table, not the fighting
+
+The sim runs inside world generation, and its budget is the generating screen's wait. The profile
+fact that decides everything: **cost tracks the region table, not the battles** — a seed with
+fewer fights can run several times longer. Ten times the years is not ten times the cost, because
+settling keeps growing the table, so late years cost more than early ones; and the recording of a
+long run can cost more than the run itself.
+
+**The shape of the fix, in the order the rungs pay.** Each is independent; measure after each.
+
+1. **Kill the scans that walk the whole table.** A cell → region spatial index removes the
+   occupancy scan from settling; per-polity holdings and aggregates are maintained on change,
+   never rebuilt per round. This turns per-year cost from O(regions) toward O(changes), and it is
+   the prerequisite for everything below.
+2. **Event-driven quiet ground.** Most of a long span, most regions do nothing. A stable interior
+   region wakes on events — a border change, a supply band crossing, a road lost — not per year.
+   Wake conditions are state-derived, never sliced by wall clock.
+3. **Banded year grain.** The premise of the span is that ages are long and quiet, punctuated by
+   arcs (§ The arc the phase must produce). Quiet bands run at coarse grain with scaled verb
+   effects and drop to yearly grain when any realm's supply, war state or nearness to a break
+   crosses a band. The grain switch must be a **pure function of sim state** — seeded, replayable,
+   asserted by the determinism harness — or it is a die roll wearing a timestep.
+4. **Record on change, at the reader's grain.** The playback and the history tab scrub decades.
+   Snapshot ownership when it changes and per decade otherwise; narrated lines are events, not
+   per-year state.
+5. **Never parallelise the sim.** Threading the polity loop trades a seconds problem for a
+   determinism problem the standing rules forbid. Single-threaded plus algorithmic fixes is the
+   whole toolbox.
+
+**What not to trade away.** Never fix by capping regions — table growth *is* the history running
+longer. Every number is measured on the sim that generates a world, at the optimised build,
+through the same parameter derivation, never on a harness divergence.
+
+**Fit check.** Rungs 1–2 target the dominant cost, rung 3 the year count, rung 4 the recording
+half. If all four together still miss the budget, the honest fallback is fewer completed arcs
+per world with every arc shape still asserted across the seed spread — degrading density, never
+determinism or legibility.
 
 ---
 

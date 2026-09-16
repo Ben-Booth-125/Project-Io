@@ -3,7 +3,7 @@
   "_note": [
     "The Colonisation tree — the store COLONISATION_TREE.md transcribes. The schema is TREES.md § The store — `*_tree.json`, and tree_lint.js cross-checks doc and store both ways.",
     "No actor, so no scorer: there is no pursued_when and no scorer_terms. A culture acquires a node by time on ground that satisfies its gate, or by contact; a daughter copies its parent's mask at coining.",
-    "Ids are CO-<branch>-<ring><seq>; 'm' is the one milestone per ring, on the spire. Each edge is listed once, from the lower id.",
+    "Ids are CO-<branch>-<ring><seq>; 'm' is the one milestone per ring, on the spire. Each edge is listed once, on the node farther from the root; the root CO-SP-1a lists none, and that empty list is how the generated table derives is_root (tree_lint holds exactly one).",
     "A milestone's requires names the spire major at its ring (AND); requires_any names the four branch majors at its ring, ANY TWO of which satisfy it (TREES.md § Milestones, and how a tree unlocks the next; COLONISATION_TREE.md § Milestones).",
     "Magnitudes are placeholders by judgement — per_mille 20–80 on minors, 60–200 on majors — and the sweep re-prices them.",
     "Names are generic mechanism nouns; earth_ref is calibration prose and never a place or a people."
@@ -44,9 +44,7 @@
       "kind": "major",
       "ring": 1,
       "branch": "SP",
-      "links": [
-        "CO-SP-1m"
-      ],
+      "links": [],
       "gate": null,
       "diffusion": "practice",
       "excludes": null,
@@ -67,7 +65,7 @@
       "ring": 1,
       "branch": "SP",
       "links": [
-        "CO-SP-2a"
+        "CO-SP-1a"
       ],
       "gate": null,
       "diffusion": "capacity",
@@ -78,7 +76,7 @@
       "effects": [
         {
           "kind": "open",
-          "target": "ring_2"
+          "target": "ring 2"
         }
       ],
       "earth_ref": "a band that eats more than it gathers — the surplus that makes a second ground worth learning",
@@ -99,7 +97,7 @@
       "ring": 2,
       "branch": "SP",
       "links": [
-        "CO-SP-2m"
+        "CO-SP-1m"
       ],
       "gate": null,
       "diffusion": "capacity",
@@ -126,7 +124,7 @@
       "ring": 2,
       "branch": "SP",
       "links": [
-        "CO-SP-3a"
+        "CO-SP-2a"
       ],
       "gate": null,
       "diffusion": "capacity",
@@ -137,7 +135,7 @@
       "effects": [
         {
           "kind": "open",
-          "target": "ring_3"
+          "target": "ring 3"
         }
       ],
       "earth_ref": "the year-round village — a store worth staying beside",
@@ -158,7 +156,7 @@
       "ring": 3,
       "branch": "SP",
       "links": [
-        "CO-SP-3m"
+        "CO-SP-2m"
       ],
       "gate": null,
       "diffusion": "capacity",
@@ -189,7 +187,9 @@
       "kind": "milestone",
       "ring": 3,
       "branch": "SP",
-      "links": [],
+      "links": [
+        "CO-SP-3a"
+      ],
       "gate": null,
       "diffusion": "capacity",
       "excludes": null,
@@ -199,7 +199,7 @@
       "effects": [
         {
           "kind": "open",
-          "target": "empire"
+          "target": "empire tree"
         }
       ],
       "earth_ref": "a town that can be seated — the condition for a polity, not a polity",
@@ -220,8 +220,7 @@
       "ring": 1,
       "branch": "FL",
       "links": [
-        "CO-SP-1a",
-        "CO-FL-1b"
+        "CO-SP-1a"
       ],
       "gate": "arable",
       "diffusion": "practice",
@@ -243,7 +242,7 @@
       "ring": 1,
       "branch": "FL",
       "links": [
-        "CO-FL-2a"
+        "CO-FL-1a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -265,8 +264,7 @@
       "ring": 2,
       "branch": "FL",
       "links": [
-        "CO-FL-2b",
-        "CO-FL-2c"
+        "CO-FL-1b"
       ],
       "gate": "arable",
       "diffusion": "capacity",
@@ -293,7 +291,7 @@
       "ring": 2,
       "branch": "FL",
       "links": [
-        "CO-FL-3a"
+        "CO-FL-2a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -314,7 +312,10 @@
       "kind": "minor",
       "ring": 2,
       "branch": "FL",
-      "links": [],
+      "links": [
+        "CO-CS-2a",
+        "CO-FL-2a"
+      ],
       "gate": null,
       "diffusion": "practice",
       "excludes": null,
@@ -334,7 +335,9 @@
       "kind": "major",
       "ring": 3,
       "branch": "FL",
-      "links": [],
+      "links": [
+        "CO-FL-2b"
+      ],
       "gate": "arable",
       "diffusion": "capacity",
       "excludes": null,
@@ -360,8 +363,7 @@
       "ring": 1,
       "branch": "HL",
       "links": [
-        "CO-SP-1a",
-        "CO-HL-1b"
+        "CO-SP-1a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -383,7 +385,7 @@
       "ring": 1,
       "branch": "HL",
       "links": [
-        "CO-HL-2a"
+        "CO-HL-1a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -405,8 +407,7 @@
       "ring": 2,
       "branch": "HL",
       "links": [
-        "CO-HL-2b",
-        "CO-HL-2c"
+        "CO-HL-1b"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -433,7 +434,7 @@
       "ring": 2,
       "branch": "HL",
       "links": [
-        "CO-HL-3a"
+        "CO-HL-2a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -454,7 +455,10 @@
       "kind": "minor",
       "ring": 2,
       "branch": "HL",
-      "links": [],
+      "links": [
+        "CO-GR-2a",
+        "CO-HL-2a"
+      ],
       "gate": null,
       "diffusion": "practice",
       "excludes": null,
@@ -474,7 +478,9 @@
       "kind": "major",
       "ring": 3,
       "branch": "HL",
-      "links": [],
+      "links": [
+        "CO-HL-2b"
+      ],
       "gate": null,
       "diffusion": "practice",
       "excludes": null,
@@ -499,8 +505,7 @@
       "ring": 1,
       "branch": "GR",
       "links": [
-        "CO-SP-1a",
-        "CO-GR-1b"
+        "CO-SP-1a"
       ],
       "gate": "grassland",
       "diffusion": "practice",
@@ -527,7 +532,7 @@
       "ring": 1,
       "branch": "GR",
       "links": [
-        "CO-GR-2a"
+        "CO-GR-1a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -549,8 +554,7 @@
       "ring": 2,
       "branch": "GR",
       "links": [
-        "CO-GR-2b",
-        "CO-HL-2c"
+        "CO-GR-1b"
       ],
       "gate": "grassland",
       "diffusion": "practice",
@@ -577,7 +581,7 @@
       "ring": 2,
       "branch": "GR",
       "links": [
-        "CO-GR-3a"
+        "CO-GR-2a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -599,7 +603,7 @@
       "ring": 3,
       "branch": "GR",
       "links": [
-        "CO-GR-3b"
+        "CO-GR-2b"
       ],
       "gate": "grassland",
       "diffusion": "practice",
@@ -629,7 +633,9 @@
       "kind": "minor",
       "ring": 3,
       "branch": "GR",
-      "links": [],
+      "links": [
+        "CO-GR-3a"
+      ],
       "gate": null,
       "diffusion": "practice",
       "excludes": null,
@@ -650,8 +656,7 @@
       "ring": 1,
       "branch": "CS",
       "links": [
-        "CO-SP-1a",
-        "CO-CS-1b"
+        "CO-SP-1a"
       ],
       "gate": "coastal",
       "diffusion": "practice",
@@ -678,7 +683,7 @@
       "ring": 1,
       "branch": "CS",
       "links": [
-        "CO-CS-2a"
+        "CO-CS-1a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -700,8 +705,7 @@
       "ring": 2,
       "branch": "CS",
       "links": [
-        "CO-CS-2b",
-        "CO-FL-2c"
+        "CO-CS-1b"
       ],
       "gate": "coastal",
       "diffusion": "practice",
@@ -728,7 +732,7 @@
       "ring": 2,
       "branch": "CS",
       "links": [
-        "CO-CS-3a"
+        "CO-CS-2a"
       ],
       "gate": null,
       "diffusion": "practice",
@@ -749,7 +753,9 @@
       "kind": "major",
       "ring": 3,
       "branch": "CS",
-      "links": [],
+      "links": [
+        "CO-CS-2b"
+      ],
       "gate": "coastal",
       "diffusion": "practice",
       "excludes": null,

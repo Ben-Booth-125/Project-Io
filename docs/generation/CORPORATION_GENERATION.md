@@ -291,12 +291,13 @@ focus receive slightly higher starting capital to offset their lack of direct re
 access.
 
 **Pre-game operating history.** Corporations do not open cold. At campaign start the economy
-is run forward a fixed number of **pre-game ticks** (`app::pre_game_ticks` = 80, sliced across
-loading-screen frames after generation completes and the corp is chosen) so every corporation
-enters turn one with a **multi-tick operating history** — warm stockpile pools and a balance
-already moved by production, wages, and trade, rather than the seeded capital alone. The
-headless `--verify` path stays deterministically cold (no pre-game ticks) so generation audits
-remain reproducible.
+is run forward a fixed number of **pre-game ticks** — phase 6's single validation run of the
+winning landscape (`app::validation_ticks`; the length and its measurement are
+`../economy/ERAS.md` § The opening position; BL-978, warm start retired, owns the work) — so
+every corporation enters turn one with a **multi-tick operating history**: warm stockpile pools
+and a balance already moved by production, wages, and trade, rather than the seeded capital
+alone. The headless `--verify` path stays deterministically cold (no pre-game ticks) so
+generation audits remain reproducible.
 
 ### Pass 4b — Starting stockpile
 
@@ -357,6 +358,14 @@ a world that consumes twice as much of the same goods gets the same firms. That 
 and it is now the intended one — but it means the demand basket's breadth is a **density knob**,
 and anything editing that basket is editing the size of the background economy.
 
+**AMENDED FORWARD (Ben, 2026-09-15): density follows the city on a Digitisation world.** The opening
+map wants *many companies around population centres*, which breadth cannot place. Where the
+Digitisation span has run, each population centre arrives with a **charter budget** — its unspent
+industry points — and the landscape search spends it on firms around that centre
+(`DIGITISATION.md` § This phase sets budgets; the search spends them). Breadth still decides which
+goods a firm can serve; the budget decides how many firms stand where. How a budget converts to a
+firm count is owed and is measured against tick cost before it is tuned.
+
 **Pass 6 is a one-shot, and the economic settle it used to recur through no longer exists.** This
 section said Pass 6 was re-run at a fixed cadence through a settle, with firm exit as the cull.
 `GENERATION_STRATEGY.md` § The eight phases retires the warm start and the settle together and
@@ -391,6 +400,12 @@ the player starts on the same footing as any other corporation, and the flag is 
 world has been run forward, not during the passes above.
 
 ### The spawn shortlist, and the seat
+
+**Reversed in intent (Ben, 2026-09-09): the player is to PICK the seat on a corporation selection
+canvas at Begin**, over the landscape the search selected (`docs/ui/STARTUP.md` § The seat; BL-880,
+corporation selection canvas). The shortlist and the weighted draw below remain the mechanism
+until that canvas exists, and afterwards they are what the canvas *offers* — the floor still filters,
+the weighting still orders, and the player chooses rather than being drawn for.
 
 Ben's call, 2026-08-26: **which corporation the player runs is drawn at random from a shortlist
 of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:

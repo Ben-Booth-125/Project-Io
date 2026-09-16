@@ -229,8 +229,8 @@ otherwise only ever the thing that ends it.
 > **Kept deliberately, not by default (Ben, 2026-09-09).** Cutting it was the live alternative:
 > the world's settlement pattern would then be fully determined at Stage 0 by the cradle windows,
 > which is simpler and defensible. It survives because a frontier that can never unstick makes the
-> long run static, and the 4000-year ladder is the target (`../lore/COLLAPSE.md` § The 4000-year
-> problem).
+> long run static, and the 4000-year ladder is the target (`CIVILISATION.md` § The long run is paid
+> for by the table, not the fighting).
 
 ---
 

@@ -215,14 +215,18 @@ continent_snapshot continent_snapshot_at(const continent_state& cs, int epochs_b
 // assigned, and the moisture sample is the tile's own. Nothing downstream can
 // move until BL-765 asks for a non-zero epoch.
 //
-// WHAT THIS SLICE DELIBERATELY DOES NOT DO — see CONTINENTS.md § The Lagrangian
-// frame for the full list. It does not move the GENERATOR into the moving frame
-// (Pass 3 still bands by present row, and must, or every world changes); it does
-// not re-derive height, cover or ocean at a past epoch; it does not flip
-// longitude for ground that crossed a pole; and it carries no body-global
-// palaeo-thermal term, because over the 100 My the drift record spans the
-// radiogenic budget moves by well under a percent and latitude is the whole
-// story. Those are BL-765's to want and to justify.
+// WHAT THE FRAME DELIBERATELY DOES NOT DO — see CONTINENTS.md § The boundary
+// of the frame for the full list. It does not re-derive height, cover or ocean
+// at a past epoch; it does not flip longitude for ground that crossed a pole;
+// and it carries no body-global palaeo-thermal term, because over the 100 My
+// the drift record spans the radiogenic budget moves by well under a percent
+// and latitude is the whole story.
+//
+// The GENERATOR reads through it (BL-963): Pass 3 takes its present band
+// raster from `paleo_frame_at` at epoch 0 and the Life phase takes the fossil
+// epochs from the same function, so the present is the epoch-0 member of one
+// family rather than a separate lookup the query had to be proved equal to.
+// The epoch-0 identity is what keeps that safe, and continent_drift holds it.
 
 /// Where a tile WAS, and what climate it sat in, at a past drift epoch.
 ///
@@ -295,3 +299,51 @@ paleo_tile_state paleo_tile_at(const continent_state& cs, int gw, int gh,
                                int col, int row, int epochs_back,
                                temperature_class temp,
                                const std::vector<float>* moisture = nullptr);
+
+// ---------------------------------------------------------------------------
+// BL-963 — the climate FRAME, the raster form of the query above
+// ---------------------------------------------------------------------------
+//
+// `paleo_tile_at` answers one tile at one epoch. The generator does not want
+// one tile: Pass 3 wants every tile's band at the present, and the Life phase
+// wants every tile's band and moisture at the two fossil epochs. Those are the
+// SAME question asked of a whole raster, and answering it as a raster is what
+// makes the present a member of the family rather than a separate lookup — the
+// present band raster is the frame at epoch 0, the coal raster is the frame at
+// the coal epoch, one implementation between them.
+//
+// It is built BY the query, tile for tile, not beside it: a second winding
+// would be a second copy of the frame, and the two-callers-one-implementation
+// discipline BL-764 established for the band table holds for the winding too.
+// Derived, never stored, consumes no randomness — every property of
+// `paleo_tile_at` is inherited because it IS `paleo_tile_at`, gw*gh times.
+
+/// Every tile's plate-carried climate at one drift epoch, in raster order.
+struct paleo_frame
+{
+    int     epochs_back          = 0;
+    int64_t years_before_present = 0;
+
+    /// [row*gw+col] pole-folded |distance from the equator| in [0, 1].
+    std::vector<float> latitude;
+
+    /// [row*gw+col] the climate belt that latitude sat in. At `epochs_back == 0`
+    /// this IS Pass 3's band raster — not equal to it, the thing itself.
+    std::vector<lat_band> band;
+
+    /// [row*gw+col] the moisture field sampled where the ground was (nearest
+    /// cell). Empty when no field was supplied.
+    std::vector<float> moisture;
+
+    /// [row*gw+col] 1 where the past position landed inside the grid, so the
+    /// moisture entry is a real sample rather than one taken at a clamped row.
+    std::vector<uint8_t> on_grid;
+};
+
+/// The frame @p epochs_back drift epochs before the present: `paleo_tile_at`
+/// for every tile, laid out as rasters. Same parameters, same contracts —
+/// an empty plate set or a stagnant lid returns the present at every epoch,
+/// and epoch 0 returns the present exactly.
+paleo_frame paleo_frame_at(const continent_state& cs, int gw, int gh,
+                           int epochs_back, temperature_class temp,
+                           const std::vector<float>* moisture = nullptr);

@@ -76,14 +76,30 @@ sentiment model, not two.
 
 `world::tile_to_nation` is the reverse index, and it is what gives a law its **jurisdiction**.
 
+### GDP
+
+**A nation's GDP is the value of production on its tiles at local market prices** (NR-774, promoted
+here 2026-09-15 as the player-facing figure Ben's opening map asks for). It is **derived, never
+stored**: a reading over what the nation's ground produces and what its markets pay, read over a
+trailing window in play and over output capacity at the seeded price field at the epoch
+(`../generation/DIGITISATION.md` § 5. Wealth inequality, market cap and GDP).
+
+**GDP per head is the axis of inequality between nations**, and output per centre is the axis
+within one. Neither is a household measure, and neither feeds the treasury — a levy does
+(§ 2). GDP says how much a nation makes; the treasury says how much the state holds.
+
+**A regime field sits beside the three character fields** as a stub, derived at the epoch from the
+Works fork, charter reach, subject history and whether the polity fought a world war
+(`../generation/DIGITISATION.md` § 6. Stubs). Its names are invented, never Earth labels.
+
 ### 2. The treasury — *a balance with both halves*
 
 `nation_component::treasury` is a float. It is zero the instant the field is constructed —
 deliberately, since a treasury that started full would be a balance change smuggled in as a
 field. **Generation itself is ruled to credit it before the campaign tick ever runs** (Ben,
-2026-08-24, NR-580) — see `docs/generation/NATION_GENERATION.md` § Pass 7 for the settled shape
-(a levy/tariff transfer, the same conservation-checked mechanism the campaign tick already uses,
-not yet implemented). The rule above is about the ONGOING campaign tick: nothing but the levy,
+2026-08-24, NR-580) — see `docs/generation/NATION_GENERATION.md` § Pass 7 for the settled shape:
+the Exploration span's 1660 polity treasury, folded across the handoff through one stated
+per-mille (BL-975, 2026-09-15). The rule above is about the ONGOING campaign tick: nothing but the levy,
 the tariff and the budget outflow may ever move this field once play starts.
 
 Two flows credit it; one pass debits it.
@@ -487,9 +503,17 @@ special-cased: with no furnace nobody is strictly ahead of anybody and the share
 That is the honest reading — protection is a response to an industrial competitor, and a world
 without one has nothing to protect against.
 
-**The colony term is owed, not forgotten.** It has no input while a polity cannot take ground across
-water; BL-749 (sea-leg campaign) is what gives it one, and it lands as an addend on the same scalar.
-A far-flung holding is a large empire, not an overseas one, so no proxy stands in for it meanwhile.
+**The colony term is owed, not forgotten.** It has no input while a polity cannot claim ground across
+water; the colonial era's two claim verbs (`../generation/COLONIAL_ERA.md` § Two ways to claim
+ground across water; BL-832, colonial ties) are what give it one, and it lands as an addend on the
+same scalar. A purchased province counts as a colony exactly as a conquered one does — a metropole
+protects what it bought no less than what it took. A far-flung holding is a large empire, not an
+overseas one, so no proxy stands in for it meanwhile.
+
+**A nation's opening treasury is the same span's output.** The wealth scalar the colonial era derives
+per polity (`../generation/COLONIAL_ERA.md` § How wealthy a nation is) seeds the balance § 2 opens
+with — furnace timing, discoveries, purchases, spoils and lanes — so a rich nation is rich because
+its history was, and the spread across nations is reported rather than flattened.
 
 **Rates are banded, blanket, and first-cut.** Three ad-valorem bands above a floor, so the report can
 show *how hard* a history protects and not merely *whether* — a single threshold yields one number

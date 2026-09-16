@@ -116,7 +116,7 @@ menu, default off) lifts:
 - **This rule's internals redaction**: the rival building hover/Selection cards open their
   Production/Stockpile rows (same rows, real values), the rival building card gains the
   read-only Profitability page, and a selected corp's facts column carries the full readout
-  (cash, reserve floor, Should-Have buffer, per-body pools, running production).
+  (cash, reserve floor, Should-Have buffer, per-market pools, running production).
 - **The geographic fog at draw time**: the Planetary canvas renders unsurveyed regions
   through a heavy lock-colour wash — the *tell* — rather than as ordinary ground, so where
   the corps' own blindness sits stays legible while the watcher sees through it. The

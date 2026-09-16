@@ -126,6 +126,109 @@ measure_market_completeness(world& w, const recipe_registry& reg,
                             const std::array<resource_classification, resource_count>& cls);
 
 // ===========================================================================
+// The static supply:demand ratio — is the market IN BAND?
+// ===========================================================================
+//
+// THE SECOND HALF OF SATURATION, promoted for the same reason as the first
+// (BL-979). Chain completeness says a market CAN close its chains; this says
+// whether what the ground offers is in proportion to what the band's sinks
+// want. `landscape_score` computed it as its term 2 and nothing else could
+// read it, so no instrument could answer "what fraction of markets clear at
+// start". The arithmetic moved here VERBATIM — the scorer now calls this and
+// the census prints it — so the search and the reading cannot drift.
+//
+// SUPPLY is deposit magnitude summed over the market's IN-REACH catchment.
+// DEMAND is the structural want: heads for a household sink, a flat weight per
+// other market sink. Both static; neither reads a price. A priced resource with
+// any signal on either side is RATED; it is BALANCED when supply/demand sits
+// inside [1/pin_ratio, pin_ratio], GLUTTED above (or supplied with no sink
+// here), STARVED below (or wanted with nothing here yielding it).
+//
+// THE DEFAULTS LIVE HERE, ONCE. `landscape_score_params` initialises from these
+// constants rather than restating them, so the search and the census read the
+// same band unless a caller says otherwise. The band is not a verdict: 4.0 sits
+// deliberately inside the authored price band of [0.25x, 10x], and where the
+// line belongs is Ben's to set — this measure REPORTS, it does not gate.
+
+constexpr double k_balance_household_per_head = 1.0;
+constexpr double k_balance_sink_weight        = 250.0;
+constexpr double k_balance_pin_ratio          = 4.0;
+
+struct market_balance
+{
+    entity_id market   = null_entity;
+    entity_id body     = null_entity;
+    int       balanced = 0;    ///< priced resources whose ratio sits inside the band
+    int       glutted  = 0;    ///< supply >> demand, or supply with no sink here
+    int       starved  = 0;    ///< demand >> supply, or a want nothing here yields
+    int       rated    = 0;    ///< priced resources with any signal at all
+    double    fraction = 0.0;  ///< balanced / rated; 0 when nothing is rated
+};
+
+/// The balance term, per market, under an explicit band and demand weights.
+/// Builds the body reach fields it needs (a `world` cache) — which is why @p w
+/// is not const, and why a bare call is safe: "not computed" reach is
+/// PERMISSIVE, so a caller that skipped the build would count every tile in
+/// reach. Deterministic: sorted market walk, sorted tile walk.
+std::vector<market_balance>
+measure_market_balance(world& w, const recipe_registry& reg,
+                       const std::array<resource_classification, resource_count>& cls,
+                       double household_per_head, double sink_weight, double pin_ratio);
+
+/// THE HEADLINE READING: per market, the fraction of priced resources whose
+/// supply:demand ratio sits within [1/ratio, ratio], at the default demand
+/// weights. A convenience over `measure_market_balance` for an instrument that
+/// wants the number and not its decomposition.
+std::vector<market_balance>
+fraction_in_band(world& w, const recipe_registry& reg, double ratio);
+
+// ===========================================================================
+// Reach quality — at what COST is a market's catchment crossed? (BL-977)
+// ===========================================================================
+//
+// THE FIFTH TERM'S READING (GENERATION_STRATEGY.md § What the objective is made
+// of, Ben 2026-09-08). Completeness and balance read reach as a BOOLEAN — is
+// this tile inside `max_logistics_reach` of an anchor — and a boolean saturates:
+// once a catchment covers every resource it will ever cover, cheaper ground
+// moves nothing, which is why every road tier scored bit-identically (NR-793).
+// This reading is the CONTINUOUS quantity the tier actually moves: the reach
+// cost itself, averaged over the catchment.
+//
+// TWO CANDIDATE READINGS answered the axis (the doc left the choice to
+// measurement): the MEAN REACH COST over the catchment, and the in-reach tile
+// COUNT rather than the boolean. Scored on candidates differing only in road
+// tier (2026-09-15, landscape_score_harness § C) the cost moved the composite
+// 8.7e-4 against the count's 6.2e-4, moved it monotonically with the tier
+// where the count did not, and told tiers 2 and 3 apart where the count all
+// but could not. `mean_cost` is the reading; `in_reach_tiles` stays on the
+// record only as the boolean the other terms consume, for a reader comparing
+// the two grains.
+//
+// "Reach cost" is the placement rule's own currency — weighted traversal cost
+// from a tile to its NEAREST SUPPLY ANCHOR (city, built port, built hub), the
+// field `body_reach_field` computes — not a path to the market tile. A market
+// is anchored at a population centre, so its catchment's anchors are what a
+// convoy actually starts from; reading the same field placement pays keeps the
+// term "how dearly can this ground be worked", not a second distance metric.
+//
+// Deterministic: sorted market walk, sorted tile walk (a double sum is not
+// associative — the rule `measure_market_balance` states).
+
+struct market_reach
+{
+    entity_id market          = null_entity;
+    entity_id body            = null_entity;
+    int       catchment_tiles = 0;    ///< tiles clearing against this market
+    int       reachable_tiles = 0;    ///< of those, with a FINITE reach cost (anchors count, at 0)
+    int       in_reach_tiles  = 0;    ///< of those, inside max_logistics_reach — the boolean, as context
+    double    mean_cost       = 0.0;  ///< THE READING: mean reach cost over reachable tiles; 0 when none
+};
+
+/// The reach-quality reading, per market. Builds the reach fields it needs.
+std::vector<market_reach>
+measure_market_reach(world& w, const recipe_registry& reg);
+
+// ===========================================================================
 // The other half of the question — does each part PAY?
 // ===========================================================================
 //

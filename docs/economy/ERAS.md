@@ -54,12 +54,37 @@ single band is `hp.tick_bands[0] = {epoch_year, 4}` in `hard_coded_world.cpp`). 
 overrides it on every world. A settle-dominated run is the intended shape, not a defect (NR-205,
 ruled 2026-08-12). Authority for the prehistory run is `docs/lore/HISTORY.md`.
 
-**The opening position has no calendar meaning** (BL-369, warm start; BL-772, retire warm start).
+**The opening position has no calendar meaning** (BL-369, warm start; BL-978, warm start retired).
 The world is generated *at* the epoch and handed to play **already settled** — not generated at an
-earlier date and advanced to it. Whatever the pass that settles it spends in simulated quarters,
-the clock is **rebased at the handoff**, so play always opens at `epoch_year`. That rebase is the
+earlier date and advanced to it. The settling pass is phase 6's **single validation run** of the
+winning landscape — `../generation/GENERATION_STRATEGY.md` § Three passes: pass 3 *selects*, and its
+one validation tick-run is the settle (BL-978, warm start retired, owns the work; BL-369 owned the
+fixed `pre_game_ticks` warm start it replaces). Whatever the pass that settles it
+spends in simulated quarters, the clock is **rebased at the handoff**, so play always opens at `epoch_year`. That rebase is the
 load-bearing half of this paragraph and it does not depend on which pass does the settling: the
 opening position owes the calendar nothing.
+
+**The validation run is twelve quarterly econ ticks** (`app::validation_ticks`), run on the winner
+in time-boxed batches across loading-screen frames, under spectate with nobody seated, with the
+persona counsel and battle dispatches suppressed. The balances, pools, filed returns and prices those ticks leave
+*are* the opening position; the seat is drawn from the returns they file. Twelve is **measured,
+not round**, and the instrument is `haulage_measure --per-tick` (the only harness that sees
+trade): pooled over five seeds, the per-tick convoy dispatch count climbs from zero — tick 1
+dispatches nothing, tick 2 about 40 % of the settled rate, tick 4 about 90 % — and then holds at
+its 80-tick level (≈125 convoys per tick over the last eight of eighty). Twelve is the first tick
+at which **both** the 4-tick and the 8-tick trailing means of that count sit within 5 % of the
+80-tick level (98 % and 96 %; at eleven the 8-tick mean is still 94.8 %). A longer run buys
+nothing the player can see. It also covers the spawn floor's whole trailing window
+(`k_spawn_trailing_quarters` = 8, `../generation/CORPORATION_GENERATION.md` § The spawn
+shortlist), so the seat is drawn on a full viability read rather than a partial one.
+
+One series does not settle in twelve, and it is named rather than hidden: the **intra-body
+market-to-market** share of those convoys drifts upward slowly, from ≈80 % of its 80-tick level
+at tick 12 to within 5 % only around tick 40, inside ±15 % quarter-to-quarter noise. That is a
+slow composition drift in the trade mix, not the cold-start transient the settle exists to
+absorb; buying it would cost half the eighty-tick warm start this replaces. If a future reading
+needs that share settled at the handoff, the number to move is `app::validation_ticks` and the
+measurement to re-run is the one above.
 
 **What settles it is a search, not a settle.** The third pass of simulated history is phase 6 — a
 **directed static search** over candidate corporate landscapes (rosters, placements, road tiers),
@@ -122,6 +147,14 @@ deterrence ceiling (*"a per-nation scalar, NOT a nuclear-equivalent object"*):
 |---|---|---|
 | **Ceiling** | How much restraint this nation carries — the memory of the rupture that *was* averted | The history-ladder outcome; decays slowly as the memory ages |
 | **Alarm** | How threatened this nation feels *by others* | Others' **visible** capability, severed trade ties, posture, domestic instability |
+
+**The epoch opens with Alarm the history left, and a world war leaves more (Ben, 2026-09-15).** A
+world that fought a world war late in the pre-game span opens *"more likely to fail our Era 1
+catastrophe"*: its survivors carry standing force their neighbours can see, grudges written by the
+dead and trade flows the war severed — all three already Alarm's inputs — and none of it adds
+Ceiling, which remembers only a rupture *averted*. The war moves a world toward the failure branch
+without deciding it (`../generation/DIGITISATION.md` § A world war leaves the campaign closer to its
+catastrophe).
 
 ### The test
 

@@ -8,11 +8,14 @@
 // markets, deposits and population are all settled by the end of phase 4 and
 // none of them moves during phase 6, so there is nothing to step and no clock.
 //
-// THE OBJECTIVE HAS THREE TERMS (Ben, 2026-09-06, on the market-work form):
+// THE OBJECTIVE HAS FIVE TERMS (GENERATION_STRATEGY.md § What the objective is
+// made of — Ben, 2026-09-06 on the market-work form for the first four; the
+// fifth, Ben, 2026-09-08), AND ALL FIVE ARE SCORED IN THIS FILE:
 //
 //   1. CHAIN COMPLETENESS  — terminals closed over terminals total, per market.
-//      Already built: measure_market_completeness (BL-775).
-//   2. THE SUPPLY-TO-DEMAND RATIO per resource per market. The static
+//      measure_market_completeness (BL-775). POTENTIAL closure.
+//   2. THE SUPPLY-TO-DEMAND RATIO per resource per market — `balance` below,
+//      the share of rated resources inside the pin band. The static
 //      price-feedback proxy. Completeness says a chain CAN close; it cannot see
 //      a good pinned at a band edge, and a good pinned at the ceiling is what
 //      actually killed the industrial field — processors buying inputs at 10x
@@ -21,6 +24,18 @@
 //      Scored for, not tolerated. An even map is the outcome
 //      § Asymmetry is the deliverable exists to prevent, and an objective that
 //      is merely neutral about evenness will drift into it.
+//   4. REALISATION — actual closure over potential closure (`realisation`
+//      below). Terms 1-3 read only what COULD close, so they come back
+//      identical for every roster; this is the term that makes the score
+//      discriminate between rosters.
+//   5. REACH QUALITY — at what traversal cost a market's catchment is actually
+//      crossed (`measure_market_reach`, market_saturation.hpp), read per market
+//      with its SPREAD scored like terms 1 and 2 and NEVER entered as a level.
+//      Terms 1 and 4 read reach as a coverage boolean, so without it the
+//      objective ranked every road tier identically (NR-793) — the axis the
+//      search chooses along and could not see. A flat "cheaper everywhere"
+//      bonus would reward exactly the evenness term 3 exists to prevent, so the
+//      level is on the record and only its unevenness reaches the composite.
 //
 // RECIPE MARGIN IS DELIBERATELY NOT A TERM. It exists (evaluate_margin, in
 // market_saturation.hpp) and it stays the AUTHORING GATE that every recipe can
@@ -51,18 +66,22 @@ class recipe_registry;
 /// STABLE across candidates, not calibrated against reality.
 struct landscape_score_params
 {
+    // The three balance weights INITIALISE FROM market_saturation.hpp's constants
+    // rather than restating them (BL-979): term 2 is computed there now, and the
+    // census prints it, so the search and the reading must start from one band.
+
     /// Household demand per head, for a resource the band's household basket names.
-    double household_per_head = 1.0;
+    double household_per_head = k_balance_household_per_head;
     /// Flat weight for each other structural market sink (process, construct,
     /// background, unit upkeep, industry upkeep, endemic).
-    double sink_weight = 250.0;
+    double sink_weight = k_balance_sink_weight;
 
     /// A resource is BALANCED when its supply:demand ratio sits inside
     /// [1/pin_ratio, pin_ratio]. Outside it the good is pinned — glutted below,
     /// starved above — which is the static shadow of a price at a band edge.
     /// 4.0 against the authored band of [0.25x, 10x] is deliberately INSIDE the
     /// band: a good does not have to reach the clamp to be a broken market.
-    double pin_ratio = 4.0;
+    double pin_ratio = k_balance_pin_ratio;
 
     /// How hard unevenness is rewarded in the composite. 0 scores viability
     /// alone; the composite is viability * (1 + unevenness_gain * spread).
@@ -87,6 +106,15 @@ struct market_score
     int    starved        = 0;    ///< demand >> supply (the ceiling shadow)
     int    rated          = 0;    ///< resources with any signal at all
     double balance        = 0.0;  ///< balanced / rated
+    /// Term 5's per-market reading: MEAN REACH COST over the catchment's
+    /// reachable tiles (`market_reach::mean_cost`). The in-reach COUNT was the
+    /// other candidate reading and was measured against it on candidates
+    /// differing only in road tier (2026-09-15, landscape_score_harness § C):
+    /// cost moved the composite 8.7e-4 to the count's 6.2e-4, moved it
+    /// MONOTONICALLY with the tier where the count did not, and separated tiers
+    /// 2 and 3 by 3.4e-4 where the count separated them by 5e-9. The count
+    /// reading is deleted, not switched off.
+    double reach          = 0.0;
 };
 
 /// The whole landscape, as one comparable record.
@@ -98,6 +126,10 @@ struct landscape_score
     double mean_completeness = 0.0;  ///< potential
     double mean_actual       = 0.0;  ///< the roster-aware term (BL-770 slice 2)
     double mean_balance      = 0.0;
+    /// Term 5's level, ON THE RECORD ONLY. It never enters the composite: a
+    /// flat reach bonus rewards a uniformly well-connected map, which is the
+    /// evenness the objective exists to prevent.
+    double mean_reach        = 0.0;
 
     /// THE RATIO THAT MAKES THE OBJECTIVE ROSTER-AWARE: actual / potential. How
     /// much of the opportunity this world offers does THIS roster take up? A
@@ -110,7 +142,8 @@ struct landscape_score
     //     the same mean.
     double completeness_spread = 0.0; ///< coefficient of variation over markets
     double balance_spread      = 0.0;
-    double spread              = 0.0; ///< the two combined
+    double reach_spread        = 0.0; ///< term 5 — the ONLY way reach reaches the composite
+    double spread              = 0.0; ///< the three combined
 
     /// viability * (1 + unevenness_gain * spread). The total order phase 6's
     /// argmax will eventually run on.

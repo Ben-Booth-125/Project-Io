@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstdint>
+#include "tree_effect.hpp" // the shared effect vocabulary (BL-973)
 
 namespace io::exploration_tree {
 
@@ -32,45 +33,101 @@ struct node
     uint64_t    requires_mask;   ///< milestones: AND set (rule 4)
     int8_t      requires_fork_a; ///< milestones: fork pair, EITHER satisfies (-1 if none)
     int8_t      requires_fork_b;
+    uint8_t     effects_begin;   ///< first row of this node's run in `effects[]` (BL-973)
+    uint8_t     effects_n;       ///< rows in that run (never 0: the lint refuses an effectless node)
 };
 
 inline constexpr int branch_count = 5;
 inline constexpr const char* branch_names[branch_count] = { "SP", "HL", "PT", "WY", "GD" };
 
-inline constexpr int rim_node_index = 5; ///< EX-SP-3m, "The Long Reckoning"
+inline constexpr int rim_node_index = 5; ///< EX-SP-3m, "The Long Reckoning" — the node carrying the open-next-tree effect
+
+inline constexpr int effect_count = 50;
+inline constexpr io::tree_effect effects[effect_count] = {
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 200, io::tree_effect_key::none, 0, false, "stores" }, // 0: EX-SP-1a
+    { io::tree_effect_kind::institution, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "the treasury stands at the capital" }, // 1: EX-SP-1a
+    { io::tree_effect_kind::open, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 2, false, "ring 2" }, // 2: EX-SP-1m
+    { io::tree_effect_kind::institution, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "an entity that outlives its members may hold capital and bind a term" }, // 3: EX-SP-2a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 120, io::tree_effect_key::none, 0, false, "stores" }, // 4: EX-SP-2a
+    { io::tree_effect_kind::open, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 3, false, "ring 3" }, // 5: EX-SP-2m
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::research, 140, io::tree_effect_key::none, 0, false, "research" }, // 6: EX-SP-3a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 100, io::tree_effect_key::none, 0, false, "stores" }, // 7: EX-SP-3a
+    { io::tree_effect_kind::open, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, true, "industry tree" }, // 8: EX-SP-3m
+    { io::tree_effect_kind::access, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "a crossing may be staged from a held port" }, // 9: EX-HL-1a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::reach, 80, io::tree_effect_key::none, 0, false, "reach" }, // 10: EX-HL-1a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::reach, 40, io::tree_effect_key::none, 0, false, "reach" }, // 11: EX-HL-1b
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::reach, 50, io::tree_effect_key::none, 0, false, "reach" }, // 12: EX-HL-2c
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::reach, 200, io::tree_effect_key::none, 0, false, "reach" }, // 13: EX-HL-2a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::forage, 120, io::tree_effect_key::none, 0, false, "forage" }, // 14: EX-HL-2a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::defence, 180, io::tree_effect_key::none, 0, false, "defence" }, // 15: EX-HL-2b
+    { io::tree_effect_kind::unlock, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "Ship of the Line" }, // 16: EX-HL-2b
+    { io::tree_effect_kind::access, io::tree_modifier_term::none, 0, io::tree_effect_key::sea_legs, 0, false, "a crossing to unmet ground no longer requires an adjacent shore" }, // 17: EX-HL-3a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::reach, 260, io::tree_effect_key::none, 0, false, "reach" }, // 18: EX-HL-3a
+    { io::tree_effect_kind::unlock, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "Port" }, // 19: EX-PT-1a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 90, io::tree_effect_key::none, 0, false, "stores" }, // 20: EX-PT-1a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::reach, 40, io::tree_effect_key::none, 0, false, "reach" }, // 21: EX-PT-1b
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::defence, 150, io::tree_effect_key::none, 0, false, "defence" }, // 22: EX-PT-2a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::muster_cost, -80, io::tree_effect_key::none, 0, false, "muster_cost" }, // 23: EX-PT-2a
+    { io::tree_effect_kind::doctrine, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "force already raised; visible to neighbours" }, // 24: EX-PT-2a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 60, io::tree_effect_key::none, 0, false, "stores" }, // 25: EX-PT-2b
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::defence, 50, io::tree_effect_key::none, 0, false, "defence" }, // 26: EX-PT-3c
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::reach, 220, io::tree_effect_key::none, 0, false, "reach" }, // 27: EX-PT-3a
+    { io::tree_effect_kind::doctrine, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "force projected to ground the realm does not hold" }, // 28: EX-PT-3a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::defence, 300, io::tree_effect_key::none, 0, false, "defence" }, // 29: EX-PT-3b
+    { io::tree_effect_kind::unlock, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "Sea Fort" }, // 30: EX-PT-3b
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::reach, 150, io::tree_effect_key::none, 0, false, "reach" }, // 31: EX-WY-1a
+    { io::tree_effect_kind::upgrade, io::tree_modifier_term::none, 0, io::tree_effect_key::post_roads, 0, false, "Road becomes Highway on a corridor that carries" }, // 32: EX-WY-1a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 180, io::tree_effect_key::none, 0, false, "stores" }, // 33: EX-WY-2a
+    { io::tree_effect_kind::institution, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "goods may stand in transit without a holder" }, // 34: EX-WY-2a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::reach, 60, io::tree_effect_key::none, 0, false, "reach" }, // 35: EX-WY-3c
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::reach, 280, io::tree_effect_key::none, 0, false, "reach" }, // 36: EX-WY-3a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::muster_cost, -60, io::tree_effect_key::none, 0, false, "muster_cost" }, // 37: EX-WY-3a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 300, io::tree_effect_key::none, 0, false, "stores" }, // 38: EX-WY-3b
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::carrying_capacity, 90, io::tree_effect_key::none, 0, false, "carrying_capacity" }, // 39: EX-WY-3b
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 70, io::tree_effect_key::none, 0, false, "stores" }, // 40: EX-WY-3d
+    { io::tree_effect_kind::intel, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "goods are named and countable rather than an undifferentiated store" }, // 41: EX-GD-1a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 70, io::tree_effect_key::none, 0, false, "stores" }, // 42: EX-GD-1a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 50, io::tree_effect_key::none, 0, false, "stores" }, // 43: EX-GD-1b
+    { io::tree_effect_kind::intel, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "a market's scarcity signal is legible to a stranger" }, // 44: EX-GD-2a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 110, io::tree_effect_key::none, 0, false, "stores" }, // 45: EX-GD-2a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 60, io::tree_effect_key::none, 0, false, "stores" }, // 46: EX-GD-2b
+    { io::tree_effect_kind::intel, io::tree_modifier_term::none, 0, io::tree_effect_key::none, 0, false, "a people's preference for a good is durable and readable across the contact graph" }, // 47: EX-GD-3a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::stores, 140, io::tree_effect_key::none, 0, false, "stores" }, // 48: EX-GD-3a
+    { io::tree_effect_kind::modifier, io::tree_modifier_term::research, 70, io::tree_effect_key::none, 0, false, "research" }, // 49: EX-GD-3b
+};
 
 inline constexpr node nodes[node_count] = {
-    { "EX-SP-1a", node_kind::major, 1, 0, gate_atom::none, -1, true, 34082882ULL, 0ULL, -1, -1 }, // 0: Consolidated Stores
-    { "EX-SP-1m", node_kind::milestone, 1, 0, gate_atom::none, -1, false, 5ULL, 528384ULL, -1, -1 }, // 1: The Common Purse
-    { "EX-SP-2a", node_kind::major, 2, 0, gate_atom::none, -1, false, 10ULL, 0ULL, -1, -1 }, // 2: The Chartered Company
-    { "EX-SP-2m", node_kind::milestone, 2, 0, gate_atom::none, -1, false, 20ULL, 134234112ULL, 9, 10 }, // 3: The Standing Charter
-    { "EX-SP-3a", node_kind::major, 3, 0, gate_atom::none, -1, false, 40ULL, 0ULL, -1, -1 }, // 4: Double-Entry Reckoning
-    { "EX-SP-3m", node_kind::milestone, 3, 0, gate_atom::none, -1, false, 16ULL, 536872960ULL, 22, 23 }, // 5: The Long Reckoning
-    { "EX-HL-1a", node_kind::major, 1, 1, gate_atom::coastal, -1, false, 8577ULL, 0ULL, -1, -1 }, // 6: Decked Coaster
-    { "EX-HL-1b", node_kind::minor, 1, 1, gate_atom::none, -1, false, 33554496ULL, 0ULL, -1, -1 }, // 7: Sounding & Chart
-    { "EX-HL-2c", node_kind::minor, 2, 1, gate_atom::none, -1, false, 1600ULL, 0ULL, -1, -1 }, // 8: Careening & Refit
-    { "EX-HL-2a", node_kind::major, 2, 1, gate_atom::coastal, 10, false, 35072ULL, 0ULL, -1, -1 }, // 9: Ocean Carrack
-    { "EX-HL-2b", node_kind::major, 2, 1, gate_atom::coastal, 9, false, 256ULL, 0ULL, -1, -1 }, // 10: Fleet of the Line
-    { "EX-HL-3a", node_kind::major, 3, 1, gate_atom::coastal, -1, false, 1073742336ULL, 0ULL, -1, -1 }, // 11: Oceanic Navigation
-    { "EX-PT-1a", node_kind::major, 1, 2, gate_atom::coastal, -1, false, 24577ULL, 0ULL, -1, -1 }, // 12: Harbour Works
-    { "EX-PT-1b", node_kind::minor, 1, 2, gate_atom::none, -1, false, 4160ULL, 0ULL, -1, -1 }, // 13: Pilot & Lighthouse
-    { "EX-PT-2a", node_kind::major, 2, 2, gate_atom::none, -1, false, 102400ULL, 0ULL, -1, -1 }, // 14: Standing Garrison
-    { "EX-PT-2b", node_kind::minor, 2, 2, gate_atom::none, -1, false, 16896ULL, 0ULL, -1, -1 }, // 15: Naval Stores
-    { "EX-PT-3c", node_kind::minor, 3, 2, gate_atom::none, -1, false, 409600ULL, 0ULL, -1, -1 }, // 16: Dry Dock
-    { "EX-PT-3a", node_kind::major, 3, 2, gate_atom::coastal, 18, false, 16842752ULL, 0ULL, -1, -1 }, // 17: Blue-Water Squadron
-    { "EX-PT-3b", node_kind::major, 3, 2, gate_atom::coastal, 17, false, 65536ULL, 0ULL, -1, -1 }, // 18: Fortified Roadstead
-    { "EX-WY-1a", node_kind::major, 1, 3, gate_atom::none, -1, false, 68157441ULL, 0ULL, -1, -1 }, // 19: Post Roads
-    { "EX-WY-2a", node_kind::major, 2, 3, gate_atom::none, -1, false, 271056896ULL, 0ULL, -1, -1 }, // 20: Bonded Warehouse
-    { "EX-WY-3c", node_kind::minor, 3, 3, gate_atom::none, -1, false, 13631488ULL, 0ULL, -1, -1 }, // 21: Wayhouse Relay
-    { "EX-WY-3a", node_kind::major, 3, 3, gate_atom::none, 23, false, 18874368ULL, 0ULL, -1, -1 }, // 22: Trunk Highway
-    { "EX-WY-3b", node_kind::major, 3, 3, gate_atom::arable, 22, false, 2097152ULL, 0ULL, -1, -1 }, // 23: Canal Cut
-    { "EX-WY-3d", node_kind::minor, 3, 3, gate_atom::none, -1, false, 4325376ULL, 0ULL, -1, -1 }, // 24: Toll & Escort
-    { "EX-GD-1a", node_kind::major, 1, 4, gate_atom::none, -1, false, 201326721ULL, 0ULL, -1, -1 }, // 25: Named Staples
-    { "EX-GD-1b", node_kind::minor, 1, 4, gate_atom::none, -1, false, 34078720ULL, 0ULL, -1, -1 }, // 26: Weights & Tally
-    { "EX-GD-2a", node_kind::major, 2, 4, gate_atom::none, -1, false, 838860800ULL, 0ULL, -1, -1 }, // 27: Quayside Market
-    { "EX-GD-2b", node_kind::minor, 2, 4, gate_atom::none, -1, false, 135266304ULL, 0ULL, -1, -1 }, // 28: Bill of Lading
-    { "EX-GD-3a", node_kind::major, 3, 4, gate_atom::none, -1, false, 1207959552ULL, 0ULL, -1, -1 }, // 29: Standing Preference
-    { "EX-GD-3b", node_kind::minor, 3, 4, gate_atom::none, -1, false, 536872960ULL, 0ULL, -1, -1 }, // 30: Factor's Ledger
+    { "EX-SP-1a", node_kind::major, 1, 0, gate_atom::none, -1, true, 34082882ULL, 0ULL, -1, -1, 0, 2 }, // 0: Consolidated Stores
+    { "EX-SP-1m", node_kind::milestone, 1, 0, gate_atom::none, -1, false, 5ULL, 528384ULL, -1, -1, 2, 1 }, // 1: The Common Purse
+    { "EX-SP-2a", node_kind::major, 2, 0, gate_atom::none, -1, false, 10ULL, 0ULL, -1, -1, 3, 2 }, // 2: The Chartered Company
+    { "EX-SP-2m", node_kind::milestone, 2, 0, gate_atom::none, -1, false, 20ULL, 134234112ULL, 9, 10, 5, 1 }, // 3: The Standing Charter
+    { "EX-SP-3a", node_kind::major, 3, 0, gate_atom::none, -1, false, 40ULL, 0ULL, -1, -1, 6, 2 }, // 4: Double-Entry Reckoning
+    { "EX-SP-3m", node_kind::milestone, 3, 0, gate_atom::none, -1, false, 16ULL, 536872960ULL, 22, 23, 8, 1 }, // 5: The Long Reckoning
+    { "EX-HL-1a", node_kind::major, 1, 1, gate_atom::coastal, -1, false, 8577ULL, 0ULL, -1, -1, 9, 2 }, // 6: Decked Coaster
+    { "EX-HL-1b", node_kind::minor, 1, 1, gate_atom::none, -1, false, 33554496ULL, 0ULL, -1, -1, 11, 1 }, // 7: Sounding & Chart
+    { "EX-HL-2c", node_kind::minor, 2, 1, gate_atom::none, -1, false, 1600ULL, 0ULL, -1, -1, 12, 1 }, // 8: Careening & Refit
+    { "EX-HL-2a", node_kind::major, 2, 1, gate_atom::coastal, 10, false, 35072ULL, 0ULL, -1, -1, 13, 2 }, // 9: Ocean Carrack
+    { "EX-HL-2b", node_kind::major, 2, 1, gate_atom::coastal, 9, false, 256ULL, 0ULL, -1, -1, 15, 2 }, // 10: Fleet of the Line
+    { "EX-HL-3a", node_kind::major, 3, 1, gate_atom::coastal, -1, false, 1073742336ULL, 0ULL, -1, -1, 17, 2 }, // 11: Oceanic Navigation
+    { "EX-PT-1a", node_kind::major, 1, 2, gate_atom::coastal, -1, false, 24577ULL, 0ULL, -1, -1, 19, 2 }, // 12: Harbour Works
+    { "EX-PT-1b", node_kind::minor, 1, 2, gate_atom::none, -1, false, 4160ULL, 0ULL, -1, -1, 21, 1 }, // 13: Pilot & Lighthouse
+    { "EX-PT-2a", node_kind::major, 2, 2, gate_atom::none, -1, false, 102400ULL, 0ULL, -1, -1, 22, 3 }, // 14: Standing Garrison
+    { "EX-PT-2b", node_kind::minor, 2, 2, gate_atom::none, -1, false, 16896ULL, 0ULL, -1, -1, 25, 1 }, // 15: Naval Stores
+    { "EX-PT-3c", node_kind::minor, 3, 2, gate_atom::none, -1, false, 409600ULL, 0ULL, -1, -1, 26, 1 }, // 16: Dry Dock
+    { "EX-PT-3a", node_kind::major, 3, 2, gate_atom::coastal, 18, false, 16842752ULL, 0ULL, -1, -1, 27, 2 }, // 17: Blue-Water Squadron
+    { "EX-PT-3b", node_kind::major, 3, 2, gate_atom::coastal, 17, false, 65536ULL, 0ULL, -1, -1, 29, 2 }, // 18: Fortified Roadstead
+    { "EX-WY-1a", node_kind::major, 1, 3, gate_atom::none, -1, false, 68157441ULL, 0ULL, -1, -1, 31, 2 }, // 19: Post Roads
+    { "EX-WY-2a", node_kind::major, 2, 3, gate_atom::none, -1, false, 271056896ULL, 0ULL, -1, -1, 33, 2 }, // 20: Bonded Warehouse
+    { "EX-WY-3c", node_kind::minor, 3, 3, gate_atom::none, -1, false, 13631488ULL, 0ULL, -1, -1, 35, 1 }, // 21: Wayhouse Relay
+    { "EX-WY-3a", node_kind::major, 3, 3, gate_atom::none, 23, false, 18874368ULL, 0ULL, -1, -1, 36, 2 }, // 22: Trunk Highway
+    { "EX-WY-3b", node_kind::major, 3, 3, gate_atom::arable, 22, false, 2097152ULL, 0ULL, -1, -1, 38, 2 }, // 23: Canal Cut
+    { "EX-WY-3d", node_kind::minor, 3, 3, gate_atom::none, -1, false, 4325376ULL, 0ULL, -1, -1, 40, 1 }, // 24: Toll & Escort
+    { "EX-GD-1a", node_kind::major, 1, 4, gate_atom::none, -1, false, 201326721ULL, 0ULL, -1, -1, 41, 2 }, // 25: Named Staples
+    { "EX-GD-1b", node_kind::minor, 1, 4, gate_atom::none, -1, false, 34078720ULL, 0ULL, -1, -1, 43, 1 }, // 26: Weights & Tally
+    { "EX-GD-2a", node_kind::major, 2, 4, gate_atom::none, -1, false, 838860800ULL, 0ULL, -1, -1, 44, 2 }, // 27: Quayside Market
+    { "EX-GD-2b", node_kind::minor, 2, 4, gate_atom::none, -1, false, 135266304ULL, 0ULL, -1, -1, 46, 1 }, // 28: Bill of Lading
+    { "EX-GD-3a", node_kind::major, 3, 4, gate_atom::none, -1, false, 1207959552ULL, 0ULL, -1, -1, 47, 2 }, // 29: Standing Preference
+    { "EX-GD-3b", node_kind::minor, 3, 4, gate_atom::none, -1, false, 536872960ULL, 0ULL, -1, -1, 49, 1 }, // 30: Factor's Ledger
 };
 
 inline constexpr int term_count = 12;

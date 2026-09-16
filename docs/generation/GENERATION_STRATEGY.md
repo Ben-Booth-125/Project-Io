@@ -30,27 +30,45 @@ The subject docs:
 - **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map,
   driven by the pre-national history ladder.
 - **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
-  market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the ancient arc's epoch (Ben, 2026-08-12, NR-177)** — § Pass 2 is the economy pass owns the calendar — and
+  market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the
+  ancient arc's epoch (Ben, 2026-08-12, NR-177); `world_params::epoch_year` selects between them,
+  and which arc the default descriptor selects is NR-869's call** — § Pass 2 is the economy
+  pass owns the calendar, and the clock rebases at the handoff (`../economy/ERAS.md`) — and
   generation runs a stepped pre-campaign history whose span § Pass 2 is the economy pass states
-  (3,600 years, 2400 BCE → 1200 CE, divided at 400 BCE — Ben, 2026-09-09). The figure restated here
-  was 4000 BCE → 0 CE, which contradicted the section it defers to. Stages 5–6 (the energy transition and
+  (3,600 years, 2400 BCE → 1200 CE, divided at 400 BCE — Ben, 2026-09-09), followed by the
+  Exploration span, 1200 → 1660 (`EXPLORATION.md`). Stages 5–6 (the energy transition and
   saturation) fall *past* the epoch entirely and are DLC-era material (BL-223, averted rupture,
   owns their reshaping).
 - **`CORPORATION_GENERATION.md`** — corporation placement, focus, holdings, and finance.
 - **`GENERATION_LEDGER.md`** — the tuning surface that explains *why* a tile generated as it did.
 
-Generation runs, in `make_hard_coded_world`:
+Generation runs, in `make_hard_coded_world` (`src/world/hard_coded_world.cpp`), in this order:
 
 ```
-planetology → continents → tiles → rivers              (per body)
-  → history ladder → creeds → settlement                 (homeworld only, from here)
-  → history sim, pass 1 (ancient) → history sim, pass 2 (industrial)
+body names → planetology → continents                   (every body, up front)
+tiles                                                    (Cinder)
+tiles → rivers                                           (Kepler, the homeworld — homeworld only
+                                                          from here to the province line)
+  → history ladder → creeds → settlement → migration time-lapse
+  → history sim, Empires span (2400 BCE → 1200 CE)       (one call; a 1700+ epoch appends the
+                                                          industrial span to the same call)
+  → history sim, Exploration span (1200 → 1660)          (whenever Empires ran and there is
+                                                          no industrial span)
+  → markets standing at the close (one per `region::has_market`)
   → population centres → nations → national character
-  → ruptures → institutional history → provinces → roads → corporations → markets
-  → other bodies' tiles → laws
-  → provinces                                            (every other body, last)
-  → background firms → the economic settle (pass 3)      (after the worker, before play)
+  → grudge sentiment → national tariffs → national coverage centres
+  → centre naming → urban land use
+  → ruptures                                             (1700+ epoch only)
+  → history merge → provinces → anchor centres → roads
+  → corporations (specialists) → market carving → endemic demand
+tiles                                                    (Selene, then the asteroids)
+laws → provinces (every other body) → province holders → garrisons
 ```
+
+After the worker returns, the app runs **phase 6 — the landscape search** (`search_landscape`;
+the winning candidate's background firms *are* the background economy) and then the **settle**:
+phase 6's single validation run of the winner (`../economy/ERAS.md`; BL-978, warm start retired,
+owns the work).
 
 The three simulated passes — two polity spans and one economic settle — are § Three passes of
 simulated history; `../lore/HISTORY.md` owns the polity spans.
@@ -323,7 +341,7 @@ They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds 4 and 5):
 | Round | Phase | The moving object |
 |---|---|---|
 | **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of 400 BCE → 1200 CE** (Ben, 2026-09-09) — the empire half of pass 1's 3,600 years; the migration half (2400 BCE → 400 BCE) is round 3's. Polity colour spreads, stalls, fractures. A **leaderboard** on the left tracks military might, research speed, population and share of the world owned. |
-| **5** | **6 — The economic substrate** | Four, in order: **metros growing** from the population centres, **colonial reach across water**, **firm markers and their charters**, and the **market carve with its price field**. |
+| **5** | **6 — The economic substrate** | A time-lapse of 1660 → 1960 showing **industrialisation**, **mass migration** and **decolonisation**, closing on **firm markers and their charters** and the **market carve with its price field** (Ben, 2026-09-15; `DIGITISATION.md` § Part II). |
 
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
 any `world_preference`, and targets no outcome — the tune-the-forces-never-the-outcome rule of
@@ -332,6 +350,11 @@ premise carries over unchanged: **you set conditions, you do not steer.**
 
 **Round 5 shows the selected landscape, not the search.** Phase 6 scores candidates statically in
 milliseconds and the ranking is not a spectacle; what the player watches is the winner being drawn.
+
+**The search is Digitisation's last act, spending its budgets (Ben, 2026-09-15).** Digitisation
+decides how much corporate capital each city holds and where; phase 6 decides which roster and
+placement spends each city's charter budget viably, on the five terms below. Neither decides the
+other's question (`DIGITISATION.md` § This phase sets budgets; the search spends them).
 
 **And the wait becomes the round.** The planetology rounds preview by re-running a cheap pure
 chain per control move; the history sim cannot be previewed that way at any budget. So rounds 4
@@ -362,7 +385,7 @@ standing preference for systemic forces over agent handicaps):
 | **Cultures in a region** | Ground of a foreign culture costs cohesion to hold and assimilates slowly, so conquest buys unrest rather than strength. | Partly built — `w_cult` and a per-region culture index exist in `history_sim.hpp`. |
 | **Simple logistics** | Reach falls with distance from the seat along real terrain, so a campaign past reach cannot be sustained. This is what makes a strait or a mountain stall a frontier without special-casing either. | Owed. |
 | **Communication** | Before a communication rung is reached, a polity cannot act on ground it cannot hear from — which bounds early growth by geography rather than by a cap. | Owed; it is also the second rung of Ben's own arc. |
-| **Succession** | A large polity fractures on a leadership transition, weighted by cohesion. This is the dark-age rung, and `../lore/COLLAPSE.md` already owns culmination. | Partly owned by COLLAPSE.md. |
+| **Succession** | A large polity fractures on a leadership transition, weighted by cohesion. This is the dark-age rung, and `CIVILISATION.md` § How an empire actually falls owns the fall as network failure. | Owned by CIVILISATION.md. |
 | **Strain** | Growth raises strain and strain caps growth; the accumulators already cross the pass 1 → pass 2 handoff. | Built. |
 | **Balancing coalitions** | Neighbours' stance moves against the largest polity. | Owed, and the most dangerous of the six — it is one step from an agent handicap. It is admissible only as a **stance the player can read on the map** (`../politics/RELATIONS.md`), never as a hidden coefficient on the leader. |
 
@@ -677,13 +700,14 @@ beat one with a well-served core and an expensive frontier at the same mean. The
 therefore a **per-market reading whose spread is scored**, exactly like terms 1 and 2, never a
 single global number added to the composite.
 
-**What the term reads is left open, deliberately, and settled by measurement rather than by
-argument.** Two candidates answer the axis: the mean traversal cost from a market to the tiles
-in its catchment, and the in-reach tile **count** rather than the coverage boolean. Both are
-continuous and both move when a tier does. The first slice's job is the one § The first slice is
-the scorer already states — score candidates that differ only in road tier and ask whether the
-chosen reading **discriminates between them at all**. A reading that does not is not worth
-keeping, and finding that out is cheaper than building the rest on it.
+**What the term reads was settled by measurement, not by argument (BL-977, search axes live and
+reach term).** Two candidates answered the axis — the mean traversal cost from a market to the
+tiles in its catchment, and the in-reach tile **count** — and the test was the one § The first
+slice is the scorer states: score candidates that differ only in road tier and ask whether the
+reading **discriminates between them at all**. The mean cost does, monotonically across three
+tiers; the count does not (two tiers apart by parts in a billion), so the term reads the **mean
+reach cost per market**, and its spread across markets is what the composite scores, as an equal
+third spread beside completeness and balance. The level never enters the composite.
 
 **Why the fourth term is not optional, and why the first three could not do its job.** Terms 1–3
 are computed from tiles, markets and population — none of which a candidate changes. Phase 6
@@ -778,7 +802,7 @@ target.
 bands and the unit roster is era-keyed, so the second span is the first span continued with more
 rows offered, not a second mechanism. What pass 2 adds is **reach across water** — a campaign or
 settle target across a sea leg, staged from harbour works — because colonisation by a major is
-the Metropole strategy played overseas, and it culminates as every major does (`../lore/COLLAPSE.md`).
+reach played overseas, and it falls as every major does (`CIVILISATION.md` § How an empire actually falls).
 The epoch still arrives multipolar; the non-hegemony invariant is not relaxed for the sea.
 
 **The boundary year is a parameter with a default, not a fact.** The default is 400 years before
@@ -904,11 +928,18 @@ is high on the real road and sea network; ties, because history routed a colony'
 its metropole. A local firm's early sales are sheltered by the same three, and a player can read
 why on the map.
 
-**The cost question is open and is measured first.** Pass 1 is already the most expensive pass;
-pass 2 doubles it and pass 3 lengthens the warm start. The budget is the generating screen's wait,
-and the affordability rungs in `../lore/COLLAPSE.md` § The 4000-year problem become load-bearing
-in the order that document gives. Whether the shape can be had cheaply is the sprint's question,
-not this document's.
+**The cost is measured, and the second pass is not the expensive half (2026-09-09, `/O2`).** The
+polity engine runs 400 years in 0.9 s and 4,000 in 66 s at the region counts of the day, so pass 1
+is the expensive pass and a second pass on the same engine runs in the low seconds. What remains
+expensive is the unwatched post-era bar. The affordability rungs in `CIVILISATION.md` § The long run
+is paid for by the table apply to pass 1 and to the region count NR-809 measured, not to the shape of
+the passes; the roster half of that reasoning moved to `../research/COLLAPSE_ROSTER.md` when
+`COLLAPSE.md` was retired on 2026-09-16.
+
+Merged late (2026-09-16): this paragraph was measured on 2026-09-09 against a design with ONE pass
+after the dark age. Two ran in its place — Exploration and Digitisation — so read "pass 2" as "a
+span on the polity engine", and take the 0.9 s / 66 s figures as the engine's rate at that region
+count, not as a budget for either round.
 
 ## Open cross-doc items
 

@@ -386,8 +386,8 @@ struct region
     /// Capital standing at this region, valid only where this region is a
     /// living polity's `capital` (which is always its seat — BL-866). Zero
     /// and unused everywhere else. Fed by `run_exploration_upkeep` (BL-932):
-    /// endowment on held ground, the inherited corridor network, and a
-    /// standing market — nothing tops it up, so a polity that inherited
+    /// endowment on held ground, the inherited corridor network, and the
+    /// trade flowing through its market (BL-954) — nothing tops it up, so a polity that inherited
     /// little stays poor. GENERATION SCRATCH, NOT SAVED, same footing as
     /// `material_stock`/`network_supply_q` above.
     int64_t treasury = 0;
@@ -400,11 +400,22 @@ struct region
     // order, offset by one to skip `region_class::none` (farm=0, ore=1,
     // energy=2, port=3) — see `history_sim.cpp`'s `scarcity_good_index`.
 
-    /// Refreshed every decision round by `refresh_market_scarcity` (BL-939)
-    /// while `history_sim_params::exploration_upkeep_enabled` is set. Zero
-    /// and unused on every non-market region. GENERATION SCRATCH, NOT SAVED,
+    /// THE UNMET SIGNAL (BL-954; EXPLORATION.md sec There is no price here:
+    /// "the signal reads UNMET want"). `scarcity_raw_q` below less the volume
+    /// every inbound `trade_flow` brought this round, floored at 0 -- what
+    /// every reader (the tech chooser's `wants_unmet_q`, `market_scarcity_q`)
+    /// sees. Equal to the raw signal wherever nothing flowed in. Zero and
+    /// unused on every non-market region. GENERATION SCRATCH, NOT SAVED,
     /// same footing as `treasury`/`material_stock` above.
     int32_t scarcity_q[4] = {0, 0, 0, 0};
+
+    /// THE RAW WANT (BL-954): what the market's ground lacks and its people
+    /// need, before trade. Refreshed every decision round by
+    /// `refresh_market_scarcity` (BL-939) while
+    /// `history_sim_params::exploration_upkeep_enabled` is set; the ONE input
+    /// a trade flow's volume reads for its want bound, so a flow cannot
+    /// relieve the very signal that sized it. GENERATION SCRATCH, NOT SAVED.
+    int32_t scarcity_raw_q[4] = {0, 0, 0, 0};
 
     // --- BL-935: a built port, navy and standing army ------------------------
     // EXPLORATION.md sec Force persists now, and persistence has a bill.
@@ -420,6 +431,22 @@ struct region
     /// with no port window at all. GENERATION SCRATCH, NOT SAVED, same footing
     /// as `treasury`/`scarcity_q` above.
     int32_t port_stock_q = 0;
+
+    /// BL-955 — THE PAID STANDING ARMY: how many of `army_stock`'s heads are
+    /// men the treasury bought (`run_exploration_upkeep`'s army step) rather
+    /// than men the muster raised. They ARE garrison men — counted inside
+    /// `army_stock`, so they fight, march and die exactly as any other — and
+    /// the one difference is that `muster_garrison` never disbands them: its
+    /// target and its excess are read on the ORDINARY men
+    /// (`army_stock - standing_army_heads`). Lost in proportion to the pool on
+    /// every loss; unfunded, they decay back to ordinary men in the upkeep.
+    /// Valid only while `nation == standing_army_owner` (read through
+    /// `standing_army_heads`), so ground that changes hands loses its paid
+    /// status without every ownership site having to clear it. Zero
+    /// throughout the Empire span, where nothing buys it. GENERATION SCRATCH,
+    /// NOT SAVED: the men themselves persist in the saved `army_stock`.
+    int64_t standing_army       = 0;
+    int     standing_army_owner = -1; ///< the polity that paid for `standing_army`.
 
     // --- Civilisations (BL-869) ---------------------------------------------
     // CIVILISATION.md § A civilisation is what mixing makes, and it is not a
@@ -854,6 +881,36 @@ struct settlement_state
     std::vector<region_reculture> culture_recultured;
 };
 
+/// The ANCIENT endowment under a region — surveyed once, over the window the
+/// region's people would have walked. These deposits predate everyone; what
+/// changes across a campaign is who ends up standing on them.
+///
+/// Held as RAW per-tile-mean richness in thousandths, not as a 0-1000 score:
+/// the four classes live on completely different absolute scales (a rich coal
+/// window and a rich grain window are nowhere near the same number), so an
+/// absolute gain either saturates one class or never fires another. The scores
+/// are computed later, against the world's own means (`score_against` in
+/// settlement.cpp), which is what `region::farm_q` and its siblings hold.
+///
+/// DECLARED HERE, NOT IN settlement.cpp's ANONYMOUS NAMESPACE, so a harness can
+/// read it (BL-966: `tools/verify/survey_endowment_harness.cpp`). It is a pure
+/// function of the tiles under the window — no RNG, no state — and exposing it
+/// changes nothing about who calls it inside generation.
+struct endowment
+{
+    int farm = 0, ore = 0, energy = 0, water = 0; ///< Per-tile mean × 1000.
+};
+
+/// Survey the window centred on (`col`, `row`): `farm` reads agricultural
+/// produce, `ore` reads iron + copper + rare-earth ore, `energy` reads coal +
+/// petroleum, `water` is the share of the window that is water. Every class is
+/// the per-tile mean over the WHOLE window (water cells count in the divisor
+/// and contribute nothing), so a coastal window is poorer per tile than an
+/// inland one of the same ground — that is the harbour discount `classify`
+/// then re-weighs. `ids` is the body's raster-order tile list.
+endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
+                           int col, int row, int gw, int gh);
+
 /// Settle the body: place regions, inherit each one's cradle culture, survey
 /// its ancient endowment, and industrialise the ones the ground can pay for.
 ///
@@ -1156,6 +1213,61 @@ int64_t raise_manpower(region& p, int64_t want);
 /// @param p                    The region; reads `population` and `work_manpower_mod`.
 /// @param garrison_fraction_q  Per-mille of the manpower ceiling to hold under arms.
 int64_t garrison_target(const region& p, int garrison_fraction_q);
+
+/// BL-955 — the paid standing heads inside `p.army_stock`: `standing_army`
+/// while the ground is still held by the polity that paid for it, clamped to
+/// the pool; 0 otherwise. Always 0 in the Empire span.
+inline int64_t standing_army_heads(const region& p)
+{
+    if (p.standing_army <= 0 || p.nation != p.standing_army_owner || p.army_stock <= 0) return 0;
+    return p.standing_army < p.army_stock ? p.standing_army : p.army_stock;
+}
+
+/// BL-955 — after `p.army_stock` fell from @p stock_before, lose the paid
+/// standing heads IN PROPORTION: a loss falls on paid and mustered men alike.
+/// The paid count is read against the pool as it stood BEFORE the loss
+/// (never the shrunken pool, which would destroy paid men twice), and the
+/// result is always <= `army_stock`. A no-op wherever there is no standing
+/// army (the whole Empire span).
+inline void scale_standing_army(region& p, int64_t stock_before)
+{
+    const int64_t raw = (p.standing_army > 0 && p.standing_army_owner == p.nation) ? p.standing_army : 0;
+    const int64_t s   = raw < stock_before ? raw : stock_before;
+    if (s <= 0 || stock_before <= 0 || p.army_stock <= 0) { p.standing_army = 0; return; }
+    if (p.army_stock >= stock_before) { p.standing_army = s < p.army_stock ? s : p.army_stock; return; }
+    p.standing_army = (s * p.army_stock) / stock_before; // s <= stock_before, so <= army_stock
+}
+
+/// BL-955 — draw @p take heads out of `p.army_stock` (clamped to the pool)
+/// for a march, losing the paid heads in proportion. Returns the PAID heads
+/// drawn, which never exceed the heads drawn.
+inline int64_t draw_army_with_standing(region& p, int64_t take)
+{
+    const int64_t stock_before = p.army_stock;
+    if (take <= 0 || stock_before <= 0) return 0;
+    if (take > stock_before) take = stock_before;
+    const int64_t paid_before = standing_army_heads(p);
+    p.army_stock -= take;
+    scale_standing_army(p, stock_before);
+    const int64_t drawn = paid_before - p.standing_army;
+    return drawn < 0 ? 0 : (drawn > take ? take : drawn);
+}
+
+/// BL-955 — call after writing `p.nation`: ground that changed hands keeps
+/// none of its previous holder's paid heads, so a region that is lost and
+/// retaken within one round cannot revive a stale paid count.
+inline void void_stale_standing_army(region& p)
+{
+    if (p.standing_army_owner != p.nation) p.standing_army = 0;
+}
+
+/// BL-955 — the raw invariant: paid heads never exceed the pool, and a paid
+/// count only stands on ground its payer holds.
+inline bool standing_army_invariant_holds(const region& p)
+{
+    return p.standing_army <= p.army_stock
+        && (p.standing_army <= 0 || p.standing_army_owner == p.nation);
+}
 
 /// ONE YEAR of the muster. Below target, close `muster_rate_q` per-mille of
 /// the shortfall by drawing from `manpower_stock` — which is what raising an
