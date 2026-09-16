@@ -185,6 +185,41 @@ constexpr int k_window       = 8;    ///< Trailing quarters averaged (FINANCE.md
 /// a definitional change and part of what moved (BL-1008, 2026-09-16).
 constexpr int k_dead_run     = k_settle_ticks;
 
+// ---------------------------------------------------------------------------
+// THE SETTLE RE-READ (BL-1008, 2026-09-16) — what moved when 80 became 12
+// ---------------------------------------------------------------------------
+// 3 seeds from 0 (not the default 8 — a shared machine), prehistory ON, default
+// --extra 80. Two things changed together and cannot be separated in this pair
+// of runs: the census moved from tick 80 to tick 12, and "dead" went from 20
+// trailing ticks of zero output to the whole 12-tick settle. A reading, not a
+// re-pin: the asserted rows (A1, A2, A3) are PASS at both lengths.
+//
+//   figure                               80 ticks, run 20  12 ticks, run 12
+//   seated dead per seed                 2.3               2.3
+//   seated dead floor, % of filed maint  18.9%             19.6%
+//   seated operating position            +82.22 cr/qtr     +83.35 cr/qtr
+//   field holdings tracked               832               807
+//   field floored (wt 0 or decom)        69.7%             71.1%
+//   field DEAD                           66.7% (555)       33.7% (272)
+//   rivals carrying a dead building      86.5%             53.6%
+//   field dead floor, % of filed maint   12.8%             7.1%
+//   field dry but paying FULL maint      27 holdings       0
+//   dead that produced again (R3)        0 of 555          11 of 272
+//   dead extraction sites UNPRICED       field 176         field 1
+//
+// CAUSES. The seated corp did not move: on seeds 0 and 2 it holds buildings that
+// never produce at any tick, at either length, so every definition of dead
+// agrees. The field HALVED its dead share because roughly as many holdings are
+// floored at tick 12 as at tick 80, but only half of them have yet gone a whole
+// run without output — a floored building at the spawn is mostly one the solver
+// dialled down during the settle, not one that has sat idle for 20 quarters.
+// The unpriced count's collapse (176 -> 1) is NOT explained by this pair: it
+// is larger than the change in holdings tracked, and this re-read did not
+// trace it. A2 is vacuous at the default --extra at BOTH lengths (80 recovery
+// ticks roll the settle's return out of the 40-quarter buffer, so the
+// reconciliation is skipped and the error reads 0); that predates the settle.
+
+
 /// BL-573: empty is correct — nothing in this sweep opens a mercenary contract.
 
 /// Only these two building types produce, so only these two can be said to have
