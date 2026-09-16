@@ -32,8 +32,10 @@ in `tools/verify/README.md`.
   rolling 40-quarter retention drops the oldest first, `book_value` is the registry's
   flat `build_cost` (historical cost — deliberately NOT the press's charge, which adds
   a market-priced materials term), the returns round-trip the save (version named
-  symbolically, never as a literal), and the pre-game warm start's 80 ticks produce
-  byte-identical records across two runs. Build via `build_harness.js`.
+  symbolically, never as a literal), and the settle's 12 ticks (`app::validation_ticks`)
+  produce byte-identical records across two runs. R6 then runs the same generated world
+  on past the retention — the harness's own choice — so the cap and the trimmed window
+  bite on a real world. Build via `build_harness.js`.
 - **`demand_census`** — BL-649, requirement group `demand-census` R1–R4: per resource and per era
   band, the total modelled demand and **which passes inject it**, with every one of MARKETS.md's
   eight channels either represented or explicitly reported ABSENT — an absent channel being the most

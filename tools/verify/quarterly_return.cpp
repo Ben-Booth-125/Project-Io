@@ -52,13 +52,15 @@
 //       stack. A stream one version older is refused whole with the destination
 //       untouched.
 //
-//   R6  THE ITEM-SPANNING GATE. End to end over the pre-game warm start
-//       (80 economy ticks — the retired `app::pre_game_ticks`; the app now
-//       runs `app::validation_ticks`, BL-978 — on a really generated
-//       world): every corporation has a filed history, each corp's last
-//       return's balance is bit-identical to its live
-//       corporation_component.balance, and two identical runs produce
-//       byte-identical records.
+//   R6  THE ITEM-SPANNING GATE. End to end over the settle — phase 6's
+//       validation run, 12 economy ticks (`app::validation_ticks`) on a
+//       really generated world: every corporation has a filed history, each
+//       corp's last return's balance is bit-identical to its live
+//       corporation_component.balance, and two identical settles produce
+//       byte-identical records. The same world then runs on past the
+//       40-quarter retention — the harness's own choice, not the game's; see
+//       the note at k_past_retention_ticks — so the cap and the trimmed-window
+//       telescoping are exercised on a real world and not only the fixture.
 //
 // REGISTRY. This harness is Lua-free by construction (build_harness.js excludes
 // the sol2 TUs), so the economics are restated here as constants taken from
@@ -460,25 +462,74 @@ void run_save_rows(const recipe_registry& reg)
 }
 
 // ---------------------------------------------------------------------------
-// R6 — the item-spanning gate: the real pre-game warm start
+// R6 — the item-spanning gate: the settle, then the same world past retention
 // ---------------------------------------------------------------------------
-constexpr int k_warm_ticks = 80; ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978), and this harness's own settle length is a re-read it owes.
+// TWO LENGTHS, AND ONLY ONE OF THEM IS THE GAME'S (BL-1008 re-read, 2026-09-16).
+//
+// k_settle_ticks mirrors `app::validation_ticks` — phase 6's single validation
+// run, whose balances and filed returns ARE the opening position play receives
+// (ERAS.md § The opening position). The handoff rows and the byte-identity row
+// are read there, because that is the record the seat is drawn from. Restated,
+// not included: app.hpp brings SDL, and this harness is SDL-free by
+// construction. If app::validation_ticks moves, this moves with it.
+//
+// k_past_retention_ticks is THIS HARNESS'S OWN CHOICE, not the game's. At the
+// settle every history is twelve returns long, under the 40-quarter retention,
+// so on a generated world the retention row would pass on nothing and the
+// retained-window telescoping below would never trim — its offset into the
+// measured deltas would be zero. Running the same world on to retention plus
+// one settle makes both bite on a world where construction, hiring, convoys and
+// surveys all move balances, with the settle's own quarters rolled out of every
+// history by the close. R3 proves the trim on the fixture; this proves it holds
+// under the real tick.
+constexpr int k_settle_ticks         = 12;
+constexpr int k_past_retention_ticks =
+    static_cast<int>(k_quarterly_return_retention) + k_settle_ticks;
 
-world warm_started_world(const recipe_registry& reg, uint32_t seed)
+world settled_world(const recipe_registry& reg, uint32_t seed)
 {
     world_params p = no_prehistory();
     p.seed = seed;
     world w = make_hard_coded_world(p);
     assign_default_recipes(w, reg);
     generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
-    for (int t = 0; t < k_warm_ticks; ++t)
+    for (int t = 0; t < k_settle_ticks; ++t)
         tick(w, reg, t);
     return w;
 }
 
-void run_warm_start_rows(const recipe_registry& reg)
+/// Every corp's history length, and whether its last return is its live balance.
+struct history_read
 {
-    std::printf("\nR6 — end to end over the pre-game warm start (%d econ ticks)\n", k_warm_ticks);
+    bool        every_files  = true;
+    bool        capped       = true;
+    bool        last_is_live = true;
+    std::size_t shortest     = static_cast<std::size_t>(-1);
+    std::size_t longest      = 0;
+};
+
+history_read read_histories(const world& w, const std::vector<entity_id>& ids)
+{
+    history_read h;
+    for (const entity_id id : ids)
+    {
+        const corporation_component& cc = w.corporations.at(id);
+        h.every_files = h.every_files && !cc.returns.empty();
+        h.capped      = h.capped && cc.returns.size() <= k_quarterly_return_retention;
+        h.shortest    = std::min(h.shortest, cc.returns.size());
+        h.longest     = std::max(h.longest, cc.returns.size());
+        if (cc.returns.empty())
+            continue;
+        h.last_is_live = h.last_is_live && cc.returns.back().balance == cc.balance;
+    }
+    return h;
+}
+
+void run_settle_rows(const recipe_registry& reg)
+{
+    std::printf("\nR6 — end to end over the settle (%d econ ticks, app::validation_ticks), "
+                "then the same world on to %d ticks (past the %zu-quarter retention)\n",
+                k_settle_ticks, k_past_retention_ticks, k_quarterly_return_retention);
 
     // The retain property has to be measured across the apply_budget CALL here:
     // the real world builds, hires, dispatches and surveys, and every one of
@@ -495,7 +546,7 @@ void run_warm_start_rows(const recipe_registry& reg)
     bool per_tick_exact = true; // every filed net == that tick's measured delta
     int  per_tick_rows  = 0;
 
-    for (int t = 0; t < k_warm_ticks; ++t)
+    for (int t = 0; t < k_past_retention_ticks; ++t)
     {
         w.current_econ_tick = t;
         dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
@@ -544,30 +595,33 @@ void run_warm_start_rows(const recipe_registry& reg)
             ++per_tick_rows;
         }
         credit_arrived_convoys(w, t);
+
+        // --- the handoff: the record play receives -------------------------
+        if (t + 1 == k_settle_ticks)
+        {
+            const std::vector<entity_id> ids = sorted_corp_ids(w);
+            check(!ids.empty(), "R6", "the generated world actually holds corporations");
+            const history_read h = read_histories(w, ids);
+            std::printf("       at the settle: %zu corporations, history length %zu..%zu\n",
+                        ids.size(), h.shortest, h.longest);
+            check(h.every_files, "R6", "every corporation has a filed history at the settle");
+            check(h.last_is_live, "R6",
+                  "at the settle, each corp's last return's balance == its live "
+                  "corporation_component.balance");
+        }
     }
 
     const std::vector<entity_id> ids = sorted_corp_ids(w);
-    check(!ids.empty(), "R6", "the generated world actually holds corporations");
-
-    bool every_files = true, capped = true, last_is_live = true;
-    std::size_t shortest = static_cast<std::size_t>(-1), longest = 0;
-    for (const entity_id id : ids)
-    {
-        const corporation_component& cc = w.corporations.at(id);
-        every_files = every_files && !cc.returns.empty();
-        capped      = capped && cc.returns.size() <= k_quarterly_return_retention;
-        shortest    = std::min(shortest, cc.returns.size());
-        longest     = std::max(longest, cc.returns.size());
-        if (cc.returns.empty())
-            continue;
-        last_is_live = last_is_live && cc.returns.back().balance == cc.balance;
-    }
-    std::printf("       %zu corporations, history length %zu..%zu (retention %zu)\n",
-                ids.size(), shortest, longest, k_quarterly_return_retention);
-    check(every_files,  "R6", "every corporation has a filed history");
-    check(capped,       "R6", "no history exceeds the retention");
-    check(last_is_live, "R6",
-          "each corp's last return's balance == its live corporation_component.balance");
+    const history_read h = read_histories(w, ids);
+    std::printf("       at tick %d: %zu corporations, history length %zu..%zu (retention %zu)\n",
+                k_past_retention_ticks, ids.size(), h.shortest, h.longest,
+                k_quarterly_return_retention);
+    check(h.every_files, "R6", "every corporation still has a filed history past retention");
+    check(h.capped,      "R6", "no history exceeds the retention");
+    check(h.longest == k_quarterly_return_retention, "R6",
+          "the run reached the retention (the cap row above is not vacuous)");
+    check(h.last_is_live, "R6",
+          "past retention, each corp's last return's balance == its live balance");
 
     // R2 on the real world: EVERY filed net is EXACTLY what apply_budget added to
     // the balance that tick. This is the record checked against the loop rather
@@ -579,9 +633,11 @@ void run_warm_start_rows(const recipe_registry& reg)
     std::printf("       %d filed rows replayed against the loop's own addition\n", per_tick_rows);
 
     // ...and the retained window's sum telescopes onto the same measured
-    // deltas over that window, exactly.
+    // deltas over that window, exactly. Past retention the window is TRIMMED, so
+    // the offset into `measured` is non-zero — the case the settle alone never
+    // reaches, and the reason this run is longer than the game's.
     {
-        bool window_exact = true, non_trivial = false;
+        bool window_exact = true, non_trivial = false, trimmed = false;
         for (const entity_id id : ids)
         {
             const corporation_component& cc = w.corporations.at(id);
@@ -591,6 +647,7 @@ void run_warm_start_rows(const recipe_registry& reg)
                 window_exact = false;
                 continue;
             }
+            trimmed = trimmed || m.size() > cc.returns.size();
             double filed = 0.0, loop = 0.0;
             for (const quarterly_return& q : cc.returns)
                 filed += static_cast<double>(q.net);
@@ -601,17 +658,19 @@ void run_warm_start_rows(const recipe_registry& reg)
         }
         check(window_exact, "R2",
               "sum of the retained nets == the loop's movement over the same window, EXACTLY");
-        check(non_trivial, "R2", "the warm start actually moved balances (not vacuously zero)");
+        check(trimmed, "R2",
+              "the window was TRIMMED (retention rolled over, so the offset above is non-zero)");
+        check(non_trivial, "R2", "the run actually moved balances (not vacuously zero)");
     }
 
-    // --- determinism: two identical runs, byte-identical records ------------
+    // --- determinism: two identical settles, byte-identical records ----------
     {
-        const world a = warm_started_world(reg, 11u);
-        const world b = warm_started_world(reg, 11u);
+        const world a = settled_world(reg, 11u);
+        const world b = settled_world(reg, 11u);
         const std::string ia = returns_image(a);
         const std::string ib = returns_image(b);
         check(!ia.empty() && ia == ib, "R6",
-              "two identical runs produce byte-identical filed records");
+              "two identical settles produce byte-identical filed records");
         std::printf("       record image %zu bytes across %zu corporations\n",
                     ia.size(), a.corporations.size());
     }
@@ -643,7 +702,7 @@ int main()
 
     run_fixture_rows(reg);
     run_save_rows(reg);
-    run_warm_start_rows(reg);
+    run_settle_rows(reg);
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES ABOVE",
                 g_failures, g_failures == 1 ? "" : "s");
