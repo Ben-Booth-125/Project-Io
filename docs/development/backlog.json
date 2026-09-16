@@ -147,6 +147,49 @@
     "src/world/hard_coded_world.cpp"
    ],
    "design": "FOUND 2026-09-16 while attributing BL-975's results. At sprint 42's base commit the harness reads 15 passed / 3 failed: R1 (every 0 CE region was founded by year 0), R2 (the 1960 world stays demography-unseeded) and R5 (the 1960 world still industrialises). They are not this sprint's: they pre-date it and nothing in DEVLOG, NEEDS_REVIEW or the backlog records them as a known baseline the way history_sim_harness's R3a2/R3a3 pair is recorded.\n\nWORK: diagnose each. R1 is a founding-schedule question (the span now closes at 1200 while the epoch is 0 CE — a founding dated after the epoch is plausible rather than wrong, in which case the CHECK is stale and says so); R2 and R5 read the two-span arc, which the default epoch never runs, so they may be asserting on a path only `--epoch 1960` exercises. Either fix the code or restate the check, and record whichever it is — an unexplained red teaches the next reader to ignore the harness.\n\nDONE WHEN: era_world_harness is green on main, or each remaining red is named as a baseline in the harness's own header and in DEVELOPMENT_PRACTICES.md's list."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-09-16",
+   "author": "Claude (housekeeping pass, from NR-832)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "id": "BL-1015",
+   "short_name": "TURBULENCE_LEAN_GETS_ITS_OWN_TYPE",
+   "priority": "C",
+   "difficulty": 1,
+   "title": "The turbulence lean reuses `lean::any`, a value that is representable and meaningless",
+   "authority_doc": "docs/generation/PLANETOLOGY.md",
+   "files": [
+    "src/world/planetology.hpp",
+    "src/world/era_minus_one.cpp",
+    "src/world/world_save.cpp"
+   ],
+   "design": "BL-839 (turbulence lean) reused the existing `lean` enum for its axis rather than minting a new type, to avoid a second serialiser and a second bound. The cost: `any` is REPRESENTABLE on this axis and has no meaning there. It is only harmless today because the field defaults to `mid` and the wizard row happens to offer three options, so `any` is unreachable from the UI. A value that is representable and meaningless is exactly what a future reader mishandles, and it is sitting in a SAVED enum - save format 12 carries it.\n\nTHE WORK: mint a three-value type for this axis, give it its own bound and serialiser, and take `any` off the wire. Decided on 2026-09-16 that this is work rather than a judgement - NR-832 put it to Ben as a call, and his answer on the shape was already implied by the entry's own recommendation (\"option 2 when something next touches that serialiser\").\n\nDO IT WHEN something else touches src/world/world_save.cpp, so it rides an existing format bump instead of spending one. It is not worth a bump of its own; it is worth not leaving a meaningless-but-representable value in a saved enum indefinitely.\n\nDONE WHEN: the turbulence axis has its own type, `any` cannot be constructed on it, and the roundtrip check still pins to a literal rather than to the value it wrote (so a writer and reader that both omit the field cannot round-trip clean and call it a pass)."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-09-16",
+   "author": "Claude (housekeeping pass, from NR-864)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "status": "designed",
+   "id": "BL-1016",
+   "short_name": "CREED_CLASSIFIER_COMPARES_ONE_SCALE",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "The sweep's creed classifier compares a product against a mean, so consolidators cannot win",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "tools/verify/exploration_sweep.cpp",
+    "docs/generation/EXPLORATION.md"
+   ],
+   "design": "READING 3 of exploration_sweep calls a culture a consolidator when `consolidator_lean_q > expansion_lean_q`. The two are not on one scale. `consolidator_lean_q = dominion * (1000 - sea_legs) / 1000` is a PRODUCT, so it is at most the smaller factor; `expansion_lean_q = (sea_legs + zeal) / 2` is a MEAN, so it is at least the smaller input. A middling culture (sea 300, zeal 500, dominion 500) reads 350 against 400 and classifies EXPANSIONIST though nothing about it is seafaring. This is BL-318 incommensurability again: the comparison answers a question about arithmetic, not about creeds.\n\nWHY IT MATTERS AND IS NOT COSMETIC. EXPLORATION.md § Two ways to be strong says that if the creed axes do not separate the strategies, the fix is UPSTREAM IN THE EMPIRE PHASE. That is a large conclusion and it must not be drawn from a comparison that could not have come out the other way. On seeds 0-2 all eighteen top-3 entries classified expansionist, consolidator lean 104-190 against expansion lean 610-860.\n\nTHE SIM IS ALREADY FIXED; THIS IS THE INSTRUMENT. BL-955 (spend is scored) uses each lean only as a PER-MILLE RANK among the round's living polities, so the two are compared on one scale wherever the sim reads them. Only the sweep's reading still compares raw values.\n\nTHE WORK, in order: (1) measure the lean distribution over ALL living polities on the 16-seed parity sweep, not the top 3, so the call is made on the population; (2) classify by RANK within the world - a culture is a consolidator if its consolidator lean is in the top third by that lean, and likewise for expansion, so a culture may be both or neither; (3) consider putting both leans on one form in src/ (both products or both means) if the rank fix leaves the raw values readable anywhere else.\n\nDONE WHEN: reading 3 reports a creed mix that can come out either way, and the sweep prints the lean distribution it classified against so the reader can see the population behind the label."
   }
  ]
 }

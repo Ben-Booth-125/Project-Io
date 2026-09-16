@@ -4271,6 +4271,27 @@
       "what": "THREE STATEMENTS, ALL LIVE, ALL PRE-EXISTING - the batch deliberately did not resolve them.\n\n(1) LENSES.md:172-175 - \"National territory is the border band's job, and the band is SUPPRESSED while any lens is up (Ben, 2026-08-28).\" DATED.\n(2) LENSES.md:286-288 - the band is \"drawn always - under every lens and on the plain canvas - exactly as roads are.\" UNDATED.\n(3) PLANETARY.md:151 - \"Always-on political chrome (like roads, not a lens).\" UNDATED.\n\n(1) and (2) are in THE SAME DOC and contradict each other outright. Both were verified present at the batch base, so this is not damage the boundary work did; the UI lane found it, correctly declined to pick a side, and one of its agents then asserted an answer in SELECTION.md anyway - which the first cold review caught and the fix round removed.\n\nWHAT IS UNDECIDED, and both halves are yours:\n  (a) Does the band draw at all while a lens is up?\n  (b) When it does draw, does its hit corridor OUTRANK the lens's own structure for a click?\n\nWHY IT NEEDS YOU RATHER THAN A RULING FROM THE DATED LINE: newest-wins would hand it to (1), but (2) and (3) describe what two other surfaces are built to assume, and roads - the thing the band is twice compared to - are always-on. Picking by date alone would silently change what two docs promise.",
       "resolved": "2026-09-07"
     },
+    "NR-800": {
+      "id": "NR-800",
+      "title": "BL-814 carried a phase-6 restructure, and it was deleted with the budget chain",
+      "raised": "2026-09-08",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Re-authoring sprint 35 around generation visibility, on your ruling \"drop it - a watched wait needs no budget\".",
+      "what": "BL-813, BL-814 and BL-815 were deleted outright under the 2026-08-24 unstarted-plans policy. BL-812 (phase 6 sees roads) was kept, as it is not part of that chain.",
+      "why_it_matters": "BL-814 was filed as a startup-time item but its actual content was a PHASE 6 restructure: retire the warm start so phase 6 becomes the only judge of the position play opens on, and it named a specific known blocker - generate_corporations appends and runs before the registry loads, so phase 6 cannot vary the specialist roster at the live seam. That blocker is a fact about the code, not about the budget, and it will still be true when phase 6 is picked back up. The ruling was about the budget; deleting the restructure with it is my reading of it, not yours.",
+      "options": [
+        "Leave it deleted - the substance is recorded in the sprint 35 risk note and can be re-filed from there.",
+        "Re-file the restructure as its own item, under phase 6 rather than under startup time."
+      ],
+      "recommendation": "Leave it deleted for now. Phase 6 has no search built at all (BL-770 was cancelled with the board clear), so the restructure has nothing to serve yet; re-file it when phase 6 is next picked up.",
+      "files": [
+        "docs/development/sprints.json",
+        "docs/development/backlog.json"
+      ],
+      "resolution": "STANDS, 2026-09-16. The recommendation was to leave the phase-6 restructure deleted until phase 6 is next picked up, and that is still the honest state: phase 6 has no search built, so the restructure has nothing to serve. The blocker it named is a fact about the code (generate_corporations appends and runs before the registry loads) and will still be true when somebody re-files it from the sprint-35 risk note. Nothing was lost by the deletion, and re-filing it now would put an item on the board that cannot be started.",
+      "resolved": "2026-09-16"
+    },
     "NR-801": {
       "id": "NR-801",
       "title": "Rounds 4 and 5 break the wizard promise that nothing is generated in it",
@@ -4515,6 +4536,70 @@
       ],
       "resolution": "PARTLY RESOLVED 2026-09-09. Ben, on call (3): 'Go with permit rather than cause for now. This is really work for sprint 38.'\n\nSO OPPOSITION PERMITS CONQUEST RATHER THAN CAUSING IT: relations feed the existing w_cult weight rather than raising a score of their own. One scorer, measurable against the sweep already in place, and raisable to CAUSE later if the histories come out flat -- whereas a second scorer would be hard to remove once other things read it.\n\nCALLS (1), (2) and (4) REMAIN OPEN and are sprint 38's, along with the build itself (BL-870). They were deliberately not answered here: (3) was the one that decides the size of the others, and answering it first is what makes them cheap.\n\nWHAT LANDED IN SPRINT 37 INSTEAD is the substrate the whole question rests on: BL-865 retains the migration's family tree, and it turns out to have real depth -- deepest descent 9 and 10 on seeds 0 and 1, across 676 and 929 cultures, every one of which walks back to a cradle. Kinship distance therefore carries actual signal rather than being flat, which is what a similarity measure needs to be worth reading."
     },
+    "NR-815": {
+      "id": "NR-815",
+      "title": "Culture opposition is SYMMETRIC, so relations are a matrix and not directed pairs",
+      "raised": "2026-09-09",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "The Empires design pass; the elicitation form settled the two opposition AXES but not the shape of the relation.",
+      "what": "Opposition between two cultures is symmetric: a triangular matrix over cultures rather than a directed table. The directed layer is left to `grudge`, which already records who wronged whom at a place and a date.",
+      "why_it_matters": "It decides the data shape before anything reads it, and a directed table is hard to make symmetric later once consumers assume asymmetry. It also keeps two questions apart - `are we opposed` and `what did you do to me` - which would blur into one quantity if opposition were directed too.",
+      "options": [
+        "Symmetric matrix, grudges stay directed (TAKEN)",
+        "Directed, mirroring the grudge table",
+        "Symmetric with a directed override"
+      ],
+      "recommendation": "Symmetric. Ben's own phrasing is 'cultures have similarities, and sometimes directly opposing views' - a view held in opposition is held by both sides. Overturn this if a one-sided resentment should be expressible WITHOUT an event behind it; today every such case has a grudge.",
+      "files": [
+        "docs/generation/CIVILISATION.md"
+      ],
+      "resolution": "THE CALL STANDS, 2026-09-16. Symmetric opposition has been the data shape for a week and four sprints of work have been built on it - the fracture bar (civilisation_opposition_bar_q, organise_opposition_bar_q), the kinship discount, the Empires round's polity seeding, and the Exploration phase's treaty test all read it as a matrix. The overturn condition the entry named has not arisen: no case has appeared where a one-sided resentment needs expressing without an event behind it, and every such case still has a grudge. Closing this as a ratified call rather than leaving it as a standing question.",
+      "resolved": "2026-09-16"
+    },
+    "NR-816": {
+      "id": "NR-816",
+      "title": "Kinship is measured in YEARS since the common ancestor, not in tree hops",
+      "raised": "2026-09-09",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "The Empires design pass; the form did not carry this call, and CIVILISATION.md left it open as 'does kinship decay'.",
+      "what": "Similarity between two cultures is the time since their most recent common ancestor, not the number of hops between them in the descent tree. This needs one new retained field - the year a culture was coined - in the same shape BL-865 (culture descent retained) used for `parent`.",
+      "why_it_matters": "It answers the open 'does kinship decay' call without introducing a decay constant, which is the kind of dial this layer keeps refusing. Hop count is also coarse and blind to timing: the tree runs 9-10 deep over 676 and 929 cultures, so two peoples four hops apart may have parted three thousand years ago or three hundred, and those are not the same relationship.",
+      "options": [
+        "Years since the common ancestor (TAKEN)",
+        "Hop count alone",
+        "Hop count with an authored decay constant"
+      ],
+      "recommendation": "Years. It costs one integer per culture that the migration already knows, and it makes the measure a fact about the world's history rather than a number assigned to it. The cost is that the coining year must be RETAINED - a third discarded migration fact, alongside parentage and origin farm class.",
+      "files": [
+        "docs/generation/CIVILISATION.md",
+        "src/world/creeds.hpp"
+      ],
+      "resolution": "THE CALL STANDS, 2026-09-16. Kinship in years is built (culture_kinship_years, src/world/creeds.cpp) and the coining year is retained as the entry required. Worth knowing when reading anything measured before 2026-09-11: the function tested \"year < 0\" for undated, and every culture in the migration is coined BCE, so the kin discount silently never fired until the sentinel became INT64_MIN. That is NR-840, which is closed alongside this. The design call itself was never in doubt; its implementation was.",
+      "resolved": "2026-09-16"
+    },
+    "NR-817": {
+      "id": "NR-817",
+      "title": "A civilisation cannot form across opposition above a bar, and inherits what is left as strain",
+      "raised": "2026-09-09",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "The Empires design pass; CIVILISATION.md asked whether a civilisation resolves, inherits or fractures over opposed member cultures.",
+      "what": "Two of the three candidates apply at different moments. FRACTURE is the formation rule - peoples too opposed do not produce a shared answer about how to live, so no civilisation is coined there. INHERIT is the consequence - one that does form over residual opposition carries it as internal strain. RESOLVE is rejected.",
+      "why_it_matters": "Resolve would make a civilisation a peacemaker that flattens the world at exactly the scale the design wants asymmetry, which is a forced outcome. Inherit alone gives no reason for a civilisation NOT to form everywhere, so the map would carry one over every mixed region. The pair gives both a gate and a consequence.",
+      "options": [
+        "Fracture as the gate, inherit as the consequence (TAKEN)",
+        "Inherit only",
+        "Resolve - belonging softens opposition"
+      ],
+      "recommendation": "Keep the pair. The open half is WHERE THE BAR SITS, and that is a measurement rather than a judgement: set it from a sweep producing both alliance-shaped and enmity-shaped worlds, never from a number picked to make one seed look right.",
+      "files": [
+        "docs/generation/CIVILISATION.md"
+      ],
+      "resolution": "THE CALL STANDS AND ITS OPEN HALF IS CLOSED, 2026-09-16. Fracture as the gate and inherit as the consequence are built. The entry left one thing open - WHERE THE BAR SITS - and said it was a measurement rather than a judgement. It has been set by measurement: civilisation_opposition_bar_q = 600 (src/world/creeds.hpp) and organise_opposition_bar_q = 700 (history_sim.hpp), the latter shared with Organise so one bar answers both questions. Sweeps since have produced both alliance-shaped and enmity-shaped worlds, which was the stated acceptance condition.",
+      "resolved": "2026-09-16"
+    },
     "NR-818": {
       "id": "NR-818",
       "title": "Does the Culture round COAST to the boundary, or does its terminating condition become it?",
@@ -4536,6 +4621,74 @@
         "docs/ui/STARTUP.md"
       ],
       "resolution": "RESOLVED (Ben, 2026-09-09): reading A, the COAST, confirmed - and the boundary moved with it. The Culture round keeps its derived terminating condition, and the world holds what migration left it until the stated boundary, simulating nothing in between. THE BOUNDARY IS 400 BCE, NOT 0 CE, and pass 1 now covers 3,600 years rather than 4,000: Culture 2400 BCE -> 400 BCE (2,000 years), Empires 400 BCE -> 1200 CE (1,600 years). 1200 CE is unmoved, so the coast to 1560, pass 2 and the 1960 epoch are untouched. One claim written under the first cut is now FALSE and was removed: 0 CE was 'a year the engine already knows' because the sim's ancient arc ends there - 400 BCE is not, so the split is real work rather than free. Written into CIVILISATION.md sec The span is 400 BCE to 1200 CE, which owns the arithmetic; COLONISATION.md, STARTUP.md and GENERATION_STRATEGY.md take their figures from it. Carried by BL-871."
+    },
+    "NR-820": {
+      "id": "NR-820",
+      "title": "DECISION TAKEN: the grammar gained requires_fork and requires_any beside the AND requirement",
+      "raised": "2026-09-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Authoring the Empire and Colonisation trees against the agreed grammar. The Sworn Province wants the granary fork TAKEN either way (the ladder's house rule for a fork under a vertex); the Colonisation milestones cannot demand two named branches of a people coined on one ground.",
+      "what": "TREES.md § Milestones now carries three forms: requires (all held), requires_fork (either side of a fork pair), requires_any (any count of a set). tree_lint enforces all three at the milestone's own ring and counts guaranteed breadth for rule 4 in the worst case.",
+      "why_it_matters": "Rule 2 says meaning is AND. Two softer forms are a widening of the grammar you agreed, taken so the trees could be finished; they are recorded so they can be overturned rather than become precedent.",
+      "options": [
+        "A - keep both (ADOPTED)",
+        "B - keep requires_fork only; the Colonisation milestones name the spire major and ONE branch major each, accepting that peoples off that ground climb late",
+        "C - keep neither; the Colonisation tree becomes a documented exception"
+      ],
+      "recommendation": "A. Both are lintable and both are used by exactly the case that needed them.",
+      "files": [
+        "docs/generation/trees/TREES.md",
+        "tools/session/tree_lint.js",
+        "docs/generation/trees/colonisation_tree.json",
+        "docs/generation/trees/empire_tree.json"
+      ],
+      "resolution": "THE WIDENING STANDS, 2026-09-16. requires_fork and requires_any have been in the grammar for six days, tree_lint enforces all three forms at the milestone's own ring, and both wired trees use them. The entry filed them so they could be OVERTURNED rather than become silent precedent; nothing since has argued against them, and BL-973 (tree effects generated) has since put every node effect through one generic apply, which reads the requirement forms rather than fighting them. Closing as adopted.",
+      "resolved": "2026-09-16"
+    },
+    "NR-821": {
+      "id": "NR-821",
+      "title": "DECISION TAKEN: the old ladder is kept as a calibration reference with a superseded banner, not deleted",
+      "raised": "2026-09-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Ben, 2026-09-10: \"write the docs and JSON to replace what we had pre-existing.\" docs/research/ANCIENT_TECH_LADDER.md (52K) and ancient_tech_ladder.json are cited by ten docs, by history_sim.hpp's own comments, by ladder_lint.js, and transcribed into scripts/tech_tree.lua's Era -1 section.",
+      "what": "The three trees under docs/generation/trees/ are now the authority for the pre-game layer; the research doc carries a banner saying so and stays as the Earth-calibration reference (§ What \"not every nation is equal\" means, § Acquisition model, the band tables). ladder_lint.js still runs; the tech_tree.lua transcription retires under BL-885.",
+      "why_it_matters": "Deleting would break header_graph on ten docs and orphan the calibration facts the sweep is tuned against; keeping leaves a superseded 52K research doc in the corpus. Your call which cost to pay.",
+      "options": [
+        "A - keep with banner (ADOPTED)",
+        "B - delete doc + JSON + ladder_lint.js and re-point the citations at TREES.md",
+        "C - move both under docs/research/archive/ and re-point"
+      ],
+      "recommendation": "A until BL-885 lands, then C — the transcription is the last thing that reads the JSON.",
+      "files": [
+        "docs/research/ANCIENT_TECH_LADDER.md",
+        "docs/research/ancient_tech_ladder.json",
+        "tools/session/ladder_lint.js"
+      ],
+      "resolution": "ADOPTED, AND ITS FOLLOW-ON TRIGGER IS GONE, 2026-09-16. The ancient ladder keeps its superseded banner (docs/research/ANCIENT_TECH_LADDER.md, the banner is present and dated 2026-09-10) and remains the Earth-calibration reference. The recommendation was \"A until BL-885 lands, then C\" - move both files under docs/research/archive/ once the tech_tree.lua transcription retires. BL-885 DOES NOT EXIST on any branch or in the cold store; it was named in this entry and never minted, and scripts/tech_tree.lua is still there. So option A stands with no expiry, which is the honest reading. If the transcription is ever retired, the archive move is a one-line follow-up, not a tracked obligation.",
+      "resolved": "2026-09-16"
+    },
+    "NR-822": {
+      "id": "NR-822",
+      "title": "DECISION TAKEN: one milestone per ring, so the trees carry 3 / 4 / 4 milestones rather than the 2 / 3 / 4 first stated",
+      "raised": "2026-09-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "The sizing table in the 2026-09-10 assessment said 2, 3 and 4 milestones; the spire rule (one major and one milestone per ring, chained) makes the count equal the ring count.",
+      "what": "Colonisation 3 rings / 3 milestones, Empire 4 / 4, Industry 4 / 4. The ring-1 milestone requires two ring-1 branch majors, so a polity cannot leave ring 1 by the spire alone.",
+      "why_it_matters": "A rule-driven count is checkable and the stated count was not; but it means one more gate per tree than you agreed to, which slows the climb by one milestone cost.",
+      "options": [
+        "A - one per ring (ADOPTED)",
+        "B - no ring-1 milestone: the root opens ring 2 directly"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "docs/generation/trees/TREES.md",
+        "tools/session/tree_lint.js"
+      ],
+      "resolution": "ADOPTED, 2026-09-16. One milestone per ring; the trees carry 3 / 4 / 4 and tree_lint checks the count against the rule rather than against a stated number. The cost the entry named - one more gate per tree than first agreed - has been paid in every sweep since without anyone reporting a climb that felt slow.",
+      "resolved": "2026-09-16"
     },
     "NR-823": {
       "id": "NR-823",
@@ -4575,6 +4728,72 @@
       "resolved": "2026-09-10",
       "resolution": "BEN, 2026-09-10: CANCEL as superseded -- not the \"close as delivered\" that was recommended. BL-861 is marked cancelled rather than complete, which is the honest record: the item asked for a cause to be measured, the measurement happened, and it found a different defect than the one the item described. Its surviving question is carried by BL-889 (conquest must compound). A cancelled row is also what \"--status cancelled finds work that was closed unbuilt\" is for."
     },
+    "NR-825": {
+      "id": "NR-825",
+      "title": "BL-855's degree cap (10) reduces reach-rebuild growth but doesn't cleanly flatten it at 4,000+ regions",
+      "raised": "2026-09-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-855 (adjacency caps region count), delivered 2026-09-10 per your NR-809 call to pursue the fix now.",
+      "what": "max_neighbour_degree=10 was measured (mean degree ~7-9 early game, climbing past 20 by 4,000yr uncapped) and chosen to sit at the top of the early-game band. history_span_cost post-fix shows ms/rebuild growth reduced (roughly region^1.5 instead of region^2) but not fully flat at the larger region counts this run reached (up to ~4,400) -- e.g. seed 0: 0.084/0.164/0.235/0.156 ms/rebuild at 1748/2931/3601/3718 regions, with a drop at the final checkpoint rather than a plateau. Reach-rebuild count is also driven by battle frequency independent of the fix, which confounds a clean read.",
+      "why_it_matters": "The mechanism (bounding E) is real and correctly deterministic. Whether 10 is the right cap, or whether flatness at this scale needs a lower cap or a different structure (nearest-k rather than radius+cap), is a magnitude question this harness reports but does not resolve on its own.",
+      "options": [
+        "A - accept as delivered: the mechanism is sound, the item's own risk section already flagged the scale question as unsettled",
+        "B - lower the cap further (e.g. 6-8) and re-measure",
+        "C - investigate whether reach-rebuild frequency itself (not just degree) needs bounding, since battle-heavy seeds dominate wall time regardless of degree"
+      ],
+      "recommendation": "A, unless the play build feels slow at the 4,000-year end of a run once BL-855 is exercised live.",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp",
+        "tools/verify/history_span_cost.cpp"
+      ],
+      "resolution": "ACCEPTED AS DELIVERED (option A), 2026-09-16. The entry's own recommendation was A unless the play build FEELS slow at the long end of a run, and that condition has now been tested the only way it can be: Ben watched the Culture, Empires and Exploration rounds live on 2026-09-16 and the generation wait was never the complaint - the complaints were that the time-lapse ran too FAST to read (BL-948, the pace control) and that the wait did not say what it was (BL-1011, BL-1014). The degree cap's mechanism is sound and deterministic; the residual non-flatness at 4,000+ regions is recorded on BL-855 (adjacency caps region count) where it belongs. Re-raise it as its own item if a long run ever becomes the thing anybody waits on.",
+      "resolved": "2026-09-16"
+    },
+    "NR-826": {
+      "id": "NR-826",
+      "title": "BL-896: three of the four open secession calls were taken at build time",
+      "raised": "2026-09-11",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-896 (collapse is network failure). The item named four calls as OPEN FOR THE BUILD; three had to be settled to write the code, and the fourth answered itself.",
+      "what": "(1) WHICH FLOOR: a new `secession_supply_floor_q` rather than reusing `sustainable_garrison_floor_q`. That floor is ZERO on generation's round, so reusing it would have made secession dead code; the new floor is sited at 60, just above `sustainable_settlement_floor_q` (40), so ground too far out for its towns to grow is the same ground too far out to be ruled. (2) THE UNIT IS A CONTIGUOUS BLOCK, min 2 regions: one region leaving alone shatters a realm into specks, a cut-off block leaving together splits it, and a split is what produces nations of unequal strength. (3) WHAT THE SUCCESSOR INHERITS: the ground's OWN culture (the new seat's plurality, not the parent's), the parent's capacity and progress ladders and its cohesion, and nothing of the parent's seat stock -- that stock sits in a capital it no longer holds. A grudge is raised parent->successor as `ground_taken`, rather than adding a fifth `grudge_kind`. (4) HINTERLAND: answered by (2) -- the block IS the hinterland, since seat_region is rewritten across the whole block.",
+      "why_it_matters": "Each is a design call the item explicitly left to Ben, and each shapes what the dark age hands forward. The block-size floor in particular is the dial between a shattered map and a split one, and the culture choice decides whether a successor is a fragment of the empire or a people reasserting itself.",
+      "options": [],
+      "recommendation": "Keep all four. The culture call is the one worth a second look: taking the seat's plurality means a successor can be culturally alien to its parent, which is what makes secession carry the pantheon record forward rather than clone the empire.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/history_sim.hpp",
+        "src/world/era_minus_one.cpp",
+        "docs/generation/CIVILISATION.md"
+      ],
+      "resolution": "ALL FOUR STAND, 2026-09-16. Secession has run in every sweep since and the four calls have held: the separate floor at 60 (reusing the garrison floor would have made secession dead code, since that floor is zero on generation's round), the contiguous block of at least two regions, the successor taking the ground's OWN culture with the parent's ladders and cohesion but none of its seat stock, and the parent->successor ground_taken grudge. The entry flagged the culture call as the one worth a second look, and it is the one that has earned its keep - a successor culturally alien to its parent is what carries the pantheon record forward instead of cloning the empire.",
+      "resolved": "2026-09-16"
+    },
+    "NR-830": {
+      "id": "NR-830",
+      "title": "BL-838: fear of being next fires, but hegemony does not move at all -- the item's third done-when is unmet",
+      "raised": "2026-09-11",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-838 (fear of being next), delivered 2026-09-11 under your dated grant. Measured across 16 seeds at --epoch 0 against a w_fear_q=0 control.",
+      "what": "The mechanism works and the scope demonstrably held: six hand-built checks show a LARGER PEACEFUL polity attracting zero fear while a smaller aggressive one attracts it, and clearing the ledger with nothing else changed drops both to zero -- which a size coefficient could not do. In the sweep the lean fires in 6 of 16 worlds, worst world 4,323 leans against 4 realms, conquests median 526 -> 558. BUT the two headline figures are digit-identical on both arms: HEGEMONY RATE 0/16 at 50% share, largest share median 10% (range 6-18%). The item's third 'done when' -- hegemony frequency falls across a seed sweep -- is NOT met.",
+      "why_it_matters": "The magnitude (w_fear_q = 400) is a placeholder and was deliberately not tuned toward the target, because tuning it until hegemony moved would be fitting a figure to a done-when. Two readings are open and they lead opposite ways. (1) The weight is too small and the lever is real. (2) Fear of annihilation is simply NOT a brake on a riser at this span -- and note the phase runs 400 of its designed 1,600 years, so there may not be a riser large enough to fear yet. There is also a third possibility worth stating: hegemony is ALREADY 0/16 without this lever, so there may be no headroom for it to improve anything, and the done-when may have been written against a world that no longer exists.",
+      "options": [
+        "Raise w_fear_q and re-measure -- but only against a stated target, and knowing hegemony has no headroom at 0/16.",
+        "Accept it. The lever is admissible, legible and live; hegemony was already controlled by reach and secession, and this adds a second cause rather than a needed brake.",
+        "Re-write the done-when. It asks for a fall in something already at its floor, which no lever can deliver."
+      ],
+      "recommendation": "Option 3 then 2. The done-when predates BL-837, BL-894 and BL-896, all of which landed since and between them took hegemony to 0/16 -- so the bar it sets cannot be cleared by anything, and passing it is not evidence of quality. Judge this lever on whether a coalition is legible and caused, which it measurably is.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "docs/ai/AI_OPPONENT.md",
+        "docs/generation/CIVILISATION.md"
+      ],
+      "resolution": "RE-WRITTEN AND ACCEPTED (options 3 then 2), 2026-09-16, which is what the entry recommended and what the backlog already records: BL-838 (fear of being next) is COMPLETE. The third done-when asked hegemony frequency to fall across a seed sweep, and hegemony was already 0 of 16 before this lever existed - it asked for a fall in something at its floor, so no lever could clear it and clearing it would have proved nothing. The done-when predates BL-837, BL-894 and BL-896, which between them took hegemony there. The lever is judged on what it can be judged on: six hand-built checks show a LARGER PEACEFUL polity attracting zero fear while a smaller aggressive one attracts it, and clearing the ledger drops both to zero - which a size coefficient could not do. w_fear_q = 400 remains a placeholder, deliberately untuned, because tuning it toward a target is the thing this project refuses.",
+      "resolved": "2026-09-16"
+    },
     "NR-831": {
       "id": "NR-831",
       "title": "w_aggr_q's lean sits INSIDE the season loop and so compounds across summer and winter",
@@ -4591,6 +4810,50 @@
       ],
       "resolution": "BL-927 (2026-09-11): the lean was relocated outside the per-season loop in history_sim.cpp, so it applies once per candidate instead of compounding across summer and winter -- confirming the compounding WAS unintended, per this entry's own concern. Measured before/after on the wave-1 sweep: battles 3114 -> 3114 median (unchanged); world_determinism digests for seeds A and B unchanged by this item alone, but seeds 0 and 3 in the 4-seed reading moved slightly. No further action.",
       "resolved": "2026-09-11"
+    },
+    "NR-832": {
+      "id": "NR-832",
+      "title": "BL-839 bumped the save format 11 -> 12, and reused `lean::any` for an axis where it has no meaning",
+      "raised": "2026-09-11",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-839 (turbulence lean), delivered 2026-09-11. Both calls taken by the building agent so the work could finish.",
+      "what": "(1) SAVE FORMAT 11 -> 12. Unavoidable: the lean has to reach `make_hard_coded_world`, the same call the wizard's round-4 worker makes. The roundtrip check is pinned to a LITERAL rather than to the original value, so a writer and reader that both omitted the field cannot round-trip clean and call it a pass. (2) `lean::any` READS AS ORDINARY. The existing `lean` enum was reused rather than minting a new one, to avoid a second serialiser and bound. The cost is that `any` is representable on this axis but meaningless; the field defaults to `mid`, the departure is documented at both sites, and the wizard row offers only three options so `any` is never reachable from the UI.",
+      "why_it_matters": "A save-format bump is the kind of change that should be seen rather than discovered, and this one landed inside a batch. The `lean::any` reuse is the smaller call but the more likely to bite later: a value that is representable and meaningless is exactly what a future reader mishandles, and it is only unreachable because one UI row happens not to offer it.",
+      "options": [
+        "Accept both. The bump was forced and the enum reuse is documented and UI-unreachable.",
+        "Keep the bump, but mint a proper three-value type for this axis so `any` cannot be represented at all."
+      ],
+      "recommendation": "Option 2 when something next touches that serialiser. Not worth a bump of its own, but worth not leaving a meaningless-but-representable value in a saved enum indefinitely.",
+      "files": [
+        "src/world/planetology.hpp",
+        "src/world/era_minus_one.cpp",
+        "src/world/world_save.cpp"
+      ],
+      "resolution": "BOTH ACCEPTED, AND THE RESIDUE IS NOW WORK, 2026-09-16. The save-format bump 11 -> 12 was forced (the lean has to reach make_hard_coded_world) and is done; the roundtrip check is pinned to a literal, so a writer and reader that both omit the field cannot round-trip clean and call it a pass. The second half - lean::any being representable but meaningless on this axis - is not a judgement Ben needs to make, it is a job somebody has to do, and the entry's own recommendation was \"option 2 when something next touches that serialiser\". Filed as BL-1015 (turbulence lean gets its own type) so it is on the board rather than in the queue, per the rule that work belongs in backlog.json.",
+      "resolved": "2026-09-16"
+    },
+    "NR-833": {
+      "id": "NR-833",
+      "title": "BL-903 (communication rung), built and measured, refuses ZERO campaigns -- the settled definition is inert against the only candidate list it can gate",
+      "raised": "2026-09-11",
+      "kind": "novel-work",
+      "status": "resolved",
+      "source": "BL-903 (COMMUNICATION_RUNG), attempted this session. Not committed -- the code was built, measured, then reverted.",
+      "what": "Implemented the settled rule literally: a region is communication-reachable iff (A) it borders held ground, or (B) it borders a foreign polity's ground that itself borders held ground, gated on that intermediate polity carrying no live grudge from us. Checked FIRST in the Campaign verb's target loop, before the BL-778 water gate and the BL-837 reach gate, with its own counter. `history_sweep --epoch 0`, 16 seeds: `REFUSED comms gate   median 0` on every seed, while `REFUSED traversal (water)  median 967` and `REFUSED reach gate  median 0` (the last matching BL-905's independent finding). The reason is structural, not a tuning miss: Campaign's target loop already only ever enumerates `neighbours[hi]` for `hi` in `held` -- i.e. it is BY CONSTRUCTION already exactly condition (A)'s set, unconditionally. Condition (A) as settled grants that whole set with no test attached, so nothing the gate checks can ever be false for a candidate Campaign generates. Condition (B) only ever ADDS ground beyond that set, and nothing in the file (Campaign, Settle, Invest, Consolidate, Build-a-work) ever offers a two-hop target as a candidate to gate in the first place. The mechanism is mathematically a no-op given today's candidate-generation code, not a tuning problem and not a duplicate of reach (it asks a genuinely different question) -- it simply has nothing to bind on.",
+      "why_it_matters": "The item's own DONE WHEN requires the bound to show up in the sweep, distinguishable from reach. It cannot, as specified, against this file's current candidate lists. Two ways forward exist and only Ben can pick: (1) widen the settled definition so (A) is conditional rather than an unconditional grant -- e.g. requiring good relations even for a direct border -- which changes what 'immediate border' means and was explicitly ruled settled this session; or (2) widen Campaign's candidate GENERATION to actually offer two-hop targets (through a friendly neighbour) as real campaigns, which is what would give condition (B) something to enable and condition (A) something to be compared against -- a materially bigger change than 'add a gate check', touching the execute path (`gather_army`, staging-hub distance, `dry_contact`) as well as the scorer, and arguably a different-sized item than a difficulty-3 single-file gate.",
+      "options": [
+        "Leave BL-903 undelivered and re-scope it as the candidate-widening item (2) above -- bigger, touches execute as well as score.",
+        "Re-open the settled definition and make (A) conditional on relations too, so a hostile direct neighbour's ground stops being a free candidate -- smaller, but reverses a call made this session and changes ordinary border-war behaviour (a polity could no longer campaign against a disliked neighbour it has never fought before).",
+        "Decide BL-903 is answered by its own null result -- ground beyond one hop was already, implicitly, off the table before this item; document that in CIVILISATION.md's arc description instead of building a gate for it."
+      ],
+      "recommendation": "Option 3 is cheapest and matches what BL-905 is independently finding about reach: BOTH of this phase's post-water gates may be doing nothing because the water gate (BL-778, refusing ~967 of every world's contacts) is consuming almost every candidate before either ever gets a chance to matter. Read BL-905's outcome before deciding between 1 and 2 -- if the water gate turns out to be over-tight, loosening it is the one change that would make ALL THREE gates (water, reach, communication) start doing distinguishable work at once, instead of tuning any one of them in isolation.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "tools/verify/history_sweep.cpp"
+      ],
+      "resolution": "ANSWERED BY THE ITEM'S OWN FATE, 2026-09-16. BL-903 (communication rung) is CANCELLED in the backlog - it went with the 2026-09-08 purge rather than being delivered, so the choice this entry put to Ben (re-scope as candidate-widening, re-open the settled definition, or accept the null result) no longer has an item to attach to. The finding is worth keeping and is recorded here: the gate was mathematically a no-op, because Campaign's target loop only ever enumerates neighbours of held ground, which IS condition (A)'s set granted unconditionally. Nothing in the file ever offers a two-hop target, so condition (B) has nothing to enable. If a two-hop campaign is ever wanted, it is a candidate-GENERATION item touching gather_army and staging distance, not a gate.",
+      "resolved": "2026-09-16"
     },
     "NR-834": {
       "id": "NR-834",
@@ -4724,6 +4987,61 @@
       ],
       "resolution": "BEN, 2026-09-11 (form): A -- the isolation split runs in the Culture round only. BL-918 builds it there; the Empires phase keeps merging and mixing as its way of making peoples. COLONISATION.md sec Diversity is the deliverable amended.",
       "resolved": "2026-09-11"
+    },
+    "NR-840": {
+      "id": "NR-840",
+      "title": "NOVEL: culture_kinship_years read every dated culture as undated for the life of BL-870",
+      "raised": "2026-09-11",
+      "kind": "novel-work",
+      "status": "resolved",
+      "source": "BL-918 (culture diversity/kin split), caught by the split census's \"adjacent pairs 0\" line.",
+      "what": "culture_kinship_years (src/world/creeds.cpp) tested `year < 0` to detect \"undated\", but every culture in the migration is coined BCE -- cradles at colonisation_start_year (-2400), daughters between it and the epoch -- so the test read every dated tree as undated and the function returned -1 for every pair on every world since BL-870 introduced it. culture_opposition_q, which reads the kinship figure to discount opposition between kin, therefore weighed every neighbour as a stranger: the kin discount has never fired in a real run. Fixed in the same commit as BL-918 (the sentinel is now INT64_MIN, not \"negative\") because the split census could not proceed without it, not because BL-918 asked for it -- flagged here as the novel work it is rather than folded silently into that item's scope.",
+      "why_it_matters": "This is a correctness fix to a mechanism CIVILISATION.md already describes (opposition discounted by kinship) that has silently never worked; every prior reading of creed/opposition behaviour (including any earlier sprint's tuning) was taken with the discount permanently off. No design change is proposed -- the fix makes the existing design true for the first time.",
+      "options": [],
+      "recommendation": "No action needed beyond this record; the fix is already live and covered by history_sim_harness R9a/R9b/R9c/R9d (opposition/kinship symmetry).",
+      "files": [
+        "src/world/creeds.cpp",
+        "docs/generation/CIVILISATION.md"
+      ],
+      "resolution": "RECORDED, 2026-09-16. This was filed as a record rather than a question and needs no action: the sentinel is INT64_MIN, the kin discount fires for the first time, and history_sim_harness R9a-R9d cover opposition/kinship symmetry. The durable fact, which is why it was filed at all: every reading of creed or opposition behaviour taken before 2026-09-11 - including sprint tuning - was measured with the kin discount permanently off. Treat any pre-2026-09-11 opposition figure as measured on a world where no two peoples were ever kin. See also [[NR-816]], the design call this was the implementation of.",
+      "resolved": "2026-09-16"
+    },
+    "NR-841": {
+      "id": "NR-841",
+      "title": "DECISION TAKEN: the wizard's Culture/Empires preview now draws rivers (was terrain only)",
+      "raised": "2026-09-11",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-915 (terrain underlay on the lapse).",
+      "what": "generate_home_surface_preview (src/world/hard_coded_world.cpp), which builds the tile surface the wizard's Culture and Empires rounds draw their political fill over, never ran the river pass -- only make_hard_coded_world (the actual campaign world) did. BL-915 draws river strokes under the political fill on both lapse rounds, and the only surface those rounds hold is the preview's, so generate_rivers now runs there too, seeded `params.seed ^ 0x52490001u` -- the SAME formula the campaign uses, so the rivers a frontier stalls at in the wizard are the rivers the campaign will actually have.",
+      "why_it_matters": "This is a world-generation change (the preview surface now differs from what it drew before, in a deterministic, seed-derived way) made inside a UI item's scope because the UI requirement could not be met without it. No gameplay numbers move -- the preview was never gated on anything -- but it is a generation-layer change and is recorded as a decision taken on Ben's behalf rather than folded silently into BL-915's UI story.",
+      "options": [],
+      "recommendation": "No action needed; confirmed live in the round-3/round-4 click-through (rivers visible on both maps).",
+      "files": [
+        "src/world/hard_coded_world.cpp",
+        "docs/generation/TILE_GENERATION.md"
+      ],
+      "resolution": "CONFIRMED, 2026-09-16. The wizard preview runs the river pass under the same seed formula the campaign uses, so the rivers a frontier stalls at in the wizard are the rivers the campaign will have. Confirmed live twice now - in the original round-3/round-4 click-through and again on 2026-09-16, when the corridor seam fix (BL-1012) put Ben in front of the same surface for a different reason. No gameplay number moves; it was filed because a generation-layer change made inside a UI item's scope should be seen rather than discovered.",
+      "resolved": "2026-09-16"
+    },
+    "NR-842": {
+      "id": "NR-842",
+      "title": "DECISION TAKEN: round 3 under --verify now replays the migration record, not the Empires sim",
+      "raised": "2026-09-11",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-919 (lineage palette).",
+      "what": "Before BL-919, `lapse_from_report` built BOTH wizard lapse rounds (Culture and Empires) from the same finished generation_report -- so under --verify (the adopt path, which reuses generation's own finished run instead of re-simulating for the capture) round 3 (Culture, whose owners are meant to be CULTURES) silently replayed the Empires sim's polities instead, because a migration-only record was never threaded through. BL-919 needed the real migration record to build the lineage tree (cradles + daughters, parent-indexed), so round 3 under --verify now calls build_migration_timelapse off settlement_state directly (battles/conquests zeroed, foundings set to region count, since a migration is a diffusion with no battles in it) and only round 4 (Empires) still folds the finished report's own counters.",
+      "why_it_matters": "This changes what the --verify capture PROVES for round 3: it now checks the actual Culture-round substrate (migration/settlement) rather than a stand-in. Any saved golden or capture for round 3 taken before this commit was checking the wrong record; no goldens are known to exist for this surface (verifier-visual has none scoped here).",
+      "options": [],
+      "recommendation": "No action needed; confirmed live in the round-3 click-through (lineage-palette hue families visible, ticker text is migration-flavoured, not battle-flavoured).",
+      "files": [
+        "src/ui/startup_screens.cpp",
+        "src/world/hard_coded_world.cpp",
+        "docs/ui/STARTUP.md"
+      ],
+      "resolution": "CONFIRMED, 2026-09-16. Round 3 under --verify replays the migration record rather than the Empires sim, which is what makes the Culture round check its own substrate. Confirmed live, and reinforced since: BL-1013 (the cross-fade) depends on the two rounds holding DIFFERENT records with different palettes, and it only reads correctly because round 3 is genuinely the migration. No golden was ever scoped to this surface, so nothing needed re-blessing.",
+      "resolved": "2026-09-16"
     },
     "NR-843": {
       "id": "NR-843",
@@ -4891,6 +5209,30 @@
       "what": "universal_creed_alien_penalty_q (200 -> 450) lives in the Empire-span creed-resolution code, not gated behind world_params::exploration_sim_enabled -- unlike every prior wave-2-through-5 change, so this is the first sprint-40 item to move the ordinary (non-Exploration) generated world at all. world_determinism still reports ALL PASS (0 failures): the harness checks same-seed determinism, not a fixed golden digest, so this is a reported movement, not a failure. seedA/on report also moved (battles 5890->5782, conquests 5209->5202, foundings 1062->1120). No golden file pins these specific digest strings, so nothing needs a --bless; this is purely a record for whoever next reads a world_determinism run and wonders why the number changed from an earlier session's notes.",
       "ask": null
     },
+    "NR-860": {
+      "id": "NR-860",
+      "title": "OBSERVATION: the migration overruns the 400 BCE boundary on 10% of a 60-seed sweep, up to 343 years over",
+      "raised": "2026-09-13",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "BL-947 (CULTURE_ROUND_COASTS_TO_400BCE), pre-fix measurement sweep, generation-dev sub-agent.",
+      "what": "CIVILISATION.md names the case where settlement_state::migration_end_year (the diffusion's own derived terminating year, 'every habitable landmass carries some culture') runs later than the Empires round's own opening year (-400 at the wizard's defaults) a defect in the migration, not in this boundary, and asks that the frequency be measured rather than assumed. A 60-seed sweep (tools/verify/culture_round_coast_measure.cpp, seeds 0xC001D00D + i*0x9E3779B9) found 6/60 (10%) overran, from 46 years over (seed 954185457, end -108) to 343 years over (seed 3665124156, end -57); the other 54/60 ended between -1652 and -411, comfortably inside the span. BL-947's fix keeps the true (later) end year and shows it honestly on an overrun rather than clamping to -400, per the doc's own instruction, so the wizard's Culture round is never wrong on these seeds -- it is just longer than 2,000 years, cutting into the Empires round's own 1,600-year budget for that world.",
+      "why_it_matters": "10% is not the '~1-in-10 worlds without an arena' kind of rare tail CIVILISATION.md is used to living with elsewhere in this pass (BL-276's own 90%-likely acceptance gate) -- it is the same order of magnitude, but nothing today rerolls or flags a slow-filling seed the way the arena gate does for a small homeworld. Whether that is fine (a diffusion is allowed to sometimes run long, and the doc already says so) or whether it wants its own gate/reroll is a design call BL-947 was not asked to make.",
+      "options": [
+        "Leave it: an overrun is rare enough (1 in 10, and none of the 60 seeds moved the boundary by more than a fifth of the Empires round's own span) that showing it honestly is sufficient.",
+        "Add a BL-276-style reject-and-reroll on the migration's own seed when it fails to finish inside the 2,000-year budget, so an overrun becomes a hard tail rather than a routine one.",
+        "Widen the Culture round's own budget (currently 2400 BCE -> 400 BCE) if 10% overrunning suggests 2,000 years is undersized for the map scale in general."
+      ],
+      "recommendation": "Leave it for now -- BL-947's fix already makes the overrun visible and honest rather than silently wrong, which was the actual bug Ben saw live; a reroll or budget change is tuning work against a sweep this item's 60 seeds is too small to calibrate from.",
+      "files": [
+        "src/world/colonisation.hpp",
+        "src/world/settlement.cpp",
+        "docs/generation/CIVILISATION.md"
+      ],
+      "ask": "Is a 10% overrun rate (measured on 60 seeds) worth a reroll or a wider Culture-round budget, or is showing the true end year honestly (BL-947's fix) sufficient?",
+      "resolution": "LEFT AS IT IS (option 1), 2026-09-16. BL-947 shows the overrun honestly rather than clamping to 400 BCE, which was the bug Ben actually saw; a 10% tail where a diffusion runs long is behaviour the doc already permits, and none of the 60 seeds moved the boundary by more than a fifth of the Empires round's span. Against a reroll (option 2): it would spend the migration's seed budget to hide a case the doc says is allowed, and 60 seeds is too small to calibrate a reject rule from. Against widening the budget (option 3): 54 of 60 finish between 1652 BCE and 411 BCE, so the budget is not undersized in general - six seeds are slow, which is a tail, not a miscalibration. Re-raise it only if an overrun is ever seen to cost the Empires round something visible.",
+      "resolved": "2026-09-16"
+    },
     "NR-861": {
       "id": "NR-861",
       "title": "OBSERVATION: treaties almost never break -- 4 breaks against 5,161 formed across 16 seeds",
@@ -4936,6 +5278,54 @@
       ],
       "ask": "Is the schism verb's cut to displacement an acceptable consequence to tune against, or a sign BL-944 needs revisiting?",
       "resolution": "SUPERSEDED BY BL-1007, 2026-09-16. Every figure in this entry — 0.88, 0.33, 0.08 and the bisect that produced them — was measured on a sweep that generated with world_gen_config's struct defaults and no works registry, which is not the world the game builds. On the shipped data layer the same 16 seeds read pooled displacement 2.73 with no silent seeds. The schism verb's effect on displacement has never been measured on the parity world; if it matters it is a fresh measurement, not this one.",
+      "resolved": "2026-09-16"
+    },
+    "NR-863": {
+      "id": "NR-863",
+      "title": "DECISION TAKEN: three calls made while writing and integrating the Exploration trade design",
+      "raised": "2026-09-14",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Exploration trade batch, design-form follow-through (BL-953, BL-954).",
+      "what": "Two things the form did not ask were written into the authority doc. (1) Outward wants lean campaigns and subjection ONLY, not settlement -- the form carried this question but it came back unanswered, so the recommended option was taken. (2) A trade flow earns BOTH ends (seller and buyer capitals), not the seller alone -- the form asked whether flow income replaces the flat market income (yes) but not who earns it. (3) ADDED at integration, 2026-09-14, after the cold review: a seller's HOLDING is shared across its buyers, mirroring the buyer's want being shared across sellers. Without it a one-province farm city-state bound to five buyers exported five holdings' worth and earned five times over. The holding stays a per-mille SHARE of held ground, so a one-province holder and a hundred-province holder with the same share export the same volume -- that scale question is untouched.",
+      "why_it_matters": "(2) decides whether being a buyer is ever profitable. Seller-only makes wealth flow to holders of scarce goods (a sharper resource asymmetry); both-ends makes any market on a busy line rich (a trading-hub asymmetry, and it keeps treasuries from collapsing for polities that hold little but sit on lines). Replacing the flat income with seller-only income would bankrupt most polities that hold no wanted good.",
+      "options": [
+        "Keep both calls as written.",
+        "Seller-only income: a trade line enriches the holder, not the hub.",
+        "Let wants also lean settlement across water.",
+        "Make holding an absolute quantity (held regions dominant in the good, not a share), so a large realm out-exports a small one."
+      ],
+      "recommendation": "Keep both as written; revisit (2) from reading 8 (treasury spread) once BL-954 lands.",
+      "files": [
+        "docs/generation/EXPLORATION.md",
+        "src/world/history_sim.cpp"
+      ],
+      "ask": "Should a trade flow earn both ends, or only the seller? Did you mean to leave wants off settlement? And should a holder's export scale with how much ground it holds, rather than the share?",
+      "resolution": "BOTH CALLS STAND, 2026-09-16, and the revisit trigger has now fired without changing the answer. The entry said to revisit call (2) - a trade flow earning BOTH ends - from reading 8 once BL-954 landed. BL-954 is complete and the treasury spread has been read twice since: BL-972 removed the scorer's saturation caps and the median polity chest fell from 1.26M to 211 while the top decile lost about 3%. That spread is driven by force upkeep against an actor with no purse in its hold term, not by who earns a trade flow - and it is open as NR-878, where the call belongs. Seller-only income would make that same spread worse by bankrupting exactly the polities that hold no wanted good. The third call (a seller's holding shared across its buyers) was a correctness fix, not a preference: without it a one-province farm bound to five buyers exported five holdings' worth.",
+      "resolved": "2026-09-16"
+    },
+    "NR-864": {
+      "id": "NR-864",
+      "title": "OBSERVATION: reading 3 classifies a creed by comparing a PRODUCT lean to an AVERAGE lean, which structurally makes consolidators rare",
+      "raised": "2026-09-14",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 41 T1 (BL-951, fair strength metric) -- main-session review of the agent diff and report.",
+      "what": "BL-951 moved reading 3 to a treasury ranking; on seeds 0-2 all 18 top-3 entries (by treasury AND by region count) still classify expansionist, with consolidator lean 104-190 against expansion lean 610-860. The classifier (exploration_sweep.cpp, sprint-40 origin, kept by BL-951) calls a culture a consolidator when consolidator_lean_q > expansion_lean_q. But consolidator_lean_q = dominion x (1000 - sea_legs) / 1000 (a product, at most the smaller factor) while expansion_lean_q = (sea_legs + zeal) / 2 (a mean, at least the smaller input). For a middling culture (sea 300, zeal 500, dominion 500) the leans are 350 vs 400: expansionist, though nothing about it is seafaring. The two leans are on incommensurable scales -- BL-318 incommensurability again -- so comparing them answers a question about arithmetic, not about creeds. DECISION TAKEN 2026-09-14 for BL-955 (spend is scored), which could not wait: the spend allocation uses each lean only as a PER-MILLE RANK among the round's living polities, never the raw value, so the two leans are compared on one scale without changing the creed arithmetic. The raw-lean comparison in exploration_sweep reading 3 is unchanged pending this call.",
+      "why_it_matters": "EXPLORATION.md sec Two ways to be strong says: if the creed axes do not separate the strategies, the fix is upstream in the Empire phase. That conclusion should not be drawn from a comparison that could not have come out the other way. The sim itself uses the two leans independently as weights in choose_exploration_node, so the defect may be in the reading only -- or the same scale mismatch may also bias the node choice and BL-955 (spend is scored), which will read both leans.",
+      "options": [
+        "Classify by rank within the world: a culture is a consolidator if its consolidator lean is in the top third of cultures by that lean, and likewise for expansion (can be both or neither).",
+        "Put both leans on one form (both products, or both means) in src/ so they are commensurable everywhere they are read, including BL-955.",
+        "Leave the classifier and accept the reading as upstream evidence."
+      ],
+      "recommendation": "Option 2 for BL-955 before it reads the leans, plus option 1 for the reading. Measure the lean distribution over ALL living polities on the 16-seed integrated sweep first (T6), so the call is made on the population, not the top 3.",
+      "files": [
+        "tools/verify/exploration_sweep.cpp",
+        "src/world/history_sim.cpp",
+        "docs/generation/EXPLORATION.md"
+      ],
+      "ask": "Are the two creed leans meant to be compared against each other, and if so should they share one form?",
+      "resolution": "HALF TAKEN, HALF FILED AS WORK, 2026-09-16. The half that could not wait was taken at build time and has shipped: BL-955 (spend is scored) is complete and uses each lean only as a PER-MILLE RANK among the round's living polities, so the two leans are compared on one scale without touching the creed arithmetic. That is option 1 applied where it mattered most. What is left is the sweep reading's own classifier, which still compares a PRODUCT lean (dominion x (1000 - sea_legs) / 1000, at most the smaller factor) against a MEAN lean ((sea_legs + zeal) / 2, at least the smaller input) and therefore cannot come out consolidator for a middling culture. That is a defect in an instrument, not a call: filed as BL-1016 (the creed classifier compares one scale). The reason it matters is on the item - EXPLORATION.md says that if the creed axes do not separate the strategies, the fix is upstream in the Empire phase, and that conclusion must not be drawn from a comparison that could not have come out the other way.",
       "resolved": "2026-09-16"
     },
     "NR-865": {
