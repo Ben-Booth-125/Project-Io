@@ -1957,6 +1957,84 @@ int main()
     }
 
     // -----------------------------------------------------------------
+    // BL-842 — SMALL GRUDGES DO NOT FREEZE.
+    //
+    // `score -= score * shed / 1000` truncates to a zero decrement once
+    // score < 1000/shed, so every grudge under that line sat still forever,
+    // never reached `grudge_floor`, and crossed the handoff as a permanent
+    // row. Asserted over EVERY score from floor+1 to cap at every step the
+    // default ladder and generation's clock use, against the one function the
+    // round loop calls, so the check cannot drift from the code it guards.
+    // -----------------------------------------------------------------
+    {
+        const history_sim_params gp; // struct defaults: decay 3/1000/yr, floor 4, cap 10000
+        const int steps[] = {1, 4, 5, 10, 20, 50, 100}; // default ladder + generation's 4
+        bool none_stationary = true, proportional_exact = true, all_erased = true;
+        int  stuck_step = -1, stuck_score = -1;
+        for (int st : steps)
+        {
+            const int shed = std::min(1000, gp.grudge_decay_per_year_q * st);
+            for (int s = gp.grudge_floor + 1; s <= gp.grudge_cap; ++s)
+            {
+                std::vector<grudge> v(1);
+                v[0].score = s;
+                v[0].peak  = s;
+                decay_grudges(v, gp, st);
+                const int after = v.empty() ? gp.grudge_floor : v[0].score;
+                if (after >= s && none_stationary)
+                {
+                    none_stationary = false;
+                    stuck_step = st;
+                    stuck_score = s;
+                }
+                // Above the truncation line the rate is untouched: the
+                // decrement is exactly the proportional one, never the floor.
+                const int prop = (s * shed) / 1000;
+                if (prop >= 1 && !v.empty() && s - v[0].score != prop) proportional_exact = false;
+            }
+            // Every border raid is eventually ERASED, not merely shrunk.
+            std::vector<grudge> raid(1);
+            raid[0].score = gp.grudge_border_raided;
+            for (int r = 0; r < 100000 && !raid.empty(); ++r) decay_grudges(raid, gp, st);
+            if (!raid.empty()) all_erased = false;
+        }
+        if (!none_stationary)
+            std::printf("      stationary: score %d at step %d\n", stuck_score, stuck_step);
+        check(none_stationary,
+              "BL842a no grudge score above grudge_floor is stationary across a round, at any step in use");
+        check(proportional_exact,
+              "BL842b above the truncation line the decrement is exactly the proportional rate");
+        check(all_erased,
+              "BL842c a single border raid decays through the floor and is erased at every step");
+
+        // THE HALF-LIFE AT THE BOTTOM, MEASURED (R2). Rounds until the score
+        // is at or below half its start, times the step; "gone" is rounds
+        // until the row is erased. Printed, not pinned: this is a reading of
+        // what the minimum decrement does, for Ben to weigh against the
+        // design's "half-life near 230 years".
+        std::printf("      grudge half-life by start score (years; erase in years):\n");
+        const int starts[] = {8, 30, 60, 83, 150, 300, 1000, 10000};
+        for (int st : {1, 4, 20, 100})
+        {
+            std::printf("        step %3d:", st);
+            for (int s0 : starts)
+            {
+                std::vector<grudge> v(1);
+                v[0].score = s0;
+                int rounds = 0, half = -1;
+                while (!v.empty() && rounds < 100000)
+                {
+                    decay_grudges(v, gp, st);
+                    ++rounds;
+                    if (half < 0 && (v.empty() || v[0].score * 2 <= s0)) half = rounds;
+                }
+                std::printf("  %d:%d;%d", s0, half * st, rounds * st);
+            }
+            std::printf("\n");
+        }
+    }
+
+    // -----------------------------------------------------------------
     // E1: BL-973 — every EMPIRE store effect reaches the sim through the
     //     generated table, and is either read or declared unread. The
     //     exploration twin is exploration_sim_harness T7.

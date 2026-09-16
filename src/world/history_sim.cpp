@@ -3662,17 +3662,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // the table sparse across four millennia rather than merely starting
         // sparse. `peak` is not decayed: it is the record of how bad it once
         // got, and a decayed peak would be a second copy of `score`.
-        if (params.grudge_decay_per_year_q > 0 && !out.grudges.empty())
-        {
-            const int shed = clampi(params.grudge_decay_per_year_q * step_years, 0, 1000);
-            for (grudge& g : out.grudges)
-                g.score -= (g.score * shed) / 1000;
-            const int floor_q = std::max(0, params.grudge_floor);
-            out.grudges.erase(
-                std::remove_if(out.grudges.begin(), out.grudges.end(),
-                               [&](const grudge& g) { return g.score <= floor_q; }),
-                out.grudges.end());
-        }
+        //
+        // One function, `decay_grudges`, so the harness asserts the arithmetic
+        // the round loop actually runs (BL-842).
+        decay_grudges(out.grudges, params, step_years);
 
         // ---- Each polity acts, in id order (deterministic) ---------------
         const scoped_ns prof_dec(prof.ns_decisions); // BL-825, report-only
@@ -7788,6 +7781,33 @@ int grudge_between(const history_sim_state& s, int from, int to)
         });
     if (it != s.grudges.end() && it->from == f && it->to == t) return it->score;
     return 0;
+}
+
+void decay_grudges(std::vector<grudge>& grudges, const history_sim_params& params, int step_years)
+{
+    if (params.grudge_decay_per_year_q <= 0 || grudges.empty()) return;
+    const int shed    = clampi(params.grudge_decay_per_year_q * std::max(step_years, 1), 0, 1000);
+    const int floor_q = std::max(0, params.grudge_floor);
+    for (grudge& g : grudges)
+    {
+        // THE PROPORTIONAL RATE, WITH A FLOOR OF ONE (BL-842). The integer
+        // product truncates to a ZERO decrement once score < 1000/shed -- below
+        // 84 at generation's 4-year step, below 334 at a 1-year one -- and a
+        // score that never moves never reaches `grudge_floor`, so every pair
+        // that ever skirmished crossed the handoff as a permanent row. One unit
+        // a round is the smallest decrement that is not zero; above the
+        // truncation line it never binds, so the large-score half-life (~230
+        // years) is unchanged. BELOW the line it is FASTER than the exponential
+        // would be, and step-dependent (a round is a round, not a year):
+        // history_sim_harness BL842 prints the measured half-lives.
+        int dec = (g.score * shed) / 1000;
+        if (dec < 1 && shed > 0 && g.score > floor_q) dec = 1;
+        g.score -= dec;
+    }
+    grudges.erase(
+        std::remove_if(grudges.begin(), grudges.end(),
+                       [&](const grudge& g) { return g.score <= floor_q; }),
+        grudges.end());
 }
 
 // ---------------------------------------------------------------------------
