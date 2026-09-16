@@ -32,8 +32,10 @@ in `tools/verify/README.md`.
   rolling 40-quarter retention drops the oldest first, `book_value` is the registry's
   flat `build_cost` (historical cost — deliberately NOT the press's charge, which adds
   a market-priced materials term), the returns round-trip the save (version named
-  symbolically, never as a literal), and the pre-game warm start's 80 ticks produce
-  byte-identical records across two runs. Build via `build_harness.js`.
+  symbolically, never as a literal), and the settle's 12 ticks (`app::validation_ticks`)
+  produce byte-identical records across two runs. R6 then runs the same generated world
+  on past the retention — the harness's own choice — so the cap and the trimmed window
+  bite on a real world. Build via `build_harness.js`.
 - **`demand_census`** — BL-649, requirement group `demand-census` R1–R4: per resource and per era
   band, the total modelled demand and **which passes inject it**, with every one of MARKETS.md's
   eight channels either represented or explicitly reported ABSENT — an absent channel being the most
@@ -339,8 +341,9 @@ in `tools/verify/README.md`.
   row C3 asserts a zero residual), its produced value, active / idle / limited / unstaffed /
   exhausted / building / mothballed counts, labour and mean supply factor; `debt.csv` has one
   row per corp that ENTERED debt in the window with its trailing-4-tick flows and the dominant
-  drain, summarised as a histogram at the end of the run. Run it unwarmed
-  (`--warm 0 --ticks 60`) to see where debt begins — the warm start hides it.
+  drain, summarised as a histogram at the end of the run. Run it with no lead-in
+  (`--settle 0 --ticks 60`; `--warm` is the same flag) to see where debt begins — the default
+  lead-in is the game's 12-tick settle, and its ticks are unlogged.
 - **`firm_exit_harness`** — BL-743 firm exit (2026-09-01): the insolvency wind-up. F1/F1b the
   trigger fires and the estate liquidates (building demolished, unit disbanded, pool lands WHOLE
   in market inventory — the conservation law); F2 the player is exempt absolutely; F3 a short
@@ -518,8 +521,8 @@ in `tools/verify/README.md`.
   this check for free. **18 named buildings carry an override, 0 offenders** as of 2026-08-24.
 - **`player_seed_sweep`** — Which seeds hand the PLAYER a corp worth playing? A live-Lua sweep (real
   `scripts/recipes.lua` + `economy.lua`, real economy ticks) that generates one world per seed and
-  reports, per seed, the player corp's buildings by type, its opening and post-warm-start balance,
-  and whether it ever dipped negative. `player_seed_sweep.exe [seed_count] [warm_ticks]`.
+  reports, per seed, the player corp's buildings by type, its opening and post-settle balance,
+  and whether it ever dipped negative. `player_seed_sweep.exe [seed_count] [settle_ticks]`.
 
   **A REPORTING tool, not a gate** — it exits 0 unless generation actually threw (that being
   `seed_sweep_probe`'s job). It deliberately does not filter seeds, resample, or carry a whitelist:

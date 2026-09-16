@@ -21,9 +21,9 @@
 // THIS HARNESS IS NOT ALLOWED TO CONFIRM THAT BY CONSTRUCTION. It measures four
 // separable things and reports each with units, so the hypothesis can fail:
 //
-//   R1  THE CENSUS. Per seed, how many of a corp's buildings end the warm start
+//   R1  THE CENSUS. Per seed, how many of a corp's buildings end the settle
 //       at workforce_target 0 or decommissioned, and how many of THOSE produced
-//       nothing across a long trailing run. A building can be at zero target and
+//       nothing across the whole settle. A building can be at zero target and
 //       still have produced last quarter; a building can be idle for one tick
 //       without being dead. The two are counted separately.
 //
@@ -40,8 +40,8 @@
 //       it need not be — pass 3 of run_economy_step re-solves EVERY tick from
 //       live market state and never reads a sticky flag, so a price move re-dials
 //       it up. That is a claim about the code; whether prices move is a claim
-//       about the world. So the sweep runs a further `--extra` ticks past the warm
-//       start and counts how many dead buildings ever produce again, alongside
+//       about the world. So the sweep runs a further `--extra` ticks past the
+//       settle and counts how many dead buildings ever produce again, alongside
 //       whether their target resource's clearing price ever leaves the band floor.
 //
 //   R4  THE FIELD. The same census over the background corporations, because a
@@ -61,8 +61,9 @@
 //     cmd //c tools\verify\build_lua_harness.bat material_floor
 //
 // ---------------------------------------------------------------------------
-// WHAT IT MEASURED, 2026-08-27, 8 seeds from 0, prehistory ON, 80 warm + 32
-// recovery ticks. Kept here as constants-in-prose rather than in a doc, because
+// WHAT IT MEASURED, 2026-08-27, 8 seeds from 0, prehistory ON, 80 settle ticks
+// (the pre-game settle's length then; it is 12 now — see THE SETTLE RE-READ
+// below) + 32 recovery ticks, dead = 20 trailing ticks of zero output. Kept here as constants-in-prose rather than in a doc, because
 // the numbers ARE the deliverable and prose elsewhere goes stale.
 // ---------------------------------------------------------------------------
 //
@@ -77,7 +78,7 @@
 //           one seed's gap. A floor that costs one percent of maintenance is not
 //           a viability factor.
 //
-//   field:  24.2% of 2,751 rival holdings end the warm start dead, and 58.3% of
+//   field:  24.2% of 2,751 rival holdings end the settle dead, and 58.3% of
 //           rivals carry at least one. The dead floor is 2.86 cr/qtr per rival =
 //           10.6% of filed maintenance and 35.7% of a -8.00 cr/qtr operating gap.
 //           Real, and the largest single named share of that gap — but a third of
@@ -120,9 +121,9 @@
 // Usage:  material_floor [seed_count] [--seed0 N] [--fast] [--extra N]
 //                        [--default-cfg]
 //   --fast        prehistory_years = 0. NOT the shipped spawn — iteration only.
-//   --extra N     ticks past the warm start for the recovery probe (default 80).
+//   --extra N     ticks past the settle for the recovery probe (default 80).
 //                 Keep it under 40 (k_quarterly_return_retention) or the
-//                 warm-start return has rolled out of the buffer and the A2
+//                 settle's closing return has rolled out of the buffer and the A2
 //                 reconciliation is skipped rather than run against the wrong
 //                 quarter.
 //   --default-cfg generate with the C++ fallback config instead of the parsed
@@ -167,9 +168,57 @@ void check(bool ok, const char* row, const char* what)
         ++g_failures;
 }
 
-constexpr int k_warm_ticks = 80;   ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978), and this harness's own settle length is a re-read it owes.
-constexpr int k_window     = 8;    ///< Trailing quarters averaged (FINANCE.md's figure).
-constexpr int k_dead_run   = 20;   ///< Trailing ticks of zero output that read as "dead".
+/// The settle: phase 6's single validation run, whose closing position is the
+/// SPAWN this census is taken at (ERAS.md § The opening position). Mirrors
+/// `app::validation_ticks`, restated because app.hpp brings SDL; if the app's
+/// number moves, this one moves with it. The census is NOT given a longer
+/// history by choice: its subject is the position the player is handed, and a
+/// census read eight quarters after the spawn would be a census of a different
+/// world. Persistence past the spawn is R3's question, and R3 has its own run.
+constexpr int k_settle_ticks = 12;
+constexpr int k_window       = 8;    ///< Trailing quarters averaged (FINANCE.md's figure).
+/// Trailing ticks of zero output that read as "dead" — THE WHOLE SETTLE. It was
+/// 20 when the settle ran 80 ticks; a 20-tick run cannot fit inside a 12-tick
+/// settle, and quietly clamping it would print a window the census never read.
+/// So "dead at the spawn" now means "produced nothing at any tick of the
+/// settle", the longest zero-output run the handed position can carry. That is
+/// a definitional change and part of what moved (BL-1008, 2026-09-16).
+constexpr int k_dead_run     = k_settle_ticks;
+
+// ---------------------------------------------------------------------------
+// THE SETTLE RE-READ (BL-1008, 2026-09-16) — what moved when 80 became 12
+// ---------------------------------------------------------------------------
+// 3 seeds from 0 (not the default 8 — a shared machine), prehistory ON, default
+// --extra 80. Two things changed together and cannot be separated in this pair
+// of runs: the census moved from tick 80 to tick 12, and "dead" went from 20
+// trailing ticks of zero output to the whole 12-tick settle. A reading, not a
+// re-pin: the asserted rows (A1, A2, A3) are PASS at both lengths.
+//
+//   figure                               80 ticks, run 20  12 ticks, run 12
+//   seated dead per seed                 2.3               2.3
+//   seated dead floor, % of filed maint  18.9%             19.6%
+//   seated operating position            +82.22 cr/qtr     +83.35 cr/qtr
+//   field holdings tracked               832               807
+//   field floored (wt 0 or decom)        69.7%             71.1%
+//   field DEAD                           66.7% (555)       33.7% (272)
+//   rivals carrying a dead building      86.5%             53.6%
+//   field dead floor, % of filed maint   12.8%             7.1%
+//   field dry but paying FULL maint      27 holdings       0
+//   dead that produced again (R3)        0 of 555          11 of 272
+//   dead extraction sites UNPRICED       field 176         field 1
+//
+// CAUSES. The seated corp did not move: on seeds 0 and 2 it holds buildings that
+// never produce at any tick, at either length, so every definition of dead
+// agrees. The field HALVED its dead share because roughly as many holdings are
+// floored at tick 12 as at tick 80, but only half of them have yet gone a whole
+// run without output — a floored building at the spawn is mostly one the solver
+// dialled down during the settle, not one that has sat idle for 20 quarters.
+// The unpriced count's collapse (176 -> 1) is NOT explained by this pair: it
+// is larger than the change in holdings tracked, and this re-read did not
+// trace it. A2 is vacuous at the default --extra at BOTH lengths (80 recovery
+// ticks roll the settle's return out of the 40-quarter buffer, so the
+// reconciliation is skipped and the error reads 0); that predates the settle.
+
 
 /// BL-573: empty is correct — nothing in this sweep opens a mercenary contract.
 
@@ -209,65 +258,65 @@ struct btrack
     resource_type target = resource_type::iron_ore;
     uint16_t      recipe = no_recipe;
 
-    // State at the end of the warm start.
-    int  wt_at_warm       = 0;
-    bool decom_at_warm    = false;
-    bool building_at_warm = false;   ///< ticks_remaining > 0 (still under construction)
+    // State at the close of the settle.
+    int  wt_at_settle       = 0;
+    bool decom_at_settle    = false;
+    bool building_at_settle = false;   ///< ticks_remaining > 0 (still under construction)
     float maint_const     = 0.0f;    ///< reg.economics(type).maintenance
-    float floor_at_warm   = 0.0f;    ///< compute_building_opex(...).maintenance at warm close
+    float floor_at_settle   = 0.0f;    ///< compute_building_opex(...).maintenance at the settle's close
 
-    // Production over the warm start.
-    double out_warm          = 0.0;  ///< total output units over the whole warm start
-    double out_trailing      = 0.0;  ///< output over the last k_dead_run warm ticks
-    int    producing_ticks   = 0;    ///< warm ticks with output > 0
-    int    last_producing    = -1;   ///< last warm tick index with output > 0
-    int    longest_dry_run   = 0;    ///< longest run of consecutive zero-output warm ticks
+    // Production over the settle.
+    double out_settle        = 0.0;  ///< total output units over the whole settle
+    double out_trailing      = 0.0;  ///< output over the last k_dead_run settle ticks
+    int    producing_ticks   = 0;    ///< settle ticks with output > 0
+    int    last_producing    = -1;   ///< last settle tick index with output > 0
+    int    longest_dry_run   = 0;    ///< longest run of consecutive zero-output settle ticks
 
-    // The recovery probe (past the warm start).
+    // The recovery probe (past the settle).
     double out_extra         = 0.0;
     int    producing_extra   = 0;
     int    wt_at_end         = 0;
     bool   decom_at_end      = false;
-    bool   wt_rose_after     = false;  ///< target went above 0 at any post-warm tick
-    bool   resumed_after     = false;  ///< decommission flag cleared at any post-warm tick
+    bool   wt_rose_after     = false;  ///< target went above 0 at any post-settle tick
+    bool   resumed_after     = false;  ///< decommission flag cleared at any post-settle tick
     bool   gone              = false;  ///< demolished during the extra run
 
     // Market context for a dead extraction site. base_price and price are kept
     // APART rather than as one ratio: a ratio of 0 conflates "the good clears at
     // the band floor" with "the good has no authored base price at all", and
     // those are different defects wanting different fixes.
-    float  base_price_warm   = -1.0f;  ///< -1 = not an extraction site / no market
-    float  price_warm        = -1.0f;
+    float  base_price_settle   = -1.0f;  ///< -1 = not an extraction site / no market
+    float  price_settle        = -1.0f;
     float  price_ratio_min   =  2.0f;
     float  price_ratio_max   =  0.0f;
-    bool   ever_priced       = false;  ///< price > 0 at any warm tick
+    bool   ever_priced       = false;  ///< price > 0 at any settle tick
     float  deposit           = 0.0f;
     float  remaining         = 0.0f;
 
     /// Produced nothing across the trailing run, whatever it is paying. Restricted
     /// to the two types that CAN produce — see is_producing_type.
-    bool dry_at_warm() const
-    { return !building_at_warm && is_producing_type(type) && out_trailing <= 0.0; }
+    bool dry_at_settle() const
+    { return !building_at_settle && is_producing_type(type) && out_trailing <= 0.0; }
 
-    bool dead_at_warm() const
+    bool dead_at_settle() const
     {
         // Dead = pays the floor and has produced nothing for a long trailing run.
         // Buildings under construction are excluded: they pay the floor too, but
         // they are pre-operational, not abandoned, and conflating the two would
         // inflate the answer in the hypothesis's favour.
-        return dry_at_warm() && floored_at_warm();
+        return dry_at_settle() && floored_at_settle();
     }
     /// THE DISCRIMINATOR. Produced nothing, and is NOT floored — so it is paying
     /// FULL maintenance, scaled by a workforce target nobody dialled down. This
     /// bucket is the one the material floor does not explain, and separating it
     /// is the whole point: a fix aimed at the floor does nothing for it.
     bool dry_paying_full() const
-    { return dry_at_warm() && !floored_at_warm(); }
+    { return dry_at_settle() && !floored_at_settle(); }
 
     /// Pays the floor for want of labour or a decommission, whatever it produced.
-    bool floored_at_warm() const
+    bool floored_at_settle() const
     {
-        return !building_at_warm && (decom_at_warm || wt_at_warm == 0);
+        return !building_at_settle && (decom_at_settle || wt_at_settle == 0);
     }
 };
 
@@ -378,7 +427,7 @@ struct corp_census
     double floor_dead = 0.0;    ///< cr/qtr paid by the dead set
     double floor_all = 0.0;     ///< cr/qtr paid by every floored building
     double maint_recon = 0.0;   ///< reconstructed total maintenance, cr/qtr
-    double maint_filed = 0.0;   ///< filed maintenance, last warm quarter, cr/qtr
+    double maint_filed = 0.0;   ///< filed maintenance, the settle's last quarter, cr/qtr
     flow_row flows;             ///< trailing-window flows
     int   recovered = 0;        ///< dead buildings that produced again in the extra run
     int   demolished = 0;       ///< dead buildings gone by the end of the extra run
@@ -428,8 +477,8 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
     std::map<entity_id, btrack> track;   // ordered: the walk below must be stable
     std::map<entity_id, int> dry_run;    // running consecutive-zero-output counter
 
-    // ---- the warm start -------------------------------------------------
-    for (int t = 0; t < k_warm_ticks; ++t)
+    // ---- the settle -----------------------------------------------------
+    for (int t = 0; t < k_settle_ticks; ++t)
     {
         const economy_report rep = tick(w, reg, t);
 
@@ -453,8 +502,8 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
 
                 const auto pit = produced.find(bid);
                 const double o = (pit != produced.end()) ? pit->second : 0.0;
-                bt.out_warm += o;
-                if (t >= k_warm_ticks - k_dead_run)
+                bt.out_settle += o;
+                if (t >= k_settle_ticks - k_dead_run)
                     bt.out_trailing += o;
                 if (o > 0.0)
                 {
@@ -482,7 +531,7 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
         }
     }
 
-    // ---- state at the close of the warm start ---------------------------
+    // ---- state at the close of the settle -------------------------------
     for (const entity_id corp : sorted_corp_ids(w))
     {
         const corporation_component& cc = w.corporations.at(corp);
@@ -493,21 +542,21 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
                 continue;
             const building_component& b = bit->second;
             btrack& bt = track[bid];
-            bt.wt_at_warm       = b.workforce_target;
-            bt.decom_at_warm    = b.decommissioned;
-            bt.building_at_warm = b.ticks_remaining > 0;
+            bt.wt_at_settle       = b.workforce_target;
+            bt.decom_at_settle    = b.decommissioned;
+            bt.building_at_settle = b.ticks_remaining > 0;
             const building_economics& e = reg.economics(b.type);
             bt.maint_const   = e.maintenance;
             // Maintenance is a pure function of the building: contention and
             // habitability move only WAGES. 1.0f/1.0f is therefore exact, not an
             // approximation, and A2 below proves it against the filed return.
-            bt.floor_at_warm = compute_building_opex(b, e, 1.0f, 1.0f,
+            bt.floor_at_settle = compute_building_opex(b, e, 1.0f, 1.0f,
                                                      reg.idle_maintenance_floor()).maintenance;
             if (b.type == building_type::extraction_site)
             {
                 const market_price mp = price_at(w, b.tile, b.target_resource);
-                bt.base_price_warm = mp.base;
-                bt.price_warm      = mp.price;
+                bt.base_price_settle = mp.base;
+                bt.price_settle      = mp.price;
                 if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
                 {
                     const std::size_t ri = static_cast<std::size_t>(b.target_resource);
@@ -521,10 +570,10 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
     // ---- the recovery probe ---------------------------------------------
     std::set<entity_id> dead_ids;
     for (const auto& kv : track)
-        if (kv.second.dead_at_warm())
+        if (kv.second.dead_at_settle())
             dead_ids.insert(kv.first);
 
-    for (int t = k_warm_ticks; t < k_warm_ticks + extra; ++t)
+    for (int t = k_settle_ticks; t < k_settle_ticks + extra; ++t)
     {
         const economy_report rep = tick(w, reg, t);
         std::map<entity_id, double> produced;
@@ -546,7 +595,7 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
                 bt.wt_rose_after = true;
             // A resume is only meaningful for a building that WAS decommissioned;
             // for one dialled to zero the flag was never set and this is vacuous.
-            if (bt.decom_at_warm && !bit->second.decommissioned)
+            if (bt.decom_at_settle && !bit->second.decommissioned)
                 bt.resumed_after = true;
         }
     }
@@ -574,27 +623,27 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
         {
             const auto tit = track.find(bid);
             if (tit == track.end())
-                continue;   // built after the warm start closed — not this census's subject
+                continue;   // built after the settle closed — not this census's subject
             const btrack& bt = tit->second;
             ++c.holdings;
-            c.maint_recon += bt.floor_at_warm;
-            if (bt.building_at_warm) ++c.under_construction;
-            if (bt.floored_at_warm())
+            c.maint_recon += bt.floor_at_settle;
+            if (bt.building_at_settle) ++c.under_construction;
+            if (bt.floored_at_settle())
             {
                 ++c.floored;
-                c.floor_all += bt.floor_at_warm;
+                c.floor_all += bt.floor_at_settle;
             }
             if (bt.dry_paying_full())
             {
                 ++c.dry_full;
-                c.maint_dry_full += bt.floor_at_warm;  // its FULL maintenance, not a floor
+                c.maint_dry_full += bt.floor_at_settle;  // its FULL maintenance, not a floor
             }
-            if (bt.dead_at_warm())
+            if (bt.dead_at_settle())
             {
                 ++c.dead;
-                c.floor_dead += bt.floor_at_warm;
-                if (bt.decom_at_warm) ++c.dead_decom; else ++c.dead_zero_wt;
-                if (bt.type == building_type::extraction_site && bt.base_price_warm <= 0.0f)
+                c.floor_dead += bt.floor_at_settle;
+                if (bt.decom_at_settle) ++c.dead_decom; else ++c.dead_zero_wt;
+                if (bt.type == building_type::extraction_site && bt.base_price_settle <= 0.0f)
                     ++c.dead_unpriced;
                 if (bt.producing_extra > 0) ++c.recovered;
                 if (bt.gone) ++c.demolished;
@@ -605,10 +654,10 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
             }
         }
         // The reconstruction guard. The filed return this compares against is the
-        // one filed at the LAST WARM TICK — cc.returns has grown by `extra` since,
+        // one filed at the LAST SETTLE TICK — cc.returns has grown by `extra` since,
         // so index back to it rather than reading the back(). It is also a rolling
         // buffer (k_quarterly_return_retention), so the reconciliation is skipped
-        // when the warm-start quarter has already rolled out of it.
+        // when the settle's closing quarter has already rolled out of it.
         const std::size_t n = cc.returns.size();
         if (n == 0)
         {
@@ -626,7 +675,7 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
         }
         else
         {
-            // The warm-start return has rolled out of the retained window; report
+            // The settle's closing return has rolled out of the retained window; report
             // the reconstruction alone rather than reconciling against the wrong
             // quarter. (Reduce --extra below the retention to restore the check.)
             c.maint_filed = c.maint_recon;
@@ -707,9 +756,9 @@ int main(int argc, char** argv)
 
     std::printf("material_floor — is the 30%% material-maintenance floor a "
                 "spawn-viability trap?\n");
-    std::printf("  %d seeds from %u, %d warm ticks + %d recovery ticks, "
+    std::printf("  %d seeds from %u, %d settle ticks (app::validation_ticks) + %d recovery ticks, "
                 "dead = %d trailing ticks of zero output, prehistory %s\n",
-                seed_count, seed0, k_warm_ticks, extra, k_dead_run,
+                seed_count, seed0, k_settle_ticks, extra, k_dead_run,
                 prehistory ? "ON (the shipped spawn)" : "OFF (--fast, NOT the spawn)");
 
     // ---------------------------------------------------------------------
@@ -768,7 +817,7 @@ int main(int argc, char** argv)
     // ---------------------------------------------------------------------
     // R1/R2 — the seated corporation.
     // ---------------------------------------------------------------------
-    std::printf("\n=== R1/R2  THE SEATED CORPORATION at the close of the warm start ===\n");
+    std::printf("\n=== R1/R2  THE SEATED CORPORATION at the close of the settle ===\n");
     std::printf("  seed | hold  bld floor dead (dec/wt0) dryFULL | floor_dead  "
                 "filed_maint  %%maint | income  operating   %%gap | balance\n");
     double t_hold = 0, t_floor = 0, t_dead = 0, t_floor_dead = 0, t_maint = 0;
@@ -823,8 +872,8 @@ int main(int argc, char** argv)
     // ---------------------------------------------------------------------
     // R3 — recovery.
     // ---------------------------------------------------------------------
-    std::printf("\n=== R3  DO DEAD BUILDINGS EVER RECOVER?  (%d ticks past the warm "
-                "start) ===\n", extra);
+    std::printf("\n=== R3  DO DEAD BUILDINGS EVER RECOVER?  (%d ticks past the "
+                "settle) ===\n", extra);
     std::printf("  seated: %.1f dead per seed, of which %.1f produced again and %.1f "
                 "were demolished\n",
                 t_dead / n, t_recovered / n, t_demolished / n);
@@ -860,7 +909,7 @@ int main(int argc, char** argv)
                 "are the target resource's at the site's own market; -1 = not an\n"
                 "  extraction site. base 0 means the good is UNPRICED, which is not the "
                 "same defect as a good clearing at the band floor.\n");
-    std::printf("  type          res/rec  wt  dec  maint  floor | out(warm) dryrun "
+    std::printf("  type          res/rec  wt  dec  maint  floor | out(settle) dryrun "
                 "lastprod | base  price ratio[min..max] priced | deposit    left | "
                 "after: wt out gone\n");
     if (!rows.empty())
@@ -876,12 +925,12 @@ int main(int argc, char** argv)
             const bool is_ext = (b.type == building_type::extraction_site);
             std::printf("  %-13s %-8s %3d %4d %6.2f %6.2f | %8.1f %6d %8d | "
                         "%5.2f %6.2f [%.2f..%.2f] %6s | %7.1f %9.1f | %3d %5.1f %s\n",
-                        type_name(b.type), what, b.wt_at_warm, b.decom_at_warm ? 1 : 0,
+                        type_name(b.type), what, b.wt_at_settle, b.decom_at_settle ? 1 : 0,
                         static_cast<double>(b.maint_const),
-                        static_cast<double>(b.floor_at_warm),
-                        b.out_warm, b.longest_dry_run, b.last_producing,
-                        static_cast<double>(b.base_price_warm),
-                        static_cast<double>(b.price_warm),
+                        static_cast<double>(b.floor_at_settle),
+                        b.out_settle, b.longest_dry_run, b.last_producing,
+                        static_cast<double>(b.base_price_settle),
+                        static_cast<double>(b.price_settle),
                         b.price_ratio_max > 0.0f ? static_cast<double>(b.price_ratio_min) : 0.0,
                         static_cast<double>(b.price_ratio_max),
                         is_ext ? (b.ever_priced ? "yes" : "NEVER") : "-",

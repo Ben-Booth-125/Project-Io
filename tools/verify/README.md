@@ -944,8 +944,9 @@ balance(t) − balance(t−1); row C3 asserts the residual is zero. Beside them:
 mothballed`, `labour` and `supply_factor_mean` / `bldg_supply_zero` (BL-641's output scalar).
 `debt.csv` has one row per corp that entered debt in the window: tick, focus, holdings by type,
 the trailing-4-tick flows, and the dominant drain; the run ends with a histogram of dominant
-drains and the median entry tick. Run it **unwarmed** (`--warm 0`) to see where debt begins — the
-80-tick warm start hides the first wave. Compare tags with the aggregator pattern in
+drains and the median entry tick. Run it with no lead-in (`--settle 0`; `--warm 0` is the same flag) to see
+where debt begins — the default lead-in is the game's 12-tick settle (`app::validation_ticks`), and its
+ticks are unlogged, so a wave that starts inside them is not in the CSVs. Compare tags with the aggregator pattern in
 `docs/development/DEVLOG.md` (2026-09-02, "every balance tracked").
 
 ## Build note (2026-08-30): the glob loop carries the sol2 + Lua INCLUDE paths
