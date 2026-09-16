@@ -37,7 +37,7 @@
 // ---------------------------------------------------------------------------
 // THE SHIPPED SPAWN, IN ITS OWN ORDER (and it is NOT spawn_solvency's)
 // ---------------------------------------------------------------------------
-// spawn_solvency (BL-635) warm-starts with `spectating = false` and reads
+// spawn_solvency (BL-635) settles with `spectating = false` and reads
 // whichever corp generation provisionally flagged. BL-630 changed what the game
 // does, and this harness follows the game:
 //
@@ -49,10 +49,11 @@
 //   4. assign_default_recipes                             — app.cpp's second pass,
 //      and NOT belt-and-braces: without it every processor a background firm
 //      authored keeps `no_recipe` for the whole campaign.
-//   5. 80 warm ticks with `spectating = TRUE`. Nobody is seated yet, so the
-//      no-auto-act prohibition has no subject (BL-409's rule, BL-630's second
-//      case) and every corp is scorer-driven. A warm start run false would
-//      measure a world one corp never acted in.
+//   5. THE SETTLE — phase 6's single validation run, 12 ticks
+//      (`app::validation_ticks`), with `spectating = TRUE`. Nobody is seated
+//      yet, so the no-auto-act prohibition has no subject (BL-409's rule,
+//      BL-630's second case) and every corp is scorer-driven. A settle run false
+//      would measure a world one corp never acted in.
 //   6. seat_player_corporation — the seat is DRAWN from the viable specialists.
 //   7. THE MEASURED WINDOW: live play, `spectating = FALSE`. The seated corp is
 //      now excluded from the scorer, exactly as a human's corp is, so what it
@@ -145,7 +146,16 @@ void check_on_real_spawn(bool ok, const char* row, const char* what)
     check(ok, row, what);
 }
 
-constexpr int k_warm_ticks = 80;  ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978), and this harness's own settle length is a re-read it owes.
+/// The settle: phase 6's single validation run, after which the seat is drawn
+/// and live play begins (ERAS.md § The opening position). Mirrors
+/// `app::validation_ticks`, restated because app.hpp brings SDL; if the app's
+/// number moves, this one moves with it. NOT a longer history by choice: Ben's
+/// criterion is about what the seated corp does FROM the seat, so the seat must
+/// be drawn where the game draws it, and every trailing window read before the
+/// measured window — the seat's (k_spawn_trailing_quarters, 8) and the price's
+/// (k_acquisition_trailing_quarters, 8) — fits inside the settle whole.
+/// Re-read under BL-1008, 2026-09-16 — see THE SETTLE RE-READ for what moved.
+constexpr int k_settle_ticks = 12;
 constexpr int k_r1_window  = 8;   ///< Quarters R1 reads for its trend. Two years.
 
 /// BL-573: run_nation_step's template registry. Empty is correct — nothing in
@@ -156,7 +166,7 @@ constexpr int k_r1_window  = 8;   ///< Quarters R1 reads for its trend. Two year
 // ---------------------------------------------------------------------------
 
 /// One economy tick in app::step_economy's order. @p spectating is the ONLY
-/// thing that differs between the warm start and live play, and it is the whole
+/// thing that differs between the settle and live play, and it is the whole
 /// of BL-630: true means nobody is seated and every corp is scorer-driven.
 void tick(world& w, const recipe_registry& reg, int t, bool spectating)
 {
@@ -543,8 +553,8 @@ seed_row run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
     for (const auto& kv : w.corporations)
         r.field_holdings_gen += static_cast<int>(kv.second.assets.size());
 
-    // The warm start runs in SPECTATE: nobody is seated yet.
-    for (int t = 1; t <= k_warm_ticks; ++t)
+    // The settle runs in SPECTATE: nobody is seated yet.
+    for (int t = 1; t <= k_settle_ticks; ++t)
         tick(w, reg, t, /*spectating=*/true);
 
     const spawn_seat_result seat = seat_player_corporation(w, seed);
@@ -568,7 +578,7 @@ seed_row run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
     // --- live play. The seated corp is excluded from the scorer, exactly as a
     //     human's corp is, so what it accumulates it accumulates by holding what
     //     it was handed. -------------------------------------------------------
-    int t = k_warm_ticks;
+    int t = k_settle_ticks;
     int q = 0;
     for (; q < search_quarters && !r.buy_attempted; ++q)
     {
@@ -755,11 +765,11 @@ int main(int argc, char** argv)
     std::printf("  Ben's criterion: \"a corporation can save up in a few economy "
                 "ticks to buy another\n"
                 "                   company, and then continue making a profit.\"\n");
-    std::printf("  %d seeds from %u | %d warm ticks in SPECTATE, then seat, then "
+    std::printf("  %d seeds from %u | %d settle ticks (app::validation_ticks) in SPECTATE, then seat, then "
                 "live play\n"
                 "  search window %d quarters, run-on %d quarters, prehistory %s\n"
                 "  the buy fires on: %s\n",
-                seed_count, seed0, k_warm_ticks, search_quarters, after_quarters,
+                seed_count, seed0, k_settle_ticks, search_quarters, after_quarters,
                 prehistory ? "ON (the shipped spawn)" : "OFF (--fast, NOT the spawn)",
                 mode == buy_mode::priced
                     ? "GATE B, the cheapest firm priced ABOVE ZERO (--target priced)"
