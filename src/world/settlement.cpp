@@ -82,26 +82,9 @@ void culture_shares::shift_toward(int c, int amount_q)
 
     for (int i = 0; i < n_comp; ++i) cw[i] -= take[i];
 
-    // The gain lands on c's own slot, or on a free slot, or — all three named
-    // by others — c CLAIMS THE SMALLEST NAMED SLOT, whose people are demoted
-    // into the tail. It never lands in the tail itself.
-    //
-    // THE CULTURE BEING SHIFTED TOWARD IS THE ONE SHARE THAT MUST BE NAMEABLE
-    // (BL-841). Its only caller is the holder's own assimilation, and the
-    // holder's share is what every reader asks about (`w_cult` charges the
-    // foreign remainder, 1000 - share_of(holder)). The old rule let c claim the
-    // smallest slot only once ONE ROUND'S take exceeded it, and poured the gain
-    // into the tail until then — where share_of reads 0. A fourth culture
-    // taking a region whose three slots were held never outgrew a proportionally
-    // shrinking smallest slot, so it digested nothing it could read, ever, and
-    // every unit it gained was stranded in a tail foreign to everyone.
-    //
-    // The cost, stated: the displaced minority falls into the tail at the
-    // moment of the first gain rather than once it has shrunk below a round's
-    // take, so ITS share stops being readable sooner. That is the tail's
-    // documented meaning — the peoples no longer named — and it keeps the three
-    // slots' invariants (sorted, no duplicate ids, weight 0 exactly where
-    // unnamed) with no new field on the record.
+    // The gain lands on c's own slot, or claims the smallest named slot if it
+    // is now larger than it, or falls into the tail. It NEVER silently
+    // overwrites a larger culture.
     int ci = -1;
     for (int i = 0; i < culture_share_slots; ++i)
         if (cid[i] == c) { ci = i; break; }
@@ -110,19 +93,24 @@ void culture_shares::shift_toward(int c, int amount_q)
             if (cid[i] < 0) { ci = i; cid[i] = c; cw[i] = 0; break; }
     if (ci < 0)
     {
-        // All slots named, none is c. Displace the smallest; a weight tie
-        // displaces the higher culture index, the same total order the re-sort
-        // below uses.
+        // All slots named, none is c. The smallest slot is the only one it may
+        // displace, and only on a strict improvement — a tie leaves the
+        // incumbent standing, the same tie-break discipline the sim's argmax
+        // uses.
         int smallest = 0;
         for (int i = 1; i < culture_share_slots; ++i)
             if (cw[i] < cw[smallest] || (cw[i] == cw[smallest] && cid[i] > cid[smallest]))
                 smallest = i;
-        cw[culture_share_slots] += cw[smallest]; // Demoted into the tail.
-        cid[smallest] = c;
-        cw[smallest]  = 0;
-        ci = smallest;
+        if (taken > cw[smallest])
+        {
+            cw[culture_share_slots] += cw[smallest]; // Demoted into the tail.
+            cid[smallest] = c;
+            cw[smallest]  = 0;
+            ci = smallest;
+        }
     }
-    cw[ci] += taken;
+    if (ci >= 0) cw[ci] += taken;
+    else         cw[culture_share_slots] += taken; // Too small to be named yet.
 
     // Re-sort the named slots descending, ties on the lower culture index.
     for (int a = 0; a < culture_share_slots; ++a)
