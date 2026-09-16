@@ -141,6 +141,15 @@ struct lapse_params
     /// longer lead-in — every trailing window (debt.csv's four ticks) is filled
     /// inside the measured window, not the lead-in — so the default follows the
     /// game. A longer or zero lead-in stays a flag, and is echoed in the manifest.
+    ///
+    /// WHAT MOVED (seed 0, --ticks 8, prehistory ON, lead-in 80 -> 12): no row
+    /// moved on substance — C1 and C3 PASS at both, and the --t0 battery sets
+    /// its own lead-in (6) so it cannot move. The measured window is now ticks
+    /// 13-20, not 81-88: its first tick reads 185 convoys / 52 active / 3 idle
+    /// buildings / 52 of 88 corps in debt, against 134 / 49 / 18 / 56 at tick
+    /// 81, and debt entries inside the window fell 2 -> 1. Anyone comparing a
+    /// default-lead-in CSV with one from before 2026-09-16 is comparing two
+    /// different quarters of the same campaign; pass --settle 80 to reproduce.
     int         settle_ticks = 12;
     int         ticks       = 120;   ///< measured window (30 years of quarters).
     bool        prehistory  = true;  ///< the shipped spawn; --fast zeroes it.
