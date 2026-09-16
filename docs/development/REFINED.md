@@ -44,6 +44,6 @@ A11 (BL-1022); economy.lua and market_clearing.cpp by A2 alone; haulage_measure.
 Merge order: instruments and docs first (A4, A1, A3, A9, A10, A11), then the history movers (A5, A6,
 A7, A8), then the economy mover (A2), then the UI (A12, live click).
 
-Waves after this one, by prerequisite: B - BL-983, BL-1004, BL-1003, BL-875, BL-822, BL-878, BL-945,
-BL-1024, BL-1025 (the timing items, on a quiet machine); C - BL-984, BL-987, BL-994, BL-997, BL-876,
-BL-1005, BL-995; D - BL-985, BL-990, BL-986, BL-992, BL-991, BL-993, BL-989, BL-988.
+Waves B-D were NOT RUN. Ben, 2026-09-16: "This work is highly unstructured, so just leave it at wave A
+and we can reinvent anything important later. (So archive)." Their 24 items are cancelled unbuilt and
+cold in the archive; each design stands in its authority doc.
