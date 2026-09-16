@@ -40,6 +40,8 @@
 #include "world/era_minus_one.hpp" // BL-754: the per-pass clock rides the fixture
 #include "world/hard_coded_world.hpp"
 #include "harness_params.hpp"
+#include "world/history_sim.hpp"   // BL-1009: polity::navy_stock, exploration_output
+#include "world/settlement.hpp"    // BL-1009: region stocks on world::gen_settlement
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -115,8 +117,36 @@ world_metrics measure(const world& w)
 // instrument, and nations, borders and city names do not move on a tick. They
 // are precisely what the pre-history pass writes, so R3 hashes them itself.
 //
-// Used ONLY by R3. R1/R2 keep the metrics they were written against, so nothing
-// about the existing cases changes.
+// Used ONLY by R3/R4. R1/R2 keep the metrics they were written against, so
+// nothing about the existing cases changes.
+//
+// THE DIGEST PROVES SAME-SEED-SAME-WORLD ONLY FOR THE FIELDS IT FOLDS (BL-1009,
+// with BL-957 merged in). Twice a real world-mover slipped through with every
+// digest digit-identical: moving world setup from 1200 grudges and corridors to
+// 1660 ones re-seeded sentiment by hundreds of rows and re-stamped hundreds of
+// road tiles (BL-956), and folding every held seat into the capital moved the
+// mean capital treasury by 80% and the Post Road count by 25 (BL-998). Neither
+// field was read here. So the digest now folds, beside the political layer:
+//
+//   - seeded sentiment   `world::sentiment` (every row, both dimensions);
+//   - road tiers         `tile_component::road_level`, per tile;
+//   - region stocks      `world::gen_settlement->regions`: `treasury`,
+//                        `port_stock_q`, `standing_army` and its owner;
+//   - the navy           `polity::navy_stock` off the Exploration handoff;
+//   - corridor tiers     the corridor set world setup stamped roads from, per
+//                        tier and per corridor.
+//
+// NATION TREASURY NEEDS NO FOLD OF ITS OWN: `world::state_hash`, which seeds this
+// digest, already folds `nation_component::treasury` whenever any is non-zero,
+// and that conditional is complete as a detector (two worlds differing in any
+// treasury have a non-zero on at least one side).
+//
+// THE LAST TWO ARE NOT WORLD STATE, which is why the digest takes the fixture.
+// A navy lives on the Era -1 polity and never lands on `world`; the corridor
+// record is a generation local that `stamp_history_roads` and the junction
+// markets consume. Both are what the span hands forward, and a regression in
+// either is otherwise invisible until something downstream happens to read it.
+// They are read off the SAME fixture generation filled, never re-derived.
 
 constexpr uint64_t fnv_prime = 1099511628211ull;
 
@@ -153,7 +183,7 @@ std::vector<entity_id> sorted_ids(const Map& m)
     return ids;
 }
 
-uint64_t deep_digest(const world& w)
+uint64_t deep_digest(const world& w, const era_minus_one_fixture& fx)
 {
     // Seed the fold with the canonical snapshot rather than repeating it.
     uint64_t h = w.state_hash(0);
@@ -230,7 +260,143 @@ uint64_t deep_digest(const world& w)
         fold_str(h, e.consequence);
     }
 
+    // --- BL-1009: what generation moves that play reads ---------------------
+    // Every section folds its size first, so an empty table and a table of
+    // one zero-valued row cannot collide.
+
+    // Seeded sentiment (BL-898's grudge rows). `sentiment_table::pairs` is a
+    // std::map keyed (observer, subject), so this is already a sorted walk.
+    fold_u32(h, static_cast<uint32_t>(w.sentiment.pairs.size()));
+    for (const auto& [pair, v] : w.sentiment.pairs)
+    {
+        fold_u32(h, pair.first);
+        fold_u32(h, pair.second);
+        fold_f32(h, v.access);
+        fold_f32(h, v.trust);
+    }
+
+    // Road tier per tile, SPARSE: (tile, tier) for every tile carrying a road,
+    // in ascending tile id. Complete as a detector — two worlds that differ on
+    // any tile's tier differ in this list — and it keeps the walk proportional
+    // to the network rather than to the grid.
+    {
+        std::vector<entity_id> roads;
+        for (const auto& [tid, tc] : w.tiles)
+            if (tc.road_level != 0) roads.push_back(tid);
+        std::sort(roads.begin(), roads.end());
+        fold_u32(h, static_cast<uint32_t>(roads.size()));
+        for (const entity_id tid : roads)
+        {
+            fold_u32(h, tid);
+            fold_u32(h, w.tiles.at(tid).road_level);
+        }
+    }
+
+    // Region stocks, in region index order (a vector: its order is the
+    // settlement's placement order, which is itself generation output). The
+    // absent record folds a sentinel so "no settlement" cannot hash as "a
+    // settlement of no regions".
+    if (const settlement_state* ss = w.gen_settlement.get())
+    {
+        fold_u32(h, static_cast<uint32_t>(ss->regions.size()));
+        for (const region& rg : ss->regions)
+        {
+            fold_i64(h, rg.treasury);
+            fold_i32(h, rg.port_stock_q);
+            fold_i64(h, rg.standing_army);
+            fold_i32(h, rg.standing_army_owner);
+        }
+    }
+    else
+    {
+        fold_u32(h, 0xFFFFFFFFu);
+    }
+
+    // The navy, off the Exploration handoff's polity table (index order).
+    // Empty — and folded as a zero size — wherever the span did not run.
+    fold_i32(h, fx.exploration_ran ? 1 : 0);
+    fold_u32(h, static_cast<uint32_t>(fx.exploration_handoff.polities.size()));
+    for (const polity& p : fx.exploration_handoff.polities)
+        fold_i64(h, p.navy_stock);
+
+    // The corridor set world setup stamped roads and junction markets from:
+    // the per-tier counts, then every corridor's (a, b, tier) in (a, b) order.
+    // Sorted here rather than trusted, so the fold cannot lean on either
+    // span's own ordering. `uses` is deliberately NOT folded — it is traffic,
+    // and nothing past generation reads it; the tier is what reaches the map.
+    {
+        std::vector<history_corridor> cs = fx.setup_corridors;
+        std::sort(cs.begin(), cs.end(),
+                  [](const history_corridor& x, const history_corridor& y) {
+                      return x.a != y.a ? x.a < y.a : x.b < y.b;
+                  });
+        std::map<int, uint32_t> tier_count;
+        for (const history_corridor& c : cs) ++tier_count[c.tier];
+        fold_u32(h, static_cast<uint32_t>(cs.size()));
+        fold_u32(h, static_cast<uint32_t>(tier_count.size()));
+        for (const auto& [tier, n] : tier_count)
+        {
+            fold_i32(h, tier);
+            fold_u32(h, n);
+        }
+        for (const history_corridor& c : cs)
+        {
+            fold_u32(h, c.a);
+            fold_u32(h, c.b);
+            fold_u32(h, c.tier);
+        }
+    }
+
     return h;
+}
+
+/// A human-readable line of what the BL-1009 folds saw, so a moved digest can be
+/// read as a moved FIELD. Reported, never asserted.
+void print_coverage(const char* what, const world& w, const era_minus_one_fixture& fx)
+{
+    std::size_t road_tiles = 0;
+    std::map<int, int> road_tier;
+    for (const auto& [tid, tc] : w.tiles)
+        if (tc.road_level != 0) { ++road_tiles; ++road_tier[tc.road_level]; }
+
+    int64_t region_treasury = 0, standing = 0;
+    int64_t port_stock = 0;
+    std::size_t regions = 0;
+    if (const settlement_state* ss = w.gen_settlement.get())
+    {
+        regions = ss->regions.size();
+        for (const region& rg : ss->regions)
+        {
+            region_treasury += rg.treasury;
+            port_stock += rg.port_stock_q;
+            standing += rg.standing_army;
+        }
+    }
+    int64_t navy = 0;
+    for (const polity& p : fx.exploration_handoff.polities) navy += p.navy_stock;
+
+    int corridor_tier[4] = { 0, 0, 0, 0 };
+    int corridor_other   = 0;
+    for (const history_corridor& c : fx.setup_corridors)
+    {
+        if (c.tier < 4) ++corridor_tier[c.tier];
+        else ++corridor_other;
+    }
+
+    double nation_treasury = 0.0;
+    for (const auto& [nid, nc] : w.nations) nation_treasury += nc.treasury;
+
+    std::printf("     coverage %-14s sentiment rows=%zu | road tiles=%zu (T1 %d, T2 %d, T3 %d)\n",
+                what, w.sentiment.pairs.size(), road_tiles,
+                road_tier[1], road_tier[2], road_tier[3]);
+    std::printf("         regions=%zu treasury=%lld port_stock_q=%lld standing_army=%lld |"
+                " navy=%lld | nation treasury=%.0f\n",
+                regions, static_cast<long long>(region_treasury),
+                static_cast<long long>(port_stock), static_cast<long long>(standing),
+                static_cast<long long>(navy), nation_treasury);
+    std::printf("         corridors=%zu (tier0 %d, tier1 %d, tier2 %d, tier3 %d, other %d)\n",
+                fx.setup_corridors.size(), corridor_tier[0], corridor_tier[1],
+                corridor_tier[2], corridor_tier[3], corridor_other);
 }
 
 int failures = 0;
@@ -256,9 +422,12 @@ void check(bool ok, const char* label)
 /// Timings are REPORTED here and never asserted. They vary with the machine,
 /// the build type and the load, so binding a check to one would be pinning a
 /// number that is not a property of the world.
-world timed_world(const world_params& p, generation_report* rep, const char* what)
+///
+/// BL-1009: the fixture is the CALLER'S now, because `deep_digest` reads two
+/// fields off it that never land on `world` (the navy and the corridor set).
+world timed_world(const world_params& p, generation_report* rep, const char* what,
+                  era_minus_one_fixture& fx)
 {
-    era_minus_one_fixture fx;
     const auto t0 = std::chrono::steady_clock::now();
     world w = make_hard_coded_world(p, rep, {}, nullptr, nullptr, &fx);
     const double secs =
@@ -357,18 +526,23 @@ int main()
 
     generation_report rep_a1{}, rep_a2{}, rep_b{};
 
-    const world w_a1  = timed_world(pre_a, &rep_a1, "seed A, prehistory ON #1");
-    const world w_a2  = timed_world(pre_a, &rep_a2, "seed A, prehistory ON #2");
-    const world w_b   = timed_world(pre_b, &rep_b,  "seed B, prehistory ON");
-    const world w_off = timed_world(off_a, nullptr, "seed A, prehistory OFF");
+    era_minus_one_fixture fx_a1, fx_a2, fx_b, fx_off;
+    const world w_a1  = timed_world(pre_a, &rep_a1, "seed A, prehistory ON #1", fx_a1);
+    const world w_a2  = timed_world(pre_a, &rep_a2, "seed A, prehistory ON #2", fx_a2);
+    const world w_b   = timed_world(pre_b, &rep_b,  "seed B, prehistory ON", fx_b);
+    const world w_off = timed_world(off_a, nullptr, "seed A, prehistory OFF", fx_off);
 
     const world_metrics m_a1 = measure(w_a1);
     const world_metrics m_a2 = measure(w_a2);
 
-    const uint64_t d_a1  = deep_digest(w_a1);
-    const uint64_t d_a2  = deep_digest(w_a2);
-    const uint64_t d_b   = deep_digest(w_b);
-    const uint64_t d_off = deep_digest(w_off);
+    const uint64_t d_a1  = deep_digest(w_a1, fx_a1);
+    const uint64_t d_a2  = deep_digest(w_a2, fx_a2);
+    const uint64_t d_b   = deep_digest(w_b, fx_b);
+    const uint64_t d_off = deep_digest(w_off, fx_off);
+
+    print_coverage("seedA/on", w_a1, fx_a1);
+    print_coverage("seedB/on", w_b, fx_b);
+    print_coverage("seedA/off", w_off, fx_off);
 
     std::printf("     digest seedA/on  = %016llX and %016llX\n",
                 static_cast<unsigned long long>(d_a1), static_cast<unsigned long long>(d_a2));
@@ -482,11 +656,13 @@ int main()
                               .industrial_years = 400 };
 
     generation_report rep_i1{}, rep_i2{};
-    const world w_i1 = timed_world(ind_a, &rep_i1, "seed A, epoch 1960 #1");
-    const world w_i2 = timed_world(ind_a, &rep_i2, "seed A, epoch 1960 #2");
+    era_minus_one_fixture fx_i1, fx_i2;
+    const world w_i1 = timed_world(ind_a, &rep_i1, "seed A, epoch 1960 #1", fx_i1);
+    const world w_i2 = timed_world(ind_a, &rep_i2, "seed A, epoch 1960 #2", fx_i2);
 
-    const uint64_t d_i1 = deep_digest(w_i1);
-    const uint64_t d_i2 = deep_digest(w_i2);
+    const uint64_t d_i1 = deep_digest(w_i1, fx_i1);
+    const uint64_t d_i2 = deep_digest(w_i2, fx_i2);
+    print_coverage("1960/two-span", w_i1, fx_i1);
     std::printf("     digest 1960/two-span = %016llX and %016llX\n",
                 static_cast<unsigned long long>(d_i1), static_cast<unsigned long long>(d_i2));
     std::printf("     report 1960: years=%lld battles=%lld conquests=%lld foundings=%lld\n",
