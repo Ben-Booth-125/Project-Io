@@ -502,6 +502,15 @@ any force in this project.
 in the migration, and a sea or storm god. **High dominion with no sea legs is the continental
 consolidator**, already derivable; deep sea legs with a universalising creed is the coloniser.
 
+**The two leans are read on one scale: each as a rank among its world's living polities, never
+against each other.** The consolidator lean is a product (dominion held back by sea legs), so it
+is at most its smaller factor; the expansion lean is a mean (sea legs with zeal), so it is at
+least its smaller input. Compared raw, a middling people reads expansionist with nothing
+seafaring about it, and on a real spread no people reads consolidator at all. So a realm is a
+consolidator when its consolidator lean ranks in the top third of its world, an expansionist
+likewise, and a realm may be both or neither. The spend scorer reads each lean only as that
+rank, and the sweep classifies by it (BL-1016, CREED_CLASSIFIER_COMPARES_ONE_SCALE).
+
 **If the mapping turns out not to separate them, the fix is upstream, not here** (Ben, 2026-09-11:
 *"if we have to force this outcome, then we should be looking back at the Empire phase to ensure
 creeds map well to our phase"*). Forcing a disposition the creeds do not support would be a term
@@ -650,9 +659,17 @@ that ran off it.
   unwritten estimate is the failure mode.
 - **Where the deterrence pair's thresholds sit.** The arms race borrows ERAS.md's Ceiling/Alarm
   shape at polity grain; what makes a neighbour bind rather than test is unmeasured.
-- **Whether the creed axes actually separate consolidators from expansionists.** § Two ways to be
-  strong argues they should, from `zeal`, `dominion` and `sea_legs_q`. If a sweep shows they do
-  not, the fix is upstream in the Empire phase, never a flag here.
+- **Whether both strategies stand among ONE world's strongest realms.** Read on one scale (§ Two
+  ways to be strong), the creed axes do separate consolidators from expansionists across a world's
+  polities, and each reaches a world's richest three somewhere on a 16-seed spread (2026-09-16).
+  What that spread did not show is a consolidator and a *different* expansionist among one
+  world's richest three. Two facts bear on it and neither is yet a cause. A world's richest realms
+  often carry identical leans, as kin sharing one creed would, and so one disposition. And every
+  living realm's people on the spread carried deep sea legs, so a consolidator is one only
+  relative to its world — the landlocked people that section describes does not occur. The
+  upstream question is therefore specific: whether
+  `sea_legs_q` is earned too easily for "no sea legs" ever to be true. If the creed axes stop
+  separating a world's polities at all, the fix is upstream in the Empire phase, never a flag here.
 - **What this phase's treaty graph hands the world war.** Ben, 2026-09-15, permits a world war in
   Digitisation and never forces it; `DIGITISATION.md` § A world war is permitted, never forced
   reads its spread through the mutual-defence clause this phase creates. How densely great powers
