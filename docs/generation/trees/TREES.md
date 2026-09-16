@@ -113,7 +113,7 @@ branches (rule 4); its `links` are the spire major below it and the spire major 
 forms exist beside the AND: `requires_fork` names a fork pair of which **either** side satisfies,
 and `requires_any` names a set of which **any N** satisfy. The second is what a *carried* tree
 needs — a people coined on one ground family holds one branch, and a milestone that demanded two
-named branches would be unreachable for every people not coined on both; "any two of four" keeps
+named branches would be unreachable for every people not coined on both; "any two of five" keeps
 rule 4's breadth without naming which breadth.
 
 **The last milestone unlocks the next tree.** The chain is Colonisation → Empire → Exploration
@@ -260,7 +260,7 @@ is an assertion the sweep makes, not a number anyone picks.
 
 | Tree | Rings | Branches | Milestones | Target nodes | Cap |
 |---|---|---|---|---|---|
-| Colonisation | 3 | 4, one per origin farm class | 3 | ~28 | 64 |
+| Colonisation | 3 | 5, one per ground family; arid and stone teach none | 3 | 36 | 64 |
 | Empire | 4 | 4 | 4 | ~48 | 64 |
 | Exploration | 3 | 4 | 3 | 31 | 64 |
 | Industry | 3 | 5 | 3 | ~44 | 64 |

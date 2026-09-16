@@ -4,7 +4,7 @@
     "The Colonisation tree — the store COLONISATION_TREE.md transcribes. The schema is TREES.md § The store — `*_tree.json`, and tree_lint.js cross-checks doc and store both ways.",
     "No actor, so no scorer: there is no pursued_when and no scorer_terms. A culture acquires a node by time on ground that satisfies its gate, or by contact; a daughter copies its parent's mask at coining.",
     "Ids are CO-<branch>-<ring><seq>; 'm' is the one milestone per ring, on the spire. Each edge is listed once, on the node farther from the root; the root CO-SP-1a lists none, and that empty list is how the generated table derives is_root (tree_lint holds exactly one).",
-    "A milestone's requires names the spire major at its ring (AND); requires_any names the four branch majors at its ring, ANY TWO of which satisfy it (TREES.md § Milestones, and how a tree unlocks the next; COLONISATION_TREE.md § Milestones).",
+    "A milestone's requires names the spire major at its ring (AND); requires_any names the five branch majors at its ring, ANY TWO of which satisfy it (TREES.md § Milestones, and how a tree unlocks the next; COLONISATION_TREE.md § Milestones).",
     "Magnitudes are placeholders by judgement — per_mille 20–80 on minors, 60–200 on majors — and the sweep re-prices them.",
     "Names are generic mechanism nouns; earth_ref is calibration prose and never a place or a people."
   ],
@@ -35,6 +35,11 @@
       "key": "CS",
       "name": "The Shore",
       "concern": "what the coast teaches: the net, the dried catch, the boat"
+    },
+    {
+      "key": "FO",
+      "name": "The Forest",
+      "concern": "what woodland and boreal ground teach: the forest floor, the clearing, the axe — and the winter carried through"
     }
   ],
   "nodes": [
@@ -85,6 +90,7 @@
         "of": [
           "CO-CS-1a",
           "CO-FL-1a",
+          "CO-FO-1a",
           "CO-GR-1a",
           "CO-HL-1a"
         ]
@@ -144,6 +150,7 @@
         "of": [
           "CO-CS-2a",
           "CO-FL-2a",
+          "CO-FO-2a",
           "CO-GR-2a",
           "CO-HL-2a"
         ]
@@ -208,6 +215,7 @@
         "of": [
           "CO-CS-3a",
           "CO-FL-3a",
+          "CO-FO-3a",
           "CO-GR-3a",
           "CO-HL-3a"
         ]
@@ -772,6 +780,175 @@
         }
       ],
       "earth_ref": "the dugout — a visible island becomes a crossing of days, never a voyage, Mesolithic equivalent"
+    },
+    {
+      "id": "CO-FO-1a",
+      "name": "Mast Gathering",
+      "kind": "major",
+      "ring": 1,
+      "branch": "FO",
+      "links": [
+        "CO-SP-1a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 100
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 50
+        }
+      ],
+      "earth_ref": "the forest floor's autumn fall of nut and acorn, gathered and pitted against the winter, Mesolithic equivalent"
+    },
+    {
+      "id": "CO-FO-1b",
+      "name": "Snare Setting",
+      "kind": "minor",
+      "ring": 1,
+      "branch": "FO",
+      "links": [
+        "CO-FO-1a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "forage",
+          "per_mille": 30
+        }
+      ],
+      "earth_ref": "a line of snares walked each morning — small game taken under cover without the chase"
+    },
+    {
+      "id": "CO-FO-2a",
+      "name": "Ring-Bark Clearing",
+      "kind": "major",
+      "ring": 2,
+      "branch": "FO",
+      "links": [
+        "CO-FO-1b"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 120
+        },
+        {
+          "kind": "modifier",
+          "target": "plague",
+          "per_mille": 40
+        }
+      ],
+      "earth_ref": "trees girdled to die standing and the dead stand burned and sown in its own ash — the clearing pushes the forest's danger back from the hearth, ~6th millennium equivalent"
+    },
+    {
+      "id": "CO-FO-2b",
+      "name": "Smoke House",
+      "kind": "minor",
+      "ring": 2,
+      "branch": "FO",
+      "links": [
+        "CO-FO-2a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 40
+        }
+      ],
+      "earth_ref": "meat hung in the hearth smoke under the roof — the winter carried in the rafters"
+    },
+    {
+      "id": "CO-FO-2c",
+      "name": "Pitch Boiling",
+      "kind": "minor",
+      "ring": 2,
+      "branch": "FO",
+      "links": [
+        "CO-CS-2a",
+        "CO-FO-2a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 30
+        }
+      ],
+      "earth_ref": "resin boiled down to pitch — a sealed basket, a sealed seam; the forest's gift to the shore"
+    },
+    {
+      "id": "CO-FO-3a",
+      "name": "Felling Axe",
+      "kind": "major",
+      "ring": 3,
+      "branch": "FO",
+      "links": [
+        "CO-FO-2b"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "access",
+          "target": "forest"
+        },
+        {
+          "kind": "modifier",
+          "target": "carrying_capacity",
+          "per_mille": 60
+        }
+      ],
+      "earth_ref": "a ground-stone blade hafted to fell rather than girdle — the stand becomes ground a people cuts a way through, ~5th–4th millennium equivalent"
+    },
+    {
+      "id": "CO-FO-3b",
+      "name": "Runner Sledge",
+      "kind": "minor",
+      "ring": 3,
+      "branch": "FO",
+      "links": [
+        "CO-FO-3a"
+      ],
+      "gate": null,
+      "diffusion": "practice",
+      "excludes": null,
+      "requires": [],
+      "effects": [
+        {
+          "kind": "modifier",
+          "target": "stores",
+          "per_mille": 40
+        }
+      ],
+      "earth_ref": "the sledge on packed snow — a winter's haul moves over cold ground no cart could cross"
     }
   ]
 }
