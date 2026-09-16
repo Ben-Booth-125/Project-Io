@@ -21,14 +21,13 @@ the opening view the flow hands over to.
 
 ```
 menu  →  generating  →  building  →  in_game
-(main menu)  (New World wizard)  (carve, then warm start)  (play)
+(main menu)  (New World wizard)  (carve, then validation run)  (play)
 ```
 
 `building` is the loading screen the world is carved on (CORPORATION_GENERATION.md
-§ Corporate seeding is watched); it also hosts the pre-game warm start that runs
-after the carve. There is **no corp-selection stage** — the player is seated on a
-corporation drawn from the spawn shortlist once the warm start has finished. See
-§ The seat below.
+§ Corporate seeding is watched); it also hosts the settle — phase 6's single validation run
+on the selected landscape (GENERATION_STRATEGY.md § The eight phases, phase 6). The player then **picks the seat on
+the corporation selection canvas at Begin**. See § The seat below.
 
 **Only `in_game` simulates.** On the menu and wizard the loop just pumps events
 and draws — the world, economy, and sim clock are not built until the wizard's
@@ -339,20 +338,31 @@ selected (CANVASES.md § Default state).
 
 ## The seat
 
-The starting-corp **selection screen is retired** (Ben, 2026-08-26): which corporation
-the player runs is drawn at random from a viability shortlist rather than picked. The
-mechanism — the warm start in spectate, the floor, the draw, and what the reorder costs
-in re-blessed goldens — is owned by
-[`CORPORATION_GENERATION.md`](../generation/CORPORATION_GENERATION.md) § The spawn
-shortlist, and the seat. This doc owns only the screen consequences:
+**The player picks the seat, on a corporation selection canvas at Begin** (Ben, 2026-09-09:
+*"Begin should go directly to a 'corporation selection' interactive canvas"*; asked whether that
+reverses the 2026-08-26 retirement of the selection screen: *"Yes, it's time to reverse that
+ruling."*). The random draw is retired as the seat mechanism. The spawn shortlist survives as
+**what the canvas offers** — the viability floor still filters, its weighting still orders, and
+the player chooses among what passes rather than being drawn for.
+[`CORPORATION_GENERATION.md`](../generation/CORPORATION_GENERATION.md) § The spawn shortlist,
+and the seat owns the shortlist; this doc owns only the screen.
 
-- `app_screen::choosing_corp`, `draw_corp_choice_screen`, `build_corp_choices`,
-  `apply_corp_choice` and the *Surprise me* press all go, along with
-  `verify.show_corp_choice` and `scripts/verify/corp_choice.lua`.
-- The three hard ordering constraints that pinned the old stage to a single frame
-  dissolve with it. The seat now happens **after** background firms and **after** the
-  warm start, which is what makes a profitability read possible at all — the old stage
-  showed no balances precisely because it ran before any had moved.
-- The loading screen gains a second phase: the carve, then the warm start it now hosts.
-  What that phase shows while it runs is unbuilt and is BL-632's (warm-start progress).
+**The floor reads the ground, not a trading record** (Ben, 2026-09-16, NR-881). The settle is
+too short for a trailing net to exist at any window, so the shortlist gates on the static
+landscape score phase 6 already computed for each seat. Trailing figures stay on the seat card
+as information; they are never the gate.
 
+**The canvas draws over a world that already exists.** It sits over the landscape the final
+wizard round selected, so the wizard hands a **world** forward rather than a record, and Begin
+takes that world instead of building a second one (Ben, 2026-09-16, NR-811). A control move
+that changes the world invalidates what the wizard holds; a held world that no longer matches
+the controls is worse than a slow one.
+
+**The seat comes after the firms and after the settle**, which is what lets the canvas show a
+seat worth weighing at all — the 2026-08-26 stage showed no balances because it ran before any
+had moved.
+
+**What the canvas is choosing is ruled separately.** Whether the seat is the firm the player
+*is*, or the base a mercenary company is hired from, is NR-885 (`../CONCEPT.md` § Player
+identity). The canvas states an answer on its first frame whether or not one has been given, so
+nothing on it is designed past the shortlist until that is ruled.

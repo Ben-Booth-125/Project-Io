@@ -1978,6 +1978,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // refused walk is held one short because the corridor will be walked
     // again on its own; a refused PURCHASE simply did not happen, so the
     // uses count is left untouched rather than nudged.
+    //
+    // KNOWN UNDER-READ (was BL-959): the promotion appends ONE row to the
+    // corridor record, so the record's `uses` under-reads the tier it grants.
+    // The carried `history_corridor::tier` is right. A reader that wants the
+    // tier reads `tier`, never infers it from `uses`. Making the two agree
+    // moves the 1960/two-span and seedA/off digests, so it rides the next
+    // authorised re-bless rather than spending one of its own.
     const auto try_upgrade_corridor = [&](int a, int b, int payer_seat) -> bool {
         if (a < 0 || b < 0 || a == b) return false;
         if (a >= static_cast<int>(owner_index_limit)

@@ -402,8 +402,7 @@ world has been run forward, not during the passes above.
 ### The spawn shortlist, and the seat
 
 **Reversed in intent (Ben, 2026-09-09): the player is to PICK the seat on a corporation selection
-canvas at Begin**, over the landscape the search selected (`docs/ui/STARTUP.md` § The seat; BL-880,
-corporation selection canvas). The shortlist and the weighted draw below remain the mechanism
+canvas at Begin**, over the landscape the search selected (`docs/ui/STARTUP.md` § The seat). The shortlist and the weighted draw below remain the mechanism
 until that canvas exists, and afterwards they are what the canvas *offers* — the floor still filters,
 the weighting still orders, and the player chooses rather than being drawn for.
 

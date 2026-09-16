@@ -673,6 +673,13 @@ struct world_preferences
     /// as `mid` (`era_minus_one.cpp`), so a save or a fixture that never set
     /// this field runs the ordinary world it always ran.
     ///
+    /// OWED, ON THE NEXT FORMAT BUMP (was BL-1015): `any` is REPRESENTABLE on
+    /// this axis and MEANS NOTHING here, and save format 12 carries it. Give
+    /// the axis its own three-value type with its own bound and serialiser
+    /// when something else next moves `world_save.cpp` — not worth a bump of
+    /// its own. The round-trip check must pin to a literal, so a writer and a
+    /// reader that both omit the field cannot round-trip clean.
+    ///
     /// IT TARGETS NO COUNT AND MUST NEVER ACQUIRE ONE. See
     /// `../world/history_sim.hpp` sec THE HISTORICAL TURBULENCE LEAN for what
     /// it actually moves and why counting polities is the one thing forbidden
