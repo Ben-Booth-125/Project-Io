@@ -215,6 +215,37 @@ constexpr double k_baseline_seated_upkeep          =  600.0;
 constexpr double k_baseline_rival_solvent_pct      =   26.9;
 constexpr double k_baseline_rival_units_per_seed   =   16.9; // mean of 15..20
 
+// ---------------------------------------------------------------------------
+// THE SETTLE RE-READ (BL-1008, 2026-09-16) — what moved when 80 became 12
+// ---------------------------------------------------------------------------
+// Same binary logic, same 3 seeds from 0, prehistory ON; the ONLY change is the
+// settle length (80 -> 12). A reading, not a re-pin: no band was touched.
+//
+//   row / figure                         80 ticks          12 ticks
+//   seated balance > 0                   1/3               3/3
+//   seated net >= 0 (trailing 8)         1/3               1/3
+//   R2 gate (both)                       1/3  FAIL         1/3  FAIL
+//   seated mean closing balance          15,153.9 cr       2,733.0 cr
+//   seated mean operating net            +214.3 cr/qtr     +123.8 cr/qtr
+//   seated dipped below zero             2/3 seeds         0/3 seeds
+//   rivals solvent at close              29.2%             36.7%   (bar 26.9)
+//   field holdings growth                +10.6%            +7.3%
+//   rival standing force                 11 units          0 units  R4 FAIL
+//
+// CAUSES. (1) The seated balance: the two seeds whose corp never produces
+// (seeds 1 and 2 — every building idle every tick) bleed maintenance and then
+// interest from the 400 cr starting capital; 80 quarters took them below zero,
+// 12 do not. The gate did not move, because its net half reads the same idle
+// buildings at either length. (2) Operating net: seed 0's income is still
+// rising at tick 12 (a processor active 7 of 12 ticks against 70 of 80), so its
+// trailing mean is lower. (3) Rival solvency rose for (1)'s reason. (4) THE
+// STANDING-FORCE ROW WENT RED, and not because rivals cannot afford to hire:
+// generation seeds no starting force (seed_starting_force = false,
+// corporation_generation.hpp), so any unit is a hire_unit the scorer makes, and
+// in 12 ticks none has. The row reads a behaviour that needs more quarters
+// than the game's settle has; whether it should read a longer run, be
+// re-expressed, or stand red is a call this re-read does not make.
+
 /// BL-573: run_nation_step's template registry. Empty is correct here — nothing
 /// in this sweep opens a mercenary contract, so the walk is vacuous.
 
