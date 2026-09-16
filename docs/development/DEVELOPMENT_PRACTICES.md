@@ -59,6 +59,20 @@ Three consequences worth holding:
   is the wiring that referenced them, and wiring fails only when something asks for it. The deletion
   looks complete because the thing deleted is gone.
 
+### Known harness baselines
+
+An unexplained red teaches the next reader to ignore the harness. A red that is **expected** — a real
+finding nobody may fix without moving a world, or a call still open — is named here and in the
+harness's own header, with its cause. Any red not on this list is a regression.
+
+Before listing a red, decide which kind it is. A check asserting a calendar, path or outcome the
+design no longer has is **stale**: restate it in place, citing the ruling, and it does not belong
+here. Only a red the code or the world is responsible for is a baseline.
+
+| Harness | Row | Cause |
+|---|---|---|
+| `era_world_harness` | R5 "the 1960 arc still industrialises (reachable across the seed sweep)" | No living polity's capacity passes 4 in any domain by 1960; the Industrial rung needs 5, so no furnace lights on any of the four swept worlds (BL-1010, measured 2026-09-16; the capacity reading holds under both default and shipped generation inputs). A fix moves the 1960 world, and whether the industrial arc must industrialise by its epoch is Ben's call. |
+
 ### Measuring a generated system
 
 Five rules, each earned by getting it wrong first (the earth-like battery, 2026-08-04). They apply
