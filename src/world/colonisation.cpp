@@ -1262,3 +1262,59 @@ isolation_result run_isolation_splits(const colonisation_input&      in,
     }
     return out;
 }
+
+// ---------------------------------------------------------------------------
+// The boundary fold (BL-1017)
+// ---------------------------------------------------------------------------
+
+culture_fold fold_empty_cultures(const std::vector<int32_t>& coined_parent,
+                                 const std::vector<uint8_t>& holds_ground)
+{
+    const std::size_t n = coined_parent.size();
+    culture_fold out;
+    out.parent.assign(n, -1);
+    out.folded_into.assign(n, -1);
+
+    const auto linked = [&](std::size_t i) {
+        const int32_t p = coined_parent[i];
+        return p >= 0 && static_cast<std::size_t>(p) < i;
+    };
+
+    // Interior-ness is read off the COINED tree: a folded name that had a
+    // daughter is the case that needs re-parenting, whatever became of her.
+    std::vector<uint8_t> has_child(n, 0u);
+    for (std::size_t i = 0; i < n; ++i)
+        if (linked(i)) has_child[static_cast<std::size_t>(coined_parent[i])] = 1u;
+
+    // living[i]: i itself where it keeps its name, else the living ancestor
+    // that absorbed it. Filled in ascending order, so living[parent] is always
+    // settled by the time a daughter reads it — which is the whole of why no
+    // daughter can be orphaned.
+    std::vector<int32_t> living(n, -1);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        const int32_t id = static_cast<int32_t>(i);
+        if (!linked(i))
+        {
+            living[i]     = id;
+            out.parent[i] = coined_parent[i];
+            continue;
+        }
+        const int32_t up    = living[static_cast<std::size_t>(coined_parent[i])];
+        const bool    holds = i < holds_ground.size() && holds_ground[i] != 0u;
+        out.parent[i] = up;
+        if (holds)
+        {
+            living[i] = id;
+            if (up != coined_parent[i]) ++out.reparented;
+        }
+        else
+        {
+            living[i]          = up;
+            out.folded_into[i] = up;
+            ++out.folded;
+            if (has_child[i]) ++out.folded_interior;
+        }
+    }
+    return out;
+}

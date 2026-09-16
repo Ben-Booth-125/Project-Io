@@ -870,6 +870,14 @@ struct settlement_state
         /// it read.
         int32_t recultured_regions = 0;
         int32_t isolation_steps    = 0;
+        /// THE BOUNDARY FOLD (BL-1017) — the one part of this record written
+        /// after the round's last split, by `run_settlement`'s close. Every
+        /// field above still counts every split; these say how many of those
+        /// names the Empires round receives. `fold_living` is the tree's size.
+        int32_t fold_living     = 0; ///< Cultures that keep their name (cradles included).
+        int32_t fold_folded     = 0; ///< Cultures folded into an ancestor.
+        int32_t fold_interior   = 0; ///< ...of which had a coined daughter.
+        int32_t fold_reparented = 0; ///< Living cultures re-parented past a folded mother.
     };
     culture_census census;
 

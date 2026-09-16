@@ -207,10 +207,18 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
         for (const auto& [cid, year] : ss.cradle_coined_year)
             if (cid >= cradles) cradles = cid + 1;
         std::vector<int32_t> parent(static_cast<std::size_t>(cradles), -1);
+        // BL-1017: a cradle never folds; a daughter carries its own fold.
+        std::vector<int32_t> folded(static_cast<std::size_t>(cradles), -1);
         parent.reserve(parent.size() + ss.spawned_cultures.size());
+        folded.reserve(parent.capacity());
         for (const culture& c : ss.spawned_cultures)
+        {
             parent.push_back(c.parent);
-        ui::build_lineage_palette(h, parent);
+            folded.push_back(c.folded_into);
+        }
+        // THE LIVING TREE (BL-1017): the settlement record's daughters arrive
+        // folded, so the wheel is spent only on names that outlived the round.
+        ui::build_lineage_palette(h, parent, &folded);
     }
 
     h.region_col.reserve(home->settlement.regions.size());

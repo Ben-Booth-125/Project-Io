@@ -240,7 +240,8 @@ ImU32 owner_colour(const history_lapse& h, uint16_t owner)
 
 } // namespace
 
-void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent)
+void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent,
+                           const std::vector<int32_t>* folded_into)
 {
     const std::size_t n = parent.size();
     h.culture_family.assign(n, -1);
@@ -253,9 +254,18 @@ void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent)
     // the k-th wedge. Even spacing rather than a hash is what makes two cradles'
     // ground read as two different families rather than two slots that happened
     // to land near each other.
+    // BL-1017: the living tree only. A folded culture's absorber is always a
+    // lower index that did not fold, so its colour is final by the time the
+    // folded row reads it.
+    const auto folded_to = [&](std::size_t i) -> int32_t {
+        if (folded_into == nullptr || i >= folded_into->size()) return -1;
+        const int32_t f = (*folded_into)[i];
+        return (f >= 0 && static_cast<std::size_t>(f) < i) ? f : -1;
+    };
+
     int roots = 0;
     for (std::size_t i = 0; i < n; ++i)
-        if (parent[i] < 0 || static_cast<std::size_t>(parent[i]) >= i) ++roots;
+        if (folded_to(i) < 0 && (parent[i] < 0 || static_cast<std::size_t>(parent[i]) >= i)) ++roots;
     const float wedge = 1.0f / static_cast<float>(roots > 0 ? roots : 1);
     // The fixed step a daughter takes off its parent, and the furthest any
     // member may drift from the root: inside the wedge with a margin, so the
@@ -272,6 +282,16 @@ void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent)
     int root_rank = 0;
     for (std::size_t i = 0; i < n; ++i)
     {
+        if (const int32_t f = folded_to(i); f >= 0)
+        {
+            const std::size_t fi = static_cast<std::size_t>(f);
+            h.culture_family[i] = h.culture_family[fi];
+            h.culture_hue[i]    = h.culture_hue[fi];
+            h.culture_depth[i]  = h.culture_depth[fi];
+            h.culture_colour[i] = h.culture_colour[fi];
+            deviation[i]        = deviation[fi];
+            continue; // No wedge, no sibling step: the name did not outlive the round.
+        }
         const int32_t p = parent[i];
         // A root, or a malformed link (a parent at or above its daughter) that is
         // treated as one rather than followed — the tree contract is that ids

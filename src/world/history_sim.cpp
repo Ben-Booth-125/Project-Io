@@ -8307,7 +8307,109 @@ namespace
             if (!culture_god_equal(a.pantheon[g], b.pantheon[g])) return false;
         return a.aggression_q == b.aggression_q && a.sea_legs_q == b.sea_legs_q
             && a.parent == b.parent && a.origin_farm_class == b.origin_farm_class
-            && a.coined_year == b.coined_year;
+            && a.coined_year == b.coined_year
+            && a.coined_from == b.coined_from && a.folded_into == b.folded_into;
+    }
+
+    /// THE BOUNDARY FOLD'S SHAPE (BL-1017), on the table alone. Every culture
+    /// the Colonisation round left without ground folded into an ancestor; this
+    /// is the proof that the tree the Empires round walks is the one the ruling
+    /// describes rather than one a reader must trust:
+    ///
+    ///  - A FOLDED CULTURE RECORDS ITS LINK: it names the lineage it was coined
+    ///    from, its `parent` is the name that absorbed it, that name is itself
+    ///    living, and it is an ancestor on the lineage — never a stranger.
+    ///  - NO ORPHAN: a living culture's `parent` never names a folded culture,
+    ///    and re-parenting only ever moves UP the lineage.
+    ///
+    /// A hand-built table with no lineage recorded (`coined_from` -1, nothing
+    /// folded) passes trivially, as every fixture predating the fold must.
+    bool culture_fold_valid(const std::vector<culture>& table, std::string* why)
+    {
+        const auto fail = [&](const std::string& msg) {
+            if (why) *why = msg;
+            return false;
+        };
+        const int n = static_cast<int>(table.size());
+        // Is @p anc on @p from's lineage (inclusive)? Bounded: `coined_from` is
+        // range-checked below for every row before any later row walks it.
+        const auto on_lineage = [&](int from, int anc) {
+            for (int at = from, guard = 0; at >= 0 && guard <= n; ++guard)
+            {
+                if (at == anc) return true;
+                at = table[static_cast<std::size_t>(at)].coined_from;
+            }
+            return false;
+        };
+        for (int i = 0; i < n; ++i)
+        {
+            const culture& c = table[static_cast<std::size_t>(i)];
+            const std::string id = "culture " + std::to_string(i);
+            if (c.coined_from < -1 || c.coined_from >= i)
+                return fail(id + " names lineage " + std::to_string(c.coined_from)
+                            + " out of range (must be -1 or below " + std::to_string(i) + ")");
+            if (c.folded_into < -1 || c.folded_into >= i)
+                return fail(id + " folded into " + std::to_string(c.folded_into)
+                            + ", out of range (must be -1 or below " + std::to_string(i) + ")");
+            if (c.folded_into >= 0)
+            {
+                if (c.coined_from < 0)
+                    return fail(id + " folded but records no lineage it was coined from");
+                if (c.parent != c.folded_into)
+                    return fail(id + " folded into " + std::to_string(c.folded_into)
+                                + " but its parent names " + std::to_string(c.parent));
+                if (table[static_cast<std::size_t>(c.folded_into)].folded_into >= 0)
+                    return fail(id + " folded into " + std::to_string(c.folded_into)
+                                + ", which folded too");
+                if (!on_lineage(c.coined_from, c.folded_into))
+                    return fail(id + " folded into " + std::to_string(c.folded_into)
+                                + ", which is not on its lineage");
+                continue;
+            }
+            if (c.parent >= 0 && c.parent < i
+                && table[static_cast<std::size_t>(c.parent)].folded_into >= 0)
+                return fail(id + " is ORPHANED: its parent " + std::to_string(c.parent)
+                            + " folded at the boundary and it was not re-parented");
+            if (c.parent >= 0 && c.coined_from >= 0 && !on_lineage(c.coined_from, c.parent))
+                return fail(id + " was re-parented onto " + std::to_string(c.parent)
+                            + ", which is not on its lineage");
+        }
+        return true;
+    }
+
+    /// NOTHING THE HANDOFF CARRIES NAMES A FOLDED CULTURE (BL-1017). The fold
+    /// keeps ids stable on the strength of this: a culture folds only where no
+    /// record names it, and the rounds after it only ever write a culture that
+    /// some region already carried. A region share, a founding culture or a
+    /// polity naming a folded culture would be a reader walking an empty name.
+    bool folded_cultures_unnamed(const std::vector<culture>& table,
+                                 const std::vector<region>&  regions,
+                                 const std::vector<polity>&  polities, std::string* why)
+    {
+        const auto fail = [&](const std::string& msg) {
+            if (why) *why = msg;
+            return false;
+        };
+        const auto folded = [&](int c) {
+            return c >= 0 && static_cast<std::size_t>(c) < table.size()
+                && table[static_cast<std::size_t>(c)].folded_into >= 0;
+        };
+        for (std::size_t i = 0; i < regions.size(); ++i)
+        {
+            const region& r = regions[i];
+            for (int k = 0; k < culture_share_slots; ++k)
+                if (r.culture.weight_q[k] > 0 && folded(r.culture.id[k]))
+                    return fail("region " + std::to_string(i) + " carries a share of folded culture "
+                                + std::to_string(r.culture.id[k]));
+            if (folded(r.founding_culture))
+                return fail("region " + std::to_string(i) + " was founded by folded culture "
+                            + std::to_string(r.founding_culture));
+        }
+        for (std::size_t p = 0; p < polities.size(); ++p)
+            if (folded(polities[p].culture))
+                return fail("polity " + std::to_string(p) + " is a people of folded culture "
+                            + std::to_string(polities[p].culture));
+        return true;
     }
 
     /// The culture-table half of both validators, shared so the two handoffs
@@ -8603,6 +8705,11 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
     //    when the live table is given -- equal to it row for row.
     if (!culture_table_valid(o.cultures, o.culture_count, o.stop_year, live, why))
         return false;
+
+    // 8. The boundary fold (BL-1017): folded cultures record their link, no
+    //    living culture is orphaned, and nothing carried names a folded one.
+    if (!culture_fold_valid(o.cultures, why)) return false;
+    if (!folded_cultures_unnamed(o.cultures, o.regions, o.polities, why)) return false;
 
     if (why) why->clear();
     return true;
@@ -8903,6 +9010,10 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
     // 11. The culture table (BL-969), held to the same rule as pass 1's.
     if (!culture_table_valid(o.cultures, o.culture_count, o.stop_year, live, why))
         return false;
+
+    // 12. The boundary fold (BL-1017), held to the same rule as pass 1's.
+    if (!culture_fold_valid(o.cultures, why)) return false;
+    if (!folded_cultures_unnamed(o.cultures, o.regions, o.polities, why)) return false;
 
     if (why) why->clear();
     return true;

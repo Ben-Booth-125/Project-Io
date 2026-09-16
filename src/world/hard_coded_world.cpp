@@ -154,17 +154,24 @@ era_timelapse build_migration_timelapse(const settlement_state& ss, const creed_
     // creeds roster already carries, dated and placed. Cradles have no parent
     // and emit nothing. Ascending by coined year, ties by culture id — the
     // allocation order, so the list is stable across machines.
+    //
+    // THE LINEAGE, NOT THE LIVING TREE (BL-1017). A split is a fact about who
+    // a people split FROM, so the event names `coined_from` — the link the
+    // boundary fold never rewrites — and a split whose name later folded is
+    // still emitted: the record sees every split that happened. A culture
+    // with no recorded lineage (a hand-built fixture) falls back to `parent`.
     for (std::size_t c = 0; c < cs.cultures.size(); ++c)
     {
         const culture& cu = cs.cultures[c];
-        if (cu.parent < 0 || cu.coined_year == INT64_MIN) continue;
+        const int from = cu.coined_from >= 0 ? cu.coined_from : cu.parent;
+        if (from < 0 || cu.coined_year == INT64_MIN) continue;
         lapse_event e;
         e.year   = static_cast<int32_t>(cu.coined_year);
         e.kind   = static_cast<uint8_t>(lapse_event_kind::culture_split);
         e.region = first_region[c] >= 0 ? static_cast<uint16_t>(first_region[c])
                                         : lapse_event_none;
         e.polity = static_cast<uint16_t>(c);
-        e.other  = static_cast<uint16_t>(cu.parent);
+        e.other  = static_cast<uint16_t>(from);
         t.events.push_back(e);
     }
     std::stable_sort(t.events.begin(), t.events.end(),
@@ -765,6 +772,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // `region::culture` -- sees ONE flat vector and needs no second lookup
         // and no id remapping. The walk allocated their ids as
         // `cs.cultures.size() + n`, which is exactly where they land here.
+        //
+        // THEY ARRIVE ALREADY FOLDED (BL-1017): `run_settlement` closed the
+        // round by folding every daughter that holds no ground into its
+        // nearest living ancestor, so from this line on `culture::parent` is
+        // the living tree every reader walks, and no id moves.
         kepler_creeds.cultures.insert(kepler_creeds.cultures.end(),
                                       kepler_settlement.spawned_cultures.begin(),
                                       kepler_settlement.spawned_cultures.end());

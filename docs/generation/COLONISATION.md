@@ -129,6 +129,11 @@ belongs to this span alone (Ben, 2026-09-11): the migration ends with the famili
 Empires phase makes peoples only by mixing them (`CIVILISATION.md` § A civilisation is what mixing
 makes).
 
+**Over-tuning is paid for at the boundary, not at the split (Ben, 2026-09-16, NR-879).** A daughter
+that ends the round holding no ground folds back into its nearest living ancestor, keeping the
+lineage link; the splits themselves are never gated. `CIVILISATION.md` § Empty cultures fold into
+their parent owns the rule.
+
 ---
 
 ## Coastal and overseas routes are the ones that need emphasis

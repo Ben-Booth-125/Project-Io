@@ -397,10 +397,19 @@ void assign_polity_colours(history_lapse& h, const std::vector<int32_t>* hue_fam
 ///                parent's index, or -1 for a cradle culture. A parent index is
 ///                always lower than its daughter's (creeds.hpp), and the walk is
 ///                guarded against a malformed tree regardless.
+/// @param folded_into  BL-1017: optional, one entry per culture —
+///                `culture::folded_into`, -1 for a name that outlived the
+///                Colonisation round. A folded culture takes NO wedge and NO
+///                sibling step; it wears the colour of the name that absorbed
+///                it. So the wheel is spent on the living tree only, and a
+///                family's daughters are spaced by the peoples who held ground
+///                rather than by every split the migration coined. nullptr =
+///                nothing folded.
 ///
-/// Deterministic and pure: a function of @p parent alone. Call it once, at
-/// record time; nothing here belongs in a frame.
-void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent);
+/// Deterministic and pure: a function of @p parent and @p folded_into alone.
+/// Call it once, at record time; nothing here belongs in a frame.
+void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent,
+                           const std::vector<int32_t>* folded_into = nullptr);
 
 /// Paint the political map for one already-materialised ownership slice into the
 /// current window's remaining content region.

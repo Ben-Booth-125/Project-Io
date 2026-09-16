@@ -797,6 +797,49 @@ isolation_result run_isolation_splits(const colonisation_input&      in,
                                       int64_t                        end_year);
 
 // ---------------------------------------------------------------------------
+// The boundary fold (BL-1017)
+// ---------------------------------------------------------------------------
+
+/// THE CULTURE TREE AS THE EMPIRES ROUND RECEIVES IT — the result of
+/// `fold_empty_cultures`, one entry per culture id.
+///
+/// Ben, 2026-09-16 (NR-879, option A): the migration coins far more peoples
+/// than ever hold ground (5,453 coined against 790 holding at the boundary over
+/// 16 seeds), and every reader of the tree walked those empty names. They fold
+/// back into their parents here, at the round's close, and the coining rule
+/// that made them is left exactly as it was.
+struct culture_fold
+{
+    /// The living tree: for a culture that keeps its name, its nearest
+    /// ancestor that also keeps one (-1 at a root); for a folded culture, the
+    /// same value as `folded_into`. Never names a folded culture.
+    std::vector<int32_t> parent;
+    /// -1 where the culture keeps its name; else the ancestor that absorbed it.
+    std::vector<int32_t> folded_into;
+    int32_t folded          = 0; ///< Cultures that folded.
+    int32_t folded_interior = 0; ///< ...of which had at least one coined daughter.
+    int32_t reparented      = 0; ///< Living cultures whose parent is no longer the one they were coined from.
+};
+
+/// Fold every culture that holds no ground into its nearest ancestor that
+/// does, re-parenting any living daughter of a folded one onto that ancestor.
+///
+/// @p coined_parent is the tree as the migration coined it (-1 at a cradle; a
+/// parent always lower-indexed than its daughter). @p holds_ground is one byte
+/// per culture, the caller's reading of "names somebody lives under".
+///
+/// A ROOT NEVER FOLDS: it has no parent to fold into, and a cradle is the
+/// people a family descends from. A malformed link (a parent at or above its
+/// daughter) is treated as a root and left exactly as it stands, the rule the
+/// tree's other readers already use.
+///
+/// NO ORPHAN BY CONSTRUCTION: ids are walked in ascending order, so a parent's
+/// own fate is settled before any daughter's, and a daughter always lands on a
+/// culture already known to be living. Pure, integer-only, no roll.
+culture_fold fold_empty_cultures(const std::vector<int32_t>& coined_parent,
+                                 const std::vector<uint8_t>& holds_ground);
+
+// ---------------------------------------------------------------------------
 // Why a cradle stopped (BL-851)
 // ---------------------------------------------------------------------------
 

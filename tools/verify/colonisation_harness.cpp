@@ -30,6 +30,8 @@
 //   C9  the field's size is bounded and stated
 //   C16 A RIVER IS A CORRIDOR: a cradle on a river reaches inland ground
 //       earlier than the same cradle with the river mask zeroed (BL-967)
+//   C17 THE BOUNDARY FOLD: an empty culture folds into its nearest living
+//       ancestor, keeps its lineage link, and orphans nobody (BL-1017)
 //
 // SYNTHETIC MAPS, ON PURPOSE, for C2-C4 and C6-C8. A generated world cannot
 // isolate "the long way round by the coast beat the short way over the
@@ -47,6 +49,7 @@
 #include "world/era_minus_one.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/hex_neighbors.hpp"
+#include "world/history_sim.hpp" // BL-1017: pass_one_output_valid, the shipped fold check
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
@@ -1508,6 +1511,261 @@ void case_split_census(int seed_count, int span_years)
           "settled as one people comes apart after settlement");
 }
 
+// ---------------------------------------------------------------------------
+// C17 — THE BOUNDARY FOLD (BL-1017)
+// ---------------------------------------------------------------------------
+//
+// Ben, 2026-09-16 (NR-879, option A): a culture holding no ground when the
+// Colonisation round hands the map on FOLDS BACK INTO ITS PARENT, the lineage
+// link is kept, and an empty interior node's living daughters are re-parented
+// with no orphan. The coining rule is untouched.
+//
+// C17a the pure fold on a hand-built tree: every rule at once — an empty
+//      interior node, a leaf, a chain of two folds, an empty cradle that
+//      cannot fold, and a malformed link left alone — against a worked answer
+// C17b THE FOLD HAPPENS AT THE BOUNDARY: on real worlds, a daughter folds
+//      exactly when no region on the map and no scheduled founding names it,
+//      no cradle folds, and the roster the Empires round reads carries the
+//      same fold as the settlement record
+// C17c NO ORPHAN: every living culture's parent is living, lies on its own
+//      lineage, and the living tree still walks to a cradle
+// C17d A FOLDED CULTURE'S LINK IS RECORDED: it names its lineage, its parent
+//      is the name that absorbed it, and that name is its NEAREST living
+//      ancestor on the lineage
+// C17e the shipped handoff validator agrees, and bites on an orphan and on an
+//      unrecorded link
+// C17f the fold is REPORTED: tree size and holding fraction before and after
+//
+// STRUCTURE ONLY, like the rest of this file. How many fold is the sweep's to
+// report, never a number asserted here.
+
+void case_boundary_fold(int seed_count, int span_years)
+{
+    std::printf("\n--- C17: the boundary fold (BL-1017) ----------------------------\n");
+
+    // --- C17a: the pure fold, worked by hand -----------------------------
+    {
+        //  id  coined  holds   expected
+        //   0   -1      yes    root
+        //   1    0      no     folds into 0 (interior: 2 and 3 are its daughters)
+        //   2    1      yes    lives, re-parented 1 -> 0
+        //   3    1      no     folds into 0 (interior: 8)
+        //   4    2      no     folds into 2 (interior: 5)
+        //   5    4      yes    lives, re-parented 4 -> 2
+        //   6   -1      no     an empty cradle: a root never folds
+        //   7    6      no     folds into 6
+        //   8    3      yes    lives, re-parented 3 -> 0, past a chain of two folds
+        //   9   12      no     a malformed link: treated as a root, left as it stands
+        const std::vector<int32_t> coined = {-1, 0, 1, 1, 2, 4, -1, 6, 3, 12};
+        const std::vector<uint8_t> holds  = { 1, 0, 1, 0, 0, 1,  0, 0, 1,  0};
+        const std::vector<int32_t> want_parent = {-1, 0, 0, 0, 2, 2, -1, 6, 0, 12};
+        const std::vector<int32_t> want_folded = {-1, 0, -1, 0, 2, -1, -1, 6, -1, -1};
+        const culture_fold f  = fold_empty_cultures(coined, holds);
+        const culture_fold f2 = fold_empty_cultures(coined, holds);
+        const bool ok = f.parent == want_parent && f.folded_into == want_folded
+                     && f.folded == 4 && f.folded_interior == 3 && f.reparented == 3
+                     && f2.parent == f.parent && f2.folded_into == f.folded_into;
+        if (!ok)
+        {
+            std::printf("      parent:");
+            for (int32_t v : f.parent) std::printf(" %d", v);
+            std::printf("\n      folded:");
+            for (int32_t v : f.folded_into) std::printf(" %d", v);
+            std::printf("\n      folded %d interior %d reparented %d\n",
+                        f.folded, f.folded_interior, f.reparented);
+        }
+        check(ok, "C17a THE PURE FOLD: empty names fold into their nearest living ancestor, living "
+                  "daughters of a folded mother are re-parented past it (through a chain of two), a "
+                  "root never folds, a malformed link is left alone, and the fold is repeatable");
+    }
+
+    int worlds = 0, boundary_ok = 0, orphan_ok = 0, link_ok = 0, validator_ok = 0;
+    long long pooled_coined = 0, pooled_living = 0, pooled_holding = 0, pooled_reparented = 0;
+    long long pooled_interior = 0, pooled_pending_only = 0;
+    for (int s = 0; s < seed_count; ++s)
+    {
+        world_params wp;
+        wp.seed = static_cast<uint32_t>(s);
+        wp.prehistory_years = span_years;
+
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        const world w = make_hard_coded_world(wp, &rep, world_gen_config{}, nullptr, nullptr, &fx);
+        (void)w;
+        if (!fx.ran) continue;
+        ++worlds;
+
+        // The boundary is `fx.settlement`: the record the Empires round was
+        // handed, map AND founding schedule, before the sim touched either.
+        const std::vector<culture>&  cs = fx.creeds.cultures;
+        const settlement_state&      ss = fx.settlement;
+        const std::size_t n       = cs.size();
+        const std::size_t cradles = n - ss.spawned_cultures.size();
+
+        std::vector<uint8_t> named(n, 0u), named_present(n, 0u);
+        const auto mark = [&](const region& p, bool present) {
+            const auto set = [&](int c) {
+                if (c < 0 || static_cast<std::size_t>(c) >= n) return;
+                named[static_cast<std::size_t>(c)] = 1u;
+                if (present) named_present[static_cast<std::size_t>(c)] = 1u;
+            };
+            set(p.founding_culture);
+            for (int k = 0; k < culture_share_slots; ++k)
+                if (p.culture.weight_q[k] > 0) set(p.culture.id[k]);
+        };
+        for (const region& p : ss.regions)           mark(p, true);
+        for (const region& p : ss.pending_foundings) mark(p, false);
+
+        // --- C17b: the fold happens at the boundary, on the right names ----
+        bool b_ok = true;
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const bool folded = cs[i].folded_into >= 0;
+            // A cradle, or a daughter with no lineage at all, is a root: never folds.
+            if (i < cradles || cs[i].coined_from < 0) { if (folded) b_ok = false; continue; }
+            if (folded == (named[i] != 0u)) b_ok = false;
+            const culture& d = ss.spawned_cultures[i - cradles];
+            if (d.parent != cs[i].parent || d.folded_into != cs[i].folded_into
+                || d.coined_from != cs[i].coined_from)
+                b_ok = false;
+        }
+        const settlement_state::culture_census& cc = ss.census;
+        if (cc.fold_living + cc.fold_folded != static_cast<int32_t>(n)) b_ok = false;
+        if (cc.cultures != static_cast<int32_t>(n)) b_ok = false; // Every split still counted.
+        if (b_ok) ++boundary_ok;
+
+        // --- C17c: no orphan -----------------------------------------------
+        const auto on_lineage = [&](int from, int anc) {
+            for (int at = from, guard = 0; at >= 0 && guard <= static_cast<int>(n); ++guard)
+            {
+                if (at == anc) return true;
+                at = cs[static_cast<std::size_t>(at)].coined_from;
+            }
+            return false;
+        };
+        bool c_ok = true;
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const culture& c = cs[i];
+            if (c.folded_into >= 0) continue;
+            if (c.parent >= 0)
+            {
+                if (c.parent >= static_cast<int>(i)) { c_ok = false; continue; }
+                if (cs[static_cast<std::size_t>(c.parent)].folded_into >= 0) c_ok = false;
+                if (c.coined_from >= 0 && !on_lineage(c.coined_from, c.parent)) c_ok = false;
+            }
+            int at = static_cast<int>(i);
+            for (int guard = 0; at >= 0 && cs[static_cast<std::size_t>(at)].parent >= 0
+                                && guard <= static_cast<int>(n); ++guard)
+            {
+                at = cs[static_cast<std::size_t>(at)].parent;
+                if (cs[static_cast<std::size_t>(at)].folded_into >= 0) c_ok = false;
+            }
+            if (at < 0 || static_cast<std::size_t>(at) >= cradles) c_ok = false; // Not a cradle.
+        }
+        if (c_ok) ++orphan_ok;
+
+        // --- C17d: a folded culture's link is recorded -----------------------
+        bool d_ok = true;
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const culture& c = cs[i];
+            if (c.folded_into < 0) continue;
+            if (c.coined_from < 0 || c.parent != c.folded_into
+                || !on_lineage(c.coined_from, c.folded_into))
+            { d_ok = false; continue; }
+            // NEAREST: every culture strictly between it and its absorber folded.
+            for (int at = c.coined_from, guard = 0; at >= 0 && at != c.folded_into
+                                                    && guard <= static_cast<int>(n); ++guard)
+            {
+                if (cs[static_cast<std::size_t>(at)].folded_into < 0) d_ok = false;
+                at = cs[static_cast<std::size_t>(at)].coined_from;
+            }
+        }
+        if (d_ok) ++link_ok;
+
+        // --- C17e: the shipped validator agrees, and bites ------------------
+        {
+            pass_one_output o;
+            o.cultures      = cs;
+            o.culture_count = static_cast<int>(n);
+            o.stop_year     = 1200;
+            std::string why;
+            bool e_ok = pass_one_output_valid(o, &why);
+            if (!e_ok) std::printf("      seed %u  validator rejected the real fold: %s\n",
+                                   wp.seed, why.c_str());
+
+            // An orphan: a living daughter pointed back at a folded mother.
+            int orphan_at = -1;
+            for (std::size_t i = 0; i < n && orphan_at < 0; ++i)
+                if (cs[i].folded_into < 0 && cs[i].coined_from >= 0
+                    && cs[static_cast<std::size_t>(cs[i].coined_from)].folded_into >= 0)
+                    orphan_at = static_cast<int>(i);
+            if (orphan_at >= 0)
+            {
+                pass_one_output bad = o;
+                culture& c = bad.cultures[static_cast<std::size_t>(orphan_at)];
+                c.parent = c.coined_from;
+                std::string w2;
+                if (pass_one_output_valid(bad, &w2) || w2.find("ORPHANED") == std::string::npos)
+                { e_ok = false; std::printf("      seed %u  orphan not caught (%s)\n", wp.seed, w2.c_str()); }
+            }
+            // An unrecorded link: a folded culture that forgot its lineage.
+            int folded_at = -1;
+            for (std::size_t i = 0; i < n && folded_at < 0; ++i)
+                if (cs[i].folded_into >= 0) folded_at = static_cast<int>(i);
+            if (folded_at >= 0)
+            {
+                pass_one_output bad = o;
+                bad.cultures[static_cast<std::size_t>(folded_at)].coined_from = -1;
+                std::string w2;
+                if (pass_one_output_valid(bad, &w2) || w2.find("no lineage") == std::string::npos)
+                { e_ok = false; std::printf("      seed %u  lost link not caught (%s)\n", wp.seed, w2.c_str()); }
+            }
+            if (e_ok) ++validator_ok;
+        }
+
+        // --- C17f: the reading ---------------------------------------------
+        const culture_footprint cf = measure_culture_footprint(cs, ss.regions, nullptr);
+        int pending_only = 0;
+        for (std::size_t i = 0; i < n; ++i)
+            if (named[i] && !named_present[i]) ++pending_only;
+        const int pm_c = cf.holding_boundary_permille(), pm_l = cf.holding_living_permille();
+        std::printf("seed %u  coined %d  tree (living) %d  folded %d (interior %d)  re-parented %d  "
+                    "holding@boundary %d = %d.%d%% of coined, %d.%d%% of the tree  "
+                    "living without a present region %d (scheduled-only %d)  depth %d -> %d\n",
+                    wp.seed, cf.coined, cf.living, cf.folded, cc.fold_interior, cf.reparented,
+                    cf.holding_boundary, pm_c / 10, pm_c % 10, pm_l / 10, pm_l % 10,
+                    cf.living_without_plurality, pending_only, cc.tree_depth, cf.deepest_living);
+        pooled_coined     += cf.coined;
+        pooled_living     += cf.living;
+        pooled_holding    += cf.holding_boundary;
+        pooled_reparented += cf.reparented;
+        pooled_interior   += cc.fold_interior;
+        pooled_pending_only += pending_only;
+    }
+
+    if (worlds == 0) { check(false, "C17 no world ran - the case is vacuous"); return; }
+    std::printf("pooled over %d worlds: coined %lld  tree %lld  holding@boundary %lld  "
+                "folded interior %lld  re-parented %lld  scheduled-only %lld\n",
+                worlds, pooled_coined, pooled_living, pooled_holding, pooled_interior,
+                pooled_reparented, pooled_pending_only);
+
+    check(boundary_ok == worlds,
+          "C17b THE FOLD HAPPENS AT THE BOUNDARY: a daughter folds exactly when no region on the "
+          "map and no scheduled founding names it, no cradle folds, the roster carries the "
+          "settlement's fold, and the census still counts every split");
+    check(orphan_ok == worlds,
+          "C17c NO ORPHAN: every living culture's parent is living and on its own lineage, and the "
+          "living tree walks to a cradle through living names only");
+    check(link_ok == worlds,
+          "C17d A FOLDED CULTURE'S LINK IS RECORDED: it names its lineage, its parent is the name "
+          "that absorbed it, and that name is its nearest living ancestor");
+    check(validator_ok == worlds,
+          "C17e the shipped handoff validator passes the real fold and rejects an orphan and a "
+          "folded culture with no recorded lineage");
+}
+
 int main(int argc, char** argv)
 {
     const int seed_count = argc > 1 ? std::atoi(argv[1]) : 3;
@@ -1537,6 +1795,7 @@ int main(int argc, char** argv)
     case_family_tree(seed_count, span_years);
     case_settlement_seats(seed_count);
     case_split_census(seed_count, span_years);
+    case_boundary_fold(seed_count, span_years);
 
     std::printf("\n=== colonisation_harness: %d failure(s) ===\n", g_failures);
     return g_failures == 0 ? 0 : 1;
