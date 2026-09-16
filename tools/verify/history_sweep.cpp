@@ -302,6 +302,14 @@ struct sweep_row
     int64_t heads_unpaid      = 0; ///< Heads sent home unpaid.
     int64_t roads_refused     = 0; ///< Corridor promotions refused for want of materials.
     int64_t cross_border_links_open = 0; ///< BL-925: amicable trade links open at run's end.
+    // BL-1021 -- BL-895's DONE WHEN, indexed size band x 4 + kinds reached
+    // (history_sim.hpp `*_by_trade_bucket`).
+    std::array<int64_t, 16> k_realm_years{};    ///< living polity-years
+    std::array<int64_t, 16> k_campaigns{};      ///< campaigns launched
+    std::array<int64_t, 16> k_campaign_cost{};  ///< material cost of them
+    std::array<int64_t, 16> k_campaign_spent{}; ///< ...of which the seat could pay
+    std::array<int64_t, 16> k_upkeep_due{};     ///< standing-army upkeep owed
+    std::array<int64_t, 16> k_upkeep_paid{};    ///< ...of which was paid
     int64_t secessions        = 0; ///< BL-896: successor realms the dark age produced.
     int64_t supply_sites_upgraded           = 0; ///< BL-929: supply sites bought outright.
     int64_t supply_sites_upgraded_regions   = 0; ///< ...of which a region's own relief.
@@ -815,7 +823,8 @@ bool apply_override(history_sim_params& p, const std::string& name, int v)
     if (name == "sea_legs_ration_q")           { p.sea_legs_ration_q = v;                return true; }
     if (name == "sea_legs_floor_q")            { p.sea_legs_floor_q = v;                 return true; }
     if (name == "sea_legs_port_q")             { p.sea_legs_port_q = v;                  return true; }
-    if (name == "trade_income_per_link")       { p.trade_income_per_link = v;            return true; }
+    // BL-1021: renamed from trade_income_per_link -- the base is kinds reached.
+    if (name == "trade_income_per_class")      { p.trade_income_per_class = v;           return true; }
     if (name == "army_upkeep_per_1000_heads")  { p.army_upkeep_per_1000_heads = v;       return true; }
     if (name == "unpaid_army_disband_q")       { p.unpaid_army_disband_q = v;            return true; }
     if (name == "road_build_material_cost")    { p.road_build_material_cost = v;         return true; }
@@ -1365,6 +1374,12 @@ int main(int argc, char** argv)
         row.mat_campaigns     = sim.materials_spent_on_campaigns;
         row.heads_unpaid      = sim.army_heads_unpaid_disbanded;
         row.roads_refused     = sim.road_builds_refused;
+        row.k_realm_years     = sim.realm_years_by_trade_bucket;
+        row.k_campaigns       = sim.campaigns_by_trade_bucket;
+        row.k_campaign_cost   = sim.campaign_cost_by_trade_bucket;
+        row.k_campaign_spent  = sim.campaign_spent_by_trade_bucket;
+        row.k_upkeep_due      = sim.upkeep_due_by_trade_bucket;
+        row.k_upkeep_paid     = sim.upkeep_paid_by_trade_bucket;
 
         // BL-925 -- HOW MANY CROSS-BORDER LINKS ARE OPEN AT THE END. Net of
         // opens and closes over the whole run, from the event layer alone
@@ -2685,8 +2700,91 @@ int main(int argc, char** argv)
                             static_cast<long long>(mmp > 0 ? (mmt * 100) / mmp : 0),
                             static_cast<long long>(mmp > 0 ? ((mmt * 10000) / mmp) % 100 : 0));
             }
+            {
+                // BL-1021 -- the POOLED share beside the median one: a median of
+                // trade over a median of production is two different worlds'
+                // numbers, so the whole sweep's totals are printed too.
+                int64_t st = 0, sp = 0;
+                for (const sweep_row& r : rows) { st += r.mat_trade; sp += r.mat_total; }
+                std::printf("  pooled over %zu worlds  trade %lld of %lld produced = %lld.%02lld%%\n",
+                            rows.size(), static_cast<long long>(st), static_cast<long long>(sp),
+                            static_cast<long long>(sp > 0 ? (st * 100) / sp : 0),
+                            static_cast<long long>(sp > 0 ? ((st * 10000) / sp) % 100 : 0));
+            }
             std::printf("  (A trade figure of ZERO means the mechanism never fired -- a wiring\n"
                         "   question, not a balance one. REPORTED, not gated.)\n");
+
+            // BL-1021 -- BL-895's OWN DONE WHEN: "a polity connected to unlike
+            // ground sustains campaigns a disconnected one cannot". Every
+            // campaign and every year of standing-army upkeep is filed under
+            // how many DISTINCT KINDS of ground (farm / ore / port) its realm
+            // reached that year. 0-1 kinds is DISCONNECTED -- no trade income
+            // at all; 2-3 is CONNECTED. "Sustains" is read two ways, both from
+            // the seat's own stock: the share of a campaign's material cost
+            // the seat could pay (a shortfall marches understocked), and the
+            // share of upkeep met (the unpaid share walks home).
+            //
+            // SIZE IS A CONFOUND, SO SIZE IS HELD FIXED. A connected realm is
+            // usually a larger one, and industry scales with ground too, so the
+            // comparison is made WITHIN a size band (regions held 1 / 2-3 / 4-7
+            // / 8+). What is left inside a band can still be the ground itself
+            // (mixed ground may simply farm and mine better), so run the sweep
+            // again with `--set trade_income_per_class=0`: realms are classified
+            // identically there, and the gap trade adds is the difference
+            // between the two runs' within-band gaps. REPORTED, not gated.
+            {
+                std::array<int64_t, 16> ry{}, cn{}, cc{}, cs{}, ud{}, up{};
+                for (const sweep_row& r : rows)
+                    for (std::size_t k = 0; k < 16; ++k)
+                    {
+                        ry[k] += r.k_realm_years[k];    cn[k] += r.k_campaigns[k];
+                        cc[k] += r.k_campaign_cost[k];  cs[k] += r.k_campaign_spent[k];
+                        ud[k] += r.k_upkeep_due[k];     up[k] += r.k_upkeep_paid[k];
+                    }
+                const auto pm = [](int64_t num, int64_t den) -> long long {
+                    return den > 0 ? static_cast<long long>((num * 1000) / den) : -1;
+                };
+                // Sum a quantity over the size bands in [b0, b1] and kinds in [k0, k1].
+                const auto sum = [](const std::array<int64_t, 16>& a, std::size_t b0, std::size_t b1,
+                                    std::size_t k0, std::size_t k1) {
+                    int64_t s = 0;
+                    for (std::size_t b = b0; b <= b1; ++b)
+                        for (std::size_t k = k0; k <= k1; ++k) s += a[b * 4 + k];
+                    return s;
+                };
+                std::printf("\n--- BL-1021  DOES REACHING UNLIKE GROUND SUSTAIN CAMPAIGNS? (pooled, %zu worlds) ---\n",
+                            rows.size());
+                std::printf("  kinds reached   realm-years   campaigns  per 1000 realm-yrs   cost covered (per-mille)   upkeep met (per-mille)\n");
+                for (std::size_t k = 0; k < 4; ++k)
+                    std::printf("  %13zu   %11lld   %9lld   %18lld   %24lld   %22lld\n",
+                                k, static_cast<long long>(sum(ry, 0, 3, k, k)),
+                                static_cast<long long>(sum(cn, 0, 3, k, k)),
+                                pm(sum(cn, 0, 3, k, k), sum(ry, 0, 3, k, k)),
+                                pm(sum(cs, 0, 3, k, k), sum(cc, 0, 3, k, k)),
+                                pm(sum(up, 0, 3, k, k), sum(ud, 0, 3, k, k)));
+                static const char* kBand[5] = { "1 region", "2-3 regions", "4-7 regions", "8+ regions", "ALL SIZES" };
+                std::printf("  %-12s  %-12s  %11s  %9s  %8s  %12s  %10s\n",
+                            "size", "trade", "realm-years", "campaigns", "per 1000", "cost covered", "upkeep met");
+                for (std::size_t b = 0; b < 5; ++b)
+                {
+                    const std::size_t b0 = b < 4 ? b : 0, b1 = b < 4 ? b : 3;
+                    for (int connected = 0; connected < 2; ++connected)
+                    {
+                        const std::size_t k0 = connected ? 2 : 0, k1 = connected ? 3 : 1;
+                        std::printf("  %-12s  %-12s  %11lld  %9lld  %8lld  %12lld  %10lld\n",
+                                    connected ? "" : kBand[b],
+                                    connected ? "CONNECTED" : "DISCONNECTED",
+                                    static_cast<long long>(sum(ry, b0, b1, k0, k1)),
+                                    static_cast<long long>(sum(cn, b0, b1, k0, k1)),
+                                    pm(sum(cn, b0, b1, k0, k1), sum(ry, b0, b1, k0, k1)),
+                                    pm(sum(cs, b0, b1, k0, k1), sum(cc, b0, b1, k0, k1)),
+                                    pm(sum(up, b0, b1, k0, k1), sum(ud, b0, b1, k0, k1)));
+                    }
+                }
+                std::printf("  (per-mille; -1 = nothing to divide. DISCONNECTED = 0-1 kinds reached, no trade\n"
+                            "   income; CONNECTED = 2-3. Compare within a size band, then against a\n"
+                            "   --set trade_income_per_class=0 run before reading a gap as trade's effect.)\n");
+            }
 
             // BL-925 -- AMICABLE CROSS-BORDER LINKS, PER WORLD. Read only: no
             // target is set here, the design's DONE WHEN asks the number be

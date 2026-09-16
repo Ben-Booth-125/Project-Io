@@ -1868,6 +1868,34 @@ history_sim_state run_history_sim(settlement_state&         ss,
         return 0;
     };
 
+    // BL-1021 -- GROUND THE NETWORK REACHES FOR TRADE. The same reading and the
+    // same comparison that gates a town's growth (`advance_region_urban`'s
+    // caller below): `sustainable_settlement_floor_q` is the floor whose own
+    // comment defines it as "a network that can carry ordinary trade". One
+    // decision round stale, exactly as that gate is.
+    const auto reached_for_trade = [&](std::size_t i) -> bool {
+        return ss.regions[i].network_supply_q > params.sustainable_settlement_floor_q;
+    };
+
+    // BL-1021 -- WHAT KINDS OF GROUND EACH REALM REACHES, one bit per
+    // `region_trade_class`, indexed by polity id. Rebuilt once a year before
+    // the demography pass pays anyone, so every region is paid against the
+    // same settled reading whatever its index.
+    std::vector<uint8_t> realm_kinds_reached;
+    std::vector<int32_t> realm_regions_held; // same year, every held region, reached or not
+    // The BL-895 reading's bucket: SIZE BAND x 4 + KINDS REACHED (0..3), where
+    // the size band is regions held 1 / 2-3 / 4-7 / 8+ (0..3). Size is in the
+    // key because a connected realm is usually a larger one, and a reading that
+    // did not hold size fixed would credit trade with what industry did.
+    const auto trade_bucket_of = [&](int qid) -> std::size_t {
+        if (qid < 0 || static_cast<std::size_t>(qid) >= realm_kinds_reached.size()) return 0;
+        const unsigned m = realm_kinds_reached[static_cast<std::size_t>(qid)];
+        const std::size_t kinds = (m & 1u) + ((m >> 1) & 1u) + ((m >> 2) & 1u);
+        const int32_t held = realm_regions_held[static_cast<std::size_t>(qid)];
+        const std::size_t band = held >= 8 ? 3u : held >= 4 ? 2u : held >= 2 ? 1u : 0u;
+        return band * 4u + kinds;
+    };
+
     // BL-925 -- WHEN TWO NEIGHBOURING POLITIES ARE AMICABLE. Kin cultures
     // (opposition below `organise_opposition_bar_q`, the SAME bar Organise
     // already reads -- CIVILISATION.md's kinship ladder is one bar, not two)
@@ -2904,6 +2932,59 @@ history_sim_state run_history_sim(settlement_state&         ss,
         int64_t total_pop = 0;
         {
         const scoped_ns prof_demo(prof.ns_demography); // BL-825, report-only
+
+        // ---- BL-1021: THE KINDS OF GROUND EACH REALM REACHES, THIS YEAR ----
+        //
+        // Computed whether or not trade pays, so a zero-income control run
+        // classifies realms for the BL-895 reading exactly as a live one does.
+        // Two passes in region-index order, OR-only writes, so the result is a
+        // property of the map and not of walk order.
+        realm_kinds_reached.assign(out.polities.size(), 0);
+        realm_regions_held.assign(out.polities.size(), 0);
+        {
+            const std::size_t n = std::min(owner.size(), ss.regions.size());
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                const int oi = owner[i];
+                if (oi < 0 || static_cast<std::size_t>(oi) >= realm_kinds_reached.size()) continue;
+                ++realm_regions_held[static_cast<std::size_t>(oi)];
+                if (!reached_for_trade(i)) continue;
+                realm_kinds_reached[static_cast<std::size_t>(oi)] |=
+                    static_cast<uint8_t>(1u << region_trade_class(ss.regions[i]));
+            }
+            // ACROSS AN AMICABLE BORDER (BL-925): a walked corridor joining two
+            // realms' REACHED ground makes each side's kind one the other
+            // reaches. Only the ground the corridor touches is added, never the
+            // neighbour's whole realm. Like ground adds nothing by construction,
+            // since the near region's own kind is already set above.
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                const int oi = owner[i];
+                if (oi < 0 || static_cast<std::size_t>(oi) >= realm_kinds_reached.size()) continue;
+                if (!reached_for_trade(i)) continue;
+                for (int nb : neighbours[i])
+                {
+                    if (nb <= static_cast<int>(i)) continue;
+                    const std::size_t ni = static_cast<std::size_t>(nb);
+                    if (ni >= n) continue;
+                    const int oj = owner[ni];
+                    if (oj < 0 || oj == oi
+                     || static_cast<std::size_t>(oj) >= realm_kinds_reached.size()) continue;
+                    if (!reached_for_trade(ni)) continue;
+                    if (road_uses_live.find(edge_key(static_cast<int>(i), nb))
+                        == road_uses_live.end()) continue;
+                    if (!polities_amicable(oi, oj)) continue;
+                    realm_kinds_reached[static_cast<std::size_t>(oi)] |=
+                        static_cast<uint8_t>(1u << region_trade_class(ss.regions[ni]));
+                    realm_kinds_reached[static_cast<std::size_t>(oj)] |=
+                        static_cast<uint8_t>(1u << region_trade_class(ss.regions[i]));
+                }
+            }
+            for (const polity& q : out.polities)
+                if (q.alive)
+                    ++out.realm_years_by_trade_bucket[trade_bucket_of(q.id)];
+        }
+
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {
             // BL-835 — WAR PRESSURE IS NO LONGER A DEMOGRAPHIC INPUT, and the
@@ -2960,95 +3041,81 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // check on a case that should not occur.
             // BL-895 -- TRADE INCOME FROM THE NETWORK, not from a market.
             //
-            // A roaded link between two held regions that hold UNLIKE ground
-            // yields materials. Only DIFFERENCE is read: this phase has no
-            // order book, no firm and no price (CIVILISATION.md sec Materials
-            // are spent when something happens), so "what a place holds" is a
-            // CLASS -- what it is best at -- and never a quantity.
+            // Only DIFFERENCE is read: this phase has no order book, no firm
+            // and no price (CIVILISATION.md sec Materials are spent when
+            // something happens), so "what a place holds" is a CLASS -- what it
+            // is best at -- and never a quantity.
             //
-            // Counted from the lower-indexed region only, so a pair is not paid
-            // twice, and gated on a walked corridor rather than mere adjacency:
-            // trade follows the road, which is what makes BL-837's network
-            // worth building for a second reason and what makes BL-896's
-            // collapse-by-network-failure cost a realm its income before it
-            // costs it ground.
-            if (params.trade_income_per_link > 0)
+            // BL-1021 -- PAID ON THE KINDS OF GROUND THE REALM REACHES, NOT ON
+            // ROADED PAIRS (Ben, 2026-09-16, NR-827 option 2). The per-link
+            // income this replaces was bounded by a region's adjacency, so it
+            // could never grow with a realm the way industry does; measured at
+            // 0.25% of production. Now a held region the network reaches trades
+            // with every KIND of ground its realm reaches that is unlike its
+            // own (`realm_kinds_reached`, built above this loop), and is paid
+            // that count times the constant, at its own seat. A realm of one
+            // kind earns nothing however large; ground the network cannot reach
+            // earns nothing and lends its kind to nobody. Roads still pay, but
+            // through REACH -- `rebuild_reach` discounts walked corridors -- and
+            // a realm whose network fails loses every kind that ground held.
+            if (params.trade_income_per_class > 0)
             {
                 const int oi = owner[i] == owner_none ? -1 : static_cast<int>(owner[i]);
                 if (oi >= 0)
                 {
+                    if (reached_for_trade(i)
+                     && static_cast<std::size_t>(oi) < realm_kinds_reached.size())
+                    {
+                        const unsigned unlike_mask =
+                            static_cast<unsigned>(realm_kinds_reached[static_cast<std::size_t>(oi)])
+                            & ~(1u << region_trade_class(ss.regions[i]));
+                        const int64_t unlike = static_cast<int64_t>(
+                            (unlike_mask & 1u) + ((unlike_mask >> 1) & 1u) + ((unlike_mask >> 2) & 1u));
+                        const int seat_t = ss.regions[i].seat_region;
+                        if (unlike > 0 && seat_t >= 0
+                         && static_cast<std::size_t>(seat_t) < ss.regions.size())
+                        {
+                            const int64_t paid = unlike * params.trade_income_per_class;
+                            ss.regions[static_cast<std::size_t>(seat_t)].material_stock += paid;
+                            out.materials_produced   += paid;
+                            out.materials_from_trade += paid;
+                        }
+                    }
+
+                    // BL-925 -- THE LAPSE DRAWS THE LINK. The cross-border link is
+                    // still an EVENT the time-lapse draws, gated exactly as it was
+                    // (a walked corridor joining unlike ground across an amicable
+                    // border); since BL-1021 it pays nothing per edge -- what it
+                    // buys is the far kind in `realm_kinds_reached`. One
+                    // transition event per state change, not one per year the
+                    // link holds open.
                     for (int nb : neighbours[i])
                     {
-                        if (nb <= static_cast<int>(i)) continue;          // pay the pair once
+                        if (nb <= static_cast<int>(i)) continue;          // note the pair once
                         const int oj = owner[static_cast<std::size_t>(nb)] == owner_none
                                        ? -1 : static_cast<int>(owner[static_cast<std::size_t>(nb)]);
-                        // BL-925 -- ACROSS A BORDER, ONLY WHEN AMICABLE. Same
-                        // owner is the BL-895 case unchanged below; a different
-                        // owner is this item's case, and an unowned neighbour
-                        // (`oj < 0`) pays neither.
-                        const bool same_owner = (oj == oi);
-                        if (!same_owner && (oj < 0 || !polities_amicable(oi, oj))) continue;
+                        if (oj < 0 || oj == oi || !polities_amicable(oi, oj)) continue;
                         // ANY WALKED CORRIDOR CARRIES TRADE, not only a promoted
                         // Track. Measured 2026-09-11: of 1,607 distinct corridors,
                         // 1,347 are walked ONCE and only 155 reach the 4 uses
-                        // `road_tier1_uses` needs -- about 52 roaded edges per
-                        // world. Gating trade on a Track therefore paid almost
-                        // nothing (0.013% of materials) for a reason that had
-                        // nothing to do with trade. A route people have walked is
-                        // a trade route whether or not it has been widened; the
-                        // TIER is about what a line does to REACH, which is
-                        // BL-837's subject, not this one's.
+                        // `road_tier1_uses` needs.
                         const uint64_t ekey = edge_key(static_cast<int>(i), nb);
                         if (road_uses_live.find(ekey) == road_uses_live.end()) continue;
                         if (region_trade_class(ss.regions[i])
                          == region_trade_class(ss.regions[static_cast<std::size_t>(nb)])) continue;
 
-                        if (!same_owner)
+                        bool& open_now = trade_link_open_live[ekey];
+                        if (!open_now)
                         {
-                            // BL-925 -- THE LAPSE DRAWS THE LINK. One transition
-                            // event per state change, not one per year the link
-                            // holds open -- `trade_link_open_live` is the same
-                            // "note only on change" idiom `try_upgrade_corridor`
-                            // uses for `roads_version` just above.
-                            bool& open_now = trade_link_open_live[ekey];
-                            if (!open_now)
-                            {
-                                open_now = true;
-                                note_event(lapse_event_kind::trade_link_opened,
-                                           static_cast<int>(i), -1, nb);
-                            }
-                        }
-
-                        const int seat_t = ss.regions[i].seat_region;
-                        if (seat_t >= 0 && static_cast<std::size_t>(seat_t) < ss.regions.size())
-                        {
-                            ss.regions[static_cast<std::size_t>(seat_t)].material_stock +=
-                                params.trade_income_per_link;
-                            out.materials_produced  += params.trade_income_per_link;
-                            out.materials_from_trade += params.trade_income_per_link;
-                        }
-                        // BL-925 -- BOTH SEATS ARE PAID ACROSS AN AMICABLE
-                        // BORDER, at the SAME constant: this is one income
-                        // extended across a new kind of edge, not a second one.
-                        // The internal case pays once because the pair share a
-                        // seat; a cross-border pair does not, so paying only `i`'s
-                        // seat would make the far side's amicability free to it.
-                        if (!same_owner)
-                        {
-                            const int seat_o = ss.regions[static_cast<std::size_t>(nb)].seat_region;
-                            if (seat_o >= 0 && static_cast<std::size_t>(seat_o) < ss.regions.size())
-                            {
-                                ss.regions[static_cast<std::size_t>(seat_o)].material_stock +=
-                                    params.trade_income_per_link;
-                                out.materials_produced  += params.trade_income_per_link;
-                                out.materials_from_trade += params.trade_income_per_link;
-                            }
+                            open_now = true;
+                            note_event(lapse_event_kind::trade_link_opened,
+                                       static_cast<int>(i), -1, nb);
                         }
                     }
 
                     // BL-925 -- A GRUDGE CLOSES THE LINK, OR CONQUEST DOES.
                     // Swept as its own pass rather than inline above: the loop
-                    // above only visits a pair while it is STILL PAYING, so a
+                    // above only visits a pair while it STILL QUALIFIES, so a
                     // pair that stopped clearing amicability needs its own
                     // check or the "open" entry would stay stale and the lapse
                     // would draw it forever.
@@ -3120,6 +3187,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     paid = std::min(due, seat.material_stock);
                     seat.material_stock -= paid;
                     out.materials_spent_on_upkeep += paid;
+                }
+                // BL-1021 -- the BL-895 reading: upkeep owed and met, by how
+                // many kinds of ground the owning realm reached this year.
+                if (i < owner.size() && owner[i] >= 0)
+                {
+                    const std::size_t kb = trade_bucket_of(owner[i]);
+                    out.upkeep_due_by_trade_bucket[kb]  += due;
+                    out.upkeep_paid_by_trade_bucket[kb] += paid;
                 }
 
                 if (paid >= due || params.unpaid_army_disband_q <= 0) continue;
@@ -5346,6 +5421,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     seat.material_stock -= material_spent;
                     out.materials_spent_on_campaigns += material_spent;
 
+                    // BL-1021 -- the BL-895 reading: what this campaign cost
+                    // against what the seat could pay, by how many kinds of
+                    // ground the acting realm reached this year.
+                    {
+                        const std::size_t kb = trade_bucket_of(q.id);
+                        ++out.campaigns_by_trade_bucket[kb];
+                        out.campaign_cost_by_trade_bucket[kb]  += material_cost;
+                        out.campaign_spent_by_trade_bucket[kb] += material_spent;
+                    }
+
                     // THE SHORTFALL IS WHAT MAKES OVER-MUSTER MEASURABLY
                     // WORSE OFF. A polity whose garrisons have been eating its
                     // own industry (`region_industry_capacity`, spent every
@@ -6682,8 +6767,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (params.universal_creed_humbled_cohesion_q > 0)
         {
             // How busy and how reachable one realm's network is, counted the
-            // same way BL-895 pays for it: a walked corridor between two held
-            // regions that hold UNLIKE ground. Recomputed on demand rather than
+            // way BL-895 FIRST paid for it: a walked corridor between two held
+            // regions that hold UNLIKE ground. (BL-1021 moved the income to
+            // kinds of ground reached; this reads CONTACT, so it still counts
+            // corridors.) Recomputed on demand rather than
             // accumulated in the demography pass, so this item adds nothing to
             // the hot loop and touches none of BL-895's code.
             const auto realm_network = [&](int qid, int& links, int& mean_supply_q) {

@@ -92,11 +92,14 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     hp.sea_legs_floor_q  = 300;
     hp.sea_legs_port_q   = 300;
 
-    // BL-895: the network pays for war. Materials per year per roaded link
-    // between held regions that hold unlike ground. A placeholder magnitude on
-    // the same footing as the w_* weights -- the SHAPE is the ruling, the
-    // number is for history_sweep to tune.
-    hp.trade_income_per_link = 40;
+    // BL-895: the network pays for war. BL-1021 (Ben, 2026-09-16, NR-827
+    // option 2) re-based it: materials per year, per held region the network
+    // reaches, per distinct KIND of unlike ground its realm reaches. The 40 is
+    // the magnitude BL-895 shipped per roaded link, deliberately NOT moved by
+    // the re-base -- raising it to make trade's share look material would be
+    // fitting a figure to a target. A placeholder on the same footing as the
+    // w_* weights.
+    hp.trade_income_per_class = 40;
 
     // BL-895's TWO SINKS (Ben, 2026-09-11). Without them the income above
     // could not gate anything: campaigns were the ONLY thing materials were

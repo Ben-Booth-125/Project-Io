@@ -586,6 +586,17 @@ int main()
         // tribute 245920676 -> 245920658, treaties 479 -> 386, broken 0,
         // owner changes 2410 -> 1896. BL-842 (small grudges decay) before it
         // left this pin green.
+        //
+        // LEFT RED 2026-09-16 BY BL-1021 (trade paid on kinds of ground reached),
+        // NOT RE-PINNED. The Exploration span's own params keep trade off; what
+        // moved is the Empires close it resumes from. Empires-round trade now pays
+        // every reached region per unlike kind its realm reaches, not per walked
+        // unlike corridor, so seats hand a different map and stock forward. Read
+        // after the change: battles 30, conquests 27, foundings 816, subjections
+        // 3, freed 0, tribute 228427344, treaties 354, broken 1, owner changes
+        // 2061. A re-pin is the wave's re-bless, not this item's.
+        // BOTH CAUSES ARE MEASURED IN ISOLATION ABOVE (each from fd7ae028); the
+        // combined read is taken on the integrated tree at the wave's re-bless.
         check(ex1.battles == 322 && ex1.conquests == 207 && ex1.foundings == 739
            && ex1.subjections_formed == 65 && ex1.subjections_freed == 62
            && ex1.tribute_remitted == 245920676 && ex1.treaties_formed == 479

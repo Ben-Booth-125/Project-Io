@@ -1956,6 +1956,89 @@ int main()
               "M3c  the captured seat's preloaded stock is carried by the ownership change, never reset");
     }
 
+    // --- T1  trade is paid on KINDS REACHED, not on roaded pairs (BL-1021) ---
+    //
+    // CIVILISATION.md sec War is paid for, and trade is what pays. One polity
+    // (one founding culture, so BL-826's seed folds every region into it), no
+    // rival, no Settle (threshold out of range), no works, no walked corridor
+    // at all -- so any trade income here cannot be a roaded pair. Each region
+    // is plainly best at ONE thing: farm, ore or port.
+    //
+    // THE RULE, as arithmetic: every held region the network reaches is paid
+    // `trade_income_per_class` per year for each DISTINCT kind of ground its
+    // realm reaches that is unlike its own. The reach reading is one decision
+    // round stale, so year 0 reads `network_supply_q`'s default (1000, every
+    // region reached) and the first round's reading holds from year 1 on.
+    {
+        const int64_t k = 40;
+        history_sim_params pt = params;
+        pt.start_year = 0;
+        pt.stop_year  = 100;
+        pt.trade_income_per_class = static_cast<int>(k);
+        pt.settle_threshold_q     = 1000000; // no Settle: the region set is the fixture's.
+        pt.terrain_reach_cost_q   = 10;      // an instrument setting, as BL872 uses: near ground stays reached.
+        const int64_t years = pt.stop_year - pt.start_year;
+
+        const auto ground = [](int col, int farm, int ore, int port, int score, const char* name) {
+            region g;
+            g.col = col; g.row = 0; g.anchor = col;
+            g.culture = culture_shares::pure(0); g.founding_culture = 0;
+            g.farm_q = farm; g.ore_q = ore; g.port_q = port;
+            g.settle_score_q = score; g.name = name;
+            return g;
+        };
+        const auto farm = [&](int col, int score) { return ground(col, 900, 100, 50, score, "Field"); };
+        const auto ore  = [&](int col)            { return ground(col, 100, 900, 50, 500, "Mine"); };
+        const auto port = [&](int col)            { return ground(col, 100, 100, 900, 400, "Harbour"); };
+
+        settlement_state w_mixed;   // farm, ore, port -- all within reach.
+        w_mixed.regions = { farm(0, 900), ore(3), port(6) };
+        settlement_state w_alike;   // three farms -- one kind, however many regions.
+        w_alike.regions = { farm(0, 900), farm(3, 600), farm(6, 500) };
+        settlement_state w_cut;     // the port far past neighbour_radius: cut off.
+        w_cut.regions = { farm(0, 900), ore(3), port(60) };
+        settlement_state w_more;    // a fourth region, of a kind already reached.
+        w_more.regions = { farm(0, 900), ore(3), port(6), farm(9, 600) };
+
+        const history_sim_state a = run_history_sim(w_mixed, nullptr, no_terrain, syn_gw, syn_gh, pt, 10211u);
+        const history_sim_state b = run_history_sim(w_alike, nullptr, no_terrain, syn_gw, syn_gh, pt, 10211u);
+        const history_sim_state c = run_history_sim(w_cut,   nullptr, no_terrain, syn_gw, syn_gh, pt, 10211u);
+        const history_sim_state d = run_history_sim(w_more,  nullptr, no_terrain, syn_gw, syn_gh, pt, 10211u);
+
+        // Expected, from the rule and nothing else.
+        const int64_t want_mixed = years * (2 + 2 + 2) * k;          // each of three reaches two unlike kinds
+        const int64_t want_cut   = 1 * (2 + 2 + 2) * k               // year 0: the default reading
+                                 + (years - 1) * (1 + 1) * k;        // then farm<->ore only; the port earns nothing
+        const int64_t want_more  = years * (2 + 2 + 2 + 2) * k;      // one more region, same three kinds
+
+        std::printf("      trade: mixed %lld (want %lld) | alike %lld | cut %lld (want %lld, port supply_q=%d) | "
+                    "four regions %lld (want %lld) | polities %zu/%zu/%zu/%zu, foundings %lld/%lld/%lld/%lld, "
+                    "corridors %zu\n",
+                    static_cast<long long>(a.materials_from_trade), static_cast<long long>(want_mixed),
+                    static_cast<long long>(b.materials_from_trade),
+                    static_cast<long long>(c.materials_from_trade), static_cast<long long>(want_cut),
+                    w_cut.regions[2].network_supply_q,
+                    static_cast<long long>(d.materials_from_trade), static_cast<long long>(want_more),
+                    a.polities.size(), b.polities.size(), c.polities.size(), d.polities.size(),
+                    static_cast<long long>(a.foundings), static_cast<long long>(b.foundings),
+                    static_cast<long long>(c.foundings), static_cast<long long>(d.foundings),
+                    a.supply_corridors.size());
+
+        check(a.polities.size() == 1 && c.polities.size() == 1 && d.polities.size() == 1
+              && a.foundings == 0 && c.foundings == 0 && d.foundings == 0,
+              "T1a  the fixture holds: one realm, no foundings (not vacuous)");
+        check(a.supply_corridors.empty() && a.materials_from_trade == want_mixed,
+              "T1b  a realm reaching farm, ore and port ground is paid kinds-reached x constant per region, "
+              "with NO walked corridor at all -- the base is not roaded pairs");
+        check(b.materials_from_trade == 0,
+              "T1c  a realm of ONE kind earns no trade however many regions it holds -- only difference is read");
+        check(w_cut.regions[2].network_supply_q <= pt.sustainable_settlement_floor_q
+              && c.materials_from_trade == want_cut,
+              "T1d  ground the network cannot reach earns nothing and lends its kind to nobody");
+        check(d.materials_from_trade == want_more && d.materials_from_trade > a.materials_from_trade,
+              "T1e  the income grows with the ground a realm reaches, not with its adjacency");
+    }
+
     // -----------------------------------------------------------------
     // BL-842 — SMALL GRUDGES DO NOT FREEZE.
     //
