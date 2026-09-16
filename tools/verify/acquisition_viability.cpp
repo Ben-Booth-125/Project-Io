@@ -538,7 +538,8 @@ seed_row run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
     // argument and it is parsed, not merely loaded. The background economy is the
     // landscape-search WINNER, not the seed candidate (BL-979).
     world w = make_hard_coded_world(p, nullptr, gen_cfg);
-    print_shipped_landscape(apply_shipped_landscape(w, reg, seed));
+    const shipped_landscape land = apply_shipped_landscape(w, reg, seed);
+    print_shipped_landscape(land);
 
     for (const auto& kv : w.corporations)
         r.field_holdings_gen += static_cast<int>(kv.second.assets.size());
@@ -547,7 +548,8 @@ seed_row run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
     for (int t = 1; t <= k_warm_ticks; ++t)
         tick(w, reg, t, /*spectating=*/true);
 
-    const spawn_seat_result seat = seat_player_corporation(w, seed);
+    // The seat gates and ranks on the winner's STATIC score (BL-1020), as the app's.
+    const spawn_seat_result seat = seat_player_corporation(w, seed, land.search.winner_score);
     r.seated      = seat.seated;
     r.floor_unmet = seat.floor_unmet;
     r.shortlist   = seat.shortlist_size;

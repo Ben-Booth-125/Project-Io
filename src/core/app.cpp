@@ -596,8 +596,9 @@ void app::poll_worldgen()
             std::printf("[start_new_game] %-24s %6lld ms\n", label,
                         static_cast<long long>(ms));
             std::fflush(stdout);
-            // BL-630: the validation run is over, so the returns the floor
-            // reads now exist. Seat BEFORE finish_new_game, which is what flips
+            // BL-630: the validation run is over, so the trailing figures the
+            // seat card shows now exist (the floor itself reads phase 6's static
+            // score — BL-1020). Seat BEFORE finish_new_game, which is what flips
             // to `in_game` — the first drawn frame must already have a player.
             seat_player();
             finish_new_game();
@@ -927,7 +928,10 @@ void app::draw_building_carve()
 
 void app::seat_player()
 {
-    m_seat_result = seat_player_corporation(m_world, m_active_world_params.seed);
+    // BL-1020: the floor and the rank read phase 6's static score of the winner,
+    // kept from start_new_game_prelude's search.
+    m_seat_result = seat_player_corporation(m_world, m_active_world_params.seed,
+                                            m_landscape_winner_score);
 
     // The player-scoped history caches were filled through the validation run
     // against whichever corp the GENERATOR provisionally flagged, so at this
@@ -951,7 +955,8 @@ void app::seat_player()
     // Printed alongside the other start_new_game phase lines. AN UNMET FLOOR IS
     // SAID OUT LOUD (CORPORATION_GENERATION.md: "a viability signal to be read,
     // not a failure to be hidden") — nothing here patches a corp to make the
-    // shortlist non-empty.
+    // shortlist non-empty. The static score is what gated; the balance and the
+    // trailing net are printed beside it as the information they now are.
     const char* name = "(none)";
     if (const auto cit = m_world.corporations.find(m_seat_result.seated);
         cit != m_world.corporations.end())
@@ -959,7 +964,16 @@ void app::seat_player()
     std::printf("[start_new_game] seat: %s — shortlist %d of %d specialists%s\n",
                 name, m_seat_result.shortlist_size, m_seat_result.specialist_count,
                 m_seat_result.floor_unmet
-                    ? "   <-- VIABILITY FLOOR UNMET (highest trailing net seated)" : "");
+                    ? "   <-- VIABILITY FLOOR UNMET (no seat on scored ground; lowest id seated)"
+                    : "");
+    for (const spawn_seat_candidate& c : m_seat_result.candidates)
+        if (c.corp == m_seat_result.seated)
+            std::printf("[start_new_game] seat card: landscape %.4f (%d of %d holdings on "
+                        "scored ground)  balance %.0f cr  trailing net %.0f cr over %d "
+                        "quarter(s)  [information, not the gate]\n",
+                        c.landscape, c.holdings_scored, c.holdings,
+                        static_cast<double>(c.balance), static_cast<double>(c.trailing_net),
+                        c.quarters_read);
     std::fflush(stdout);
 }
 
@@ -1047,6 +1061,9 @@ void app::start_new_game_prelude()
         // candidate; BL-977's report carries the before/after.
         const landscape_search_result r = search_landscape(m_world, m_registry, sp);
         apply_landscape_candidate(m_world, m_registry, r.winner, true);
+        // Kept for the seat (BL-1020): the shortlist gates and ranks on this
+        // static score, read at each specialist's holdings, after the settle.
+        m_landscape_winner_score = r.winner_score;
         std::printf("[landscape_search] winner corps=%d placement=%08X tier=%u  "
                     "accepted roster=%d placement=%d road_tier=%d of %d rounds\n",
                     r.winner.corporation_count, r.winner.placement_seed,

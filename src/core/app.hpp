@@ -720,6 +720,13 @@ private:
     spawn_seat_result m_seat_result;
     void seat_player();                ///< Draw the seat and re-point the player-scoped caches.
 
+    /// Phase 6's static score of the WINNING landscape, kept from the search to
+    /// the seat (BL-1020, the seat floor reads the static score): the shortlist
+    /// gates and ranks on it rather than on a trailing net the twelve-tick
+    /// settle cannot produce. Presentation state, like `m_seat_result` — never
+    /// serialised, overwritten by the next search.
+    landscape_score m_landscape_winner_score;
+
     /// The winner's VALIDATION RUN (BL-978, warm start retired): the one short
     /// tick-simulation phase 6 runs on the searched landscape to confirm the
     /// static proxy held — GENERATION_STRATEGY.md § Three passes, ERAS.md § the
@@ -732,9 +739,10 @@ private:
     /// shows the per-tick convoy dispatch count climb from zero and settle; this
     /// is the first tick at which both its 4-tick and 8-tick trailing means sit
     /// within 5% of the 80-tick level, so a longer run buys nothing the player
-    /// can see. It also covers the spawn floor's whole trailing window
-    /// (`k_spawn_trailing_quarters` = 8), so the seat is drawn on a full
-    /// viability read rather than a partial one.
+    /// can see. The seat is NOT read off this run's returns: its floor is the
+    /// static landscape score (BL-1020), because twelve ticks over a ramping
+    /// field file no trading record a viability verdict could stand on. The
+    /// trailing figures the run files reach the seat card as information only.
     static constexpr int validation_ticks = 12;
     /// Validation ticks completed so far, or -1 when no validation run is in
     /// progress. >= 0 marks the batched phase between generation finishing and
