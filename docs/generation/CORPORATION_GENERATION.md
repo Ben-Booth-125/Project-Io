@@ -404,15 +404,16 @@ world has been run forward, not during the passes above.
 **Reversed in intent (Ben, 2026-09-09): the player is to PICK the seat on a corporation selection
 canvas at Begin**, over the landscape the search selected (`docs/ui/STARTUP.md` § The seat). The shortlist and the weighted draw below remain the mechanism
 until that canvas exists, and afterwards they are what the canvas *offers* — the floor still filters,
-the weighting still orders, and the player chooses rather than being drawn for.
+the static score ranks what passes, and the player chooses rather than being drawn for.
 
 Ben's call, 2026-08-26: **which corporation the player runs is drawn at random from a shortlist
 of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:
 
 1. **Generate** — Passes 1–6, exactly as above. No corporation is the player's yet.
-2. **Warm-start in spectate** — the pre-game ticks run with **no seated corp**, under
-   `corp_ai_params::spectating`.
-3. **Shortlist** — every specialist whose quarterly returns clear the viability floor.
+2. **Search and settle in spectate** — phase 6 scores and applies the landscape, then its single
+   validation run ticks with **no seated corp**, under `corp_ai_params::spectating`.
+3. **Shortlist** — every specialist whose ground clears the viability floor on the static landscape
+   score, ranked by that score.
 4. **Seat** — one is drawn from the shortlist against the world seed, and `is_player` /
    `world::player_entity` are re-pointed onto it.
 
@@ -428,10 +429,28 @@ start. **Every seed's opening position therefore changes**, and the goldens re-b
 deliberately, in a single wave with dated provenance, never as a dribble. Ben took that cost
 knowingly on 2026-08-26.
 
-**The viability floor is measured, not authored.** Its metric is the spawn-viability pass's to
-settle, and the shape it must have is: a specialist qualifies if it is solvent at the end of the
-warm start and its trailing net over the last 8 filed quarters is non-negative. Determinism is
-unaffected — the draw consumes the world seed, so a seed reproduces its seat exactly.
+**The viability floor reads the ground, not a trading record** (Ben, 2026-09-16, NR-881; BL-1020,
+the seat floor reads the static score). The settle is phase 6's single short validation run over a
+field that is still ramping, so no trailing net exists to judge at any window — a floor on solvency
+plus eight quarters of trailing net passes nobody, and the shortlist comes back empty. An empty
+shortlist is a broken opening, not a tuning nit: the player picks from it. What *is* knowable before the first
+convoy runs is what phase 6 already scored (`GENERATION_STRATEGY.md` § The eight phases, phase 6).
+That score is a landscape record with per-market readings, so the seat's reading is taken from
+those terms and nothing new: for each holding, the **viability** of the market it clears against —
+`actual × balance`, the per-market form of the composite's own `mean_actual × mean_balance` — and
+the seat's score is the mean over its holdings. The composite's unevenness multiplier belongs to
+the whole landscape and is the same for every seat, so it is not applied.
+
+- **The gate:** a specialist qualifies if its score is above zero — at least one holding stands in
+  a market where the roster closes a chain *and* some resource sits inside the pin band. It is the
+  same necessary condition phase 6 applies to a whole landscape.
+- **The order:** the shortlist is ranked by that score, highest first, entity id breaking a tie.
+- **The trailing figures stay, as information.** The settle's closing balance and the trailing net
+  over the last 8 filed quarters are read for every candidate and shown on the seat card. They
+  never gate and never rank.
+
+Determinism is unaffected — the score is static and the draw consumes the world seed, so a seed
+reproduces its shortlist and its seat exactly.
 
 **The draw over the shortlist is WEIGHTED, not uniform.** Ben, 2026-08-26: *"mostly random for now,
 targeted towards population centres and processing, rather than extraction."* The floor is a filter;
@@ -460,8 +479,9 @@ asserting it against a target. A bias is not a guarantee, and the honest measure
 what share of seeds actually seat a processor-bearing corp near population once the weights are
 live.
 
-**An unmet floor stands.** If no specialist clears, the highest trailing-net specialist is seated
-and the world records that the floor went unmet. That is a viability signal to be read, not a
+**An unmet floor stands.** If no specialist clears, the first-ranked specialist is seated — every
+score is zero, so that is the lowest entity id, and the trailing net is not consulted — and the
+world records that the floor went unmet. That is a viability signal to be read, not a
 failure to be hidden — the same position § Pass 2's diversity floor takes.
 
 **What this retires.** The starting-corp selection stage (`app_screen::choosing_corp`) and its

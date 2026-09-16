@@ -324,12 +324,12 @@ The wizard's "Begin", and the one and only generation call:
    pools and live markets rather than a cold zero state. Batched across
    loading-screen frames (a tick on a searched landscape is ~0.9 s in Release, so
    the run in one frame would trip Windows' hang kill). It runs **in spectate** —
-   `corp_ai_params::spectating`, no corp seated — because the seat is decided from
-   what the run produces. `run_verify` stays cold.
-5. **Seat the player**: shortlist the specialists whose filed returns clear the
-   viability floor, draw one against the world seed, and re-point `is_player` /
-   `world::player_entity` onto it. Owned by CORPORATION_GENERATION.md § The spawn
-   shortlist, and the seat.
+   `corp_ai_params::spectating`, no corp seated — because the seat comes after the
+   run, so its card can show the figures the run files. `run_verify` stays cold.
+5. **Seat the player**: shortlist the specialists whose ground clears the viability
+   floor on phase 6's static landscape score, ranked by it; draw one against the
+   world seed, and re-point `is_player` / `world::player_entity` onto it. Owned by
+   CORPORATION_GENERATION.md § The spawn shortlist, and the seat.
 6. Rebase the clock again (generation + validation-run wall time must not become
    in-game days), then `m_screen = in_game`.
 
@@ -342,14 +342,14 @@ selected (CANVASES.md § Default state).
 *"Begin should go directly to a 'corporation selection' interactive canvas"*; asked whether that
 reverses the 2026-08-26 retirement of the selection screen: *"Yes, it's time to reverse that
 ruling."*). The random draw is retired as the seat mechanism. The spawn shortlist survives as
-**what the canvas offers** — the viability floor still filters, its weighting still orders, and
-the player chooses among what passes rather than being drawn for.
+**what the canvas offers** — the viability floor still filters, the static score ranks what
+passes, and the player chooses among it rather than being drawn for.
 [`CORPORATION_GENERATION.md`](../generation/CORPORATION_GENERATION.md) § The spawn shortlist,
 and the seat owns the shortlist; this doc owns only the screen.
 
 **The floor reads the ground, not a trading record** (Ben, 2026-09-16, NR-881). The settle is
-too short for a trailing net to exist at any window, so the shortlist gates on the static
-landscape score phase 6 already computed for each seat. Trailing figures stay on the seat card
+too short for a trailing net to exist at any window, so the shortlist gates and ranks on the
+static landscape score phase 6 already computed for each seat. Trailing figures stay on the seat card
 as information; they are never the gate.
 
 **The canvas draws over a world that already exists.** It sits over the landscape the final

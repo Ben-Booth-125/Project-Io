@@ -67,16 +67,22 @@ opening position owes the calendar nothing.
 **The validation run is twelve quarterly econ ticks** (`app::validation_ticks`), run on the winner
 in time-boxed batches across loading-screen frames, under spectate with nobody seated, with the
 persona counsel and battle dispatches suppressed. The balances, pools, filed returns and prices those ticks leave
-*are* the opening position; the seat is drawn from the returns they file. Twelve is **measured,
+*are* the opening position; the seat card shows the returns they file. Twelve is **measured,
 not round**, and the instrument is `haulage_measure --per-tick` (the only harness that sees
 trade): pooled over five seeds, the per-tick convoy dispatch count climbs from zero — tick 1
 dispatches nothing, tick 2 about 40 % of the settled rate, tick 4 about 90 % — and then holds at
 its 80-tick level (≈125 convoys per tick over the last eight of eighty). Twelve is the first tick
 at which **both** the 4-tick and the 8-tick trailing means of that count sit within 5 % of the
 80-tick level (98 % and 96 %; at eleven the 8-tick mean is still 94.8 %). A longer run buys
-nothing the player can see. It also covers the spawn floor's whole trailing window
-(`k_spawn_trailing_quarters` = 8, `../generation/CORPORATION_GENERATION.md` § The spawn
-shortlist), so the seat is drawn on a full viability read rather than a partial one.
+nothing the player can see.
+
+**The seat's viability floor does not read this run** (Ben, 2026-09-16, NR-881; BL-1020, the seat
+floor reads the static score). Twelve ticks over a field still ramping from zero file no trading
+record a viability verdict could stand on, at any trailing window. The shortlist therefore gates
+and ranks on the static landscape score phase 6 computed before the run, and the run's figures —
+the closing balance and the trailing net over `k_spawn_trailing_quarters` = 8 filed returns — reach
+the seat card as information only (`../generation/CORPORATION_GENERATION.md` § The spawn
+shortlist, and the seat).
 
 One series does not settle in twelve, and it is named rather than hidden: the **intra-body
 market-to-market** share of those convoys drifts upward slowly, from ≈80 % of its 80-tick level

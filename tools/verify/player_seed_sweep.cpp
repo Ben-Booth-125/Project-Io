@@ -31,6 +31,7 @@
 // Run: .\build\player_seed_sweep.exe [seed_count] [warm_ticks]
 //      .\build\player_seed_sweep.exe --seat  [seed_count] [--fast]
 //      .\build\player_seed_sweep.exe --guard [seed_count] [--fast]
+//      .\build\player_seed_sweep.exe --guard --seeds 46,17,11 [--reproduce N] [--fast]
 //
 // BL-630 (2026-08-26) ADDED THE MODE THIS FILE NOW LEADS WITH. The two default
 // conditions above ("worth playing" == a processor, and solvent) were written
@@ -286,8 +287,17 @@ void warm_tick(world& w, const recipe_registry& reg, int t)
     credit_arrived_convoys(w, t);
 }
 
-constexpr int k_seat_warm_ticks = 80; ///< The retired app::pre_game_ticks; the app now runs app::validation_ticks (BL-978), and this harness's own settle length is a re-read it owes.
+/// The settle the seat is drawn after: `app::validation_ticks` (app.hpp), phase
+/// 6's single validation run of the winner (BL-978, warm start retired). It was
+/// the retired eighty-tick `app::pre_game_ticks` until BL-1020 paid the re-read
+/// it owed — a sweep that settled for eighty ticks measured a shortlist the app
+/// never builds, and hid exactly the empty shortlist a Release run printed.
+/// Stated rather than included because app.hpp drags in SDL and ImGui; change
+/// both together.
+constexpr int k_seat_warm_ticks = 12;
 /// How many seeds get the two-independently-built-worlds treatment (S4).
+/// The default; `--reproduce N` overrides it, so a sweep split across processes
+/// (BL-1020 ran the sixteen curated seeds as three) does not pay it three times.
 constexpr int k_reproduce_seeds  = 4;
 
 struct seat_row
@@ -305,10 +315,23 @@ struct seat_row
     float     seat_weight    = 0.0f;
     float     seat_balance   = 0.0f;
     float     seat_trailing  = 0.0f;
+    /// The seated corp's static landscape score — what the floor gated on.
+    double    seat_landscape = 0.0;
     /// The SHORTLIST's composition, so the distribution can be read against what
     /// was actually on offer rather than against the whole specialist set.
     int       shortlisted_with_proc = 0;
     int       shortlisted_near_pop  = 0;   ///< population_share > 0.
+    /// Shortlisted corps whose settle closed at a balance <= 0, or whose trailing
+    /// net is negative — the two facts the RETIRED floor gated on, counted so the
+    /// sweep shows what moving the gate onto the static score let through
+    /// (BL-1020). Information, never a verdict.
+    int       shortlisted_insolvent = 0;
+    int       shortlisted_trail_neg = 0;
+    /// Specialists the RETIRED floor would have passed — solvent AND trailing
+    /// net >= 0, the exact test seat_player_corporation applied before BL-1020 —
+    /// over the same settled world. The before-and-after of the gate in one
+    /// run: the settle does not depend on the seat, so this IS the old shortlist.
+    int       retired_floor_passed  = 0;
     /// The smallest weight any shortlisted corp carried, over this seed. S3's
     /// input: it must never reach zero, or the bias has become a gate.
     float     min_shortlist_weight  = 0.0f;
@@ -328,23 +351,29 @@ spawn_seat_result build_and_seat(uint32_t seed, const recipe_registry& reg,
     out_world = make_hard_coded_world(p);
     // The app's own ordering: the landscape-search WINNER applied over the loaded
     // registry (not the seed candidate — BL-979), the recipe authoring pass, then
-    // the warm start (app::start_new_game_prelude).
-    apply_shipped_landscape(out_world, reg, seed);
+    // the validation run (app::start_new_game_prelude, app::poll_worldgen), then
+    // the seat on the WINNER'S STATIC SCORE (BL-1020) — the one the app keeps as
+    // `m_landscape_winner_score`.
+    const shipped_landscape land = apply_shipped_landscape(out_world, reg, seed);
     for (int t = 1; t <= k_seat_warm_ticks; ++t)
         warm_tick(out_world, reg, t);
-    return seat_player_corporation(out_world, seed);
+    return seat_player_corporation(out_world, seed, land.search.winner_score);
 }
 
-int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mode)
+int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, bool fast,
+             bool assert_mode, int reproduce_seeds)
 {
+    const int n_seeds = static_cast<int>(seeds.size());
     std::printf("player_seed_sweep %s — %d seeds, %d warm ticks in spectate, %s spawn\n",
                 assert_mode ? "--guard" : "--seat", n_seeds, k_seat_warm_ticks,
                 fast ? "FAST (prehistory OFF — iteration only, NOT the shipped spawn)"
                      : "the shipped");
-    std::printf("BL-630. The floor filters; the draw over the shortlist is BIASED, never gated.\n\n");
+    std::printf("BL-630. The floor filters; the draw over the shortlist is BIASED, never gated.\n");
+    std::printf("BL-1020. The floor reads phase 6's STATIC landscape score; balance and trail8 "
+                "are information.\n\n");
 
-    std::printf("seed  spec  short  proc  pop%%  weight   balance   trail8  unmet  seated\n");
-    std::printf("----  ----  -----  ----  ----  ------  --------  -------  -----  ------\n");
+    std::printf("seed  spec  short  old  land    proc  pop%%  weight   balance   trail8  unmet  seated\n");
+    std::printf("----  ----  -----  ---  ------  ----  ----  ------  --------  -------  -----  ------\n");
 
     std::vector<seat_row> rows;
     rows.reserve(static_cast<std::size_t>(n_seeds));
@@ -352,7 +381,7 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
     for (int i = 0; i < n_seeds; ++i)
     {
         seat_row r;
-        r.seed = static_cast<uint32_t>(i);
+        r.seed = seeds[static_cast<std::size_t>(i)];
         std::string seat_name = "-";
         try
         {
@@ -380,11 +409,16 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
                     r.seat_pop_share = c.population_share;
                     r.seat_weight    = c.weight;
                     r.seat_trailing  = c.trailing_net;
+                    r.seat_landscape = c.landscape;
                 }
+                if (c.solvent && c.trailing_net >= 0.0f)
+                    ++r.retired_floor_passed;
                 if (!c.shortlisted)
                     continue;
                 if (c.has_processor)          ++r.shortlisted_with_proc;
                 if (c.population_share > 0.0f) ++r.shortlisted_near_pop;
+                if (!c.solvent)               ++r.shortlisted_insolvent;
+                if (c.trailing_net < 0.0f)    ++r.shortlisted_trail_neg;
                 if (first || c.weight < r.min_shortlist_weight)
                     r.min_shortlist_weight = c.weight;
                 first = false;
@@ -400,15 +434,31 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
             // structural — an unordered walk or an unseeded stream would break
             // on the first seed, not the twentieth. The sample size is stated in
             // S4's own row so nobody reads it as a full sweep.
-            if (i < k_reproduce_seeds)
+            if (i < reproduce_seeds)
             {
                 world w2;
                 const spawn_seat_result res2 = build_and_seat(r.seed, reg, fast, w2);
+                // The ranked candidate list too, score for score: the static
+                // score is the gate and the order now (BL-1020), so a score that
+                // drifted between two builds would move the shortlist silently.
+                bool same_rank = res2.candidates.size() == res.candidates.size();
+                for (std::size_t k = 0; same_rank && k < res.candidates.size(); ++k)
+                    same_rank = res2.candidates[k].corp == res.candidates[k].corp
+                             && res2.candidates[k].landscape == res.candidates[k].landscape;
                 r.reproduced = (res2.seated == res.seated)
                             && (res2.shortlist_size == res.shortlist_size)
-                            && (res2.floor_unmet == res.floor_unmet);
+                            && (res2.floor_unmet == res.floor_unmet)
+                            && same_rank;
                 r.reproduce_checked = true;
             }
+
+            // The whole ranking, so the gate's discrimination is readable per
+            // seed: `*` the seat, `x` below the floor. Printed before the row.
+            std::printf("      rank:");
+            for (const spawn_seat_candidate& c : res.candidates)
+                std::printf(" %.4f%s", c.landscape,
+                            c.corp == res.seated ? "*" : (c.shortlisted ? "" : "x"));
+            std::printf("\n");
         }
         catch (const std::exception& e)
         {
@@ -422,8 +472,9 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
         }
 
         if (!r.threw)
-            std::printf("%4u  %4d  %5d  %4s  %4.0f  %6.2f  %8.0f  %7.0f  %5s  %s%s\n",
-                        r.seed, r.specialists, r.shortlisted,
+            std::printf("%4u  %4d  %5d  %3d  %6.4f  %4s  %4.0f  %6.2f  %8.0f  %7.0f  %5s  %s%s\n",
+                        r.seed, r.specialists, r.shortlisted, r.retired_floor_passed,
+                        r.seat_landscape,
                         r.seat_processor ? "YES" : "no",
                         static_cast<double>(r.seat_pop_share * 100.0f),
                         static_cast<double>(r.seat_weight),
@@ -442,6 +493,8 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
     int unmet = 0, non_specialist = 0, unseated = 0, threw = 0;
     int not_reproduced = 0, reproduce_checked = 0;
     int total_short = 0, total_short_proc = 0, total_short_pop = 0, total_spec = 0;
+    int total_short_insolvent = 0, total_short_trail_neg = 0, empty_shortlist = 0;
+    int total_retired = 0, empty_retired = 0;
     float min_weight = 0.0f;
     bool  have_weight = false;
     for (const seat_row& r : rows)
@@ -452,6 +505,13 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
         total_short += r.shortlisted;
         total_short_proc += r.shortlisted_with_proc;
         total_short_pop  += r.shortlisted_near_pop;
+        total_short_insolvent += r.shortlisted_insolvent;
+        total_short_trail_neg += r.shortlisted_trail_neg;
+        if (r.shortlisted == 0)
+            ++empty_shortlist;
+        total_retired += r.retired_floor_passed;
+        if (r.retired_floor_passed == 0)
+            ++empty_retired;
         if (!r.floor_unmet)
         {
             ++drawn;
@@ -478,7 +538,7 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
     // WHICH MECHANISM ACTUALLY DECIDED THE SEAT. Printed FIRST and unconditionally,
     // because every percentage below is meaningless without it: when the shortlist
     // is empty the WEIGHTED DRAW NEVER RUNS and the seat is the floor-unmet
-    // fallback (highest trailing net), which reads no weight at all. A sweep that
+    // fallback (first in rank order), which reads no weight at all. A sweep that
     // reported a "seat distribution" over seeds the draw never touched would be
     // attributing the fallback's behaviour to the bias.
     std::printf("\n=== which mechanism decided the seat ===\n");
@@ -505,11 +565,18 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
                 total_short_proc, total_short, pct(total_short_proc, total_short));
     std::printf("    of the shortlisted, near population .. %d/%d  (%.1f%%)\n",
                 total_short_pop, total_short, pct(total_short_pop, total_short));
+    std::printf("    the RETIRED floor (solvent, trail8 >= 0) would pass %d/%d, and be EMPTY on "
+                "%d/%d seeds\n",
+                total_retired, total_spec, empty_retired, done);
+    std::printf("    of the shortlisted, balance <= 0 ..... %d/%d  (%.1f%%)   [information — the\n"
+                "    of the shortlisted, trail8 < 0 ....... %d/%d  (%.1f%%)    retired floor's inputs]\n",
+                total_short_insolvent, total_short, pct(total_short_insolvent, total_short),
+                total_short_trail_neg, total_short, pct(total_short_trail_neg, total_short));
     std::printf("\n  The bias is legible as the GAP between each seated row and its\n"
                 "  on-offer row. Equal shares would mean the weights did nothing;\n"
                 "  100%% would mean they had become a gate, which they must not be.\n");
     std::printf("\n  viability floor UNMET on %d/%d seeds%s\n", unmet, done,
-                unmet ? "   (highest trailing net seated; the fact stands, nothing was patched)"
+                unmet ? "   (first-ranked specialist seated; the fact stands, nothing was patched)"
                       : "");
     std::printf("  OF THE SEEDS THE DRAW ACTUALLY RAN ON (%d): processor %d (%.1f%%), "
                 "near population %d (%.1f%%)\n",
@@ -530,7 +597,7 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
 
     std::printf("\n=== guard — the properties the seat must hold ===\n");
     bool all = true;
-    char buf[224];
+    char buf[320];
 
     std::snprintf(buf, sizeof buf, "every seed seats somebody (%d unseated, %d threw)",
                   unseated, threw);
@@ -551,7 +618,7 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
     std::snprintf(buf, sizeof buf,
                   "the draw is REPRODUCIBLE — same seed, two independently built worlds, "
                   "same seat (%d of the first %d seeds checked, %d disagreed)",
-                  reproduce_checked, k_reproduce_seeds, not_reproduced);
+                  reproduce_checked, reproduce_seeds, not_reproduced);
     all &= row("S4", reproduce_checked > 0 && not_reproduced == 0, buf);
 
     std::snprintf(buf, sizeof buf,
@@ -560,6 +627,17 @@ int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mod
                   "count — an unmet floor is a viability signal, not a failure)",
                   unmet, done);
     all &= row("S5", unmet == 0 || non_specialist == 0, buf);
+
+    // S6 — BL-1020. The player picks a seat FROM this shortlist, so an empty one
+    // is a broken opening rather than a tuning nit (Ben, 2026-09-16, NR-881). The
+    // mechanism still patches nothing to make it non-empty; this row is what
+    // notices when the ground stops carrying one.
+    std::snprintf(buf, sizeof buf,
+                  "the shortlist is NON-EMPTY on every seed — the floor reads phase 6's "
+                  "static landscape score, not a trading record the settle cannot file "
+                  "(%d/%d seeds empty; %d shortlisted of %d specialists)",
+                  empty_shortlist, done, total_short, total_spec);
+    all &= row("S6", done > 0 && empty_shortlist == 0, buf);
 
     std::printf("\n%s\n", all ? "ALL PASS" : "FAILURES ABOVE");
     return all ? 0 : 1;
@@ -612,10 +690,41 @@ int main(int argc, char** argv)
     // the viability floor for a reason that is not the world's.
     if (seat_mode || guard_mode)
     {
-        int g_seeds = 24;
-        if (argc > 2 && std::string(argv[2]) != "--fast")
-            g_seeds = std::atoi(argv[2]);
-        return run_seat(g_seeds > 0 ? g_seeds : 24, reg, fast, guard_mode);
+        // `--seeds a,b,c` names the worlds outright — the curated library
+        // (`node tools/session/seed_library.js`) is sixteen chosen seeds, not
+        // 0..15. Otherwise the positional count sweeps 0..n-1 as it always has.
+        std::vector<uint32_t> seeds;
+        int reproduce = k_reproduce_seeds;
+        for (int a = 2; a + 1 < argc; ++a)
+            if (std::string(argv[a]) == "--reproduce")
+                reproduce = std::max(1, std::atoi(argv[a + 1]));
+        for (int a = 2; a + 1 < argc; ++a)
+            if (std::string(argv[a]) == "--seeds")
+            {
+                const std::string csv = argv[a + 1];
+                std::size_t at = 0;
+                while (at <= csv.size())
+                {
+                    std::size_t comma = csv.find(',', at);
+                    if (comma == std::string::npos)
+                        comma = csv.size();
+                    if (comma > at)
+                        seeds.push_back(static_cast<uint32_t>(
+                            std::strtoul(csv.substr(at, comma - at).c_str(), nullptr, 10)));
+                    at = comma + 1;
+                }
+            }
+        if (seeds.empty())
+        {
+            int g_seeds = 24;
+            if (argc > 2 && std::string(argv[2]).rfind("--", 0) != 0)
+                g_seeds = std::atoi(argv[2]);
+            if (g_seeds <= 0)
+                g_seeds = 24;
+            for (int i = 0; i < g_seeds; ++i)
+                seeds.push_back(static_cast<uint32_t>(i));
+        }
+        return run_seat(seeds, reg, fast, guard_mode, reproduce);
     }
 
     std::printf("player_seed_sweep — %d seeds, %d warm ticks (%.2f in-game years)\n\n",

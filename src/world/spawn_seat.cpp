@@ -1,9 +1,11 @@
 #include "spawn_seat.hpp"
 
 #include "components.hpp"
+#include "market_clearing.hpp" // market_for_tile — the score's own catchment partition
 
 #include <algorithm>
 #include <random>
+#include <unordered_map>
 
 namespace {
 
@@ -53,7 +55,49 @@ bool centre_near_tile(const world& w, const tile_component& tc, int radius)
 
 } // namespace
 
+double seat_landscape_score(const world& w, const landscape_score& landscape,
+                            entity_id corp, int* holdings_scored)
+{
+    if (holdings_scored)
+        *holdings_scored = 0;
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return 0.0;
+
+    // Market id -> its per-market viability. Built from the score's own
+    // `markets` vector, which is sorted by id; a lookup map is order-free.
+    std::unordered_map<entity_id, double> viability;
+    viability.reserve(landscape.markets.size());
+    for (const market_score& m : landscape.markets)
+        viability[m.market] = m.actual * m.balance;
+
+    // The mean over SITED holdings, walked in the corp's own asset order. The
+    // accumulation is a double sum, and `assets` is a vector whose order is set
+    // by generation, not by hash layout — so the sum is the same on every run.
+    double sum    = 0.0;
+    int    sited  = 0;
+    int    scored = 0;
+    for (const entity_id bid : cit->second.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        if (w.tiles.find(bit->second.tile) == w.tiles.end())
+            continue;
+        ++sited;
+        const auto vit = viability.find(market_for_tile(w, bit->second.tile));
+        if (vit == viability.end())
+            continue;               // no scored catchment: zero viability, still counted
+        ++scored;
+        sum += vit->second;
+    }
+    if (holdings_scored)
+        *holdings_scored = scored;
+    return sited > 0 ? sum / static_cast<double>(sited) : 0.0;
+}
+
 spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
+                                          const landscape_score& landscape,
                                           spawn_seat_params params)
 {
     spawn_seat_result out;
@@ -86,24 +130,29 @@ spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
 
         spawn_seat_candidate c;
         c.corp    = id;
+
+        // THE FLOOR (BL-1020, Ben 2026-09-16, NR-881). The static landscape
+        // score phase 6 computed, read at this seat's holdings: does this corp
+        // stand on ground where the landscape actually works? A property of the
+        // ground, its reach and its market — knowable before the first convoy
+        // runs, which a trading record over a twelve-tick settle is not. About
+        // whether the seat is VIABLE, never about whether there is a good GAME
+        // in it, which is the weighting's job below.
+        c.landscape   = seat_landscape_score(w, landscape, id, &c.holdings_scored);
+        c.shortlisted = (c.landscape > 0.0);
+
+        // INFORMATION, NOT THE GATE. The settle's closing balance and the
+        // trailing net over the last k_spawn_trailing_quarters FILED returns,
+        // kept for the seat card. `returns` is oldest-first and rolling-capped,
+        // so the window is its tail; a corp that has filed fewer is read over
+        // everything it has, the same accommodation the acquisition price makes.
         c.balance = cc.balance;
         c.solvent = (cc.balance > 0.0f);
-
-        // Trailing net over the last k_spawn_trailing_quarters FILED returns.
-        // `returns` is oldest-first and rolling-capped, so the window is its
-        // tail; a corp that has filed fewer is read over everything it has,
-        // which is the same accommodation the acquisition price makes.
         const std::size_t filed = cc.returns.size();
         const std::size_t take  = std::min(filed, k_spawn_trailing_quarters);
         for (std::size_t i = filed - take; i < filed; ++i)
             c.trailing_net += cc.returns[i].net;
         c.quarters_read = static_cast<int>(take);
-
-        // THE FLOOR. Solvent at the end of the warm start, trailing net
-        // non-negative. Two conditions, both about whether this corp can carry
-        // its own weight — neither about whether there is a good GAME in it,
-        // which is the weighting's job below.
-        c.shortlisted = c.solvent && (c.trailing_net >= 0.0f);
 
         for (const entity_id bid : cc.assets)
         {
@@ -143,6 +192,23 @@ spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
         if (c.shortlisted)
             ++out.shortlist_size;
 
+    // --- THE ORDER -----------------------------------------------------------
+    //
+    // Ranked on the static score, highest first, entity id breaking a tie — a
+    // TOTAL order, so the ranking is the same on every machine whatever order
+    // the specialists were gathered in. It is the order the shortlist is offered
+    // in and the order the draw walks; the draw's probabilities are the weights'
+    // alone, so the rank moves which corp a given cursor lands on and nothing
+    // about how often each is chosen. Stable sort over an id-sorted vector, and
+    // the id tie-break is explicit anyway.
+    std::stable_sort(out.candidates.begin(), out.candidates.end(),
+                     [](const spawn_seat_candidate& a, const spawn_seat_candidate& b)
+                     {
+                         if (a.landscape != b.landscape)
+                             return a.landscape > b.landscape;
+                         return a.corp < b.corp;
+                     });
+
     // --- the draw ------------------------------------------------------------
     entity_id chosen = null_entity;
 
@@ -181,18 +247,15 @@ spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
     else
     {
         // AN UNMET FLOOR STANDS. Nothing here conjures a corp, patches one, or
-        // relaxes the floor to make the shortlist non-empty: the highest
-        // trailing-net specialist is seated as-is and the fact is RECORDED, so
-        // the sweep reads it as the viability signal it is. Ties break on the
-        // lowest entity id, which the sorted walk gives for free.
+        // relaxes the floor to make the shortlist non-empty: the first-ranked
+        // specialist is seated as-is and the fact is RECORDED, so the sweep reads
+        // it as the viability signal it is. Every score is zero here, so rank
+        // order is entity-id order. The trailing net is NOT consulted — it
+        // stopped deciding anything with BL-1020, and a fallback that read it
+        // would bring the retired gate back through the side door.
         out.floor_unmet = true;
-        float best = 0.0f;
-        for (const spawn_seat_candidate& c : out.candidates)
-            if (chosen == null_entity || c.trailing_net > best)
-            {
-                chosen = c.corp;
-                best   = c.trailing_net;
-            }
+        if (!out.candidates.empty())
+            chosen = out.candidates.front().corp;
     }
 
     // --- re-point ------------------------------------------------------------
