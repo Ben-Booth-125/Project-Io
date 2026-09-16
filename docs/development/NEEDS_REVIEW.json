@@ -118,30 +118,6 @@
    "resolution": null
   },
   {
-   "id": "NR-810",
-   "title": "Round 4 promises four thousand years and plays four hundred, because settlement places the whole map before the sim starts",
-   "raised": "2026-09-09",
-   "kind": "observation",
-   "status": "open",
-   "source": "Sprint 37 build session, 2026-09-09. Found by building BL-829 (time-lapse view) and watching what it draws; confirmed in the main session from scripts/verify/history_lapse_press.lua, whose own assertion reads 'the record spans years (-400 -> 0)'.",
-   "what": "Round 4's subtitle asks 'Who claimed this ground, and who lost it, over four thousand years?' The record it plays covers 400. On the first frame every continent is already claimed and all 12 powers already exist, because run_settlement places all ~533 regions and dates them BEFORE run_history_sim starts - so what the map animates is borders shifting, not land filling. 384 foundings do happen inside the run, but they land on ground that already has an owner colour.",
-   "why_it_matters": "It is not a drawing problem and it cannot be fixed in the UI. Ben's stated acceptance criterion for round 4 is the ARC - origin, communication, conquest or diplomatic union, a stable dark age - and the origin phase is not missing from the DRAWING, it is missing from the RECORD. Round 4 is currently showing the last tenth of the story it advertises. It also means objective 2 ('make sure it works and produces interesting cultures') cannot be judged from this round yet: there is no spreading to look at.",
-   "options": [
-    "Wire BL-846 (colonisation span) so foundings happen INSIDE the recorded span - run_settlement takes each site's founded_year and culture from the colonisation flood's arrival record instead of from a settle-score formula, and the sim's pre-boundary span plays that schedule out, emitting an ownership change as each region is reached. The flood is already built and harnessed.",
-    "Leave the round honest about its scope in the meantime - retitle it to the span it actually plays - and treat the arc as blocked on the colonisation integration.",
-    "Both: retitle now, wire BL-846 next."
-   ],
-   "recommendation": "Option 3. The retitle is a one-line honesty fix and should not wait; the integration is the real answer and is the natural next piece of sprint 37, since the flood exists and is green. Worth noting that this finding independently confirms an architectural reading that was genuinely ambiguous when the span was being built: COLONISATION.md could be read as colonisation dating the map before the sim, or as founding regions inside it. A round built to show the arc proves it must be the second.",
-   "files": [
-    "src/world/settlement.cpp",
-    "src/world/history_sim.cpp",
-    "src/world/colonisation.cpp",
-    "src/ui/history_lapse.cpp",
-    "docs/ui/STARTUP.md"
-   ],
-   "resolution": null
-  },
-  {
    "id": "NR-811",
    "title": "Round 4 pays a full world build, and Begin then pays it again",
    "raised": "2026-09-09",
@@ -159,47 +135,6 @@
    "files": [
     "src/ui/startup_screens.cpp",
     "src/core/app.hpp",
-    "docs/ui/STARTUP.md"
-   ],
-   "resolution": null
-  },
-  {
-   "id": "NR-812",
-   "title": "Does the wizard's ACTIONS.json exemption cover a Run button on a pass round?",
-   "raised": "2026-09-09",
-   "kind": "question",
-   "status": "open",
-   "source": "Sprint 37 build session, 2026-09-09. The BL-829 implementer was briefed that round 4 was outside the exemption, read the doc as broader than the brief, followed the doc, and flagged the disagreement rather than silently picking either way.",
-   "what": "The brief for round 4 said the pre-game-wizard ACTIONS.json exemption covers the preference rows, so a new Run button needs an entry. ACTIONS.json's own _note (Ben, 2026-09-09, ruling on NR-804) reads wider: 'The startup wizard - its rounds, per-round Reroll, Next and Begin - gets no entries here and no startup.* family... The any-control-change-updates-its-entry rule above does not reach it.' A Run button on a wizard round arguably sits inside 'its rounds'. No entry was added.",
-   "why_it_matters": "Small either way - the entry is a two-minute add - but the exemption's edge decides whether every future control on rounds 4 and 5 needs one, and those rounds are about to grow controls (transport, leans). Better settled once than re-argued per control.",
-   "options": [
-    "The exemption covers the whole wizard including new controls on its rounds. Nothing to do.",
-    "The exemption covers only the rounds' NAVIGATION and preference rows; functional controls like Run get entries."
-   ],
-   "recommendation": "The implementer followed the doc as written, which was the right call. If option 2 is what was meant, the _note wants a sentence saying so, because as written it reads as option 1.",
-   "files": [
-    "docs/ai/ACTIONS.json",
-    "src/ui/startup_screens.cpp"
-   ],
-   "resolution": null
-  },
-  {
-   "id": "NR-813",
-   "title": "Should round 4's time-lapse get a scrubber?",
-   "raised": "2026-09-09",
-   "kind": "decision",
-   "status": "open",
-   "source": "Sprint 37 build session, 2026-09-09. BL-829 left transport controls deliberately open, to be decided by watching rather than in advance.",
-   "what": "The plain transport was built as briefed: Run, then it plays, then Restart. The question BL-829 parked is whether the player may scrub, pause or replay.",
-   "why_it_matters": "The wizard's standing premise is 'you set conditions, you do not steer', and the globe's no-input ruling is a real precedent against any steerable control. A scrubber would be the wizard's first.",
-   "options": [
-    "Keep it plain - Run and Restart only. Consistent with the globe ruling.",
-    "Add a scrubber. The argument for it: the interesting moments are unevenly spaced - most centuries are static and two or three are not - and at ~30 s for the span you cannot go back to the one you missed. Restart-and-rewatch is a 30-second answer to a 2-second question.",
-    "Add pause as well."
-   ],
-   "recommendation": "Not yet, and for a reason that outranks the argument: the round currently plays 400 years of a 4000-year record (NR-810), so how it should be steered cannot be judged from what it does now. Decide after the colonisation span is wired and there is a real arc to sit through. If it is decided sooner, a scrub earns its place and a pause does not - a frozen map is what the round already looks like most of the time. The ~30 s duration is also unvalidated and was not Ben's.",
-   "files": [
-    "src/ui/history_lapse.cpp",
     "docs/ui/STARTUP.md"
    ],
    "resolution": null
@@ -596,49 +531,6 @@
    "ask": "Is a 10% overrun rate (measured on 60 seeds) worth a reroll or a wider Culture-round budget, or is showing the true end year honestly (BL-947's fix) sufficient?"
   },
   {
-   "id": "NR-861",
-   "title": "OBSERVATION: treaties almost never break -- 4 breaks against 5,161 formed across 16 seeds",
-   "raised": "2026-09-14",
-   "kind": "observation",
-   "status": "open",
-   "source": "exploration_sweep, 16 seeds (0-15), main session review of the Exploration round.",
-   "what": "Reading 4 printed treaties formed=5161, broken=4, non-aggression-blocked campaigns=3,853,341, with 930 standing at 1660 (median 20 years left). The break test in history_sim.cpp (~2592) re-scores a bound pair against the same treaty_value_q formation uses and breaks only below HALF the formation threshold, as hysteresis. At a 0.08% break rate the harness line \"treaties both stand AND break\" is technically true and substantively false.",
-   "why_it_matters": "EXPLORATION.md: \"A treaty that cannot be broken is a rule, not a promise, and a phase whose actors never defect produces a flat map.\" 3.85M blocked campaigns against 4 defections suggests the non-aggression block is the main reason neighbour war fell (reading 2 fell 8x), which is calming rather than displacement -- the failure mode the doc names. Treaties also expire on term, so standing treaties are not permanent; whether expiry-and-reform is enough churn, or defection itself should be commoner, is a judgement.",
-   "options": [
-    "Leave it: expiry already churns treaties, and defection being rare is historically plausible.",
-    "Treat it as a measurement first: add a reading of expiries vs renewals vs defections so the churn is visible before any tuning.",
-    "Tune toward more defection by letting a want or an opportunity (a treatied neighbour whose ground holds a wanted good) lower treaty value -- which BL-953 (wants point outward) would make possible without a new term."
-   ],
-   "recommendation": "Option 2 now, inside BL-952 (sweep builds each world once), and revisit after BL-953/954 land, since outward wants and trade value both change treaty value.",
-   "files": [
-    "src/world/history_sim.cpp",
-    "tools/verify/exploration_sweep.cpp",
-    "docs/generation/EXPLORATION.md"
-   ],
-   "ask": "Is a 0.08% defection rate a rule wearing a promise's clothes, or acceptable given treaties expire on term?"
-  },
-  {
-   "id": "NR-862",
-   "title": "OBSERVATION: displacement regressed 0.33 -> 0.08 (16 seeds) at the schism verb, and NR-855's 0.88 was a 3-seed artefact",
-   "raised": "2026-09-14",
-   "kind": "observation",
-   "status": "open",
-   "source": "exploration_sweep at HEAD 643ebf79 vs NR-855 (sprint 40 wave 4, ec335d2c).",
-   "what": "BISECTED 2026-09-14 with exploration_sweep at four commits. Seeds 0-2: wave-4 close ec335d2c and its successor 4f07f5ea (pre-schism) both read 0.0066 / 1.1054 / 0.8775 (median 0.88, exactly NR-855). 4605a90d (schism merged) and HEAD 643ebf79 both read 0.0116 / 1.4241 / 0.0392 (median 0.04). The only src/world commit between 4f07f5ea and 4605a90d is 3d58001d (BL-944, schism verb). It changes the EMPIRES round (seed 0: 6000 -> 6479 battles before 1200), so the Exploration span opens on a different world; seed 2 loses nearly all its frontier war (18.70 -> 0.43 skirmishes/century). WIDER SPREAD: the wave-4 tree over 16 seeds has a median of 0.33, not 0.88 -- the 3-seed median rested on seed 2 alone. HEAD over 16 seeds: 0.08.",
-   "why_it_matters": "BL-950 (displacement clears the bar) was designed to push from 0.88 to above 1.0. The honest starting point was 0.33 before the schism and 0.08 after. And the regression was silent: the sweep reports rather than gates, and nothing else reads displacement, so an upstream Empires verb cut the phase's headline reading by three quarters without a red line anywhere.",
-   "options": [
-    "Treat BL-944 as legitimate (a schism is a real force) and let BL-950 tune against the post-schism world, from the integrated sprint-41 16-seed baseline.",
-    "Investigate why the schism collapses frontier war on some seeds (fewer, smaller realms at 1200 with no sea reach?) before tuning.",
-    "Make exploration_sweep gate on a displacement floor so the next upstream change goes red."
-   ],
-   "recommendation": "Option 1, with option 2 as the first step of BL-950's tuning pass (cheap once the 16-seed run exists). Option 3 is a separate call: the harness deliberately reports.",
-   "files": [
-    "src/world/history_sim.cpp",
-    "tools/verify/exploration_sweep.cpp"
-   ],
-   "ask": "Is the schism verb's cut to displacement an acceptable consequence to tune against, or a sign BL-944 needs revisiting?"
-  },
-  {
    "id": "NR-863",
    "title": "DECISION TAKEN: three calls made while writing and integrating the Exploration trade design",
    "raised": "2026-09-14",
@@ -683,106 +575,84 @@
    "ask": "Are the two creed leans meant to be compared against each other, and if so should they share one form?"
   },
   {
-   "id": "NR-866",
-   "title": "CALL: the navy and army saturation in the spend scorer is a brake inside the scorer, where EXPLORATION.md wants a cost in the world",
-   "raised": "2026-09-14",
+   "id": "NR-877",
+   "title": "AUTHORISE: the sprint-42 wave-1 re-bless — five named causes, one world",
+   "raised": "2026-09-16",
+   "kind": "decision",
+   "status": "open",
+   "source": "Sprint 42 wave 1 (the batch), sixteen items merged and verified on sprint-42-wave-1.",
+   "what": "DELIVERY.md sec The digest re-bless is one act per WAVE: one authorisation, N named causes, each measured in isolation in its own worktree. FIVE items moved the world; eleven did not.\n\nCAUSE 1 — BL-961 (planetology thermal series). Coal and petroleum magnitudes scale by the interior's own budget at the fossil epoch instead of today's; about a percent over the record's depth, world deposits +0.086%. Moved all four digests in isolation.\nCAUSE 2 — BL-967 (rivers priced in the walk). A river step now takes the same 30% corridor discount as a shore step (it was 22%, a river-cheaper-than-shore preference no doc stated). The migration reaches inland earlier: 4,000-11,000 tiles earlier per world, none later. More cultures coin on a different farm class (seed 0: 380 -> 444). Moved all four digests in isolation.\nCAUSE 3 — BL-972 (force upkeep in the world). Navies and standing armies pay a per-head bill from the treasury each round, the scorer's saturation caps are gone, and a paid army is levied from the ground's manpower. Moved seedA/on only.\nCAUSE 4 — BL-973 (tree effects generated). Every node effect in the two wired trees now reaches the sim through one generic apply; the three hand-wired nodes are retired. Effects that did nothing now do something, in both spans. Moved seedA/on, seedB/on and the 1960 arc.\nCAUSE 5 — BL-975 (nation treasury from Exploration). A nation opens with its folded polities' 1660 chest through one stated per-mille (0.01 per mille; about thirteen quarters of its own levy for the median nation), so garrisons differentiate. Moved seedA/on and seedB/on.\n\nTHE SHAPE, not the hash. The world the player would generate today: people spread further inland and split into more, smaller peoples; realms that hold ground pay to keep armies and fleets standing and can bankrupt themselves doing it; a realm's technology actually changes what it can do; and a nation arrives at the campaign with the money its history banked. The Exploration round is calmer and more commercial than it was (Exploration over 16 seeds: battle rate 55.9 -> 28.7 per century, displacement median 1.35 -> 1.70 while the pooled ratio fell 1.68 -> 1.28, held seeds 6 -> 5, silent seeds 9 -> 4 and 7, trade flows 687 -> 643. Empires: more and smaller realms (powers at 1200 49 -> 55, largest share by people 110 -> 100 per mille, peak 132 -> 116) with slightly more fighting (battles 6479 -> 6762, conquests 5464 -> 5843)).\n\nTHE DIGESTS. Authorised wave-0 baseline -> integrated wave-1: seedA/on 457483363D79D700 -> 983298AE413B0A8E; seedB/on 728607C66CE6A4BE -> F2A66ACE583F1784; seedA/off F9BF05466A631FF9 -> 5346EB2A9C4E1144; 1960 two-span 851FE345B2E37618 -> 82EE79155BA2F47D.\n\nTHE PIN. exploration_sim_harness R3b (the w_want_q = 0 span) reads battles 322 (pinned 308), conquests 207 (306), foundings 739 (472), subjections 65 (5), freed 62 (1), tribute 245,920,676 (134,358,620), treaties 479 (293), broken 0 (2), owner changes 2410 (2196). Left red with this entry as its stated cause.\n\nEVERYTHING ELSE IS GREEN on the integrated tree: world_determinism, pass_one_handoff, colonisation_harness, deposit_origin, planetology_harness, continent_drift, tile_height_retention, survey_endowment_harness (34/0), earthlike_tile_census (120 seeds, 0 fail), tree_lint (all four, both headers fresh), landscape_score/search, haulage_measure (2035 all / 1627 intra-body against the 1055/802 baseline), demand_census. history_sim_harness stays at its 2-failure baseline; era_world_harness's three reds pre-date the wave (BL-1010).",
+   "why_it_matters": "A re-bless is the moment the old world stops being reproducible. Ben authorises against the shape above, never against the hashes, and until he does the pin stays red and the digests stay unblessed.",
+   "options": [
+    "Authorise: re-pin R3b to 322/207/739/65/62/245920676/479/0/2410 and record the four digests as the baseline.",
+    "Authorise the physical and economic causes but hold BL-972 or BL-973 for a live look at the round first.",
+    "Not yet: read the wave live in build_rel before anything is re-pinned."
+   ],
+   "recommendation": "Option 1 if the round reads right live; the causes are attributable one by one, and every reading that judges them is now checked in."
+  },
+  {
+   "id": "NR-878",
+   "title": "CALL: nothing in the scorer reads the purse, so a polity spends itself to nothing once the caps are gone",
+   "raised": "2026-09-16",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "BL-972 (force upkeep in the world), measured over 16 seeds against a control run.",
+   "what": "With the saturation caps deleted, a polity ranked above about 500 on either lean buys a stock step whenever one is affordable, and the new per-head bill then drains what it bought with. Over the span the per-seed MEDIAN polity treasury falls from 1.26M to 211 while the top decile loses about 3%; roughly 14% of polity-rounds cannot pay the army bill. Rate sensitivity says it is structural, not a tuning miss: at a tenth of the rate the median still ends at 181k, because a cap-sized army over 115 rounds costs about one median hoard. The caps were hiding a 600x treasury spread.",
+   "why_it_matters": "EXPLORATION.md sec Force persists asked for a cost in the world rather than a brake in the scorer, and it got one — but the scorer's hold term still has no purse in it, so the actor has no reason to stop before it is broke. Displacement's median fell to 0.85 on this arm (pooled held at 1.64), which is the visible consequence.",
+   "options": [
+    "Accept the spent-purse shape: a realm that over-builds is poor, and poverty is the brake.",
+    "Add a solvency term to the step's eligibility — a step needs next round's bill covered — which is in the world rather than in the scorer's ranking.",
+    "Keep a cap as well as the bill, and say in the doc that the cap is the actor knowing its own limit."
+   ],
+   "recommendation": "Option 2. It is the smallest in-world rule that gives the actor a reason to stop, and it leaves the bill as the cost the doc asked for."
+  },
+  {
+   "id": "NR-879",
+   "title": "CALL: 85% of coined cultures never hold ground — fold them into the parent, or stop coining them?",
+   "raised": "2026-09-16",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-968 step 1 (ephemeral cultures measured), 16 seeds.",
+   "what": "Pooled: 5,453 cultures coined, 790 holding ground when the Empires round opens (14.4%), 471 still holding at 1200 CE (8.6%). The empty mass is overwhelmingly first-generation daughters (4,455 empty leaves against 208 empty interior nodes); no cradle is ever empty. Holding falls a further 40% during the Empires round through assimilation and conquest.",
+   "why_it_matters": "The lineage palette, kinship years, culture opposition and the Empires round's polity seeding all walk a tree whose leaves are mostly names nobody ever lived under. Step 1 measured it and built no rule, by the brief.",
+   "options": [
+    "A) Fold an empty culture back into its parent at the boundary, keeping the lineage link; the tree shrinks about 85%, empty interior nodes need re-parenting, every digest moves.",
+    "B) Gate coining on a minimum settled footprint, so the name never exists; the split counters move, the tails and the Empires-round erosion are untouched, every digest moves.",
+    "Neither yet: the count is harmless while nothing reads it, and the Empires-round erosion is the bigger half anyway."
+   ],
+   "recommendation": "B, if either. It keeps the record self-consistent without re-parenting, and a culture that never settled anywhere is a name the generator should not have minted."
+  },
+  {
+   "id": "NR-880",
+   "title": "READING: four of the six held seeds have no frontier at all, and alarm saturates on every near pair",
+   "raised": "2026-09-16",
    "kind": "question",
    "status": "open",
-   "source": "Sprint 41 wave 2 (BL-955, spend is scored), cold review finding 4.",
-   "what": "BL-955's allocation scores a navy step 0 once the fleet exceeds 400 per held region and an army step 0 once paid heads exceed 300 per held region. Without the army cap, polities bought an army step every round (12,371 steps vs 800 ports on 3 seeds), starving fleets and sea trade. But EXPLORATION.md sec Force persists now says upkeep is 'a cost in the world rather than a handicap in the scorer', and the standing rule prefers systemic forces over agent terms. Separately, paid heads cost no manpower or population, and now that they persist, a 44-region realm at the cap holds 13,200 paid heads at no population cost, which saturates neighbours' Alarm against visible_capability_reference 5000 -- unmeasured.",
-   "why_it_matters": "A cap in the scorer is the polity knowing it has enough. A per-head running cost is the world making more expensive to keep. They can produce similar spreads, but only the second is visible on the map as a cause (a treasury drained by its garrison), and only the second makes an over-built polity poorer every round, which is the pressure the doc names.",
+   "source": "BL-999 (held seeds cause measured), 16 seeds.",
+   "what": "Seeds 0, 3, 6 and 7 are NO FRONTIER: by 1660 they have met exactly one polity across a landmass. Tens of thousands of unmet candidates reach the scorer each run, 2-8% clear the threshold, and one or two are ever chosen in 460 years — so the frontier those seeds could displace onto never opens. Seed 15 is NO EXPLORER (no polity took the rim). Seed 12 fits none of the four labels: 91% of its near pairs are bound by treaty, and the four unbound pairs carry 51% of allowed near campaigns against the frontier's 0.9%. Cross-cutting: visible_capability_reference = 5000 saturates, so alarm reads 1000 on essentially every near pair on every seed and the deterrence weight acts as a flat constant rather than a discriminator.",
+   "why_it_matters": "Displacement is the Exploration phase's one structural claim, and the census says the held seeds are not failures of deterrence but of first contact: the constants implicated are the campaign threshold and prize pricing for an unmet target, not the alarm weight that was tuned in sprint 41.",
    "options": [
-    "Keep the scorer saturation (diminishing value of more of what you hold is a reading of the world, not a handicap).",
-    "Replace it with an in-world bill: paid heads and hulls cost treasury per unit per year; unaffordable upkeep decays them. The scorer then sees a falling purse, not a cap.",
-    "Both: the bill as the force, a soft saturation only as tie-breaking."
+    "Accept the census and file the first-crossing question as its own item.",
+    "Accept a fifth label (UNCLASSIFIED) for seed 12's shape, or widen DETERRENCE-INERT to cover \"bound majority, unbound remainder carries the war\".",
+    "Re-scale visible_capability_reference first, so alarm discriminates before anything else is read."
    ],
-   "recommendation": "Option 2: it is what the doc already says, and it fixes the free-manpower problem at the same stroke if paid heads also draw from manpower. It moves the world again, so it would be its own item after this sprint rather than folded into the tuning wave.",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/settlement.hpp",
-    "docs/generation/EXPLORATION.md"
-   ],
-   "ask": "Is a saturation cap in the spend scorer acceptable, or should standing forces cost upkeep per head so the world does the braking?"
+   "recommendation": "All three eventually; the saturation finding is the cheapest to act on and it makes every later deterrence reading mean something."
   },
- {
-  "id": "NR-877",
-  "title": "AUTHORISE: the sprint-42 wave-1 re-bless — five named causes, one world",
-  "raised": "2026-09-16",
-  "kind": "decision",
-  "status": "open",
-  "source": "Sprint 42 wave 1 (the batch), sixteen items merged and verified on sprint-42-wave-1.",
-  "what": "DELIVERY.md sec The digest re-bless is one act per WAVE: one authorisation, N named causes, each measured in isolation in its own worktree. FIVE items moved the world; eleven did not.\n\nCAUSE 1 — BL-961 (planetology thermal series). Coal and petroleum magnitudes scale by the interior's own budget at the fossil epoch instead of today's; about a percent over the record's depth, world deposits +0.086%. Moved all four digests in isolation.\nCAUSE 2 — BL-967 (rivers priced in the walk). A river step now takes the same 30% corridor discount as a shore step (it was 22%, a river-cheaper-than-shore preference no doc stated). The migration reaches inland earlier: 4,000-11,000 tiles earlier per world, none later. More cultures coin on a different farm class (seed 0: 380 -> 444). Moved all four digests in isolation.\nCAUSE 3 — BL-972 (force upkeep in the world). Navies and standing armies pay a per-head bill from the treasury each round, the scorer's saturation caps are gone, and a paid army is levied from the ground's manpower. Moved seedA/on only.\nCAUSE 4 — BL-973 (tree effects generated). Every node effect in the two wired trees now reaches the sim through one generic apply; the three hand-wired nodes are retired. Effects that did nothing now do something, in both spans. Moved seedA/on, seedB/on and the 1960 arc.\nCAUSE 5 — BL-975 (nation treasury from Exploration). A nation opens with its folded polities' 1660 chest through one stated per-mille (0.01 per mille; about thirteen quarters of its own levy for the median nation), so garrisons differentiate. Moved seedA/on and seedB/on.\n\nTHE SHAPE, not the hash. The world the player would generate today: people spread further inland and split into more, smaller peoples; realms that hold ground pay to keep armies and fleets standing and can bankrupt themselves doing it; a realm's technology actually changes what it can do; and a nation arrives at the campaign with the money its history banked. The Exploration round is calmer and more commercial than it was (Exploration over 16 seeds: battle rate 55.9 -> 28.7 per century, displacement median 1.35 -> 1.70 while the pooled ratio fell 1.68 -> 1.28, held seeds 6 -> 5, silent seeds 9 -> 4 and 7, trade flows 687 -> 643. Empires: more and smaller realms (powers at 1200 49 -> 55, largest share by people 110 -> 100 per mille, peak 132 -> 116) with slightly more fighting (battles 6479 -> 6762, conquests 5464 -> 5843)).\n\nTHE DIGESTS. Authorised wave-0 baseline -> integrated wave-1: seedA/on 457483363D79D700 -> 983298AE413B0A8E; seedB/on 728607C66CE6A4BE -> F2A66ACE583F1784; seedA/off F9BF05466A631FF9 -> 5346EB2A9C4E1144; 1960 two-span 851FE345B2E37618 -> 82EE79155BA2F47D.\n\nTHE PIN. exploration_sim_harness R3b (the w_want_q = 0 span) reads battles 322 (pinned 308), conquests 207 (306), foundings 739 (472), subjections 65 (5), freed 62 (1), tribute 245,920,676 (134,358,620), treaties 479 (293), broken 0 (2), owner changes 2410 (2196). Left red with this entry as its stated cause.\n\nEVERYTHING ELSE IS GREEN on the integrated tree: world_determinism, pass_one_handoff, colonisation_harness, deposit_origin, planetology_harness, continent_drift, tile_height_retention, survey_endowment_harness (34/0), earthlike_tile_census (120 seeds, 0 fail), tree_lint (all four, both headers fresh), landscape_score/search, haulage_measure (2035 all / 1627 intra-body against the 1055/802 baseline), demand_census. history_sim_harness stays at its 2-failure baseline; era_world_harness's three reds pre-date the wave (BL-1010).",
-  "why_it_matters": "A re-bless is the moment the old world stops being reproducible. Ben authorises against the shape above, never against the hashes, and until he does the pin stays red and the digests stay unblessed.",
-  "options": [
-   "Authorise: re-pin R3b to 322/207/739/65/62/245920676/479/0/2410 and record the four digests as the baseline.",
-   "Authorise the physical and economic causes but hold BL-972 or BL-973 for a live look at the round first.",
-   "Not yet: read the wave live in build_rel before anything is re-pinned."
-  ],
-  "recommendation": "Option 1 if the round reads right live; the causes are attributable one by one, and every reading that judges them is now checked in."
- },
- {
-  "id": "NR-878",
-  "title": "CALL: nothing in the scorer reads the purse, so a polity spends itself to nothing once the caps are gone",
-  "raised": "2026-09-16",
-  "kind": "novel-work",
-  "status": "open",
-  "source": "BL-972 (force upkeep in the world), measured over 16 seeds against a control run.",
-  "what": "With the saturation caps deleted, a polity ranked above about 500 on either lean buys a stock step whenever one is affordable, and the new per-head bill then drains what it bought with. Over the span the per-seed MEDIAN polity treasury falls from 1.26M to 211 while the top decile loses about 3%; roughly 14% of polity-rounds cannot pay the army bill. Rate sensitivity says it is structural, not a tuning miss: at a tenth of the rate the median still ends at 181k, because a cap-sized army over 115 rounds costs about one median hoard. The caps were hiding a 600x treasury spread.",
-  "why_it_matters": "EXPLORATION.md sec Force persists asked for a cost in the world rather than a brake in the scorer, and it got one — but the scorer's hold term still has no purse in it, so the actor has no reason to stop before it is broke. Displacement's median fell to 0.85 on this arm (pooled held at 1.64), which is the visible consequence.",
-  "options": [
-   "Accept the spent-purse shape: a realm that over-builds is poor, and poverty is the brake.",
-   "Add a solvency term to the step's eligibility — a step needs next round's bill covered — which is in the world rather than in the scorer's ranking.",
-   "Keep a cap as well as the bill, and say in the doc that the cap is the actor knowing its own limit."
-  ],
-  "recommendation": "Option 2. It is the smallest in-world rule that gives the actor a reason to stop, and it leaves the bill as the cost the doc asked for."
- },
- {
-  "id": "NR-879",
-  "title": "CALL: 85% of coined cultures never hold ground — fold them into the parent, or stop coining them?",
-  "raised": "2026-09-16",
-  "kind": "decision",
-  "status": "open",
-  "source": "BL-968 step 1 (ephemeral cultures measured), 16 seeds.",
-  "what": "Pooled: 5,453 cultures coined, 790 holding ground when the Empires round opens (14.4%), 471 still holding at 1200 CE (8.6%). The empty mass is overwhelmingly first-generation daughters (4,455 empty leaves against 208 empty interior nodes); no cradle is ever empty. Holding falls a further 40% during the Empires round through assimilation and conquest.",
-  "why_it_matters": "The lineage palette, kinship years, culture opposition and the Empires round's polity seeding all walk a tree whose leaves are mostly names nobody ever lived under. Step 1 measured it and built no rule, by the brief.",
-  "options": [
-   "A) Fold an empty culture back into its parent at the boundary, keeping the lineage link; the tree shrinks about 85%, empty interior nodes need re-parenting, every digest moves.",
-   "B) Gate coining on a minimum settled footprint, so the name never exists; the split counters move, the tails and the Empires-round erosion are untouched, every digest moves.",
-   "Neither yet: the count is harmless while nothing reads it, and the Empires-round erosion is the bigger half anyway."
-  ],
-  "recommendation": "B, if either. It keeps the record self-consistent without re-parenting, and a culture that never settled anywhere is a name the generator should not have minted."
- },
- {
-  "id": "NR-880",
-  "title": "READING: four of the six held seeds have no frontier at all, and alarm saturates on every near pair",
-  "raised": "2026-09-16",
-  "kind": "question",
-  "status": "open",
-  "source": "BL-999 (held seeds cause measured), 16 seeds.",
-  "what": "Seeds 0, 3, 6 and 7 are NO FRONTIER: by 1660 they have met exactly one polity across a landmass. Tens of thousands of unmet candidates reach the scorer each run, 2-8% clear the threshold, and one or two are ever chosen in 460 years — so the frontier those seeds could displace onto never opens. Seed 15 is NO EXPLORER (no polity took the rim). Seed 12 fits none of the four labels: 91% of its near pairs are bound by treaty, and the four unbound pairs carry 51% of allowed near campaigns against the frontier's 0.9%. Cross-cutting: visible_capability_reference = 5000 saturates, so alarm reads 1000 on essentially every near pair on every seed and the deterrence weight acts as a flat constant rather than a discriminator.",
-  "why_it_matters": "Displacement is the Exploration phase's one structural claim, and the census says the held seeds are not failures of deterrence but of first contact: the constants implicated are the campaign threshold and prize pricing for an unmet target, not the alarm weight that was tuned in sprint 41.",
-  "options": [
-   "Accept the census and file the first-crossing question as its own item.",
-   "Accept a fifth label (UNCLASSIFIED) for seed 12's shape, or widen DETERRENCE-INERT to cover \"bound majority, unbound remainder carries the war\".",
-   "Re-scale visible_capability_reference first, so alarm discriminates before anything else is read."
-  ],
-  "recommendation": "All three eventually; the saturation finding is the cheapest to act on and it makes every later deterrence reading mean something."
- },
- {
-  "id": "NR-881",
-  "title": "CALL: the seat viability floor reads eight quarters, and the pre-game is now twelve ticks",
-  "raised": "2026-09-16",
-  "kind": "question",
-  "status": "open",
-  "source": "BL-978 (warm start retired): a Release run seated with \"shortlist 0 of 8 specialists — VIABILITY FLOOR UNMET\".",
-  "what": "The warm start is gone: the settle is phase 6's single validation run, 12 ticks, chosen as the first tick at which the 4- and 8-tick trailing convoy means are both within 5% of the settled level. The seat shortlist's floor reads solvency plus trailing net over eight quarters — and over ticks 5 to 12 the field is still ramping, so on the measured run no specialist cleared it.",
-  "why_it_matters": "The player picks a seat from that shortlist. Either the floor's window is wrong for a 12-tick pre-game, or 12 ticks is too short for what the floor is asking, and the two cannot both stand. The 2026-08-26 record says most corps were underwater at 80 ticks too, so this may be an old condition the shorter settle merely exposed.",
-  "options": [
-   "Shorten the floor's window to the settle's length and re-read it.",
-   "Lengthen the validation run until the floor is meetable, and say in ERAS.md that the seat, not the trade, sets the settle's length.",
-   "Neither: the floor is measuring the wrong thing for a world that has not traded yet, and it should read the static score instead."
-  ],
-  "recommendation": "Option 1 first, because it costs nothing to measure; option 3 is the honest answer if the shortlist stays empty."
- }
+  {
+   "id": "NR-881",
+   "title": "CALL: the seat viability floor reads eight quarters, and the pre-game is now twelve ticks",
+   "raised": "2026-09-16",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-978 (warm start retired): a Release run seated with \"shortlist 0 of 8 specialists — VIABILITY FLOOR UNMET\".",
+   "what": "The warm start is gone: the settle is phase 6's single validation run, 12 ticks, chosen as the first tick at which the 4- and 8-tick trailing convoy means are both within 5% of the settled level. The seat shortlist's floor reads solvency plus trailing net over eight quarters — and over ticks 5 to 12 the field is still ramping, so on the measured run no specialist cleared it.",
+   "why_it_matters": "The player picks a seat from that shortlist. Either the floor's window is wrong for a 12-tick pre-game, or 12 ticks is too short for what the floor is asking, and the two cannot both stand. The 2026-08-26 record says most corps were underwater at 80 ticks too, so this may be an old condition the shorter settle merely exposed.",
+   "options": [
+    "Shorten the floor's window to the settle's length and re-read it.",
+    "Lengthen the validation run until the floor is meetable, and say in ERAS.md that the seat, not the trade, sets the settle's length.",
+    "Neither: the floor is measuring the wrong thing for a world that has not traded yet, and it should read the static score instead."
+   ],
+   "recommendation": "Option 1 first, because it costs nothing to measure; option 3 is the honest answer if the shortlist stays empty."
+  }
  ]
 }

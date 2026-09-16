@@ -4424,6 +4424,74 @@
       ],
       "resolution": "BEN, 2026-09-09: option 3, re-derive fragmentation from contact. The tribal marches RETIRE; fragmentation_q is read off how far two peoples' streams interpenetrate, which the colonisation span already produces in culture_shares.\n\nTHE FINDING THAT REFRAMED THE QUESTION: the marches' TIMING was the lesser problem and their GRAIN the greater one. They compare cradle to cradle - a scalar against a scalar between two discrete points - but under diffusion a cradle is a SOURCE, not a point, and what meets at a frontier is two streams already mixing. Moving them past the boundary would have fixed when they ran and left that untouched.\n\nWHAT IT SEPARATES: aggression_q drove both how consolidated the political map is and how a polity fights once it exists. It now drives only the second; package breadth drives the first. One cause each.\n\nWritten into COLONISATION.md (new section: Fragmentation comes from contact), CREEDS.md (the creed drives, rewritten) and HISTORY.md (the ladder pass + the pipeline diagram). Work is BL-852. TWO THINGS CARRIED FORWARD, both open in COLONISATION.md: the non-hegemony floor must be re-derived for the new mechanism (the old welding carried an explicit half-fragmentation floor for BL-224's sake), and the nation-count distribution must be MEASURED across a seed spread before the change lands."
     },
+    "NR-810": {
+      "id": "NR-810",
+      "title": "Round 4 promises four thousand years and plays four hundred, because settlement places the whole map before the sim starts",
+      "raised": "2026-09-09",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 37 build session, 2026-09-09. Found by building BL-829 (time-lapse view) and watching what it draws; confirmed in the main session from scripts/verify/history_lapse_press.lua, whose own assertion reads 'the record spans years (-400 -> 0)'.",
+      "what": "Round 4's subtitle asks 'Who claimed this ground, and who lost it, over four thousand years?' The record it plays covers 400. On the first frame every continent is already claimed and all 12 powers already exist, because run_settlement places all ~533 regions and dates them BEFORE run_history_sim starts - so what the map animates is borders shifting, not land filling. 384 foundings do happen inside the run, but they land on ground that already has an owner colour.",
+      "why_it_matters": "It is not a drawing problem and it cannot be fixed in the UI. Ben's stated acceptance criterion for round 4 is the ARC - origin, communication, conquest or diplomatic union, a stable dark age - and the origin phase is not missing from the DRAWING, it is missing from the RECORD. Round 4 is currently showing the last tenth of the story it advertises. It also means objective 2 ('make sure it works and produces interesting cultures') cannot be judged from this round yet: there is no spreading to look at.",
+      "options": [
+        "Wire BL-846 (colonisation span) so foundings happen INSIDE the recorded span - run_settlement takes each site's founded_year and culture from the colonisation flood's arrival record instead of from a settle-score formula, and the sim's pre-boundary span plays that schedule out, emitting an ownership change as each region is reached. The flood is already built and harnessed.",
+        "Leave the round honest about its scope in the meantime - retitle it to the span it actually plays - and treat the arc as blocked on the colonisation integration.",
+        "Both: retitle now, wire BL-846 next."
+      ],
+      "recommendation": "Option 3. The retitle is a one-line honesty fix and should not wait; the integration is the real answer and is the natural next piece of sprint 37, since the flood exists and is green. Worth noting that this finding independently confirms an architectural reading that was genuinely ambiguous when the span was being built: COLONISATION.md could be read as colonisation dating the map before the sim, or as founding regions inside it. A round built to show the arc proves it must be the second.",
+      "files": [
+        "src/world/settlement.cpp",
+        "src/world/history_sim.cpp",
+        "src/world/colonisation.cpp",
+        "src/ui/history_lapse.cpp",
+        "docs/ui/STARTUP.md"
+      ],
+      "resolution": "ANSWERED BY LANDED WORK, 2026-09-16. BL-906 decoupled the Empires round's stop year from the epoch, so round 4 runs its whole 400 BCE - 1200 CE span rather than 400 years of it, and BL-871 split the migration into its own round 3 with its own record. The subtitle the entry quotes is gone with them: round 4 now asks \"who claimed this ground, and who lost it, in the age before the epoch?\" and round 3 owns the migration. Nothing here is still owed.",
+      "resolved": "2026-09-16"
+    },
+    "NR-812": {
+      "id": "NR-812",
+      "title": "Does the wizard's ACTIONS.json exemption cover a Run button on a pass round?",
+      "raised": "2026-09-09",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 37 build session, 2026-09-09. The BL-829 implementer was briefed that round 4 was outside the exemption, read the doc as broader than the brief, followed the doc, and flagged the disagreement rather than silently picking either way.",
+      "what": "The brief for round 4 said the pre-game-wizard ACTIONS.json exemption covers the preference rows, so a new Run button needs an entry. ACTIONS.json's own _note (Ben, 2026-09-09, ruling on NR-804) reads wider: 'The startup wizard - its rounds, per-round Reroll, Next and Begin - gets no entries here and no startup.* family... The any-control-change-updates-its-entry rule above does not reach it.' A Run button on a wizard round arguably sits inside 'its rounds'. No entry was added.",
+      "why_it_matters": "Small either way - the entry is a two-minute add - but the exemption's edge decides whether every future control on rounds 4 and 5 needs one, and those rounds are about to grow controls (transport, leans). Better settled once than re-argued per control.",
+      "options": [
+        "The exemption covers the whole wizard including new controls on its rounds. Nothing to do.",
+        "The exemption covers only the rounds' NAVIGATION and preference rows; functional controls like Run get entries."
+      ],
+      "recommendation": "The implementer followed the doc as written, which was the right call. If option 2 is what was meant, the _note wants a sentence saying so, because as written it reads as option 1.",
+      "files": [
+        "docs/ai/ACTIONS.json",
+        "src/ui/startup_screens.cpp"
+      ],
+      "resolution": "MOOT, 2026-09-16. There is no Run button: BL-914 retired it on Ben's 2026-09-09 ruling (\"arriving on the round IS the instruction to run it\"), and BL-1014 replaced the whole wait with a blank Loading line. No control was ever added for ACTIONS.json to cover, and the wizard-wide exemption stands unchanged.",
+      "resolved": "2026-09-16"
+    },
+    "NR-813": {
+      "id": "NR-813",
+      "title": "Should round 4's time-lapse get a scrubber?",
+      "raised": "2026-09-09",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Sprint 37 build session, 2026-09-09. BL-829 left transport controls deliberately open, to be decided by watching rather than in advance.",
+      "what": "The plain transport was built as briefed: Run, then it plays, then Restart. The question BL-829 parked is whether the player may scrub, pause or replay.",
+      "why_it_matters": "The wizard's standing premise is 'you set conditions, you do not steer', and the globe's no-input ruling is a real precedent against any steerable control. A scrubber would be the wizard's first.",
+      "options": [
+        "Keep it plain - Run and Restart only. Consistent with the globe ruling.",
+        "Add a scrubber. The argument for it: the interesting moments are unevenly spaced - most centuries are static and two or three are not - and at ~30 s for the span you cannot go back to the one you missed. Restart-and-rewatch is a 30-second answer to a 2-second question.",
+        "Add pause as well."
+      ],
+      "recommendation": "Not yet, and for a reason that outranks the argument: the round currently plays 400 years of a 4000-year record (NR-810), so how it should be steered cannot be judged from what it does now. Decide after the colonisation span is wired and there is a real arc to sit through. If it is decided sooner, a scrub earns its place and a pause does not - a frozen map is what the round already looks like most of the time. The ~30 s duration is also unvalidated and was not Ben's.",
+      "files": [
+        "src/ui/history_lapse.cpp",
+        "docs/ui/STARTUP.md"
+      ],
+      "resolution": "ANSWERED BY LANDED WORK, 2026-09-16. BL-914 built the transport the question parked: Pause/Play plus a scrubber, both live once the record is complete, and BL-948 added the pace control beside them (30 s / 1 m / 1 m 30 s). Ben has now watched several rounds with all three. The premise for deferring — no real arc to sit through — went when BL-906 lengthened the span.",
+      "resolved": "2026-09-16"
+    },
     "NR-814": {
       "id": "NR-814",
       "title": "Culture relations: four calls that decide whether the empire phase has an engine",
@@ -4823,6 +4891,53 @@
       "what": "universal_creed_alien_penalty_q (200 -> 450) lives in the Empire-span creed-resolution code, not gated behind world_params::exploration_sim_enabled -- unlike every prior wave-2-through-5 change, so this is the first sprint-40 item to move the ordinary (non-Exploration) generated world at all. world_determinism still reports ALL PASS (0 failures): the harness checks same-seed determinism, not a fixed golden digest, so this is a reported movement, not a failure. seedA/on report also moved (battles 5890->5782, conquests 5209->5202, foundings 1062->1120). No golden file pins these specific digest strings, so nothing needs a --bless; this is purely a record for whoever next reads a world_determinism run and wonders why the number changed from an earlier session's notes.",
       "ask": null
     },
+    "NR-861": {
+      "id": "NR-861",
+      "title": "OBSERVATION: treaties almost never break -- 4 breaks against 5,161 formed across 16 seeds",
+      "raised": "2026-09-14",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "exploration_sweep, 16 seeds (0-15), main session review of the Exploration round.",
+      "what": "Reading 4 printed treaties formed=5161, broken=4, non-aggression-blocked campaigns=3,853,341, with 930 standing at 1660 (median 20 years left). The break test in history_sim.cpp (~2592) re-scores a bound pair against the same treaty_value_q formation uses and breaks only below HALF the formation threshold, as hysteresis. At a 0.08% break rate the harness line \"treaties both stand AND break\" is technically true and substantively false.",
+      "why_it_matters": "EXPLORATION.md: \"A treaty that cannot be broken is a rule, not a promise, and a phase whose actors never defect produces a flat map.\" 3.85M blocked campaigns against 4 defections suggests the non-aggression block is the main reason neighbour war fell (reading 2 fell 8x), which is calming rather than displacement -- the failure mode the doc names. Treaties also expire on term, so standing treaties are not permanent; whether expiry-and-reform is enough churn, or defection itself should be commoner, is a judgement.",
+      "options": [
+        "Leave it: expiry already churns treaties, and defection being rare is historically plausible.",
+        "Treat it as a measurement first: add a reading of expiries vs renewals vs defections so the churn is visible before any tuning.",
+        "Tune toward more defection by letting a want or an opportunity (a treatied neighbour whose ground holds a wanted good) lower treaty value -- which BL-953 (wants point outward) would make possible without a new term."
+      ],
+      "recommendation": "Option 2 now, inside BL-952 (sweep builds each world once), and revisit after BL-953/954 land, since outward wants and trade value both change treaty value.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "tools/verify/exploration_sweep.cpp",
+        "docs/generation/EXPLORATION.md"
+      ],
+      "ask": "Is a 0.08% defection rate a rule wearing a promise's clothes, or acceptable given treaties expire on term?",
+      "resolution": "PREMISE REFUTED, 2026-09-16. BL-972 put a real per-head bill on force and measured the break rate against it: 10 breaks became 13 of about 5,900. The entry's reading was that nothing drains a treasury enough to make defection worth it; the drain now exists and the rate barely moved, so breaks are bound by the treaty test's own terms (it re-scores against the formation threshold and breaks only below half of it), not by the purse. If defection should be commoner it is that test that must change, and that is a design question nobody has asked yet rather than an open observation.",
+      "resolved": "2026-09-16"
+    },
+    "NR-862": {
+      "id": "NR-862",
+      "title": "OBSERVATION: displacement regressed 0.33 -> 0.08 (16 seeds) at the schism verb, and NR-855's 0.88 was a 3-seed artefact",
+      "raised": "2026-09-14",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "exploration_sweep at HEAD 643ebf79 vs NR-855 (sprint 40 wave 4, ec335d2c).",
+      "what": "BISECTED 2026-09-14 with exploration_sweep at four commits. Seeds 0-2: wave-4 close ec335d2c and its successor 4f07f5ea (pre-schism) both read 0.0066 / 1.1054 / 0.8775 (median 0.88, exactly NR-855). 4605a90d (schism merged) and HEAD 643ebf79 both read 0.0116 / 1.4241 / 0.0392 (median 0.04). The only src/world commit between 4f07f5ea and 4605a90d is 3d58001d (BL-944, schism verb). It changes the EMPIRES round (seed 0: 6000 -> 6479 battles before 1200), so the Exploration span opens on a different world; seed 2 loses nearly all its frontier war (18.70 -> 0.43 skirmishes/century). WIDER SPREAD: the wave-4 tree over 16 seeds has a median of 0.33, not 0.88 -- the 3-seed median rested on seed 2 alone. HEAD over 16 seeds: 0.08.",
+      "why_it_matters": "BL-950 (displacement clears the bar) was designed to push from 0.88 to above 1.0. The honest starting point was 0.33 before the schism and 0.08 after. And the regression was silent: the sweep reports rather than gates, and nothing else reads displacement, so an upstream Empires verb cut the phase's headline reading by three quarters without a red line anywhere.",
+      "options": [
+        "Treat BL-944 as legitimate (a schism is a real force) and let BL-950 tune against the post-schism world, from the integrated sprint-41 16-seed baseline.",
+        "Investigate why the schism collapses frontier war on some seeds (fewer, smaller realms at 1200 with no sea reach?) before tuning.",
+        "Make exploration_sweep gate on a displacement floor so the next upstream change goes red."
+      ],
+      "recommendation": "Option 1, with option 2 as the first step of BL-950's tuning pass (cheap once the 16-seed run exists). Option 3 is a separate call: the harness deliberately reports.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "tools/verify/exploration_sweep.cpp"
+      ],
+      "ask": "Is the schism verb's cut to displacement an acceptable consequence to tune against, or a sign BL-944 needs revisiting?",
+      "resolution": "SUPERSEDED BY BL-1007, 2026-09-16. Every figure in this entry — 0.88, 0.33, 0.08 and the bisect that produced them — was measured on a sweep that generated with world_gen_config's struct defaults and no works registry, which is not the world the game builds. On the shipped data layer the same 16 seeds read pooled displacement 2.73 with no silent seeds. The schism verb's effect on displacement has never been measured on the parity world; if it matters it is a fresh measurement, not this one.",
+      "resolved": "2026-09-16"
+    },
     "NR-865": {
       "id": "NR-865",
       "title": "OBSERVATION: outward wants alone do not point conflict outward -- the doc claim needs the trade flows beside it, measured on the integrated tree",
@@ -4845,6 +4960,30 @@
       ],
       "ask": "If trade flows do not make wants point outward, should the doc claim be weakened, or is widening the goods grain in scope?",
       "resolution": "RESOLVED (Ben, 2026-09-14): weaken the claim. EXPLORATION.md sec A want points a campaign outward is now sec A want ranks a campaign: a want ranks campaigns a polity could already win and reach; where it fights is decided by treaties, ports and deterrence. The shape-of-the-age paragraph's third displacement cause is now deterrence, not wants."
+    },
+    "NR-866": {
+      "id": "NR-866",
+      "title": "CALL: the navy and army saturation in the spend scorer is a brake inside the scorer, where EXPLORATION.md wants a cost in the world",
+      "raised": "2026-09-14",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 41 wave 2 (BL-955, spend is scored), cold review finding 4.",
+      "what": "BL-955's allocation scores a navy step 0 once the fleet exceeds 400 per held region and an army step 0 once paid heads exceed 300 per held region. Without the army cap, polities bought an army step every round (12,371 steps vs 800 ports on 3 seeds), starving fleets and sea trade. But EXPLORATION.md sec Force persists now says upkeep is 'a cost in the world rather than a handicap in the scorer', and the standing rule prefers systemic forces over agent terms. Separately, paid heads cost no manpower or population, and now that they persist, a 44-region realm at the cap holds 13,200 paid heads at no population cost, which saturates neighbours' Alarm against visible_capability_reference 5000 -- unmeasured.",
+      "why_it_matters": "A cap in the scorer is the polity knowing it has enough. A per-head running cost is the world making more expensive to keep. They can produce similar spreads, but only the second is visible on the map as a cause (a treasury drained by its garrison), and only the second makes an over-built polity poorer every round, which is the pressure the doc names.",
+      "options": [
+        "Keep the scorer saturation (diminishing value of more of what you hold is a reading of the world, not a handicap).",
+        "Replace it with an in-world bill: paid heads and hulls cost treasury per unit per year; unaffordable upkeep decays them. The scorer then sees a falling purse, not a cap.",
+        "Both: the bill as the force, a soft saturation only as tie-breaking."
+      ],
+      "recommendation": "Option 2: it is what the doc already says, and it fixes the free-manpower problem at the same stroke if paid heads also draw from manpower. It moves the world again, so it would be its own item after this sprint rather than folded into the tuning wave.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/settlement.hpp",
+        "docs/generation/EXPLORATION.md"
+      ],
+      "ask": "Is a saturation cap in the spend scorer acceptable, or should standing forces cost upkeep per head so the world does the braking?",
+      "resolution": "RESOLVED BY BL-972, 2026-09-16. The two scorer saturation caps are deleted and force now pays a per-head bill from the treasury each round, with the levy drawn from the ground's manpower — the cost in the world EXPLORATION.md asked for. It also produced a finding the entry did not anticipate: with the caps gone and no purse term in the scorer's hold, the median polity spends itself to a treasury of 211 against 1.26M before. That is NR-878, which is where the remaining judgement lives.",
+      "resolved": "2026-09-16"
     },
     "NR-867": {
       "id": "NR-867",

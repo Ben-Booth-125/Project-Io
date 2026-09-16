@@ -10,6 +10,104 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-16 (after the sprint) — Measurement parity, sixteen saved worlds, and an evening at the live app
+
+**Runtime:** Delivery — Light, then a long live session with Ben watching the wizard. Everything
+here was found by looking at the thing running.
+
+### The sweeps were measuring a world nobody plays (BL-1007)
+
+Two gaps, not one. `history_sweep` and `exploration_sweep` generated with `world_gen_config`'s
+struct defaults where the app loads `scripts/world_gen.lua`, AND passed a null works registry,
+which makes `build_work` a dead branch — no polity in a swept world had ever raised a work. Both
+now load the shipped data layer the way `app::begin_new_game` and `ensure_works_loaded` do, and
+print the configuration on their face.
+
+| reading (16 seeds) | struct defaults | parity |
+|---|---|---|
+| seed 0 Empire battles | 6,253 | 11,824 |
+| median battles / conquests | 6,762 / 5,843 | 9,932 / 7,913 |
+| pooled displacement | 1.28 | 2.73 |
+| silent seeds | 2 | 0 |
+| Exploration battles per century | 28.7 | 69.3 |
+
+**Sprints 40 and 41 tuned deterrence against a crippled world.** On the real data layer the phase
+displaces conflict about twice as strongly as the reading Ben authorised. Both artefacts are
+regenerated; the live app and the sweep now agree seed for seed (the wizard's own round 4 readout
+says 11,824 battles on seed 0, which is what the sweep prints).
+
+### Sixteen worlds saved for Digitisation
+
+A seed IS the save — generation is a pure function of the descriptor — so what was missing was not
+a snapshot format but the REASON a world is worth opening. `docs/generation/seed_library.json`
+holds sixteen, chosen off a 48-seed parity sweep, each with the readings that made it interesting
+and a five-counter fingerprint; `tools/session/seed_library.js` queries it (`--for`, `--seed`,
+`--check`, `--bless`). They span what the next phase forms companies on: a median chest of 27.1M
+(seed 46) against 245 (12), 112 polities (11) against fourteen (17), eight colonial subjects
+(13, 41) against none (37, 4), thirty post roads with little trade (32) against no roads and
+plenty (10).
+
+### The live session, and what watching found
+
+**BL-1000 closed on a real click** — menu to round 4 by presses, on a rolled seed. Worth recording:
+three access requests were denied because the Start-menu entry for ProjectIo resolves to
+`.claude/worktrees/elated-mclean-7dd61c/build/ProjectIo.exe`, a build from 14 September in a
+worktree git no longer lists. It launched twice instead of the real build and briefly looked like a
+regression in the board. Granting the running process by basename reached the right one.
+
+Then five things Ben saw and asked for, in the order he saw them:
+
+1. **The white event pings** fired several a year and drew the eye off the borders. Every one of
+   fifteen region-carrying kinds drew the same ring, so a realm dying and a trade route opening
+   were one mark. Removed entirely (`BL-1011`); the record, the ticker, the arc readout and the
+   corridor overlays are untouched.
+2. **The Exploration round's wait** read "Running the ancient era — year 397 of 460" while the
+   ancient era is 1,600 years long: the stage label was last set at stage 8 and never moved. A
+   fourteenth label is published before the Exploration pass; it now reads 613 of 1600 (`BL-1011`).
+3. **Roads wrapping the whole view** (`BL-1012`). The world is a cylinder and both corridor bakes
+   stored raw anchor columns, so a ten-column hop over the seam was drawn as a 250-column line —
+   and the same columns fed the over-water sample, the bridge test and the exemplar's midpoint.
+   Fixed at the bake; the draw strokes each corridor twice, a world width apart, inside the map's
+   clip rect.
+4. **A pace control** (`BL-948`), filed 2026-09-13 as 45/90/180. Ben chose 90/180/270 on the form,
+   watched it and called it "much slower than I imagined": the rungs are 30 s / 1 m / 1 m 30 s,
+   a minute by default. It sets wall clock for the whole span, so a longer span moves faster.
+5. **Continuity between rounds** (`BL-1013`, then `BL-1014`). A round now opens on the ground the
+   round before it left, cross-fading over the opening tenth of its own span, and it generalises:
+   Empires carries the migration, Exploration carries Empires, Digitisation joins when it exists.
+
+### Three fixes the continuity work needed, each found by watching
+
+- The first cut gated the carry on the predecessor having polity SAMPLE steps. The migration record
+  has none — its board shows dashes in People for that very reason — so the one hand-over the
+  feature existed for was the one that could never fire.
+- The second painted the carried frame only under UNCLAIMED ground. Right for Culture into Empires
+  (400 BCE is nearly all unorganised); invisible for Empires into Exploration, where every realm
+  already holds its land at 1200 CE. It now goes under the whole map.
+- Ben: *"it looks like it actually carried over from culture."* It had not. `polity_slot` is a
+  greedy graph colouring over each record's OWN adjacency, so the same realm got a different colour
+  in each round and the boundary read as a different world. A shared polity id now inherits its slot.
+
+### The reversal worth naming (BL-1014)
+
+Ben: *"there is a clear phase where the simulation is done rapidly, and this sort of breaks the
+narrative flow of the time-lapse... separate each part with an otherwise completely blank Loading X
+Round."* That and the missing fade were ONE defect: a round that opens chasing the sim's frontier is
+past its own cross-fade before anyone sees it. The wait is now one centred line and nothing else,
+and the lapse plays from its first year. This reverses BL-914's "the wait is the round" for the pass
+rounds, and `STARTUP.md` records it in his words.
+
+### Also answered, in passing
+
+Does the Exploration round really continue the Empires world, or start fresh? **It continues, by
+determinism, but recomputes**: each wizard round calls the generator from scratch with the same seed
+and stops at its own span, so round 5 replays the migration and the whole Empires era first. Proved
+twice — a run that stops after Empires and one that continues into Exploration produce identical
+Empires spans on all sixteen seeds, and live, round 5 scrubbed to 1200 CE shows round 4's realms in
+the same order. The cost (four full generations by the time Begin is pressed) is `NR-811`, still open.
+
+---
+
 ## 2026-09-16 — Sprint 42 wave 1: sixteen items, five that moved the world, and the measurements that outran them
 
 **Runtime:** Full / Batch Delivery, continuing the same session. Sixteen worktree agents, one per item,
