@@ -294,6 +294,25 @@ void settle_tick(world& w, const recipe_registry& reg, int t)
 /// trailing window the draw reads (k_spawn_trailing_quarters, 8) fits inside the
 /// settle whole. Re-read under BL-1008, 2026-09-16 — see THE SETTLE RE-READ.
 constexpr int k_settle_ticks = 12;
+
+// THE SETTLE RE-READ (BL-1008, 2026-09-16) — `--guard 3`, the shipped spawn,
+// settle 80 -> 12. A reading, not a re-pin: no row was touched.
+//
+//   seed  80 ticks: short / balance / trail8 / seat    12 ticks: same columns
+//   0     0 UNMET /   37 /  -7 / Borex-JorarHexis      0 UNMET /  406 /  -7 / Orban-SolaxAthix
+//   1     3       / 1490 / 350 / OrbanXeris-TeryxDelur 3       / 1576 /  18 / PaxenJorax-Genan
+//   2     0 UNMET /   46 /  -7 / Huth Extraction       0 UNMET /  259 /  -7 / IntelNexan
+//
+// NO GUARD ROW MOVED ON SUBSTANCE. At 12, S1-S5 PASS. At 80, the 3-seed run
+// threw std::bad_alloc on seed 0 (a machine under memory pressure, the same
+// minute the compiler ran out of heap) and read S1 FAIL; seed 0 re-run alone
+// seated a specialist, and S3 over seeds 0-2 carries seed 1's 5.00 weight.
+// WHAT MOVED: the seated corp on all three seeds, because both mechanisms read
+// the trailing returns the settle filed — the fallback takes the highest
+// trailing net, and the floor filters on it — and 12 quarters rank the field
+// differently from 80. The floor-unmet split (2 of 3) and the processor share
+// (3 of 3) held. Seat balances on the unmet seeds are higher (406 / 259 against
+// 37 / 46) because 12 quarters have not yet drained the starting capital.
 /// How many seeds get the two-independently-built-worlds treatment (S4).
 constexpr int k_reproduce_seeds  = 4;
 
