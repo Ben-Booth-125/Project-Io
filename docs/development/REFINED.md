@@ -25,4 +25,4 @@ Sequential; one lane at a time. Requirements for the seam: `requirements.json §
   (amended 2026-09-17: app.cpp takes no behavioural change; reviewed against its harness copy.)
   provides: charter_budget, charter_spend_params, charter_spend_report, landscape_search_params::budget/spend, the apply_landscape_candidate budget overload, charter_web_from_budget. consumes: the BL-1031 pins, place_starting_assets anchor_window (landed), nearest_region (landed).
 - [ ] **BL-1033 (charter budget cost)** — files: tools/verify/player_seed_sweep.cpp, tools/verify/harness_params.hpp. Waits on BL-1032.
-  provides: --charter-budget, --budget-scale, --province-cap, --specialist-price, the synthetic builder (tools/verify only). consumes: everything BL-1032 provides.
+  provides: --charter-budget, --budget-scale, --province-cap, --resource-cap (NR-889: kept vs lifted, budget path only), --specialist-price, the synthetic builder (tools/verify only). consumes: everything BL-1032 provides.

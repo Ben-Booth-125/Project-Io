@@ -60,6 +60,8 @@ OPTIONS. (a) Keep the cap: capital beyond breadth x 8 stays unspent, and density
 
 READINGS TAKEN ON YOUR BEHALF in the seam (reversible, none moves today's world): rung 2 of a charter's anchor is its centre's own region, not BL-283's home-plus-three; a specialist that finds no ground in either window is not chartered and its price is counted unspent (no asset-light specialist); a firm that fails to place ends that centre's firm spend; only a firm's anchor is held to the window — its other holdings walk outward as Pass 3 lays them, now reported by distance; the synthetic test budget weighs centres by a seeded 1/rank law so that a 1x budget can afford any specialist at all (population is never read).
 
+UPDATE 2026-09-17 (Ben, elicitation): measure first. BL-1033 runs the per-resource cap kept and lifted side by side on budget worlds; the call is ruled on its tick cost and unspent points. The entry stays open until then.
+
 **Why it matters.** BL-1033 (charter budget cost) measures tick cost at 1x/2x/4x. Under (a) the 4x world is barely denser than 1x and the cost reading understates what Beat 1 could ask for; under (b) or (c) the measurement must lift the cap to mean anything. Better ruled before BL-1033 runs.
 
 - (a) keep the per-resource cap on budget worlds; capital beyond it stays unspent
