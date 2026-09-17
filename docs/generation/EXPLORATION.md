@@ -469,6 +469,24 @@ everywhere and hand Digitisation a frozen map. `CIVILISATION.md`'s handoff requi
 **fragmentation**, not peace. So the reading is neighbour-war rate *against* frontier-skirmish
 rate, and a fall in both is a failure, not a success (§ What the phase is judged on).
 
+**THE DISPLACEMENT MEASURED SO FAR HELD ONLY AGAINST A SATURATED ALARM (measured 2026-09-16, on an
+unmerged reading kept for its finding; Ben archived the change).** With `visible_capability_reference`
+at 5000, alarm read 1000 on 88.5% of near-home reads, so the deterrence weight acted as a flat
+constant on every near pair, and the sprint-41 plateau at weight 525 was an artefact of that. Setting
+the reference from the measured distribution instead (the 90th percentile of the other side's army
+plus navy across near-home treaty reads, about 31,000 over 16 seeds) spreads alarm (reads at 1000 fall
+to 11%) and the displacement the phase claims does not survive: pooled displacement 2.73 -> 0.50,
+held seeds 3 -> 15, battle rate 69 -> 206 per century. Re-taken across weights 0 to 1000, no weight
+restores pooled displacement above 1 (the best, 1000, reads 0.81). **So a discriminating alarm, read
+through the weight alone, does not produce the claim above.** Whatever makes near-home peace and
+far-home conflict true has to come from somewhere other than the deterrence weight's magnitude.
+
+**And the missing frontier is not a pricing gap.** On the seeds that met one polity in 460 years, the
+campaign scorer never reads contact at all, so an unmet target is not "priced on nothing". Unmet
+ground is simply worse to take -- supply reaching it averages 420 against 548 for known neighbours,
+and its mean score is -12 against +80 -- and when an unmet target does clear the threshold, a
+stay-home verb (Invest, Consolidate or Settle) outranks it in 78.6% of those rounds.
+
 ---
 
 ## Two ways to be strong, and the creed decides which
@@ -642,6 +660,11 @@ that ran off it.
 
 ## Open questions
 
+- **What displaces conflict, if not the deterrence weight** (§ The arms race, the 2026-09-16 finding).
+  The options on the table when it was archived: accept the weaker displacement an unsaturated alarm
+  gives; strengthen deterrence by something other than the weight; let contact happen without conquest
+  (a hull or a trade line meeting a coast); extend reach to a realm's edge; or rebalance staying home
+  against going out. Unruled.
 - **What earns the treasury, in terms.** § Capital arrives names the four sources; the arithmetic
   is a measurement, and it must be set from a sweep that produces both rich and poor survivors,
   never from a number picked to make one seed solvent.
