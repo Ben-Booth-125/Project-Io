@@ -95,6 +95,21 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 #include <iterator>
 #include <vector>
 
+/// BL-1032 — a charter budget handed to the search, for an instrument that
+/// wants one. THE SHIPPED PATH PASSES NONE: app.cpp's new-game prelude has no
+/// budget source (the Digitisation stockpile does not exist yet), so its search
+/// params carry `landscape_search_params::budget`'s null default, and every
+/// helper below defaults this to the same none. A null `budget` is the app's
+/// call, verbatim; a non-null one (even an empty one) reaches the seam.
+struct harness_charter_input
+{
+    const charter_budget* budget = nullptr;
+    charter_spend_params  spend{};
+    /// Receives the WINNER'S spend report (the search's own evaluations report
+    /// nothing). Untouched when the budget is null or empty.
+    charter_spend_report* report = nullptr;
+};
+
 struct shipped_landscape
 {
     landscape_search_result search;   ///< the walk; `winner` is what was applied
@@ -137,7 +152,8 @@ inline landscape_search_params shipped_search_params(
 /// that omits it gets exactly what it got when this was a hard-coded 8 (BL-1030).
 inline shipped_landscape apply_shipped_landscape(
     world& w, const recipe_registry& reg, std::uint32_t world_seed, bool search = true,
-    int corporation_count = world_gen_config{}.corporation_count)
+    int corporation_count = world_gen_config{}.corporation_count,
+    const harness_charter_input& charter = {})
 {
     shipped_landscape out;
     out.searched = search;
@@ -152,7 +168,14 @@ inline shipped_landscape apply_shipped_landscape(
         before.push_back(kv.first);
     std::sort(before.begin(), before.end());
 
-    const landscape_search_params sp = shipped_search_params(world_seed, corporation_count);
+    landscape_search_params sp = shipped_search_params(world_seed, corporation_count);
+    // BL-1032: app.cpp sets neither field (its budget is none); only an
+    // instrument that asked for a budget writes them.
+    if (charter.budget != nullptr)
+    {
+        sp.budget = charter.budget;
+        sp.spend  = charter.spend;
+    }
     if (search)
     {
         out.search = search_landscape(w, reg, sp);
@@ -162,7 +185,18 @@ inline shipped_landscape apply_shipped_landscape(
         out.search.seed_candidate = sp.start;
         out.search.winner         = sp.start;
     }
-    apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true);
+    if (charter.budget == nullptr)
+    {
+        // app.cpp:1063, verbatim — the shipped path.
+        apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true);
+    }
+    else
+    {
+        // BL-1032's overload. An EMPTY budget forwards to the call above inside
+        // world/*, which is what `--charter-budget empty|zero` exists to prove.
+        apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true,
+                                  charter.budget, charter.spend, charter.report);
+    }
 
     // app.cpp's second pass, and not belt-and-braces: without it every processor
     // a background firm authored keeps `no_recipe` for the whole campaign.
@@ -272,7 +306,8 @@ struct app_start_world
 /// where the app arms the validation run (app.cpp:653-655). @p lua plays
 /// app::m_lua: one long-lived state the scripts are (re)loaded into.
 inline void build_app_start_world(lua_state& lua, const world_params& params,
-                                  app_start_world& out)
+                                  app_start_world& out,
+                                  const harness_charter_input& charter = {})
 {
     out.params = params;
 
@@ -313,8 +348,10 @@ inline void build_app_start_world(lua_state& lua, const world_params& params,
     // app.cpp:1052-1073 — the search, the winner applied — and app.cpp:1084, the
     // second recipe pass: apply_shipped_landscape is that block, given the
     // PARSED config's roster count (app.cpp:1057).
+    // BL-1032: the app passes NO charter budget here (its default is none), and
+    // neither does this mirror unless an instrument hands one in.
     out.land = apply_shipped_landscape(out.w, out.reg, params.seed, /*search=*/true,
-                                       out.cfg.corporation_count);
+                                       out.cfg.corporation_count, charter);
 }
 
 /// Run the validation run on @p w exactly as app::poll_worldgen does
@@ -360,4 +397,112 @@ inline void run_app_validation_settle(world& w, const recipe_registry& reg,
         run_firm_exits(w, reg.firm_exit(), &report.firm_exits);           // app.cpp:1306
         // app.cpp:1314-1345: presentation over a const world; nothing to mirror.
     }
+}
+
+// ---------------------------------------------------------------------------
+// SYNTHETIC TEST INPUT — a charter budget for the BL-1032 seam (tools/verify only)
+// ---------------------------------------------------------------------------
+// NOT A BUDGET SOURCE, AND NOTHING SHIPPED MAY READ IT. The budget has one source
+// by design — a centre's unspent industry-point stockpile at 1960 (DIGITISATION.md
+// § 1) — and "no stand-in derived from urban population fills it" (Ben,
+// 2026-09-17). This builder exists only so the seam can be shown to DO something
+// (BL-1032 R4): its weights are SEEDED DRAWS, never population, so a reading taken
+// on it proves the plumbing and cannot be mistaken for a density result.
+//
+// 1x is the number of corporations the LEGACY landscape charters on the same seed
+// (specialists + background firms), which the caller measures on a legacy build in
+// the same process and passes in. Prices: firm 1 point, specialist 4 points.
+
+#include "world/planetology.hpp"  // checkpoint_rng
+
+#include <cmath>
+#include <map>
+
+/// Salt for the synthetic weights. Harness-only, and collides with no generation salt.
+inline constexpr std::uint32_t k_synthetic_charter_salt = 0x5C0FFA7Bu;
+
+/// The synthetic spend: firm 1, specialist 4, window 4, province cap on.
+inline charter_spend_params synthetic_charter_spend()
+{
+    charter_spend_params s;
+    s.firm_price_points       = 1;
+    s.specialist_price_points = 4;
+    s.window_radius           = 4;
+    s.province_cap            = true;
+    return s;
+}
+
+/// SYNTHETIC TEST INPUT. round(@p scale x @p legacy_corporations) points spread
+/// over @p w's NON-RAZED population centres by seeded integer weights,
+/// apportioned by LARGEST REMAINDER — integer throughout, ties to the lower
+/// centre id — so the total is exact.
+///
+/// THE WEIGHTS ARE A SEEDED RANK LAW, and still pure draws: every centre gets a
+/// keyed 64-bit draw, the draws order the centres (ties to the lower id), and the
+/// centre at rank r weighs 1e9 / r. MEASURED 2026-09-17 on seed 0: 1x is 87
+/// points against a centre count far larger, so a per-centre uniform weight left
+/// 87 centres at one point each, and a per-centre 1/k tail left the richest at
+/// two — no centre reached the specialist price (4), and the seam's specialist
+/// half went unexercised. A rank law gives the richest centre about 1x / ln(N)
+/// whatever N is. It is NOT a claim about where capital sits: the order is a
+/// shuffle, and no centre's size, scale or population is read.
+inline charter_budget synthetic_charter_budget(const world& w, std::uint32_t world_seed,
+                                               std::int64_t legacy_corporations, double scale)
+{
+    std::vector<entity_id> centres;
+    for (const auto& [cid, pc] : w.population_centres)
+        if (!pc.razed)
+            centres.push_back(cid);
+    std::sort(centres.begin(), centres.end());
+    if (centres.empty())
+        return charter_budget{};
+
+    const std::int64_t total = std::llround(static_cast<double>(legacy_corporations) * scale);
+    if (total <= 0)
+        return charter_budget{};
+
+    // The seeded shuffle: a keyed draw per centre, one splitmix64 step past its key.
+    std::vector<std::pair<std::uint64_t, entity_id>> keyed(centres.size());
+    for (std::size_t i = 0; i < centres.size(); ++i)
+    {
+        checkpoint_rng key(world_seed ^ k_synthetic_charter_salt, centres[i]);
+        key.unit();
+        keyed[i] = { key.s, centres[i] };
+    }
+    std::sort(keyed.begin(), keyed.end());
+    centres.clear();
+    for (const auto& kv : keyed)
+        centres.push_back(kv.second);   // now in rank order, rank 1 first
+
+    std::vector<std::int64_t> weight(centres.size());
+    std::int64_t weight_sum = 0;
+    for (std::size_t i = 0; i < centres.size(); ++i)
+    {
+        weight[i] = 1000000000LL / static_cast<std::int64_t>(i + 1);
+        weight_sum += weight[i];
+    }
+
+    std::vector<std::int64_t> share(centres.size());
+    std::vector<std::int64_t> rem(centres.size());
+    std::int64_t assigned = 0;
+    for (std::size_t i = 0; i < centres.size(); ++i)
+    {
+        share[i] = total * weight[i] / weight_sum;
+        rem[i]   = total * weight[i] % weight_sum;
+        assigned += share[i];
+    }
+    std::vector<std::size_t> by_rem(centres.size());
+    for (std::size_t i = 0; i < by_rem.size(); ++i)
+        by_rem[i] = i;
+    std::sort(by_rem.begin(), by_rem.end(), [&](std::size_t a, std::size_t b) {
+        if (rem[a] != rem[b]) return rem[a] > rem[b];
+        return centres[a] < centres[b];
+    });
+    for (std::int64_t k = 0; k < total - assigned; ++k)
+        ++share[by_rem[static_cast<std::size_t>(k)]];
+
+    std::map<entity_id, std::int32_t> points;
+    for (std::size_t i = 0; i < centres.size(); ++i)
+        points[centres[i]] = static_cast<std::int32_t>(share[i]);
+    return charter_budget(points);   // a zero share is dropped here, as any budget's is
 }

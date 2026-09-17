@@ -94,7 +94,13 @@ void score_one(const world& base, const recipe_registry& reg,
                const landscape_search_params& p, scored& s)
 {
     world w = base;                       // its OWN world — score_landscape memoises into it
-    apply_landscape_candidate(w, reg, s.cand, p.regenerate_specialists);
+    // BL-1032: the spend params are COPIED here, per evaluation — the scoring
+    // threads share `p`, so nothing any evaluation could mutate may live in it.
+    // The budget itself is read-only. With no budget (or an empty one) the
+    // overload forwards to the legacy 4-argument call, so this is today's path.
+    const charter_spend_params spend = p.spend;
+    apply_landscape_candidate(w, reg, s.cand, p.regenerate_specialists,
+                              p.budget, spend, /*report=*/nullptr);
     s.score = score_landscape(w, reg, p.score);
 }
 
@@ -214,11 +220,86 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     invalidate_logistics_caches(w);
 }
 
+void apply_landscape_candidate(world& w, const recipe_registry& reg,
+                               const landscape_candidate& c,
+                               bool regenerate_specialists,
+                               const charter_budget* budget,
+                               const charter_spend_params& spend,
+                               charter_spend_report* report)
+{
+    // --- THE ONE BRANCH (BL-1032) ------------------------------------------
+    // No budget, or an empty one (the all-zero budget is the same state: the
+    // type drops entries <= 0), is TODAY'S WORLD: the legacy overload, called
+    // verbatim, with nothing before it and nothing after it. Nothing below this
+    // line runs for such a world, and no spend param or price is read.
+    if (budget == nullptr || budget->empty())
+    {
+        apply_landscape_candidate(w, reg, c, regenerate_specialists);
+        return;
+    }
+
+    // --- a BUDGET WORLD ------------------------------------------------------
+    // The road tier, copied from the legacy body rather than shared with it —
+    // a shared helper is a refactor of the legacy path, and the legacy path's
+    // bytes are the contract (BL-1031's pins).
+    bool moved = false;
+    for (auto& kv : w.tiles)
+    {
+        tile_component& t = kv.second;
+        if (t.road_level > 0 && t.road_level < c.road_tier)
+        {
+            t.road_level = c.road_tier;
+            moved = true;
+        }
+    }
+    if (moved)
+        invalidate_logistics_caches(w);
+
+    assign_default_recipes(w, reg);
+
+    // THE BUDGET CHARTERS THE WHOLE WEB (DIGITISATION.md § 1, Ben 2026-09-17):
+    // world-gen's specialist roster goes, and every specialist and background
+    // firm the candidate carries is bought from a centre's budget. So there is
+    // no `regenerate_specialists = false` reading here — the roster is not the
+    // world-gen one on a budget world under any flag.
+    (void)regenerate_specialists;
+    remove_specialist_roster(w);
+    charter_web_from_budget(w, reg, *budget, spend, c.placement_seed,
+                            w.gen_settlement.get(), report);
+
+    // As the legacy body: a chartered port or hub is a supply anchor.
+    invalidate_logistics_caches(w);
+}
+
 landscape_search_result search_landscape(const world& base, const recipe_registry& reg,
                                          const landscape_search_params& p)
 {
     landscape_search_result out;
     out.seed_candidate = p.start;
+
+    // BL-1032. A BUDGET WORLD skips the roster axis (the budget decides the
+    // roster). A null or empty budget is not a budget world, and everything
+    // below runs exactly as it did before the seam.
+    const bool budget_world = p.budget != nullptr && !p.budget->empty();
+    if (budget_world)
+    {
+        // A non-empty budget with a refused spend (a price <= 0 — the prices
+        // have no shipped default) is not searched: every candidate would
+        // charter nothing. The start candidate stands, unscored; applying it
+        // charters nothing and its report says why.
+        if (const char* why = charter_spend_refusal(*p.budget, p.spend))
+        {
+            out.winner = p.start;
+            if (p.print_rounds)
+                std::printf("[landscape_search] charter budget REFUSED, search not run: %s\n", why);
+            return out;
+        }
+        if (p.print_rounds)
+            std::printf("[landscape_search] charter budget: %zu centres, %lld points; roster axis "
+                        "SKIPPED (the budget decides the roster)\n",
+                        p.budget->points().size(),
+                        static_cast<long long>(p.budget->total()));
+    }
 
     using clock = std::chrono::steady_clock;
     const auto ms_since = [](clock::time_point t0)
@@ -252,12 +333,26 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     {
         const auto round_t0 = clock::now();
         // --- propose, one per axis, in the fixed axis order ------------------
+        // `live` holds the axes this round proposes, ascending. On every world
+        // but a budget world that is all of them, {0, 1, 2}, and each loop below
+        // walks it in exactly the order it walked the axes before BL-1032.
+        //
+        // A BUDGET WORLD SKIPS ROSTER: no draw, no proposal, no score, no path
+        // step. SKIPPED, NEVER RE-KEYED — the draws are keyed by (round, axis),
+        // so not drawing roster leaves the placement and road-tier proposals
+        // exactly what they are on a legacy world, and the axis count and the
+        // tag formula do not move.
         std::vector<scored> props(landscape_axis_count);
+        std::vector<std::size_t> live;
+        live.reserve(landscape_axis_count);
         for (int a = 0; a < landscape_axis_count; ++a)
         {
             const landscape_axis axis = static_cast<landscape_axis>(a);
+            if (budget_world && axis == landscape_axis::roster)
+                continue;
             checkpoint_rng rng = axis_rng(p.seed, r, axis);
             props[static_cast<std::size_t>(a)].cand = perturb(out.winner, axis, p, rng);
+            live.push_back(static_cast<std::size_t>(a));
         }
 
         // --- score them INDEPENDENTLY ---------------------------------------
@@ -267,12 +362,12 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
         // race and an ordering hazard (landscape_score.hpp § the consequence).
         if (threads <= 1)
         {
-            for (scored& s : props)
-                score_one(base, reg, p, s);
+            for (const std::size_t i : live)
+                score_one(base, reg, p, props[i]);
         }
         else
         {
-            const int n = static_cast<int>(props.size());
+            const int n = static_cast<int>(live.size());
             const int spawn = std::min(threads, n);
             std::vector<std::thread> pool;
             pool.reserve(static_cast<std::size_t>(spawn));
@@ -281,21 +376,22 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
                 pool.emplace_back([&, t]
                 {
                     for (int i = t; i < n; i += spawn)
-                        score_one(base, reg, p, props[static_cast<std::size_t>(i)]);
+                        score_one(base, reg, p, props[live[static_cast<std::size_t>(i)]]);
                 });
             }
             for (std::thread& th : pool)
                 th.join();
         }
-        out.evaluations += landscape_axis_count;
+        out.evaluations += static_cast<int>(live.size());
 
         // --- argmax over the proposals, by the TOTAL order -------------------
         // Proposal-vs-proposal ties are broken by `candidate_key_less`, so an
         // exact tie between two proposals resolves identically everywhere. This
         // key is deliberately NOT consulted against the incumbent below.
-        std::size_t best = 0;
-        for (std::size_t i = 1; i < props.size(); ++i)
+        std::size_t best = live.front();
+        for (std::size_t k = 1; k < live.size(); ++k)
         {
+            const std::size_t i = live[k];
             const int c = compare_landscape(props[i].score, props[best].score);
             if (c > 0 || (c == 0 && candidate_key_less(props[i].cand, props[best].cand)))
                 best = i;
@@ -326,10 +422,10 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
                         bc.corporation_count, bc.placement_seed,
                         static_cast<unsigned>(bc.road_tier), props[best].score.composite,
                         incumbent_composite, out.round_ms.back(),
-                        out.round_ms.back() / static_cast<double>(landscape_axis_count));
+                        out.round_ms.back() / static_cast<double>(live.size()));
         }
 
-        for (std::size_t i = 0; i < props.size(); ++i)
+        for (const std::size_t i : live)
         {
             landscape_search_step step;
             step.round    = r;

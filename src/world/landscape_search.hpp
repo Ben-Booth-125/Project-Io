@@ -63,6 +63,7 @@
 // is a world, not a field — so it adds nothing to the flat-binary save path.
 // ---------------------------------------------------------------------------
 
+#include "charter_budget.hpp"
 #include "landscape_score.hpp"
 
 #include <cstdint>
@@ -145,6 +146,33 @@ struct landscape_search_params
     int thread_count = 1;
 
     landscape_score_params score{};
+
+    /// BL-1032 — the per-centre CHARTER BUDGET, or none. NONE BY DEFAULT, and
+    /// nothing shipped passes one (app.cpp passes nothing; the budget's one
+    /// source, the Digitisation stockpile, does not exist yet).
+    ///
+    /// Null or EMPTY (an all-zero budget is the same state — charter_budget
+    /// drops entries <= 0) is today's search, byte for byte: every axis
+    /// proposed and scored, every candidate applied by the legacy calls.
+    ///
+    /// NON-EMPTY makes this a BUDGET WORLD, and two things change and nothing
+    /// else does: each candidate's corporations are chartered from the budget
+    /// (`apply_landscape_candidate`'s budget overload), and the ROSTER axis is
+    /// SKIPPED — neither proposed nor scored, because the budget decides the
+    /// roster (GENERATION_STRATEGY.md phase 6 point 3). It is skipped, never
+    /// re-keyed: `landscape_axis_count`, the (round, axis) tag and every other
+    /// axis's draw are unchanged, so placement and road tier propose exactly
+    /// what they would on a legacy world. A non-empty budget whose spend params
+    /// are refused (`charter_spend_refusal`) is not searched at all: the result
+    /// is the start candidate with no evaluations.
+    ///
+    /// Read-only and shared across the scoring threads; the pointee must
+    /// outlive the search.
+    const charter_budget* budget = nullptr;
+
+    /// How the budget is spent. Read only on a budget world, and COPIED per
+    /// evaluation (threads share these params). The prices have no default.
+    charter_spend_params spend{};
 };
 
 /// One proposal, kept whether or not it won — the path is the point.
@@ -190,6 +218,26 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
 
 void apply_landscape_candidate(world& w, const recipe_registry& reg,
                                const landscape_candidate& c);
+
+/// BL-1032 — lay a candidate with a CHARTER BUDGET. Branches exactly ONCE:
+///
+///   * @p budget null or empty -> the 4-argument overload above, verbatim —
+///     today's calls in today's order, and @p spend and @p report are not read.
+///   * otherwise -> the road tier and the recipe pass as above, then
+///     `remove_specialist_roster` and `charter_web_from_budget` from the
+///     candidate's placement seed and `world::gen_settlement`, in place of
+///     `generate_corporations` and `generate_background_firms`. The budget
+///     charters the whole web, so @p regenerate_specialists is not read on
+///     this branch.
+///
+/// @p report, when non-null, receives the spend's report on the budget branch
+/// and is left untouched on the legacy one.
+void apply_landscape_candidate(world& w, const recipe_registry& reg,
+                               const landscape_candidate& c,
+                               bool regenerate_specialists,
+                               const charter_budget* budget,
+                               const charter_spend_params& spend,
+                               charter_spend_report* report);
 
 /// The total order the argmax runs on. Returns <0 if @p a sorts BEFORE @p b
 /// (i.e. @p a is WORSE), >0 if better, 0 only when every scored term is exactly

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "charter_budget.hpp"
 #include "recipe_registry.hpp"
 #include "world.hpp"
 
@@ -144,6 +145,59 @@ std::vector<entity_id> generate_corporations(
 ///
 /// @return The number of corporations removed.
 int remove_specialist_roster(world& w);
+
+/// BL-1032 — CHARTER THE WEB FROM A PER-CENTRE BUDGET (DIGITISATION.md § 1;
+/// CORPORATION_GENERATION.md Pass 1 and Pass 6, both AMENDED FORWARD). Lays
+/// specialists AND background firms around the population centres @p budget
+/// names, in place of `generate_corporations` + `generate_background_firms`.
+/// The caller (`apply_landscape_candidate`'s budget overload) has already run
+/// `remove_specialist_roster`; this function appends.
+///
+/// NEW CODE BESIDE THE LEGACY PASSES, NEVER A REFACTOR OF THEM: it reuses this
+/// file's helpers (placement, capital, stockpile, naming, HQ, the gap
+/// selection's measurements) and edits neither legacy body, so a world with no
+/// budget keeps its bytes.
+///
+/// THE SPEND, in order:
+///  * Refused params (`charter_spend_refusal`) charter NOTHING; every point is
+///    reported unspent with reason `refused`.
+///  * Centres spend by budget DESCENDING, ties to the lower centre id, in two
+///    sweeps — every specialist first, then every centre's firms — so, as in the
+///    legacy order, specialists stake their ground before any background firm.
+///  * Home nation = `tile_to_nation` of the centre tile; none -> the whole
+///    budget unspent (`no_nation`). Region = `nearest_region`, reconciled to that
+///    nation (a mismatch takes the nation's own nearest region to the centre;
+///    with none, or no settlement, the national-character fallback).
+///  * A centre whose budget >= the specialist price charters EXACTLY ONE
+///    specialist: focus and ownership from the region (Passes 2 and 2b), today's
+///    capital (400 +/- 40%), stockpile, name and HQ. NO nation balancing, no
+///    diversity reroll. The remainder buys background firms at the firm price by
+///    Pass 6's gap selection (construction first, then the biggest gap under the
+///    per-resource cap 8), under the per-province cap 2 when
+///    `spend.province_cap`, and the 200-per-body cap.
+///  * Anchor rungs: the centre nation's tiles within `spend.window_radius` of
+///    the centre tile (column-wrapped), then the centre region's window, then
+///    UNSPENT (`window_exhausted`) — never nation-wide.
+///  * What is not spent is counted by reason (`no_gap`, `body_cap`, `remainder`
+///    too), never scattered.
+///  * The player is a seeded pick among the budget's specialists; with none,
+///    nobody is picked and the report says `no_specialists`.
+///
+/// RNG: a fresh std::mt19937 per centre per role, seeded through a keyed
+/// `checkpoint_rng` draw on salts no other generation stream uses, so one
+/// centre's draws never depend on another's success.
+///
+/// @param seed    The candidate's placement seed (as the legacy passes take it).
+/// @param settle  The settlement record (`world::gen_settlement`), or null.
+/// @param report  Optional; overwritten with the spend's report.
+/// @return        Every corporation chartered, ascending id.
+std::vector<entity_id> charter_web_from_budget(world& w,
+                                               const recipe_registry& reg,
+                                               const charter_budget& budget,
+                                               const charter_spend_params& spend,
+                                               uint32_t seed,
+                                               const struct settlement_state* settle,
+                                               charter_spend_report* report = nullptr);
 
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631)

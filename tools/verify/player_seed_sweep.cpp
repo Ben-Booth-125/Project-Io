@@ -41,6 +41,8 @@
 //      .\build\player_seed_sweep.exe --guard --seeds 46,17,11 [--reproduce N] [--fast]
 //      .\build\player_seed_sweep.exe --digest       [--seeds 46,17,11]   (BL-1031)
 //      .\build\player_seed_sweep.exe --digest-check [--seeds 46,17,11]   (BL-1031)
+//      ... --digest / --digest-check [--charter-budget none|empty|zero|synthetic]
+//                                    [--charter-scale X]                    (BL-1032)
 //
 // BL-630 (2026-08-26) ADDED THE MODE THIS FILE NOW LEADS WITH. The two default
 // conditions above ("worth playing" == a processor, and solvent) were written
@@ -68,10 +70,12 @@
 #include "world/world_save.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -532,15 +536,17 @@ std::uint64_t digest_search(const landscape_search_result& r)
 /// what was seated. With @p dig, the four BL-1031 digests are taken at the
 /// seams between the phases; without it the path is exactly the seat sweep's.
 spawn_seat_result build_and_seat(lua_state& lua, uint32_t seed, bool fast,
-                                 app_start_world& out, world_digests* dig = nullptr)
+                                 app_start_world& out, world_digests* dig = nullptr,
+                                 const harness_charter_input& charter = {})
 {
     world_params p = fast ? no_prehistory() : world_params{};
     p.seed = seed;
     // app::begin_new_game + app::start_new_game_prelude: config and works, the
     // world, setup_world's writes, load_economy with its era band, the
     // landscape-search WINNER (not the seed candidate — BL-979) and the second
-    // recipe pass (BL-1030; harness_params.hpp).
-    build_app_start_world(lua, p, out);
+    // recipe pass (BL-1030; harness_params.hpp). `charter` is none unless a
+    // digest run asked for a budget (BL-1032); none is the app's own call.
+    build_app_start_world(lua, p, out, charter);
     if (dig != nullptr)
     {
         dig->search = digest_search(out.land.search);
@@ -632,11 +638,161 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
     {  0u, 0x893B6977B1E9DC1Full, 0x1A24D230FDDF2C7Eull, 0xA392EFF987F374E2ull, 0x8BBEAB8453901456ull },
 };
 
-int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check)
+// --- BL-1032: the charter-budget seam, driven through the digest modes -------
+//
+// `--charter-budget none|empty|zero|synthetic` (default none) hands the search a
+// budget; the digests are taken exactly as without one, so a row can be checked
+// against the SAME pins:
+//   none       no budget at all — the shipped path (R1).
+//   empty      an empty budget reaches the seam (R2).
+//   zero       a budget of zero entries reaches the seam; the type drops them, so
+//              it is the empty budget by construction (R2).
+//   synthetic  SYNTHETIC TEST INPUT (harness_params.hpp): scale x the legacy
+//              corporation count, measured on a legacy build of the same seed in
+//              this process, over the non-razed centres by seeded weights (R4 —
+//              the non-vacuity reading; its digests must NOT match the pins).
+// empty and zero pass the DEFAULT spend, whose prices are 0: a non-empty budget
+// with those prices would be refused, so a PASS also shows the refusal never
+// reads an empty budget.
+
+enum class charter_mode { none, empty, zero, synthetic };
+
+const char* charter_mode_name(charter_mode m)
+{
+    switch (m)
+    {
+    case charter_mode::none:      return "none";
+    case charter_mode::empty:     return "empty";
+    case charter_mode::zero:      return "zero";
+    case charter_mode::synthetic: return "synthetic";
+    }
+    return "?";
+}
+
+/// The ids the `zero` budget is built over. Every one carries 0 points, so the
+/// budget drops them all; the range is wide enough to cover every centre id a
+/// generated world hands out.
+constexpr entity_id k_zero_budget_ids = 65536;
+
+/// Squared, column-wrapped grid distance between two tiles, or -1 when either
+/// cannot be resolved — the report's independent re-measure of "in the window".
+long long charter_tile_d2(const world& w, entity_id a, entity_id b)
+{
+    const auto ta = w.tiles.find(a);
+    const auto tb = w.tiles.find(b);
+    if (ta == w.tiles.end() || tb == w.tiles.end() || ta->second.body != tb->second.body)
+        return -1;
+    const auto body = w.bodies.find(ta->second.body);
+    const int gw = (body != w.bodies.end()) ? body->second.grid_width : 0;
+    long long dx = std::abs(ta->second.grid_x - tb->second.grid_x);
+    if (gw > 0 && dx > gw / 2)
+        dx = gw - dx;
+    const long long dy = ta->second.grid_y - tb->second.grid_y;
+    return dx * dx + dy * dy;
+}
+
+void print_charter_report(const world& w, charter_mode mode, const charter_budget& budget,
+                          const charter_spend_params& spend, const charter_spend_report& rep,
+                          std::size_t legacy_specialists, std::size_t legacy_firms, double scale)
+{
+    if (budget.empty())
+    {
+        std::printf("      charter budget %s: EMPTY after construction (entries <= 0 dropped) -> "
+                    "the legacy branch; prices unset (firm %d, specialist %d); no report\n",
+                    charter_mode_name(mode), spend.firm_price_points, spend.specialist_price_points);
+        return;
+    }
+    std::printf("      charter budget %s — SYNTHETIC TEST INPUT (seeded weights, never population): "
+                "scale %.2f x 1x %zu legacy corporations (%zu specialists + %zu firms) = %lld points "
+                "over %zu centres; firm price %d, specialist price %d, window radius %d, province cap %s\n",
+                charter_mode_name(mode), scale, legacy_specialists + legacy_firms, legacy_specialists,
+                legacy_firms, static_cast<long long>(budget.total()), budget.points().size(),
+                spend.firm_price_points, spend.specialist_price_points, spend.window_radius,
+                spend.province_cap ? "on" : "off");
+    {
+        std::int32_t richest = 0;
+        int affords = 0;
+        for (const auto& kv : budget.points())
+        {
+            richest = std::max(richest, kv.second);
+            if (kv.second >= spend.specialist_price_points)
+                ++affords;
+        }
+        int non_razed = 0;
+        for (const auto& kv : w.population_centres)
+            if (!kv.second.razed)
+                ++non_razed;
+        std::printf("      budget shape: %d non-razed centres in the world, %zu hold points; richest "
+                    "centre %d points; %d centres afford a specialist\n",
+                    non_razed, budget.points().size(), richest, affords);
+    }
+    if (rep.refused)
+        std::printf("      REFUSED: %s\n", rep.refusal.c_str());
+
+    const long long r2 = static_cast<long long>(spend.window_radius) * spend.window_radius;
+    int spec_cw = 0, spec_rw = 0, spec_in = 0, firm_cw = 0, firm_rw = 0, firm_in = 0;
+    std::vector<entity_id> centres_with_both;
+    std::map<entity_id, std::pair<int, int>> in_window_by_centre;   // centre -> (specialists, firms)
+    for (const charter_record& r : rep.charters)
+    {
+        const auto ct = w.population_centre_tile.find(r.centre);
+        const long long d2 = (ct != w.population_centre_tile.end())
+            ? charter_tile_d2(w, r.anchor_tile, ct->second) : -1;
+        const bool inside = d2 >= 0 && d2 <= r2;
+        if (r.specialist)
+        {
+            (r.rung == charter_rung::centre_window ? spec_cw : spec_rw)++;
+            if (inside) { ++spec_in; ++in_window_by_centre[r.centre].first; }
+        }
+        else
+        {
+            (r.rung == charter_rung::centre_window ? firm_cw : firm_rw)++;
+            if (inside) { ++firm_in; ++in_window_by_centre[r.centre].second; }
+        }
+    }
+    int both = 0;
+    for (const auto& [centre, n] : in_window_by_centre)
+        if (n.first > 0 && n.second > 0)
+            ++both;
+
+    std::printf("      specialists %zu (rung centre_window %d, region_window %d; anchor re-measured "
+                "inside radius %d of its centre: %d); player %u%s\n",
+                rep.specialists.size(), spec_cw, spec_rw, spend.window_radius, spec_in,
+                rep.player, rep.no_specialists ? " — no_specialists, nobody seated by the spend" : "");
+    std::printf("      background firms %zu (rung centre_window %d, region_window %d; anchor "
+                "re-measured inside radius: %d); centres holding a specialist AND a firm inside "
+                "their window: %d\n",
+                rep.firms.size(), firm_cw, firm_rw, firm_in, both);
+
+    std::array<long long, charter_unspent_reason_count> pts{};
+    std::array<int, charter_unspent_reason_count> ctr{};
+    for (const charter_unspent& u : rep.unspent)
+    {
+        pts[static_cast<std::size_t>(u.reason)] += u.points;
+        ++ctr[static_cast<std::size_t>(u.reason)];
+    }
+    std::printf("      points: budgeted %lld = spent %lld + unspent %lld [%s]; unspent by reason:",
+                static_cast<long long>(rep.points_budgeted), static_cast<long long>(rep.points_spent),
+                static_cast<long long>(rep.points_unspent),
+                rep.points_budgeted == rep.points_spent + rep.points_unspent ? "balanced" : "UNBALANCED");
+    for (int r = 0; r < charter_unspent_reason_count; ++r)
+        std::printf(" %s %lld (%d centres)%s",
+                    charter_unspent_reason_name(static_cast<charter_unspent_reason>(r)),
+                    pts[static_cast<std::size_t>(r)], ctr[static_cast<std::size_t>(r)],
+                    r + 1 < charter_unspent_reason_count ? "," : "\n");
+}
+
+int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
+               charter_mode mode = charter_mode::none, double charter_scale = 1.0)
 {
     std::printf("player_seed_sweep %s — %zu seeds, the shipped spawn built, settled (%d ticks) "
                 "and seated in app order (BL-1030)\n",
                 check ? "--digest-check" : "--digest", seeds.size(), k_settle_ticks);
+    std::printf("BL-1032. --charter-budget %s%s\n", charter_mode_name(mode),
+                mode == charter_mode::none ? " (the shipped path: no budget reaches the search)"
+                : mode == charter_mode::synthetic
+                    ? " — SYNTHETIC TEST INPUT; its digests are EXPECTED to differ from the pins"
+                    : " (an empty budget reaches the seam; the digests must equal the pins)");
     std::printf("BL-1031. FNV-1a 64: D_search the walk; D_land the snapshot as the landscape "
                 "lands; D_settle the snapshot + state_hash after the validation run; D_seat the "
                 "seat + the snapshot after it.\n");
@@ -654,10 +810,44 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check)
     for (std::size_t i = 0; i < seeds.size(); ++i)
     {
         const uint32_t seed = seeds[i];
+        // BL-1032's budget for this seed, and the report its winner leaves.
+        charter_budget       budget;
+        charter_spend_report report;
+        harness_charter_input charter;
+        std::size_t legacy_specialists = 0, legacy_firms = 0;
+        std::unique_ptr<app_start_world> start;
         try
         {
-            const auto start = std::make_unique<app_start_world>();
-            build_and_seat(lua, seed, /*fast=*/false, *start, &got[i]);
+            if (mode == charter_mode::zero)
+            {
+                std::map<entity_id, std::int32_t> zeros;
+                for (entity_id id = 1; id <= k_zero_budget_ids; ++id)
+                    zeros[id] = 0;
+                budget = charter_budget(zeros);
+            }
+            else if (mode == charter_mode::synthetic)
+            {
+                // 1x, measured: the legacy landscape on this seed, built in this
+                // process exactly as the none row is, and freed before the budget
+                // world is built.
+                const auto legacy = std::make_unique<app_start_world>();
+                world_params lp{};
+                lp.seed = seed;
+                build_app_start_world(lua, lp, *legacy);
+                legacy_specialists = legacy->land.specialists.size();
+                legacy_firms       = legacy->land.firms.size();
+                budget = synthetic_charter_budget(
+                    legacy->w, seed,
+                    static_cast<std::int64_t>(legacy_specialists + legacy_firms), charter_scale);
+                charter.spend = synthetic_charter_spend();
+            }
+            if (mode != charter_mode::none)
+            {
+                charter.budget = &budget;
+                charter.report = &report;
+            }
+            start = std::make_unique<app_start_world>();
+            build_and_seat(lua, seed, /*fast=*/false, *start, &got[i], charter);
             ok[i] = true;
         }
         catch (const std::exception& e)
@@ -722,6 +912,9 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check)
         {
             std::printf("\n");
         }
+        if (mode != charter_mode::none)
+            print_charter_report(start->w, mode, budget, charter.spend, report,
+                                 legacy_specialists, legacy_firms, charter_scale);
         std::fflush(stdout);
     }
 
@@ -1064,7 +1257,8 @@ int main(int argc, char** argv)
                     "       %s --seat  [seed_count] [--fast] (REPORT the seat distribution)\n"
                     "       %s --guard [seed_count] [--fast] (assert what the seat holds)\n"
                     "       %s --digest       [--seeds a,b,c]  (print the BL-1031 world digests)\n"
-                    "       %s --digest-check [--seeds a,b,c]  (fail on any row differing from the pin)\n",
+                    "       %s --digest-check [--seeds a,b,c]  (fail on any row differing from the pin)\n"
+                    "           both digest modes: [--charter-budget none|empty|zero|synthetic] [--charter-scale X]\n",
                     argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
         return 2;
     }
@@ -1137,7 +1331,46 @@ int main(int argc, char** argv)
             std::printf("no seeds: pass --seeds a,b,c (the pin table is empty)\n");
             return 2;
         }
-        return run_digest(seeds, lua, check_mode);
+        // BL-1032: `--charter-budget none|empty|zero|synthetic`, `--charter-scale X`.
+        charter_mode mode  = charter_mode::none;
+        double       scale = 1.0;
+        for (int a = 2; a < argc; ++a)
+        {
+            const std::string arg = argv[a];
+            if (arg == "--charter-budget" || arg == "--charter-scale")
+            {
+                if (a + 1 >= argc)
+                {
+                    std::printf("%s needs a value\n", arg.c_str());
+                    return 2;
+                }
+                const std::string val = argv[++a];
+                if (arg == "--charter-budget")
+                {
+                    if      (val == "none")      mode = charter_mode::none;
+                    else if (val == "empty")     mode = charter_mode::empty;
+                    else if (val == "zero")      mode = charter_mode::zero;
+                    else if (val == "synthetic") mode = charter_mode::synthetic;
+                    else
+                    {
+                        std::printf("--charter-budget: '%s' is not none|empty|zero|synthetic\n",
+                                    val.c_str());
+                        return 2;
+                    }
+                }
+                else
+                {
+                    char* end = nullptr;
+                    scale = std::strtod(val.c_str(), &end);
+                    if (end == val.c_str() || *end != '\0' || !(scale > 0.0) || scale > 1000.0)
+                    {
+                        std::printf("--charter-scale: '%s' is not a number in (0, 1000]\n", val.c_str());
+                        return 2;
+                    }
+                }
+            }
+        }
+        return run_digest(seeds, lua, check_mode, mode, scale);
     }
 
     // Same placement, same reason: a seat sweep against an empty registry would
