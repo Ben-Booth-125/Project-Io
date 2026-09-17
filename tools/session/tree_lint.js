@@ -15,7 +15,8 @@
 //   the spire has no minors and alternates major/milestone by ring; one milestone per ring on
 //   the spire; every node reachable from the root by links; forks are symmetric, same ring,
 //   both majors, sharing a linked minor; effect kinds / gate atoms / diffusion classes stay in
-//   vocabulary; minors carry exactly one modifier; milestones carry exactly one `open`;
+//   vocabulary; minors carry exactly one modifier; milestones carry exactly one `open`, and a
+//   `ring N` open is the milestone's own ring + 1;
 //   invested trees carry `pursued_when` on every node; every node id in the doc exists in the
 //   store and vice versa;
 //   exactly one node per tree derives as ROOT by the generator's own rule (its OWN `links` is
@@ -115,6 +116,11 @@ function lintTree(name, spec) {
       }
       if (e.kind === 'open' && !/^ring \d+$/.test(e.target) && !/^[a-z]+ tree$/.test(e.target))
         fail(`${n.id}: open target must be "ring N" or "<tree> tree", got "${e.target}"`);
+      // A milestone opens the ring above its own. The format check alone passed IN-SP-1m opening
+      // ring 3 and IN-SP-2m opening ring 4, which would have stranded the tree at ring 1.
+      const ringOpen = e.kind === 'open' ? /^ring (\d+)$/.exec(e.target) : null;
+      if (ringOpen && Number(ringOpen[1]) !== n.ring + 1)
+        fail(`${n.id}: a ring-${n.ring} milestone opens ring ${n.ring + 1}, not "${e.target}"`);
     }
     if (n.kind === 'minor' && !(effects.length === 1 && effects[0].kind === 'modifier'))
       fail(`${n.id}: a minor carries exactly one modifier`);

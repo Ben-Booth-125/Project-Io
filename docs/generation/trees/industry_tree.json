@@ -113,7 +113,7 @@
       "effects": [
         {
           "kind": "open",
-          "target": "ring 3"
+          "target": "ring 2"
         }
       ],
       "pursued_when": {
@@ -176,7 +176,7 @@
       "effects": [
         {
           "kind": "open",
-          "target": "ring 4"
+          "target": "ring 3"
         }
       ],
       "pursued_when": {
