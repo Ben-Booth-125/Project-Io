@@ -470,7 +470,9 @@ everywhere and hand Digitisation a frozen map. `CIVILISATION.md`'s handoff requi
 rate, and a fall in both is a failure, not a success (§ What the phase is judged on).
 
 **THE DISPLACEMENT MEASURED SO FAR HELD ONLY AGAINST A SATURATED ALARM (measured 2026-09-16, on an
-unmerged reading kept for its finding; Ben archived the change).** With `visible_capability_reference`
+unmerged reading kept for its finding; Ben archived the change; the saturation re-measured on main
+2026-09-17, BL-1028: 89.7% of near-home reads at 1000 by 1660, and 88.5% over 1660 -> 1960, while
+pooled displacement falls from 3.02 to 1.74).** With `visible_capability_reference`
 at 5000, alarm read 1000 on 88.5% of near-home reads, so the deterrence weight acted as a flat
 constant on every near pair, and the sprint-41 plateau at weight 525 was an artefact of that. Setting
 the reference from the measured distribution instead (the 90th percentile of the other side's army
@@ -481,11 +483,16 @@ restores pooled displacement above 1 (the best, 1000, reads 0.81). **So a discri
 through the weight alone, does not produce the claim above.** Whatever makes near-home peace and
 far-home conflict true has to come from somewhere other than the deterrence weight's magnitude.
 
-**And the missing frontier is not a pricing gap.** On the seeds that met one polity in 460 years, the
-campaign scorer never reads contact at all, so an unmet target is not "priced on nothing". Unmet
-ground is simply worse to take -- supply reaching it averages 420 against 548 for known neighbours,
-and its mean score is -12 against +80 -- and when an unmet target does clear the threshold, a
-stay-home verb (Invest, Consolidate or Settle) outranks it in 78.6% of those rounds.
+**Polities meet; what they meet never binds (measured 2026-09-17, BL-1028, 16 library seeds).**
+Contact is not rare in the span: between 3 and 300 new contact pairs a world, 1,250 across the
+library, by crossing or by inheriting a conquered polity's contacts. What fails is what follows.
+**Not one pair first met after 1200 holds a non-aggression clause at 1660 (0 of 492)**, while 99.1%
+of near-home campaign candidates are blocked by one — so treaties seal the old neighbourhood and
+never reach the new. The campaign scorer does not read contact, so an unmet target is not "priced on
+nothing"; it is simply worse ground to take, with less supply reaching it than reaches known
+neighbours on every seed that has a near-home candidate in reach (15 of 16). When an unmet target does clear the threshold, another verb wins 88.2% of
+those rounds, Invest most often. Continued past 1660 on Exploration's own forces, contact nearly
+stops — 43 new pairs in 300 years across the library, none by crossing on half the seeds.
 
 ---
 
