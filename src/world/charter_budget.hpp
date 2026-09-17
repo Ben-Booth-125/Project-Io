@@ -95,6 +95,14 @@ struct charter_spend_params
     int window_radius = 4;
     /// Pass 6's per-province firm cap (2) applies to budget firms when true.
     bool province_cap = true;
+    /// Pass 6's per-RESOURCE firm cap (8) applies to the budget path's gap
+    /// selection when true — the copy inside `charter_web_from_budget`, and
+    /// nothing else: `generate_background_firms` keeps its own cap whatever this
+    /// says. BL-1033 (Ben, NR-889: measure the cap KEPT and LIFTED before ruling
+    /// which gives way) — false lifts it so a denser budget can buy past it; the
+    /// construction-yard provisioning bound, the province cap switch, the
+    /// 200-per-body cap and the `no_gap` stop all still apply.
+    bool resource_cap = true;
 
     /// Points one specialist costs: the firm price times the firm charters it is
     /// worth. Widened, so no pair of int32 inputs overflows it; a price above any

@@ -43,6 +43,13 @@
 //      .\build\player_seed_sweep.exe --digest-check [--seeds 46,17,11]   (BL-1031)
 //      ... --digest / --digest-check [--charter-budget none|empty|zero|synthetic|refused]
 //                                    [--charter-scale X]                    (BL-1032)
+//      .\build\player_seed_sweep.exe --charter-cost [--seeds 0,28,46] [--budget-scales 1,2,4]
+//                                    [--resource-cap on|off|both] [--province-cap on|off|both]
+//                                    [--specialist-prices 4,8] [--ladder-scales 2|all]
+//                                    [--no-extra] [--no-forced] [--forced-only]
+//                                    [--forced-radius 4] [--forced-pick sparse|richest]
+//                                    [--live-ticks 8]
+//                                    [--out file.json] [--note TEXT]        (BL-1033)
 //
 // BL-630 (2026-08-26) ADDED THE MODE THIS FILE NOW LEADS WITH. The two default
 // conditions above ("worth playing" == a processor, and solvent) were written
@@ -62,6 +69,7 @@
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/settlement.hpp"   // nearest_region (the forced row's pick)
 #include "world/nation_step.hpp"
 #include "world/spawn_seat.hpp"
 #include "world/supply_system.hpp"
@@ -75,11 +83,16 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
+#include <cmath>
+#include <functional>
 #include <map>
 #include <memory>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -530,6 +543,53 @@ std::uint64_t digest_search(const landscape_search_result& r)
     return f.h;
 }
 
+/// The four BL-1031 digest seams, one function each, so every mode that takes a
+/// digest hashes the same fields in the same order (BL-1033's cost mode takes
+/// them on its `none` row to prove the world it measures is the shipped start).
+void digest_at_land(const app_start_world& out, world_digests& dig)
+{
+    dig.search = digest_search(out.land.search);
+    fnv1a64 f;
+    dig.land_bytes = hash_snapshot(f, out.w);
+    dig.land = f.h;
+}
+
+void digest_at_settle(const app_start_world& out, world_digests& dig)
+{
+    fnv1a64 f;
+    dig.settle_bytes = hash_snapshot(f, out.w);
+    f.scalar(out.w.state_hash(out.w.current_day_tick));
+    dig.settle = f.h;
+}
+
+void digest_at_seat(const app_start_world& out, const spawn_seat_result& res, world_digests& dig)
+{
+    fnv1a64 f;
+    f.scalar(res.seated);
+    f.flag(res.floor_unmet);
+    f.scalar(res.specialist_count);
+    f.scalar(res.shortlist_size);
+    f.count(res.candidates.size());
+    for (const spawn_seat_candidate& c : res.candidates)
+    {
+        f.scalar(c.corp);
+        f.scalar(c.landscape);
+        f.scalar(c.holdings_scored);
+        f.flag(c.shortlisted);
+        f.scalar(c.balance);
+        f.flag(c.solvent);
+        f.scalar(c.trailing_net);
+        f.scalar(c.quarters_read);
+        f.flag(c.has_processor);
+        f.scalar(c.holdings);
+        f.scalar(c.holdings_near_pop);
+        f.scalar(c.population_share);
+        f.scalar(c.weight);
+    }
+    dig.seat_bytes = hash_snapshot(f, out.w);
+    dig.seat = f.h;
+}
+
 /// Build one world, settle it, seat it — the app's campaign start end to end.
 /// Returns the seat result; @p out holds the world (and the registry, config
 /// and search it was built from), because the caller needs both to describe
@@ -548,51 +608,16 @@ spawn_seat_result build_and_seat(lua_state& lua, uint32_t seed, bool fast,
     // digest run asked for a budget (BL-1032); none is the app's own call.
     build_app_start_world(lua, p, out, charter);
     if (dig != nullptr)
-    {
-        dig->search = digest_search(out.land.search);
-        fnv1a64 f;
-        dig->land_bytes = hash_snapshot(f, out.w);
-        dig->land = f.h;
-    }
+        digest_at_land(out, *dig);
     // app::poll_worldgen's validation run (BL-1030; harness_params.hpp).
     run_app_validation_settle(out.w, out.reg);
     if (dig != nullptr)
-    {
-        fnv1a64 f;
-        dig->settle_bytes = hash_snapshot(f, out.w);
-        f.scalar(out.w.state_hash(out.w.current_day_tick));
-        dig->settle = f.h;
-    }
+        digest_at_settle(out, *dig);
     // app::seat_player (app.cpp:933): the seat on the WINNER'S STATIC SCORE
     // (BL-1020) — the one the app keeps as `m_landscape_winner_score`.
     spawn_seat_result res = seat_player_corporation(out.w, p.seed, out.land.search.winner_score);
     if (dig != nullptr)
-    {
-        fnv1a64 f;
-        f.scalar(res.seated);
-        f.flag(res.floor_unmet);
-        f.scalar(res.specialist_count);
-        f.scalar(res.shortlist_size);
-        f.count(res.candidates.size());
-        for (const spawn_seat_candidate& c : res.candidates)
-        {
-            f.scalar(c.corp);
-            f.scalar(c.landscape);
-            f.scalar(c.holdings_scored);
-            f.flag(c.shortlisted);
-            f.scalar(c.balance);
-            f.flag(c.solvent);
-            f.scalar(c.trailing_net);
-            f.scalar(c.quarters_read);
-            f.flag(c.has_processor);
-            f.scalar(c.holdings);
-            f.scalar(c.holdings_near_pop);
-            f.scalar(c.population_share);
-            f.scalar(c.weight);
-        }
-        dig->seat_bytes = hash_snapshot(f, out.w);
-        dig->seat = f.h;
-    }
+        digest_at_seat(out, res, *dig);
     return res;
 }
 
@@ -697,6 +722,41 @@ long long charter_tile_d2(const world& w, entity_id a, entity_id b)
     return dx * dx + dy * dy;
 }
 
+/// Every charter's holdings re-measured to its centre — anchors and secondary
+/// holdings, inside and outside @p radius — from the tiles the record kept.
+struct charter_spill
+{
+    int anchor_in = 0, anchor_out = 0, second_in = 0, second_out = 0, unresolved = 0;
+    long long far_d2 = 0;
+};
+
+void measure_charter_spill(const world& w, const charter_spend_report& rep, int radius,
+                           charter_spill& spec_sp, charter_spill& firm_sp)
+{
+    const long long r2 = static_cast<long long>(radius) * radius;
+    for (const charter_record& r : rep.charters)
+    {
+        charter_spill& s = r.specialist ? spec_sp : firm_sp;
+        const auto ct = w.population_centre_tile.find(r.centre);
+        for (std::size_t h = 0; h < r.holdings.size(); ++h)
+        {
+            const long long d2 = (ct != w.population_centre_tile.end())
+                ? charter_tile_d2(w, r.holdings[h], ct->second) : -1;
+            if (d2 < 0)
+            {
+                ++s.unresolved;
+                continue;
+            }
+            s.far_d2 = std::max(s.far_d2, d2);
+            const bool inside = d2 <= r2;
+            if (h == 0)
+                (inside ? s.anchor_in : s.anchor_out)++;
+            else
+                (inside ? s.second_in : s.second_out)++;
+        }
+    }
+}
+
 void print_charter_report(const world& w, charter_mode mode, const charter_budget& budget,
                           const charter_spend_params& spend, const charter_spend_report& rep,
                           const landscape_search_result& search,
@@ -714,12 +774,12 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
     std::printf("      charter budget %s — SYNTHETIC TEST INPUT (seeded weights, never population): "
                 "scale %.2f x 1x %zu legacy corporations (%zu specialists + %zu firms) = %lld points "
                 "over %zu centres; firm price %d, specialist %d firm charters (= %lld points), "
-                "window radius %d, province cap %s\n",
+                "window radius %d, province cap %s, resource cap %s\n",
                 charter_mode_name(mode), scale, legacy_specialists + legacy_firms, legacy_specialists,
                 legacy_firms, static_cast<long long>(budget.total()), budget.points().size(),
                 spend.firm_price_points, spend.specialist_firm_charters,
                 static_cast<long long>(spend.specialist_price_points()), spend.window_radius,
-                spend.province_cap ? "on" : "off");
+                spend.province_cap ? "on" : "off", spend.resource_cap ? "on" : "off");
     {
         std::int32_t richest = 0;
         int affords = 0;
@@ -796,33 +856,9 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
     // EVERY holding — anchor and secondary — is re-measured here to its centre on
     // the wrapped metric, from the tiles the record kept as placed (the world
     // printed here has settled, and a firm may since have exited).
-    struct spill
-    {
-        int anchor_in = 0, anchor_out = 0, second_in = 0, second_out = 0, unresolved = 0;
-        long long far_d2 = 0;
-    };
+    using spill = charter_spill;
     spill spec_sp, firm_sp;
-    for (const charter_record& r : rep.charters)
-    {
-        spill& s = r.specialist ? spec_sp : firm_sp;
-        const auto ct = w.population_centre_tile.find(r.centre);
-        for (std::size_t h = 0; h < r.holdings.size(); ++h)
-        {
-            const long long d2 = (ct != w.population_centre_tile.end())
-                ? charter_tile_d2(w, r.holdings[h], ct->second) : -1;
-            if (d2 < 0)
-            {
-                ++s.unresolved;
-                continue;
-            }
-            s.far_d2 = std::max(s.far_d2, d2);
-            const bool inside = d2 <= r2;
-            if (h == 0)
-                (inside ? s.anchor_in : s.anchor_out)++;
-            else
-                (inside ? s.second_in : s.second_out)++;
-        }
-    }
+    measure_charter_spill(w, rep, spend.window_radius, spec_sp, firm_sp);
     const auto print_spill = [&](const char* role, const spill& s) {
         std::printf("      %s holdings %d re-measured to their centre (radius %d): anchors %d inside / "
                     "%d outside; secondary %d inside / %d outside; unresolved %d; farthest %.2f tiles\n",
@@ -1037,6 +1073,1327 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                        : full ? "DIGEST CHECK PASS"
                               : "DIGEST CHECK PARTIAL - the rows checked pass, but pinned seeds were left out");
     return !clean ? 1 : full ? 0 : 3;
+}
+
+// --- BL-1033: what a denser corporate web costs --------------------------------
+//
+// `player_seed_sweep --charter-cost [--seeds a,b,c] [--budget-scales 1,2,4]
+//       [--resource-cap on|off|both] [--province-cap on|off|both]
+//       [--specialist-prices 4,8] [--ladder-scales 2|all] [--no-extra]
+//       [--no-forced] [--forced-only] [--forced-radius N] [--forced-pick sparse|richest]
+//       [--live-ticks N]
+//       [--out file.json] [--note TEXT]`
+//
+// WHY (DIGITISATION.md hard part 7, § Open questions; Ben, NR-889). The charter
+// prices are measured against live-play cost before either is fixed, and the
+// per-resource firm cap is measured KEPT and LIFTED before the ruling on which
+// gives way. This mode REPORTS; nothing in it is a verdict on a price or a cap.
+//
+// THE PRICE. A firm is 1 point (synthetic_charter_spend). A specialist costs a
+// whole number of firm charters (DIGITISATION.md § 1), read from
+// --specialist-prices (each > 0; default 4,8). The FIRST entry is the BASE price;
+// every later entry is a LADDER rung. Every row carries its price in its label,
+// and the table and the JSON write firm_price_points, specialist_firm_charters
+// and the specialist's price in points on every row (the none row, which spends
+// no budget, writes '-' and null).
+//
+// THE MATRIX, per seed. Every configuration is a full campaign start in app
+// order — the landscape search and its winner, the validation run, the seat —
+// and then a LIVE WINDOW after the seat:
+//   none                         the legacy baseline, no budget (the shipped path)
+//   synthetic Sx rcap R pcap P sp<base>
+//                                for each --budget-scales S x --resource-cap R x
+//                                --province-cap P, at the BASE price (defaults
+//                                1,2,4 x on,off x on, at 4)
+//   synthetic Lx rcap R pcap P sp<rung>
+//                                for each LADDER rung x --ladder-scales L x R x P
+//                                (defaults: rung 8 x 2 x on,off x on). `all` takes
+//                                the --budget-scales list, widening to the full cross.
+//   synthetic 4x rcap off pcap off sp<base>   the extra row (--no-extra drops it)
+//   forced province cap          at the BASE price: the 1x total on ONE centre, window radius
+//                                --forced-radius (default 4): BUILD ONLY (the
+//                                reason is decided at the apply), and the one row
+//                                with a verdict — province_cap > 0 and the points
+//                                balanced (--no-forced drops it). --forced-only runs
+//                                the none row build-only (it measures 1x) and this.
+//                                The centre is `--forced-pick sparse` (default:
+//                                pick_sparse_province_centre) or `richest`.
+//
+// WHY NOT THE RICHEST CENTRE AT RADIUS 1 (measured 2026-09-17, seed 28, both
+// readings reproducible with --forced-pick richest --forced-radius 1|4). At radius
+// 1 the window is 5 tiles and the specialist and three firms filled all five:
+// window_exhausted 80, province_cap 0. At radius 4 the 49-tile window took 21
+// firms and filled whole — the provinces around that centre are so small that the
+// tiles ran out before any province held two firms: window_exhausted 62,
+// province_cap 0. The cap binds only where a window is wider than the provinces
+// it spans and no second rung absorbs the charters, so the default pick reads
+// exactly that ground.
+//
+// THE DEFAULT MATRIX is eleven rows per seed — ten full rows and one build-only
+// row, sized so three seeds stay affordable:
+//   none; 1x, 2x, 4x x rcap on/off at sp4 (pcap on); 2x x rcap on/off at sp8
+//   (pcap on); 4x rcap off pcap off at sp4; forced province cap at sp4.
+// Flags widen it (--province-cap both, --ladder-scales all, more prices).
+//
+// THE BUDGET IS SYNTHETIC TEST INPUT (harness_params.hpp): seeded weights, never
+// population, 1x = the none row's chartered count on the same seed. Every header
+// says so, and no reading here is a density-follows-cities result. A scale whose
+// synthetic total rounds to 0 on a seed (llround(scale x 1x) == 0) would be an
+// EMPTY budget — today's world under a budget label — so the run REFUSES it with
+// exit 2 as soon as that seed's 1x is measured, before any row settles.
+//
+// EVERY ROW BUILDS ITS OWN WORLD, generation included, and never copies one.
+// MEASURED 2026-09-17 (seed 28): a pre-landscape world built once and COPIED per
+// row matched the pins at D_search and D_land and DIFFERED at D_settle and D_seat
+// — a copied world does not settle byte for byte as the one it was copied from
+// (the `world` copy, not the registry's: harness_params.hpp build_app_base_world
+// records the probe). So the row is `build_app_base_world` then `apply_app_start_landscape` on the
+// same object (exactly `build_app_start_world`, split only so the landscape
+// phase is timed on its own). The none row takes the four BL-1031 digests and,
+// on a pinned seed, must match the pins — the proof this mode measures the
+// shipped start. A mismatch fails the run.
+//
+// TIMINGS ARE WALL CLOCK and only as clean as the machine was quiet. `--note`
+// records the run conditions into the JSON; the build type prints on every header.
+//   search   ms per evaluation at thread_count 1 (the app's): round_ms[0] is the
+//            seed candidate's evaluation; the rest of round_ms over the rest of
+//            the evaluations is the per-proposal mean.
+//   val      ms per economy tick over the 12 validation ticks (run_app_validation_settle).
+//   live     ms per economy tick over the live window after the seat
+//            (run_app_live_window — app.cpp:380-423 into step_economy, not
+//            spectating).
+//   BOTH ARE A LOWER BOUND on the app's step_economy. They time laps 0-5 —
+//   phase 5 is the app's "standings + convoy credit + exits" lap, with
+//   compute_corp_standings mirrored — and NOT laps 6-8: the agency comms, battle
+//   dispatches, persona counsel, the history recorders and the strategy readout
+//   are neither run nor timed (src/core, src/ui). That gap widens with density.
+//   evalsDue a COUNT, not a cost: corporations corp_strategic_eval_due names at the
+//            live window's day tick. post_persona_counsel evaluates at most the
+//            one open-channel corporation per tick (BL-398,
+//            session_history.cpp:206-220), so its live cost does not scale with
+//            corporation count; the column is printed away from the timings.
+
+struct cost_config
+{
+    enum class kind { none, synthetic, forced };
+    kind   k             = kind::none;
+    double scale         = 1.0;
+    bool   resource_cap  = true;
+    bool   province_cap  = true;
+    int    window_radius = 4;
+    /// The specialist's price as a whole number of firm charters (a --specialist-prices
+    /// entry). The firm's price is synthetic_charter_spend's. Unused on the none row.
+    std::int32_t specialist_firm_charters = 4;
+    /// Stop after the landscape lands (no settle, seat or live window). Always
+    /// true for `forced`; true for `none` only under --forced-only.
+    bool   build_only    = false;
+    /// The 1x the budget was built from, for the forced row's charter report only.
+    std::size_t legacy_specialists = 0, legacy_firms = 0;
+    /// The forced row's pick (`--forced-pick`) and centre, recorded for the JSON.
+    bool        forced_pick_sparse = true;
+    entity_id   forced_centre      = null_entity;
+};
+
+std::string cost_config_label(const cost_config& c)
+{
+    char buf[128];
+    switch (c.k)
+    {
+    case cost_config::kind::none:
+        return "none (legacy)";
+    case cost_config::kind::synthetic:
+        std::snprintf(buf, sizeof buf, "synthetic %gx rcap %s pcap %s sp%d", c.scale,
+                      c.resource_cap ? "on" : "off", c.province_cap ? "on" : "off",
+                      static_cast<int>(c.specialist_firm_charters));
+        return buf;
+    case cost_config::kind::forced:
+        std::snprintf(buf, sizeof buf, "forced pcap (%gx on 1 centre, r%d, sp%d)", c.scale,
+                      c.window_radius, static_cast<int>(c.specialist_firm_charters));
+        return buf;
+    }
+    return "?";
+}
+
+struct tick_summary
+{
+    int    n = 0;
+    double median = 0.0, mean = 0.0, min = 0.0, max = 0.0;
+};
+
+tick_summary summarise(const std::vector<double>& v)
+{
+    tick_summary s;
+    s.n = static_cast<int>(v.size());
+    if (v.empty())
+        return s;
+    std::vector<double> sorted = v;
+    std::sort(sorted.begin(), sorted.end());
+    const std::size_t n = sorted.size();
+    s.median = (n % 2 == 1) ? sorted[n / 2] : 0.5 * (sorted[n / 2 - 1] + sorted[n / 2]);
+    double sum = 0.0;
+    for (const double x : sorted)
+        sum += x;
+    s.mean = sum / static_cast<double>(n);
+    s.min  = sorted.front();
+    s.max  = sorted.back();
+    return s;
+}
+
+struct body_counts
+{
+    int corps = 0, background = 0;
+    /// The body carrying the most corporations (ties to the lower id), and its counts.
+    entity_id busiest = null_entity;
+    int busiest_corps = 0, busiest_background = 0;
+};
+
+/// Corporations in the world and on its busiest body. A corporation's body is
+/// the body of its first holding's tile; one with no resolvable holding counts
+/// in the world total only.
+body_counts count_corporations(const world& w)
+{
+    body_counts out;
+    std::map<entity_id, std::pair<int, int>> by_body;
+    for (const auto& [cid, cc] : w.corporations)
+    {
+        ++out.corps;
+        if (cc.is_background)
+            ++out.background;
+        if (cc.assets.empty())
+            continue;
+        const auto b = w.buildings.find(cc.assets.front());
+        if (b == w.buildings.end())
+            continue;
+        const auto t = w.tiles.find(b->second.tile);
+        if (t == w.tiles.end())
+            continue;
+        auto& n = by_body[t->second.body];
+        ++n.first;
+        if (cc.is_background)
+            ++n.second;
+    }
+    for (const auto& [body, n] : by_body)   // ascending id: a tie keeps the lower
+        if (n.first > out.busiest_corps)
+        {
+            out.busiest            = body;
+            out.busiest_corps      = n.first;
+            out.busiest_background = n.second;
+        }
+    return out;
+}
+
+struct cost_row
+{
+    cost_config cfg;
+    std::string label;
+    bool        threw = false;
+    std::string error;
+    double      wall_ms = 0.0;
+    double      base_ms = 0.0;   ///< generation through load_economy (build_app_base_world)
+    bool        build_only = false;
+
+    /// Set when the at-land hook refused the row (a zero synthetic total): the
+    /// row stopped at the landscape and nothing after it was measured.
+    bool        stopped_at_land = false;
+
+    // --- the budget and its spend (budget rows only) ---
+    bool        budget_row = false;
+    /// The prices the row's spend ran on, read back from the spend params it
+    /// handed the seam (budget rows only; the none row spends nothing).
+    std::int32_t firm_price_points = 0, specialist_firm_charters = 0;
+    long long    specialist_price_points = 0;
+    long long   points_budgeted = 0, points_spent = 0, points_unspent = 0;
+    bool        balanced = true;
+    bool        refused  = false;
+    std::array<long long, charter_unspent_reason_count> unspent_by_reason{};
+    int         budget_centres = 0;
+    int         richest_centre_points = 0;
+    int         centres_affording_specialist = 0;
+    charter_spill spec_spill, firm_spill;
+
+    // --- the landscape as it landed ---
+    std::size_t specialists = 0, firms = 0;
+    bool        any_specialist = false;
+    double      largest_nation_share = 0.0;   ///< of specialists, by home nation
+    entity_id   largest_nation = null_entity;
+    int         specialist_nations = 0;
+    body_counts at_land, at_seat;
+
+    // --- the search ---
+    int    evaluations = 0;
+    int    accepted = 0;
+    double seed_eval_ms = 0.0, proposal_mean_ms = 0.0, search_ms = 0.0, landscape_ms = 0.0;
+    std::vector<double> round_ms;
+
+    // --- ticks ---
+    app_tick_timing val, live;
+    tick_summary    val_sum, live_sum;
+    /// Mean of live.strategic_evals_due — a COUNT, not a cost (see the section note).
+    double          strategic_evals_due_mean = 0.0;
+
+    // --- the seat ---
+    entity_id seated = null_entity;
+    bool      floor_unmet = false;
+    int       seat_specialists = 0, shortlist = 0;
+    int       trail_n = 0;
+    double    trail_min = 0.0, trail_median = 0.0, trail_max = 0.0, trail_neg_share = 0.0;
+
+    // --- the none row's fidelity check ---
+    bool          digested = false, pinned = false, digest_match = false;
+    world_digests dig;
+    std::string   digest_diff;
+
+    // --- the forced row's verdict ---
+    bool forced_pass = false;
+};
+
+/// Run one configuration: its own world built in app order, then measured.
+/// @p at_land runs as the landscape lands; returning false stops the row there
+/// (`stopped_at_land`), before any settle, seat or live window.
+void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
+                     const charter_budget* budget, int live_ticks, cost_row& row,
+                     const std::function<bool(const app_start_world&)>& at_land = {})
+{
+    using clk = std::chrono::steady_clock;
+    const auto wall0 = clk::now();
+    row.cfg        = cfg;
+    row.label      = cost_config_label(cfg);
+    row.build_only = cfg.build_only || cfg.k == cost_config::kind::forced;
+    row.budget_row = cfg.k != cost_config::kind::none;
+
+    // The spend this row hands the seam, and the prices it records — set first,
+    // so even a row that throws below carries the price it was run at.
+    charter_spend_report  report;
+    harness_charter_input charter;
+    if (row.budget_row)
+    {
+        charter.budget              = budget;
+        charter.spend               = synthetic_charter_spend();
+        charter.spend.resource_cap  = cfg.resource_cap;
+        charter.spend.province_cap  = cfg.province_cap;
+        charter.spend.window_radius = cfg.window_radius;
+        charter.spend.specialist_firm_charters = cfg.specialist_firm_charters;
+        charter.report              = &report;
+        row.firm_price_points        = charter.spend.firm_price_points;
+        row.specialist_firm_charters = charter.spend.specialist_firm_charters;
+        row.specialist_price_points  = static_cast<long long>(charter.spend.specialist_price_points());
+    }
+
+    // A budget row with no points would take the legacy branch and measure
+    // TODAY'S world under a budget label. run_charter_cost refuses such a scale
+    // (exit 2) before any budget row runs; this is the backstop.
+    if (row.budget_row && (budget == nullptr || budget->empty()))
+        throw std::runtime_error("budget row '" + row.label + "' has an empty budget: it would "
+                                 "measure today's world under a budget label");
+
+    // The row's own world, from generation — never a copy (see the section note).
+    auto run = std::make_unique<app_start_world>();
+    {
+        world_params p{};
+        p.seed = seed;
+        const auto g0 = clk::now();
+        build_app_base_world(lua, p, *run);
+        row.base_ms = std::chrono::duration<double, std::milli>(clk::now() - g0).count();
+    }
+
+    const auto land0 = clk::now();
+    apply_app_start_landscape(*run, charter);
+    row.landscape_ms = std::chrono::duration<double, std::milli>(clk::now() - land0).count();
+    if (at_land && !at_land(*run))
+    {
+        row.stopped_at_land = true;
+        row.wall_ms = std::chrono::duration<double, std::milli>(clk::now() - wall0).count();
+        return;
+    }
+
+    const landscape_search_result& sr = run->land.search;
+    row.evaluations  = sr.evaluations;
+    row.accepted     = sr.accepted;
+    row.round_ms     = sr.round_ms;
+    row.seed_eval_ms = sr.round_ms.empty() ? 0.0 : sr.round_ms.front();
+    for (const double ms : sr.round_ms)
+        row.search_ms += ms;
+    row.proposal_mean_ms = (sr.evaluations > 1)
+        ? (row.search_ms - row.seed_eval_ms) / static_cast<double>(sr.evaluations - 1) : 0.0;
+
+    const world& w = run->w;
+    row.specialists    = run->land.specialists.size();
+    row.firms          = run->land.firms.size();
+    row.any_specialist = row.specialists > 0;
+    {
+        std::map<entity_id, int> by_nation;
+        for (const entity_id sid : run->land.specialists)
+            ++by_nation[w.corporations.at(sid).home_nation];
+        row.specialist_nations = static_cast<int>(by_nation.size());
+        int most = 0;
+        for (const auto& [nation, n] : by_nation)   // ascending id: a tie keeps the lower
+            if (n > most)
+            {
+                most               = n;
+                row.largest_nation = nation;
+            }
+        row.largest_nation_share = row.specialists > 0
+            ? static_cast<double>(most) / static_cast<double>(row.specialists) : 0.0;
+    }
+    row.at_land = count_corporations(w);
+
+    if (row.budget_row)
+    {
+        row.refused         = report.refused;
+        row.points_budgeted = report.points_budgeted;
+        row.points_spent    = report.points_spent;
+        row.points_unspent  = report.points_unspent;
+        row.balanced        = report.points_budgeted == report.points_spent + report.points_unspent;
+        for (const charter_unspent& u : report.unspent)
+            row.unspent_by_reason[static_cast<std::size_t>(u.reason)] += u.points;
+        row.budget_centres = static_cast<int>(budget->points().size());
+        for (const auto& kv : budget->points())
+        {
+            row.richest_centre_points = std::max(row.richest_centre_points, kv.second);
+            if (kv.second >= charter.spend.specialist_price_points())
+                ++row.centres_affording_specialist;
+        }
+        measure_charter_spill(w, report, charter.spend.window_radius, row.spec_spill,
+                              row.firm_spill);
+    }
+
+    if (cfg.k == cost_config::kind::none)
+    {
+        row.digested = true;
+        digest_at_land(*run, row.dig);
+    }
+
+    if (row.build_only && !row.budget_row)
+    {
+        row.wall_ms = std::chrono::duration<double, std::milli>(clk::now() - wall0).count();
+        return;
+    }
+    if (row.build_only)
+    {
+        const long long pcap =
+            row.unspent_by_reason[static_cast<std::size_t>(charter_unspent_reason::province_cap)];
+        row.forced_pass = row.budget_row && !row.refused && row.balanced && pcap > 0;
+        std::printf("      FORCED PROVINCE CAP — SYNTHETIC TEST INPUT, build only:\n");
+        print_charter_report(w, charter_mode::synthetic, *budget, charter.spend, report, sr,
+                             cfg.legacy_specialists, cfg.legacy_firms, cfg.scale);
+        std::printf("      %s  province_cap unspent %lld points (must be > 0); points %s; %s\n",
+                    row.forced_pass ? "PASS" : "FAIL", pcap,
+                    row.balanced ? "balanced" : "UNBALANCED",
+                    row.refused ? "REFUSED (unexpected)" : "not refused");
+        row.wall_ms = std::chrono::duration<double, std::milli>(clk::now() - wall0).count();
+        return;
+    }
+
+    run_app_validation_settle(run->w, run->reg, k_settle_ticks, &row.val);
+    if (row.digested)
+        digest_at_settle(*run, row.dig);
+
+    // app::seat_player (app.cpp:933), as build_and_seat does.
+    const spawn_seat_result res =
+        seat_player_corporation(run->w, run->params.seed, run->land.search.winner_score);
+    if (row.digested)
+        digest_at_seat(*run, res, row.dig);
+    row.seated           = res.seated;
+    row.floor_unmet      = res.floor_unmet;
+    row.seat_specialists = res.specialist_count;
+    row.shortlist        = res.shortlist_size;
+    {
+        std::vector<double> trail;
+        for (const spawn_seat_candidate& c : res.candidates)
+            if (c.shortlisted)
+                trail.push_back(static_cast<double>(c.trailing_net));
+        row.trail_n = static_cast<int>(trail.size());
+        if (!trail.empty())
+        {
+            const tick_summary t = summarise(trail);
+            row.trail_min    = t.min;
+            row.trail_median = t.median;
+            row.trail_max    = t.max;
+            int neg = 0;
+            for (const double x : trail)
+                if (x < 0.0)
+                    ++neg;
+            row.trail_neg_share = static_cast<double>(neg) / static_cast<double>(trail.size());
+        }
+    }
+    row.at_seat = count_corporations(run->w);
+
+    // The live window, after the seat: econ ticks continue from the validation run.
+    run_app_live_window(run->w, run->reg, /*first_econ_step=*/k_settle_ticks, live_ticks, &row.live);
+
+    row.val_sum  = summarise(row.val.tick_ms);
+    row.live_sum = summarise(row.live.tick_ms);
+    if (!row.live.strategic_evals_due.empty())
+    {
+        double due = 0.0;
+        for (const int n : row.live.strategic_evals_due)
+            due += n;
+        row.strategic_evals_due_mean = due / static_cast<double>(row.live.strategic_evals_due.size());
+    }
+    row.wall_ms = std::chrono::duration<double, std::milli>(clk::now() - wall0).count();
+}
+
+std::string json_escape(const std::string& in)
+{
+    std::string out;
+    out.reserve(in.size() + 8);
+    for (const char ch : in)
+    {
+        const unsigned char c = static_cast<unsigned char>(ch);
+        if (c == '"' || c == '\\') { out += '\\'; out += ch; }
+        else if (c == '\n')        out += "\\n";
+        else if (c < 0x20)
+        {
+            char buf[8];
+            std::snprintf(buf, sizeof buf, "\\u%04x", c);
+            out += buf;
+        }
+        else
+            out += ch;
+    }
+    return out;
+}
+
+struct cost_options
+{
+    std::vector<double> scales = { 1.0, 2.0, 4.0 };
+    std::vector<bool>   resource_caps = { true, false };
+    std::vector<bool>   province_caps = { true };
+    /// --specialist-prices: firm charters per specialist. [0] is the BASE price
+    /// (the full scale cross, the extra row, the forced row); the rest are LADDER
+    /// rungs, each run at `ladder_scales`.
+    std::vector<std::int32_t> specialist_prices = { 4, 8 };
+    /// --ladder-scales: the scales a ladder rung runs at (default 2x).
+    std::vector<double> ladder_scales = { 2.0 };
+    /// --ladder-scales all: a ladder rung runs at every --budget-scales entry.
+    bool        ladder_all = false;
+    bool        extra   = true;
+    bool        forced  = true;
+    bool        forced_only = false;
+    int         forced_radius = 4;
+    bool        forced_sparse = true;   ///< --forced-pick sparse (default) | richest
+    int         live_ticks = 8;
+    std::string out_path;
+    std::string note;
+    std::vector<std::string> argv;
+};
+
+struct cost_seed
+{
+    uint32_t    seed = 0;
+    long long   legacy_1x = 0;
+    std::size_t legacy_specialists = 0, legacy_firms = 0;
+    bool        threw = false;
+    std::string error;
+    std::vector<cost_row> rows;
+};
+
+const char* build_type_label()
+{
+#ifdef NDEBUG
+    return "Release (NDEBUG)";
+#else
+    return "DEBUG (NDEBUG unset) - these timings are NOT Release timings";
+#endif
+}
+
+void write_cost_json(const std::string& path, const cost_options& opt,
+                     const std::vector<cost_seed>& seeds,
+                     // BL-1033 cold re-review: a refused scale used to exit before the
+                     // JSON was written, leaving an --out file that read like a complete
+                     // shorter run. An aborted run now says so on its face.
+                     const char* aborted_reason = nullptr, uint32_t aborted_seed = 0)
+{
+    std::FILE* f = std::fopen(path.c_str(), "wb");
+    if (f == nullptr)
+    {
+        std::printf("--out: cannot open '%s' for writing\n", path.c_str());
+        return;
+    }
+    const auto b = [](bool v) { return v ? "true" : "false"; };
+    std::fprintf(f, "{\n  \"tool\": \"player_seed_sweep --charter-cost\",\n");
+    std::fprintf(f, "  \"item\": \"BL-1033\",\n");
+    if (aborted_reason != nullptr)
+        std::fprintf(f, "  \"aborted\": {\"reason\": \"%s\", \"seed\": %u, \"complete\": false},\n",
+                     json_escape(aborted_reason).c_str(), aborted_seed);
+    else
+        std::fprintf(f, "  \"aborted\": null,\n");
+    std::fprintf(f, "  \"synthetic_test_input\": true,\n");
+    std::fprintf(f, "  \"synthetic_note\": \"%s\",\n",
+                 json_escape("SYNTHETIC TEST INPUT: seeded weights, never population; 1x = the none "
+                             "row's chartered count on the same seed. Never a density-follows-cities "
+                             "reading.").c_str());
+    std::fprintf(f, "  \"build\": \"%s\",\n", build_type_label());
+#ifdef _MSC_FULL_VER
+    std::fprintf(f, "  \"msc_full_ver\": %lld,\n", static_cast<long long>(_MSC_FULL_VER));
+#endif
+    std::fprintf(f, "  \"note\": \"%s\",\n", json_escape(opt.note).c_str());
+    std::fprintf(f, "  \"argv\": [");
+    for (std::size_t i = 0; i < opt.argv.size(); ++i)
+        std::fprintf(f, "%s\"%s\"", i ? ", " : "", json_escape(opt.argv[i]).c_str());
+    std::fprintf(f, "],\n");
+    std::fprintf(f, "  \"validation_ticks\": %d,\n  \"live_ticks\": %d,\n  \"search_thread_count\": 1,\n",
+                 k_settle_ticks, opt.live_ticks);
+    std::fprintf(f, "  \"firm_price_points\": %d,\n  \"specialist_prices_firm_charters\": [",
+                 static_cast<int>(synthetic_charter_spend().firm_price_points));
+    for (std::size_t i = 0; i < opt.specialist_prices.size(); ++i)
+        std::fprintf(f, "%s%d", i ? ", " : "", static_cast<int>(opt.specialist_prices[i]));
+    std::fprintf(f, "],\n  \"ladder_scales\": ");
+    if (opt.ladder_all)
+        std::fprintf(f, "\"all\"");
+    else
+    {
+        std::fprintf(f, "[");
+        for (std::size_t i = 0; i < opt.ladder_scales.size(); ++i)
+            std::fprintf(f, "%s%g", i ? ", " : "", opt.ladder_scales[i]);
+        std::fprintf(f, "]");
+    }
+    std::fprintf(f, ",\n  \"price_note\": \"%s\",\n",
+                 json_escape("Every row carries firm_price_points, specialist_firm_charters and "
+                             "specialist_price_points (= firm x charters); null on the none row, "
+                             "which spends no budget. specialist_prices_firm_charters[0] is the base "
+                             "price; later entries are ladder rungs run at ladder_scales.").c_str());
+    std::fprintf(f, "  \"timing_note\": \"%s\",\n",
+                 json_escape("tick_ms times app::step_economy laps 0-5 only (phase 5 = standings + "
+                             "convoy credit + firm exits, compute_corp_standings mirrored). Laps 6-8 "
+                             "- agency comms, battle dispatches, persona counsel, the history "
+                             "recorders, the strategy readout - are NOT run and NOT timed, so val and "
+                             "live ms per tick are a LOWER BOUND on the app's step_economy that "
+                             "widens with density. Wall clock: only as clean as the machine was quiet.").c_str());
+    std::fprintf(f, "  \"strategic_evals_due_note\": \"%s\",\n",
+                 json_escape("A COUNT, not a cost driver: corporations corp_strategic_eval_due names "
+                             "at each live tick's day tick. post_persona_counsel evaluates at most the "
+                             "one open-channel corporation per tick (BL-398, "
+                             "session_history.cpp:206-220), so its live cost does not scale with "
+                             "corporation count.").c_str());
+    std::fprintf(f, "  \"tick_phases\": [");
+    for (int i = 0; i < k_app_tick_phase_count; ++i)
+        std::fprintf(f, "%s\"%s\"", i ? ", " : "", k_app_tick_phase_names[i]);
+    std::fprintf(f, "],\n  \"unspent_reasons\": [");
+    for (int i = 0; i < charter_unspent_reason_count; ++i)
+        std::fprintf(f, "%s\"%s\"", i ? ", " : "",
+                     charter_unspent_reason_name(static_cast<charter_unspent_reason>(i)));
+    std::fprintf(f, "],\n  \"seeds\": [\n");
+    for (std::size_t si = 0; si < seeds.size(); ++si)
+    {
+        const cost_seed& s = seeds[si];
+        std::fprintf(f, "    {\n      \"seed\": %u,\n      \"threw\": %s,\n      \"error\": \"%s\",\n",
+                     s.seed, b(s.threw), json_escape(s.error).c_str());
+        std::fprintf(f, "      \"legacy_1x\": %lld,\n"
+                        "      \"legacy_specialists\": %zu,\n      \"legacy_firms\": %zu,\n"
+                        "      \"configs\": [\n",
+                     s.legacy_1x, s.legacy_specialists, s.legacy_firms);
+        for (std::size_t ri = 0; ri < s.rows.size(); ++ri)
+        {
+            const cost_row& r = s.rows[ri];
+            const char* kind = r.cfg.k == cost_config::kind::none ? "none"
+                             : r.cfg.k == cost_config::kind::synthetic ? "synthetic" : "forced";
+            const char* sep  = ri + 1 < s.rows.size() ? "," : "";
+            std::fprintf(f, "        {\n");
+            std::fprintf(f, "          \"label\": \"%s\", \"kind\": \"%s\", \"scale\": %g, "
+                            "\"resource_cap\": %s, \"province_cap\": %s, \"window_radius\": %d,\n",
+                         json_escape(r.label).c_str(), kind, r.cfg.scale,
+                         b(r.cfg.resource_cap), b(r.cfg.province_cap), r.cfg.window_radius);
+            if (r.budget_row)
+                std::fprintf(f, "          \"firm_price_points\": %d, \"specialist_firm_charters\": %d, "
+                                "\"specialist_price_points\": %lld,\n",
+                             static_cast<int>(r.firm_price_points),
+                             static_cast<int>(r.specialist_firm_charters), r.specialist_price_points);
+            else
+                std::fprintf(f, "          \"firm_price_points\": null, \"specialist_firm_charters\": null, "
+                                "\"specialist_price_points\": null,\n");
+            std::fprintf(f, "          \"threw\": %s, \"error\": \"%s\", \"wall_ms\": %.1f, "
+                            "\"generation_ms\": %.1f, \"build_only\": %s, \"stopped_at_land\": %s",
+                         b(r.threw), json_escape(r.error).c_str(), r.wall_ms, r.base_ms,
+                         b(r.build_only), b(r.stopped_at_land));
+            if (r.threw || r.stopped_at_land)
+            {
+                std::fprintf(f, "\n        }%s\n", sep);
+                continue;
+            }
+            if (r.budget_row)
+            {
+                std::fprintf(f, ",\n          \"budget\": { \"points_budgeted\": %lld, \"points_spent\": %lld, "
+                                "\"points_unspent\": %lld, \"balanced\": %s, \"refused\": %s, "
+                                "\"centres\": %d, \"richest_centre_points\": %d, "
+                                "\"centres_affording_specialist\": %d, \"unspent_by_reason\": {",
+                             r.points_budgeted, r.points_spent, r.points_unspent, b(r.balanced),
+                             b(r.refused), r.budget_centres, r.richest_centre_points,
+                             r.centres_affording_specialist);
+                for (int i = 0; i < charter_unspent_reason_count; ++i)
+                    std::fprintf(f, "%s\"%s\": %lld", i ? ", " : " ",
+                                 charter_unspent_reason_name(static_cast<charter_unspent_reason>(i)),
+                                 r.unspent_by_reason[static_cast<std::size_t>(i)]);
+                const auto spill = [&](const charter_spill& sp) {
+                    std::fprintf(f, "{ \"anchor_in\": %d, \"anchor_out\": %d, \"secondary_in\": %d, "
+                                    "\"secondary_out\": %d, \"unresolved\": %d, \"farthest_tiles\": %.2f }",
+                                 sp.anchor_in, sp.anchor_out, sp.second_in, sp.second_out,
+                                 sp.unresolved, std::sqrt(static_cast<double>(sp.far_d2)));
+                };
+                std::fprintf(f, " },\n            \"holdings_specialist\": ");
+                spill(r.spec_spill);
+                std::fprintf(f, ", \"holdings_firm\": ");
+                spill(r.firm_spill);
+                std::fprintf(f, ",\n            \"holdings_inside_window\": %d, \"holdings_outside_window\": %d }",
+                             r.spec_spill.anchor_in + r.spec_spill.second_in
+                                 + r.firm_spill.anchor_in + r.firm_spill.second_in,
+                             r.spec_spill.anchor_out + r.spec_spill.second_out
+                                 + r.firm_spill.anchor_out + r.firm_spill.second_out);
+                if (r.cfg.k == cost_config::kind::forced)
+                    std::fprintf(f, ",\n          \"forced_province_cap_pass\": %s, \"forced_pick\": \"%s\", "
+                                    "\"forced_centre\": %u",
+                                 b(r.forced_pass), r.cfg.forced_pick_sparse ? "sparse" : "richest",
+                                 r.cfg.forced_centre);
+            }
+            std::fprintf(f, ",\n          \"landscape\": { \"specialists\": %zu, \"firms\": %zu, "
+                            "\"any_specialist\": %s, \"specialist_nations\": %d, "
+                            "\"largest_nation_share\": %.4f, \"largest_nation\": %u,\n"
+                            "            \"corporations_at_land\": %d, \"background_at_land\": %d, "
+                            "\"busiest_body_at_land\": %u, \"busiest_body_corporations_at_land\": %d, "
+                            "\"busiest_body_background_at_land\": %d }",
+                         r.specialists, r.firms, b(r.any_specialist), r.specialist_nations,
+                         r.largest_nation_share, r.largest_nation, r.at_land.corps,
+                         r.at_land.background, r.at_land.busiest, r.at_land.busiest_corps,
+                         r.at_land.busiest_background);
+            std::fprintf(f, ",\n          \"search\": { \"evaluations\": %d, \"accepted\": %d, "
+                            "\"seed_eval_ms\": %.1f, \"proposal_mean_ms\": %.1f, \"search_ms\": %.1f, "
+                            "\"landscape_phase_ms\": %.1f, \"round_ms\": [",
+                         r.evaluations, r.accepted, r.seed_eval_ms, r.proposal_mean_ms, r.search_ms,
+                         r.landscape_ms);
+            for (std::size_t i = 0; i < r.round_ms.size(); ++i)
+                std::fprintf(f, "%s%.1f", i ? ", " : "", r.round_ms[i]);
+            std::fprintf(f, "] }");
+            if (r.build_only)
+            {
+                if (r.digested)
+                    std::fprintf(f, ",\n          \"digests\": { \"search\": \"%016" PRIX64 "\", \"land\": \"%016"
+                                    PRIX64 "\", \"pinned\": %s, \"match_search_and_land\": %s }",
+                                 r.dig.search, r.dig.land, b(r.pinned), b(r.digest_match));
+                std::fprintf(f, "\n        }%s\n", sep);
+                continue;
+            }
+            const auto ticks = [&](const char* name, const app_tick_timing& t, const tick_summary& ts,
+                                   bool live) {
+                std::fprintf(f, ",\n          \"%s\": { \"n\": %d, \"median_ms\": %.2f, \"mean_ms\": %.2f, "
+                                "\"min_ms\": %.2f, \"max_ms\": %.2f, \"tick_ms\": [",
+                             name, ts.n, ts.median, ts.mean, ts.min, ts.max);
+                for (std::size_t i = 0; i < t.tick_ms.size(); ++i)
+                    std::fprintf(f, "%s%.2f", i ? ", " : "", t.tick_ms[i]);
+                std::fprintf(f, "], \"phase_ms_sum\": {");
+                for (int i = 0; i < k_app_tick_phase_count; ++i)
+                    std::fprintf(f, "%s\"%s\": %.2f", i ? ", " : " ", k_app_tick_phase_names[i],
+                                 t.phase_ms[i]);
+                std::fprintf(f, " }");
+                if (live)
+                    std::fprintf(f, ", \"between_ticks_ms_sum\": %.2f", t.between_ms);
+                std::fprintf(f, ", \"lower_bound\": true }");
+            };
+            ticks("validation_ticks", r.val, r.val_sum, false);
+            ticks("live_ticks", r.live, r.live_sum, true);
+            std::fprintf(f, ",\n          \"seat\": { \"seated\": %u, \"floor_unmet\": %s, "
+                            "\"specialists\": %d, \"shortlist\": %d, \"trailing_net_n\": %d, "
+                            "\"trailing_net_min\": %.1f, \"trailing_net_median\": %.1f, "
+                            "\"trailing_net_max\": %.1f, \"trailing_net_negative_share\": %.4f, "
+                            "\"corporations_at_seat\": %d, \"background_at_seat\": %d,\n"
+                            "            \"busiest_body_at_seat\": %u, "
+                            "\"busiest_body_corporations_at_seat\": %d, "
+                            "\"busiest_body_background_at_seat\": %d }",
+                         r.seated, b(r.floor_unmet), r.seat_specialists, r.shortlist, r.trail_n,
+                         r.trail_min, r.trail_median, r.trail_max, r.trail_neg_share,
+                         r.at_seat.corps, r.at_seat.background, r.at_seat.busiest,
+                         r.at_seat.busiest_corps, r.at_seat.busiest_background);
+            // A COUNT, kept apart from the timings (strategic_evals_due_note).
+            std::fprintf(f, ",\n          \"strategic_evals_due\": { \"count_not_cost\": true, "
+                            "\"mean\": %.2f, \"per_live_tick\": [", r.strategic_evals_due_mean);
+            for (std::size_t i = 0; i < r.live.strategic_evals_due.size(); ++i)
+                std::fprintf(f, "%s%d", i ? ", " : "", r.live.strategic_evals_due[i]);
+            std::fprintf(f, "] }");
+            if (r.digested)
+                std::fprintf(f, ",\n          \"digests\": { \"search\": \"%016" PRIX64 "\", \"land\": \"%016"
+                                PRIX64 "\", \"settle\": \"%016" PRIX64 "\", \"seat\": \"%016" PRIX64
+                                "\", \"pinned\": %s, \"match\": %s, \"diff\": \"%s\" }",
+                             r.dig.search, r.dig.land, r.dig.settle, r.dig.seat, b(r.pinned),
+                             b(r.digest_match), json_escape(r.digest_diff).c_str());
+            std::fprintf(f, "\n        }%s\n", sep);
+        }
+        std::fprintf(f, "      ]\n    }%s\n", si + 1 < seeds.size() ? "," : "");
+    }
+    std::fprintf(f, "  ]\n}\n");
+    std::fclose(f);
+}
+
+/// The table's legend and column heads. Every price in it is read from the spend
+/// params the rows run on (synthetic_charter_spend's firm price, the
+/// --specialist-prices ladder), never restated as a literal.
+void print_cost_table_header(const cost_options& opt)
+{
+    const charter_spend_params spend = synthetic_charter_spend();
+    std::string ladder;
+    for (std::size_t i = 0; i < opt.specialist_prices.size(); ++i)
+    {
+        char buf[64];
+        std::snprintf(buf, sizeof buf, "%s%d firm charters = %lld points%s", i ? ", " : "",
+                      static_cast<int>(opt.specialist_prices[i]),
+                      static_cast<long long>(spend.firm_price_points)
+                          * static_cast<long long>(opt.specialist_prices[i]),
+                      i == 0 ? " (base)" : "");
+        ladder += buf;
+    }
+    std::printf("  SYNTHETIC TEST INPUT on every budget row (seeded weights, never population). "
+                "PRICES per row: firm = %d point(s); specialist ladder %s. fP firm price in points, "
+                "sFC specialist price in firm charters, sPts specialist price in points ('-' on the "
+                "none row: it spends no budget) | unspent points by reason | anyS a specialist exists, "
+                "natSh largest one-nation share of specialists | holdings inside/outside the window | "
+                "corps/bg at land | search evaluations, seed-candidate ms, per-proposal mean ms | val "
+                "and live ms per economy tick over step_economy laps 0-5 ONLY — a LOWER BOUND on the "
+                "app's tick that widens with density: agency comms, battle dispatches, persona "
+                "counsel, the history recorders and the strategy readout are NOT timed | shortlist, "
+                "trailing net over it, negative share | evalsDue = strategic evals due per live tick "
+                "(count) — NOT a cost: BL-398 bounds counsel's export and evaluation to the one "
+                "open-channel corporation per tick, so only its sort and channel walk follow density\n",
+                static_cast<int>(spend.firm_price_points), ladder.c_str());
+    std::printf("  %-40s %3s %3s %4s | %4s %5s | %6s %6s %6s %6s %6s %6s | %4s %5s | %11s | %9s | "
+                "%5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
+                "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window", "body",
+                "remain", "nonat", "anyS", "natSh", "hold in/out", "corps/bg", "evals", "seed_ms",
+                "prop_ms", "val med/mean", "live med/mean", "short", "trail8 min/med/max", "neg%",
+                "evalsDue");
+}
+
+void print_cost_row(const cost_row& r)
+{
+    if (r.threw)
+    {
+        std::printf("  %-40s THREW: %s\n", r.label.c_str(), r.error.c_str());
+        return;
+    }
+    char fp[16] = "-", sfc[16] = "-", spts[24] = "-";
+    if (r.budget_row)
+    {
+        std::snprintf(fp, sizeof fp, "%d", static_cast<int>(r.firm_price_points));
+        std::snprintf(sfc, sizeof sfc, "%d", static_cast<int>(r.specialist_firm_charters));
+        std::snprintf(spts, sizeof spts, "%lld", r.specialist_price_points);
+    }
+    if (r.stopped_at_land)
+    {
+        std::printf("  %-40s %3s %3s %4s | stopped as the landscape landed: nothing measured\n",
+                    r.label.c_str(), fp, sfc, spts);
+        return;
+    }
+    const auto u = [&](charter_unspent_reason why) {
+        return r.unspent_by_reason[static_cast<std::size_t>(why)];
+    };
+    char hold[32] = "-";
+    if (r.budget_row)
+        std::snprintf(hold, sizeof hold, "%d/%d",
+                      r.spec_spill.anchor_in + r.spec_spill.second_in + r.firm_spill.anchor_in
+                          + r.firm_spill.second_in,
+                      r.spec_spill.anchor_out + r.spec_spill.second_out + r.firm_spill.anchor_out
+                          + r.firm_spill.second_out);
+    char corps[32];
+    std::snprintf(corps, sizeof corps, "%d/%d", r.at_land.corps, r.at_land.background);
+    std::printf("  %-40s %3s %3s %4s | %4zu %5zu | %6lld %6lld %6lld %6lld %6lld %6lld | %4s %5.2f | "
+                "%11s | %9s | %5d %7.0f %7.0f",
+                r.label.c_str(), fp, sfc, spts, r.specialists, r.firms,
+                u(charter_unspent_reason::no_gap), u(charter_unspent_reason::province_cap),
+                u(charter_unspent_reason::window_exhausted), u(charter_unspent_reason::body_cap),
+                u(charter_unspent_reason::remainder), u(charter_unspent_reason::no_nation),
+                r.any_specialist ? "yes" : "NO", r.largest_nation_share, hold, corps,
+                r.evaluations, r.seed_eval_ms, r.proposal_mean_ms);
+    if (r.build_only)
+    {
+        std::printf(" | %15s | %15s | build only%s\n", "-", "-",
+                    !r.budget_row ? "" : r.forced_pass ? ": PASS" : ": FAIL");
+        std::printf("  %-40s   busiest body AT LAND %u: %d corps, %d bg; AT SEAT: not reached (build only)\n",
+                    "", r.at_land.busiest, r.at_land.busiest_corps, r.at_land.busiest_background);
+        if (r.digested)
+            std::printf("  %-40s   digests D_search %016" PRIX64 " D_land %016" PRIX64 " — %s\n", "",
+                        r.dig.search, r.dig.land,
+                        !r.pinned ? "no pinned row for this seed"
+                        : r.digest_match ? "MATCH the BL-1031 pins (search and land only: build-only row)"
+                                         : "DIFFER from the pins");
+        return;
+    }
+    // The timings, then the seat, then the due COUNT last — apart from the timings.
+    std::printf(" | %7.1f/%-7.1f | %7.1f/%-7.1f | %5d %8.0f/%8.0f/%8.0f %5.1f | %8.1f\n",
+                r.val_sum.median, r.val_sum.mean, r.live_sum.median, r.live_sum.mean,
+                r.shortlist, r.trail_min, r.trail_median, r.trail_max, 100.0 * r.trail_neg_share,
+                r.strategic_evals_due_mean);
+    std::printf("  %-40s   points %lld = %lld + %lld [%s]; generation %.0f ms; landscape phase %.0f ms "
+                "(search %.0f ms); row wall %.0f ms; seated %u%s\n",
+                "", r.points_budgeted, r.points_spent, r.points_unspent,
+                r.budget_row ? (r.balanced ? "balanced" : "UNBALANCED") : "no budget",
+                r.base_ms, r.landscape_ms, r.search_ms, r.wall_ms,
+                r.seated, r.floor_unmet ? " (floor UNMET)" : "");
+    std::printf("  %-40s   corps/bg AT LAND %d/%d, AT SEAT %d/%d; busiest body AT LAND %u: %d corps, "
+                "%d bg; busiest body AT SEAT %u: %d corps, %d bg\n",
+                "", r.at_land.corps, r.at_land.background, r.at_seat.corps, r.at_seat.background,
+                r.at_land.busiest, r.at_land.busiest_corps, r.at_land.busiest_background,
+                r.at_seat.busiest, r.at_seat.busiest_corps, r.at_seat.busiest_background);
+    const auto phases = [&](const char* name, const app_tick_timing& t) {
+        std::printf("  %-40s   %s phase ms sums (lower bound):", "", name);
+        for (int i = 0; i < k_app_tick_phase_count; ++i)
+            std::printf(" %s %.0f", k_app_tick_phase_names[i], t.phase_ms[i]);
+        std::printf("\n");
+    };
+    phases("val ", r.val);
+    phases("live", r.live);
+    if (r.digested)
+    {
+        const std::string verdict = !r.pinned ? "no pinned row for this seed (copy fidelity unchecked)"
+            : r.digest_match ? "MATCH the BL-1031 pins: this row is the shipped start"
+                             : "DIFFER from the pins:" + r.digest_diff;
+        std::printf("  %-40s   digests %016" PRIX64 " %016" PRIX64 " %016" PRIX64 " %016" PRIX64
+                    " — %s\n", "", r.dig.search, r.dig.land, r.dig.settle, r.dig.seat,
+                    verdict.c_str());
+    }
+}
+
+/// The forced row's centre, and why it was picked.
+struct forced_pick
+{
+    entity_id centre = null_entity;
+    bool      sparse = true;          ///< false: the synthetic budget's richest centre
+    int       window_tiles = 0;       ///< the centre nation's tiles inside the window
+    int       window_provinces = 0;   ///< distinct provinces among them
+    bool      rung2_empty = false;    ///< nearest region is not the centre nation's own
+};
+
+/// SYNTHETIC TEST INPUT — where the forced row puts its points under
+/// `--forced-pick sparse` (the default). The province cap stops a spend only where
+/// a centre's window is WIDER than the provinces it spans and nothing wider can
+/// absorb the charters, so the pick reads exactly that geometry and nothing else:
+/// among non-razed centres on nation-owned tiles, prefer one whose rung 2 is EMPTY
+/// (its nearest region is not its nation's own, so charter_place has only the
+/// centre window), then the most nation tiles per distinct province inside the
+/// window (radius @p radius, column-wrapped), then more tiles, then the lower id.
+/// It never reads population and it is not a density reading — a fixture that
+/// makes the `province_cap` branch reachable, chosen for its ground.
+forced_pick pick_sparse_province_centre(const world& w, int radius)
+{
+    forced_pick best;
+    std::unordered_map<std::uint64_t, entity_id> at;   // lookups only, never iterated
+    at.reserve(w.tiles.size());
+    const auto key = [](entity_id body, int x, int y) {
+        return (static_cast<std::uint64_t>(body) << 32)
+             ^ (static_cast<std::uint64_t>(static_cast<std::uint32_t>(y)) << 16)
+             ^ static_cast<std::uint64_t>(static_cast<std::uint32_t>(x));
+    };
+    for (const auto& [tid, t] : w.tiles)
+        at[key(t.body, t.grid_x, t.grid_y)] = tid;
+
+    std::vector<entity_id> nation_ids;
+    for (const auto& kv : w.nations)
+        nation_ids.push_back(kv.first);
+    std::sort(nation_ids.begin(), nation_ids.end());
+    const settlement_state* ss = w.gen_settlement.get();
+
+    std::vector<entity_id> centres;
+    for (const auto& [cid, pc] : w.population_centres)
+        if (!pc.razed)
+            centres.push_back(cid);
+    std::sort(centres.begin(), centres.end());
+
+    const long long r2 = static_cast<long long>(radius) * radius;
+    for (const entity_id cid : centres)
+    {
+        const auto ct = w.population_centre_tile.find(cid);
+        if (ct == w.population_centre_tile.end())
+            continue;
+        const auto t = w.tiles.find(ct->second);
+        if (t == w.tiles.end())
+            continue;
+        const auto own = w.tile_to_nation.find(ct->second);
+        if (own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
+            continue;
+        const entity_id nation = own->second;
+        const auto body = w.bodies.find(t->second.body);
+        const int gw = (body != w.bodies.end()) ? body->second.grid_width : 0;
+        if (gw <= 0)
+            continue;
+
+        bool rung2_empty = true;
+        if (ss != nullptr && !ss->regions.empty())
+        {
+            const int pi = nearest_region(*ss, t->second.grid_x, t->second.grid_y, gw);
+            if (pi >= 0)
+            {
+                const int ni = ss->regions[static_cast<std::size_t>(pi)].nation;
+                rung2_empty = !(ni >= 0 && ni < static_cast<int>(nation_ids.size())
+                                && nation_ids[static_cast<std::size_t>(ni)] == nation);
+            }
+        }
+
+        int tiles = 0;
+        std::vector<std::uint32_t> provs;
+        for (int dy = -radius; dy <= radius; ++dy)
+            for (int dx = -radius; dx <= radius; ++dx)
+            {
+                if (static_cast<long long>(dx) * dx + static_cast<long long>(dy) * dy > r2)
+                    continue;
+                const int x = ((t->second.grid_x + dx) % gw + gw) % gw;
+                const auto hit = at.find(key(t->second.body, x, t->second.grid_y + dy));
+                if (hit == at.end())
+                    continue;
+                const auto tn = w.tile_to_nation.find(hit->second);
+                if (tn == w.tile_to_nation.end() || tn->second != nation)
+                    continue;
+                ++tiles;
+                const std::uint32_t prov = w.provinces.province_of(hit->second);
+                if (prov != 0 && std::find(provs.begin(), provs.end(), prov) == provs.end())
+                    provs.push_back(prov);
+            }
+        const int n_provs = static_cast<int>(provs.size());
+        if (n_provs == 0)
+            continue;
+
+        bool better = best.centre == null_entity;
+        if (!better && rung2_empty != best.rung2_empty)
+            better = rung2_empty;
+        else if (!better)
+        {
+            const long long lhs = static_cast<long long>(tiles) * best.window_provinces;
+            const long long rhs = static_cast<long long>(best.window_tiles) * n_provs;
+            better = lhs > rhs || (lhs == rhs && tiles > best.window_tiles);
+        }
+        if (better)   // ascending id: a full tie keeps the lower
+        {
+            best.centre           = cid;
+            best.window_tiles     = tiles;
+            best.window_provinces = n_provs;
+            best.rung2_empty      = rung2_empty;
+        }
+    }
+    return best;
+}
+
+int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const cost_options& opt)
+{
+    using clk = std::chrono::steady_clock;
+    const auto run0 = clk::now();
+
+    std::printf("player_seed_sweep --charter-cost — BL-1033: what a denser corporate web costs\n");
+    std::printf("SYNTHETIC TEST INPUT: every budget is seeded weights over non-razed centres, never "
+                "population; 1x = the none row's chartered count. NOT a density-follows-cities reading.\n");
+    std::printf("build: %s", build_type_label());
+#ifdef _MSC_FULL_VER
+    std::printf(", _MSC_FULL_VER %lld", static_cast<long long>(_MSC_FULL_VER));
+#endif
+    std::printf("; search thread_count 1 (the app's); %d validation ticks; %d live ticks after the "
+                "seat, not spectating\n", k_settle_ticks, opt.live_ticks);
+    std::printf("TIMINGS ARE WALL CLOCK — only as clean as the machine was quiet.%s%s\n",
+                opt.note.empty() ? "" : " note: ", opt.note.c_str());
+    std::printf("TIMINGS ARE A LOWER BOUND on the app's step_economy: laps 0-5 only (phase 5 = "
+                "standings + convoy credit + firm exits); agency comms, battle dispatches, persona "
+                "counsel, the history recorders and the strategy readout are NOT timed, and that gap "
+                "widens with density.\n");
+
+    // The matrix line, built from the options and the spend params, never a literal.
+    const charter_spend_params base_spend = synthetic_charter_spend();
+    const std::int32_t base_price = opt.specialist_prices.front();
+    const auto caps_text = [&]() {
+        std::string t = " x resource cap";
+        for (const bool v : opt.resource_caps)
+            t += v ? " on" : " off";
+        t += " x province cap";
+        for (const bool v : opt.province_caps)
+            t += v ? " on" : " off";
+        return t;
+    };
+    const std::vector<double>& ladder_scales = opt.ladder_all ? opt.scales : opt.ladder_scales;
+    std::printf("prices: firm %d point(s); specialist base %d firm charters (%lld points)",
+                static_cast<int>(base_spend.firm_price_points), static_cast<int>(base_price),
+                static_cast<long long>(base_spend.firm_price_points) * base_price);
+    for (std::size_t i = 1; i < opt.specialist_prices.size(); ++i)
+        std::printf("; ladder rung %d firm charters (%lld points)",
+                    static_cast<int>(opt.specialist_prices[i]),
+                    static_cast<long long>(base_spend.firm_price_points) * opt.specialist_prices[i]);
+    std::printf("\nmatrix: none");
+    if (!opt.forced_only)
+    {
+        std::printf("; scales");
+        for (const double s : opt.scales)
+            std::printf(" %gx", s);
+        std::printf("%s at sp%d", caps_text().c_str(), static_cast<int>(base_price));
+        for (std::size_t i = 1; i < opt.specialist_prices.size(); ++i)
+        {
+            std::printf("; scales");
+            for (const double s : ladder_scales)
+                std::printf(" %gx", s);
+            std::printf("%s at sp%d", caps_text().c_str(), static_cast<int>(opt.specialist_prices[i]));
+        }
+        if (opt.extra)
+            std::printf("; + 4x rcap off pcap off at sp%d", static_cast<int>(base_price));
+    }
+    if (opt.forced)
+        std::printf("; + forced province cap (1x on one %s centre, radius %d, sp%d, build only)",
+                    opt.forced_sparse ? "SPARSE-province" : "richest", opt.forced_radius,
+                    static_cast<int>(base_price));
+    std::printf("%s\n", opt.forced_only
+                    ? " — FORCED ONLY: the none row is build-only and the matrix is skipped" : "");
+    std::fflush(stdout);
+
+    std::vector<cost_seed> results;
+    bool any_threw = false, forced_failed = false, digest_failed = false;
+
+    for (const uint32_t seed : seeds)
+    {
+        cost_seed cs;
+        cs.seed = seed;
+        std::printf("\n=== seed %u — SYNTHETIC TEST INPUT on every budget row (%s) ===\n", seed,
+                    build_type_label());
+        std::fflush(stdout);
+        try
+        {
+
+            // THE NONE ROW FIRST: it is the baseline and it measures 1x. The
+            // synthetic budgets are built from its world as the landscape lands —
+            // the same world the digest mode's `synthetic` builds them from.
+            std::vector<double> needed = opt.forced_only ? std::vector<double>{} : opt.scales;
+            if (!opt.forced_only && opt.specialist_prices.size() > 1)
+                needed.insert(needed.end(), ladder_scales.begin(), ladder_scales.end());
+            if (opt.extra && !opt.forced_only) needed.push_back(4.0);
+            if (opt.forced) needed.push_back(1.0);
+            std::sort(needed.begin(), needed.end());
+            needed.erase(std::unique(needed.begin(), needed.end()), needed.end());
+            std::map<double, charter_budget> budgets;
+            forced_pick pick;
+            // A scale whose synthetic total rounds to 0 on THIS seed's 1x: its
+            // budget would be empty, i.e. today's world under a budget label.
+            std::vector<double> zero_scales;
+
+            cost_row none;
+            cost_config none_cfg;
+            none_cfg.build_only = opt.forced_only;
+            run_cost_config(lua, seed, none_cfg, nullptr, opt.live_ticks, none,
+                            [&](const app_start_world& landed) {
+                                cs.legacy_specialists = landed.land.specialists.size();
+                                cs.legacy_firms       = landed.land.firms.size();
+                                cs.legacy_1x = static_cast<long long>(cs.legacy_specialists
+                                                                      + cs.legacy_firms);
+                                for (const double s : needed)
+                                    if (std::llround(static_cast<double>(cs.legacy_1x) * s) <= 0)
+                                        zero_scales.push_back(s);
+                                if (!zero_scales.empty())
+                                    return false;   // refused below, before any row settles
+                                for (const double s : needed)
+                                    budgets[s] = synthetic_charter_budget(landed.w, seed,
+                                                                          cs.legacy_1x, s);
+                                if (opt.forced && opt.forced_sparse)
+                                    pick = pick_sparse_province_centre(landed.w, opt.forced_radius);
+                                return true;
+                            });
+            if (none.stopped_at_land)
+            {
+                for (const double s : zero_scales)
+                    std::printf("--budget-scales/--ladder-scales: scale %g on seed %u gives a synthetic total of "
+                                "llround(%g x 1x %lld) = 0 points — an EMPTY budget, which would "
+                                "measure today's world under a budget label. Refused; nothing "
+                                "measured on this seed.\n",
+                                s, seed, s, cs.legacy_1x);
+                std::fflush(stdout);
+                if (!opt.out_path.empty())
+                {
+                    results.push_back(cs);
+                    write_cost_json(opt.out_path, opt, results,
+                                    "a --budget-scales/--ladder-scales value rounded to an empty "
+                                    "budget on this seed; nothing was measured under a budget label",
+                                    seed);
+                }
+                return 2;
+            }
+            for (const world_digest_pin& pin : k_world_digest_pins)
+                if (pin.seed == seed)
+                {
+                    none.pinned = true;
+                    std::string d;
+                    if (pin.search != none.dig.search) d += " D_search";
+                    if (pin.land   != none.dig.land)   d += " D_land";
+                    // A build-only none row (--forced-only) stops at the landscape.
+                    if (!none.build_only && pin.settle != none.dig.settle) d += " D_settle";
+                    if (!none.build_only && pin.seat   != none.dig.seat)   d += " D_seat";
+                    none.digest_match = d.empty();
+                    none.digest_diff  = d;
+                    if (!d.empty())
+                        digest_failed = true;
+                }
+
+            std::printf("  1x = %lld legacy corporations (%zu specialists + %zu firms). SYNTHETIC budgets "
+                        "(firm %d point(s); specialist ladder",
+                        cs.legacy_1x, cs.legacy_specialists, cs.legacy_firms,
+                        static_cast<int>(base_spend.firm_price_points));
+            for (const std::int32_t sp : opt.specialist_prices)
+                std::printf(" %d", static_cast<int>(sp));
+            std::printf(" firm charters):");
+            for (const auto& [s, bud] : budgets)
+            {
+                std::int32_t richest = 0;
+                for (const auto& kv : bud.points())
+                    richest = std::max(richest, kv.second);
+                std::printf(" %gx %lld pts over %zu centres (richest %d; afford a specialist:",
+                            s, static_cast<long long>(bud.total()), bud.points().size(), richest);
+                for (const std::int32_t sp : opt.specialist_prices)
+                {
+                    const long long price = static_cast<long long>(base_spend.firm_price_points) * sp;
+                    int affords = 0;
+                    for (const auto& kv : bud.points())
+                        if (kv.second >= price)
+                            ++affords;
+                    std::printf(" sp%d %d", static_cast<int>(sp), affords);
+                }
+                std::printf(");");
+            }
+            std::printf("\n");
+            print_cost_table_header(opt);
+            print_cost_row(none);
+            std::fflush(stdout);
+            cs.rows.push_back(std::move(none));
+
+            // The matrix, in the order the section note gives: the base-price
+            // cross, each ladder rung at its scales, the extra row, then forced.
+            std::vector<cost_config> matrix;
+            const auto add_cross = [&](const std::vector<double>& scales, std::int32_t price) {
+                for (const double s : scales)
+                    for (const bool rc : opt.resource_caps)
+                        for (const bool pc : opt.province_caps)
+                        {
+                            cost_config c;
+                            c.k            = cost_config::kind::synthetic;
+                            c.scale        = s;
+                            c.resource_cap = rc;
+                            c.province_cap = pc;
+                            c.specialist_firm_charters = price;
+                            matrix.push_back(c);
+                        }
+            };
+            if (!opt.forced_only)
+            {
+                add_cross(opt.scales, base_price);
+                for (std::size_t i = 1; i < opt.specialist_prices.size(); ++i)
+                    add_cross(ladder_scales, opt.specialist_prices[i]);
+            }
+            if (opt.extra && !opt.forced_only)
+            {
+                const bool present = std::any_of(matrix.begin(), matrix.end(), [&](const cost_config& c) {
+                    return c.scale == 4.0 && !c.resource_cap && !c.province_cap
+                        && c.specialist_firm_charters == base_price;
+                });
+                if (!present)
+                {
+                    cost_config c;
+                    c.k            = cost_config::kind::synthetic;
+                    c.scale        = 4.0;
+                    c.resource_cap = false;
+                    c.province_cap = false;
+                    c.specialist_firm_charters = base_price;
+                    matrix.push_back(c);
+                }
+            }
+            for (const cost_config& c : matrix)
+            {
+                cost_row row;
+                try
+                {
+                    run_cost_config(lua, seed, c, &budgets.at(c.scale), opt.live_ticks, row);
+                }
+                catch (const std::exception& e)
+                {
+                    row.cfg   = c;
+                    row.label = cost_config_label(c);
+                    row.threw = true;
+                    row.error = e.what();
+                    any_threw = true;
+                }
+                print_cost_row(row);
+                std::fflush(stdout);
+                cs.rows.push_back(std::move(row));
+            }
+
+            if (opt.forced)
+            {
+                cost_config c;
+                c.k             = cost_config::kind::forced;
+                c.scale         = 1.0;
+                c.window_radius = opt.forced_radius;
+                c.resource_cap  = true;
+                c.province_cap  = true;
+                c.specialist_firm_charters = base_price;
+                c.legacy_specialists = cs.legacy_specialists;
+                c.legacy_firms       = cs.legacy_firms;
+                charter_budget concentrated = concentrated_charter_budget(budgets.at(1.0));
+                if (opt.forced_sparse)
+                {
+                    std::map<entity_id, std::int32_t> one;
+                    if (pick.centre != null_entity)
+                        one[pick.centre] = static_cast<std::int32_t>(budgets.at(1.0).total());
+                    concentrated = charter_budget(one);
+                    std::printf("      forced pick SPARSE (SYNTHETIC TEST INPUT): centre %u — rung 2 %s; "
+                                "%d nation tiles over %d provinces inside radius %d\n",
+                                pick.centre, pick.rung2_empty ? "EMPTY" : "not empty",
+                                pick.window_tiles, pick.window_provinces, opt.forced_radius);
+                }
+                else
+                {
+                    pick.sparse = false;
+                    pick.centre = concentrated.points().empty() ? null_entity
+                                                                : concentrated.points().begin()->first;
+                    std::printf("      forced pick RICHEST (SYNTHETIC TEST INPUT): centre %u, the 1x "
+                                "synthetic budget's richest\n", pick.centre);
+                }
+                c.forced_pick_sparse = pick.sparse;
+                c.forced_centre      = pick.centre;
+                cost_row row;
+                try
+                {
+                    run_cost_config(lua, seed, c, &concentrated, opt.live_ticks, row);
+                    if (!row.forced_pass)
+                        forced_failed = true;
+                }
+                catch (const std::exception& e)
+                {
+                    row.cfg   = c;
+                    row.label = cost_config_label(c);
+                    row.threw = true;
+                    row.error = e.what();
+                    any_threw = true;
+                    forced_failed = true;
+                }
+                print_cost_row(row);
+                std::fflush(stdout);
+                cs.rows.push_back(std::move(row));
+            }
+        }
+        catch (const std::exception& e)
+        {
+            cs.threw  = true;
+            cs.error  = e.what();
+            any_threw = true;
+            std::printf("  seed %u THREW: %s\n", seed, e.what());
+        }
+        catch (...)
+        {
+            cs.threw  = true;
+            cs.error  = "unknown";
+            any_threw = true;
+            std::printf("  seed %u THREW: unknown\n", seed);
+        }
+        results.push_back(std::move(cs));
+        if (!opt.out_path.empty())
+            write_cost_json(opt.out_path, opt, results);   // after every seed: a crash keeps the rest
+        std::fflush(stdout);
+    }
+
+    const double total_s = std::chrono::duration<double>(clk::now() - run0).count();
+    const std::string written = opt.out_path.empty() ? std::string("No --out: nothing written.")
+                                                     : "JSON: " + opt.out_path;
+    std::printf("\n%zu seeds in %.0f s (%.0f s per seed). %s\n", seeds.size(), total_s,
+                seeds.empty() ? 0.0 : total_s / static_cast<double>(seeds.size()), written.c_str());
+    std::printf("none-row digests: %s. forced province cap: %s. %s\n",
+                digest_failed ? "DIFFER from the pins on some seed (this mode is NOT measuring the shipped start)"
+                              : "match wherever a pin exists",
+                !opt.forced ? "not run" : forced_failed ? "FAIL on some seed" : "PASS on every seed",
+                any_threw ? "SOMETHING THREW." : "nothing threw.");
+    return (any_threw || forced_failed || digest_failed) ? 1 : 0;
 }
 
 int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
@@ -1336,7 +2693,9 @@ int main(int argc, char** argv)
     const bool seat_mode   = (argc > 1 && std::string(argv[1]) == "--seat");
     const bool digest_mode = (argc > 1 && std::string(argv[1]) == "--digest");
     const bool check_mode  = (argc > 1 && std::string(argv[1]) == "--digest-check");
-    const bool mode_arg = roster_mode || guard_mode || seat_mode || digest_mode || check_mode;
+    const bool cost_mode   = (argc > 1 && std::string(argv[1]) == "--charter-cost");
+    const bool mode_arg = roster_mode || guard_mode || seat_mode || digest_mode || check_mode
+                       || cost_mode;
     bool fast = false;
     for (int a = 1; a < argc; ++a)
         if (std::string(argv[a]) == "--fast")
@@ -1351,8 +2710,13 @@ int main(int argc, char** argv)
                     "       %s --guard [seed_count] [--fast] (assert what the seat holds)\n"
                     "       %s --digest       [--seeds a,b,c]  (print the BL-1031 world digests)\n"
                     "       %s --digest-check [--seeds a,b,c]  (fail on any row differing from the pin)\n"
-                    "           both digest modes: [--charter-budget none|empty|zero|synthetic|refused] [--charter-scale X]\n",
-                    argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
+                    "           both digest modes: [--charter-budget none|empty|zero|synthetic|refused] [--charter-scale X]\n"
+                    "       %s --charter-cost [--seeds a,b,c] [--budget-scales 1,2,4] [--resource-cap on|off|both]\n"
+                    "                         [--province-cap on|off|both] [--specialist-prices 4,8]\n"
+                    "                         [--ladder-scales 2|all] [--no-extra] [--no-forced]\n"
+                    "                         [--forced-only] [--forced-radius N] [--forced-pick sparse|richest]\n"
+                    "                         [--live-ticks N] [--out file.json] [--note TEXT]   (BL-1033)\n",
+                    argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
         return 2;
     }
 
@@ -1465,6 +2829,166 @@ int main(int argc, char** argv)
             }
         }
         return run_digest(seeds, lua, check_mode, mode, scale);
+    }
+
+    // BL-1033 cost mode. The shipped spawn only, like the digest modes, and for
+    // the same reason: its none row is checked against the pins.
+    if (cost_mode)
+    {
+        if (fast)
+        {
+            std::printf("--fast is refused in --charter-cost: its none row is checked against the "
+                        "shipped spawn's pins\n");
+            return 2;
+        }
+        cost_options opt;
+        for (int a = 0; a < argc; ++a)
+            opt.argv.emplace_back(argv[a]);
+        std::vector<uint32_t> seeds = seeds_arg();
+        if (seeds.empty())
+            seeds = { 0u, 28u, 46u };
+        const auto on_off = [](const std::string& v, std::vector<bool>& out) {
+            if (v == "on")        out = { true };
+            else if (v == "off")  out = { false };
+            else if (v == "both") out = { true, false };
+            else                  return false;
+            return true;
+        };
+        for (int a = 2; a < argc; ++a)
+        {
+            const std::string arg = argv[a];
+            if (arg == "--no-extra")  { opt.extra = false;  continue; }
+            if (arg == "--no-forced") { opt.forced = false; continue; }
+            if (arg == "--forced-only") { opt.forced_only = true; opt.forced = true; continue; }
+            if (arg == "--seeds")     { ++a; continue; }   // read by seeds_arg
+            if (arg != "--budget-scales" && arg != "--resource-cap" && arg != "--province-cap"
+                && arg != "--live-ticks" && arg != "--out" && arg != "--note"
+                && arg != "--forced-radius" && arg != "--forced-pick"
+                && arg != "--specialist-prices" && arg != "--ladder-scales")
+            {
+                std::printf("--charter-cost: unknown argument '%s'\n", arg.c_str());
+                return 2;
+            }
+            if (a + 1 >= argc)
+            {
+                std::printf("%s needs a value\n", arg.c_str());
+                return 2;
+            }
+            const std::string val = argv[++a];
+            // A comma list of scales in (0, 1000]. A scale whose synthetic total
+            // rounds to 0 on a seed is refused once that seed's 1x is measured.
+            const auto parse_scales = [&](std::vector<double>& out) {
+                out.clear();
+                std::size_t at = 0;
+                while (at <= val.size())
+                {
+                    std::size_t comma = val.find(',', at);
+                    if (comma == std::string::npos)
+                        comma = val.size();
+                    const std::string tok = val.substr(at, comma - at);
+                    char* end = nullptr;
+                    const double x = std::strtod(tok.c_str(), &end);
+                    if (tok.empty() || end == tok.c_str() || *end != '\0' || !(x > 0.0) || x > 1000.0)
+                    {
+                        std::printf("%s: '%s' is not a number in (0, 1000]\n", arg.c_str(), tok.c_str());
+                        return false;
+                    }
+                    out.push_back(x);
+                    at = comma + 1;
+                }
+                return true;
+            };
+            if (arg == "--budget-scales")
+            {
+                if (!parse_scales(opt.scales))
+                    return 2;
+            }
+            else if (arg == "--ladder-scales")
+            {
+                if (val == "all")
+                    opt.ladder_all = true;
+                else
+                {
+                    opt.ladder_all = false;
+                    if (!parse_scales(opt.ladder_scales))
+                        return 2;
+                }
+            }
+            else if (arg == "--specialist-prices")
+            {
+                // Firm charters per specialist, each a whole number > 0; the first
+                // is the base price, the rest ladder rungs. No duplicates.
+                opt.specialist_prices.clear();
+                std::size_t at = 0;
+                while (at <= val.size())
+                {
+                    std::size_t comma = val.find(',', at);
+                    if (comma == std::string::npos)
+                        comma = val.size();
+                    const std::string tok = val.substr(at, comma - at);
+                    if (tok.empty() || tok.size() > 4
+                        || tok.find_first_not_of("0123456789") != std::string::npos
+                        || std::atoi(tok.c_str()) <= 0)
+                    {
+                        std::printf("--specialist-prices: '%s' is not a whole number of firm charters "
+                                    "in [1, 9999] (each price must be > 0)\n", tok.c_str());
+                        return 2;
+                    }
+                    const std::int32_t p = static_cast<std::int32_t>(std::atoi(tok.c_str()));
+                    if (std::find(opt.specialist_prices.begin(), opt.specialist_prices.end(), p)
+                        != opt.specialist_prices.end())
+                    {
+                        std::printf("--specialist-prices: %d is listed twice\n", static_cast<int>(p));
+                        return 2;
+                    }
+                    opt.specialist_prices.push_back(p);
+                    at = comma + 1;
+                }
+            }
+            else if (arg == "--resource-cap" || arg == "--province-cap")
+            {
+                if (!on_off(val, arg == "--resource-cap" ? opt.resource_caps : opt.province_caps))
+                {
+                    std::printf("%s: '%s' is not on|off|both\n", arg.c_str(), val.c_str());
+                    return 2;
+                }
+            }
+            else if (arg == "--live-ticks")
+            {
+                if (val.empty() || val.find_first_not_of("0123456789") != std::string::npos
+                    || std::atoi(val.c_str()) <= 0 || std::atoi(val.c_str()) > 400)
+                {
+                    std::printf("--live-ticks: '%s' is not a whole number in [1, 400]\n", val.c_str());
+                    return 2;
+                }
+                opt.live_ticks = std::atoi(val.c_str());
+            }
+            else if (arg == "--forced-pick")
+            {
+                if (val == "sparse")       opt.forced_sparse = true;
+                else if (val == "richest") opt.forced_sparse = false;
+                else
+                {
+                    std::printf("--forced-pick: '%s' is not sparse|richest\n", val.c_str());
+                    return 2;
+                }
+            }
+            else if (arg == "--forced-radius")
+            {
+                if (val.empty() || val.find_first_not_of("0123456789") != std::string::npos
+                    || std::atoi(val.c_str()) > 64)
+                {
+                    std::printf("--forced-radius: '%s' is not a whole number in [0, 64]\n", val.c_str());
+                    return 2;
+                }
+                opt.forced_radius = std::atoi(val.c_str());
+            }
+            else if (arg == "--out")
+                opt.out_path = val;
+            else
+                opt.note = val;
+        }
+        return run_charter_cost(seeds, lua, opt);
     }
 
     // Same placement, same reason: a seat sweep against an empty registry would

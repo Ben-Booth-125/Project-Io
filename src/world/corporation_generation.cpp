@@ -3098,6 +3098,11 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // (BL-708 upkeep and BL-709 construction re-measured per firm; the
             // per-resource cap masks; construction capacity provisioned first,
             // then the biggest absolute gap). See that body for the reasoning.
+            //
+            // BL-1033: `spend.resource_cap` false lifts the per-resource cap on
+            // THIS copy only — neither the mask below nor the yard's cap test
+            // applies. The yard's `want_yards` bound, the province cap, the body
+            // cap and the no_gap stop are unchanged.
             std::array<float, resource_count> production = {};
             accumulate_body_production(w, reg, cc.body, production);
 
@@ -3111,9 +3116,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 demand[r] += construction_need[r];
 
             std::array<float, resource_count> selectable = production;
-            for (std::size_t r = 0; r < resource_count; ++r)
-                if (bs.firms_by_resource[r] >= k_charter_per_resource_firm_cap)
-                    selectable[r] = std::max(selectable[r], demand[r]);
+            if (spend.resource_cap)
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (bs.firms_by_resource[r] >= k_charter_per_resource_firm_cap)
+                        selectable[r] = std::max(selectable[r], demand[r]);
 
             std::size_t gap_r    = resource_count;
             int         recipe_i = -1;
@@ -3121,7 +3127,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 const std::size_t cap_i =
                     static_cast<std::size_t>(resource_type::construction_capacity);
                 const int ci = best_construction_recipe(reg);
-                if (ci >= 0 && bs.firms_by_resource[cap_i] < k_charter_per_resource_firm_cap)
+                if (ci >= 0
+                    && (!spend.resource_cap
+                        || bs.firms_by_resource[cap_i] < k_charter_per_resource_firm_cap))
                 {
                     const float per_yard =
                         reg.recipe_at(building_type::processing_facility, ci).outputs[cap_i];

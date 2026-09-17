@@ -179,8 +179,8 @@ int remove_specialist_roster(world& w);
 ///    (400 +/- 40%), stockpile, name and HQ. NO nation balancing, no diversity
 ///    reroll. The remainder buys background firms at the firm price by Pass 6's
 ///    gap selection (construction first, then the biggest gap under the
-///    per-resource cap 8), under the per-province cap 2 when
-///    `spend.province_cap`, and the 200-per-body cap.
+///    per-resource cap 8 when `spend.resource_cap`), under the per-province cap
+///    2 when `spend.province_cap`, and the 200-per-body cap.
 ///  * Anchor rungs: the centre nation's tiles within `spend.window_radius` of
 ///    the centre tile (column-wrapped), then the anchor region's window (empty
 ///    when the nearest region is a neighbour's), then UNSPENT — never nation-wide.
