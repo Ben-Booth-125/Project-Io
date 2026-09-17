@@ -1,7 +1,7 @@
 {
  "_schema": "generation/seed-library-v1",
  "_note": [
-  "Sixteen curated generation seeds, chosen off a 48-seed parity sweep on 2026-09-16 for the Digitisation phase.",
+  "Sixteen curated generation seeds, chosen off a 48-seed parity sweep on 2026-09-16 for the Digitisation phase; four replaced off a re-sweep on main 2026-09-17 (NR-887).",
   "",
   "A SEED IS THE SAVE. Generation is a pure function of the world descriptor, so a seed reproduces its world exactly on a given binary; there is no separate snapshot format and none is needed. What a seed cannot carry is why it was chosen, which is what this store holds.",
   "",
@@ -11,7 +11,7 @@
   "",
   "To check or bless, regenerate the library's own table first: `build_gen/verify/exploration_sweep.exe --seeds $(node tools/session/seed_library.js --seed-list) --out seed_library_sweep.json` (BL-1026). The checked-in exploration_sweep.json carries seeds 0..15 only and is not the library's table.",
   "",
-  "A `review` field marks a seed whose rationale is under Ben's review in NEEDS_REVIEW; it names the entry and the candidates, and is removed when he rules. Its `readings` are current; its `why` still describes the world it was chosen as."
+  "A `review` field marks a seed whose rationale is under Ben's review in NEEDS_REVIEW, naming the entry and the candidates; it is removed when he rules. A `replaces` field records which seed an entry took the place of, and why."
  ],
  "pool": {
   "swept": 48,
@@ -55,38 +55,38 @@
    "fingerprint_blessed": "2026-09-17"
   },
   {
-   "seed": 17,
+   "seed": 28,
    "name": "The quiet world",
    "tags": [
     "floor",
     "sparse",
     "stress"
    ],
-   "why": "The floor case, and the only SILENT seed in 48: fourteen polities, 1,820 Empire battles, two Exploration battles, thirteen trade flows. Digitisation has to produce something legible from almost nothing here.",
+   "why": "The floor case: 22 polities, eleven trade flows and 320 volume — the fewest flows and the lowest volume in the pool — no post roads and a modest 66k median chest. Digitisation has to produce something legible from almost nothing here.",
    "readings": {
-    "empire_battles": 2384,
-    "expl_battles": 41,
+    "empire_battles": 3418,
+    "expl_battles": 181,
     "displacement": null,
     "displacement_verdict": "displaced(no-nb)",
-    "living_polities": 17,
-    "subjects_alive": 0,
-    "treasury_median": 11523855,
-    "treasury_max": 163788635,
-    "flows": 16,
-    "flow_volume": 1839,
-    "corridors": 786,
-    "post_roads_built": 9,
-    "treaties_standing_1660": 20
+    "living_polities": 22,
+    "subjects_alive": 1,
+    "treasury_median": 66493,
+    "treasury_max": 764662902,
+    "flows": 11,
+    "flow_volume": 320,
+    "corridors": 1257,
+    "post_roads_built": 0,
+    "treaties_standing_1660": 22
    },
    "fingerprint": {
-    "empire_battles": 2384,
-    "expl_battles": 41,
-    "flows": 16,
-    "treasury_median": 11523855,
-    "living_polities": 17
+    "empire_battles": 3418,
+    "expl_battles": 181,
+    "flows": 11,
+    "treasury_median": 66493,
+    "living_polities": 22
    },
    "fingerprint_blessed": "2026-09-17",
-   "review": "NR-887: still the floor on breadth (17 polities, 786 corridors, 16 flows — the fewest), but no longer SILENT (41 Exploration battles) and no longer poor (11.5M median chest). Keep, or candidates 28 and 3 for a floor on capital too."
+   "replaces": "seed 17 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
    "seed": 11,
@@ -154,47 +154,47 @@
    "fingerprint_blessed": "2026-09-17"
   },
   {
-   "seed": 6,
+   "seed": 40,
    "name": "The inward world",
    "tags": [
     "held",
     "treasury",
     "roads"
    ],
-   "why": "Wealthy and uninterested: displacement 0.19 (neighbour war leads by five to one), a 521k median chest, 17 post roads and 67 flows. Money and infrastructure without an outward turn — the case where Digitisation must not assume exploration set the table.",
+   "why": "Wealthy and uninterested: displacement 0.88 (135 neighbour wars against 119 frontier battles), a 1.64M median chest, 26 post roads — the second most in the pool — and 36 flows. Money and infrastructure without an outward turn — the case where Digitisation must not assume exploration set the table.",
    "readings": {
-    "empire_battles": 9683,
-    "expl_battles": 316,
-    "displacement": 1.7965,
-    "displacement_verdict": "displaced",
-    "living_polities": 60,
-    "subjects_alive": 2,
-    "treasury_median": 127675,
-    "treasury_max": 847851942,
-    "flows": 58,
-    "flow_volume": 4141,
-    "corridors": 3002,
-    "post_roads_built": 9,
-    "treaties_standing_1660": 75
+    "empire_battles": 5820,
+    "expl_battles": 254,
+    "displacement": 0.8815,
+    "displacement_verdict": "held",
+    "living_polities": 33,
+    "subjects_alive": 3,
+    "treasury_median": 1643825,
+    "treasury_max": 660204008,
+    "flows": 36,
+    "flow_volume": 4581,
+    "corridors": 1715,
+    "post_roads_built": 26,
+    "treaties_standing_1660": 34
    },
    "fingerprint": {
-    "empire_battles": 9683,
-    "expl_battles": 316,
-    "flows": 58,
-    "treasury_median": 127675,
-    "living_polities": 60
+    "empire_battles": 5820,
+    "expl_battles": 254,
+    "flows": 36,
+    "treasury_median": 1643825,
+    "living_polities": 33
    },
    "fingerprint_blessed": "2026-09-17",
-   "review": "NR-887: the reason is gone. It is no longer inward — displacement 1.80, a 127k chest, 9 post roads. Candidates 40 and 39."
+   "replaces": "seed 6 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
    "seed": 12,
    "name": "The most inward world",
    "tags": [
-    "held",
+    "silent",
     "sparse"
    ],
-   "why": "The extreme of the same shape: displacement 0.03, 21 flows, a 245 median chest, no subjects. Whatever the phase does here, it does without colonial ties or capital.",
+   "why": "The inward extreme, and the only SILENT seed in the pool: twelve Exploration battles, twenty flows, a 274 median chest and no subjects. Whatever the phase does here, it does without colonial ties, capital or an outward turn.",
    "readings": {
     "empire_battles": 4905,
     "expl_battles": 12,
@@ -217,8 +217,7 @@
     "treasury_median": 274,
     "living_polities": 50
    },
-   "fingerprint_blessed": "2026-09-17",
-   "review": "NR-887: named for replacement, but the question still holds — inward, no subjects, no capital — and it is now the only SILENT seed in the pool (12 Exploration battles). Keep recommended; candidate 30."
+   "fingerprint_blessed": "2026-09-17"
   },
   {
    "seed": 37,
@@ -259,7 +258,7 @@
     "colonial",
     "displaced"
    ],
-   "why": "Eight subjects alive at 1660 with displacement 46 and 62 flows — the densest overlord graph in the pool at this size. The seed for preferred-seller ties, which EXPLORATION hands forward and nothing yet reads.",
+   "why": "Seven subjects alive at 1660, tied for the most in the pool, at a middling size — 50 polities and 53 flows. The seed for preferred-seller ties, which EXPLORATION hands forward and nothing yet reads. It barely displaced (1.16), so this overlord graph formed close to home.",
    "readings": {
     "empire_battles": 10250,
     "expl_battles": 266,
@@ -282,8 +281,7 @@
     "treasury_median": 38820,
     "living_polities": 50
    },
-   "fingerprint_blessed": "2026-09-17",
-   "review": "NR-887: named for replacement. The colonial half holds (7 subjects, tied for the most) but displacement fell to 1.16. Keep recommended; candidates 36 and 20."
+   "fingerprint_blessed": "2026-09-17"
   },
   {
    "seed": 41,
@@ -449,72 +447,72 @@
    "fingerprint_blessed": "2026-09-17"
   },
   {
-   "seed": 19,
+   "seed": 38,
    "name": "The insular rich",
    "tags": [
     "treasury",
     "held",
     "sparse"
    ],
-   "why": "Twenty-one polities, a 2.24M median chest, displacement 0.2 and sixteen flows. Wealth that stayed home, against seed 6 which is wealth that built roads.",
+   "why": "Thirty polities, an 8.6M median chest, displacement 0.50 and 27 flows. Wealth that stayed home, against seed 40 which is wealth that built roads.",
    "readings": {
-    "empire_battles": 3881,
-    "expl_battles": 550,
-    "displacement": 1.3913,
-    "displacement_verdict": "displaced",
-    "living_polities": 24,
+    "empire_battles": 4453,
+    "expl_battles": 176,
+    "displacement": 0.5043,
+    "displacement_verdict": "held",
+    "living_polities": 30,
     "subjects_alive": 1,
-    "treasury_median": 285,
-    "treasury_max": 470457951,
-    "flows": 20,
-    "flow_volume": 2522,
-    "corridors": 1278,
+    "treasury_median": 8602106,
+    "treasury_max": 198671803,
+    "flows": 27,
+    "flow_volume": 1909,
+    "corridors": 1910,
     "post_roads_built": 4,
-    "treaties_standing_1660": 24
+    "treaties_standing_1660": 36
    },
    "fingerprint": {
-    "empire_battles": 3881,
-    "expl_battles": 550,
-    "flows": 20,
-    "treasury_median": 285,
-    "living_polities": 24
+    "empire_battles": 4453,
+    "expl_battles": 176,
+    "flows": 27,
+    "treasury_median": 8602106,
+    "living_polities": 30
    },
    "fingerprint_blessed": "2026-09-17",
-   "review": "NR-887: the reason is gone. It is neither rich (median chest 285) nor inward (displacement 1.39). Candidates 7 and 38."
+   "replaces": "seed 19 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
-   "seed": 4,
+   "seed": 9,
    "name": "The frontier with no neighbours",
    "tags": [
     "displaced",
     "no-colonial",
     "ordinary"
    ],
-   "why": "A no-neighbour-war world: 336 frontier battles, zero neighbour wars, zero subjects, 52 polities. It tests the displacement reading itself as much as the phase — a world satisfied by silence on one axis and busy on the other.",
+   "why": "A no-neighbour-war world: 229 frontier battles, zero neighbour wars, one subject, 50 polities and a 380 median chest. It tests the displacement reading itself as much as the phase — a world satisfied by silence on one axis and busy on the other.",
    "readings": {
-    "empire_battles": 5194,
-    "expl_battles": 85,
-    "displacement": 27.3333,
-    "displacement_verdict": "displaced",
-    "living_polities": 46,
+    "empire_battles": 5834,
+    "expl_battles": 229,
+    "displacement": null,
+    "displacement_verdict": "displaced(no-nb)",
+    "living_polities": 50,
     "subjects_alive": 1,
-    "treasury_median": 21603,
-    "treasury_max": 272877238,
-    "flows": 29,
-    "flow_volume": 3903,
-    "corridors": 1321,
-    "post_roads_built": 5,
-    "treaties_standing_1660": 45
+    "treasury_median": 380,
+    "treasury_max": 162260598,
+    "flows": 41,
+    "flow_volume": 3029,
+    "corridors": 2891,
+    "post_roads_built": 3,
+    "treaties_standing_1660": 69
    },
    "fingerprint": {
-    "empire_battles": 5194,
-    "expl_battles": 85,
-    "flows": 29,
-    "treasury_median": 21603,
-    "living_polities": 46
+    "empire_battles": 5834,
+    "expl_battles": 229,
+    "flows": 41,
+    "treasury_median": 380,
+    "living_polities": 50
    },
    "fingerprint_blessed": "2026-09-17",
-   "review": "NR-887: the reason is gone. It has neighbours now — 3 neighbour wars, displacement 27.3 — and one subject. Candidates 9 and 16."
+   "replaces": "seed 4 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
    "seed": 0,
