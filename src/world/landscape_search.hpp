@@ -67,6 +67,7 @@
 #include "landscape_score.hpp"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 class recipe_registry;
@@ -163,8 +164,10 @@ struct landscape_search_params
     /// re-keyed: `landscape_axis_count`, the (round, axis) tag and every other
     /// axis's draw are unchanged, so placement and road tier propose exactly
     /// what they would on a legacy world. A non-empty budget whose spend params
-    /// are refused (`charter_spend_refusal`) is not searched at all: the result
-    /// is the start candidate with no evaluations.
+    /// are refused (`charter_spend_refusal`) is NOT a budget world: the refusal
+    /// is checked before anything else, the search runs exactly as with no
+    /// budget, prints REFUSED with the reason, and sets
+    /// `landscape_search_result::charter_refused`.
     ///
     /// Read-only and shared across the scoring threads; the pointee must
     /// outlive the search.
@@ -205,6 +208,13 @@ struct landscape_search_result
     /// Wall time per round, milliseconds, DIAGNOSTIC ONLY (see `print_rounds`).
     /// Index 0 is the seed candidate's evaluation.
     std::vector<double> round_ms;
+
+    /// BL-1032. Set when a NON-EMPTY charter budget arrived with spend params
+    /// `charter_spend_refusal` refused; `charter_refusal` says why. Such a search
+    /// is exactly the no-budget search — every axis, every score — so every
+    /// field above is what it is on a world with no budget.
+    bool        charter_refused = false;
+    std::string charter_refusal;
 };
 
 /// Lay a candidate onto @p w, which must be a copy of the phase-4 base world.
@@ -223,6 +233,10 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
 ///
 ///   * @p budget null or empty -> the 4-argument overload above, verbatim —
 ///     today's calls in today's order, and @p spend and @p report are not read.
+///   * @p budget non-empty but @p spend REFUSED (`charter_spend_refusal`,
+///     checked before any mutation) -> the 4-argument overload above, verbatim,
+///     exactly as with no budget; @p report receives `charter_refused_report`.
+///     No roster is removed and nothing is chartered.
 ///   * otherwise -> the road tier and the recipe pass as above, then
 ///     `remove_specialist_roster` and `charter_web_from_budget` from the
 ///     candidate's placement seed and `world::gen_settlement`, in place of
@@ -231,7 +245,8 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
 ///     this branch.
 ///
 /// @p report, when non-null, receives the spend's report on the budget branch
-/// and is left untouched on the legacy one.
+/// and the refusal report on a refused budget, and is left untouched on the
+/// null-or-empty branch.
 void apply_landscape_candidate(world& w, const recipe_registry& reg,
                                const landscape_candidate& c,
                                bool regenerate_specialists,

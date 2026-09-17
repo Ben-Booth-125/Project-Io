@@ -238,6 +238,18 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
         return;
     }
 
+    // A REFUSED spend is decided HERE, before any mutation, and it is today's
+    // world too: the legacy overload verbatim, exactly as with no budget, and a
+    // report that says every point went unspent and why. No roster is removed,
+    // nothing is chartered — a refusal mutates nothing beyond today's world.
+    if (const char* why = charter_spend_refusal(*budget, spend))
+    {
+        apply_landscape_candidate(w, reg, c, regenerate_specialists);
+        if (report != nullptr)
+            *report = charter_refused_report(*budget, why);
+        return;
+    }
+
     // --- a BUDGET WORLD ------------------------------------------------------
     // The road tier, copied from the legacy body rather than shared with it —
     // a shared helper is a refactor of the legacy path, and the legacy path's
@@ -272,34 +284,44 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
 }
 
 landscape_search_result search_landscape(const world& base, const recipe_registry& reg,
-                                         const landscape_search_params& p)
+                                         const landscape_search_params& p_in)
 {
     landscape_search_result out;
-    out.seed_candidate = p.start;
+    out.seed_candidate = p_in.start;
+
+    // BL-1032 — A REFUSAL, decided before anything else. A non-empty budget
+    // whose spend params are refused (a price <= 0 — the prices have no shipped
+    // default) is NOT a budget world: the search below runs on a copy of the
+    // params with the budget removed, which is exactly the no-budget search
+    // (all three axes, every score real), and the result says it was refused.
+    // `p` is that copy on a refusal and `p_in` itself otherwise.
+    const char* const refusal = (p_in.budget != nullptr)
+        ? charter_spend_refusal(*p_in.budget, p_in.spend) : nullptr;
+    landscape_search_params refused_params;
+    if (refusal != nullptr)
+    {
+        refused_params        = p_in;
+        refused_params.budget = nullptr;
+        out.charter_refused   = true;
+        out.charter_refusal   = refusal;
+        // Unconditional, not a round diagnostic: a refused budget is a caller
+        // error that must not pass silently as today's world.
+        std::printf("[landscape_search] charter budget REFUSED (%lld points over %zu centres); "
+                    "running the no-budget search: %s\n",
+                    static_cast<long long>(p_in.budget->total()), p_in.budget->points().size(),
+                    refusal);
+    }
+    const landscape_search_params& p = (refusal != nullptr) ? refused_params : p_in;
 
     // BL-1032. A BUDGET WORLD skips the roster axis (the budget decides the
-    // roster). A null or empty budget is not a budget world, and everything
-    // below runs exactly as it did before the seam.
+    // roster). A null, empty or refused budget is not a budget world, and
+    // everything below runs exactly as it did before the seam.
     const bool budget_world = p.budget != nullptr && !p.budget->empty();
-    if (budget_world)
-    {
-        // A non-empty budget with a refused spend (a price <= 0 — the prices
-        // have no shipped default) is not searched: every candidate would
-        // charter nothing. The start candidate stands, unscored; applying it
-        // charters nothing and its report says why.
-        if (const char* why = charter_spend_refusal(*p.budget, p.spend))
-        {
-            out.winner = p.start;
-            if (p.print_rounds)
-                std::printf("[landscape_search] charter budget REFUSED, search not run: %s\n", why);
-            return out;
-        }
-        if (p.print_rounds)
-            std::printf("[landscape_search] charter budget: %zu centres, %lld points; roster axis "
-                        "SKIPPED (the budget decides the roster)\n",
-                        p.budget->points().size(),
-                        static_cast<long long>(p.budget->total()));
-    }
+    if (budget_world && p.print_rounds)
+        std::printf("[landscape_search] charter budget: %zu centres, %lld points; roster axis "
+                    "SKIPPED (the budget decides the roster)\n",
+                    p.budget->points().size(),
+                    static_cast<long long>(p.budget->total()));
 
     using clock = std::chrono::steady_clock;
     const auto ms_since = [](clock::time_point t0)

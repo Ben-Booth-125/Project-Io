@@ -1055,6 +1055,14 @@ void app::start_new_game_prelude()
         sp.seed                    = m_active_world_params.seed ^ 0x8A21F00Du;
         sp.start.placement_seed    = sp.seed;
         sp.start.corporation_count = m_worldgen_cfg.corporation_count;
+        // BL-1032 — NO CHARTER BUDGET REACHES THIS SEARCH, deliberately. `sp.budget`
+        // keeps its none default because the budget's one source, a centre's
+        // unspent industry-point stockpile (Beat 1, DIGITISATION.md § 1), does not
+        // exist yet, and nothing may stand in for it. When it does, a budget must
+        // reach BOTH `sp.budget` (with `sp.spend`) AND the winner's apply below —
+        // apply_landscape_candidate's budget overload — or the search scores one
+        // world and the app lays another. tools/verify/harness_params.hpp
+        // `apply_shipped_landscape` passes an instrument's budget to both.
         // MEASURED 2026-09-07 (placement + tier only): ~20 s for 19 evaluations,
         // ~1.1 s each. The per-round lines the search prints are the live
         // measurement now that the roster axis regenerates specialists per

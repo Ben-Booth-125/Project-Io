@@ -41,7 +41,7 @@
 //      .\build\player_seed_sweep.exe --guard --seeds 46,17,11 [--reproduce N] [--fast]
 //      .\build\player_seed_sweep.exe --digest       [--seeds 46,17,11]   (BL-1031)
 //      .\build\player_seed_sweep.exe --digest-check [--seeds 46,17,11]   (BL-1031)
-//      ... --digest / --digest-check [--charter-budget none|empty|zero|synthetic]
+//      ... --digest / --digest-check [--charter-budget none|empty|zero|synthetic|refused]
 //                                    [--charter-scale X]                    (BL-1032)
 //
 // BL-630 (2026-08-26) ADDED THE MODE THIS FILE NOW LEADS WITH. The two default
@@ -405,7 +405,7 @@ struct seat_row
 //             a busy machine.
 //   D_land    write_world_snapshot's bytes the moment the landscape is applied —
 //             build_app_start_world returns with the winner laid and the second
-//             recipe pass run (app.cpp:1084), before any validation tick.
+//             recipe pass run (app.cpp:1092), before any validation tick.
 //   D_settle  the snapshot bytes after the validation run, then `state_hash`
 //             (at `current_day_tick`, the tick the app's verify API hashes at).
 //   D_seat    the seat — the seated corp, the floor flag, the specialist and
@@ -651,11 +651,16 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 //              corporation count, measured on a legacy build of the same seed in
 //              this process, over the non-razed centres by seeded weights (R4 —
 //              the non-vacuity reading; its digests must NOT match the pins).
+//   refused    the SAME synthetic budget — non-empty, and one that moves the
+//              world when priced (see `synthetic`) — with the firm price ZEROED,
+//              so `charter_spend_refusal` refuses it. A refusal mutates nothing
+//              beyond today's world, so its digests MUST equal the pins, and the
+//              search and the apply must both report the refusal.
 // empty and zero pass the DEFAULT spend, whose prices are 0: a non-empty budget
 // with those prices would be refused, so a PASS also shows the refusal never
 // reads an empty budget.
 
-enum class charter_mode { none, empty, zero, synthetic };
+enum class charter_mode { none, empty, zero, synthetic, refused };
 
 const char* charter_mode_name(charter_mode m)
 {
@@ -665,6 +670,7 @@ const char* charter_mode_name(charter_mode m)
     case charter_mode::empty:     return "empty";
     case charter_mode::zero:      return "zero";
     case charter_mode::synthetic: return "synthetic";
+    case charter_mode::refused:   return "refused";
     }
     return "?";
 }
@@ -693,41 +699,62 @@ long long charter_tile_d2(const world& w, entity_id a, entity_id b)
 
 void print_charter_report(const world& w, charter_mode mode, const charter_budget& budget,
                           const charter_spend_params& spend, const charter_spend_report& rep,
+                          const landscape_search_result& search,
                           std::size_t legacy_specialists, std::size_t legacy_firms, double scale)
 {
     if (budget.empty())
     {
         std::printf("      charter budget %s: EMPTY after construction (entries <= 0 dropped) -> "
-                    "the legacy branch; prices unset (firm %d, specialist %d); no report\n",
-                    charter_mode_name(mode), spend.firm_price_points, spend.specialist_price_points);
+                    "the legacy branch; prices unset (firm %d, specialist %d firm charters); "
+                    "no report; search refused flag %s\n",
+                    charter_mode_name(mode), spend.firm_price_points, spend.specialist_firm_charters,
+                    search.charter_refused ? "SET (unexpected)" : "clear");
         return;
     }
     std::printf("      charter budget %s — SYNTHETIC TEST INPUT (seeded weights, never population): "
                 "scale %.2f x 1x %zu legacy corporations (%zu specialists + %zu firms) = %lld points "
-                "over %zu centres; firm price %d, specialist price %d, window radius %d, province cap %s\n",
+                "over %zu centres; firm price %d, specialist %d firm charters (= %lld points), "
+                "window radius %d, province cap %s\n",
                 charter_mode_name(mode), scale, legacy_specialists + legacy_firms, legacy_specialists,
                 legacy_firms, static_cast<long long>(budget.total()), budget.points().size(),
-                spend.firm_price_points, spend.specialist_price_points, spend.window_radius,
+                spend.firm_price_points, spend.specialist_firm_charters,
+                static_cast<long long>(spend.specialist_price_points()), spend.window_radius,
                 spend.province_cap ? "on" : "off");
     {
         std::int32_t richest = 0;
         int affords = 0;
+        const bool priced = charter_spend_refusal(budget, spend) == nullptr;
         for (const auto& kv : budget.points())
         {
             richest = std::max(richest, kv.second);
-            if (kv.second >= spend.specialist_price_points)
+            if (priced && kv.second >= spend.specialist_price_points())
                 ++affords;
         }
         int non_razed = 0;
         for (const auto& kv : w.population_centres)
             if (!kv.second.razed)
                 ++non_razed;
-        std::printf("      budget shape: %d non-razed centres in the world, %zu hold points; richest "
-                    "centre %d points; %d centres afford a specialist\n",
-                    non_razed, budget.points().size(), richest, affords);
+        if (priced)
+            std::printf("      budget shape: %d non-razed centres in the world, %zu hold points; "
+                        "richest centre %d points; %d centres afford a specialist\n",
+                        non_razed, budget.points().size(), richest, affords);
+        else
+            std::printf("      budget shape: %d non-razed centres in the world, %zu hold points; "
+                        "richest centre %d points; prices refused, so nothing is affordable\n",
+                        non_razed, budget.points().size(), richest);
     }
+    // BOTH halves of a refusal, read separately: the search's flag and the
+    // apply's report. Either missing is a finding.
+    std::printf("      search: %s%s%s (%d evaluations, %zu path steps)\n",
+                search.charter_refused ? "REFUSED — " : "budget world, roster axis skipped",
+                search.charter_refused ? search.charter_refusal.c_str() : "",
+                search.charter_refused ? "; the no-budget search ran" : "",
+                search.evaluations, search.path.size());
     if (rep.refused)
-        std::printf("      REFUSED: %s\n", rep.refusal.c_str());
+        std::printf("      apply: REFUSED — %s; the legacy calls ran, nothing chartered\n",
+                    rep.refusal.c_str());
+    else
+        std::printf("      apply: spent (not refused)\n");
 
     const long long r2 = static_cast<long long>(spend.window_radius) * spend.window_radius;
     int spec_cw = 0, spec_rw = 0, spec_in = 0, firm_cw = 0, firm_rw = 0, firm_in = 0;
@@ -764,6 +791,53 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
                 "their window: %d\n",
                 rep.firms.size(), firm_cw, firm_rw, firm_in, both);
 
+    // HOLDING SPILL. The rungs bound the ANCHOR only; `place_starting_assets`
+    // walks the secondary holdings outward from it across the whole nation. So
+    // EVERY holding — anchor and secondary — is re-measured here to its centre on
+    // the wrapped metric, from the tiles the record kept as placed (the world
+    // printed here has settled, and a firm may since have exited).
+    struct spill
+    {
+        int anchor_in = 0, anchor_out = 0, second_in = 0, second_out = 0, unresolved = 0;
+        long long far_d2 = 0;
+    };
+    spill spec_sp, firm_sp;
+    for (const charter_record& r : rep.charters)
+    {
+        spill& s = r.specialist ? spec_sp : firm_sp;
+        const auto ct = w.population_centre_tile.find(r.centre);
+        for (std::size_t h = 0; h < r.holdings.size(); ++h)
+        {
+            const long long d2 = (ct != w.population_centre_tile.end())
+                ? charter_tile_d2(w, r.holdings[h], ct->second) : -1;
+            if (d2 < 0)
+            {
+                ++s.unresolved;
+                continue;
+            }
+            s.far_d2 = std::max(s.far_d2, d2);
+            const bool inside = d2 <= r2;
+            if (h == 0)
+                (inside ? s.anchor_in : s.anchor_out)++;
+            else
+                (inside ? s.second_in : s.second_out)++;
+        }
+    }
+    const auto print_spill = [&](const char* role, const spill& s) {
+        std::printf("      %s holdings %d re-measured to their centre (radius %d): anchors %d inside / "
+                    "%d outside; secondary %d inside / %d outside; unresolved %d; farthest %.2f tiles\n",
+                    role, s.anchor_in + s.anchor_out + s.second_in + s.second_out + s.unresolved,
+                    spend.window_radius, s.anchor_in, s.anchor_out, s.second_in, s.second_out,
+                    s.unresolved, std::sqrt(static_cast<double>(s.far_d2)));
+    };
+    print_spill("specialist", spec_sp);
+    print_spill("firm", firm_sp);
+    std::printf("      ALL holdings: %d inside radius %d, %d outside (%d unresolved)\n",
+                spec_sp.anchor_in + spec_sp.second_in + firm_sp.anchor_in + firm_sp.second_in,
+                spend.window_radius,
+                spec_sp.anchor_out + spec_sp.second_out + firm_sp.anchor_out + firm_sp.second_out,
+                spec_sp.unresolved + firm_sp.unresolved);
+
     std::array<long long, charter_unspent_reason_count> pts{};
     std::array<int, charter_unspent_reason_count> ctr{};
     for (const charter_unspent& u : rep.unspent)
@@ -792,6 +866,9 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                 mode == charter_mode::none ? " (the shipped path: no budget reaches the search)"
                 : mode == charter_mode::synthetic
                     ? " — SYNTHETIC TEST INPUT; its digests are EXPECTED to differ from the pins"
+                : mode == charter_mode::refused
+                    ? " — the synthetic budget with a ZERO firm price: REFUSED, so the digests "
+                      "must equal the pins"
                     : " (an empty budget reaches the seam; the digests must equal the pins)");
     std::printf("BL-1031. FNV-1a 64: D_search the walk; D_land the snapshot as the landscape "
                 "lands; D_settle the snapshot + state_hash after the validation run; D_seat the "
@@ -825,7 +902,7 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                     zeros[id] = 0;
                 budget = charter_budget(zeros);
             }
-            else if (mode == charter_mode::synthetic)
+            else if (mode == charter_mode::synthetic || mode == charter_mode::refused)
             {
                 // 1x, measured: the legacy landscape on this seed, built in this
                 // process exactly as the none row is, and freed before the budget
@@ -840,6 +917,10 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                     legacy->w, seed,
                     static_cast<std::int64_t>(legacy_specialists + legacy_firms), charter_scale);
                 charter.spend = synthetic_charter_spend();
+                // `refused`: the same budget, and a price with no default left
+                // at its default — the refusal a caller that forgets a price gets.
+                if (mode == charter_mode::refused)
+                    charter.spend.firm_price_points = 0;
             }
             if (mode != charter_mode::none)
             {
@@ -913,7 +994,7 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
             std::printf("\n");
         }
         if (mode != charter_mode::none)
-            print_charter_report(start->w, mode, budget, charter.spend, report,
+            print_charter_report(start->w, mode, budget, charter.spend, report, start->land.search,
                                  legacy_specialists, legacy_firms, charter_scale);
         std::fflush(stdout);
     }
@@ -1258,7 +1339,7 @@ int main(int argc, char** argv)
                     "       %s --guard [seed_count] [--fast] (assert what the seat holds)\n"
                     "       %s --digest       [--seeds a,b,c]  (print the BL-1031 world digests)\n"
                     "       %s --digest-check [--seeds a,b,c]  (fail on any row differing from the pin)\n"
-                    "           both digest modes: [--charter-budget none|empty|zero|synthetic] [--charter-scale X]\n",
+                    "           both digest modes: [--charter-budget none|empty|zero|synthetic|refused] [--charter-scale X]\n",
                     argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
         return 2;
     }
@@ -1331,7 +1412,7 @@ int main(int argc, char** argv)
             std::printf("no seeds: pass --seeds a,b,c (the pin table is empty)\n");
             return 2;
         }
-        // BL-1032: `--charter-budget none|empty|zero|synthetic`, `--charter-scale X`.
+        // BL-1032: `--charter-budget none|empty|zero|synthetic|refused`, `--charter-scale X`.
         charter_mode mode  = charter_mode::none;
         double       scale = 1.0;
         for (int a = 2; a < argc; ++a)
@@ -1351,9 +1432,10 @@ int main(int argc, char** argv)
                     else if (val == "empty")     mode = charter_mode::empty;
                     else if (val == "zero")      mode = charter_mode::zero;
                     else if (val == "synthetic") mode = charter_mode::synthetic;
+                    else if (val == "refused")   mode = charter_mode::refused;
                     else
                     {
-                        std::printf("--charter-budget: '%s' is not none|empty|zero|synthetic\n",
+                        std::printf("--charter-budget: '%s' is not none|empty|zero|synthetic|refused\n",
                                     val.c_str());
                         return 2;
                     }

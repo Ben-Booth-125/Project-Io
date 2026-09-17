@@ -187,7 +187,7 @@ inline shipped_landscape apply_shipped_landscape(
     }
     if (charter.budget == nullptr)
     {
-        // app.cpp:1063, verbatim — the shipped path.
+        // app.cpp:1071, verbatim — the shipped path.
         apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true);
     }
     else
@@ -298,7 +298,7 @@ struct app_start_world
     generation_report report{};   ///< app::m_generation_report
     world             w;          ///< app::m_world
     /// The search. `land.search.winner_score` is app::m_landscape_winner_score
-    /// (app.cpp:1066), the score the seat reads.
+    /// (app.cpp:1074), the score the seat reads.
     shipped_landscape land;
 };
 
@@ -316,7 +316,7 @@ inline void build_app_start_world(lua_state& lua, const world_params& params,
     lua.load("scripts/world_gen.lua");
     out.cfg = world_gen_config{};
     out.cfg.load_from_lua(lua);
-    // app.cpp:546 -> app::ensure_works_loaded (app.cpp:1132-1140), loaded once.
+    // app.cpp:546 -> app::ensure_works_loaded (app.cpp:1140-1148), loaded once.
     if (out.works.size() == 0)
     {
         lua.load("scripts/works.lua");
@@ -328,24 +328,24 @@ inline void build_app_start_world(lua_state& lua, const world_params& params,
     out.w = make_hard_coded_world(params, &out.report, out.cfg, /*progress=*/nullptr,
                                   &out.works);
 
-    // --- app::start_new_game_prelude (app.cpp:980-1100) --------------------
-    // app.cpp:1014 -> app::setup_world (app.cpp:1356-1511). Its world is already
-    // built (the app.cpp:1382 branch is not taken on this path); of the rest,
+    // --- app::start_new_game_prelude (app.cpp:980-1108) --------------------
+    // app.cpp:1014 -> app::setup_world (app.cpp:1364-1519). Its world is already
+    // built (the app.cpp:1390 branch is not taken on this path); of the rest,
     // only two calls write the world — the others frame the camera and the chat.
-    seed_genesis_history(out.w, out.report);   // app.cpp:1397
-    init_survey_states(out.w);                 // app.cpp:1509
+    seed_genesis_history(out.w, out.report);   // app.cpp:1405
+    init_survey_states(out.w);                 // app.cpp:1517
 
-    // app.cpp:1016 -> app::load_economy (app.cpp:1142-1229).
-    lua.load("scripts/recipes.lua");           // app.cpp:1145
-    lua.load("scripts/economy.lua");           // app.cpp:1146
-    out.reg.load_from_lua(lua);                // app.cpp:1147
-    out.reg.set_era(era_band_for_epoch(params.epoch_year)); // app.cpp:1157
-    // app.cpp:1168 ensure_works_loaded: already loaded above. app.cpp:1172-1173
+    // app.cpp:1016 -> app::load_economy (app.cpp:1150-1237).
+    lua.load("scripts/recipes.lua");           // app.cpp:1153
+    lua.load("scripts/economy.lua");           // app.cpp:1154
+    out.reg.load_from_lua(lua);                // app.cpp:1155
+    out.reg.set_era(era_band_for_epoch(params.epoch_year)); // app.cpp:1165
+    // app.cpp:1176 ensure_works_loaded: already loaded above. app.cpp:1180-1181
     // (tech_tree.lua) and 1220-1228 (persona bench) write no world state, and
-    // app.cpp:1201-1213 only reads it.
-    assign_default_recipes(out.w, out.reg);    // app.cpp:1185
+    // app.cpp:1209-1221 only reads it.
+    assign_default_recipes(out.w, out.reg);    // app.cpp:1193
 
-    // app.cpp:1052-1073 — the search, the winner applied — and app.cpp:1084, the
+    // app.cpp:1052-1081 — the search, the winner applied — and app.cpp:1092, the
     // second recipe pass: apply_shipped_landscape is that block, given the
     // PARSED config's roster count (app.cpp:1057).
     // BL-1032: the app passes NO charter budget here (its default is none), and
@@ -355,7 +355,7 @@ inline void build_app_start_world(lua_state& lua, const world_params& params,
 }
 
 /// Run the validation run on @p w exactly as app::poll_worldgen does
-/// (app.cpp:575-606): `ticks` calls to app::step_economy (app.cpp:1231-1347),
+/// (app.cpp:575-606): `ticks` calls to app::step_economy (app.cpp:1239-1355),
 /// under the tick state the app has at that moment. Does NOT seat — the app
 /// seats after the run closes (app.cpp:603), and the caller does the same with
 /// `seat_player_corporation`.
@@ -363,12 +363,12 @@ inline void build_app_start_world(lua_state& lua, const world_params& params,
 /// THE TICK STATE, and why each value is what it is:
 ///   * econ tick 0..ticks-1. app.cpp:655 sets m_econ_steps = 0 when the run is
 ///     armed, and step_economy stamps `current_econ_tick = m_econ_steps++`
-///     (app.cpp:1250) — so the first validation tick is 0, not 1.
+///     (app.cpp:1258) — so the first validation tick is 0, not 1.
 ///   * day tick 0, for every tick. The sim loop is rebuilt at app.cpp:1010 and
 ///     only `sim_loop::tick()` advances its day counter; the frame loop skips
 ///     that call on every screen but `in_game` (app.cpp:320-324), and the
 ///     validation run happens on the `building` screen. So
-///     `m_sim_loop.day_tick()` (app.cpp:1301) is 0 throughout.
+///     `m_sim_loop.day_tick()` (app.cpp:1309) is 0 throughout.
 ///   * `world::current_day_tick` is NOT written. The app mirrors it only inside
 ///     the in_game frame loop (app.cpp:401); through the validation run it keeps
 ///     the value generation left, and this helper leaves it alone likewise.
@@ -378,24 +378,24 @@ inline void run_app_validation_settle(world& w, const recipe_registry& reg,
     constexpr int k_validation_day_tick = 0; // m_sim_loop.day_tick(), see above
     for (int econ_step = 0; econ_step < ticks; ++econ_step)  // app.cpp:655, 579-583
     {
-        w.current_econ_tick = econ_step;                                  // app.cpp:1250
-        lp_pool_map tick_lp_pools;                                        // app.cpp:1257
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // app.cpp:1258-1260
+        w.current_econ_tick = econ_step;                                  // app.cpp:1258
+        lp_pool_map tick_lp_pools;                                        // app.cpp:1265
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // app.cpp:1266-1268
                          reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
-        advance_convoys(w);                                               // app.cpp:1261
-        // app.cpp:1273-1275: `m_ui.spectating || m_validation_run`, and
+        advance_convoys(w);                                               // app.cpp:1269
+        // app.cpp:1281-1283: `m_ui.spectating || m_validation_run`, and
         // m_validation_run is true for every tick of this run (app.cpp:653).
         economy_report report = run_economy_step(w, reg, /*spectating=*/true,
                                                  &tick_lp_pools);
-        const auto flows = clear_markets(w, reg, report);                 // app.cpp:1277
-        apply_budget(w, reg, flows, report.workforce_contention,          // app.cpp:1279-1282
+        const auto flows = clear_markets(w, reg, report);                 // app.cpp:1285
+        apply_budget(w, reg, flows, report.workforce_contention,          // app.cpp:1287-1290
                      &report.budgets, &report.buildings, &report.building_labour);
-        run_nation_step(w, reg, report, w.current_econ_tick);             // app.cpp:1289
-        advance_tech_gates(w);                                            // app.cpp:1295
-        // app.cpp:1300 compute_corp_standings reads a const world into a UI cache.
-        credit_arrived_convoys(w, k_validation_day_tick);                 // app.cpp:1301
-        run_firm_exits(w, reg.firm_exit(), &report.firm_exits);           // app.cpp:1306
-        // app.cpp:1314-1345: presentation over a const world; nothing to mirror.
+        run_nation_step(w, reg, report, w.current_econ_tick);             // app.cpp:1297
+        advance_tech_gates(w);                                            // app.cpp:1303
+        // app.cpp:1308 compute_corp_standings reads a const world into a UI cache.
+        credit_arrived_convoys(w, k_validation_day_tick);                 // app.cpp:1309
+        run_firm_exits(w, reg.firm_exit(), &report.firm_exits);           // app.cpp:1314
+        // app.cpp:1322-1353: presentation over a const world; nothing to mirror.
     }
 }
 
@@ -411,7 +411,8 @@ inline void run_app_validation_settle(world& w, const recipe_registry& reg,
 //
 // 1x is the number of corporations the LEGACY landscape charters on the same seed
 // (specialists + background firms), which the caller measures on a legacy build in
-// the same process and passes in. Prices: firm 1 point, specialist 4 points.
+// the same process and passes in. Prices: firm 1 point, specialist 4 firm charters
+// (so 4 points).
 
 #include "world/planetology.hpp"  // checkpoint_rng
 
@@ -421,14 +422,15 @@ inline void run_app_validation_settle(world& w, const recipe_registry& reg,
 /// Salt for the synthetic weights. Harness-only, and collides with no generation salt.
 inline constexpr std::uint32_t k_synthetic_charter_salt = 0x5C0FFA7Bu;
 
-/// The synthetic spend: firm 1, specialist 4, window 4, province cap on.
+/// The synthetic spend: firm 1 point, specialist 4 firm charters, window 4,
+/// province cap on.
 inline charter_spend_params synthetic_charter_spend()
 {
     charter_spend_params s;
-    s.firm_price_points       = 1;
-    s.specialist_price_points = 4;
-    s.window_radius           = 4;
-    s.province_cap            = true;
+    s.firm_price_points        = 1;
+    s.specialist_firm_charters = 4;
+    s.window_radius            = 4;
+    s.province_cap             = true;
     return s;
 }
 

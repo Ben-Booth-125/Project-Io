@@ -73,32 +73,51 @@ private:
 /// How a budget is spent. THE PRICES HAVE NO SHIPPED DEFAULT (DIGITISATION.md
 /// § 1: "the price of a specialist and of a firm are measured against live-play
 /// cost before either is fixed"). They default to 0, and a NON-EMPTY budget with
-/// a price <= 0 is REFUSED (`charter_spend_refusal`): the search declines to
-/// run, and the spend charters nothing and reports every point unspent. An
-/// empty budget is never refused — it is today's world, whatever the prices.
+/// a price <= 0 is REFUSED (`charter_spend_refusal`). A REFUSAL MUTATES NOTHING
+/// BEYOND TODAY'S WORLD: it is checked before any mutation, the search then runs
+/// exactly the no-budget search and flags the refusal, and the apply runs exactly
+/// the legacy calls and reports every point unspent as `refused`. An empty budget
+/// is never refused — it is today's world, whatever the prices.
+///
+/// A SPECIALIST'S PRICE IS A WHOLE NUMBER OF FIRM CHARTERS (DIGITISATION.md § 1:
+/// "a specialist's price — a fixed number of firm charters"), so it is not a free
+/// number: it is `firm_price_points x specialist_firm_charters`.
 struct charter_spend_params
 {
     /// Points one background firm costs. Must be > 0 on a non-empty budget.
     std::int32_t firm_price_points = 0;
-    /// Points one specialist costs. Must be > 0 on a non-empty budget.
-    std::int32_t specialist_price_points = 0;
+    /// How many firm charters one specialist costs. Must be > 0 on a non-empty
+    /// budget.
+    std::int32_t specialist_firm_charters = 0;
     /// The anchor window's radius around the centre tile, in grid tiles, on a
     /// column-WRAPPED squared metric (dx*dx + dy*dy <= r*r). 4 is the seat's
     /// `population_radius` precedent.
     int window_radius = 4;
     /// Pass 6's per-province firm cap (2) applies to budget firms when true.
     bool province_cap = true;
+
+    /// Points one specialist costs: the firm price times the firm charters it is
+    /// worth. Widened, so no pair of int32 inputs overflows it; a price above any
+    /// int32 budget entry is simply never affordable.
+    std::int64_t specialist_price_points() const
+    {
+        return static_cast<std::int64_t>(firm_price_points)
+             * static_cast<std::int64_t>(specialist_firm_charters);
+    }
 };
 
 /// Why a point was not spent. Ordered: a report sorts (centre, reason) on it.
+/// Nothing here is persistent, so the numbering follows the reading.
 enum class charter_unspent_reason : std::uint8_t
 {
     no_nation        = 0, ///< the centre's tile belongs to no nation (or has no tile)
     window_exhausted = 1, ///< no anchorable ground in the centre window nor its region window
-    no_gap           = 2, ///< the body had no resource short enough to charter a firm for
-    body_cap         = 3, ///< the body already carries Pass 6's 200 background firms
-    remainder        = 4, ///< fewer points left than one firm costs
-    refused          = 5, ///< the spend params were refused (a price <= 0); nothing chartered
+    province_cap     = 2, ///< the windows HAD anchorable ground, but every such tile stands in
+                          ///< a province already at Pass 6's per-province firm cap
+    no_gap           = 3, ///< the body had no resource short enough to charter a firm for
+    body_cap         = 4, ///< the body already carries Pass 6's 200 background firms
+    remainder        = 5, ///< fewer points left than one firm costs
+    refused          = 6, ///< the spend params were refused (a price <= 0); nothing chartered
 };
 
 inline const char* charter_unspent_reason_name(charter_unspent_reason r)
@@ -107,6 +126,7 @@ inline const char* charter_unspent_reason_name(charter_unspent_reason r)
     {
     case charter_unspent_reason::no_nation:        return "no_nation";
     case charter_unspent_reason::window_exhausted: return "window_exhausted";
+    case charter_unspent_reason::province_cap:     return "province_cap";
     case charter_unspent_reason::no_gap:           return "no_gap";
     case charter_unspent_reason::body_cap:         return "body_cap";
     case charter_unspent_reason::remainder:        return "remainder";
@@ -115,14 +135,15 @@ inline const char* charter_unspent_reason_name(charter_unspent_reason r)
     return "?";
 }
 
-constexpr int charter_unspent_reason_count = 6;
+constexpr int charter_unspent_reason_count = 7;
 
 /// Which anchor rung a charter landed on. There is no third rung: a charter that
 /// finds no ground in either is UNSPENT, never scattered nation-wide.
 enum class charter_rung : std::uint8_t
 {
     centre_window = 1, ///< the centre nation's tiles within `window_radius` of the centre tile
-    region_window = 2, ///< the centre nation's tiles in the centre's region
+    region_window = 2, ///< the centre nation's tiles in the centre's NEAREST region, and
+                       ///< only when that region is the centre nation's own
 };
 
 struct charter_unspent
@@ -140,6 +161,10 @@ struct charter_record
     charter_rung rung        = charter_rung::centre_window;
     entity_id    anchor_tile = null_entity; ///< the tile the first holding stands on
     std::int32_t price       = 0;
+    /// EVERY holding's tile as placed, the anchor first. The rung bounds only
+    /// the anchor: `place_starting_assets` walks the secondary holdings outward
+    /// from it across the whole nation, so a reader measures the spill here.
+    std::vector<entity_id> holdings;
 };
 
 /// What one spend did. Every vector is SORTED — ids ascending, unspent by
@@ -147,6 +172,8 @@ struct charter_record
 struct charter_spend_report
 {
     /// Set when `charter_spend_refusal` refused the params; `refusal` says why.
+    /// On `apply_landscape_candidate`'s budget overload a refused world is
+    /// TODAY'S world — the legacy calls ran, and nothing here was chartered.
     bool        refused = false;
     std::string refusal;
 
@@ -168,16 +195,32 @@ struct charter_spend_report
 
 /// Null when @p s may spend @p b; otherwise why not. An EMPTY budget is never
 /// refused: it is today's world, and it takes the legacy branch before any
-/// price is read.
+/// price is read. Every caller checks this BEFORE ANY MUTATION.
 inline const char* charter_spend_refusal(const charter_budget& b, const charter_spend_params& s)
 {
     if (b.empty())
         return nullptr;
     if (s.firm_price_points <= 0)
         return "firm_price_points must be > 0 on a non-empty charter budget (no shipped default)";
-    if (s.specialist_price_points <= 0)
-        return "specialist_price_points must be > 0 on a non-empty charter budget (no shipped default)";
+    if (s.specialist_firm_charters <= 0)
+        return "specialist_firm_charters must be > 0 on a non-empty charter budget (no shipped default)";
     if (s.window_radius < 0)
         return "window_radius must be >= 0";
     return nullptr;
+}
+
+/// The report a REFUSED spend leaves: nothing chartered, nobody picked, every
+/// point unspent with reason `refused`, and the refusal's text. It reads the
+/// budget only — a refusal is decided before any world is touched.
+inline charter_spend_report charter_refused_report(const charter_budget& b, const char* why)
+{
+    charter_spend_report rep;
+    rep.refused         = true;
+    rep.refusal         = (why != nullptr) ? why : "";
+    rep.no_specialists  = true;
+    rep.points_budgeted = b.total();
+    for (const auto& [centre, pts] : b.points())
+        rep.unspent.push_back({ centre, charter_unspent_reason::refused, pts });
+    rep.points_unspent  = rep.points_budgeted;
+    return rep;
 }

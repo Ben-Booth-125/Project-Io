@@ -159,27 +159,37 @@ int remove_specialist_roster(world& w);
 /// budget keeps its bytes.
 ///
 /// THE SPEND, in order:
-///  * Refused params (`charter_spend_refusal`) charter NOTHING; every point is
-///    reported unspent with reason `refused`.
-///  * Centres spend by budget DESCENDING, ties to the lower centre id, in two
-///    sweeps — every specialist first, then every centre's firms — so, as in the
-///    legacy order, specialists stake their ground before any background firm.
+///  * Refused params (`charter_spend_refusal`) charter NOTHING and touch
+///    nothing; the report is `charter_refused_report`. (The landscape overload
+///    decides a refusal before any mutation and never calls this with one.)
+///  * Centres spend by budget DESCENDING, ties to the lower centre id, in ONE
+///    walk (DIGITISATION.md § 1: a centre "charters exactly one specialist; what
+///    remains buys background firms around it"): each centre's specialist, then
+///    that centre's firms, then the next centre.
 ///  * Home nation = `tile_to_nation` of the centre tile; none -> the whole
-///    budget unspent (`no_nation`). Region = `nearest_region`, reconciled to that
-///    nation (a mismatch takes the nation's own nearest region to the centre;
-///    with none, or no settlement, the national-character fallback).
-///  * A centre whose budget >= the specialist price charters EXACTLY ONE
-///    specialist: focus and ownership from the region (Passes 2 and 2b), today's
-///    capital (400 +/- 40%), stockpile, name and HQ. NO nation balancing, no
-///    diversity reroll. The remainder buys background firms at the firm price by
-///    Pass 6's gap selection (construction first, then the biggest gap under the
+///    budget unspent (`no_nation`).
+///  * TWO REGIONS. CHARACTER (a specialist's focus and ownership) is
+///    `nearest_region` reconciled to that nation — a mismatch takes the nation's
+///    own nearest region to the centre; with none, or no settlement, the
+///    national-character fallback. ANCHORING (rung 2) is `nearest_region` only
+///    when that region is the centre nation's own, and otherwise nothing.
+///  * A centre whose budget >= the specialist price (`firm_price_points x
+///    specialist_firm_charters`) charters EXACTLY ONE specialist: focus and
+///    ownership from the character region (Passes 2 and 2b), today's capital
+///    (400 +/- 40%), stockpile, name and HQ. NO nation balancing, no diversity
+///    reroll. The remainder buys background firms at the firm price by Pass 6's
+///    gap selection (construction first, then the biggest gap under the
 ///    per-resource cap 8), under the per-province cap 2 when
 ///    `spend.province_cap`, and the 200-per-body cap.
 ///  * Anchor rungs: the centre nation's tiles within `spend.window_radius` of
-///    the centre tile (column-wrapped), then the centre region's window, then
-///    UNSPENT (`window_exhausted`) — never nation-wide.
-///  * What is not spent is counted by reason (`no_gap`, `body_cap`, `remainder`
-///    too), never scattered.
+///    the centre tile (column-wrapped), then the anchor region's window (empty
+///    when the nearest region is a neighbour's), then UNSPENT — never nation-wide.
+///    The rungs bound the ANCHOR only; secondary holdings walk outward from it
+///    (`place_starting_assets`, unchanged), and each record lists every holding
+///    tile so a reader can measure the spill.
+///  * What is not spent is counted by reason: `window_exhausted`,
+///    `province_cap` (the windows had anchorable ground and the cap took all of
+///    it), `no_gap`, `body_cap`, `remainder` — never scattered.
 ///  * The player is a seeded pick among the budget's specialists; with none,
 ///    nobody is picked and the report says `no_specialists`.
 ///

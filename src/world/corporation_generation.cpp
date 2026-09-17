@@ -2611,7 +2611,20 @@ struct charter_centre
 
     entity_id    nation     = null_entity;   ///< null -> the whole budget is `no_nation`
     int          nation_idx = -1;            ///< into the sorted nation ids (region.nation's space)
-    int          region_idx = -1;            ///< settle->regions index reconciled to `nation`, or -1
+
+    /// TWO REGIONS, because they answer two different questions.
+    ///
+    /// CHARACTER (a specialist's focus and ownership): `nearest_region`
+    /// reconciled to the centre's nation — on a mismatch, the nation's own
+    /// nearest region, however far; with none, -1 and the national-character
+    /// fallback. A character is a reading of the nation's settlement record, so
+    /// distance does not disqualify it.
+    int          character_region_idx = -1;
+    /// ANCHORING (rung 2's window): `nearest_region` ONLY when that region is
+    /// the centre nation's own, else -1 and rung 2 is empty. Never the
+    /// reconciled region: a charter stays near its centre (DIGITISATION.md § 1),
+    /// and the nation's nearest region can be anywhere in the nation.
+    int          anchor_region_idx    = -1;
 
     /// Points left for background firms once the specialist price is taken.
     int32_t      firm_points = 0;
@@ -2651,8 +2664,9 @@ const std::vector<entity_id>& charter_centre_window(const world& w, const nation
     return cc.centre_window;
 }
 
-/// Rung 2: the centre nation's tiles inside the centre's region (`region_window`,
-/// BL-283's reading of "inside a region"). Empty with no region.
+/// Rung 2: the centre nation's tiles inside the centre's ANCHOR region
+/// (`region_window`, BL-283's reading of "inside a region"). Empty when the
+/// centre's nearest region is not its nation's own (`anchor_region_idx` -1).
 const std::vector<entity_id>& charter_region_window(const world& w, const nation_component& nc,
                                                     const settlement_state* settle,
                                                     charter_centre& cc)
@@ -2660,8 +2674,9 @@ const std::vector<entity_id>& charter_region_window(const world& w, const nation
     if (cc.region_window_built)
         return cc.region_tiles;
     cc.region_window_built = true;
-    if (settle != nullptr && cc.region_idx >= 0 && cc.gw > 0)
-        cc.region_tiles = region_window(w, nc, *settle, std::vector<int>{ cc.region_idx }, cc.gw);
+    if (settle != nullptr && cc.anchor_region_idx >= 0 && cc.gw > 0)
+        cc.region_tiles = region_window(w, nc, *settle, std::vector<int>{ cc.anchor_region_idx },
+                                        cc.gw);
     return cc.region_tiles;
 }
 
@@ -2690,6 +2705,30 @@ std::vector<entity_id> charter_under_province_cap(const world& w,
     return out;
 }
 
+/// True when @p window holds a tile `place_starting_assets` could anchor @p focus
+/// on — its candidate filter restated, READ-ONLY and drawing nothing (that
+/// function authors a building on success, so it cannot be used as the probe).
+/// Only asked after a placement failed, to name WHY it failed.
+bool charter_window_anchorable(const world& w, const std::vector<entity_id>& window,
+                               industrial_focus focus,
+                               const std::unordered_set<entity_id>& occupied)
+{
+    const building_type anchor_type = focus_asset_pattern(focus).front();
+    for (entity_id tid : window)
+    {
+        if (occupied.count(tid))
+            continue;
+        const auto it = w.tiles.find(tid);
+        if (it == w.tiles.end())
+            continue;
+        bool any = false;
+        const resource_type tgt = placement_rules::richest_extractable(it->second, any);
+        if (placement_rules::can_place(it->second, anchor_type, tgt))
+            return true;
+    }
+    return false;
+}
+
 /// Place one charter's holdings on the two anchor rungs, and NOTHING wider.
 ///
 /// AN EMPTY WINDOW IS NEVER PASSED to `place_starting_assets`: that function
@@ -2697,6 +2736,11 @@ std::vector<entity_id> charter_under_province_cap(const world& w,
 /// scatter a budget charter must not do. An empty rung is skipped. A rung that
 /// finds no anchorable tile consumes no randomness (place_starting_assets
 /// returns before its first draw), so rung 2 draws as if it had been first.
+///
+/// On failure @p fail_out names why: `province_cap` when some rung's UNFILTERED
+/// window held anchorable ground and the province-cap filter took all of it
+/// (the filter emptied the window, or left only unanchorable tiles); otherwise
+/// `window_exhausted`. With no cap in force the reason is always the latter.
 std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      industrial_focus focus,
                                      std::unordered_set<entity_id>& occupied,
@@ -2705,14 +2749,20 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      const settlement_state* settle,
                                      const charter_spend_params& spend,
                                      const std::map<uint32_t, int>* by_province,
-                                     charter_rung& rung_out)
+                                     charter_rung& rung_out,
+                                     charter_unspent_reason& fail_out)
 {
-    for (const charter_rung rung : { charter_rung::centre_window, charter_rung::region_window })
+    static constexpr charter_rung k_rungs[] = { charter_rung::centre_window,
+                                                charter_rung::region_window };
+    const auto base_of = [&](charter_rung rung) -> const std::vector<entity_id>& {
+        return (rung == charter_rung::centre_window)
+            ? charter_centre_window(w, nc, cc, spend.window_radius)
+            : charter_region_window(w, nc, settle, cc);
+    };
+
+    for (const charter_rung rung : k_rungs)
     {
-        const std::vector<entity_id>& base =
-            (rung == charter_rung::centre_window)
-                ? charter_centre_window(w, nc, cc, spend.window_radius)
-                : charter_region_window(w, nc, settle, cc);
+        const std::vector<entity_id>& base = base_of(rung);
         std::vector<entity_id> window = (by_province != nullptr)
             ? charter_under_province_cap(w, base, *by_province)
             : base;
@@ -2725,10 +2775,21 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
             return assets;
         }
     }
+
+    // Nothing placed, so nothing moved: `occupied` and the windows are as they
+    // were, and the probe below reads the same ground the rungs just did.
+    fail_out = charter_unspent_reason::window_exhausted;
+    if (by_province != nullptr)
+        for (const charter_rung rung : k_rungs)
+            if (charter_window_anchorable(w, base_of(rung), focus, occupied))
+            {
+                fail_out = charter_unspent_reason::province_cap;
+                break;
+            }
     return {};
 }
 
-/// Per-body state of the firm sweep — Pass 6's per-body tallies.
+/// Per-body state of the firm charters — Pass 6's per-body tallies.
 struct charter_body_state
 {
     std::array<float, resource_count> consumer_demand{};
@@ -2747,28 +2808,32 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                                const settlement_state* settle,
                                                charter_spend_report* report)
 {
-    charter_spend_report rep;
-    rep.points_budgeted = budget.total();
     std::vector<entity_id> chartered;
 
-    // --- refused params charter NOTHING -------------------------------------
+    // --- refused params charter NOTHING, and touch nothing ------------------
+    // `apply_landscape_candidate`'s budget overload decides a refusal before any
+    // mutation and never reaches here with one; this guard keeps the function
+    // honest for any other caller.
     if (const char* why = charter_spend_refusal(budget, spend))
     {
-        rep.refused = true;
-        rep.refusal = why;
-        for (const auto& [centre, pts] : budget.points())
-            rep.unspent.push_back({ centre, charter_unspent_reason::refused, pts });
-        rep.points_unspent = rep.points_budgeted;
         if (report != nullptr)
-            *report = std::move(rep);
+            *report = charter_refused_report(budget, why);
         return chartered;
     }
+
+    charter_spend_report rep;
+    rep.points_budgeted = budget.total();
     if (budget.empty())
     {
+        rep.no_specialists = true;
         if (report != nullptr)
             *report = std::move(rep);
         return chartered;
     }
+
+    // Widened: the product of two int32 inputs. A price above every int32
+    // budget entry is simply never affordable.
+    const int64_t specialist_price = spend.specialist_price_points();
 
     // Sorted nation ids — the index space `region::nation` speaks, exactly as
     // generate_corporations builds it.
@@ -2820,11 +2885,15 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             continue;
         }
 
-        // THE REGION. `nearest_region` is nation-AGNOSTIC: near a border the
-        // nearest anchor can be a neighbour's. The charter's region must be its
-        // own nation's, so a mismatch takes the nation's own nearest region to
-        // the centre (same wrapped metric, ties to the lower index); a nation
-        // with none keeps -1 and falls to the national character below.
+        // THE REGIONS. `nearest_region` is nation-AGNOSTIC: near a border the
+        // nearest anchor can be a neighbour's.
+        //  * ANCHORING takes it only when it is the centre nation's own; a
+        //    neighbour's nearest region leaves rung 2 empty, so a charter that
+        //    finds no ground in the centre window goes unspent rather than to
+        //    some far region of its nation.
+        //  * CHARACTER takes the nation's own nearest region to the centre on a
+        //    mismatch (same wrapped metric, ties to the lower index); a nation
+        //    with none keeps -1 and falls to the national character below.
         if (settle != nullptr && !settle->regions.empty() && cc.gw > 0)
         {
             int pi = nearest_region(*settle, cc.x, cc.y, cc.gw);
@@ -2833,6 +2902,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 && settle->regions[static_cast<std::size_t>(pi)].nation < nation_count
                 && nation_ids[static_cast<std::size_t>(
                        settle->regions[static_cast<std::size_t>(pi)].nation)] == cc.nation;
+            cc.anchor_region_idx = same_nation ? pi : -1;
             if (!same_nation)
             {
                 pi = -1;
@@ -2850,7 +2920,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     }
                 }
             }
-            cc.region_idx = pi;
+            cc.character_region_idx = pi;
         }
         centres.push_back(std::move(cc));
     }
@@ -2874,113 +2944,125 @@ std::vector<entity_id> charter_web_from_budget(world& w,
 
     const corporation_params capital_params;   // today's starting capital: 400 +/- 40%
 
+    // `assets` is read BEFORE it is moved into the corporation, so the record
+    // holds every holding's tile as placed (anchor first).
     auto record = [&](entity_id corp_id, const charter_centre& cc, bool specialist,
-                      charter_rung rung, entity_id anchor_tile, int32_t price) {
+                      charter_rung rung, const std::vector<entity_id>& assets, int32_t price) {
         charter_record r;
         r.corp        = corp_id;
         r.centre      = cc.centre;
         r.specialist  = specialist;
         r.rung        = rung;
-        r.anchor_tile = anchor_tile;
+        r.anchor_tile = w.buildings.at(assets.front()).tile;
         r.price       = price;
-        rep.charters.push_back(r);
+        r.holdings.reserve(assets.size());
+        for (const entity_id bid : assets)
+            r.holdings.push_back(w.buildings.at(bid).tile);
+        rep.charters.push_back(std::move(r));
         (specialist ? rep.specialists : rep.firms).push_back(corp_id);
         rep.points_spent += price;
         chartered.push_back(corp_id);
     };
 
-    // --- SWEEP 1: one specialist per centre that can afford one --------------
-    // Every specialist before any firm, as the legacy order stakes specialists
-    // before Pass 6 fills in around them.
+    std::map<entity_id, charter_body_state> bodies;
+
+    // --- ONE WALK (DIGITISATION.md § 1) ---------------------------------------
+    // Each centre in spend order "charters exactly one specialist; what remains
+    // buys background firms around it" — its specialist, then its firms, then
+    // the next centre. So a richer centre's firms stand before a poorer centre's
+    // specialist, and a centre's specialist stakes its ground before its own firms.
     for (const std::size_t oi : order)
     {
         charter_centre& cc = centres[oi];
         if (cc.nation == null_entity)
             continue;
-        cc.firm_points = cc.points;
-        if (cc.points < spend.specialist_price_points)
-            continue;
-        cc.firm_points = cc.points - spend.specialist_price_points;
-
         const nation_component& nc = w.nations.at(cc.nation);
+        cc.firm_points = cc.points;
 
-        // Focus and ownership from the region, as Passes 2 and 2b read them;
-        // with no region, the national-character fallback generate_corporations
-        // takes for a nation the settlement pass never reached.
-        industrial_focus focus;
-        ownership_class  own;
-        if (settle != nullptr && cc.region_idx >= 0)
+        // --- this centre's specialist, if it can afford one -------------------
+        if (static_cast<int64_t>(cc.points) >= specialist_price)
         {
-            const region& rg = settle->regions[static_cast<std::size_t>(cc.region_idx)];
-            focus = focus_from_region(rg, settle->median_industrial_year);
-            own   = ownership_from_region(rg, settle->charter, nc.politics);
-        }
-        else
-        {
-            focus = static_cast<industrial_focus>(static_cast<uint8_t>(nc.focus));
-            own   = ownership_from_character(nc.politics);
+            const int32_t price = static_cast<int32_t>(specialist_price);   // <= points
+            cc.firm_points = cc.points - price;
+
+            // Focus and ownership from the CHARACTER region, as Passes 2 and 2b
+            // read them; with none, the national-character fallback
+            // generate_corporations takes for a nation the settlement pass never
+            // reached.
+            industrial_focus focus;
+            ownership_class  own;
+            if (settle != nullptr && cc.character_region_idx >= 0)
+            {
+                const region& rg = settle->regions[static_cast<std::size_t>(cc.character_region_idx)];
+                focus = focus_from_region(rg, settle->median_industrial_year);
+                own   = ownership_from_region(rg, settle->charter, nc.politics);
+            }
+            else
+            {
+                focus = static_cast<industrial_focus>(static_cast<uint8_t>(nc.focus));
+                own   = ownership_from_character(nc.politics);
+            }
+
+            std::mt19937 asset_rng = charter_stream(seed, k_charter_salt_spec_asset, cc.centre);
+            charter_rung rung = charter_rung::centre_window;
+            charter_unspent_reason why = charter_unspent_reason::window_exhausted;
+            std::vector<entity_id> assets = charter_place(w, nc, focus, occupied, asset_rng, cc,
+                                                          settle, spend, /*by_province=*/nullptr,
+                                                          rung, why);
+            if (assets.empty())
+            {
+                // No ground in either window: the specialist's price stays
+                // unspent. Never an asset-light corp, never a nation-wide anchor.
+                // The remainder still buys firms below.
+                cc.unspent[static_cast<std::size_t>(why)] += price;
+            }
+            else
+            {
+                std::mt19937 capital_rng =
+                    charter_stream(seed, k_charter_salt_spec_capital, cc.centre);
+                const float capital = compute_capital(capital_params.base_capital,
+                                                      capital_params.wealth_variance, focus,
+                                                      capital_rng);
+                std::mt19937 name_rng = charter_stream(seed, k_charter_salt_spec_name, cc.centre);
+
+                corporation_component corp;
+                corp.name             = make_corp_name(nc.name, name_rng);
+                corp.home_nation      = cc.nation;
+                corp.focus            = focus;
+                corp.ownership_class  = own;
+                corp.starting_capital = capital;
+                corp.balance          = capital;
+                corp.is_player        = false;
+                corp.is_background    = false;
+
+                const entity_id home_body = corp_home_body(w, assets);
+                const hq_designation hq   = designate_hq(w, assets, home_body);
+                corp.hq_building     = hq.building;
+                corp.influence_range = hq.range;
+
+                const entity_id corp_id = w.create_entity();
+                record(corp_id, cc, /*specialist=*/true, rung, assets, price);
+                corp.assets = std::move(assets);
+                w.corporations[corp_id] = std::move(corp);
+
+                std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_spec_stock, cc.centre);
+                const auto stock = generate_starting_stockpile(focus, capital,
+                                                               capital_params.base_capital,
+                                                               stock_rng);
+                if (home_body != null_entity)
+                {
+                    stockpile_component& pool = w.pool_for(corp_id, home_body);
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        pool.quantities[r] += stock[r];
+                }
+            }
         }
 
-        std::mt19937 asset_rng = charter_stream(seed, k_charter_salt_spec_asset, cc.centre);
-        charter_rung rung = charter_rung::centre_window;
-        std::vector<entity_id> assets = charter_place(w, nc, focus, occupied, asset_rng, cc,
-                                                      settle, spend, /*by_province=*/nullptr, rung);
-        if (assets.empty())
-        {
-            // No ground in either window: the specialist's price stays unspent.
-            // Never an asset-light corp, never a nation-wide anchor.
-            cc.unspent[static_cast<std::size_t>(charter_unspent_reason::window_exhausted)]
-                += spend.specialist_price_points;
+        // --- then what remains buys this centre's background firms -------------
+        if (cc.firm_points <= 0)
             continue;
-        }
 
-        std::mt19937 capital_rng = charter_stream(seed, k_charter_salt_spec_capital, cc.centre);
-        const float capital = compute_capital(capital_params.base_capital,
-                                              capital_params.wealth_variance, focus, capital_rng);
-        std::mt19937 name_rng = charter_stream(seed, k_charter_salt_spec_name, cc.centre);
-
-        corporation_component corp;
-        corp.name             = make_corp_name(nc.name, name_rng);
-        corp.home_nation      = cc.nation;
-        corp.focus            = focus;
-        corp.ownership_class  = own;
-        corp.starting_capital = capital;
-        corp.balance          = capital;
-        corp.is_player        = false;
-        corp.is_background    = false;
-
-        const entity_id anchor_tile = w.buildings.at(assets.front()).tile;
-        const entity_id home_body   = corp_home_body(w, assets);
-        const hq_designation hq     = designate_hq(w, assets, home_body);
-        corp.hq_building     = hq.building;
-        corp.influence_range = hq.range;
-        corp.assets          = std::move(assets);
-
-        const entity_id corp_id = w.create_entity();
-        w.corporations[corp_id] = std::move(corp);
-
-        std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_spec_stock, cc.centre);
-        const auto stock = generate_starting_stockpile(focus, capital,
-                                                       capital_params.base_capital, stock_rng);
-        if (home_body != null_entity)
-        {
-            stockpile_component& pool = w.pool_for(corp_id, home_body);
-            for (std::size_t r = 0; r < resource_count; ++r)
-                pool.quantities[r] += stock[r];
-        }
-        record(corp_id, cc, /*specialist=*/true, rung, anchor_tile,
-               spend.specialist_price_points);
-    }
-
-    // --- SWEEP 2: the remainder buys background firms ------------------------
-    std::map<entity_id, charter_body_state> bodies;
-    for (const std::size_t oi : order)
-    {
-        charter_centre& cc = centres[oi];
-        if (cc.nation == null_entity || cc.firm_points <= 0)
-            continue;
-
-        const int32_t n_firms = cc.firm_points / spend.firm_price_points;
+        const int32_t n_firms  = cc.firm_points / spend.firm_price_points;
         const int32_t leftover = cc.firm_points % spend.firm_price_points;
         if (leftover > 0)
             cc.unspent[static_cast<std::size_t>(charter_unspent_reason::remainder)] += leftover;
@@ -2998,7 +3080,6 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         }
         charter_body_state& bs = bit->second;
 
-        const nation_component& nc = w.nations.at(cc.nation);
         std::mt19937 asset_rng = charter_stream(seed, k_charter_salt_firm_asset, cc.centre);
         std::mt19937 name_rng  = charter_stream(seed, k_charter_salt_firm_name,  cc.centre);
         std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_firm_stock, cc.centre);
@@ -3077,15 +3158,17 @@ std::vector<entity_id> charter_web_from_budget(world& w,
 
             // --- placement: the centre's two windows and nothing wider ----------
             charter_rung rung = charter_rung::centre_window;
+            charter_unspent_reason why = charter_unspent_reason::window_exhausted;
             std::vector<entity_id> assets = charter_place(
                 w, nc, focus, occupied, asset_rng, cc, settle, spend,
-                spend.province_cap ? &bs.firms_by_province : nullptr, rung);
+                spend.province_cap ? &bs.firms_by_province : nullptr, rung, why);
             if (assets.empty())
             {
-                // The selection and the windows are both unchanged by a failed
-                // placement (and it drew nothing), so every later firm here would
-                // fail identically: the rest of the budget is unspent.
-                cc.unspent[static_cast<std::size_t>(charter_unspent_reason::window_exhausted)] += left;
+                // The selection, the windows and the province tallies are all
+                // unchanged by a failed placement (and it drew nothing), so every
+                // later firm here would fail identically: the rest of the budget
+                // is unspent, under the reason the placement named.
+                cc.unspent[static_cast<std::size_t>(why)] += left;
                 break;
             }
 
@@ -3122,9 +3205,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             const hq_designation hq   = designate_hq(w, assets, home_body);
             corp.hq_building     = hq.building;
             corp.influence_range = hq.range;
-            corp.assets          = std::move(assets);
 
             const entity_id corp_id = w.create_entity();
+            record(corp_id, cc, /*specialist=*/false, rung, assets, spend.firm_price_points);
+            corp.assets = std::move(assets);
             w.corporations[corp_id] = std::move(corp);
             ++bs.firms;
             ++bs.firms_by_resource[gap_r];
@@ -3139,7 +3223,6 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 for (std::size_t r = 0; r < resource_count; ++r)
                     pool.quantities[r] += stock[r];
             }
-            record(corp_id, cc, /*specialist=*/false, rung, anchor_tile, spend.firm_price_points);
         }
     }
 
