@@ -10,6 +10,90 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-17 — Digitisation picked up: the 1960 baseline measured, then the corporate web's plumbing
+
+**Runtime:** ~11 h. Design (cutting the plan, four elicitation forms), Delivery — Full for sprint 43
+(one lane) and sprint 44 (three worktree lanes, each cold-reviewed, two with a fix round).
+
+### The plan was re-cut before anything was built
+The handoff said Digitisation was designed and its build plan archived as "highly unstructured". Seven
+read-only lanes and an adversarial cross-check mapped the engine first, and the cross-check earned its
+keep: three lanes said running 1660 → 1960 needed a third resumed sim call, and it needs one parameter
+(`world_params::exploration_stop_year`) with no source change. The handoff also expected the run to
+un-zero *advanced chains*; the recipe band follows `epoch_year`, so it cannot. **`epoch_year = 1960`
+selects the superseded 1160 → 1560 → 1960 two-span arc with Exploration off** — never a baseline.
+
+Ben ruled the plan on a form: sprint 43 filed in full, 44–45 as goal rows; the seed library re-blessed
+with replacements; the charter budget's only source is Beat 1's stockpile, no stand-in; **the budget
+charters the whole web, specialists included**; both inherited weaknesses measured in 43 and ruled at
+its gate.
+
+### Sprint 43 — the 1960 baseline (four items, one day, no shipped world moved)
+- **BL-1026 (seed library re-read).** `exploration_sweep` gained `--seeds`/`--out`; the library reads
+  its own table. Every one of the 16 seeds had moved under wave A. Nine rationales were reworded; six
+  went to Ben, who replaced four (4 → 9, 6 → 40, 19 → 38, 17 → 28) and kept 12 and 13. Seed 19 was not
+  on his original list: it was neither rich nor inward any more.
+- **BL-1027 (span cost to 1960).** `--through` and `--cost`. The run stopped at 1660 reproduces every
+  library fingerprint, so the continued world *is* the shipped world. **1660 → 1960 costs a median
+  1.7–1.9 s a seed in Release — less than the 460 years before it.** Reach is 2–17% of sim time, not
+  the dominant term.
+- **BL-1028 (weakness counters).** Trace-only counters ported from two unmerged commits (never their
+  re-scaled capability reference), per half, in a worktree lane with a cold review. Digests identical.
+  **The alarm is a seal, not a deterrent:** ~89% of near-home reads at the ceiling, 99%+ of near-home
+  campaigns treaty-blocked, pooled displacement 3.02 → 1.74. **Polities meet and never bind:** 1,250
+  first contacts by 1660, 0 of 492 new pairs holding non-aggression, 43 new contacts in the 300 years
+  after.
+- **BL-1029 (readings at 1960).** `--through` plus a 1660 control held to the library fingerprint
+  (16/16). **On Exploration's forces the continued world coasts:** urban share 14.7% → 14.6%, subjects
+  median 3 → 3 with none lost on 14 of 14 worlds, flows 51 → 52, checkered regions 1 → 0; only
+  industrial polities climb, 12 → 21. Advanced chains stays a structural zero and now prints as one.
+  A first run's two prefix mismatches were the check comparing a folded flow count against a raw one.
+
+`EXPLORATION.md`'s contact paragraph rested on an unmerged snapshot artefact ("the seeds that met one
+polity"); it now states main's measurement. At the gate (NR-888) Ben inherited both weaknesses into
+Digitisation's beats — Beat 3 carries its own displacement force, this phase binds far pairs itself —
+on Exploration's 4-year band.
+
+### Sprint 44 — the corporate web's plumbing (three of four items)
+Ben ruled the charter calls: **one specialist per centre that can afford one, richest first**; today's
+starting capital kept; the no-specialist world deferred to sprint 45; Pass 1's nation balancing dropped
+on the budget path.
+
+- **BL-1030 (parity).** `player_seed_sweep` was measuring an off-product world: no `world_gen.lua`, no
+  works registry, no `set_era`, ticks numbered from 1, the convoy credit given the wrong tick, no firm
+  exits. Two helpers in `harness_params.hpp` now mirror `app.cpp` line by line. Baseline move: 109 of
+  170 specialists shortlisted (was 81 of 158), a different seat on every seed, negative trailing net
+  93.8% → 74.3% — which re-reads NR-886 item 3's figure.
+- **BL-1031 (the world pin).** Nothing pinned world bytes across a commit: `world_determinism` never
+  calls the search, and `state_hash` cannot see a building's tile or assets. Four FNV digests per seed
+  (search, after the landscape, after the validation run, after the seat), pinned for all 16 seeds on
+  the pre-seam tree. Tamper tests: a changed search seed fails all four; a validation run one tick short
+  fails only the last two.
+- **BL-1032 (the charter budget seam).** Off by default, and pinned: **16/16 seeds hold the pins with no
+  budget and again with an empty one**, an all-zero and a refused budget too, with the refusal flags
+  asserted. `app.cpp` takes a comment and nothing else. Two cold reviews and a fix round: a refused
+  budget now mutates nothing (it used to wipe the roster), each centre spends in turn, a charter cannot
+  anchor in a far region, and holding spill is measured.
+- **BL-1033 (the cost instrument).** Eleven rows a seed — 1x/2x/4x crossed with the per-resource cap
+  kept and lifted, a specialist-price ladder, and a build-only row that forces the province cap to bind.
+  The sweep itself runs on a quiet machine after this entry.
+
+### What the seam found, and what it costs
+**A charter budget cannot raise a body's firm count above Pass 6's breadth cap.** On seed 0 at 4x, 219
+of 348 points found no good to serve; lifting the cap spends 244 of 348. That is two of Ben's rulings
+meeting, filed as **NR-889** — he chose to measure both before ruling. The dense rows are the cost
+risk: 443 s against 198 s for 1x, nearly all of it economy ticks.
+
+**A copied world does not tick byte for byte as its original** (seed 28: D_settle 18F78EB9B2B20F29
+against the pinned 265C48A23E313B1A). Latent today — the search copies but never ticks a copy — filed
+as **BL-1034** with **NR-890**, scheduling Ben's call.
+
+### Left open
+NR-886 (four of seven calls), NR-889 (the density cap, on the sweep's table), NR-890 (scheduling
+BL-1034). BL-1033 closes on the quiet sweep; sprint 44 closes with it.
+
+---
+
 ## 2026-09-16 (late) — The queue emptied, the backlog cut, wave A built, and the rest archived
 
 **Runtime:** Design (the review queue), Corpus (the backlog cut), then Delivery — Full as one batch of
