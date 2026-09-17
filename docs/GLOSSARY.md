@@ -271,7 +271,7 @@ A per-mille distribution over peoples, carried on a **region** and on a **popula
 The Digitisation span's located industrial stock: one number per population centre, built by large cities from their scale, fuel within reach, capital paid in and tree capacity. Spent on **rail**, **mechanised force** or **works**; what is left at the epoch is the centre's **charter budget**. Located, so a conqueror who takes the city takes it. Not a campaign quantity. See `docs/generation/DIGITISATION.md` § Beat 1.
 
 **Charter budget**
-A population centre's unspent industry points at the epoch — the corporate capital the landscape search spends on firms around that centre. It is what makes firm density follow cities. See `docs/generation/DIGITISATION.md` § This phase sets budgets; the search spends them.
+A population centre's unspent industry points at the epoch — the corporate capital the landscape search spends on firms around that centre, specialists and background firms alike. It is what makes firm density follow cities. See `docs/generation/DIGITISATION.md` § This phase sets budgets; the search spends them.
 
 **Decolonisation**
 A subject polity leaving its overlord in the Digitisation span — by refusing renewal of its tribute clause once it can pay for itself, or by a war over empire. Holding a subject grows dearer as the subject's cities and industry grow, whether or not anyone fights. See `docs/generation/DIGITISATION.md` § Beat 3.

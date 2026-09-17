@@ -11,5 +11,102 @@
   "  design-owed (glyph ~) - design still owed; must be settled before promotion.",
   "PRIORITY (ascending): F C B A S SSS."
  ],
- "items": []
+ "items": [
+  {
+   "glyph": "✓",
+   "sprint": "43",
+   "written": "2026-09-17",
+   "author": "Ben (2026-09-17, cutting the Digitisation build plan: elicitation form); Claude (item text, from a seven-lane read of the engine with an adversarial cross-check)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "priority": "A",
+   "status": "designed",
+   "requires": [],
+   "id": "BL-1026",
+   "short_name": "SEED_LIBRARY_REREAD",
+   "difficulty": 2,
+   "title": "The seed library is re-read on main: fingerprints re-blessed from a sweep of the library seeds, and replacements brought to Ben for the seeds that lost their reason",
+   "authority_doc": "docs/generation/seed_library.json",
+   "files": [
+    "tools/verify/exploration_sweep.cpp",
+    "tools/session/seed_library.js",
+    "docs/generation/seed_library.json"
+   ],
+   "design": "WHY. The library's fingerprints predate the wave A re-bless: `seed_library.js --check` reports 7 seeds moved and 9 absent, because exploration_sweep.json carries seeds 0..15 only while library seeds reach 46. Seeds 4, 6, 12 and 13 no longer show what their rationale says. Every sprint 43 baseline is read per seed, so the library must describe the worlds main generates before anything is read off it.\n\nRULED (Ben, 2026-09-17, elicitation): re-bless the fingerprints, and bring replacements for 4, 6, 12 and 13 rather than rewording their rationale.\n\nTHE WORK. (1) exploration_sweep gains `--seeds a,b,c` (the library's list, or any list) and `--out <path>`, so a library sweep never overwrites the tracked 16-seed exploration_sweep.json whose pooled figures the docs quote. (2) seed_library.js reads its fingerprints from that library artefact (flag or fixed name, stated in its usage block); --check then --bless, dated. (3) Re-read all sixteen rationales against the new readings; reword only where the number moved and the question the seed answers still holds. (4) For 4, 6, 12 and 13, sweep a wider range (the 48-seed pool the library was picked from, wider if needed) and bring two candidates per lost question, with the readings that make each one answer it.\n\nDONE WHEN. --check reports every library seed present and unmoved; the rationale text matches the readings; a NEEDS_REVIEW decision entry offers the replacement candidates for 4, 6, 12 and 13 (Ben picks; the store is edited on his verdict).\n\nRUN CONDITIONS (sprint 43, all items): one lane, serial, in the main session; Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify, never %TEMP%; timings on a quiet machine with the build tree quoted; never write over a tracked sweep artefact (use --out). No item in this sprint changes a shipped world."
+  },
+  {
+   "glyph": "✓",
+   "sprint": "43",
+   "written": "2026-09-17",
+   "author": "Ben (2026-09-17, cutting the Digitisation build plan: elicitation form); Claude (item text, from a seven-lane read of the engine with an adversarial cross-check)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "priority": "A",
+   "status": "designed",
+   "requires": [
+    "BL-1026"
+   ],
+   "id": "BL-1027",
+   "short_name": "SPAN_COST_TO_1960",
+   "difficulty": 2,
+   "title": "What 300 more years cost: exploration_sweep runs the shipped world through 1960 and times each span half per seed",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "tools/verify/exploration_sweep.cpp"
+   ],
+   "design": "WHY. DIGITISATION.md § Open questions asks whether 300 years on the shared engine is affordable at Exploration's region counts, and no measured figure exists: the only Release numbers are ~6.2 s/seed to 1660 (2026-09-14, before BL-1007) and 38.6 s/seed for a full world plus an Empires re-run. The cost lane's estimate of 1-4 s/seed for 1660 -> 1960 is inference.\n\nWHAT \"THROUGH 1960\" MEANS, AND WHAT IT IS NOT. `world_params::exploration_stop_year = 1960` with `epoch_year` left at 0: the shipped world, with Exploration's own call running on to 1960 (190 rounds at its 4-year band). NEVER `epoch_year = 1960`, which selects the superseded 1160 -> 1560 -> 1960 two-span arc with Exploration off (era_minus_one.cpp:25-35, 365-370; DIGITISATION.md, opening: a 1960 epoch names a calendar). The extended span runs Exploration's forces only, with the Empires-round overrides off (era_minus_one.cpp:372-405); the face says so on every run.\n\nTHE WORK. exploration_sweep gains `--through <year>` (default 1660): generation and the traced acceptance re-run both stop there, so the existing acceptance check still holds the re-run to generation. A cost pass per seed times UNTRACED re-runs from the fixture to 1660 and to --through, and prints wall ms for each, the history_sim_last_profile split (demography, decisions, battles, reach), decision rounds, reach rebuilds, and regions and living polities at 1200, 1660 and 1960. The 1660 -> 1960 cost is the difference, labelled as such. A saturation line per half — battles and conquests per century, exploration tree nodes held — says whether the stretched world is still moving, so a frozen 1960 world reads as an inherited finding, not a Digitisation result.\n\nDONE WHEN. A per-seed table over the sixteen library seeds, written to --out; the acceptance check green at --through 1960 on every seed; a stated wall-clock budget per seed for the span, quoted with the build tree.\n\nRUN CONDITIONS (sprint 43, all items): one lane, serial, in the main session; Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify, never %TEMP%; timings on a quiet machine with the build tree quoted; never write over a tracked sweep artefact (use --out). No item in this sprint changes a shipped world."
+  },
+  {
+   "glyph": "✓",
+   "sprint": "43",
+   "written": "2026-09-17",
+   "author": "Ben (2026-09-17, cutting the Digitisation build plan: elicitation form); Claude (item text, from a seven-lane read of the engine with an adversarial cross-check)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "priority": "A",
+   "status": "designed",
+   "requires": [
+    "BL-1027"
+   ],
+   "id": "BL-1028",
+   "short_name": "WEAKNESS_COUNTERS_TO_1960",
+   "difficulty": 3,
+   "title": "Both inherited weaknesses counted per seed at 1660 and 1960 — contact, binding, alarm saturation and displacement — for Ben's ruling at the sprint 43 gate",
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "files": [
+    "tools/verify/exploration_sweep.cpp",
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "WHY. NEXT_SESSION (2026-09-17) names two weaknesses Digitisation inherits: displacement held only against a saturated alarm (pooled 2.73 -> 0.50 when alarm tracked measured capability, no weight restoring it above 0.81), and polities rarely meet (stay-home verbs win 78.6% where an unmet target clears). RULED (Ben, 2026-09-17, elicitation): measure both in sprint 43 and rule at the gate. The evidence is weaker than the statement: the 78.6% and the corrected first-contact count (3..221 per seed) sit on unmerged commits eaf15a37 and 6d7bb462 on a world that is not main; main's sweep shows 412 first-crossing campaigns chosen over 16 seeds and 0 of 265 in-span pairs treaty-bound.\n\nTHE WORK. On the --through runs of BL-1027, report per seed for the 1200 -> 1660 half and the 1660 -> 1960 half: first contacts, split into battle crossings and inherited; pairs first met after 1200 that hold any treaty (met_pairs_bound); the share of alarm reads at the ceiling, beside near_alarm_max_q; pooled and median displacement; the contact-class campaign funnel (near / met in span / unmet: examined, in reach, cleared, chosen); trade-flow volume crossing landmasses. The existing counters are in exploration_sweep.cpp (near_alarm_max_q, met_pairs_bound, cross_landmass_volume, the displacement block). Port ONLY the trace-only halves of eaf15a37 (first contacts by kind, the unmet contest) and 6d7bb462 (the alarm spread) — never 6d7bb462's re-scaled visible_capability_reference, which moves the world.\n\nDETERMINISM. A counter the harness cannot read off state or trace sits on history_sim_state as a pure, decision-free counter in the BL-926 idiom. Proof is world_determinism and the goldens holding bit-identical, stated in the close; any moved digest means a counter touched a decision and the item is not done.\n\nDONE WHEN. The per-seed table at both halves, written to --out; digests unmoved; a NEEDS_REVIEW decision entry at the sprint 43 gate puts W1 (inherit, or revisit the capability reference) and W2 (inherit and produce contact in Digitisation, or a first-crossing force in Exploration) to Ben with these readings, read per seed, never the median.\n\nRUN CONDITIONS (sprint 43, all items): one lane, serial, in the main session; Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify, never %TEMP%; timings on a quiet machine with the build tree quoted; never write over a tracked sweep artefact (use --out). No item in this sprint changes a shipped world."
+  },
+  {
+   "glyph": "✓",
+   "sprint": "43",
+   "written": "2026-09-17",
+   "author": "Ben (2026-09-17, cutting the Digitisation build plan: elicitation form); Claude (item text, from a seven-lane read of the engine with an adversarial cross-check)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "priority": "A",
+   "status": "designed",
+   "requires": [
+    "BL-1026",
+    "BL-1027"
+   ],
+   "id": "BL-1029",
+   "short_name": "DIGITISATION_READINGS_AT_1960",
+   "difficulty": 3,
+   "title": "digitisation_sim_harness reads the shipped world continued to 1960 beside a 1660 control, and says on its face what each of the thirteen readings is",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "tools/verify/digitisation_sim_harness.cpp",
+    "tools/verify/harness_params.hpp"
+   ],
+   "design": "WHY. BL-982 (Digitisation readings) generates at epoch 0 and reads the 1660 close: 3 measured, 1 partial, 9 n/a (NR-886 item 7). Its recorded baseline (6/16, 0, 12/16, 0.48/0.74/0.82) and built exe predate wave A. The measure-before-mechanism slice gives every reading a real 1960 baseline before any Digitisation mechanism is admitted.\n\nWHAT IT CAN AND CANNOT MOVE, said on the face. Real 1960 values: reading 5's present half (mixed cities) and reading 7 (far trade, as standing flows). Newly measurable from existing state: reading 10 (subjects at 1660 and 1960, plus subject_freed events after 1660 split by whether a war freed them) and reading 9's urban half (urban share of population at 1660 and 1960). Inputs moved only: reading 1 and reading 6's proxy. STRUCTURAL ZEROS, printed as such and never counted measured: reading 3 (the recipe band follows epoch_year, ancient at epoch 0) and reading 8's region half (Stage 4 lag is computed only for a settlement stop >= 1700). Polity industrial crossings still move and are printed. n/a until their mechanism: 2, 4, 11, 12, 13, 5's concentration half, 9's cross-border half. The far-trade reading of BL-1006 (haulage_measure) runs epoch_year 1960, the superseded arc; the face records that it moves with the epoch flip, not here.\n\nTHE WORK. `--through <year>` sets exploration_stop_year (default 1660; this sprint runs 1960), epoch_year stays 0. Per seed: the world through --through, as today up to the applied search winner; a 1660 control re-run from the captured fixture (exploration_sweep.cpp:566-590, reading fx.works); the control's fingerprint counters must equal the library fingerprint from BL-1026, which proves the extended run agrees with the shipped world at 1660. Every face line names its surface and its year. SUMMARY counts measured, partial, structural zero and n/a separately (today it counts reading 3 as measured). Handoff violations from generation_report are printed per seed, and a seed with one reports no reading as measured. Output also to a per-seed JSON via --out.\n\nDONE WHEN. The sixteen library seeds read at 1660 and 1960, per seed; every control matches its fingerprint; no src/world change; the SUMMARY and every structural zero honest. NR-886 item 7 is answered by the run and noted there.\n\nRUN CONDITIONS (sprint 43, all items): one lane, serial, in the main session; Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify, never %TEMP%; timings on a quiet machine with the build tree quoted; never write over a tracked sweep artefact (use --out). No item in this sprint changes a shipped world."
+  }
+ ]
 }

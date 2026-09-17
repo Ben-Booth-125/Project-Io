@@ -26,6 +26,11 @@
 > **PROPOSED** blocks are Claude's readings that the form did not ask about, and stand until
 > overturned (NR filed with this change).
 
+> ⟳ **What changed (2026-09-17, cutting the build plan — remove once reviewed):** Ben ruled on an
+> elicitation form that the charter budget charters the whole web, specialists included, and that
+> the budget has no stand-in source before industry points exist. The epoch flip is recorded as
+> selecting this span, never the superseded industrial pass.
+
 **Digitisation is the fourth and last simulated span: 1660 → 1960 CE, 300 years.** It opens the
 instant Exploration closes and ends at the epoch, so the world it produces is the world the
 campaign opens on (`GENERATION_STRATEGY.md` § Pass 2).
@@ -34,6 +39,11 @@ campaign opens on (`GENERATION_STRATEGY.md` § Pass 2).
 campaign epoch is 1960 (Ben, 2026-09-08), and the default world descriptor selects that arc when
 this phase lands — never before, because a 1960 world with no Digitisation opens on a 300-year gap
 the sim did not simulate.
+
+**A 1960 epoch names a calendar, not a history.** The arc the flip selects is Exploration's handoff
+continued through this span — never the single 1560 → 1960 industrial pass that
+`GENERATION_STRATEGY.md` § Pass 2 records as superseded, which runs no Exploration and so hands this
+phase none of its inputs.
 
 **This phase is designed backwards, from the map it leaves.** Ben, 2026-09-15: *"While the wizard
 visibly should show these happening, the real aim of our functions on this round is to seed the
@@ -128,6 +138,16 @@ CHARTER BUDGET.** What a city built and did not spend (§ Beat 1) is the capital
 against, located where the firm will stand. The web is dense where industry accumulated and thin
 where it was spent or never lit — a consequence with a place on the map, never a count picked per
 world. How the budget is spent is § This phase sets budgets; the search spends them.
+
+**SETTLED (Ben, 2026-09-17, elicitation): the budget charters the WHOLE web, specialists
+included.** A city's budget pays for the specialists the seat is chosen from, not only for the
+background firms around them. So the seat shortlist is drawn from firms the budgets chartered, and
+the corporations a player can hold stand where capital accumulated
+(`CORPORATION_GENERATION.md` § The spawn shortlist, and the seat).
+
+**The budget has one source: the stockpile (Ben, 2026-09-17).** No stand-in derived from urban
+population fills it before industry points exist. A budget made of headcount would pass *density
+follows cities* by construction, and the reading would prove nothing.
 
 **SETTLED (Ben, 2026-09-15, elicitation): terminal demand keeps universal PRESENCE and takes a
 cultural WEIGHT.** `../economy/MARKETS.md` § Three properties the set has to hold (property 5)
@@ -575,7 +595,8 @@ Measured rather than argued:
 - **Whether the arms race actually displaces great-power war onto clients**, or merely damps it.
 - **Whether a colony can hold a colony** (carried from `EXPLORATION.md`).
 - **The depletion formula itself** — writing it down is the work.
-- **How a charter budget converts to firms** — budget per firm, and whether it is spent whole.
+- **How a charter budget converts to firms** — budget per firm, how it divides between specialists
+  and background firms, and whether it is spent whole.
 
 Owed from Ben when they bite, not before:
 

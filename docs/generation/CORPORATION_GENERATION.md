@@ -67,6 +67,11 @@ Corporation count per campaign is a tunable parameter: `corporation_params::corp
 **8** specialists on the homeworld (including the player's). Background firms (Pass 6) are not
 counted by it.
 
+**AMENDED FORWARD (Ben, 2026-09-17): on a Digitisation world the specialists are chartered too.**
+Where the span has run, each population centre's charter budget pays for specialists as well as
+background firms, so the specialist roster is spent from the budgets rather than set by a count
+(`DIGITISATION.md` § 1). The shortlist the seat is chosen from follows where capital accumulated.
+
 ### Pass 2 — Industrial focus assignment
 
 Each corporation receives a primary `industrial_focus`:
@@ -361,7 +366,8 @@ and anything editing that basket is editing the size of the background economy.
 **AMENDED FORWARD (Ben, 2026-09-15): density follows the city on a Digitisation world.** The opening
 map wants *many companies around population centres*, which breadth cannot place. Where the
 Digitisation span has run, each population centre arrives with a **charter budget** — its unspent
-industry points — and the landscape search spends it on firms around that centre
+industry points — and the landscape search spends it on firms around that centre, specialists and
+background firms alike (Ben, 2026-09-17)
 (`DIGITISATION.md` § This phase sets budgets; the search spends them). Breadth still decides which
 goods a firm can serve; the budget decides how many firms stand where. How a budget converts to a
 firm count is owed and is measured against tick cost before it is tuned.
