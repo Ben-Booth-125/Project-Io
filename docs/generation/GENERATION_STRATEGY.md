@@ -617,6 +617,9 @@ decision and you set the quiet precedent this project files items to avoid):
    over a world with no cities in it.
 3. **The candidate search varies rosters, placements and road tiers — not worlds.** So generation
    runs once and only the economic sim repeats, which is the whole reason the budget closes.
+   PROPOSED (listed to Ben 2026-09-17, not overturned): where a charter budget sets the roster
+   (`DIGITISATION.md` § 1), the roster axis has nothing to choose and is skipped rather than scored;
+   the axis count and the order of every other draw are unchanged.
 4. **The search optimises for viable-but-uneven, not maximum profit.** Maximising profit would
    flatten exactly the spread this document asks generation to produce.
 5. **Life samples the real drift history**, rather than proxying ancient climate from the present

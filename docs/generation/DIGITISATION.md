@@ -156,6 +156,22 @@ the corporations a player can hold stand where capital accumulated
 population fills it before industry points exist. A budget made of headcount would pass *density
 follows cities* by construction, and the reading would prove nothing.
 
+**SETTLED (Ben, 2026-09-17, elicitation): one specialist per centre that can afford one, richest
+first.** Centres spend in order of budget, largest first, ties to the lower centre id. A centre whose
+budget covers a specialist's price — a fixed number of firm charters — charters exactly one
+specialist; what remains buys background firms around it; what cannot be spent stays unspent and is
+counted. So the number of specialists is the number of centres rich enough to afford one, and it
+rises with capital rather than being set by a count. **Pass 1's balancing across nations does not
+apply on this path:** a nation whose cities accumulated capital holds the seats that capital
+bought. The price of a specialist and of a firm are measured against live-play cost before either
+is fixed; a specialist keeps today's starting capital until that measurement is read.
+
+**PROPOSED (listed to Ben 2026-09-17, not overturned): a charter stays near its centre.** A firm is
+anchored inside a window around its centre and then its centre's region; a charter that finds no
+ground there is counted unspent rather than scattered across the nation, because a scattered firm
+is capital that left the city that built it. **No budget and an empty budget are the same world as
+today's**: the population-blind placement stands until a budget with something in it arrives.
+
 **SETTLED (Ben, 2026-09-15, elicitation): terminal demand keeps universal PRESENCE and takes a
 cultural WEIGHT.** `../economy/MARKETS.md` § Three properties the set has to hold (property 5)
 rules terminal demand universal, and that half stands: every market keeps a buyer for every
@@ -625,8 +641,12 @@ Measured rather than argued:
 - **What binds a far pair, and how fast** (§ Far pairs meet and bind, and this phase makes them).
 - **Whether a colony can hold a colony** (carried from `EXPLORATION.md`).
 - **The depletion formula itself** — writing it down is the work.
-- **How a charter budget converts to firms** — budget per firm, how it divides between specialists
-  and background firms, and whether it is spent whole.
+- **How a charter budget converts to firms** — the price of a firm charter and of a specialist in
+  budget points, measured against live-play cost before either is fixed (the split itself is
+  settled in § 1).
+- **Whether a specialist's charter price becomes its starting capital**, once that price is measured.
+- **What a world gets when no centre can afford a specialist** — decided when Beat 1's real
+  stockpiles exist, not on a synthetic budget.
 
 Owed from Ben when they bite, not before:
 

@@ -11,5 +11,104 @@
   "  design-owed (glyph ~) - design still owed; must be settled before promotion.",
   "PRIORITY (ascending): F C B A S SSS."
  ],
- "items": []
+ "items": [
+  {
+   "glyph": "✓",
+   "sprint": "44",
+   "written": "2026-09-17",
+   "author": "Ben (2026-09-17: NR-888 gate \"cut and build\"; charter calls on an elicitation form — Rule A, capital kept, no-specialist world at sprint 45, nation balance dropped); Claude (item text, from a three-lane seam map with an adversarial cross-check)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "priority": "A",
+   "status": "designed",
+   "id": "BL-1030",
+   "short_name": "PLAYER_SEED_SWEEP_PARITY",
+   "difficulty": 2,
+   "requires": [],
+   "title": "player_seed_sweep builds and settles the world the app builds, through one shared harness helper",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "tools/verify/harness_params.hpp",
+    "tools/verify/player_seed_sweep.cpp"
+   ],
+   "design": "WHY. Sprint 44 measures the charter budget and pins world bytes through player_seed_sweep, and it is not at app parity (cross-checked 2026-09-17): no scripts/world_gen.lua config, no scripts/works.lua registry, no set_era(era_band_for_epoch), no run_firm_exits in the settle, ticks numbered from 1, and a non-zero tick passed to credit_arrived_convoys/intercept_convoys where the app passes day tick 0 during validation (app.cpp:320-323, 560-606). harness_params.hpp also hard-codes corporation_count 8 instead of reading the config (latent: Lua says 8). Every number sprint 44 takes would describe an off-product world.\n\nTHE WORK. One shared helper in harness_params.hpp that builds a world in app order (config + works -> make_hard_coded_world -> recipes/economy -> set_era -> apply_shipped_landscape with the config's corporation_count) and one that runs the 12-tick validation settle as app::poll_worldgen does (firm exits, day tick 0 to the convoy calls, tick numbering from 0). player_seed_sweep uses both. Other harnesses are not migrated here; the helper says it exists for them.\n\nDONE WHEN. player_seed_sweep --guard and --seat run on the helpers over the 16 library seeds; the before and after tables are recorded in the close as a BASELINE MOVE, not a regression; S4 still reproduces; nothing under src/ changes.\n\nRUN CONDITIONS: Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify (MSVC /O2 — the toolchain every pin is bound to; never %TEMP%); serial, quiet machine, build tree quoted; tracked tables only via --out."
+  },
+  {
+   "glyph": "✓",
+   "sprint": "44",
+   "written": "2026-09-17",
+   "author": "Ben (2026-09-17: NR-888 gate \"cut and build\"; charter calls on an elicitation form — Rule A, capital kept, no-specialist world at sprint 45, nation balance dropped); Claude (item text, from a three-lane seam map with an adversarial cross-check)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "priority": "A",
+   "status": "designed",
+   "id": "BL-1031",
+   "short_name": "LANDSCAPE_WORLD_PIN",
+   "difficulty": 2,
+   "requires": [
+    "BL-1030"
+   ],
+   "title": "player_seed_sweep pins the campaign world's bytes after the landscape search, the validation run and the seat, per library seed",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "tools/verify/player_seed_sweep.cpp"
+   ],
+   "design": "WHY. Sprint 44's done-when says an empty charter budget reproduces today's world byte for byte, proven by a determinism check and not a re-bless. No such check exists: world_determinism and determinism_harness never call the search; landscape_search_harness R2/R3 and player_seed_sweep S4 are same-binary A/A; state_hash cannot see building tile, type or assets. The proof must hash world bytes on the tree BEFORE the seam.\n\nTHE WORK. --digest prints, per seed, four FNV-1a digests: D_search (winner candidate, every winner score term bit-exact, evaluations, accepted, and each path step's proposal and score); D_land (write_world_snapshot bytes right after apply_shipped_landscape); D_settle (snapshot bytes plus state_hash after the 12-tick validation run); D_seat (seated corp, floor flag, shortlist, each candidate's corp/landscape/trailing net/weight, plus snapshot bytes after the seat). The values for all 16 library seeds are pinned in the source with the commit and toolchain they were taken on; --digest-check fails any row that differs. Taken after BL-1030 and before any seam code.\n\nDONE WHEN. The pin table is in source for the 16 library seeds; --digest-check passes on the tree it was taken on and on a second run; a deliberate one-byte perturbation in a scratch build fails it (non-vacuity, recorded, not committed). Never re-pinned by BL-1032.\n\nRUN CONDITIONS: Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify (MSVC /O2 — the toolchain every pin is bound to; never %TEMP%); serial, quiet machine, build tree quoted; tracked tables only via --out."
+  },
+  {
+   "glyph": "✓",
+   "sprint": "44",
+   "written": "2026-09-17",
+   "author": "Ben (2026-09-17: NR-888 gate \"cut and build\"; charter calls on an elicitation form — Rule A, capital kept, no-specialist world at sprint 45, nation balance dropped); Claude (item text, from a three-lane seam map with an adversarial cross-check)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "priority": "A",
+   "status": "designed",
+   "id": "BL-1032",
+   "short_name": "CHARTER_BUDGET_SEAM",
+   "difficulty": 4,
+   "requires": [
+    "BL-1031"
+   ],
+   "title": "A per-centre charter budget reaches the landscape search and charters specialists and background firms around each centre, off by default",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "src/world/charter_budget.hpp",
+    "src/world/landscape_search.hpp",
+    "src/world/landscape_search.cpp",
+    "src/world/corporation_generation.hpp",
+    "src/world/corporation_generation.cpp",
+    "src/core/app.cpp",
+    "tools/verify/harness_params.hpp"
+   ],
+   "design": "THE DESIGN IS IN THE DOCS: DIGITISATION.md § 1 (the budget charters the whole web; one specialist per centre that affords one, richest first; nation balance dropped; charters stay near their centre; no budget and an empty budget are today's world), CORPORATION_GENERATION.md Pass 1, GENERATION_STRATEGY.md phase 6 point 3 (the roster axis is skipped on a budget world). This item is the plumbing; no price is chosen and nothing ships a source.\n\nSHAPE (from the 2026-09-17 seam map; the cross-check's corrections applied). charter_budget: points by population-centre entity id (ascending map), integer, entries <= 0 dropped, so empty and all-zero are one state that takes the legacy branch. charter_spend_params: firm price and specialist price in points (no shipped defaults; the search refuses a non-empty budget with a zero price), window radius 4 (the seat's population_radius precedent), province cap on/off. landscape_search_params gains the budget pointer and spend params; the search copies spend state per evaluation (threads share params). A new apply_landscape_candidate overload branches ONCE: null or empty runs today's calls verbatim; otherwise remove_specialist_roster then charter_web_from_budget. The 3- and 4-arg overloads and generate_corporations/generate_background_firms bodies are untouched. On a budget world the roster axis is skipped, never re-keyed: the axis count and the tag formula stay.\n\ncharter_web_from_budget (corporation_generation.cpp, new, reusing file-local helpers, editing no legacy body): centres by budget descending, ties lower id; home nation from tile_to_nation of the centre tile (none -> unspent, reason no_nation); region from nearest_region reconciled against that nation (mismatch -> the nation's nearest region to the centre, or the national-character fallback); a centre whose budget covers the specialist price charters one specialist (focus and ownership from the region, today's capital 400 +/-40%, no nation balancing); the remainder buys background firms by the existing gap selection under the per-resource cap 8, the province cap when on, and the 200-per-body cap; anchor rungs are the window around the centre tile (wrapped metric), then the centre's region window, then UNSPENT (reason window_exhausted), never nation-wide; leftovers counted by reason. RNG keyed per centre and role with salts that collide with none in use. The player is a seeded pick among budget specialists; with none, the report says no_specialists and nothing forces one (sprint 45 decides).\n\napp.cpp and harness_params.hpp change together and both pass no budget, with a comment naming the missing source (Beat 1). The synthetic budget builder lives only under tools/verify. No save-format change, no Lua key.\n\nDONE WHEN: requirements.json § charter-budget-seam, all rows.\n\nRUN CONDITIONS: Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify (MSVC /O2 — the toolchain every pin is bound to; never %TEMP%); serial, quiet machine, build tree quoted; tracked tables only via --out."
+  },
+  {
+   "glyph": "✓",
+   "sprint": "44",
+   "written": "2026-09-17",
+   "author": "Ben (2026-09-17: NR-888 gate \"cut and build\"; charter calls on an elicitation form — Rule A, capital kept, no-specialist world at sprint 45, nation balance dropped); Claude (item text, from a three-lane seam map with an adversarial cross-check)",
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "priority": "A",
+   "status": "designed",
+   "id": "BL-1033",
+   "short_name": "CHARTER_BUDGET_COST",
+   "difficulty": 3,
+   "requires": [
+    "BL-1032"
+   ],
+   "title": "What a denser corporate web costs: player_seed_sweep charters a synthetic budget at 1x, 2x and 4x and times the search and the economy tick",
+   "authority_doc": "docs/generation/DIGITISATION.md",
+   "files": [
+    "tools/verify/player_seed_sweep.cpp",
+    "tools/verify/harness_params.hpp"
+   ],
+   "design": "WHY. DIGITISATION.md hard part 7 and § Open questions: the charter prices are measured against live-play cost before either is fixed. The only figures today are ~0.9 s per validation tick and ~1-2.5 s per search evaluation in Release.\n\nTHE WORK. --charter-budget synthetic --budget-scale 1|2|4 [--province-cap on|off] [--specialist-price K]. The budget is SYNTHETIC TEST INPUT, printed as such on every header line and never read for density-follows-cities: 1x charters today's chartered count on that seed (specialists plus background firms, measured first), spread over non-razed centres by seeded per-centre weights (never population), integer by largest remainder; firm price 1 point; specialist price from a small ladder (e.g. 4 and 8). Per seed per density: specialists and firms chartered, unspent by reason, whether any specialist exists, the largest one-nation share of specialists, search ms per evaluation at thread count 1 (round_ms), ms per economy tick over the 12 validation ticks and an 8-tick live window after the seat, shortlist size and the trailing-net spread. JSON via --out.\n\nDONE WHEN. The table over the library seeds (at least the three the pin run shows fastest, all 16 if the clock allows) is checked in; a NEEDS_REVIEW entry puts the price readings and the specialist-count behaviour to Ben for sprint 45. A static check shows no `synthetic` symbol under src/.\n\nRUN CONDITIONS: Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify (MSVC /O2 — the toolchain every pin is bound to; never %TEMP%); serial, quiet machine, build tree quoted; tracked tables only via --out."
+  }
+ ]
 }

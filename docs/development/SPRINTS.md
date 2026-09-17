@@ -60,15 +60,23 @@ and/or a version goal (v0.1.1 etc.).
 ## Open now
 
 ### Sprint 44 — the corporate web's plumbing
-*Proposed · Ben (2026-09-17, elicitation: "Sprint 43 items; 44-45 as goal rows"); Claude (cut from a seven-lane engine read with an adversarial cross-check)*
+*Open · opened 2026-09-17 · Ben (2026-09-17, elicitation: "Sprint 43 items; 44-45 as goal rows"); Claude (cut from a seven-lane engine read with an adversarial cross-check)*
 
 **Goal.** A per-centre charter budget reaches the landscape search and charters specialists and background firms around each centre, with the path off by default and its live-play cost measured before any conversion constant is chosen.
+
+**Planned.**
+- BL-1030 (player_seed_sweep parity) — one shared harness helper builds and settles the world in app order.
+- BL-1031 (landscape world pin) — four digests per library seed, pinned in source before the seam.
+- BL-1032 (charter budget seam) — the plumbing, off by default; the pins must hold with no budget and an empty one.
+- BL-1033 (charter budget cost) — synthetic 1x/2x/4x; search ms per evaluation, ms per tick, unspent by reason, shortlist.
 
 **Done when.** An empty budget reproduces today's world byte for byte, proven by a determinism check, not a re-bless. A synthetic budget at 1x, 2x and 4x charters specialists and background firms around centres through the existing anchor_window seam, with unplaced budget counted. Milliseconds per economy tick and per search evaluation reported at each density; seat shortlist size and trailing-net spread reported, not gated. No save-format change.
 
 **Risk.** Background firm placement is population-blind today (corporation_generation.cpp:2366-2374), so density following the city is a new placement rule, not a tuning change. The seat reads specialists, and the budget charters them (Ben, 2026-09-17), so the seat shortlist moves with the budget: NR-886 item 3 (solvency no longer gates the seat) sits on this path. The integration seam is two-sided — app.cpp and harness_params.hpp change together, and the direct callers of the firm pass (verify_api.cpp, main.cpp, three harnesses) must name the legacy path.
 
 RULINGS (Ben, 2026-09-17, elicitation): the budget charters the whole web, specialists included (DIGITISATION.md § 1); the path stays off until Beat 1's industry points switch it on, with no stand-in source in between. OPEN, measured here rather than argued: budget per firm, the split between specialists and background firms, whether a budget is spent whole.
+
+CUT 2026-09-17 on the NR-888 gate. RULINGS on the form the same day: Rule A (one specialist per centre that affords one, richest first); specialist capital kept at today's 400 +/-40% for this sprint; the no-specialist world decided at sprint 45; Pass 1 nation balance dropped on the budget path. PROPOSED and not overturned: no budget = empty budget = today's world; charters stay near their centre or go unspent; roster axis skipped on budget worlds; province cap measured on and off; synthetic budgets harness-only and never population-weighted.
 
 ### Sprint 45 — industrialisation makes the web real
 *Proposed · Ben (2026-09-17, elicitation: "Sprint 43 items; 44-45 as goal rows"); Claude (cut from a seven-lane engine read with an adversarial cross-check)*
@@ -147,7 +155,7 @@ OWED WHEN THE ITEMS ARE CUT, not before: whether consolidation and the near-home
 | 41 | Exploration trade | COMPLETE 2026-09-14. Nine items built and merged; the wave world shape authorised at Alarm 525 (NR-867); the wants claim weakened in EXPLORATION.md (NR-865). |
 | 42 | generation sharpened before Digitisation | CLOSED 2026-09-16. Twenty-five items delivered across two waves (wave 0: nine; wave 1: sixteen, one of them — BL-1000 — built but open on a live click). Every gate green on the integrated tree bar two knowns: the exploration R3b pin, held red as the wave re-bless NR-877 asks Ben to authorise, and era_world_harness's three reds, which pre-date the sprint (BL-1010). Five items moved the world and each was measured in isolation. Four design calls and one reading are in the queue as NR-878..881; four items of owed work are filed as BL-1007..1010. |
 | 43 | the 1960 baseline | CLOSED 2026-09-17. Four items delivered in one day, one lane plus one worktree port; no shipped world moved (digests identical). The gate is NR-888: W1, W2 and the clock, on the 1960 baseline. |
-| 44 | the corporate web's plumbing | PROPOSED 2026-09-17. Items cut at the sprint 43 gate. A per-centre charter budget reaches the landscape search, off by default; no world moves. |
+| 44 | the corporate web's plumbing | OPEN 2026-09-17. Four items in order: harness parity, a world-bytes pin taken before the seam, the seam itself (worktree, cold review), then the cost sweep. No shipped world moves. |
 | 45 | industrialisation makes the web real | PROPOSED 2026-09-17. Items cut after sprint 44. Digitisation runs as its own span from exploration_output, cities accumulate industry points, and sprint 44's budget switches on — one re-bless, one cold review. |
 
 **Next up.** SPRINT 43 OPEN (2026-09-17): the 1960 baseline — BL-1026 (seed library re-read), then BL-1027 (span cost to 1960), BL-1028 (weakness counters to 1960), BL-1029 (Digitisation readings at 1960), serially in one lane. Sprints 44 (the corporate web's plumbing) and 45 (industrialisation makes the web real) are proposed goal rows; their items are cut at the gates.

@@ -5657,6 +5657,82 @@
    "batch": "backlog-wave-a",
    "resolved": "2026-09-16",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "charter-budget-seam",
+   "title": "BL-1032 - A per-centre charter budget reaches the landscape search and charters specialists and background firms around each centre, off by default",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1032 - sprint 44 (2026-09-17)",
+   "batch": "sprint-44",
+   "resolved": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep --digest-check"
+     ],
+     "requirement": "With no charter budget, every library seed's four digests (search path, world after the landscape, after the validation run, after the seat) equal the BL-1031 pins taken before the seam.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep --digest-check --charter-budget empty"
+     ],
+     "requirement": "With an explicitly empty budget (and with one holding only zero entries), every digest equals the pins.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: landscape_search_harness",
+      "headless: world_determinism"
+     ],
+     "requirement": "landscape_search_harness R2 (thread invariance) and R3 (path replay) stay green, and world_determinism's digests are unchanged.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep --charter-budget synthetic"
+     ],
+     "requirement": "Non-vacuity: a synthetic 1x budget changes the world digest after the landscape, charters at least one specialist and one background firm inside a centre's window, and counts every unspent point by reason.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "code: app.cpp and harness_params.hpp pass no budget",
+      "code: no `synthetic` symbol under src/",
+      "code: write_world_snapshot and the save version unchanged"
+     ],
+     "requirement": "No shipped path reaches a budget source: the app and its harness mirror pass none, the synthetic builder lives only under tools/verify, and the save format does not change.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold adversarial review of the seam finds no unresolved blocker, with particular attention to any way an empty budget could still move a byte.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

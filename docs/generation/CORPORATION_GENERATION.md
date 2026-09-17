@@ -71,6 +71,9 @@ counted by it.
 Where the span has run, each population centre's charter budget pays for specialists as well as
 background firms, so the specialist roster is spent from the budgets rather than set by a count
 (`DIGITISATION.md` § 1). The shortlist the seat is chosen from follows where capital accumulated.
+On that path a specialist's home nation is its centre's nation, one specialist per centre rich enough
+to afford one, and **the balancing factor above does not apply** (Ben, 2026-09-17): a nation whose
+cities built capital holds the seats it bought.
 
 ### Pass 2 — Industrial focus assignment
 
