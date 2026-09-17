@@ -29,7 +29,9 @@
 > ⟳ **What changed (2026-09-17, cutting the build plan — remove once reviewed):** Ben ruled on an
 > elicitation form that the charter budget charters the whole web, specialists included, and that
 > the budget has no stand-in source before industry points exist. The epoch flip is recorded as
-> selecting this span, never the superseded industrial pass.
+> selecting this span, never the superseded industrial pass. On the sprint 43 gate (NR-888) Ben
+> ruled that Beat 3 carries its own displacement force, that this phase binds far pairs itself,
+> and that the span runs on Exploration's 4-year band.
 
 **Digitisation is the fourth and last simulated span: 1660 → 1960 CE, 300 years.** It opens the
 instant Exploration closes and ends at the epoch, so the world it produces is the world the
@@ -44,6 +46,11 @@ the sim did not simulate.
 continued through this span — never the single 1560 → 1960 industrial pass that
 `GENERATION_STRATEGY.md` § Pass 2 records as superseded, which runs no Exploration and so hands this
 phase none of its inputs.
+
+**SETTLED (Ben, 2026-09-17, NR-888): the span runs on Exploration's 4-year band.** One decision
+round every four years, 75 rounds from 1660 to 1960. Measured on Exploration's forces alone, that
+costs less than the 460 years before it; a 1-year band costs about four times as much and is not
+taken unless a mechanism this phase adds is shown to need the grain.
 
 **This phase is designed backwards, from the map it leaves.** Ben, 2026-09-15: *"While the wizard
 visibly should show these happening, the real aim of our functions on this round is to seed the
@@ -121,7 +128,7 @@ has no business here.
 |---|---|---|---|
 | 1 | Many companies around population centres; most markets carry goods suited to their cultures | Corporations, companies, market stock, household demand weights | Beat 1's stockpile, spent at the epoch; preference from Exploration |
 | 2 | Advanced production (parts, computing) exists; wealth converts into production | Installations on advanced chains; capital | Beat 1, paid into by the treasury |
-| 3 | Some conflicts are ongoing, mostly proxy wars in polities left behind or decolonised | A standing war condition on provinces | Beat 3, and the arms race between great powers |
+| 3 | Some conflicts are ongoing, mostly proxy wars in polities left behind or decolonised | A standing war condition on provinces | Beat 3, and the price gap it builds between great powers |
 | 4 | A culture lens: primary culture per province, a secondary as a checkered fill when close | Culture shares read onto provinces | Beat 2 moves culture into cities |
 | 5 | Wealth inequality, a tangible market cap per market, GDP per nation | Derived readings over the seeded economy | Beats 1 and 2 concentrating output |
 | 6 | Some technological progress, political systems and armies — simple stubs | Campaign tech state, a regime field, garrison strength | Tree masks, the works fork, carried force |
@@ -188,13 +195,19 @@ the campaign's own reading of *wealthier nations leverage their wealth*. The int
 **The campaign opens mid-history, not at peace.** `EXPLORATION.md` already refuses a frozen map
 at 1660; this phase carries the same refusal to 1960.
 
-**PROPOSED: proxy war is the arms race's next displacement.** Exploration moved conflict from the
-home coast to far ground because treaties and deterrence raised the price of a neighbour war.
-Carry that forward: great powers that read each other's visible capability do not fight each
-other cheaply, so the cheap option is backing one side of a war somewhere weak. A proxy war is a
-**patron link** — a great power paying treasury or force into a client's army — on ground whose
-polity was left behind (no furnace lit) or recently decolonised (§ Beat 3). Nothing picks the
-client; the price gap does.
+**PROPOSED: proxy war is where great-power conflict goes when war at home costs too much.** Great
+powers that read each other's visible capability do not fight each other cheaply, so the cheap
+option is backing one side of a war somewhere weak. A proxy war is a **patron link** — a great
+power paying treasury or force into a client's army — on ground whose polity was left behind (no
+furnace lit) or recently decolonised (§ Beat 3). Nothing picks the client; the price gap does.
+
+**SETTLED (Ben, 2026-09-17, NR-888): Beat 3 carries its own displacement force; none is
+inherited.** The arms race Exploration hands forward seals near-home war rather than displacing it.
+Continued past 1660 on Exploration's own forces, about 89% of near-home alarm reads sit at the
+ceiling, over 99% of near-home campaign candidates are blocked by a treaty, and pooled displacement
+falls from 3.02 to 1.74 (BL-1028, weakness counters to 1960). So the price gap that sends a patron
+abroad is this phase's to build, and **this phase reads Alarm on its own scale**, never through
+Exploration's visible-capability reference. Exploration is not revisited for it.
 
 **SETTLED (Ben, 2026-09-15, elicitation): a war standing at the epoch crosses as a STANDING
 PROVINCE CONDITION, not as a war anyone plays.** The provinces it covers carry contested ground,
@@ -368,6 +381,18 @@ one rule:
 |---|---|---|---|---|
 | **Urbanisation** | A region's countryside → a centre in the same polity | Industry-point output at the centre | Depleted or strained ground | Held corridors |
 | **Emigration** | A centre → a centre in another polity | The same pull, larger | War, a lost colony, strain | Contact, a line that can carry people, no war between them |
+
+#### Far pairs meet and bind, and this phase makes them
+
+**SETTLED (Ben, 2026-09-17, NR-888): the force that binds far pairs is Digitisation's.** Polities
+arrive having met — 1,250 new contact pairs across the seed library by 1660 — but not one pair
+first met after 1200 holds a non-aggression clause, and continued past 1660 on Exploration's own
+forces contact nearly stops: 43 new pairs in 300 years (BL-1028, weakness counters to 1960).
+Emigration's line needs contact, far trade (property 7) needs relationships between distant
+polities, and a world war spreads only through bindings that reach across the map. So this phase
+raises contact and binds far pairs itself — through trade, migration and alliance — rather than
+inheriting a treaty graph that never reached past the old neighbourhood. Exploration is not
+revisited for it.
 
 **Migration carries culture.** A stream moves culture shares into its destination centre, so a
 destination becomes mixed while its countryside stays plain. **This is what produces property 4's
@@ -595,7 +620,9 @@ Measured rather than argued:
 - **Where the migration pull saturates** — a stream that never stops empties the countryside.
 - **How dense the treaty graph must be for a world war to be "not unlikely"** without being
   certain.
-- **Whether the arms race actually displaces great-power war onto clients**, or merely damps it.
+- **What price gap sends a patron abroad.** The inherited arms race seals near-home war rather than
+  displacing it (§ 3), so Beat 3's displacement force is designed here, then measured.
+- **What binds a far pair, and how fast** (§ Far pairs meet and bind, and this phase makes them).
 - **Whether a colony can hold a colony** (carried from `EXPLORATION.md`).
 - **The depletion formula itself** — writing it down is the work.
 - **How a charter budget converts to firms** — budget per firm, how it divides between specialists
@@ -607,4 +634,4 @@ Owed from Ben when they bite, not before:
   `../ai/AI_OPPONENT.md` § 11, raised when the campaign wants it.
 - **The PROPOSED readings above that the form did not ask about** — computing as electronics,
   located industry points, the Works-fork lean, the migration streams, colony loss by rising cost,
-  proxy war as displacement, the three war-death mechanisms, and the stub sources.
+  proxy war as a patron link, the three war-death mechanisms, and the stub sources.

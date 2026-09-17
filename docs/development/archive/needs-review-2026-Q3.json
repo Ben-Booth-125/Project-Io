@@ -5932,6 +5932,30 @@
         "seed_library_sweep.json"
       ],
       "resolution": "RULED 2026-09-17 (Ben, elicitation form). Seed 4 -> 9, seed 6 -> 40, seed 19 -> 38, seed 17 -> 28; keep 12 and 13, rationale reworded. Applied to docs/generation/seed_library.json with a `replaces` field on each new entry; seed_library_sweep.json regenerated on the new list and --check clean."
+    },
+    "NR-888": {
+      "id": "NR-888",
+      "title": "GATE (sprint 43): rule the two inherited weaknesses and the span's clock on the 1960 baseline",
+      "raised": "2026-09-17",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 43 (the 1960 baseline): BL-1027 (span cost to 1960), BL-1028 (weakness counters to 1960), BL-1029 (Digitisation readings at 1960). exploration_sweep_1960.json and digitisation_readings_1960.json at the repo root, 16 library seeds, the shipped world with Exploration's own call continued to 1960, Release. Read per seed, never the median.",
+      "what": "THE BASELINE (what 300 more years of Exploration's own forces do):\n- Cost: the 1660 -> 1960 half costs a median 1.7-1.9 s a seed (two runs), at most 10-15 s, less than the 460 years before it. Affordable at the 4-year band.\n- The world coasts. Urban share 14.7% -> 14.6% (rising in 5 of 16); subjects median 3 -> 3, fewer in 0 of 14 worlds; standing flows 51 -> 52; checkered regions median 1 -> 0; conquests per century fall on every seed. Only industrial polities climb (median 12 -> 21). No Digitisation beat arrives as momentum.\n\nW1 — THE ALARM IS A SEAL, NOT A DETERRENT. Near-home alarm reads at the ceiling 89.7% before 1660 and 88.5% after; 99.1% / 99.7% of near-home campaign candidates are treaty-blocked; pooled displacement 3.02 -> 1.74 across the halves, below 1 after 1660 on seeds 46, 40, 13, 41, 38. On the unmerged branch, an alarm set from measured capability collapsed displacement to 0.50 and no weight restored it.\n  Inherit: Beat 3's proxy war carries its own displacement force, and Digitisation reads epoch Alarm from its own scale, never through the 5000 reference. No re-bless.\n  Revisit Exploration: re-derive the capability reference on main and find a force other than the weight. Re-blesses the 1660 world and the seed library; open-ended.\n\nW2 — REFRAMED BY MEASUREMENT: POLITIES MEET; WHAT THEY MEET NEVER BINDS. 1,250 first contacts by 1660 (3 to 300 a world), but 0 of 492 pairs first met after 1200 hold non-aggression at 1660 and 0 of 506 at 1960; another verb wins 88% (96% after 1660) of the rounds an unmet target clears. After 1660, 43 new contacts in 300 years across the library, none by crossing on 8 seeds. Far trade, emigration and a world war that spreads by mutual defence all need far pairs that bind.\n  Inherit: Digitisation owns a force that binds far pairs (trade, migration, alliance) and raises contact itself.\n  Revisit Exploration: re-price the far-pair treaty penalty or replace it with a force, so new contacts can bind before 1660. Re-blesses.\n\nTHE CLOCK. DIGITISATION.md names none. Exploration's 4-year band is measured affordable; a 1-year band costs about four times as much and would give war deaths, migration and decolonisation finer grain.\n\nCORRECTED ON THE WAY: EXPLORATION.md's contact paragraph rested on \"the seeds that met one polity\", an unmerged snapshot artefact; it now states main's measurement (9cb4cb7e).",
+      "why_it_matters": "Sprint 45 cuts the Digitisation span itself; sprint 44 (the corporate web's plumbing) depends on neither weakness. Inheriting keeps Exploration frozen, as Ben directed on 2026-09-11 (stop adding Era -1 mechanism), and moves both forces into Digitisation's beats; revisiting re-blesses the 1660 world a second time in a week.",
+      "options": [
+        "W1 inherit, W2 inherit, 4-year clock (recommended).",
+        "W1 inherit, W2 revisit Exploration, 4-year clock.",
+        "Revisit both in Exploration before sprint 45.",
+        "Measure once more first: the existing --set visible_capability_reference and treaty_far_penalty_q tuning flags on the 1960 sweep, no world moved."
+      ],
+      "recommendation": "Option 1. The baseline shows the continued world carrying no momentum into any beat, so Digitisation supplies each force anyway; a far-binding force and a proxy-war displacement belong to beats the doc already owns (Beat 2, property 7, Beat 3). Keep the 4-year band until war deaths are built and measured.",
+      "files": [
+        "exploration_sweep_1960.json",
+        "digitisation_readings_1960.json",
+        "docs/generation/EXPLORATION.md",
+        "docs/generation/DIGITISATION.md"
+      ],
+      "resolution": "RULED 2026-09-17 (Ben, elicitation form). W1: inherit — Beat 3 owns its displacement force; this phase reads Alarm on its own scale. W2: inherit — Digitisation binds far pairs itself (trade, migration, alliance). Clock: Exploration's 4-year band. Exploration is not revisited. Written into DIGITISATION.md (§ 3; § Far pairs meet and bind, and this phase makes them; the clock after the epoch paragraph; Open questions) and EXPLORATION.md § Open questions. Sprint 44: cut and build."
     }
   }
 }

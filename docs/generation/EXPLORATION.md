@@ -667,11 +667,11 @@ that ran off it.
 
 ## Open questions
 
-- **What displaces conflict, if not the deterrence weight** (§ The arms race, the 2026-09-16 finding).
-  The options on the table when it was archived: accept the weaker displacement an unsaturated alarm
-  gives; strengthen deterrence by something other than the weight; let contact happen without conquest
-  (a hull or a trade line meeting a coast); extend reach to a realm's edge; or rebalance staying home
-  against going out. Unruled.
+- **What displaces conflict, if not the deterrence weight — RULED NOT THIS PHASE'S (Ben,
+  2026-09-17, NR-888).** Exploration is not revisited for the saturated alarm or for new contacts
+  that never bind (§ The arms race). The displacement this phase measures is carried forward as
+  found; `DIGITISATION.md` owns both the force that sends a patron abroad (§ 3) and the force that
+  binds far pairs (§ Far pairs meet and bind, and this phase makes them).
 - **What earns the treasury, in terms.** § Capital arrives names the four sources; the arithmetic
   is a measurement, and it must be set from a sweep that produces both rich and poor survivors,
   never from a number picked to make one seed solvent.
