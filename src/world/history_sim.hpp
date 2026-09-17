@@ -2930,6 +2930,45 @@ struct history_sim_state
     /// [3] reach-denied, [4] season scores clearing the threshold, [5] chosen.
     /// Read by nothing in the sim.
     int64_t campaign_class_trace[3][6] = {};
+    /// BL-1018 DIAGNOSTIC, trace only: the RAW visible capability
+    /// (`visible_capability_raw`, before `visible_capability_reference` divides
+    /// it) of the COUNTERPART in every NEAR-HOME treaty read -- one entry per
+    /// side per living long-known pair per decision round, bound or not, read
+    /// off the round's opening stocks. Append-only, so a run stopped earlier
+    /// holds a prefix of a longer run's vector. The population the alarm
+    /// spread and its ceiling share are read from. Read by nothing in the
+    /// sim; empty unless `trace_battles`.
+    std::vector<int64_t> near_capability_trace;
+    /// BL-1019 DIAGNOSTICS, trace only, read by nothing in the sim -- the
+    /// first crossing's funnel past the gates `campaign_class_trace` counts.
+    ///
+    /// New contact PAIRS raised during the run, by `contact_kind`
+    /// ([0] campaign -- a crossing onto the other's ground, [1] inherited
+    /// from a conquered polity). The span's first-contact count.
+    int64_t contacts_raised_trace[2] = {};
+    /// Per contact class (as `campaign_class_trace`), over candidates that
+    /// passed every gate and were scored: [0] count, and sums of [1] the
+    /// ground's worth before odds (after `campaign_gain_q`), [2] `p_win_q`,
+    /// [3] supply at the objective, [4] the value the season loop starts
+    /// from (every lean and cost applied), [5] the summer defender term,
+    /// [6] tiles from the decider's capital, [7] candidates that cannot
+    /// forage (a sea leg), [8] the target's `campaign_prize_q` (city and
+    /// seat), [9] its ground at the un-jittered farm/ore/port weights,
+    /// [10] the value after odds, distance and supply cost (before
+    /// foreignness and the leans), [11] the share foreignness leaves
+    /// (1000 - the culture discount), [12] candidates an ally's mutual
+    /// defence discounted.
+    int64_t class_score_trace[3][13] = {};
+    /// Of the rounds `unmet_contest_trace[4]` counts, which verb won, indexed
+    /// by `sim_verb`.
+    int64_t unmet_lost_to_verb_trace[8] = {};
+    /// Decision rounds in which an UNMET-owner candidate cleared the
+    /// threshold: [0] such rounds, [1] won by an unmet campaign, [2] lost to
+    /// a campaign on a pre-span neighbour, [3] lost to a campaign on a pair met
+    /// during the span, [4] lost to another verb. And, over the lost rounds,
+    /// the summed margin (winning score minus the best unmet score).
+    int64_t unmet_contest_trace[5] = {};
+    int64_t unmet_contest_margin_sum = 0;
     int64_t campaign_scored   = 0; ///< Candidates that reached the score comparison.
     int64_t campaign_chosen   = 0; ///< Rounds where Campaign won the verb choice.
 
@@ -3701,6 +3740,16 @@ int treaty_value_q(const history_sim_params& p,
 /// bounds.
 int visible_capability_q(const std::vector<region>& regions, const history_sim_state& s,
                           const history_sim_params& p, int polity_id);
+
+/// BL-1018 — the same read UNSCALED, for the trace alone: capital `army_stock`
+/// plus `navy_stock`, in heads and hulls, before the reference divides it. 0
+/// on the same conditions as `visible_capability_q`. A pure read that no
+/// decision calls (`visible_capability_q` keeps its own copy of the
+/// arithmetic, so the decision path is untouched); `near_capability_trace`
+/// and the sweep's alarm spread read it. The two must agree: if the numerator
+/// of `visible_capability_q` changes, this changes with it.
+int64_t visible_capability_raw(const std::vector<region>& regions, const history_sim_state& s,
+                               int polity_id);
 
 /// BL-941 — ALARM: how threatened `self` feels by `other`'s visible
 /// capability, gated on contact (the omniscience guard every want-shaped read

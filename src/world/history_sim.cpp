@@ -2208,6 +2208,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                    int region_idx, int64_t year) {
         if (a < 0 || b < 0 || a == b) return;
         if (contact_exists(a, b)) return; // symmetric: (a,b) implies (b,a)
+        if (params.trace_battles) ++out.contacts_raised_trace[static_cast<int>(kind) & 1]; // BL-1019, trace only
         contact_event e;
         e.year   = static_cast<int32_t>(year);
         e.region = (region_idx >= 0 && region_idx < static_cast<int>(owner_index_limit))
@@ -3417,6 +3418,23 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // the upkeep step above.
             const trade_context treaty_trade_ctx =
                 build_trade_context(ss.regions, out.polities, out.supply_corridors);
+
+            // BL-1018 DIAGNOSTIC (trace only): the raw capability each side
+            // of every living NEAR-HOME pair reads of the other this round,
+            // bound or not -- the round's opening stocks, exactly what the
+            // formation walk and the break re-score below both read. One pass
+            // of its own so a pair formed this round is not read twice. Pure
+            // reads into a trace vector no decision consults.
+            if (params.trace_battles)
+                for (const contact& c : out.contacts)
+                {
+                    if (c.from >= c.to || c.first.year >= params.start_year) continue;
+                    if (c.to >= out.polities.size()
+                     || !out.polities[c.from].alive || !out.polities[c.to].alive) continue;
+                    out.near_capability_trace.push_back(visible_capability_raw(ss.regions, out, c.to));
+                    out.near_capability_trace.push_back(visible_capability_raw(ss.regions, out, c.from));
+                }
+
             for (const contact& c : out.contacts)
             {
                 if (c.from >= c.to) continue; // the pair's OTHER row; skip
@@ -4347,6 +4365,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // is byte-identical with tracing on or off.
             int      best_campaign_score  = 0;
             bool     campaign_cleared_now = false;
+            // BL-1019, trace only: the best score an UNMET-owner candidate
+            // (the first crossing) cleared the threshold with this round, so
+            // the round's end can say what beat it. Never compared by a decision.
+            int      best_unmet_score     = 0;
+            bool     unmet_cleared_now    = false;
 
             // -- BL-838: FEAR OF BEING NEXT, the decider's side of it -------
             //
@@ -4547,6 +4570,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // "how seriously would they actually fight" reading this
                     // file has cheaply available (the same term the odds
                     // calculation below reads for the primary combatants).
+                    int ally_discount_trace = 0; // BL-1019 trace only
                     {
                         int ally_deterrence_q = 0;
                         for (const polity& ally : out.polities)
@@ -4559,11 +4583,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         }
                         if (ally_deterrence_q > 0)
                             value -= (value * ally_deterrence_q) / 2000; // up to -50% at full cohesion
+                        ally_discount_trace = ally_deterrence_q;
                     }
 
                     // In the currency: expected value TAKEN, discounted by the
                     // odds of taking it, less what the attempt costs.
                     value = (value * params.campaign_gain_q) / 1000;
+                    const int value_prize_trace = value; // BL-1019 trace: the ground's worth before odds and costs
 
                     // Odds from the power ratio the sim can actually estimate:
                     // levy x supply x cohesion against the defender's levy.
@@ -4648,6 +4674,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // at any map size instead of vetoing war on large ones.
                     value = (value * clampi(1000 - params.w_dist * cap_dist / 100, 200, 1000)) / 1000;
                     value -= (1000 - supply_here) * params.campaign_supply_cost_q / 1000;
+                    const int value_costed_trace = value; // BL-1019 trace: after odds, distance and supply cost
+                    int cult_keep_trace = 1000;           // BL-1019 trace: the share foreignness leaves
                     // FOREIGN GROUND IS WORTH LESS, PROPORTIONALLY — not a flat
                     // toll (2026-08-12).
                     //
@@ -4728,6 +4756,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int cult_q =
                             (clampi(cult_w, 0, 1000) * clampi(foreign_q, 0, 1000)) / 1000;
                         value = (value * (1000 - cult_q)) / 1000;
+                        cult_keep_trace = 1000 - cult_q;
                     }
 
                     // BL-838 -- FEAR OF BEING NEXT, leaning the prize upward
@@ -4825,6 +4854,31 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // axis is dead — the first cut had exactly that bug. The
                     // defender's readiness penalty is what the scorer is
                     // trading the premium and the extra attrition against.
+                    // BL-1019 DIAGNOSTIC (trace only): what an in-reach
+                    // candidate of each contact class is scored ON, summed so
+                    // the sweep can set a first crossing's terms beside a
+                    // known neighbour's. Pure reads of locals already computed
+                    // (and one pure `campaign_prize_q`); no jitter, no RNG.
+                    // Read by nothing in the sim.
+                    if (params.trace_battles)
+                    {
+                        int64_t* ct = out.class_score_trace[dclass];
+                        ++ct[0];
+                        ct[1] += value_prize_trace;
+                        ct[2] += p_win_q;
+                        ct[3] += supply_here;
+                        ct[4] += value;
+                        ct[5] += (params.w_def * def_scaled) / 2000;
+                        ct[6] += cap_dist;
+                        if (!forages) ++ct[7];
+                        ct[8]  += campaign_prize_q(tgt);
+                        ct[9]  += (params.w_farm * tgt.farm_q + params.w_ore * tgt.ore_q
+                                 + params.w_port * tgt.port_q) / 1000;
+                        ct[10] += value_costed_trace;
+                        ct[11] += cult_keep_trace;
+                        if (ally_discount_trace > 0) ++ct[12];
+                    }
+
                     for (int w = 0; w < 2; ++w)
                     {
                         const bool winter = (w == 1);
@@ -4850,6 +4904,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             ++out.campaign_class_trace[dclass][4];
                             campaign_cleared_now = true;
                             if (s > best_campaign_score) best_campaign_score = s;
+                            if (dclass == 2 && (!unmet_cleared_now || s > best_unmet_score)) // BL-1019
+                            {
+                                unmet_cleared_now = true;
+                                best_unmet_score  = s;
+                            }
                         }
 
                         if (s > best_score && s >= params.campaign_threshold_q)
@@ -5272,6 +5331,26 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     best_campaign_score,
                     best_score,
                     best_verb});
+            }
+            // BL-1019: the same fork for the FIRST CROSSING alone. A round in
+            // which an unmet owner's ground cleared the bar -- what won it?
+            // Trace only: reads the round's settled argmax, writes counters.
+            if (params.trace_battles && unmet_cleared_now)
+            {
+                ++out.unmet_contest_trace[0];
+                if (best_verb == sim_verb::campaign && best_dclass == 2)
+                    ++out.unmet_contest_trace[1];
+                else
+                {
+                    if (best_verb == sim_verb::campaign)
+                        ++out.unmet_contest_trace[best_dclass == 0 ? 2 : 3];
+                    else
+                    {
+                        ++out.unmet_contest_trace[4];
+                        ++out.unmet_lost_to_verb_trace[static_cast<int>(best_verb) & 7];
+                    }
+                    out.unmet_contest_margin_sum += best_score - best_unmet_score;
+                }
             }
 
             if (best_verb == sim_verb::none) best_verb = sim_verb::consolidate;
@@ -8029,6 +8108,19 @@ int visible_capability_q(const std::vector<region>& regions, const history_sim_s
     const int64_t capability = regions[static_cast<std::size_t>(q.capital)].army_stock + q.navy_stock;
     return static_cast<int>(clampi64((capability * 1000) / std::max<int64_t>(1, p.visible_capability_reference),
                                       0, 1000));
+}
+
+// BL-1018: trace-only. Mirrors `visible_capability_q`'s numerator exactly and
+// is called by no decision -- the function above is deliberately left as it
+// was rather than routed through this one.
+int64_t visible_capability_raw(const std::vector<region>& regions, const history_sim_state& s,
+                               int polity_id)
+{
+    if (polity_id < 0 || polity_id >= static_cast<int>(s.polities.size())) return 0;
+    const polity& q = s.polities[static_cast<std::size_t>(polity_id)];
+    if (!q.alive || q.capital < 0 || static_cast<std::size_t>(q.capital) >= regions.size())
+        return 0;
+    return regions[static_cast<std::size_t>(q.capital)].army_stock + q.navy_stock;
 }
 
 int deterrence_alarm_q(const std::vector<region>& regions, const history_sim_state& s,

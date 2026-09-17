@@ -55,6 +55,25 @@
 //                  to 1660 and to --through, with the sim's profile split, and
 //                  report the 1660 -> Y half as their difference.
 //
+// BL-1018 adds the ALARM SPREAD: the raw visible capability every near-home
+// treaty read saw over the traced run, its quantiles, and the alarm those
+// reads come to through the reference in effect -- printed per seed and
+// pooled, written as `spread.alarm_spread` and per seed. (The trace-only half
+// of that item; its re-scaled `visible_capability_reference` is not taken.)
+// BL-1019 adds FIRST CONTACT: per seed, the first-contact count over the
+// traced run (crossings and inheritance), the geography at 1200 it had to work
+// with, the unmet candidate's contest (what beat it on the rounds it cleared),
+// and pooled what each contact class is scored on; written per seed as
+// `first_contacts`. (Trace-only half; its census label changes are not taken.)
+// BL-1028 adds the WEAKNESS COUNTERS: first contacts by kind, met-in-span
+// pairs holding a treaty, near-home alarm reads at the ceiling, displacement,
+// the contact-class campaign funnel, the unmet contest and cross-landmass
+// trade volume -- per seed, for half A (1200 -> 1660) and, when --through runs
+// past 1660, half B (1660 -> --through). Half B needs ONE extra traced re-run
+// per seed, stopped at 1660; its method is stated above the section. Printed
+// as "--- weakness counters (BL-1028) ---", written per seed as `weakness`
+// (`half_a`, `half_b`) and pooled as `spread.weakness`.
+//
 // Writes: exploration_sweep.json in the working directory (BL-971) — one row
 // per seed over all eleven readings plus the spread face, checked in at the
 // repo root from a 16-seed run at generation's own constants. A tuning run
@@ -173,6 +192,123 @@ int percentile_of(const std::vector<int>& sorted, int pct)
     const std::size_t idx = (sorted.size() - 1) * static_cast<std::size_t>(pct) / 100u;
     return sorted[idx];
 }
+
+// ---------------------------------------------------------------------------
+// BL-1028 -- ONE HALF OF THE WEAKNESS COUNTERS.
+// ---------------------------------------------------------------------------
+// Two kinds of field, and the difference is the whole method:
+//   CUMULATIVE -- counted over a traced run from 1200 (a trace counter, or a
+//     count over an append-only trace vector). Half A reads them off a traced
+//     run stopped at 1660; half B is (run to --through) minus (run to 1660).
+//   AT STOP -- the state a run closes on (standing pairs, treaties, the
+//     final round's trade flows, the alarm each near pair reads). Read at
+//     each run's own stop: half A at 1660, half B at --through. Never
+//     subtracted.
+struct weakness_half
+{
+    int64_t from_year = 0, to_year = 0;
+
+    // --- CUMULATIVE ----------------------------------------------------------
+    /// New contact pairs raised (`contacts_raised_trace`): [0] a campaign
+    /// crossing onto the other's ground, [1] inherited from a conquered polity.
+    int64_t contacts_raised[2] = {0, 0};
+    /// Near-home treaty reads (`near_capability_trace` entries) and how many
+    /// read the alarm's ceiling through the run's reference (raw * 1000 /
+    /// reference >= 1000, the same clamp `visible_capability_q` applies).
+    int64_t alarm_reads = 0, alarm_reads_ceiling = 0;
+    /// Traced battles by pair class (`battle_trace`): neighbour = the pair was
+    /// in contact at 1200 (`pre_exploration_contacts`), frontier otherwise;
+    /// ambiguous = attacker and defender both id 0 (excluded, as readings 1-2).
+    int64_t neighbour_battles = 0, frontier_battles = 0, ambiguous_battles = 0;
+    /// `campaign_class_trace` [class][gate]: class 0 near (met before 1200),
+    /// 1 met in span, 2 unmet; gates examined, treaty-blocked, water-illegal,
+    /// reach-denied, cleared (season-grain), chosen (round-grain).
+    int64_t funnel[3][6] = {};
+    /// `unmet_contest_trace` [0] rounds an unmet candidate cleared, [1] won by
+    /// it, [2] lost to a near campaign, [3] lost to a met-in-span campaign,
+    /// [4] lost to another verb; the margin sum over the lost rounds; and
+    /// `unmet_lost_to_verb_trace` by `sim_verb`.
+    int64_t unmet_contest[5] = {0, 0, 0, 0, 0};
+    int64_t unmet_margin_sum = 0;
+    int64_t unmet_lost_verb[8] = {};
+
+    // --- AT STOP --------------------------------------------------------------
+    /// Pairs (canonical row) first met at or after 1200, those holding a
+    /// non-aggression clause (the existing `met_pairs_bound`'s own test), and
+    /// those holding a clause of ANY treaty kind.
+    int64_t met_pairs = 0, met_pairs_bound = 0, met_pairs_any_treaty = 0;
+    /// Pairs met before 1200: how many, how many either side reads a positive
+    /// `deterrence_alarm_q` of, how many read the ceiling, and the largest
+    /// read (the existing `near_alarm_max_q`'s own test).
+    int64_t near_pairs = 0, near_pairs_alarmed = 0, near_pairs_ceiling = 0;
+    int     near_alarm_max_q = 0;
+    /// The final decision round's trade flows (reading 11's own test).
+    int64_t flow_volume = 0, cross_landmass_volume = 0, unknown_landmass_volume = 0;
+};
+
+/// Half B's cumulative fields as (to --through) minus (to 1660); its at-stop
+/// fields are the --through run's own.
+weakness_half weakness_minus(const weakness_half& through, const weakness_half& a)
+{
+    weakness_half b = through;
+    for (int k = 0; k < 2; ++k) b.contacts_raised[k] -= a.contacts_raised[k];
+    b.alarm_reads         -= a.alarm_reads;
+    b.alarm_reads_ceiling -= a.alarm_reads_ceiling;
+    b.neighbour_battles   -= a.neighbour_battles;
+    b.frontier_battles    -= a.frontier_battles;
+    b.ambiguous_battles   -= a.ambiguous_battles;
+    for (int k = 0; k < 3; ++k)
+        for (int g = 0; g < 6; ++g) b.funnel[k][g] -= a.funnel[k][g];
+    for (int g = 0; g < 5; ++g) b.unmet_contest[g] -= a.unmet_contest[g];
+    b.unmet_margin_sum -= a.unmet_margin_sum;
+    for (int g = 0; g < 8; ++g) b.unmet_lost_verb[g] -= a.unmet_lost_verb[g];
+    return b;
+}
+
+/// Every CUMULATIVE field non-negative: what a (through - 1660) difference
+/// must satisfy if the shorter run is a prefix of the longer one.
+bool weakness_cumulative_nonnegative(const weakness_half& h)
+{
+    bool ok = h.contacts_raised[0] >= 0 && h.contacts_raised[1] >= 0
+           && h.alarm_reads >= 0 && h.alarm_reads_ceiling >= 0
+           && h.neighbour_battles >= 0 && h.frontier_battles >= 0 && h.ambiguous_battles >= 0
+           && h.unmet_margin_sum >= 0;
+    for (int k = 0; k < 3; ++k)
+        for (int g = 0; g < 6; ++g) ok = ok && h.funnel[k][g] >= 0;
+    for (int g = 0; g < 5; ++g) ok = ok && h.unmet_contest[g] >= 0;
+    for (int g = 0; g < 8; ++g) ok = ok && h.unmet_lost_verb[g] >= 0;
+    return ok;
+}
+
+/// Pooled sum of two halves' counts (maximum for the max read).
+void weakness_accumulate(weakness_half& into, const weakness_half& h)
+{
+    into.from_year = h.from_year; into.to_year = h.to_year;
+    for (int k = 0; k < 2; ++k) into.contacts_raised[k] += h.contacts_raised[k];
+    into.alarm_reads         += h.alarm_reads;
+    into.alarm_reads_ceiling += h.alarm_reads_ceiling;
+    into.neighbour_battles   += h.neighbour_battles;
+    into.frontier_battles    += h.frontier_battles;
+    into.ambiguous_battles   += h.ambiguous_battles;
+    for (int k = 0; k < 3; ++k)
+        for (int g = 0; g < 6; ++g) into.funnel[k][g] += h.funnel[k][g];
+    for (int g = 0; g < 5; ++g) into.unmet_contest[g] += h.unmet_contest[g];
+    into.unmet_margin_sum += h.unmet_margin_sum;
+    for (int g = 0; g < 8; ++g) into.unmet_lost_verb[g] += h.unmet_lost_verb[g];
+    into.met_pairs            += h.met_pairs;
+    into.met_pairs_bound      += h.met_pairs_bound;
+    into.met_pairs_any_treaty += h.met_pairs_any_treaty;
+    into.near_pairs           += h.near_pairs;
+    into.near_pairs_alarmed   += h.near_pairs_alarmed;
+    into.near_pairs_ceiling   += h.near_pairs_ceiling;
+    into.near_alarm_max_q      = std::max(into.near_alarm_max_q, h.near_alarm_max_q);
+    into.flow_volume             += h.flow_volume;
+    into.cross_landmass_volume   += h.cross_landmass_volume;
+    into.unknown_landmass_volume += h.unknown_landmass_volume;
+}
+
+/// In reach, per `campaign_class_trace`'s grain: examined less the three gates.
+int64_t funnel_in_reach(const int64_t* c) { return c[0] - c[1] - c[2] - c[3]; }
 
 // ---------------------------------------------------------------------------
 // ONE SEED'S READING.
@@ -369,6 +505,42 @@ struct exploration_row
     /// the sim keeps no cumulative alarm counter), and the largest such read.
     int64_t near_pairs_alarmed = 0;
     int     near_alarm_max_q   = 0;
+    /// BL-1018: of those near pairs, how many read the alarm's ceiling (1000)
+    /// at the close.
+    int64_t near_pairs_saturated = 0;
+    /// BL-1018: the traced run's `visible_capability_reference`, and the RAW
+    /// visible capability of the counterpart in every near-home treaty read
+    /// over the whole traced run (`near_capability_trace`), sorted ascending.
+    int64_t capability_reference = 0;
+    std::vector<int64_t> near_capability;
+
+    // --- BL-1019: the first crossing, off the traced re-run -----------------
+    /// New contact pairs raised over the traced run: [0] by a campaign
+    /// crossing, [1] inherited from a conquered polity (`contacts_raised_trace`).
+    int64_t contacts_raised[2] = {0, 0};
+    /// `class_score_trace` copied whole (see its field comment).
+    int64_t class_score[3][13] = {};
+    /// `unmet_contest_trace` and its margin sum, and `unmet_lost_to_verb_trace`, copied whole.
+    int64_t unmet_contest[5] = {0, 0, 0, 0, 0};
+    int64_t unmet_lost_verb[8] = {};
+    int64_t unmet_margin_sum = 0;
+    /// THE GEOGRAPHY AT 1200, off the handoff state: living polities, their
+    /// pairs, the pairs never met, and of those the ones that TOUCH -- some
+    /// region of each within `neighbour_radius` of the other, which is the
+    /// only way a campaign candidate between them can exist -- split by
+    /// whether their capitals share a landmass.
+    int64_t polities_1200 = 0, pairs_1200 = 0, unmet_pairs_1200 = 0;
+    int64_t unmet_touching_1200 = 0, unmet_touching_cross_mass_1200 = 0;
+    int64_t landmasses_with_polity_1200 = 0;
+
+    // --- BL-1028: the weakness counters, per half ---------------------------
+    weakness_half weak_a;              ///< 1200 -> min(1660, --through)
+    weakness_half weak_b;              ///< 1660 -> --through; meaningful only when weak_have_b
+    bool          weak_have_b = false;
+    /// The traced run stopped at 1660 is a prefix of the traced run to
+    /// --through (battle traces, alarm reads, every cumulative counter) --
+    /// what licenses the subtraction. True when no half B was taken.
+    bool          weak_prefix_ok = true;
     /// Polities holding the exploration tree's rim node at the close: alive,
     /// and ever (the mask is never cleared, so a dead holder still reads).
     int64_t rim_holders_alive = 0, rim_holders_ever = 0;
@@ -757,7 +929,75 @@ int main(int argc, char** argv)
                 const int ab = deterrence_alarm_q(ss_copy.regions, traced, ep2, c.to, c.from);
                 const int m  = std::max(aa, ab);
                 if (m > 0) ++row.near_pairs_alarmed;
+                if (m >= 1000) ++row.near_pairs_saturated; // BL-1018
                 row.near_alarm_max_q = std::max(row.near_alarm_max_q, m);
+            }
+            // BL-1018: the raw capability behind every near-home read.
+            row.capability_reference = ep2.visible_capability_reference;
+            row.near_capability      = traced.near_capability_trace;
+            std::sort(row.near_capability.begin(), row.near_capability.end());
+
+            // BL-1019: the first crossing's funnel, and the geography it
+            // had to work with at 1200.
+            row.contacts_raised[0] = traced.contacts_raised_trace[0];
+            row.contacts_raised[1] = traced.contacts_raised_trace[1];
+            for (int k = 0; k < 3; ++k)
+                for (int g = 0; g < 13; ++g) row.class_score[k][g] = traced.class_score_trace[k][g];
+            for (int g = 0; g < 5; ++g) row.unmet_contest[g] = traced.unmet_contest_trace[g];
+            for (int g = 0; g < 8; ++g) row.unmet_lost_verb[g] = traced.unmet_lost_to_verb_trace[g];
+            row.unmet_margin_sum = traced.unmet_contest_margin_sum;
+            {
+                const std::vector<polity>& P = fx.pre_exploration_polities;
+                const std::vector<region>& R = fx.pre_exploration_settlement.regions;
+                const std::vector<int32_t> mass = label_landmasses(fx.terrain.substrate, fx.gw, fx.gh);
+                const auto mass_of = [&](const polity& q) -> int32_t {
+                    if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= R.size()) return -1;
+                    const region& rg = R[static_cast<std::size_t>(q.capital)];
+                    if (rg.col < 0 || rg.row < 0 || rg.col >= fx.gw || rg.row >= fx.gh) return -1;
+                    return mass[static_cast<std::size_t>(rg.row * fx.gw + rg.col)];
+                };
+                const std::size_t np = P.size();
+                const auto alive_id = [&](int id) {
+                    return id >= 0 && static_cast<std::size_t>(id) < np && P[static_cast<std::size_t>(id)].alive;
+                };
+                // Touching pairs: any two differently-held regions of living
+                // polities within the radius, as sorted unique (lo, hi) keys.
+                std::vector<std::pair<int, int>> touching;
+                for (std::size_t i = 0; i < R.size(); ++i)
+                {
+                    if (!alive_id(R[i].nation)) continue;
+                    for (std::size_t j = i + 1; j < R.size(); ++j)
+                    {
+                        if (R[j].nation == R[i].nation || !alive_id(R[j].nation)) continue;
+                        if (region_distance(R[i], R[j], fx.gw) > ep2.neighbour_radius) continue;
+                        touching.push_back({std::min(R[i].nation, R[j].nation), std::max(R[i].nation, R[j].nation)});
+                    }
+                }
+                std::sort(touching.begin(), touching.end());
+                touching.erase(std::unique(touching.begin(), touching.end()), touching.end());
+                std::vector<int32_t> masses;
+                for (std::size_t a = 0; a < np; ++a)
+                {
+                    if (!P[a].alive) continue;
+                    ++row.polities_1200;
+                    if (mass_of(P[a]) >= 0) masses.push_back(mass_of(P[a]));
+                    for (std::size_t b = a + 1; b < np; ++b)
+                    {
+                        if (!P[b].alive) continue;
+                        ++row.pairs_1200;
+                        if (contact_exists(fx.pre_exploration_contacts, static_cast<int>(a), static_cast<int>(b)))
+                            continue;
+                        ++row.unmet_pairs_1200;
+                        if (!std::binary_search(touching.begin(), touching.end(),
+                                                std::pair<int, int>{static_cast<int>(a), static_cast<int>(b)}))
+                            continue;
+                        ++row.unmet_touching_1200;
+                        if (mass_of(P[a]) != mass_of(P[b])) ++row.unmet_touching_cross_mass_1200;
+                    }
+                }
+                std::sort(masses.begin(), masses.end());
+                masses.erase(std::unique(masses.begin(), masses.end()), masses.end());
+                row.landmasses_with_polity_1200 = static_cast<int64_t>(masses.size());
             }
             for (const polity& q : traced.polities)
             {
@@ -1116,6 +1356,142 @@ int main(int argc, char** argv)
             }
         }
 
+        // --- BL-1028: THE WEAKNESS COUNTERS, PER HALF --------------------------
+        // Half A is 1200 -> 1660, half B 1660 -> --through. At --through 1660
+        // (or earlier) the traced re-run above IS half A and no half B exists.
+        // Past 1660, ONE more traced re-run is built exactly as the one above
+        // (the same `ep2` -- resume pointers, overrides, seed, fx.works, the
+        // band's step) but stopped at 1660; half A reads it, and half B's
+        // cumulative fields are the longer run's less the shorter's. The sim's
+        // year loop reads `stop_year` only as its bound, so the shorter run is
+        // a prefix of the longer one; that is CHECKED per seed, not assumed.
+        {
+            constexpr int64_t kHalfBoundary = 1660;
+            const std::vector<int32_t> mass_k = label_landmasses(fx.terrain.substrate, fx.gw, fx.gh);
+            const int64_t reference = std::max<int64_t>(1, ep2.visible_capability_reference);
+
+            const auto read_cumulative = [&](const history_sim_state& st, weakness_half& h) {
+                h.contacts_raised[0] = st.contacts_raised_trace[0];
+                h.contacts_raised[1] = st.contacts_raised_trace[1];
+                h.alarm_reads = static_cast<int64_t>(st.near_capability_trace.size());
+                for (int64_t c : st.near_capability_trace)
+                    if (std::max<int64_t>(0, c) * 1000 / reference >= 1000) ++h.alarm_reads_ceiling;
+                for (const battle_trace& bt : st.battle_traces)
+                {
+                    if (bt.defender == 0 && bt.attacker == 0) { ++h.ambiguous_battles; continue; }
+                    if (contact_exists(fx.pre_exploration_contacts, bt.attacker, bt.defender)) ++h.neighbour_battles;
+                    else                                                                      ++h.frontier_battles;
+                }
+                for (int k = 0; k < 3; ++k)
+                    for (int g = 0; g < 6; ++g) h.funnel[k][g] = st.campaign_class_trace[k][g];
+                for (int g = 0; g < 5; ++g) h.unmet_contest[g] = st.unmet_contest_trace[g];
+                h.unmet_margin_sum = st.unmet_contest_margin_sum;
+                for (int g = 0; g < 8; ++g) h.unmet_lost_verb[g] = st.unmet_lost_to_verb_trace[g];
+            };
+            const auto read_at_stop = [&](const history_sim_state& st, const std::vector<region>& regs,
+                                          weakness_half& h) {
+                for (const contact& c : st.contacts)
+                {
+                    if (c.from >= c.to) continue;
+                    if (c.first.year >= ep2.start_year)
+                    {
+                        bool non_aggression = false, any = false;
+                        for (const dated_object& o : st.dated_objects)
+                        {
+                            if (!((o.a == c.from && o.b == c.to) || (o.a == c.to && o.b == c.from))) continue;
+                            if (o.kind < 0 || o.kind >= treaty_clause_count) continue;
+                            any = true;
+                            if (o.kind == static_cast<int32_t>(treaty_clause::non_aggression)) non_aggression = true;
+                        }
+                        ++h.met_pairs;
+                        if (non_aggression) ++h.met_pairs_bound;
+                        if (any)            ++h.met_pairs_any_treaty;
+                    }
+                    else
+                    {
+                        const int m = std::max(deterrence_alarm_q(regs, st, ep2, c.from, c.to),
+                                               deterrence_alarm_q(regs, st, ep2, c.to, c.from));
+                        ++h.near_pairs;
+                        if (m > 0)     ++h.near_pairs_alarmed;
+                        if (m >= 1000) ++h.near_pairs_ceiling;
+                        h.near_alarm_max_q = std::max(h.near_alarm_max_q, m);
+                    }
+                }
+                const auto mass_of_capital = [&](int pid) -> int32_t {
+                    if (pid < 0 || static_cast<std::size_t>(pid) >= st.polities.size()) return -1;
+                    const int cap = st.polities[static_cast<std::size_t>(pid)].capital;
+                    if (cap < 0 || static_cast<std::size_t>(cap) >= regs.size()) return -1;
+                    const region& rg = regs[static_cast<std::size_t>(cap)];
+                    if (rg.col < 0 || rg.row < 0 || rg.col >= fx.gw || rg.row >= fx.gh) return -1;
+                    return mass_k[static_cast<std::size_t>(rg.row * fx.gw + rg.col)];
+                };
+                for (const trade_flow& f : st.trade_flows)
+                {
+                    h.flow_volume += f.volume_q;
+                    const int32_t ms = mass_of_capital(f.seller), mb = mass_of_capital(f.buyer);
+                    if (ms < 0 || mb < 0) h.unknown_landmass_volume += f.volume_q;
+                    else if (ms != mb)    h.cross_landmass_volume   += f.volume_q;
+                }
+            };
+
+            weakness_half to_through;
+            read_cumulative(traced, to_through);
+            read_at_stop(traced, ss_copy.regions, to_through);
+
+            if (through_year > kHalfBoundary)
+            {
+                history_sim_params ep_a = ep2;
+                ep_a.stop_year       = kHalfBoundary;
+                ep_a.tick_bands[0]   = {kHalfBoundary, ep2.tick_bands[0].step_years};
+                ep_a.tick_band_count = 1;
+                settlement_state ss_a = fx.pre_exploration_settlement;
+                creed_state      cs_a = fx.pre_exploration_creeds;
+                const history_sim_state traced_a = run_history_sim(
+                    ss_a, &cs_a, fx.terrain.view(), fx.gw, fx.gh, ep_a,
+                    fx.exploration_seed, /*year_progress=*/nullptr, fx.works, /*tap=*/nullptr);
+
+                weakness_half a;
+                read_cumulative(traced_a, a);
+                read_at_stop(traced_a, ss_a.regions, a);
+                a.from_year = ep2.start_year; a.to_year = kHalfBoundary;
+                weakness_half b = weakness_minus(to_through, a);
+                b.from_year = kHalfBoundary;  b.to_year = through_year;
+
+                // THE PREFIX CHECK: every battle the short run traced is the
+                // long run's battle at the same index (year, pair, ground,
+                // outcome), all dated before the boundary, and the long run's
+                // remaining battles all dated at or after it; the alarm reads
+                // agree entry for entry; and no cumulative difference is
+                // negative.
+                bool prefix = traced_a.battle_traces.size() <= traced.battle_traces.size()
+                           && traced_a.near_capability_trace.size() <= traced.near_capability_trace.size();
+                for (std::size_t k = 0; prefix && k < traced_a.battle_traces.size(); ++k)
+                {
+                    const battle_trace& s = traced_a.battle_traces[k];
+                    const battle_trace& l = traced.battle_traces[k];
+                    prefix = s.year == l.year && s.attacker == l.attacker && s.defender == l.defender
+                          && s.region == l.region && s.attacker_won == l.attacker_won
+                          && s.year < kHalfBoundary;
+                }
+                for (std::size_t k = traced_a.battle_traces.size(); prefix && k < traced.battle_traces.size(); ++k)
+                    prefix = traced.battle_traces[k].year >= kHalfBoundary;
+                if (prefix)
+                    prefix = std::equal(traced_a.near_capability_trace.begin(), traced_a.near_capability_trace.end(),
+                                        traced.near_capability_trace.begin());
+                prefix = prefix && weakness_cumulative_nonnegative(b);
+
+                row.weak_a = a;
+                row.weak_b = b;
+                row.weak_have_b    = true;
+                row.weak_prefix_ok = prefix;
+            }
+            else
+            {
+                to_through.from_year = ep2.start_year; to_through.to_year = through_year;
+                row.weak_a = to_through;
+            }
+        }
+
         // --- BL-1027: THE SPAN'S COST ----------------------------------------
         // Two UNTRACED re-runs from the fixture, one stopped at 1660 and one at
         // --through, so the later half is the difference of two clocks on the
@@ -1257,6 +1633,15 @@ int main(int argc, char** argv)
         check(all_cost_reproduce,
             "BL-1027: the untraced cost run to --through reproduces generation's own counts, every ran seed");
     }
+    if (through_year > 1660)
+    {
+        bool all_prefix = true;
+        for (const exploration_row& r : rows)
+            if (r.ok && r.weak_have_b && !r.weak_prefix_ok) all_prefix = false;
+        check(all_prefix,
+            "BL-1028: the traced run stopped at 1660 is a prefix of the traced run to --through "
+            "(battle traces, alarm reads, cumulative counters), every ran seed");
+    }
 
     // -----------------------------------------------------------------------
     // THE SPREAD FACE (BL-971). Every aggregate a section prints is ALSO
@@ -1277,6 +1662,23 @@ int main(int argc, char** argv)
         // BL-999 held-seed cause census: NO FRONTIER, NO EXPLORER, TREATY-CALM,
         // DETERRENCE-INERT, UNCLASSIFIED.
         int     held_cause[5] = {0, 0, 0, 0, 0};
+        // BL-1018 alarm spread: pooled over every near-home treaty read.
+        int64_t a_reads = 0, a_reference = 0;
+        int64_t a_cap[8] = {0, 0, 0, 0, 0, 0, 0, 0};  ///< p10 p25 p50 p75 p90 p95 p99 max
+        int     a_alarm[5] = {0, 0, 0, 0, 0};         ///< p10 p25 p50 p75 p90
+        double  a_saturated_share = 0.0, a_zero_share = 0.0;
+        int64_t a_hist[12] = {};                      ///< [0], (0,100), [100,200) .. [900,1000), [1000]
+        int64_t a_seed_p90_median = 0;
+        int64_t a_close_saturated = 0, a_close_pairs = 0;
+        // BL-1028 weakness counters, pooled per half: the summed half, the
+        // median of per-seed displacement ratios over seeds with any
+        // neighbour battle, and how many seeds that median is taken over.
+        weakness_half w_pooled[2];
+        bool    w_have_median[2] = {false, false};
+        double  w_median_ratio[2] = {0.0, 0.0};
+        int     w_seeds_with_ratio[2] = {0, 0};
+        int     w_seeds[2] = {0, 0};
+        bool    w_have_b = false;
         // reading 8
         int64_t r8_polities = 0, r8_treasury_min = 0, r8_treasury_max = 0;
         double  r8_treasury_mean = 0.0, r8_corr = 0.0;
@@ -1640,6 +2042,209 @@ int main(int argc, char** argv)
     face.held_cause[0] = census.no_frontier;      face.held_cause[1] = census.no_explorer;
     face.held_cause[2] = census.treaty_calm;      face.held_cause[3] = census.deterrence_inert;
     face.held_cause[4] = census.unclassified;
+
+    // -----------------------------------------------------------------------
+    // THE ALARM SPREAD (BL-1018, Ben's ruling 2026-09-16, NR-880). Deterrence
+    // acts through near-home Alarm = min(1000, capability * 1000 / reference),
+    // and a reference the capabilities outgrow reads 1000 on every pair -- a
+    // flat constant, not a discriminator. So this section reads the RAW
+    // capability every near-home treaty read saw (both sides, every decision
+    // round, formation and break alike -- `near_capability_trace`), the
+    // quantiles the reference would be derived from, and the alarm those reads
+    // come to through the reference in effect. Pooled over the spread, since
+    // the reference is one constant for every world; each seed's own line sits
+    // beside it so one heavy seed cannot hide. The close snapshot (pairs at the
+    // close reading the ceiling) is printed as the cross-check. Whole traced
+    // run (1200 -> --through); the per-half split is BL-1028's section.
+    // Report only.
+    // -----------------------------------------------------------------------
+    {
+        const auto at_pct = [](const std::vector<int64_t>& v, int pct) -> int64_t {
+            if (v.empty()) return 0;
+            return v[(v.size() - 1) * static_cast<std::size_t>(pct) / 100];
+        };
+        const auto alarm_of = [](int64_t cap, int64_t ref) -> int {
+            return static_cast<int>(std::min<int64_t>(1000, std::max<int64_t>(0, cap) * 1000
+                                                             / std::max<int64_t>(1, ref)));
+        };
+        std::printf("\n--- alarm spread over near pairs (BL-1018) -- every near-home treaty read, "
+                    "both sides, every decision round ---\n");
+        std::printf("%-6s %9s %9s | %9s %9s %9s %9s | %6s %6s %6s %7s %7s | %s\n",
+                    "seed", "reads", "reference", "cap.p50", "cap.p90", "cap.p99", "cap.max",
+                    "al.p10", "al.p50", "al.p90", "al=1000", "al=0", "close: near pairs at 1000");
+        std::vector<int64_t> pooled;
+        std::vector<int64_t> seed_p90;
+        int64_t reference = 0;
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok) continue;
+            reference = r.capability_reference; // one value per run: every row's traced params agree
+            face.a_close_saturated += r.near_pairs_saturated;
+            face.a_close_pairs     += r.near_pairs;
+            const std::vector<int64_t>& v = r.near_capability;
+            int64_t sat = 0, zero = 0;
+            for (int64_t c : v)
+            {
+                const int a = alarm_of(c, r.capability_reference);
+                if (a >= 1000) ++sat;
+                if (a == 0) ++zero;
+            }
+            if (!v.empty()) seed_p90.push_back(at_pct(v, 90));
+            const double n = static_cast<double>(std::max<std::size_t>(1, v.size()));
+            std::printf("%-6u %9zu %9lld | %9lld %9lld %9lld %9lld | %6d %6d %6d %6.1f%% %6.1f%% | %lld/%lld\n",
+                        r.seed, v.size(), static_cast<long long>(r.capability_reference),
+                        static_cast<long long>(at_pct(v, 50)), static_cast<long long>(at_pct(v, 90)),
+                        static_cast<long long>(at_pct(v, 99)), static_cast<long long>(v.empty() ? 0 : v.back()),
+                        alarm_of(at_pct(v, 10), r.capability_reference),
+                        alarm_of(at_pct(v, 50), r.capability_reference),
+                        alarm_of(at_pct(v, 90), r.capability_reference),
+                        100.0 * static_cast<double>(sat) / n, 100.0 * static_cast<double>(zero) / n,
+                        static_cast<long long>(r.near_pairs_saturated), static_cast<long long>(r.near_pairs));
+            pooled.insert(pooled.end(), v.begin(), v.end());
+        }
+        std::sort(pooled.begin(), pooled.end());
+        std::sort(seed_p90.begin(), seed_p90.end());
+        face.a_reads = static_cast<int64_t>(pooled.size());
+        face.a_reference = reference;
+        const int cap_pcts[7] = {10, 25, 50, 75, 90, 95, 99};
+        for (int k = 0; k < 7; ++k) face.a_cap[k] = at_pct(pooled, cap_pcts[k]);
+        face.a_cap[7] = pooled.empty() ? 0 : pooled.back();
+        const int alarm_pcts[5] = {10, 25, 50, 75, 90};
+        for (int k = 0; k < 5; ++k) face.a_alarm[k] = alarm_of(at_pct(pooled, alarm_pcts[k]), reference);
+        int64_t sat = 0, zero = 0;
+        for (int64_t c : pooled)
+        {
+            const int a = alarm_of(c, reference);
+            if (a >= 1000) ++sat;
+            if (a == 0) ++zero;
+            const int bucket = a <= 0 ? 0 : (a >= 1000 ? 11 : (a < 100 ? 1 : 1 + a / 100));
+            ++face.a_hist[bucket];
+        }
+        const double n = static_cast<double>(std::max<std::size_t>(1, pooled.size()));
+        face.a_saturated_share = static_cast<double>(sat) / n;
+        face.a_zero_share      = static_cast<double>(zero) / n;
+        face.a_seed_p90_median = seed_p90.empty() ? 0 : seed_p90[seed_p90.size() / 2];
+
+        if (pooled.empty())
+            std::printf("  NOT MEASURED: no near-home treaty read on this spread.\n");
+        else
+        {
+            std::printf("  POOLED over %lld reads, reference %lld:\n", static_cast<long long>(face.a_reads),
+                        static_cast<long long>(reference));
+            std::printf("    raw capability  p10 %lld  p25 %lld  p50 %lld  p75 %lld  p90 %lld  p95 %lld  p99 %lld  max %lld"
+                        "   (median of per-seed p90: %lld)\n",
+                        static_cast<long long>(face.a_cap[0]), static_cast<long long>(face.a_cap[1]),
+                        static_cast<long long>(face.a_cap[2]), static_cast<long long>(face.a_cap[3]),
+                        static_cast<long long>(face.a_cap[4]), static_cast<long long>(face.a_cap[5]),
+                        static_cast<long long>(face.a_cap[6]), static_cast<long long>(face.a_cap[7]),
+                        static_cast<long long>(face.a_seed_p90_median));
+            std::printf("    alarm           p10 %d  p25 %d  p50 %d  p75 %d  p90 %d;  reading 1000: %.1f%%  reading 0: %.1f%%\n",
+                        face.a_alarm[0], face.a_alarm[1], face.a_alarm[2], face.a_alarm[3], face.a_alarm[4],
+                        100.0 * face.a_saturated_share, 100.0 * face.a_zero_share);
+            std::printf("    alarm histogram  0:%.1f%%  1-99:%.1f%%", 100.0 * face.a_hist[0] / n, 100.0 * face.a_hist[1] / n);
+            for (int b = 2; b <= 10; ++b)
+                std::printf("  %d-%d:%.1f%%", (b - 1) * 100, (b - 1) * 100 + 99, 100.0 * face.a_hist[b] / n);
+            std::printf("  1000:%.1f%%\n", 100.0 * face.a_hist[11] / n);
+            std::printf("    close snapshot: %lld of %lld near pairs read the ceiling (%.1f%%)\n",
+                        static_cast<long long>(face.a_close_saturated), static_cast<long long>(face.a_close_pairs),
+                        face.a_close_pairs > 0 ? 100.0 * face.a_close_saturated / face.a_close_pairs : 0.0);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // THE FIRST CROSSING (BL-1019, Ben's ruling 2026-09-16, NR-880). A pair
+    // meets only when a campaign crosses onto the other's ground or a
+    // conqueror inherits what its victim knew, so the frontier the
+    // displacement reading needs is made by first crossings. Per seed: the
+    // geography at 1200 (unmet pairs of living polities, and the ones that
+    // TOUCH -- the only unmet pairs a campaign can ever reach), the
+    // first-contact count over the traced run (new pairs raised, by kind), the
+    // met-in-span pairs still standing at the close, and the unmet candidate's
+    // funnel with what beat it on the rounds it cleared. Then, pooled, what
+    // each contact class is scored on -- a first crossing set beside a known
+    // neighbour. Whole traced run (1200 -> --through). Report only.
+    // -----------------------------------------------------------------------
+    {
+        std::printf("\n--- first contact (BL-1019) -- geography at 1200, contacts raised over the traced run, "
+                    "and the unmet candidate's contest ---\n");
+        std::printf("%-6s %6s %7s %7s %7s %7s | %8s %8s %8s | %8s %7s %6s | %7s %6s %6s %6s %6s %7s | %7s %7s %7s %7s\n",
+                    "seed", "pol.", "unmet", "touch", "t.xmass", "masses",
+                    "1st.camp", "1st.inh", "met@cls",
+                    "u.reach", "u.clear", "u.chos",
+                    "u.rnds", "won", "l.near", "l.met", "l.verb", "margin",
+                    "n.value", "u.value", "n.supp", "u.supp");
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok) continue;
+            const int64_t* u = r.campaign_class[2];
+            const int64_t lost = r.unmet_contest[2] + r.unmet_contest[3] + r.unmet_contest[4];
+            const auto mean_of = [&](int k, int g) {
+                return r.class_score[k][0] > 0
+                    ? static_cast<double>(r.class_score[k][g]) / static_cast<double>(r.class_score[k][0]) : 0.0;
+            };
+            std::printf("%-6u %6lld %7lld %7lld %7lld %7lld | %8lld %8lld %8lld | %8lld %7lld %6lld | %7lld %6lld %6lld %6lld %6lld %7.0f"
+                        " | %7.1f %7.1f %7.1f %7.1f\n",
+                        r.seed, static_cast<long long>(r.polities_1200), static_cast<long long>(r.unmet_pairs_1200),
+                        static_cast<long long>(r.unmet_touching_1200),
+                        static_cast<long long>(r.unmet_touching_cross_mass_1200),
+                        static_cast<long long>(r.landmasses_with_polity_1200),
+                        static_cast<long long>(r.contacts_raised[0]), static_cast<long long>(r.contacts_raised[1]),
+                        static_cast<long long>(r.far_pairs),
+                        static_cast<long long>(u[0] - u[1] - u[2] - u[3]), static_cast<long long>(u[4]),
+                        static_cast<long long>(u[5]),
+                        static_cast<long long>(r.unmet_contest[0]), static_cast<long long>(r.unmet_contest[1]),
+                        static_cast<long long>(r.unmet_contest[2]), static_cast<long long>(r.unmet_contest[3]),
+                        static_cast<long long>(r.unmet_contest[4]),
+                        lost > 0 ? static_cast<double>(r.unmet_margin_sum) / static_cast<double>(lost) : 0.0,
+                        mean_of(0, 4), mean_of(2, 4), mean_of(0, 3), mean_of(2, 3));
+        }
+        std::printf("  columns: pol. living polities at 1200; unmet/touch/t.xmass unmet pairs, of them touching within the "
+                    "neighbour radius, of those with capitals on different landmasses; masses landmasses holding a capital; "
+                    "1st.camp/1st.inh new contact pairs raised over the traced run by a crossing / by inheritance; met@cls "
+                    "met-in-span pairs at the close; u.* the unmet class (in reach, season scores clearing, "
+                    "rounds chosen); u.rnds rounds an unmet candidate cleared, won by it / lost to a near campaign / to a "
+                    "met-in-span campaign / to another verb, and the mean winning margin over the lost rounds; n./u.value "
+                    "and n./u.supp the mean value and supply of in-reach near-class / unmet-class candidates.\n");
+
+        int64_t pooled[3][13] = {};
+        int64_t lost_verb[8] = {};
+        for (const exploration_row& r : rows)
+            if (r.ok)
+            {
+                for (int k = 0; k < 3; ++k)
+                    for (int g = 0; g < 13; ++g) pooled[k][g] += r.class_score[k][g];
+                for (int g = 0; g < 8; ++g) lost_verb[g] += r.unmet_lost_verb[g];
+            }
+        std::printf("  POOLED, rounds an unmet candidate cleared and another VERB won, by verb: "
+                    "settle %lld, invest %lld, consolidate %lld, build %lld, upgrade-supply %lld, organise %lld\n",
+                    static_cast<long long>(lost_verb[static_cast<int>(sim_verb::settle)]),
+                    static_cast<long long>(lost_verb[static_cast<int>(sim_verb::invest)]),
+                    static_cast<long long>(lost_verb[static_cast<int>(sim_verb::consolidate)]),
+                    static_cast<long long>(lost_verb[static_cast<int>(sim_verb::build_work)]),
+                    static_cast<long long>(lost_verb[static_cast<int>(sim_verb::upgrade_supply)]),
+                    static_cast<long long>(lost_verb[static_cast<int>(sim_verb::organise)]));
+        const char* names[3] = {"near (met before 1200)", "met in span", "unmet (first crossing)"};
+        std::printf("  POOLED, what an in-reach candidate is scored on, by contact class (means):\n");
+        std::printf("    %-24s %9s %7s %7s %7s %7s %7s %7s %7s %7s %7s %7s %7s %7s %8s\n", "class", "scored",
+                    "city", "ground", "prize", "p_win", "supply", "costed", "cult", "value", "def", "dist",
+                    "sea-leg", "ally", "clear/scr");
+        for (int k = 0; k < 3; ++k)
+        {
+            const double n = static_cast<double>(std::max<int64_t>(1, pooled[k][0]));
+            int64_t cleared = 0;
+            for (const exploration_row& r : rows) if (r.ok) cleared += r.campaign_class[k][4];
+            std::printf("    %-24s %9lld %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %6.1f%% %6.1f%% %7.1f%%\n",
+                        names[k], static_cast<long long>(pooled[k][0]),
+                        pooled[k][8] / n, pooled[k][9] / n, pooled[k][1] / n, pooled[k][2] / n, pooled[k][3] / n,
+                        pooled[k][10] / n, pooled[k][11] / n, pooled[k][4] / n, pooled[k][5] / n, pooled[k][6] / n,
+                        100.0 * pooled[k][7] / n, 100.0 * pooled[k][12] / n,
+                        100.0 * static_cast<double>(cleared) / (2.0 * n));
+        }
+        std::printf("    (city = campaign_prize_q; ground = farm/ore/port at the un-jittered weights; prize = the ground's "
+                    "worth before odds; costed = after odds, distance and supply cost; cult = share foreignness leaves; "
+                    "value = after every lean, before the defender and season terms; ally = discounted by a mutual-defence "
+                    "ally; clear/scr = season scores clearing the threshold per season score)\n");
+    }
 
     double med_empire = 0.0, med_expl = 0.0;
     if (!empire_rates.empty())
@@ -2252,6 +2857,167 @@ int main(int argc, char** argv)
     }
 
     // -----------------------------------------------------------------------
+    // THE WEAKNESS COUNTERS (BL-1028), PER HALF. Half A = 1200 -> 1660 (or to
+    // --through if that is earlier), half B = 1660 -> --through, printed only
+    // when --through runs past 1660. HOW EACH READING'S HALVES ARE DERIVED:
+    //
+    //   first contacts (crossing / inherited) -- CUMULATIVE,
+    //     `contacts_raised_trace`. A: the traced run stopped at 1660. B: the
+    //     traced run to --through less the run to 1660.
+    //   met pairs, bound, any treaty -- AT STOP. Canonical contact rows first
+    //     met at or after 1200 (the engine's start_year on this path), and of
+    //     them those holding non-aggression (`met_pairs_bound`'s own test) and
+    //     those holding any clause. A: at the 1660 stop. B: at the --through
+    //     stop -- so B counts every pair met since 1200 that stands then, not
+    //     only pairs met after 1660.
+    //   near-home alarm reads at the ceiling -- CUMULATIVE, over
+    //     `near_capability_trace` (near home = contact before 1200): an entry
+    //     is at the ceiling when raw * 1000 / visible_capability_reference
+    //     >= 1000. A: the 1660 run's entries. B: the --through run's count less
+    //     the 1660 run's (the entries past the 1660 run's length, which the
+    //     prefix check proves are the same reads). Beside it, AT STOP: near
+    //     pairs, those alarmed, those at the ceiling, and `near_alarm_max_q`.
+    //   displacement -- CUMULATIVE, over `battle_trace`: neighbour = the pair
+    //     was in contact at 1200, frontier otherwise (readings 1-2's test,
+    //     unchanged in both halves). A: the 1660 run's traces. B: the
+    //     difference, equal to the --through run's traces dated >= 1660 (the
+    //     prefix check verifies the dates). Ratio = frontier / neighbour;
+    //     pooled = summed frontier / summed neighbour; median over seeds with
+    //     any neighbour battle in that half. No SILENT verdict is taken here.
+    //   campaign funnel (near / met in span / unmet: examined, in reach,
+    //     cleared, chosen) -- CUMULATIVE, `campaign_class_trace`, by
+    //     difference. In reach = examined less treaty-blocked, water-illegal
+    //     and reach-denied. Grains as that trace's own comment: cleared is
+    //     season-grain, chosen round-grain.
+    //   unmet contest (rounds cleared, won, lost to another verb) --
+    //     CUMULATIVE, `unmet_contest_trace`, by difference.
+    //   trade volume crossing landmasses -- AT STOP, the final decision
+    //     round's `trade_flows` (reading 11's test). A: at 1660. B: at --through.
+    //
+    // The prefix the subtraction relies on is a structural check above.
+    // Report only; read per seed, never the median alone.
+    // -----------------------------------------------------------------------
+    {
+        const bool have_b = through_year > 1660;
+        face.w_have_b = have_b;
+        std::printf("\n--- weakness counters (BL-1028) ---\n");
+        if (have_b)
+            std::printf("  half A = 1200 -> 1660 (a traced re-run stopped at 1660); half B = 1660 -> %lld "
+                        "(cumulative: the run to %lld less the run to 1660; at-stop: read at %lld)\n",
+                        static_cast<long long>(through_year), static_cast<long long>(through_year),
+                        static_cast<long long>(through_year));
+        else
+            std::printf("  half A = 1200 -> %lld only (--through does not pass 1660, so there is no half B)\n",
+                        static_cast<long long>(through_year));
+        std::printf("  %-4s %-4s | %6s %6s | %5s %5s %5s | %8s %7s | %5s %5s %5s %5s | %5s %5s %6s | "
+                    "%-23s | %-23s | %-23s | %6s %5s %6s | %9s %9s %6s\n",
+                    "seed", "half", "1st.x", "1st.in", "met", "bound", "treat",
+                    "al.reads", "al@1000", "near", "alrmd", "@1000", "max", "nb", "fr", "ratio",
+                    "near ex/rch/clr/ch", "met ex/rch/clr/ch", "unmet ex/rch/clr/ch",
+                    "u.clr", "u.won", "u.verb", "volume", "x-mass", "x.shr");
+
+        const auto pct_of = [](int64_t num, int64_t den) {
+            return den > 0 ? 100.0 * static_cast<double>(num) / static_cast<double>(den) : 0.0;
+        };
+        const auto funnel_str = [](const int64_t* c) {
+            char buf[64];
+            std::snprintf(buf, sizeof buf, "%lld/%lld/%lld/%lld", static_cast<long long>(c[0]),
+                          static_cast<long long>(funnel_in_reach(c)), static_cast<long long>(c[4]),
+                          static_cast<long long>(c[5]));
+            return std::string(buf);
+        };
+        const auto print_half = [&](const char* seed_label, const char* half_label, const weakness_half& h) {
+            char ratio[16];
+            if (h.neighbour_battles > 0)
+                std::snprintf(ratio, sizeof ratio, "%.2f",
+                              static_cast<double>(h.frontier_battles) / static_cast<double>(h.neighbour_battles));
+            else
+                std::snprintf(ratio, sizeof ratio, "no-nb");
+            std::printf("  %-4s %-4s | %6lld %6lld | %5lld %5lld %5lld | %8lld %6.1f%% | %5lld %5lld %5lld %5d | "
+                        "%5lld %5lld %6s | %-23s | %-23s | %-23s | %6lld %5lld %5.1f%% | %9lld %9lld %5.1f%%\n",
+                        seed_label, half_label,
+                        static_cast<long long>(h.contacts_raised[0]), static_cast<long long>(h.contacts_raised[1]),
+                        static_cast<long long>(h.met_pairs), static_cast<long long>(h.met_pairs_bound),
+                        static_cast<long long>(h.met_pairs_any_treaty),
+                        static_cast<long long>(h.alarm_reads), pct_of(h.alarm_reads_ceiling, h.alarm_reads),
+                        static_cast<long long>(h.near_pairs), static_cast<long long>(h.near_pairs_alarmed),
+                        static_cast<long long>(h.near_pairs_ceiling), h.near_alarm_max_q,
+                        static_cast<long long>(h.neighbour_battles), static_cast<long long>(h.frontier_battles), ratio,
+                        funnel_str(h.funnel[0]).c_str(), funnel_str(h.funnel[1]).c_str(), funnel_str(h.funnel[2]).c_str(),
+                        static_cast<long long>(h.unmet_contest[0]), static_cast<long long>(h.unmet_contest[1]),
+                        pct_of(h.unmet_contest[4], h.unmet_contest[0]),
+                        static_cast<long long>(h.flow_volume), static_cast<long long>(h.cross_landmass_volume),
+                        pct_of(h.cross_landmass_volume, h.flow_volume));
+        };
+
+        std::vector<double> ratios[2];
+        for (const exploration_row& r : rows)
+        {
+            if (!r.ok) continue;
+            char seed_label[16];
+            std::snprintf(seed_label, sizeof seed_label, "%u", r.seed);
+            print_half(seed_label, "A", r.weak_a);
+            weakness_accumulate(face.w_pooled[0], r.weak_a);
+            ++face.w_seeds[0];
+            if (r.weak_a.neighbour_battles > 0)
+                ratios[0].push_back(static_cast<double>(r.weak_a.frontier_battles)
+                                    / static_cast<double>(r.weak_a.neighbour_battles));
+            if (have_b && r.weak_have_b)
+            {
+                print_half(seed_label, r.weak_prefix_ok ? "B" : "B!", r.weak_b);
+                weakness_accumulate(face.w_pooled[1], r.weak_b);
+                ++face.w_seeds[1];
+                if (r.weak_b.neighbour_battles > 0)
+                    ratios[1].push_back(static_cast<double>(r.weak_b.frontier_battles)
+                                        / static_cast<double>(r.weak_b.neighbour_battles));
+            }
+        }
+        for (int hh = 0; hh < (have_b ? 2 : 1); ++hh)
+        {
+            std::sort(ratios[hh].begin(), ratios[hh].end());
+            face.w_seeds_with_ratio[hh] = static_cast<int>(ratios[hh].size());
+            face.w_have_median[hh] = !ratios[hh].empty();
+            face.w_median_ratio[hh] = ratios[hh].empty() ? 0.0 : ratios[hh][ratios[hh].size() / 2];
+        }
+        for (int hh = 0; hh < (have_b ? 2 : 1); ++hh)
+            print_half("POOL", hh == 0 ? "A" : "B", face.w_pooled[hh]);
+
+        std::printf("  columns: 1st.x/1st.in new contact pairs raised in the half by a crossing / by inheritance; "
+                    "met/bound/treat pairs first met since 1200 standing at the half's stop, those holding "
+                    "non-aggression (met_pairs_bound), those holding any treaty clause; al.reads/al@1000 near-home "
+                    "treaty reads in the half and the share at the alarm ceiling; near/alrmd/@1000/max near pairs at "
+                    "the stop, alarmed, at the ceiling, and near_alarm_max_q; nb/fr/ratio neighbour and frontier "
+                    "battles in the half and frontier/neighbour; ex/rch/clr/ch the campaign funnel by contact class "
+                    "(examined, in reach, cleared [season-grain], chosen); u.clr/u.won/u.verb rounds an unmet "
+                    "candidate cleared, won by it, and the share another verb won; volume/x-mass/x.shr trade volume "
+                    "at the stop, crossing landmasses, and its share. A half marked B! failed the prefix check.\n");
+        for (int hh = 0; hh < (have_b ? 2 : 1); ++hh)
+        {
+            const weakness_half& p = face.w_pooled[hh];
+            std::printf("  POOLED half %c (%lld -> %lld, %d seeds): displacement pooled %s, median %s over %d seeds "
+                        "with a neighbour battle; alarm reads at the ceiling %.1f%% (max near alarm at the stop %d); "
+                        "met pairs bound %lld of %lld (any treaty %lld); first contacts %lld crossing + %lld inherited; "
+                        "unmet rounds cleared %lld, won %lld, lost to another verb %.1f%%; cross-landmass trade "
+                        "%.1f%% of volume\n",
+                        hh == 0 ? 'A' : 'B', static_cast<long long>(p.from_year), static_cast<long long>(p.to_year),
+                        face.w_seeds[hh],
+                        p.neighbour_battles > 0
+                            ? std::to_string(static_cast<double>(p.frontier_battles)
+                                             / static_cast<double>(p.neighbour_battles)).substr(0, 5).c_str()
+                            : "undefined",
+                        face.w_have_median[hh] ? std::to_string(face.w_median_ratio[hh]).substr(0, 5).c_str() : "undefined",
+                        face.w_seeds_with_ratio[hh],
+                        pct_of(p.alarm_reads_ceiling, p.alarm_reads), p.near_alarm_max_q,
+                        static_cast<long long>(p.met_pairs_bound), static_cast<long long>(p.met_pairs),
+                        static_cast<long long>(p.met_pairs_any_treaty),
+                        static_cast<long long>(p.contacts_raised[0]), static_cast<long long>(p.contacts_raised[1]),
+                        static_cast<long long>(p.unmet_contest[0]), static_cast<long long>(p.unmet_contest[1]),
+                        pct_of(p.unmet_contest[4], p.unmet_contest[0]),
+                        pct_of(p.cross_landmass_volume, p.flow_volume));
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // THE CHECKED-IN TABLE (BL-971). exploration_sweep.json at the working
     // directory (the repo root when run as documented), one row per seed
     // over all eleven readings plus the spread face above — the same spirit
@@ -2307,6 +3073,70 @@ int main(int argc, char** argv)
                 }
                 std::fprintf(f, "]");
             };
+            // BL-1028: one half of the weakness counters as a JSON object.
+            // `median` is written only for the pooled face (have_median set).
+            const auto put_weak = [&](const weakness_half& h, bool pooled, bool have_median, double median,
+                                      int seeds_with_ratio, int seeds, const char* tail) {
+                const auto put_funnel = [&](const char* key, const int64_t* c, const char* ftail) {
+                    std::fprintf(f, "\"%s\": {\"examined\": %lld, \"treaty_blocked\": %lld, \"water_illegal\": %lld, "
+                                    "\"reach_denied\": %lld, \"in_reach\": %lld, \"cleared\": %lld, \"chosen\": %lld}%s",
+                                 key, static_cast<long long>(c[0]), static_cast<long long>(c[1]),
+                                 static_cast<long long>(c[2]), static_cast<long long>(c[3]),
+                                 static_cast<long long>(funnel_in_reach(c)), static_cast<long long>(c[4]),
+                                 static_cast<long long>(c[5]), ftail);
+                };
+                std::fprintf(f, "{\"from_year\": %lld, \"to_year\": %lld, ",
+                             static_cast<long long>(h.from_year), static_cast<long long>(h.to_year));
+                if (pooled) std::fprintf(f, "\"seeds\": %d, ", seeds);
+                std::fprintf(f, "\"first_contacts_crossing\": %lld, \"first_contacts_inherited\": %lld, "
+                                "\"met_pairs_at_stop\": %lld, \"met_pairs_bound_at_stop\": %lld, "
+                                "\"met_pairs_any_treaty_at_stop\": %lld, "
+                                "\"near_alarm_reads\": %lld, \"near_alarm_reads_at_ceiling\": %lld, ",
+                             static_cast<long long>(h.contacts_raised[0]), static_cast<long long>(h.contacts_raised[1]),
+                             static_cast<long long>(h.met_pairs), static_cast<long long>(h.met_pairs_bound),
+                             static_cast<long long>(h.met_pairs_any_treaty),
+                             static_cast<long long>(h.alarm_reads), static_cast<long long>(h.alarm_reads_ceiling));
+                put_d("near_alarm_ceiling_share", h.alarm_reads > 0,
+                      h.alarm_reads > 0 ? static_cast<double>(h.alarm_reads_ceiling) / static_cast<double>(h.alarm_reads) : 0.0,
+                      ", ");
+                std::fprintf(f, "\"near_pairs_at_stop\": %lld, \"near_pairs_alarmed_at_stop\": %lld, "
+                                "\"near_pairs_at_ceiling_at_stop\": %lld, \"near_alarm_max_q_at_stop\": %d, "
+                                "\"neighbour_battles\": %lld, \"frontier_battles\": %lld, \"ambiguous_battles\": %lld, ",
+                             static_cast<long long>(h.near_pairs), static_cast<long long>(h.near_pairs_alarmed),
+                             static_cast<long long>(h.near_pairs_ceiling), h.near_alarm_max_q,
+                             static_cast<long long>(h.neighbour_battles), static_cast<long long>(h.frontier_battles),
+                             static_cast<long long>(h.ambiguous_battles));
+                put_d(pooled ? "displacement_pooled" : "displacement_ratio", h.neighbour_battles > 0,
+                      h.neighbour_battles > 0
+                          ? static_cast<double>(h.frontier_battles) / static_cast<double>(h.neighbour_battles) : 0.0,
+                      ", ");
+                if (pooled)
+                {
+                    put_d("displacement_median", have_median, median, ", ");
+                    std::fprintf(f, "\"seeds_with_ratio\": %d, ", seeds_with_ratio);
+                }
+                std::fprintf(f, "\"funnel\": {");
+                put_funnel("near", h.funnel[0], ", ");
+                put_funnel("met", h.funnel[1], ", ");
+                put_funnel("unmet", h.funnel[2], "}, ");
+                std::fprintf(f, "\"unmet_contest\": {\"cleared_rounds\": %lld, \"won\": %lld, \"lost_to_near\": %lld, "
+                                "\"lost_to_met\": %lld, \"lost_to_verb\": %lld, \"lost_margin_sum\": %lld, "
+                                "\"lost_to_verb_by_verb\": {\"settle\": %lld, \"invest\": %lld, \"consolidate\": %lld, "
+                                "\"build\": %lld, \"upgrade_supply\": %lld, \"organise\": %lld}}, ",
+                             static_cast<long long>(h.unmet_contest[0]), static_cast<long long>(h.unmet_contest[1]),
+                             static_cast<long long>(h.unmet_contest[2]), static_cast<long long>(h.unmet_contest[3]),
+                             static_cast<long long>(h.unmet_contest[4]), static_cast<long long>(h.unmet_margin_sum),
+                             static_cast<long long>(h.unmet_lost_verb[static_cast<int>(sim_verb::settle)]),
+                             static_cast<long long>(h.unmet_lost_verb[static_cast<int>(sim_verb::invest)]),
+                             static_cast<long long>(h.unmet_lost_verb[static_cast<int>(sim_verb::consolidate)]),
+                             static_cast<long long>(h.unmet_lost_verb[static_cast<int>(sim_verb::build_work)]),
+                             static_cast<long long>(h.unmet_lost_verb[static_cast<int>(sim_verb::upgrade_supply)]),
+                             static_cast<long long>(h.unmet_lost_verb[static_cast<int>(sim_verb::organise)]));
+                std::fprintf(f, "\"flow_volume_at_stop\": %lld, \"cross_landmass_volume_at_stop\": %lld, "
+                                "\"unknown_landmass_volume_at_stop\": %lld}%s",
+                             static_cast<long long>(h.flow_volume), static_cast<long long>(h.cross_landmass_volume),
+                             static_cast<long long>(h.unknown_landmass_volume), tail);
+            };
 
             std::fprintf(f, "{\n \"_note\": \"BL-937/BL-971 exploration sweep, 1200 -> 1660 CE. Reported, not gated "
                             "- see the harness header. One row per seed over the eleven readings of "
@@ -2354,6 +3184,25 @@ int main(int argc, char** argv)
             std::fprintf(f, "  \"conflict_persists\": {\"median_empire_rate_per_century\": %.4f, "
                             "\"median_exploration_rate_per_century\": %.4f},\n",
                          face.med_empire_rate, face.med_expl_rate);
+            // BL-1018: the alarm spread over every near-home treaty read (whole traced run).
+            std::fprintf(f, "  \"alarm_spread\": {\"reference\": %lld, \"reads\": %lld, "
+                            "\"capability_p10\": %lld, \"capability_p25\": %lld, \"capability_p50\": %lld, "
+                            "\"capability_p75\": %lld, \"capability_p90\": %lld, \"capability_p95\": %lld, "
+                            "\"capability_p99\": %lld, \"capability_max\": %lld, \"seed_p90_median\": %lld, "
+                            "\"alarm_p10\": %d, \"alarm_p25\": %d, \"alarm_p50\": %d, \"alarm_p75\": %d, \"alarm_p90\": %d, "
+                            "\"saturated_share\": %.4f, \"zero_share\": %.4f, \"histogram\": [",
+                         static_cast<long long>(face.a_reference), static_cast<long long>(face.a_reads),
+                         static_cast<long long>(face.a_cap[0]), static_cast<long long>(face.a_cap[1]),
+                         static_cast<long long>(face.a_cap[2]), static_cast<long long>(face.a_cap[3]),
+                         static_cast<long long>(face.a_cap[4]), static_cast<long long>(face.a_cap[5]),
+                         static_cast<long long>(face.a_cap[6]), static_cast<long long>(face.a_cap[7]),
+                         static_cast<long long>(face.a_seed_p90_median),
+                         face.a_alarm[0], face.a_alarm[1], face.a_alarm[2], face.a_alarm[3], face.a_alarm[4],
+                         face.a_saturated_share, face.a_zero_share);
+            for (int b = 0; b < 12; ++b)
+                std::fprintf(f, "%s%lld", b ? ", " : "", static_cast<long long>(face.a_hist[b]));
+            std::fprintf(f, "], \"close_near_pairs\": %lld, \"close_near_pairs_saturated\": %lld},\n",
+                         static_cast<long long>(face.a_close_pairs), static_cast<long long>(face.a_close_saturated));
             std::fprintf(f, "  \"strategies\": {\"classifier\": \"per-mille lean rank among living cultured polities, top third\", "
                             "\"top_third_rank_q\": %d, \"seeds_measured\": %lld, \"treasury_top_has_consolidator\": %lld, "
                             "\"treasury_top_has_expansionist\": %lld, \"treasury_top_has_both\": %lld, "
@@ -2451,7 +3300,14 @@ int main(int argc, char** argv)
                          static_cast<long long>(face.r11_zero_pairs));
             put_d("cross_landmass_share", face.r11_volume > 0,
                   face.r11_volume > 0 ? static_cast<double>(face.r11_cross) / static_cast<double>(face.r11_volume) : 0.0, ", ");
-            put_d("top_decile_share", face.r11_volume > 0 && face.r11_pairs > 0, face.r11_top_decile_share, "}\n");
+            put_d("top_decile_share", face.r11_volume > 0 && face.r11_pairs > 0, face.r11_top_decile_share, "},\n");
+            // BL-1028: the weakness counters pooled per half.
+            std::fprintf(f, "  \"weakness\": {\"half_a\": ");
+            put_weak(face.w_pooled[0], true, face.w_have_median[0], face.w_median_ratio[0],
+                     face.w_seeds_with_ratio[0], face.w_seeds[0], face.w_have_b ? ",\n   \"half_b\": " : "}\n");
+            if (face.w_have_b)
+                put_weak(face.w_pooled[1], true, face.w_have_median[1], face.w_median_ratio[1],
+                         face.w_seeds_with_ratio[1], face.w_seeds[1], "}\n");
             std::fprintf(f, " },\n");
 
             // --- one row per seed -------------------------------------------
@@ -2513,6 +3369,38 @@ int main(int argc, char** argv)
                                  static_cast<long long>(r.rim_holders_ever), static_cast<long long>(r.rim_holders_alive),
                                  static_cast<long long>(r.wants_total), static_cast<long long>(r.wants_outward),
                                  static_cast<long long>(r.wants_frontier));
+                }
+                // BL-1019: this seed's first contact over the traced run, the
+                // geography at 1200, and the unmet candidate's contest.
+                std::fprintf(f, "   \"first_contacts\": {\"crossings\": %lld, \"inherited\": %lld, \"met_pairs_1660\": %lld, "
+                                "\"polities_1200\": %lld, \"pairs_1200\": %lld, \"unmet_pairs_1200\": %lld, "
+                                "\"unmet_touching_1200\": %lld, \"unmet_touching_cross_mass_1200\": %lld, "
+                                "\"landmasses_with_polity_1200\": %lld, \"unmet_cleared_rounds\": %lld, "
+                                "\"unmet_won\": %lld, \"unmet_lost_to_near\": %lld, \"unmet_lost_to_met\": %lld, "
+                                "\"unmet_lost_to_verb\": %lld, \"unmet_lost_margin_sum\": %lld},\n",
+                             static_cast<long long>(r.contacts_raised[0]), static_cast<long long>(r.contacts_raised[1]),
+                             static_cast<long long>(r.far_pairs), static_cast<long long>(r.polities_1200),
+                             static_cast<long long>(r.pairs_1200), static_cast<long long>(r.unmet_pairs_1200),
+                             static_cast<long long>(r.unmet_touching_1200),
+                             static_cast<long long>(r.unmet_touching_cross_mass_1200),
+                             static_cast<long long>(r.landmasses_with_polity_1200),
+                             static_cast<long long>(r.unmet_contest[0]), static_cast<long long>(r.unmet_contest[1]),
+                             static_cast<long long>(r.unmet_contest[2]), static_cast<long long>(r.unmet_contest[3]),
+                             static_cast<long long>(r.unmet_contest[4]), static_cast<long long>(r.unmet_margin_sum));
+                // BL-1018: this seed's own alarm read (whole traced run).
+                {
+                    const std::vector<int64_t>& v = r.near_capability;
+                    const auto pct = [&](int p) -> long long {
+                        return v.empty() ? 0 : static_cast<long long>(v[(v.size() - 1) * static_cast<std::size_t>(p) / 100]);
+                    };
+                    int64_t sat = 0;
+                    for (int64_t c : v)
+                        if (std::max<int64_t>(0, c) * 1000 / std::max<int64_t>(1, r.capability_reference) >= 1000) ++sat;
+                    std::fprintf(f, "   \"alarm_reads\": %zu, \"capability_p50\": %lld, \"capability_p90\": %lld, "
+                                    "\"alarm_saturated_share\": %.4f, \"near_pairs_saturated_1660\": %lld,\n",
+                                 v.size(), pct(50), pct(90),
+                                 v.empty() ? 0.0 : static_cast<double>(sat) / static_cast<double>(v.size()),
+                                 static_cast<long long>(r.near_pairs_saturated));
                 }
                 // reading 3
                 std::fprintf(f, "   \"strength_measured\": %s, \"treasury_top_has_consolidator\": %s, "
@@ -2647,6 +3535,15 @@ int main(int argc, char** argv)
                                  (long long)r.regions_1200, (long long)r.alive_1200);
                     put_cost("to_1660", r.to_1660, ",\n    ");
                     put_cost("to_through", r.to_through, "}");
+                }
+                // BL-1028: the weakness counters, per half (method: the
+                // console section's comment).
+                std::fprintf(f, ",\n   \"weakness\": {\"half_a\": ");
+                put_weak(r.weak_a, false, false, 0.0, 0, 0, r.weak_have_b ? ",\n    \"half_b\": " : "}");
+                if (r.weak_have_b)
+                {
+                    put_weak(r.weak_b, false, false, 0.0, 0, 0, ", ");
+                    std::fprintf(f, "\"prefix_check_ok\": %s}", r.weak_prefix_ok ? "true" : "false");
                 }
                 std::fprintf(f, "}%s\n", sep);
             }
