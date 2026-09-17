@@ -72,6 +72,29 @@
     "tools/verify/digitisation_sim_harness.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-889",
+   "title": "CALL: a charter budget cannot raise a body's firm count above Pass 6's breadth cap — which ruling gives way?",
+   "raised": "2026-09-17",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1032 (charter budget seam), its lane's novelty flag and cold review, on seed 0 with a synthetic budget (test input only).",
+   "what": "TWO RULINGS MEET. CORPORATION_GENERATION.md Pass 6 (Ben, 2026-09-06): density IS the per-resource firm cap — a body holds at most 8 firms per demanded good, so the count is exactly specialists + 8 x goods with demand. DIGITISATION.md § 1 (Ben, 2026-09-15/17): on a Digitisation world the budget decides how many firms stand where, and breadth only decides which goods.\nWHAT THE SEAM SHOWS. The budget path keeps Pass 6's gap selection and its cap, so the cap still binds. Seed 0: the legacy landscape lays 81 background firms. A synthetic budget at 1x (87 points) charters 2 specialists and 79 firms and spends everything; at 4x (348 points) it charters 11 specialists and 81 firms and leaves 219 points unspent as no_gap across 204 centres. So a richer world moves firms toward its cities and adds specialists, but cannot make a body denser than breadth x 8.\nOPTIONS. (a) Keep the cap: capital beyond breadth x 8 stays unspent, and density follows cities only in where firms stand, not how many there are. (b) Lift the per-resource cap on a budget world only: capital decides the count, bounded by the 200-per-body anti-runaway and by what each market can absorb. (c) Scale the cap with the body's charter capital. (b) and (c) amend the 2026-09-06 ruling for Digitisation worlds, and raise the live tick cost BL-1033 measures.\n\nREADINGS TAKEN ON YOUR BEHALF in the seam (reversible, none moves today's world): rung 2 of a charter's anchor is its centre's own region, not BL-283's home-plus-three; a specialist that finds no ground in either window is not chartered and its price is counted unspent (no asset-light specialist); a firm that fails to place ends that centre's firm spend; only a firm's anchor is held to the window — its other holdings walk outward as Pass 3 lays them, now reported by distance; the synthetic test budget weighs centres by a seeded 1/rank law so that a 1x budget can afford any specialist at all (population is never read).",
+   "why_it_matters": "BL-1033 (charter budget cost) measures tick cost at 1x/2x/4x. Under (a) the 4x world is barely denser than 1x and the cost reading understates what Beat 1 could ask for; under (b) or (c) the measurement must lift the cap to mean anything. Better ruled before BL-1033 runs.",
+   "options": [
+    "(a) keep the per-resource cap on budget worlds; capital beyond it stays unspent",
+    "(b) lift the per-resource cap on budget worlds; the 200-per-body cap and market absorption bound density",
+    "(c) scale the cap with the body's charter capital"
+   ],
+   "recommendation": "Measure (a) and (b) side by side in BL-1033 before ruling: the cost sweep already runs the province cap on and off, and the per-resource cap is the same kind of switch. Rule after reading tick cost and unspent points at 4x under both.",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "docs/generation/CORPORATION_GENERATION.md",
+    "docs/generation/DIGITISATION.md",
+    "tools/verify/player_seed_sweep.cpp"
+   ],
+   "resolution": null
   }
  ]
 }
