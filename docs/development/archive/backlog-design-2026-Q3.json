@@ -18604,6 +18604,50 @@
         "design",
         "resolved"
       ]
+    },
+    "BL-1027": {
+      "glyph": "✓",
+      "sprint": "43",
+      "written": "2026-09-17",
+      "author": "Ben (2026-09-17, cutting the Digitisation build plan: elicitation form); Claude (item text, from a seven-lane read of the engine with an adversarial cross-check)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "priority": "A",
+      "status": "complete",
+      "requires": [
+        "BL-1026"
+      ],
+      "id": "BL-1027",
+      "short_name": "SPAN_COST_TO_1960",
+      "difficulty": 2,
+      "title": "What 300 more years cost: exploration_sweep runs the shipped world through 1960 and times each span half per seed",
+      "authority_doc": "docs/generation/DIGITISATION.md",
+      "files": [
+        "tools/verify/exploration_sweep.cpp"
+      ],
+      "design": "DELIVERED 2026-09-17 (sprint 43). exploration_sweep gained --through <year> and --cost. The 16 library seeds ran through 1960 in 399 s (Release, build_gen/verify, quiet machine); the table is checked in as exploration_sweep_1960.json at the repo root.\n\nPREFIX HOLDS, MEASURED: on every seed the untraced run stopped at 1660 reproduces the library fingerprint taken from a default (1660) generation — battles and living polities, 16 of 16. Continuing the Exploration call to 1960 leaves 1200 -> 1660 untouched. The cost run to 1960 reproduces generation's own counts on every seed (structural check PASS).\n\nCOST: the 1660 -> 1960 half costs a median 1,918 ms a seed (min 193, seed 28; max 14,868, seed 31), 46.4 s over 16 seeds — LESS than the 460-year Exploration half before it (median 2,094 ms, 54.3 s total). Regions grow 7-28% over the half (seed 11: 2,468 -> 3,147). Decision rounds dominate; reach (the Dijkstra rebuild) is only 2-17% of sim time on the shipped world. At Exploration's 4-year band the span is affordable.\n\nTHE STRETCHED WORLD WINDS DOWN (an inherited finding, for the sprint 43 gate): conquests per century fall in the later half on all 16 seeds and battles per century on all 16 (seed 28 barely: 39.3 -> 39.0); four seeds nearly stop conquering (12: 0.33, 41: 0.00, 38: 0.67, 9: 1.33 a century). Exploration-tree nodes held per living polity stall on three seeds (28, 12, 10) and grow elsewhere (seed 46: 8.8 -> 16.5 of 31); rim holders grow on 12 seeds.\n\n--- THE ORIGINAL ITEM ---\n\nWHY. DIGITISATION.md § Open questions asks whether 300 years on the shared engine is affordable at Exploration's region counts, and no measured figure exists: the only Release numbers are ~6.2 s/seed to 1660 (2026-09-14, before BL-1007) and 38.6 s/seed for a full world plus an Empires re-run. The cost lane's estimate of 1-4 s/seed for 1660 -> 1960 is inference.\n\nWHAT \"THROUGH 1960\" MEANS, AND WHAT IT IS NOT. `world_params::exploration_stop_year = 1960` with `epoch_year` left at 0: the shipped world, with Exploration's own call running on to 1960 (190 rounds at its 4-year band). NEVER `epoch_year = 1960`, which selects the superseded 1160 -> 1560 -> 1960 two-span arc with Exploration off (era_minus_one.cpp:25-35, 365-370; DIGITISATION.md, opening: a 1960 epoch names a calendar). The extended span runs Exploration's forces only, with the Empires-round overrides off (era_minus_one.cpp:372-405); the face says so on every run.\n\nTHE WORK. exploration_sweep gains `--through <year>` (default 1660): generation and the traced acceptance re-run both stop there, so the existing acceptance check still holds the re-run to generation. A cost pass per seed times UNTRACED re-runs from the fixture to 1660 and to --through, and prints wall ms for each, the history_sim_last_profile split (demography, decisions, battles, reach), decision rounds, reach rebuilds, and regions and living polities at 1200, 1660 and 1960. The 1660 -> 1960 cost is the difference, labelled as such. A saturation line per half — battles and conquests per century, exploration tree nodes held — says whether the stretched world is still moving, so a frozen 1960 world reads as an inherited finding, not a Digitisation result.\n\nDONE WHEN. A per-seed table over the sixteen library seeds, written to --out; the acceptance check green at --through 1960 on every seed; a stated wall-clock budget per seed for the span, quoted with the build tree.\n\nRUN CONDITIONS (sprint 43, all items): one lane, serial, in the main session; Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify, never %TEMP%; timings on a quiet machine with the build tree quoted; never write over a tracked sweep artefact (use --out). No item in this sprint changes a shipped world.",
+      "resolved": "2026-09-17",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "priority",
+        "status",
+        "requires",
+        "id",
+        "short_name",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved"
+      ]
     }
   }
 }

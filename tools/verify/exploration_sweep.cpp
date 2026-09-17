@@ -45,6 +45,15 @@
 //                  name. The library's fingerprints are read from
 //                  `--seeds <library> --out seed_library_sweep.json`
 //                  (`node tools/session/seed_library.js --seed-list` prints it).
+//   --through Y    BL-1027: run the Exploration call on to year Y instead of 1660
+//                  (world_params::exploration_stop_year; epoch_year stays 0, so
+//                  this is the shipped world continued, never the superseded
+//                  two-span arc). Every reading then describes the close at Y,
+//                  field names ending _1660 included. Without --out, a run past
+//                  1660 writes exploration_sweep.through.json, never the table.
+//   --cost         BL-1027: time two UNTRACED re-runs per seed from the fixture,
+//                  to 1660 and to --through, with the sim's profile split, and
+//                  report the 1660 -> Y half as their difference.
 //
 // Writes: exploration_sweep.json in the working directory (BL-971) — one row
 // per seed over all eleven readings plus the spread face, checked in at the
@@ -76,6 +85,7 @@
 #include "scripting/lua_state.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -188,6 +198,26 @@ struct exploration_row
     int64_t ambiguous_battles = 0; ///< defender id 0 — unowned ground or polity 0, indistinguishable (see note below).
 
     bool traced_matches_untraced = false; ///< The acceptance check: re-run reproduces battles/conquests/foundings bit for bit.
+
+    // --- BL-1027: the span's cost, when --cost ran ---------------------------
+    /// One untraced re-run from the fixture, stopped at a given year: its wall
+    /// clock, the sim's own profile split, and what the world looked like at
+    /// the stop. Every counter is cumulative from 1200.
+    struct span_cost
+    {
+        int64_t wall_ms = 0;
+        int64_t ns_demography = 0, ns_decisions = 0, ns_battles = 0, ns_reach = 0;
+        int64_t decision_rounds = 0, reach_rebuilds = 0;
+        int64_t battles = 0, conquests = 0, foundings = 0;
+        int64_t regions = 0, alive = 0, rim_holders = 0;
+        double  mean_exploration_nodes = 0.0; ///< Exploration-tree nodes held, per living polity.
+    };
+    bool      cost_ran        = false;
+    bool      cost_reproduces = false; ///< The untraced run to --through reproduces generation's counts.
+    int64_t   regions_1200    = 0;
+    int64_t   alive_1200      = 0;
+    span_cost to_1660;
+    span_cost to_through;
 
     /// BL-932 DIAGNOSTIC (not yet reading 8's formal row — that is BL-940's,
     /// once throughput exists too): (capital treasury, corridors touching
@@ -443,6 +473,8 @@ int main(int argc, char** argv)
     int seed_count = 8;
     std::vector<uint32_t> seed_list; // BL-1026: --seeds; empty means 0..seed_count-1.
     std::string out_path;            // BL-1026: --out; empty means the default name.
+    int64_t through_year = 1660;     // BL-1027: --through; the Exploration call's stop.
+    bool    run_cost     = false;    // BL-1027: --cost.
     bool want_override = false;
     int  want_override_q = 0;
     std::vector<std::pair<std::string, long long>> param_sets;
@@ -467,6 +499,17 @@ int main(int argc, char** argv)
         if (std::strcmp(argv[a], "--out") == 0 && a + 1 < argc)
         {
             out_path = argv[++a];
+            continue;
+        }
+        if (std::strcmp(argv[a], "--through") == 0 && a + 1 < argc)
+        {
+            through_year = std::atoll(argv[++a]);
+            if (through_year <= 1200) { std::printf("--through must be after 1200\n"); std::exit(2); }
+            continue;
+        }
+        if (std::strcmp(argv[a], "--cost") == 0)
+        {
+            run_cost = true;
             continue;
         }
         if (std::strcmp(argv[a], "--set") == 0 && a + 1 < argc)
@@ -511,7 +554,14 @@ int main(int argc, char** argv)
         std::printf("NOTE: --w_want_q=%d overrides the traced re-run's want lean (tuning only).\n",
                     want_override_q);
 
-    std::printf("=== exploration sweep (BL-937) - %d seeds, 1200 -> 1660 CE ===\n\n", seed_count);
+    std::printf("=== exploration sweep (BL-937) - %d seeds, 1200 -> %lld CE ===\n\n", seed_count,
+                static_cast<long long>(through_year));
+    if (through_year != 1660)
+        std::printf("NOTE: --through %lld runs the SHIPPED world (epoch 0) with Exploration's own call continued\n"
+                    "      past 1660. It runs Exploration's forces only, with the Empires-round overrides off\n"
+                    "      (era_minus_one.cpp exploration_sim_params). Every reading below describes the close\n"
+                    "      at %lld, including those whose names say 1660.\n\n",
+                    static_cast<long long>(through_year), static_cast<long long>(through_year));
 
     std::vector<exploration_row> rows;
     rows.reserve(static_cast<std::size_t>(seed_count));
@@ -522,6 +572,7 @@ int main(int argc, char** argv)
         world_params wp;
         wp.seed = seed;
         wp.exploration_sim_enabled = true; // BL-937: the whole point of this sweep.
+        wp.exploration_stop_year   = through_year; // BL-1027: 1660 unless --through.
 
         generation_report     rep;
         era_minus_one_fixture fx;
@@ -1065,8 +1116,124 @@ int main(int argc, char** argv)
             }
         }
 
+        // --- BL-1027: THE SPAN'S COST ----------------------------------------
+        // Two UNTRACED re-runs from the fixture, one stopped at 1660 and one at
+        // --through, so the later half is the difference of two clocks on the
+        // same world. Untraced because generation never pays for tracing, and
+        // built exactly as the traced re-run above is, minus the trace.
+        if (run_cost)
+        {
+            const auto run_to = [&](int64_t stop) {
+                history_sim_params hp = fx.exploration_params;
+                hp.stop_year        = stop;
+                hp.tick_bands[0]    = {stop, fx.exploration_params.tick_bands[0].step_years};
+                hp.tick_band_count  = 1;
+                hp.trace_battles    = false;
+                hp.resume_polities  = &fx.pre_exploration_polities;
+                hp.resume_grudges   = &fx.pre_exploration_grudges;
+                hp.resume_contacts  = &fx.pre_exploration_contacts;
+                hp.resume_corridors = &fx.pre_exploration_corridors;
+                settlement_state ss = fx.pre_exploration_settlement;
+                creed_state      cs = fx.pre_exploration_creeds;
+                const auto t0 = std::chrono::steady_clock::now();
+                const history_sim_state st = run_history_sim(
+                    ss, &cs, fx.terrain.view(), fx.gw, fx.gh, hp,
+                    fx.exploration_seed, /*year_progress=*/nullptr, fx.works, /*tap=*/nullptr);
+                const auto t1 = std::chrono::steady_clock::now();
+
+                exploration_row::span_cost c;
+                c.wall_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+                const history_sim_profile& pr = history_sim_last_profile();
+                c.ns_demography   = pr.ns_demography;
+                c.ns_decisions    = pr.ns_decisions;
+                c.ns_battles      = pr.ns_battles;
+                c.ns_reach        = pr.ns_reach;
+                c.decision_rounds = pr.decision_rounds;
+                c.reach_rebuilds  = pr.reach_rebuilds;
+                c.battles   = st.battles;
+                c.conquests = st.conquests;
+                c.foundings = st.foundings;
+                c.regions   = static_cast<int64_t>(ss.regions.size());
+                int64_t nodes = 0;
+                for (const polity& q : st.polities)
+                {
+                    if (!q.alive) continue;
+                    ++c.alive;
+                    for (uint64_t m = q.exploration_mask; m != 0; m &= m - 1) ++nodes;
+                    if (polity_holds_exploration_rim(q)) ++c.rim_holders;
+                }
+                c.mean_exploration_nodes = c.alive > 0 ? static_cast<double>(nodes) / static_cast<double>(c.alive) : 0.0;
+                return c;
+            };
+            row.cost_ran   = true;
+            row.to_1660    = run_to(1660);
+            row.to_through = run_to(through_year);
+            row.cost_reproduces = row.to_through.battles   == fx.exploration_state.battles
+                               && row.to_through.conquests == fx.exploration_state.conquests
+                               && row.to_through.foundings == fx.exploration_state.foundings;
+            row.regions_1200 = static_cast<int64_t>(fx.pre_exploration_settlement.regions.size());
+            for (const polity& q : fx.pre_exploration_polities) if (q.alive) ++row.alive_1200;
+        }
+
         row.ok = true;
         rows.push_back(row);
+    }
+
+    // -----------------------------------------------------------------------
+    // BL-1027 — THE SPAN'S COST, per seed. Wall clock on whatever build ran
+    // this; the build type is printed because a Debug figure is 12-80x a
+    // Release one and means nothing quoted alone.
+    // -----------------------------------------------------------------------
+    if (run_cost)
+    {
+#ifdef NDEBUG
+        const char* build_kind = "Release (NDEBUG)";
+#else
+        const char* build_kind = "DEBUG - these timings are meaningless";
+#endif
+        const long long T = static_cast<long long>(through_year);
+        std::printf("\n--- span cost (BL-1027), %s, two untraced re-runs per seed ---\n", build_kind);
+        std::printf("  Half A = 1200 -> 1660; half B = 1660 -> %lld, the difference of the two runs.\n", T);
+        std::printf("  seed | regions 1200/1660/%lld | alive 1200/1660/%lld | A ms (rounds, rebuilds, reach%%) | B ms (rounds, rebuilds, reach%%)"
+                    " | battles/century A B | conquests/century A B | expl nodes held A B | rim holders A B\n", T, T);
+        const double years_a = 460.0, years_b = static_cast<double>(through_year - 1660);
+        std::vector<int64_t> ms_a, ms_b;
+        for (const exploration_row& r : rows)
+        {
+            if (!r.cost_ran) continue;
+            const exploration_row::span_cost& a = r.to_1660;
+            const exploration_row::span_cost& t = r.to_through;
+            const int64_t b_ms = t.wall_ms - a.wall_ms;
+            const auto pct = [](int64_t part, int64_t whole) { return whole > 0 ? 100.0 * part / whole : 0.0; };
+            const double b_battles = years_b > 0 ? 100.0 * (t.battles - a.battles) / years_b : 0.0;
+            const double b_conq    = years_b > 0 ? 100.0 * (t.conquests - a.conquests) / years_b : 0.0;
+            std::printf("  %4u | %lld/%lld/%lld | %lld/%lld/%lld | %lld (%lld, %lld, %.0f%%) | %lld (%lld, %lld, %.0f%%)"
+                        " | %.1f %.1f | %.2f %.2f | %.1f %.1f | %lld %lld%s\n",
+                        r.seed,
+                        (long long)r.regions_1200, (long long)a.regions, (long long)t.regions,
+                        (long long)r.alive_1200, (long long)a.alive, (long long)t.alive,
+                        (long long)a.wall_ms, (long long)a.decision_rounds, (long long)a.reach_rebuilds,
+                        pct(a.ns_reach, a.ns_demography + a.ns_decisions),
+                        (long long)b_ms, (long long)(t.decision_rounds - a.decision_rounds),
+                        (long long)(t.reach_rebuilds - a.reach_rebuilds),
+                        pct(t.ns_reach - a.ns_reach, (t.ns_demography + t.ns_decisions) - (a.ns_demography + a.ns_decisions)),
+                        100.0 * a.battles / years_a, b_battles, 100.0 * a.conquests / years_a, b_conq,
+                        a.mean_exploration_nodes, t.mean_exploration_nodes,
+                        (long long)a.rim_holders, (long long)t.rim_holders,
+                        r.cost_reproduces ? "" : "  [DOES NOT REPRODUCE GENERATION]");
+            ms_a.push_back(a.wall_ms);
+            ms_b.push_back(b_ms);
+        }
+        const auto summary = [](const char* label, std::vector<int64_t> v) {
+            if (v.empty()) return;
+            std::sort(v.begin(), v.end());
+            int64_t sum = 0;
+            for (int64_t x : v) sum += x;
+            std::printf("  %s: median %lld ms, min %lld, max %lld, total %lld ms over %zu seeds\n", label,
+                        (long long)v[v.size() / 2], (long long)v.front(), (long long)v.back(), (long long)sum, v.size());
+        };
+        summary("half A (1200 -> 1660)", ms_a);
+        summary("half B (1660 -> through)", ms_b);
     }
 
     // -----------------------------------------------------------------------
@@ -1082,6 +1249,14 @@ int main(int argc, char** argv)
         if (r.ok && !r.traced_matches_untraced) all_traces_match = false;
     check(all_traces_match,
         "traced re-run reproduces generation's own (untraced) battles/conquests/foundings, every ran seed");
+    if (run_cost)
+    {
+        bool all_cost_reproduce = true;
+        for (const exploration_row& r : rows)
+            if (r.ok && r.cost_ran && !r.cost_reproduces) all_cost_reproduce = false;
+        check(all_cost_reproduce,
+            "BL-1027: the untraced cost run to --through reproduces generation's own counts, every ran seed");
+    }
 
     // -----------------------------------------------------------------------
     // THE SPREAD FACE (BL-971). Every aggregate a section prints is ALSO
@@ -2087,7 +2262,9 @@ int main(int argc, char** argv)
     // -----------------------------------------------------------------------
     {
         const char* json_path = !out_path.empty() ? out_path.c_str()
-                              : want_override ? "exploration_sweep.tuning.json" : "exploration_sweep.json";
+                              : want_override ? "exploration_sweep.tuning.json"
+                              : through_year != 1660 ? "exploration_sweep.through.json"
+                              : "exploration_sweep.json";
         FILE* f = std::fopen(json_path, "w");
         if (!f)
         {
@@ -2137,8 +2314,8 @@ int main(int argc, char** argv)
                             "console prints. Displacement is read pooled (the verdict), volume-weighted and "
                             "as a median; a seed under silent_floor_battles traced battles is SILENT and "
                             "carries no verdict.\",\n");
-            std::fprintf(f, " \"seed_count\": %d,\n \"deterrence_alarm_weight_q\": %d,\n \"overrides\": [",
-                         seed_count, history_sim_params{}.deterrence_alarm_weight_q);
+            std::fprintf(f, " \"seed_count\": %d,\n \"through_year\": %lld,\n \"deterrence_alarm_weight_q\": %d,\n \"overrides\": [",
+                         seed_count, static_cast<long long>(through_year), history_sim_params{}.deterrence_alarm_weight_q);
             {
                 bool first = true;
                 if (want_override && want_override_q >= 0)
@@ -2443,13 +2620,35 @@ int main(int argc, char** argv)
                     for (int64_t v : r.pair_volume) if (v > 0) ++with_flow;
                     std::fprintf(f, "   \"flows\": %lld, \"flow_volume\": %lld, \"cross_landmass_volume\": %lld, "
                                     "\"unknown_landmass_volume\": %lld, \"flows_without_clause\": %lld, "
-                                    "\"trade_access_pairs\": %lld, \"pairs_with_flow\": %lld}%s\n",
+                                    "\"trade_access_pairs\": %lld, \"pairs_with_flow\": %lld",
                                  static_cast<long long>(r.flow_count), static_cast<long long>(r.flow_volume),
                                  static_cast<long long>(r.cross_landmass_volume),
                                  static_cast<long long>(r.unknown_landmass_volume),
                                  static_cast<long long>(r.flows_without_clause),
-                                 static_cast<long long>(r.trade_bound_pairs), static_cast<long long>(with_flow), sep);
+                                 static_cast<long long>(r.trade_bound_pairs), static_cast<long long>(with_flow));
                 }
+                // BL-1027: the span's cost, cumulative from 1200 at each stop.
+                if (r.cost_ran)
+                {
+                    const auto put_cost = [&](const char* key, const exploration_row::span_cost& c, const char* tail) {
+                        std::fprintf(f, "\"%s\": {\"wall_ms\": %lld, \"ns_demography\": %lld, \"ns_decisions\": %lld, "
+                                        "\"ns_battles\": %lld, \"ns_reach\": %lld, \"decision_rounds\": %lld, "
+                                        "\"reach_rebuilds\": %lld, \"battles\": %lld, \"conquests\": %lld, "
+                                        "\"foundings\": %lld, \"regions\": %lld, \"alive\": %lld, "
+                                        "\"rim_holders\": %lld, \"mean_exploration_nodes\": %.3f}%s",
+                                     key, (long long)c.wall_ms, (long long)c.ns_demography, (long long)c.ns_decisions,
+                                     (long long)c.ns_battles, (long long)c.ns_reach, (long long)c.decision_rounds,
+                                     (long long)c.reach_rebuilds, (long long)c.battles, (long long)c.conquests,
+                                     (long long)c.foundings, (long long)c.regions, (long long)c.alive,
+                                     (long long)c.rim_holders, c.mean_exploration_nodes, tail);
+                    };
+                    std::fprintf(f, ",\n   \"cost\": {\"reproduces_generation\": %s, \"regions_1200\": %lld, \"alive_1200\": %lld,\n    ",
+                                 r.cost_reproduces ? "true" : "false",
+                                 (long long)r.regions_1200, (long long)r.alive_1200);
+                    put_cost("to_1660", r.to_1660, ",\n    ");
+                    put_cost("to_through", r.to_through, "}");
+                }
+                std::fprintf(f, "}%s\n", sep);
             }
             std::fprintf(f, " ]\n}\n");
             std::fclose(f);

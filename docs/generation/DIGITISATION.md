@@ -588,7 +588,10 @@ the failure mode (`EXPLORATION.md` § Spend is estimated at the end, not accumul
 
 Measured rather than argued:
 
-- **Whether 300 years on the shared engine is affordable** at the region counts Exploration leaves.
+- **Whether 300 years stays affordable once mechanism is added.** On Exploration's forces alone, at
+  its 4-year band, the span costs less than the 460 years before it: a median 1.9 s a seed in
+  Release across the library, at most 14.9 s (BL-1027, span cost to 1960). Migration and war that
+  kills add per-round work that measurement does not yet include.
 - **Where the migration pull saturates** — a stream that never stops empties the countryside.
 - **How dense the treaty graph must be for a world war to be "not unlikely"** without being
   certain.

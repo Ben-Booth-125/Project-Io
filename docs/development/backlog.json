@@ -23,29 +23,6 @@
    "priority": "A",
    "status": "designed",
    "requires": [
-    "BL-1026"
-   ],
-   "id": "BL-1027",
-   "short_name": "SPAN_COST_TO_1960",
-   "difficulty": 2,
-   "title": "What 300 more years cost: exploration_sweep runs the shipped world through 1960 and times each span half per seed",
-   "authority_doc": "docs/generation/DIGITISATION.md",
-   "files": [
-    "tools/verify/exploration_sweep.cpp"
-   ],
-   "design": "WHY. DIGITISATION.md § Open questions asks whether 300 years on the shared engine is affordable at Exploration's region counts, and no measured figure exists: the only Release numbers are ~6.2 s/seed to 1660 (2026-09-14, before BL-1007) and 38.6 s/seed for a full world plus an Empires re-run. The cost lane's estimate of 1-4 s/seed for 1660 -> 1960 is inference.\n\nWHAT \"THROUGH 1960\" MEANS, AND WHAT IT IS NOT. `world_params::exploration_stop_year = 1960` with `epoch_year` left at 0: the shipped world, with Exploration's own call running on to 1960 (190 rounds at its 4-year band). NEVER `epoch_year = 1960`, which selects the superseded 1160 -> 1560 -> 1960 two-span arc with Exploration off (era_minus_one.cpp:25-35, 365-370; DIGITISATION.md, opening: a 1960 epoch names a calendar). The extended span runs Exploration's forces only, with the Empires-round overrides off (era_minus_one.cpp:372-405); the face says so on every run.\n\nTHE WORK. exploration_sweep gains `--through <year>` (default 1660): generation and the traced acceptance re-run both stop there, so the existing acceptance check still holds the re-run to generation. A cost pass per seed times UNTRACED re-runs from the fixture to 1660 and to --through, and prints wall ms for each, the history_sim_last_profile split (demography, decisions, battles, reach), decision rounds, reach rebuilds, and regions and living polities at 1200, 1660 and 1960. The 1660 -> 1960 cost is the difference, labelled as such. A saturation line per half — battles and conquests per century, exploration tree nodes held — says whether the stretched world is still moving, so a frozen 1960 world reads as an inherited finding, not a Digitisation result.\n\nDONE WHEN. A per-seed table over the sixteen library seeds, written to --out; the acceptance check green at --through 1960 on every seed; a stated wall-clock budget per seed for the span, quoted with the build tree.\n\nRUN CONDITIONS (sprint 43, all items): one lane, serial, in the main session; Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify, never %TEMP%; timings on a quiet machine with the build tree quoted; never write over a tracked sweep artefact (use --out). No item in this sprint changes a shipped world."
-  },
-  {
-   "glyph": "✓",
-   "sprint": "43",
-   "written": "2026-09-17",
-   "author": "Ben (2026-09-17, cutting the Digitisation build plan: elicitation form); Claude (item text, from a seven-lane read of the engine with an adversarial cross-check)",
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "priority": "A",
-   "status": "designed",
-   "requires": [
     "BL-1027"
    ],
    "id": "BL-1028",
