@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*2 entries — 2 open, 0 resolved.*
+*3 entries — 3 open, 0 resolved.*
 
 ---
 
@@ -71,6 +71,20 @@ UPDATE 2026-09-17 (Ben, elicitation): measure first. BL-1033 runs the per-resour
 > **Recommendation:** Measure (a) and (b) side by side in BL-1033 before ruling: the cost sweep already runs the province cap on and off, and the per-resource cap is the same kind of switch. Rule after reading tick cost and unspent points at 4x under both.
 
 *Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`, `docs/generation/DIGITISATION.md`, `tools/verify/player_seed_sweep.cpp`*
+
+### NR-890 — NOVEL: a copied world ticks differently from its original — filed as BL-1034, not scheduled
+*novel-work · raised 2026-09-17 · from BL-1033 lane and its cold review (sprint 44).*
+
+A determinism defect no sprint owns: on seed 28 a world copied before or after the landscape settles to D_settle 18F78EB9B2B20F29 instead of the pinned 265C48A23E313B1A. Shipped worlds are unaffected today (the search copies but never ticks a copy). Filed as BL-1034 (world copy ticks diverge) with a reproduction-first plan; sprint 44 works around it by never copying a world before ticking.
+
+**Why it matters.** Determinism is a standing rule, and the defect is latent: the first feature that previews or branches a world by copying it will diverge silently. It is not in sprint 44's goal, so scheduling it is your call.
+
+- Schedule BL-1034 into sprint 45 ahead of Beat 1
+- Leave it filed until a feature needs a ticking copy
+
+> **Recommendation:** Schedule it early in sprint 45: Beat 1 and the wizard's time-lapse round are the likeliest first features to copy a world.
+
+*Files: `src/world/world.hpp`, `tools/verify/harness_params.hpp`*
 
 ---
 

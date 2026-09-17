@@ -95,6 +95,26 @@
     "tools/verify/player_seed_sweep.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-890",
+   "title": "NOVEL: a copied world ticks differently from its original — filed as BL-1034, not scheduled",
+   "raised": "2026-09-17",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "BL-1033 lane and its cold review (sprint 44).",
+   "what": "A determinism defect no sprint owns: on seed 28 a world copied before or after the landscape settles to D_settle 18F78EB9B2B20F29 instead of the pinned 265C48A23E313B1A. Shipped worlds are unaffected today (the search copies but never ticks a copy). Filed as BL-1034 (world copy ticks diverge) with a reproduction-first plan; sprint 44 works around it by never copying a world before ticking.",
+   "why_it_matters": "Determinism is a standing rule, and the defect is latent: the first feature that previews or branches a world by copying it will diverge silently. It is not in sprint 44's goal, so scheduling it is your call.",
+   "options": [
+    "Schedule BL-1034 into sprint 45 ahead of Beat 1",
+    "Leave it filed until a feature needs a ticking copy"
+   ],
+   "recommendation": "Schedule it early in sprint 45: Beat 1 and the wizard's time-lapse round are the likeliest first features to copy a world.",
+   "files": [
+    "src/world/world.hpp",
+    "tools/verify/harness_params.hpp"
+   ],
+   "resolution": null
   }
  ]
 }

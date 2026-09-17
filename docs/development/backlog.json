@@ -65,6 +65,29 @@
     "src/world/corporation_generation.cpp"
    ],
    "design": "AMENDED 2026-09-17 (Ben, NR-889: measure first): the sweep also runs the per-resource firm cap KEPT and LIFTED on budget worlds. That needs a budget-path-only switch in charter_spend_params (e.g. resource_cap on/off, default on) read by charter_web_from_budget; the legacy Pass 6 body and every legacy digest stay untouched, proven by --digest-check on the pinned seeds. Report per density per cap setting: firms chartered, unspent by reason (no_gap should fall when lifted), the 200-per-body cap hits, search ms per evaluation and ms per tick. The NR-889 ruling is taken off that table.\n\nWHY. DIGITISATION.md hard part 7 and § Open questions: the charter prices are measured against live-play cost before either is fixed. The only figures today are ~0.9 s per validation tick and ~1-2.5 s per search evaluation in Release.\n\nTHE WORK. --charter-budget synthetic --budget-scale 1|2|4 [--province-cap on|off] [--specialist-price K]. The budget is SYNTHETIC TEST INPUT, printed as such on every header line and never read for density-follows-cities: 1x charters today's chartered count on that seed (specialists plus background firms, measured first), spread over non-razed centres by seeded per-centre weights (never population), integer by largest remainder; firm price 1 point; specialist price from a small ladder (e.g. 4 and 8). Per seed per density: specialists and firms chartered, unspent by reason, whether any specialist exists, the largest one-nation share of specialists, search ms per evaluation at thread count 1 (round_ms), ms per economy tick over the 12 validation ticks and an 8-tick live window after the seat, shortlist size and the trailing-net spread. JSON via --out.\n\nDONE WHEN. The table over the library seeds (at least the three the pin run shows fastest, all 16 if the clock allows) is checked in; a NEEDS_REVIEW entry puts the price readings and the specialist-count behaviour to Ben for sprint 45. A static check shows no `synthetic` symbol under src/.\n\nRUN CONDITIONS: Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify (MSVC /O2 — the toolchain every pin is bound to; never %TEMP%); serial, quiet machine, build tree quoted; tracked tables only via --out."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-17",
+   "author": "Claude (found by the BL-1033 lane on 2026-09-17, flagged by its cold review; filed by the main session)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1034",
+   "short_name": "WORLD_COPY_TICKS_DIVERGE",
+   "category": "Determinism",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A copied world does not tick byte for byte as its original: find the unfaithful copy and make world copies exact",
+   "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+   "files": [
+    "src/world/world.hpp",
+    "src/world/world.cpp",
+    "tools/verify/player_seed_sweep.cpp"
+   ],
+   "design": "FOUND 2026-09-17 by the BL-1033 lane (charter budget cost), probing whether one pre-landscape world per seed could be copied per matrix row. On seed 28 a copied base world matched the BL-1031 pins at D_search and D_land, but after the 12-tick validation settle it digested D_settle 18F78EB9B2B20F29 against the pinned 265C48A23E313B1A — whether copied before the landscape or after it — while the original world, settled with a copied recipe_registry, matches the pin. So `world`'s copy is faithful as data and unfaithful as a program: something the tick path reads differs between an original and its copy. Suspected (not located): an unordered container whose iteration order depends on insertion/rehash history, a pointer-keyed cache, or a cache the copy constructor carries stale.\n\nWHY IT MATTERS. The simulation is deterministic by standing rule. The landscape search copies the base world for every evaluation (landscape_search.cpp score_one) but only scores statically, so today's shipped worlds are unaffected; any future feature or instrument that copies a world and then ticks it (a what-if preview, a save-branch, a matrix instrument) silently diverges. The harness comment in tools/verify/harness_params.hpp above build_app_base_world is the only other record.\n\nTHE WORK. A minimal reproduction in a harness (build seed 28 in app order, copy, settle both, compare snapshot bytes per tick to find the first tick that diverges), then bisect the tick path to the reading that differs, then fix the copy (or the container) so a copy ticks byte for byte. DONE WHEN: the reproduction passes on the 16 library seeds with the BL-1031 pins unmoved; if the fix must change iteration order on the ORIGINAL path, that is a world-mover and needs Ben's re-bless authorisation first."
   }
  ]
 }
