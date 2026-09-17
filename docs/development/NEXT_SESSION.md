@@ -1,81 +1,92 @@
-# Next session — after sprint 42, before Digitisation
+# Next session — after NR-885, before Digitisation is built
 
-Written 2026-09-16 at the close of sprint 42 (generation sharpened before Digitisation).
-**Read this, then `docs/development/NEEDS_REVIEW.md` for NR-877..881, and nothing else until you
-know which mode you are in.**
+Written 2026-09-17. **Read this, then `docs/generation/DIGITISATION.md`, and nothing else until you
+know which mode you are in.** The natural next step is Digitisation. It is designed and it is not
+yet ready to build; this note says what stands between the two.
 
-## The one thing that blocks everything
+## Where things stand
 
-**NR-877 — the wave-1 re-bless is not authorised.** Five items moved the world and the exploration
-regression pin (`exploration_sim_harness` R3b) is deliberately red with that entry as its stated
-cause. Until Ben answers, nothing re-pins and no golden is blessed. The entry carries the shape, the
-five named causes and the four digests; it is written to be read without any of this session's
-context.
+- **Backlog empty, `REFINED.md` drained.** Ben stopped at wave A on 2026-09-16 and archived waves
+  B–D unbuilt: *"just leave it at wave A and we can reinvent anything important later."*
+- **`main` is pushed and level with `origin`** (09a1b567). Pushing is allowed; force-pushing is not.
+- **One review entry is open: NR-886** (seven calls left by wave A). None blocks anything.
+- **The player identity is ruled (NR-885, 2026-09-17).** The player is a **corporation that holds
+  a seat**; the mercenary company is retired; the FIELD / ANSWER-TO design test is kept as written.
+  `docs/CONCEPT.md` § Player identity holds it, with Ben's statement of the role. The idea of the
+  player as the corporation's individual leader, recruiting talent, is an open direction only.
 
-## Where sprint 42 left the generation layer
+## Digitisation: designed, not ready
 
-Twenty-five items across two waves. The layer now has what it did not have on 2026-09-15:
+**The design is complete.** `DIGITISATION.md` carries the seven properties of the opening map, the
+three beats, the region-to-tile downscale, and the readings the phase is judged on. Its input is the
+checked `exploration_output` struct (`EXPLORATION.md` § What this phase hands digitisation). Ben on
+its aim (2026-09-17): *"it's less important what the player should be doing, and more important what
+the world allows."*
 
-- **Instruments that can see their subject.** Every downstream harness measures the landscape the
-  search actually chose; `demand_census` reports the fraction of markets in band; both sweeps are
-  checked in with per-seed tables; the terrain's economic output is asserted, not printed.
-- **Handoffs that are checked.** Both `pass_one_output` and `exploration_output` are validated on the
-  shipped path and carry the culture table; consumers read the structs, not the live sim.
-- **A cheap tuning loop.** The harness builder compiles the world set once (22 s cold, 5 s to link);
-  the tile pipeline re-runs its Life half over a cached record in 13% of a full pass.
-- **A campaign that inherits its history.** Nations open with the money their 1660 polities banked,
-  so garrisons differentiate; every seat's stores consolidate at 1200; the settle is phase 6's own
-  validation run rather than a warm start.
+**The build plan is gone.** The Digitisation span and its dependants were cancelled unbuilt with
+waves B–D on 2026-09-16 and sit cold in `archive/backlog-design-2026-Q3.json`. Starting means cutting a
+new, tighter plan — Ben called the last one "highly unstructured". Do not resurrect it wholesale.
 
-## The three findings that should shape what comes next
+**Two inherited weaknesses want a call before Beat 3 is built.**
 
-1. **Measurement parity is broken (`BL-1007`, priority A).** The sweeps generate with
-   `world_gen_config`'s struct defaults; the app loads the Lua config. Seed 0 is two different worlds
-   (6,479 battles against 9,928). **Do this before tuning anything else** — every figure in the
-   sprint's records is internally consistent and describes a world the player never gets.
-2. **The Exploration actor has no purse term (`NR-878`).** With the saturation caps replaced by a
-   real per-head bill, the median polity spends itself to a treasury of 211. Ben's call: accept the
-   shape, or add a solvency rule to a step's eligibility.
-3. **The first crossing almost never happens (`NR-880`).** Four of six held seeds meet one polity in
-   460 years, so there is no frontier to displace onto — and alarm saturates on every near pair, so
-   the constant tuned in sprint 41 is not discriminating. The implicated constants are the campaign
-   threshold and the prize pricing for an unmet target.
+1. **Displacement held only against a saturated alarm.** With alarm set from measured capability,
+   pooled displacement fell 2.73 → 0.50 and no deterrence weight restored it
+   (`EXPLORATION.md` § The arms race). Beat 3's proxy war assumes the arms race displaces great-power
+   war onto clients — which is also one of the doc's open questions.
+2. **Polities rarely meet.** The exploration scorer never reads contact, and stay-home verbs win
+   78.6% of the rounds where an unmet target clears the threshold. World war, decolonisation and far
+   trade all need a world that has met itself. Either Digitisation inherits that and must produce
+   contact itself, or Exploration is revisited first. Ben's call.
+
+**Two build hazards are already known.**
+
+- **Property 7 (far trade) is campaign economy work:** per-market pools change the save format.
+  That is Full mode, with a cold review.
+- **Property 2 (advanced production) needs a buyer before a seller.** Its demand ladder
+  (BL-996, demand ladder) was archived after failing cold review on six counts.
+
+## The suggested first slice
+
+**Measure before mechanism.** Run the span 1660 → 1960 on the existing engine with no new
+mechanism, and take the Digitisation readings at 1960 over the seed library.
+
+- It answers the doc's first open question: whether 300 more years on the shared engine is
+  affordable at Exploration's region counts.
+- It gives every reading a real baseline. Today `digitisation_sim_harness` generates at epoch 0, so
+  "advanced chains" reads zero by construction (NR-886, item 7).
+- It is small, and it does not flip the default epoch — that stays Digitisation's own done-when
+  (NR-869).
+
+After that, admit mechanisms **one property at a time**, starting with property 1 (the corporate
+web), because the seat shortlist and every downstream reading consume it.
+
+## Calls in NR-886 that sit on this path
+
+- **Item 3 — solvency no longer gates the seat** (74 of 84 shortlisted seats have negative trailing
+  net; the live click never ran). Now that the seat is an identity, this is the next seat question.
+- **Item 7 — readings generated at epoch 0**, above.
+- Items 1, 2 and 4–6 wait for the Exploration or harness work that next reads them.
+
+## Noticed, not filed
+
+The backlog is deliberately empty, so these are recorded here rather than filed.
+
+- The retired **mercenary contract** still has doc tails: `NATIONS.md` § Trust names it as the
+  dimension's rider, and `SELECTION.md` still describes its contract card.
+- `mercenary_contract` still appears in `src/world/world_save.hpp`, `binary_io.hpp`,
+  `corp_command.hpp` and two UI headers — a save-format remnant, so removing it is a seam change.
 
 ## Sixteen worlds to design against
 
-`docs/generation/seed_library.json`, queried with `node tools/session/seed_library.js`. Chosen off a
-48-seed parity sweep on 2026-09-16, one per question the next phase has to answer: the rich world
-(seed 46, a 27M median chest) and the quiet one (seed 17, fourteen polities and thirteen flows); the
-crowded (11) against the thin and rich (43); two colonial worlds (13, 41) against two that subjected
-nobody (37, 4); infrastructure without trade (32) against trade without roads (10). Seed 0 is in it
-because everything else is compared against it. A seed is the save — generation is a pure function of
-the descriptor — so the store holds the rationale and a fingerprint, not a snapshot.
+`docs/generation/seed_library.json`, queried with `node tools/session/seed_library.js`. One seed per
+question the phase has to answer; a seed is the save. Read readings per seed, never the median.
 
-## Digitisation, when it starts
-
-`docs/generation/DIGITISATION.md` is still the placeholder and its boundary is unchanged: companies,
-prices and tariffs are its subjects. Two things it now inherits that it did not before:
-
-- The tariff derivation is **retired on the single-span arc** and the enactment seam waits for
-  Digitisation to write `protection_q` from scarcity, flows and preference (`BL-976`).
-- The default epoch moves to 1960 **as Digitisation's own done-when** (Ben, NR-869), never before.
-
-Its input contract is `EXPLORATION.md` § What this phase hands digitisation, unchanged.
-
-## Owed, in priority order
-
-*(BL-1007 measurement parity and BL-1000's live click both landed on 2026-09-16 and are gone from this list.)*
-
-`BL-1009` (the digest cannot see treasuries — region treasury moved 80% with every digest identical)
-· `BL-1010` (era_world_harness's three reds pre-date the sprint) · `BL-1008` (six harnesses still
-simulate an 80-tick warm start) · `NR-879` (85% of coined cultures never hold ground) · `NR-881` (the
-seat viability floor reads eight quarters against a 12-tick settle).
-
-## Standing hazards this sprint re-learned
+## Standing hazards
 
 - An agent's **worktree** survives a stop; its **uncommitted work** does not. Make a checkpoint
   commit the first instruction in any long brief.
-- Sweep artefacts and NR readings must be regenerated on the **final integrated tree**; two items
-  reported the same digests because a sibling clobbered a shared scratchpad file.
-- `NR-` ids must be minted against the **hot store and the archive together**; the hot file's maximum
-  is not the true maximum after an archive pass.
+- Regenerate sweep artefacts and NR readings on the **final integrated tree**, after the last world
+  mover merges.
+- Mint `NR-` ids against the **hot store and the archive together**.
+- Cold review catches what self-report cannot: budget a fix round on any lane that touches the
+  economy or the save format.
