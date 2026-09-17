@@ -104,10 +104,10 @@ carries no tariff, which is a legitimate outcome rather than a gap.
 `node tools/session/seed_library.js`). Generation is a pure function of the world descriptor, so a
 seed is the save: each entry carries the readings that made that world interesting and a fingerprint
 that says whether the world it still generates is the world described. They span the axes this phase
-forms companies on — a chest of 27 million against one of 245, 112 polities against fourteen, eight
-colonial subjects against none, thirty post roads against zero, 103 trade flows against thirteen.
-The floor case and the ceiling case are both deliberate: seed 17 hands this phase almost nothing,
-and seed 46 hands it everything.
+forms companies on — the median chest, the polity count, colonial subjects, post roads and trade
+flows — from a floor case that hands this phase almost nothing to a ceiling case that hands it
+everything. **The numbers live in the store, not here,** because a world-moving item is supposed to
+move them.
 
 ---
 

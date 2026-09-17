@@ -22,29 +22,6 @@
    "category": "Generation",
    "priority": "A",
    "status": "designed",
-   "requires": [],
-   "id": "BL-1026",
-   "short_name": "SEED_LIBRARY_REREAD",
-   "difficulty": 2,
-   "title": "The seed library is re-read on main: fingerprints re-blessed from a sweep of the library seeds, and replacements brought to Ben for the seeds that lost their reason",
-   "authority_doc": "docs/generation/seed_library.json",
-   "files": [
-    "tools/verify/exploration_sweep.cpp",
-    "tools/session/seed_library.js",
-    "docs/generation/seed_library.json"
-   ],
-   "design": "WHY. The library's fingerprints predate the wave A re-bless: `seed_library.js --check` reports 7 seeds moved and 9 absent, because exploration_sweep.json carries seeds 0..15 only while library seeds reach 46. Seeds 4, 6, 12 and 13 no longer show what their rationale says. Every sprint 43 baseline is read per seed, so the library must describe the worlds main generates before anything is read off it.\n\nRULED (Ben, 2026-09-17, elicitation): re-bless the fingerprints, and bring replacements for 4, 6, 12 and 13 rather than rewording their rationale.\n\nTHE WORK. (1) exploration_sweep gains `--seeds a,b,c` (the library's list, or any list) and `--out <path>`, so a library sweep never overwrites the tracked 16-seed exploration_sweep.json whose pooled figures the docs quote. (2) seed_library.js reads its fingerprints from that library artefact (flag or fixed name, stated in its usage block); --check then --bless, dated. (3) Re-read all sixteen rationales against the new readings; reword only where the number moved and the question the seed answers still holds. (4) For 4, 6, 12 and 13, sweep a wider range (the 48-seed pool the library was picked from, wider if needed) and bring two candidates per lost question, with the readings that make each one answer it.\n\nDONE WHEN. --check reports every library seed present and unmoved; the rationale text matches the readings; a NEEDS_REVIEW decision entry offers the replacement candidates for 4, 6, 12 and 13 (Ben picks; the store is edited on his verdict).\n\nRUN CONDITIONS (sprint 43, all items): one lane, serial, in the main session; Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify, never %TEMP%; timings on a quiet machine with the build tree quoted; never write over a tracked sweep artefact (use --out). No item in this sprint changes a shipped world."
-  },
-  {
-   "glyph": "✓",
-   "sprint": "43",
-   "written": "2026-09-17",
-   "author": "Ben (2026-09-17, cutting the Digitisation build plan: elicitation form); Claude (item text, from a seven-lane read of the engine with an adversarial cross-check)",
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "priority": "A",
-   "status": "designed",
    "requires": [
     "BL-1026"
    ],

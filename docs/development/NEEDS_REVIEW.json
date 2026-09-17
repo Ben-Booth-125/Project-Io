@@ -72,6 +72,27 @@
     "tools/verify/digitisation_sim_harness.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-887",
+   "title": "PICK: which library seeds to replace — three lost their reason, two you named still hold, and the floor case got rich",
+   "raised": "2026-09-17",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1026 (seed library re-read). Library sweep of the sixteen seeds plus a 48-seed pool sweep on main at 4c9feb4c, Release, 2026-09-17 (136 s and 295 s). The two runs agree on all 1,552 shared fields.",
+   "what": "Every library seed moved under wave A; the fingerprints are re-blessed (your ruling). Your ruling named 4, 6, 12 and 13 for replacement on partial evidence (seven seeds were visible then). With all sixteen read against the pool:\n\nLOST THEIR REASON — replace:\n- Seed 4, \"The frontier with no neighbours\": it has neighbours now (3 neighbour wars, displacement 27.3, 1 subject). Candidates: 9 (0 neighbour wars, 229 frontier battles, 50 polities, 1 subject, 41 flows, chest 380 — the ordinary one) or 16 (0 neighbour wars, 728 frontier battles, 42 polities, 2 subjects, 49 flows, chest 43k — the busy frontier).\n- Seed 6, \"The inward world\" (wealthy, held, roads): displaced 1.80, chest 127k, 9 roads. Candidates: 40 (held 0.88, chest 1.64M, 26 post roads — second most — 36 flows, 33 polities) or 39 (held 0.49, chest 216k, 16 roads, 42 flows, 49 polities).\n- Seed 19, \"The insular rich\" (NOT on your list): chest 285 and displaced 1.39, so neither rich nor inward. Candidates: 7 (held 0.99, chest 2.6M, 20 polities, 23 flows) or 38 (held 0.50, chest 8.6M, 30 polities, 27 flows).\n\nNAMED, BUT STILL ANSWER THEIR QUESTION — keep recommended:\n- Seed 12, \"The most inward world\": still inward with no subjects and no capital (20 flows, chest 274), and now the only SILENT seed in the pool (12 Exploration battles). Only the verdict word changed. Candidate if you still want it out: 30 (held 0.49, chest 335, 2 subjects — but 69 polities and 57 flows, so not sparse).\n- Seed 13, \"The colonial world\": 7 subjects, tied for the most in the pool, at a middling 50 polities and 53 flows. Displacement fell from 46 to 1.16. Candidates if the displaced half matters: 36 (4 subjects, displacement 5.3, 43 flows) or 20 (4 subjects, displacement 73.5, 1,250 frontier battles, chest 173).\n\nCHANGED SHAPE — your call:\n- Seed 17, \"The quiet world\", the floor case: still the fewest polities (17), corridors (786) and flows (16), but no longer SILENT (41 Exploration battles) and no longer poor (median chest 11.5M, second in the pool). Keep as the floor on breadth, or candidates for a floor on capital too: 28 (22 polities, 11 flows and 320 volume — the lowest — 0 roads, chest 66k) or 3 (30 polities, 27 Exploration battles, 19 flows, 9 treaties — the fewest — chest 54k).\n\nHOLD, REWORDED TO TODAY'S NUMBERS: 46, 11, 31 (colonial tag dropped: 3 subjects), 37, 41 (treaties tag dropped: 68), 43, 32 (now also the poorest chest, 163), 10, 25, and 0 by definition.",
+   "why_it_matters": "Sprint 43 reads every Digitisation reading per seed, never the median, so each library seed has to be the question it says it is. A replacement is cheap now and expensive after BL-1027..1029 have written per-seed baselines against the old list.",
+   "options": [
+    "As recommended: replace 4, 6 and 19 (pick one candidate each); keep 12, 13 and 17 with their rationale reworded.",
+    "As ruled: replace 4, 6, 12 and 13, and also 19; keep 17.",
+    "Replace every seed flagged, including 17."
+   ],
+   "recommendation": "Option 1, with 9 for seed 4, 40 for seed 6 and 38 for seed 19 — each is the cleanest match to the question the old seed was chosen to put. For 19, seed 7 matches the old size and chest better, but its displacement of 0.99 sits on the held line and would likely flip on the next world-mover; 38 is held at 0.50.",
+   "files": [
+    "docs/generation/seed_library.json",
+    "seed_library_sweep.json"
+   ],
+   "resolution": null
   }
  ]
 }

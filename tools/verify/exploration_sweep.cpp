@@ -35,7 +35,16 @@
 // world, and each generation stops at the Exploration close (BL-958), so
 // the `[sweep] seed N generated` line count equals the seed count.
 //
-// Usage:  exploration_sweep [seed_count] [--w_want_q=N]   (default 8)
+// Usage:  exploration_sweep [seed_count] [--seeds a,b,c] [--out path] [--w_want_q=N]
+//         (default 8 seeds, 0..N-1)
+//
+//   --seeds a,b,c  BL-1026: measure exactly these seeds, in this order, instead
+//                  of 0..N-1. The seed library's list reaches 46, and a 48-seed
+//                  run to reach it would overwrite the checked-in 16-seed table.
+//   --out path     BL-1026: write the JSON table here instead of the default
+//                  name. The library's fingerprints are read from
+//                  `--seeds <library> --out seed_library_sweep.json`
+//                  (`node tools/session/seed_library.js --seed-list` prints it).
 //
 // Writes: exploration_sweep.json in the working directory (BL-971) — one row
 // per seed over all eleven readings plus the spread face, checked in at the
@@ -432,11 +441,34 @@ int main(int argc, char** argv)
     load_shipped_inputs(shipped);
 
     int seed_count = 8;
+    std::vector<uint32_t> seed_list; // BL-1026: --seeds; empty means 0..seed_count-1.
+    std::string out_path;            // BL-1026: --out; empty means the default name.
     bool want_override = false;
     int  want_override_q = 0;
     std::vector<std::pair<std::string, long long>> param_sets;
     for (int a = 1; a < argc; ++a)
     {
+        if (std::strcmp(argv[a], "--seeds") == 0 && a + 1 < argc)
+        {
+            const std::string list = argv[++a];
+            std::size_t at = 0;
+            while (at <= list.size())
+            {
+                const std::size_t comma = list.find(',', at);
+                const std::string tok = list.substr(at, comma == std::string::npos ? std::string::npos : comma - at);
+                if (tok.empty() || tok.find_first_not_of("0123456789") != std::string::npos)
+                { std::printf("--seeds: '%s' is not a seed number\n", tok.c_str()); std::exit(2); }
+                seed_list.push_back(static_cast<uint32_t>(std::strtoul(tok.c_str(), nullptr, 10)));
+                if (comma == std::string::npos) break;
+                at = comma + 1;
+            }
+            continue;
+        }
+        if (std::strcmp(argv[a], "--out") == 0 && a + 1 < argc)
+        {
+            out_path = argv[++a];
+            continue;
+        }
         if (std::strcmp(argv[a], "--set") == 0 && a + 1 < argc)
         {
             const std::string kv = argv[++a];
@@ -454,6 +486,9 @@ int main(int argc, char** argv)
         const int n = std::atoi(argv[a]);
         if (n > 0) seed_count = n;
     }
+    if (seed_list.empty())
+        for (int i = 0; i < seed_count; ++i) seed_list.push_back(static_cast<uint32_t>(i));
+    seed_count = static_cast<int>(seed_list.size());
     const auto apply_sets = [&](history_sim_params& hp) {
         for (const auto& kv : param_sets)
         {
@@ -481,10 +516,11 @@ int main(int argc, char** argv)
     std::vector<exploration_row> rows;
     rows.reserve(static_cast<std::size_t>(seed_count));
 
-    for (int i = 0; i < seed_count; ++i)
+    for (const uint32_t seed : seed_list)
     {
+        const int i = static_cast<int>(seed); // the printed seed, not a loop index
         world_params wp;
-        wp.seed = static_cast<uint32_t>(i);
+        wp.seed = seed;
         wp.exploration_sim_enabled = true; // BL-937: the whole point of this sweep.
 
         generation_report     rep;
@@ -2050,7 +2086,8 @@ int main(int argc, char** argv)
     // always describes generation's own constants.
     // -----------------------------------------------------------------------
     {
-        const char* json_path = want_override ? "exploration_sweep.tuning.json" : "exploration_sweep.json";
+        const char* json_path = !out_path.empty() ? out_path.c_str()
+                              : want_override ? "exploration_sweep.tuning.json" : "exploration_sweep.json";
         FILE* f = std::fopen(json_path, "w");
         if (!f)
         {

@@ -10,21 +10,29 @@
 // a fingerprint so a future session can tell whether the world it generates is
 // still the world this was written about.
 //
-// THE FINGERPRINT IS NOT A GOLDEN. It is five counters from exploration_sweep
-// .json, which carries both spans (it reports the Empires battle count beside
-// its own). If a world-moving item lands, these move, and that is correct —
+// THE FINGERPRINT IS NOT A GOLDEN. It is five counters from an exploration
+// sweep table, which carries both spans (it reports the Empires battle count
+// beside its own). If a world-moving item lands, these move, and that is correct —
 // re-run `--check` and, if the movement is authorised, `--bless` writes the new
 // values with the date. The library's VALUE is the rationale, which survives.
+//
+// THE LIBRARY HAS ITS OWN TABLE (BL-1026). The checked-in exploration_sweep.json
+// is seeds 0..15, and the library reaches 46, so reading fingerprints off it left
+// most of the library "absent". The library's table is a sweep of exactly its
+// own seeds, at the repo root:
+//   build_gen/verify/exploration_sweep.exe --seeds $(node tools/session/seed_library.js --seed-list) \
+//       --out seed_library_sweep.json
 //
 // USAGE:
 //   node tools/session/seed_library.js                 the whole library
 //   node tools/session/seed_library.js --for trade     seeds tagged 'trade'
 //   node tools/session/seed_library.js --seed 6        one seed, in full
-//   node tools/session/seed_library.js --check         compare against the
-//                                                      sweep artefacts at the
-//                                                      repo root
+//   node tools/session/seed_library.js --seed-list     the seeds, comma-joined
+//   node tools/session/seed_library.js --check         compare against
+//                                                      seed_library_sweep.json
 //   node tools/session/seed_library.js --bless         rewrite the fingerprints
-//                                                      from those artefacts
+//                                                      from that table
+//   ... --from <path>                                  read another sweep table
 //
 // The store is docs/generation/seed_library.json. Edit the rationale there by
 // hand; let --bless write the numbers.
@@ -34,7 +42,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const STORE = path.join(ROOT, 'docs', 'generation', 'seed_library.json');
-const EXPL = path.join(ROOT, 'exploration_sweep.json');
+const DEFAULT_TABLE = path.join(ROOT, 'seed_library_sweep.json');
 
 function readJson(p) {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
@@ -53,16 +61,21 @@ const argv = process.argv.slice(2);
 const flag = (name) => argv.includes(name);
 const value = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : null; };
 
-/// Sweep rows for one seed, or null when the artefact does not carry it.
+const TABLE = value('--from') ? path.resolve(value('--from')) : DEFAULT_TABLE;
+const table = readJson(TABLE);
+
+if (flag('--seed-list')) {
+  console.log(store.seeds.map(s => s.seed).join(','));
+  process.exit(0);
+}
+
+/// Sweep rows for one seed, or null when the table does not carry it.
 function rowsFor(seed) {
-  const e = readJson(EXPL);
-  return { er: e && e.worlds ? e.worlds.find(r => r.seed === seed) : null };
+  return { er: table && table.worlds ? table.worlds.find(r => r.seed === seed) : null };
 }
 function fingerprintOf(seed) {
   // The exploration sweep alone carries every field, INCLUDING the Empires
-  // span's battle count, so one artefact answers for both spans and a library
-  // seed beyond the checked-in sixteen can still be checked: run
-  //   build_gen/verify/exploration_sweep.exe 48
+  // span's battle count, so one table answers for both spans.
   const { er } = rowsFor(seed);
   if (!er) return null;
   return {
@@ -75,10 +88,12 @@ function fingerprintOf(seed) {
 }
 
 if (flag('--check') || flag('--bless')) {
+  if (!table) { console.error(`seed_library: no sweep table at ${path.relative(ROOT, TABLE)} — see the header for the command.`); process.exit(1); }
+  console.log(`reading ${path.relative(ROOT, TABLE)}`);
   let moved = 0, missing = 0;
   for (const s of store.seeds) {
     const now = fingerprintOf(s.seed);
-    if (!now) { console.log(`  seed ${s.seed}: not in the sweep artefacts (run the sweeps at 48+ seeds)`); missing++; continue; }
+    if (!now) { console.log(`  seed ${s.seed}: not in the sweep table (re-run the library sweep; see the header)`); missing++; continue; }
     const was = s.fingerprint || {};
     const diff = Object.keys(now).filter(k => was[k] !== now[k]);
     if (!diff.length) { console.log(`  seed ${s.seed}: unchanged`); continue; }
@@ -102,6 +117,7 @@ if (one !== null || picked.length === 1) {
     console.log(`seed ${s.seed} — ${s.name}`);
     console.log(`  tags: ${(s.tags || []).join(', ')}`);
     console.log(`  why:  ${s.why}`);
+    if (s.review) console.log(`  UNDER REVIEW: ${s.review}`);
     if (s.fingerprint) console.log('  fingerprint: ' + Object.entries(s.fingerprint).map(([k, v]) => `${k}=${v}`).join(' '));
   }
   process.exit(0);
@@ -110,5 +126,5 @@ if (one !== null || picked.length === 1) {
 console.log(`seed library — ${store.seeds.length} worlds${tag ? ` tagged '${tag}'` : ''}`);
 console.log(`(${store._note[0]})\n`);
 const pad = (s, n) => String(s).padEnd(n);
-console.log(pad('seed', 6) + pad('name', 32) + 'why');
-for (const s of picked) console.log(pad(s.seed, 6) + pad(s.name, 32) + s.why);
+console.log(pad('seed', 6) + pad('name', 42) + 'why');
+for (const s of picked) console.log(pad(s.seed, 6) + pad(s.name + (s.review ? ' [review]' : ''), 42) + s.why);
