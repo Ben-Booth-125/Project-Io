@@ -41,6 +41,8 @@ the work happens, and that is the durable record. What stays here is what is sti
 6. THE CULTURE FOLD (BL-1017): a culture whose only ground is a future founding is not folded; kinship walks the living tree rather than coined_from. Neither moves any shipped world today.
 7. DECISIONS TAKEN ON YOUR BEHALF: the far-trade reading's defaults (epoch 1960, first year of play, nearest by dispatcher pricing, cargo counted first) and the Digitisation readings' interpretations -- which generate at epoch 0 and so read "advanced chains" as zero by construction.
 
+UPDATE 2026-09-17 (item 7): answered by BL-1029 (Digitisation readings at 1960). digitisation_sim_harness --through 1960 reads the shipped world continued to 1960 beside a fingerprint-checked 1660 control; "advanced chains" stays a STRUCTURAL ZERO there too, because the recipe band follows epoch_year, and now prints as one. The far-trade reading (haulage_measure) still runs epoch_year 1960, the superseded arc; it moves with the epoch flip. Items 1-6 unchanged.
+
 **Why it matters.** Each sits on code now on main and re-blessed. None blocks anything, because the backlog is empty; they are the questions to settle before any of that work is picked up again.
 
 > **Recommendation:** Take 1 and 2 whenever Exploration or the Era -1 economy is next touched; 3 before the seat canvas is designed (it sits beside NR-885); 4-7 can wait for the harness or item that next reads them.

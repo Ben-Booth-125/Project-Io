@@ -11,23 +11,35 @@
 // hands play already reads on each property, before the 1660 -> 1960 span
 // that is supposed to produce it exists.
 //
-// WHAT "AT 1960" READS TODAY. There is no Digitisation span. The world the
-// campaign opens on is the Exploration close (1660 CE) plus world setup —
-// nations, centres, markets — plus the landscape the search applied. So every
-// reading below is taken off one of two surfaces, and each printed line says
-// which:
-//   * the CAMPAIGN WORLD as the app builds it, up to the applied search
-//     winner (readings 1, 3, 6's proxy, and the evidence counts); or
-//   * the Exploration HANDOFF (`era_minus_one_fixture::exploration_handoff`),
-//     the explicit 1660 value the next phase is meant to consume (readings
-//     5, 7, 10's 1660 half, and 8's evidence).
+// WHAT "AT 1960" READS (BL-1029). There is no Digitisation span. With
+// `--through 1960` the harness generates the SHIPPED world (epoch_year 0) with
+// Exploration's own call continued to 1960 (world_params::exploration_stop_year)
+// — never epoch_year 1960, which selects the superseded 1160 -> 1560 -> 1960
+// two-span arc with Exploration off (DIGITISATION.md's opening). The stretched
+// span runs Exploration's forces only. Every reading is taken off one of three
+// surfaces, and each printed line names its surface and its year:
+//   * the CAMPAIGN WORLD as the app builds it on that close, up to the applied
+//     search winner (readings 1, 3, 6's proxy, and the evidence counts);
+//   * the HANDOFF at the close (`era_minus_one_fixture::exploration_handoff`,
+//     folded at --through); or
+//   * the 1660 CONTROL: the Exploration span re-run from the fixture and
+//     stopped at 1660, folded with `make_exploration_output` — the handoff the
+//     shipped world hands at 1660. Its battles, flows and living polities must
+//     equal the seed library's fingerprint (taken off a default generation):
+//     that equality is the proof the extended run IS the shipped world up to
+//     1660, and a seed that fails it reports no reading as measured.
+// Without --through (1660) the close and the control are the same world.
 //
-// THREE STATES, NEVER A FOURTH. A reading is MEASURED (its observable exists
-// in today's world and is computed off it), PARTIAL (one clause is measured,
-// the other prints n/a with its reason), or n/a (the mechanism it reads does
-// not exist; the line names the missing piece and, where a count proves the
-// absence, prints that count). A reading is never approximated into a pass: a
-// PROXY line, where one is printed, is labelled as not the reading.
+// FOUR STATES, NEVER A FIFTH. A reading is MEASURED (its observable exists in
+// today's world and is computed off it), PARTIAL (one clause is measured, the
+// other prints n/a with its reason), a STRUCTURAL ZERO (the observable exists
+// but a setting forbids it on every seed, so the zero is the setting, not a
+// finding), or n/a (the mechanism it reads does not exist; the line names the
+// missing piece and, where a count proves the absence, prints that count). A
+// reading is never approximated into a pass: a PROXY line, where one is
+// printed, is labelled as not the reading. A seed whose generation recorded a
+// handoff violation (generation_report::handoff_invalid) is excluded from
+// every handoff reading, and says so.
 //
 // THIS HARNESS REPORTS; IT DOES NOT GATE. "A reading is a requirement, not a
 // target. A seed that refuses one is a legitimate world; a spread that
@@ -54,9 +66,11 @@
 // THE SEEDS are read from docs/generation/seed_library.json, so the library
 // and the harness cannot drift. Run from the repo root.
 //
-// Usage:  digitisation_sim_harness [--limit N] [--seeds a,b,c]
+// Usage:  digitisation_sim_harness [--limit N] [--seeds a,b,c] [--through Y] [--out path]
 //   --limit N    take the library's first N seeds (a quick run)
 //   --seeds ...  measure these seeds instead of the library's
+//   --through Y  BL-1029: continue Exploration's call to year Y (default 1660)
+//   --out path   BL-1029: also write the per-seed table as JSON
 // ---------------------------------------------------------------------------
 
 #include "harness_params.hpp" // apply_shipped_landscape, print_shipped_landscape
@@ -196,6 +210,149 @@ void print_spread(const char* label, const std::vector<double>& values)
 }
 
 // ---------------------------------------------------------------------------
+// ONE HANDOFF'S READINGS (BL-1029). Taken identically off the 1660 control and
+// off the handoff at the close.
+// ---------------------------------------------------------------------------
+struct handoff_reading
+{
+    // Reading 5, present half: DIGITISATION.md sec 4 — checkered when the
+    // second culture's share is at least 95% of the first's.
+    int settled_land_regions = 0;
+    int checkered_regions    = 0;
+
+    // Reading 7: far trade.
+    int     flows            = 0;
+    int     flows_far        = 0;
+    int     flows_unreadable = 0; ///< a flow whose party or capital is out of range.
+    int64_t volume           = 0;
+    int64_t volume_far       = 0;
+
+    // Reading 8's evidence: region half (Stage 4) and polity half (the band).
+    int industrialised_regions = 0;
+    int polities_industrial    = 0; ///< living polities whose materials band crossed industrial.
+
+    // Reading 9's urban half.
+    int64_t urban_heads = 0;
+    int64_t heads       = 0;
+
+    // Reading 10.
+    int subjects       = 0;
+    int alive_polities = 0;
+};
+
+handoff_reading read_handoff(const exploration_output& h, int gw)
+{
+    handoff_reading out;
+    const std::vector<region>& R = h.regions;
+    const std::vector<polity>& P = h.polities;
+
+    for (const region& rg : R)
+    {
+        if (rg.industrialised) ++out.industrialised_regions;
+        out.heads       += rg.population;
+        out.urban_heads += rg.urban_population;
+        if (rg.domain != region_domain::land || rg.culture.empty()) continue;
+        ++out.settled_land_regions;
+        const int w0 = rg.culture.weight_q[0];
+        const int w1 = rg.culture.weight_q[1];
+        if (rg.culture.id[1] >= 0 && w1 > 0 && 100 * w1 >= 95 * w0)
+            ++out.checkered_regions;
+    }
+
+    for (const polity& q : P)
+    {
+        if (!q.alive) continue;
+        ++out.alive_polities;
+        if (q.overlord >= 0) ++out.subjects;
+        if (q.industrial_year != k_never_industrialised) ++out.polities_industrial;
+    }
+
+    // Reading 7. A market here is a LIVING polity's capital seat: the flow
+    // model sizes a flow at the buyer's capital, so these are the markets any
+    // flow could have landed at. A flow is FAR when its buyer's market is
+    // strictly farther from the seller's than the seller's nearest other
+    // market; a tie is not far.
+    std::vector<int> market_regions;
+    for (const polity& q : P)
+        if (q.alive && q.capital >= 0 && static_cast<std::size_t>(q.capital) < R.size())
+            market_regions.push_back(q.capital);
+    std::sort(market_regions.begin(), market_regions.end());
+    market_regions.erase(std::unique(market_regions.begin(), market_regions.end()), market_regions.end());
+
+    for (const trade_flow& f : h.trade_flows)
+    {
+        ++out.flows;
+        out.volume += f.volume_q;
+        if (f.seller >= P.size() || f.buyer >= P.size()) { ++out.flows_unreadable; continue; }
+        const int sc = P[f.seller].capital;
+        const int bc = P[f.buyer].capital;
+        if (sc < 0 || bc < 0 || static_cast<std::size_t>(sc) >= R.size()
+         || static_cast<std::size_t>(bc) >= R.size()) { ++out.flows_unreadable; continue; }
+        const int d_buyer = region_distance(R[static_cast<std::size_t>(sc)], R[static_cast<std::size_t>(bc)], gw);
+        int d_nearest = std::numeric_limits<int>::max();
+        for (int m : market_regions)
+        {
+            if (m == sc) continue;
+            d_nearest = std::min(d_nearest, region_distance(R[static_cast<std::size_t>(sc)],
+                                                            R[static_cast<std::size_t>(m)], gw));
+        }
+        if (d_buyer > d_nearest)
+        {
+            ++out.flows_far;
+            out.volume_far += f.volume_q;
+        }
+    }
+    return out;
+}
+
+/// The library fingerprint for one seed: the three counters the 1660 control
+/// can reproduce exactly (Exploration battles, standing flows, living
+/// polities). A minimal scan, like `library_seeds`.
+struct library_fingerprint
+{
+    int64_t expl_battles    = -1;
+    int64_t flows           = -1;
+    int64_t living_polities = -1;
+};
+
+std::map<uint32_t, library_fingerprint> library_fingerprints(const char* path)
+{
+    std::map<uint32_t, library_fingerprint> out;
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return out;
+    std::stringstream ss;
+    ss << in.rdbuf();
+    const std::string text = ss.str();
+    const auto int_after = [&](const std::string& key, std::size_t from, std::size_t to) -> int64_t {
+        const std::size_t at = text.find("\"" + key + "\"", from);
+        if (at == std::string::npos || at >= to) return -1;
+        std::size_t p = at + key.size() + 2;
+        while (p < text.size() && (text[p] == ' ' || text[p] == ':')) ++p;
+        return std::strtoll(text.c_str() + p, nullptr, 10);
+    };
+    std::size_t pos = text.find("\"seeds\"");
+    if (pos == std::string::npos) return out;
+    const std::string key = "\"seed\":";
+    while ((pos = text.find(key, pos)) != std::string::npos)
+    {
+        const uint32_t seed = static_cast<uint32_t>(std::strtoul(text.c_str() + pos + key.size(), nullptr, 10));
+        std::size_t next = text.find(key, pos + key.size());
+        if (next == std::string::npos) next = text.size();
+        const std::size_t fp = text.find("\"fingerprint\"", pos);
+        if (fp != std::string::npos && fp < next)
+        {
+            library_fingerprint f;
+            f.expl_battles    = int_after("expl_battles", fp, next);
+            f.flows           = int_after("flows", fp, next);
+            f.living_polities = int_after("living_polities", fp, next);
+            out[seed] = f;
+        }
+        pos = next;
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
 // ONE SEED'S READING. Everything a reading needs is captured here in the main
 // loop, so the report below reads `rows` only and no section regenerates.
 // ---------------------------------------------------------------------------
@@ -222,27 +379,29 @@ struct seed_row
     double  rho_adv_population     = k_undef;
     double  rho_adv_territory      = k_undef;
 
-    // --- Reading 5: mixed cities, present half (1660 handoff) ---------------
-    int settled_land_regions = 0;
-    int checkered_regions    = 0;
-
     // --- Reading 6: PROXY only (campaign world) -----------------------------
     int    nations_with_heads = 0;
     double treasury_per_head_gini       = k_undef;
     double treasury_per_head_max_on_med = k_undef;
 
-    // --- Reading 7: far trade (1660 handoff) --------------------------------
-    int     flows       = 0;
-    int     flows_far   = 0;
-    int     flows_unreadable = 0; ///< a flow whose party or capital is out of range.
-    int64_t volume      = 0;
-    int64_t volume_far  = 0;
+    // --- Handoff readings (5, 7, 8, 9, 10), at the 1660 control and at the
+    //     close. BL-1029: one struct read by one function, so the two years
+    //     cannot be measured two different ways.
+    handoff_reading at_1660;
+    handoff_reading at_close;
+    bool    handoff_ok      = true;  ///< generation recorded no handoff violation.
+    std::string handoff_violation;
+    int64_t secessions_1660  = 0;    ///< refused-renewal secessions (no war) by 1660.
+    int64_t secessions_close = 0;    ///< ... by the close.
+    int64_t subjections_formed_1660  = 0;
+    int64_t subjections_formed_close = 0;
 
-    // --- Reading 10: the 1660 half (1660 handoff) ---------------------------
-    int subjects_1660 = 0;
+    // --- The 1660 control's proof: the library fingerprint ------------------
+    bool    has_fingerprint = false;
+    bool    prefix_matches  = false;
+    int64_t control_battles = 0;
 
     // --- Evidence counts behind the n/a lines -------------------------------
-    int         industrialised_regions_1660 = 0;
     std::size_t battles_standing   = 0; ///< world::battles after generation.
     std::size_t buy_orders         = 0; ///< world::buy_orders (the preferred_seller carrier).
     std::size_t buy_orders_with_preferred_seller = 0;
@@ -298,11 +457,26 @@ int main(int argc, char** argv)
     std::vector<uint32_t> seeds;
     bool seeds_from_args = false;
     int  limit = -1;
+    int64_t through_year = 1660; // BL-1029
+    std::string out_path;        // BL-1029
     for (int a = 1; a < argc; ++a)
     {
         if (std::strcmp(argv[a], "--limit") == 0 && a + 1 < argc)
         {
             limit = std::atoi(argv[++a]);
+        }
+        else if (std::strcmp(argv[a], "--through") == 0 && a + 1 < argc)
+        {
+            through_year = std::atoll(argv[++a]);
+            if (through_year < 1660)
+            {
+                std::printf("--through must be 1660 or later (the control is the 1660 handoff)\n");
+                return 2;
+            }
+        }
+        else if (std::strcmp(argv[a], "--out") == 0 && a + 1 < argc)
+        {
+            out_path = argv[++a];
         }
         else if (std::strcmp(argv[a], "--seeds") == 0 && a + 1 < argc)
         {
@@ -314,7 +488,8 @@ int main(int argc, char** argv)
         }
         else
         {
-            std::printf("unknown argument '%s'\nusage: digitisation_sim_harness [--limit N] [--seeds a,b,c]\n", argv[a]);
+            std::printf("unknown argument '%s'\nusage: digitisation_sim_harness [--limit N] [--seeds a,b,c] "
+                        "[--through Y] [--out path]\n", argv[a]);
             return 2;
         }
     }
@@ -331,7 +506,14 @@ int main(int argc, char** argv)
     if (limit > 0 && static_cast<std::size_t>(limit) < seeds.size())
         seeds.resize(static_cast<std::size_t>(limit));
 
+    const std::map<uint32_t, library_fingerprint> fingerprints =
+        library_fingerprints("docs/generation/seed_library.json");
+
     std::printf("=== digitisation_sim_harness (BL-982) - the thirteen Digitisation readings ===\n");
+    std::printf("close: %lld CE - the shipped world (epoch_year 0) with Exploration's own call continued%s;\n"
+                "control: the 1660 handoff, re-run from the fixture and held to the seed library fingerprint\n",
+                static_cast<long long>(through_year),
+                through_year == 1660 ? " (not continued: close and control are one world)" : "");
     std::printf("seeds (%s, %zu):", seeds_from_args ? "--seeds" : "docs/generation/seed_library.json",
                 seeds.size());
     for (uint32_t s : seeds) std::printf(" %u", s);
@@ -385,6 +567,7 @@ int main(int argc, char** argv)
     {
         world_params wp = shipped_descriptor;
         wp.seed = seed;
+        wp.exploration_stop_year = through_year; // BL-1029: never epoch_year.
 
         std::fprintf(stderr, "[digitisation] seed %u generating\n", seed);
         generation_report     rep;
@@ -537,67 +720,51 @@ int main(int argc, char** argv)
                 row.treasury_per_head_max_on_med = *std::max_element(tph.begin(), tph.end()) / med;
         }
 
-        // ================ The 1660 handoff: readings 5, 7, 8, 10 ============
+        // ====== The handoff at the close, and the 1660 control (BL-1029) =====
+        row.handoff_ok        = !rep.handoff_invalid;
+        row.handoff_violation = rep.handoff_violation;
         if (fx.exploration_ran)
         {
-            const exploration_output& h = fx.exploration_handoff;
-            const std::vector<region>& R = h.regions;
-            const std::vector<polity>& P = h.polities;
+            row.at_close = read_handoff(fx.exploration_handoff, fx.gw);
+            row.secessions_close         = fx.exploration_state.subjections_freed;
+            row.subjections_formed_close = fx.exploration_state.subjections_formed;
 
-            // Reading 5, present half: DIGITISATION.md sec 4 — checkered when
-            // the second culture's share is at least 95% of the first's.
-            for (const region& rg : R)
-            {
-                if (rg.industrialised) ++row.industrialised_regions_1660;
-                if (rg.domain != region_domain::land || rg.culture.empty()) continue;
-                ++row.settled_land_regions;
-                const int w0 = rg.culture.weight_q[0];
-                const int w1 = rg.culture.weight_q[1];
-                if (rg.culture.id[1] >= 0 && w1 > 0 && 100 * w1 >= 95 * w0)
-                    ++row.checkered_regions;
-            }
+            // THE 1660 CONTROL: the Exploration span re-run from the fixture
+            // and stopped at 1660, built exactly as exploration_sweep's re-runs
+            // are (resume pointers, fx.works, the band's step, the seed).
+            history_sim_params hp = fx.exploration_params;
+            hp.stop_year        = 1660;
+            hp.tick_bands[0]    = {1660, fx.exploration_params.tick_bands[0].step_years};
+            hp.tick_band_count  = 1;
+            hp.trace_battles    = false;
+            hp.resume_polities  = &fx.pre_exploration_polities;
+            hp.resume_grudges   = &fx.pre_exploration_grudges;
+            hp.resume_contacts  = &fx.pre_exploration_contacts;
+            hp.resume_corridors = &fx.pre_exploration_corridors;
+            settlement_state ss_control = fx.pre_exploration_settlement;
+            creed_state      cs_control = fx.pre_exploration_creeds;
+            const history_sim_state control = run_history_sim(
+                ss_control, &cs_control, fx.terrain.view(), fx.gw, fx.gh, hp,
+                fx.exploration_seed, /*year_progress=*/nullptr, fx.works, /*tap=*/nullptr);
+            const exploration_output control_handoff = make_exploration_output(ss_control, control, &cs_control);
+            row.at_1660                 = read_handoff(control_handoff, fx.gw);
+            row.secessions_1660         = control.subjections_freed;
+            row.subjections_formed_1660 = control.subjections_formed;
+            row.control_battles         = control.battles;
 
-            // Reading 10's 1660 half.
-            for (const polity& q : P)
-                if (q.alive && q.overlord >= 0) ++row.subjects_1660;
-
-            // Reading 7. A market here is a LIVING polity's capital seat: the
-            // flow model sizes a flow at the buyer's capital, so these are the
-            // markets any flow could have landed at. A flow is FAR when its
-            // buyer's market is strictly farther from the seller's than the
-            // seller's nearest other market; a tie is not far.
-            std::vector<int> market_regions;
-            for (const polity& q : P)
-                if (q.alive && q.capital >= 0 && static_cast<std::size_t>(q.capital) < R.size())
-                    market_regions.push_back(q.capital);
-            std::sort(market_regions.begin(), market_regions.end());
-            market_regions.erase(std::unique(market_regions.begin(), market_regions.end()),
-                                 market_regions.end());
-
-            for (const trade_flow& f : h.trade_flows)
-            {
-                ++row.flows;
-                row.volume += f.volume_q;
-                if (f.seller >= P.size() || f.buyer >= P.size()) { ++row.flows_unreadable; continue; }
-                const int sc = P[f.seller].capital;
-                const int bc = P[f.buyer].capital;
-                if (sc < 0 || bc < 0 || static_cast<std::size_t>(sc) >= R.size()
-                 || static_cast<std::size_t>(bc) >= R.size()) { ++row.flows_unreadable; continue; }
-                const int d_buyer = region_distance(R[static_cast<std::size_t>(sc)],
-                                                    R[static_cast<std::size_t>(bc)], fx.gw);
-                int d_nearest = std::numeric_limits<int>::max();
-                for (int m : market_regions)
-                {
-                    if (m == sc) continue;
-                    d_nearest = std::min(d_nearest, region_distance(R[static_cast<std::size_t>(sc)],
-                                                                    R[static_cast<std::size_t>(m)], fx.gw));
-                }
-                if (d_buyer > d_nearest)
-                {
-                    ++row.flows_far;
-                    row.volume_far += f.volume_q;
-                }
-            }
+            // Living polities off the sim state, as exploration_sweep counts
+            // them for the fingerprint (BL-1027 matched this on all 16 seeds).
+            int64_t control_alive = 0;
+            for (const polity& q : control.polities) if (q.alive) ++control_alive;
+            const auto fp = fingerprints.find(seed);
+            row.has_fingerprint = fp != fingerprints.end();
+            // Flows against the RAW sim state, as the fingerprint counts them:
+            // the fold prunes flows whose clause lapsed or whose party died by
+            // the close, so the folded count can sit one or two below it.
+            if (row.has_fingerprint)
+                row.prefix_matches = fp->second.expl_battles    == control.battles
+                                  && fp->second.flows           == static_cast<int64_t>(control.trade_flows.size())
+                                  && fp->second.living_polities == control_alive;
         }
 
         // ================ Evidence behind the n/a lines ======================
@@ -611,24 +778,32 @@ int main(int argc, char** argv)
     }
 
     std::size_t generated = 0, handoffs = 0;
+    std::size_t prefix_checked = 0, prefix_failed = 0, violations = 0;
     for (const seed_row& r : rows)
     {
         if (r.era_ran) ++generated;
-        if (r.expl_ran) ++handoffs;
+        if (r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches)) ++handoffs;
+        if (r.expl_ran && r.has_fingerprint) { ++prefix_checked; if (!r.prefix_matches) ++prefix_failed; }
+        if (!r.handoff_ok) ++violations;
     }
     if (rows.empty())
     {
         std::printf("FATAL  no seed generated\n");
         return 1;
     }
+    const bool continued = through_year > 1660;
+    const long long T = static_cast<long long>(through_year);
 
     // ======================= Per-seed table =================================
-    std::printf("\n=== per seed (inputs to the spread; not verdicts) ===\n");
-    std::printf("  seed | mkts urb corps  rho(f,urb) rho(f,gds) | inst  adv nat nat+adv | chk/settled | "
-                "flows far  vol  volfar | subj1660 | tph gini\n");
+    std::printf("\n=== per seed (inputs to the spread; not verdicts) - C = the %lld close, K = the 1660 control ===\n", T);
+    std::printf("  seed | mkts urb corps  rho(f,urb) rho(f,gds) | inst  adv nat nat+adv | chk K/C | "
+                "flows K/C far K/C | subj K/C secess K/C | urban%% K/C | ind.polities K/C | tph gini | prefix\n");
     const auto fmt_rho = [](double x, char* buf, std::size_t len) {
         if (std::isnan(x)) std::snprintf(buf, len, "  undef");
         else std::snprintf(buf, len, "%7.3f", x);
+    };
+    const auto urban_pct = [](const handoff_reading& h) {
+        return h.heads > 0 ? 100.0 * static_cast<double>(h.urban_heads) / static_cast<double>(h.heads) : 0.0;
     };
     for (const seed_row& r : rows)
     {
@@ -636,14 +811,22 @@ int main(int argc, char** argv)
         fmt_rho(r.rho_firms_urban, a, sizeof a);
         fmt_rho(r.rho_firms_goods, b, sizeof b);
         fmt_rho(r.treasury_per_head_gini, c, sizeof c);
-        std::printf("  %4u | %4d %3d %5d    %s    %s | %5lld %4lld %3d %7d | %4d/%-6d | %5d %3d %5lld %6lld | %8d | %s%s\n",
+        const char* prefix = !r.expl_ran ? "no handoff"
+                           : !r.has_fingerprint ? "no fingerprint"
+                           : r.prefix_matches ? "matches" : "MISMATCH";
+        std::printf("  %4u | %4d %3d %5d    %s    %s | %5lld %4lld %3d %7d | %3d/%-3d | %3d/%-3d %3d/%-3d | "
+                    "%2d/%-2d %2lld/%-2lld | %4.1f/%-4.1f | %3d/%-3d | %s | %s%s%s\n",
                     r.seed, r.markets, r.markets_urban, r.corps_on_body, a, b,
                     static_cast<long long>(r.installations), static_cast<long long>(r.advanced),
                     r.nations, r.nations_with_advanced,
-                    r.checkered_regions, r.settled_land_regions,
-                    r.flows, r.flows_far, static_cast<long long>(r.volume),
-                    static_cast<long long>(r.volume_far), r.subjects_1660, c,
-                    r.expl_ran ? "" : "  (no Exploration handoff)");
+                    r.at_1660.checkered_regions, r.at_close.checkered_regions,
+                    r.at_1660.flows, r.at_close.flows, r.at_1660.flows_far, r.at_close.flows_far,
+                    r.at_1660.subjects, r.at_close.subjects,
+                    static_cast<long long>(r.secessions_1660), static_cast<long long>(r.secessions_close),
+                    urban_pct(r.at_1660), urban_pct(r.at_close),
+                    r.at_1660.polities_industrial, r.at_close.polities_industrial,
+                    c, prefix,
+                    r.handoff_ok ? "" : "  HANDOFF VIOLATION: ", r.handoff_ok ? "" : r.handoff_violation.c_str());
     }
 
     const auto collect = [&](double (*get)(const seed_row&)) {
@@ -651,24 +834,35 @@ int main(int argc, char** argv)
         for (const seed_row& r : rows) v.push_back(get(r));
         return v;
     };
+    // A handoff reading counts a seed only when the handoff exists, generation
+    // recorded no violation, and the 1660 control matched its fingerprint.
     const auto handoff_collect = [&](double (*get)(const seed_row&)) {
         std::vector<double> v;
-        for (const seed_row& r : rows) v.push_back(r.expl_ran ? get(r) : k_undef);
+        for (const seed_row& r : rows)
+            v.push_back(r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches) ? get(r) : k_undef);
         return v;
     };
     const std::size_t N = rows.size();
 
     std::printf("\n=== THE THIRTEEN READINGS - a spread over %zu seeds, never a per-world verdict ===\n", N);
-    std::printf("(%zu of %zu worlds ran the Empires round; %zu carry the 1660 Exploration handoff.)\n",
-                generated, N, handoffs);
-    std::printf("WHAT 'AT 1960' READS TODAY: the Digitisation span (1660 -> 1960) does not exist. The world\n"
-                "play opens on is the 1660 Exploration close plus world setup and the applied landscape\n"
-                "search winner (the 12-tick validation run is not mirrored). Each line names its surface.\n\n");
+    std::printf("(%zu of %zu worlds ran the Empires round; %zu carry a usable handoff. 1660 control vs the\n"
+                " library fingerprint: %zu checked, %zu mismatched. Handoff violations: %zu.)\n",
+                generated, N, handoffs, prefix_checked, prefix_failed, violations);
+    if (continued)
+        std::printf("WHAT 'AT %lld' READS: the Digitisation span does not exist. The close is the SHIPPED world\n"
+                    "(epoch 0) with Exploration's own call continued to %lld - Exploration's forces only, the\n"
+                    "Empires-round overrides off - plus world setup and the applied landscape search winner\n"
+                    "(the 12-tick validation run is not mirrored). Each line names its surface and year.\n\n", T, T);
+    else
+        std::printf("WHAT 'AT 1960' READS TODAY: nothing ran past 1660 (--through 1660). The world play opens on\n"
+                    "is the 1660 Exploration close plus world setup and the applied landscape search winner (the\n"
+                    "12-tick validation run is not mirrored). Run with --through 1960 for the continued world.\n\n");
 
     // ---- 1 ------------------------------------------------------------------
     {
-        std::printf("[ 1] Density follows cities - MEASURED on the campaign world (firms laid by today's\n"
-                    "     landscape search; the city charter budget that is meant to lay them does not exist)\n");
+        std::printf("[ 1] Density follows cities - MEASURED on the campaign world built on the %lld close (firms\n"
+                    "     laid by today's landscape search; the city charter budget meant to lay them does not exist,\n"
+                    "     so a continued span moves this reading's inputs, not its cause)\n", T);
         std::printf("     firm = a corporation with >= 1 installation clearing against the market (market_for_tile);\n"
                     "     urban population = non-razed centres routed there; good count = distinct goods deposited\n"
                     "     on the catchment's tiles. Spearman rho across one world's markets:\n");
@@ -702,15 +896,19 @@ int main(int argc, char** argv)
     }
 
     // ---- 3 ------------------------------------------------------------------
+    const bool r3_structural_zero = band_tier3_recipes == 0;
     {
-        std::printf("[ 3] Advanced chains - MEASURED on the campaign world (installations running a recipe that\n"
-                    "     makes machinery, alloys or electronics - DIGITISATION.md sec 2's tier-3 goods; the\n"
-                    "     wealth-to-production force that is meant to place them does not exist)\n");
+        if (r3_structural_zero)
+            std::printf("[ 3] Advanced chains - STRUCTURAL ZERO on the campaign world: the shipped descriptor's era\n"
+                        "     band (it follows epoch_year, which stays 0 however far the span runs) admits no tier-3\n"
+                        "     recipe, so no installation can make machinery, alloys or electronics on any seed. The\n"
+                        "     counts below are the band, not a finding; the reading moves only when the epoch flip\n"
+                        "     decouples the arc from the recipe band.\n");
+        else
+            std::printf("[ 3] Advanced chains - MEASURED on the campaign world (installations running a recipe that\n"
+                        "     makes machinery, alloys or electronics - DIGITISATION.md sec 2's tier-3 goods; the\n"
+                        "     wealth-to-production force that is meant to place them does not exist)\n");
         std::printf("     tier-3 recipes the campaign's era band admits: %d\n", band_tier3_recipes);
-        if (band_tier3_recipes == 0)
-            std::printf("     STRUCTURAL ZERO: the shipped descriptor's era band admits no tier-3 recipe, so no\n"
-                        "     installation can make one on any seed - the count below is not a finding about the\n"
-                        "     spread, it is the band.\n");
         print_spread("installations making a tier-3 good",
                      collect([](const seed_row& r) { return static_cast<double>(r.advanced); }));
         std::size_t realised = 0;
@@ -740,20 +938,25 @@ int main(int argc, char** argv)
     // ---- 5 ------------------------------------------------------------------
     {
         std::printf("[ 5] Mixed cities - PARTIAL\n");
-        std::printf("     present - MEASURED off the 1660 handoff's region culture shares (checkered: second\n"
-                    "     culture >= 95%% of the first, DIGITISATION.md sec 4). While no centre carries shares a\n"
-                    "     province reads its region's, so a checkered land region is a checkered province set:\n");
-        print_spread("checkered land regions per world",
-                     handoff_collect([](const seed_row& r) { return static_cast<double>(r.checkered_regions); }));
-        print_spread("share of settled land regions checkered",
+        std::printf("     present - MEASURED off region culture shares at the 1660 control and the %lld close\n"
+                    "     (checkered: second culture >= 95%% of the first, DIGITISATION.md sec 4). While no centre\n"
+                    "     carries shares a province reads its region's, so a checkered land region is a checkered\n"
+                    "     province set:\n", T);
+        print_spread("checkered land regions per world, 1660 control",
+                     handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_1660.checkered_regions); }));
+        print_spread("checkered land regions per world, at the close",
+                     handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.checkered_regions); }));
+        print_spread("share of settled land regions checkered, at the close",
                      handoff_collect([](const seed_row& r) {
-                         return r.settled_land_regions > 0
-                             ? static_cast<double>(r.checkered_regions) / static_cast<double>(r.settled_land_regions)
+                         return r.at_close.settled_land_regions > 0
+                             ? static_cast<double>(r.at_close.checkered_regions) / static_cast<double>(r.at_close.settled_land_regions)
                              : k_undef;
                      }));
         std::size_t present = 0;
-        for (const seed_row& r : rows) if (r.expl_ran && r.checkered_regions > 0) ++present;
-        std::printf("     present in %zu of %zu worlds with a handoff\n", present, handoffs);
+        for (const seed_row& r : rows)
+            if (r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches) && r.at_close.checkered_regions > 0)
+                ++present;
+        std::printf("     present at the close in %zu of %zu worlds with a usable handoff\n", present, handoffs);
         std::printf("     concentrated in large centres - n/a: population centres carry no culture shares (the\n"
                     "     PROPOSED Beat 2 mechanism), so every province of a region reads alike and there is no\n"
                     "     city-grain mix to concentrate.\n\n");
@@ -777,51 +980,129 @@ int main(int argc, char** argv)
         std::size_t unreadable = 0, any_far = 0;
         for (const seed_row& r : rows)
         {
-            unreadable += static_cast<std::size_t>(r.flows_unreadable);
-            if (r.expl_ran && r.flows_far > 0) ++any_far;
+            unreadable += static_cast<std::size_t>(r.at_close.flows_unreadable);
+            if (r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches) && r.at_close.flows_far > 0)
+                ++any_far;
         }
-        std::printf("[ 7] Far trade - MEASURED off the 1660 handoff's standing trade flows, the only seeded trade\n"
-                    "     relationships generation holds (nothing yet carries them into play as preferred\n"
-                    "     sellers). A market is a living polity's capital seat; a flow is far when its buyer is\n"
-                    "     strictly farther (region_distance) than the seller's nearest other market:\n");
-        print_spread("far share of flows, by count",
+        std::printf("[ 7] Far trade - MEASURED off the standing trade flows at the 1660 control and the %lld close,\n"
+                    "     the only seeded trade relationships generation holds (nothing yet carries them into play as\n"
+                    "     preferred sellers). A market is a living polity's capital seat; a flow is far when its buyer\n"
+                    "     is strictly farther (region_distance) than the seller's nearest other market:\n", T);
+        print_spread("far share of flows by count, 1660 control",
                      handoff_collect([](const seed_row& r) {
-                         return r.flows > 0 ? static_cast<double>(r.flows_far) / static_cast<double>(r.flows) : k_undef;
+                         return r.at_1660.flows > 0 ? static_cast<double>(r.at_1660.flows_far) / static_cast<double>(r.at_1660.flows) : k_undef;
                      }));
-        print_spread("far share of flows, by volume",
+        print_spread("far share of flows by count, at the close",
                      handoff_collect([](const seed_row& r) {
-                         return r.volume > 0 ? static_cast<double>(r.volume_far) / static_cast<double>(r.volume) : k_undef;
+                         return r.at_close.flows > 0 ? static_cast<double>(r.at_close.flows_far) / static_cast<double>(r.at_close.flows) : k_undef;
                      }));
-        print_spread("standing flows per world",
-                     handoff_collect([](const seed_row& r) { return static_cast<double>(r.flows); }));
-        std::printf("     worlds with at least one far flow: %zu of %zu with a handoff; unreadable flows %zu\n\n",
-                    any_far, handoffs, unreadable);
+        print_spread("far share of flows by volume, at the close",
+                     handoff_collect([](const seed_row& r) {
+                         return r.at_close.volume > 0 ? static_cast<double>(r.at_close.volume_far) / static_cast<double>(r.at_close.volume) : k_undef;
+                     }));
+        print_spread("standing flows per world, 1660 control",
+                     handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_1660.flows); }));
+        print_spread("standing flows per world, at the close",
+                     handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.flows); }));
+        std::printf("     worlds with at least one far flow at the close: %zu of %zu with a usable handoff;\n"
+                    "     unreadable flows %zu\n", any_far, handoffs, unreadable);
+        std::printf("     NOT THIS READING'S SECOND HALF: haulage_measure's far-trade reading (BL-1006) ticks a year\n"
+                    "     of play on epoch_year 1960, which is the superseded two-span arc with Exploration off; it\n"
+                    "     moves with the epoch flip, not with --through.\n\n");
     }
 
     // ---- 8 ------------------------------------------------------------------
     {
-        std::size_t lit = 0;
-        for (const seed_row& r : rows) lit += static_cast<std::size_t>(r.industrialised_regions_1660);
+        std::size_t lit_1660 = 0, lit_close = 0;
+        for (const seed_row& r : rows)
+        {
+            lit_1660  += static_cast<std::size_t>(r.at_1660.industrialised_regions);
+            lit_close += static_cast<std::size_t>(r.at_close.industrialised_regions);
+        }
         std::printf("[ 8] Industrialisation - n/a: industry points do not exist (Beat 1: cities make industry\n"
                     "     points), so there is no holding to be uneven and no fuel gate to show in it.\n");
-        std::printf("     evidence: regions industrialised at the 1660 handoff, summed over the spread %zu\n\n", lit);
+        std::printf("     region half - STRUCTURAL ZERO: Stage 4's per-region lag is computed only for a settlement\n"
+                    "     stop at or after 1700, and the shipped world's settlement stops at epoch 0, so no region can\n"
+                    "     light a furnace however far the span runs. Regions industrialised, summed over the spread:\n"
+                    "     1660 control %zu, close %zu.\n", lit_1660, lit_close);
+        std::printf("     polity half - evidence, not the reading: living polities whose materials band crossed\n"
+                    "     industrial (polity::industrial_year set):\n");
+        print_spread("industrial polities per world, 1660 control",
+                     handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_1660.polities_industrial); }));
+        print_spread("industrial polities per world, at the close",
+                     handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.polities_industrial); }));
+        std::printf("\n");
     }
 
     // ---- 9 ------------------------------------------------------------------
-    std::printf("[ 9] Migration - n/a: there is no 1660 -> 1960 span for an urban share to rise across, and\n"
-                "     generation runs no cross-border migration stream.\n\n");
+    if (continued)
+    {
+        std::printf("[ 9] Migration - PARTIAL\n");
+        std::printf("     urban share rising - MEASURED off region urban_population / population at the 1660 control\n"
+                    "     and the %lld close:\n", T);
+        print_spread("urban share of heads, 1660 control",
+                     handoff_collect([](const seed_row& r) {
+                         return r.at_1660.heads > 0 ? static_cast<double>(r.at_1660.urban_heads) / static_cast<double>(r.at_1660.heads) : k_undef;
+                     }));
+        print_spread("urban share of heads, at the close",
+                     handoff_collect([](const seed_row& r) {
+                         return r.at_close.heads > 0 ? static_cast<double>(r.at_close.urban_heads) / static_cast<double>(r.at_close.heads) : k_undef;
+                     }));
+        std::size_t rising = 0;
+        for (const seed_row& r : rows)
+        {
+            if (!(r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches))) continue;
+            if (r.at_1660.heads <= 0 || r.at_close.heads <= 0) continue;
+            const double a = static_cast<double>(r.at_1660.urban_heads) / static_cast<double>(r.at_1660.heads);
+            const double b = static_cast<double>(r.at_close.urban_heads) / static_cast<double>(r.at_close.heads);
+            if (b > a) ++rising;
+        }
+        std::printf("     urban share rose across the span in %zu of %zu worlds with a usable handoff\n", rising, handoffs);
+        std::printf("     at least one cross-border stream - n/a: generation runs no cross-border migration stream\n"
+                    "     (the PROPOSED Beat 2 mechanism).\n\n");
+    }
+    else
+    {
+        std::printf("[ 9] Migration - n/a: nothing ran past 1660 for an urban share to rise across (run with\n"
+                    "     --through 1960), and generation runs no cross-border migration stream.\n\n");
+    }
 
     // ---- 10 -----------------------------------------------------------------
     {
-        std::printf("[10] Decolonisation - n/a: it compares subjects at 1960 against 1660, and no 1960 polity map\n"
-                    "     exists; losing a subject without a war is likewise unrecorded. The 1660 half, MEASURED\n"
-                    "     off the handoff (living polities with an overlord):\n");
+        std::printf("[10] Decolonisation - %s\n", continued ? "MEASURED" : "n/a (the 1660 half only)");
+        std::printf("     subjects = living polities with an overlord, at the 1660 control%s:\n",
+                    continued ? " and at the close" : "");
         print_spread("subjects at 1660",
-                     handoff_collect([](const seed_row& r) { return static_cast<double>(r.subjects_1660); }));
-        std::size_t with = 0;
-        for (const seed_row& r : rows) if (r.expl_ran && r.subjects_1660 > 0) ++with;
-        std::printf("     worlds holding at least one subject at 1660: %zu of %zu (a world with none cannot\n"
-                    "     decolonise)\n\n", with, handoffs);
+                     handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_1660.subjects); }));
+        if (continued)
+        {
+            print_spread("subjects at the close",
+                         handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.subjects); }));
+            print_spread("subjections formed after 1660",
+                         handoff_collect([](const seed_row& r) {
+                             return static_cast<double>(r.subjections_formed_close - r.subjections_formed_1660);
+                         }));
+            print_spread("subjects lost without a war after 1660 (refused-renewal secessions)",
+                         handoff_collect([](const seed_row& r) {
+                             return static_cast<double>(r.secessions_close - r.secessions_1660);
+                         }));
+            std::size_t fewer = 0, none_left = 0, peaceful_loss = 0, held_any = 0;
+            for (const seed_row& r : rows)
+            {
+                if (!(r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches))) continue;
+                if (r.at_1660.subjects == 0) continue;
+                ++held_any;
+                if (r.at_close.subjects < r.at_1660.subjects) ++fewer;
+                if (r.at_close.subjects == 0) ++none_left;
+                if (r.secessions_close > r.secessions_1660) ++peaceful_loss;
+            }
+            std::printf("     of %zu worlds holding a subject at 1660: fewer at the close %zu, none left %zu, at least\n"
+                        "     one lost without a war after 1660 %zu\n\n", held_any, fewer, none_left, peaceful_loss);
+        }
+        else
+        {
+            std::printf("     (a 1960 half needs --through 1960)\n\n");
+        }
     }
 
     // ---- 11 -----------------------------------------------------------------
@@ -829,16 +1110,95 @@ int main(int argc, char** argv)
                 "     (printing 'absent in every world' would be a refusal nobody measured).\n\n");
 
     // ---- 12 -----------------------------------------------------------------
-    std::printf("[12] War dead - n/a: there are no 1660 -> 1960 wars, and in the spans that do exist battles\n"
-                "     destroy armies, never population (settlement.hpp `region::army_stock`, Ben 2026-09-08).\n\n");
+    std::printf("[12] War dead - n/a: battles destroy armies, never population, in every span that runs\n"
+                "     (settlement.hpp `region::army_stock`, Ben 2026-09-08); the war-death mechanisms are\n"
+                "     Digitisation's and do not exist.\n\n");
 
     // ---- 13 -----------------------------------------------------------------
     std::printf("[13] Catastrophe lean - n/a: it splits worlds by world war (reading 11 is n/a) and reads\n"
                 "     aggregate Alarm against Ceiling, and the campaign world seeds neither a per-nation Alarm\n"
                 "     nor a Ceiling.\n\n");
 
-    std::printf("SUMMARY  measured 3 (1, 3, 7) | partial 1 (5) | n/a 9 (2, 4, 6, 8, 9, 10, 11, 12, 13);\n"
-                "         6 prints a labelled proxy and 10 its 1660 half beside the n/a.\n");
+    // ---- SUMMARY (BL-1029: the states are computed, not hand-typed) ----------
+    {
+        std::string measured = "1, 7", partial = "5", zero, na = "2, 4, 6, 8, 11, 12, 13";
+        if (r3_structural_zero) zero = "3"; else measured = "1, 3, 7";
+        if (continued) { measured += ", 10"; partial += ", 9"; }
+        else           { na += ", 9, 10"; }
+        const auto count = [](const std::string& list) {
+            return list.empty() ? 0 : 1 + static_cast<int>(std::count(list.begin(), list.end(), ','));
+        };
+        std::printf("SUMMARY at %lld  measured %d (%s) | partial %d (%s) | structural zero %d (%s) | n/a %d (%s);\n"
+                    "         6 prints a labelled proxy; 8 prints its region half as a structural zero and its polity\n"
+                    "         half as evidence. Prefix: %zu of %zu fingerprinted controls matched.\n",
+                    T, count(measured), measured.c_str(), count(partial), partial.c_str(),
+                    count(zero), zero.empty() ? "-" : zero.c_str(), count(na), na.c_str(),
+                    prefix_checked - prefix_failed, prefix_checked);
+    }
+
+    // ---- JSON (BL-1029) -----------------------------------------------------
+    if (!out_path.empty())
+    {
+        FILE* f = std::fopen(out_path.c_str(), "w");
+        if (!f)
+        {
+            std::printf("Could not write %s\n", out_path.c_str());
+        }
+        else
+        {
+            const auto put_rho = [&](const char* key, double v, const char* tail) {
+                if (std::isnan(v)) std::fprintf(f, "\"%s\": null%s", key, tail);
+                else               std::fprintf(f, "\"%s\": %.4f%s", key, v, tail);
+            };
+            const auto put_handoff = [&](const char* key, const handoff_reading& h, const char* tail) {
+                std::fprintf(f, "\"%s\": {\"settled_land_regions\": %d, \"checkered_regions\": %d, \"flows\": %d, "
+                                "\"flows_far\": %d, \"flows_unreadable\": %d, \"volume\": %lld, \"volume_far\": %lld, "
+                                "\"industrialised_regions\": %d, \"polities_industrial\": %d, \"urban_heads\": %lld, "
+                                "\"heads\": %lld, \"subjects\": %d, \"alive_polities\": %d}%s",
+                             key, h.settled_land_regions, h.checkered_regions, h.flows, h.flows_far, h.flows_unreadable,
+                             (long long)h.volume, (long long)h.volume_far, h.industrialised_regions,
+                             h.polities_industrial, (long long)h.urban_heads, (long long)h.heads, h.subjects,
+                             h.alive_polities, tail);
+            };
+            std::fprintf(f, "{\n \"_note\": \"BL-1029 digitisation_sim_harness per-seed table. Close = the shipped world "
+                            "(epoch_year 0) with Exploration's call continued to through_year; control = the 1660 handoff "
+                            "re-run from the fixture and held to the seed library fingerprint. Reported, not gated.\",\n");
+            std::fprintf(f, " \"through_year\": %lld,\n \"band_tier3_recipes\": %d,\n \"worlds\": [\n", T, band_tier3_recipes);
+            for (std::size_t i = 0; i < rows.size(); ++i)
+            {
+                const seed_row& r = rows[i];
+                std::fprintf(f, "  {\"seed\": %u, \"era_ran\": %s, \"expl_ran\": %s, \"handoff_ok\": %s, "
+                                "\"has_fingerprint\": %s, \"prefix_matches\": %s, \"control_battles\": %lld,\n",
+                             r.seed, r.era_ran ? "true" : "false", r.expl_ran ? "true" : "false",
+                             r.handoff_ok ? "true" : "false", r.has_fingerprint ? "true" : "false",
+                             r.prefix_matches ? "true" : "false", (long long)r.control_battles);
+                std::fprintf(f, "   \"markets\": %d, \"markets_urban\": %d, \"corps_on_body\": %d, ",
+                             r.markets, r.markets_urban, r.corps_on_body);
+                put_rho("rho_firms_urban", r.rho_firms_urban, ", ");
+                put_rho("rho_firms_goods", r.rho_firms_goods, ",\n");
+                std::fprintf(f, "   \"installations\": %lld, \"advanced\": %lld, \"nations\": %d, "
+                                "\"nations_with_advanced\": %d, \"nations_with_heads\": %d, ",
+                             (long long)r.installations, (long long)r.advanced, r.nations,
+                             r.nations_with_advanced, r.nations_with_heads);
+                put_rho("treasury_per_head_gini", r.treasury_per_head_gini, ", ");
+                put_rho("treasury_per_head_max_on_med", r.treasury_per_head_max_on_med, ",\n   ");
+                put_handoff("at_1660", r.at_1660, ",\n   ");
+                put_handoff("at_close", r.at_close, ",\n");
+                std::fprintf(f, "   \"secessions_1660\": %lld, \"secessions_close\": %lld, "
+                                "\"subjections_formed_1660\": %lld, \"subjections_formed_close\": %lld, "
+                                "\"battles_standing\": %zu, \"buy_orders\": %zu, \"buy_orders_with_preferred_seller\": %zu, "
+                                "\"trade_routes\": %zu}%s\n",
+                             (long long)r.secessions_1660, (long long)r.secessions_close,
+                             (long long)r.subjections_formed_1660, (long long)r.subjections_formed_close,
+                             r.battles_standing, r.buy_orders, r.buy_orders_with_preferred_seller, r.trade_routes,
+                             i + 1 < rows.size() ? "," : "");
+            }
+            std::fprintf(f, " ]\n}\n");
+            std::fclose(f);
+            std::printf("\nWrote %s (%zu rows)\n", out_path.c_str(), rows.size());
+        }
+    }
+
     std::printf("REPORT ONLY - no reading is asserted; the spread above is for judgement.\n");
     return 0;
 }

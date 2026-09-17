@@ -18694,6 +18694,52 @@
         "design",
         "resolved"
       ]
+    },
+    "BL-1029": {
+      "glyph": "✓",
+      "sprint": "43",
+      "written": "2026-09-17",
+      "author": "Ben (2026-09-17, cutting the Digitisation build plan: elicitation form); Claude (item text, from a seven-lane read of the engine with an adversarial cross-check)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "priority": "A",
+      "status": "complete",
+      "requires": [
+        "BL-1026",
+        "BL-1027"
+      ],
+      "id": "BL-1029",
+      "short_name": "DIGITISATION_READINGS_AT_1960",
+      "difficulty": 3,
+      "title": "digitisation_sim_harness reads the shipped world continued to 1960 beside a 1660 control, and says on its face what each of the thirteen readings is",
+      "authority_doc": "docs/generation/DIGITISATION.md",
+      "files": [
+        "tools/verify/digitisation_sim_harness.cpp",
+        "tools/verify/harness_params.hpp"
+      ],
+      "design": "DELIVERED 2026-09-17 (sprint 43). digitisation_sim_harness gained --through <year> and --out, a 1660 control re-run from the fixture and folded with make_exploration_output, and a prefix check against the seed library fingerprint (Exploration battles, raw standing flows, living polities). Handoff readings 5, 7, 8, 9 and 10 are read by one function at both years. SUMMARY states are computed; reading 3 prints as a STRUCTURAL ZERO. Handoff violations exclude a seed. The face names haulage_measure's far-trade reading (BL-1006) as running the superseded arc. digitisation_readings_1960.json is checked in (16 seeds, 1,401 s Release).\n\nA FIRST RUN CAUGHT A CHECK BUG, NOT A DIVERGENT WORLD: seeds 11 and 31 mismatched on flows by one, because the fold prunes flows whose clause lapsed or whose party died by the close while the fingerprint counts the raw sim state. The check now compares raw flows; the reading stays on the folded handoff. Re-run: 16 of 16 controls match, 0 handoff violations.\n\nTHE BASELINE AT 1960 (16 library seeds; the shipped world continued on Exploration's forces). [1] rho(firms, urban heads) median 0.431 against rho(firms, goods) 0.460; urban wins in 7 of 16 — density does not follow cities. [3] structural zero (0 tier-3 recipes in the ancient band). [5] checkered land regions median 1 at 1660 -> 0 at 1960; present at the close in 6 of 16 (seed 31: 90 -> 0; seed 25: 2 -> 17). [7] far share of flows by count median 0.638 -> 0.683; standing flows median 51 -> 52. [8] regions industrialised 0 at both years (structural); industrial polities median 12 -> 21. [9] urban share of heads median 14.7% -> 14.6%, rising in 5 of 16. [10] subjects median 3 -> 3; fewer at the close in 0 of 14 worlds holding one; a subject lost without a war after 1660 in 2 (seed 32 forms and frees 45). [2, 4, 6, 11, 12, 13] n/a until their mechanism. SUMMARY at 1960: measured 3 (1, 7, 10), partial 2 (5, 9), structural zero 1 (3), n/a 7.\n\nREAD: on Exploration's forces alone the world coasts through 300 years — no urbanisation, no decolonisation, flat trade, mixing that fades — and only the materials band keeps climbing. Every beat DIGITISATION.md names has to be supplied as mechanism; nothing is inherited as momentum. Answers NR-886 item 7.\n\n--- THE ORIGINAL ITEM ---\n\nWHY. BL-982 (Digitisation readings) generates at epoch 0 and reads the 1660 close: 3 measured, 1 partial, 9 n/a (NR-886 item 7). Its recorded baseline (6/16, 0, 12/16, 0.48/0.74/0.82) and built exe predate wave A. The measure-before-mechanism slice gives every reading a real 1960 baseline before any Digitisation mechanism is admitted.\n\nWHAT IT CAN AND CANNOT MOVE, said on the face. Real 1960 values: reading 5's present half (mixed cities) and reading 7 (far trade, as standing flows). Newly measurable from existing state: reading 10 (subjects at 1660 and 1960, plus subject_freed events after 1660 split by whether a war freed them) and reading 9's urban half (urban share of population at 1660 and 1960). Inputs moved only: reading 1 and reading 6's proxy. STRUCTURAL ZEROS, printed as such and never counted measured: reading 3 (the recipe band follows epoch_year, ancient at epoch 0) and reading 8's region half (Stage 4 lag is computed only for a settlement stop >= 1700). Polity industrial crossings still move and are printed. n/a until their mechanism: 2, 4, 11, 12, 13, 5's concentration half, 9's cross-border half. The far-trade reading of BL-1006 (haulage_measure) runs epoch_year 1960, the superseded arc; the face records that it moves with the epoch flip, not here.\n\nTHE WORK. `--through <year>` sets exploration_stop_year (default 1660; this sprint runs 1960), epoch_year stays 0. Per seed: the world through --through, as today up to the applied search winner; a 1660 control re-run from the captured fixture (exploration_sweep.cpp:566-590, reading fx.works); the control's fingerprint counters must equal the library fingerprint from BL-1026, which proves the extended run agrees with the shipped world at 1660. Every face line names its surface and its year. SUMMARY counts measured, partial, structural zero and n/a separately (today it counts reading 3 as measured). Handoff violations from generation_report are printed per seed, and a seed with one reports no reading as measured. Output also to a per-seed JSON via --out.\n\nDONE WHEN. The sixteen library seeds read at 1660 and 1960, per seed; every control matches its fingerprint; no src/world change; the SUMMARY and every structural zero honest. NR-886 item 7 is answered by the run and noted there.\n\nRUN CONDITIONS (sprint 43, all items): one lane, serial, in the main session; Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify, never %TEMP%; timings on a quiet machine with the build tree quoted; never write over a tracked sweep artefact (use --out). No item in this sprint changes a shipped world.",
+      "resolved": "2026-09-17",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "priority",
+        "status",
+        "requires",
+        "id",
+        "short_name",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved"
+      ]
     }
   }
 }
