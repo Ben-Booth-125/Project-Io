@@ -250,6 +250,51 @@
    ],
    "resolution": "w_aggr_q relocated outside the per-season loop in history_sim.cpp so it leans a candidate once, matching the fear lean's siting. Resolves NR-831. Before/after on the wave-1 4-seed reading: battles 3114 -> 3114 median (unchanged); seeds 0 and 3 moved slightly in the full 4-seed digest set once combined with the other six items."
   },
+  "alarm-stops-saturating": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "visible_capability_reference is set from the MEASURED distribution of visible capability, and the derivation is recorded.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "Alarm across near pairs has a spread rather than a mode at 1000, and the sweep reports it.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "The sprint-41 arms-race reading is re-taken through the unsaturated signal and recorded, whatever it says.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ],
+   "resolution": "Archived unmerged (Ben, 2026-09-16). Built on worktree-agent-a0956d0cb7960ba28 (6d7bb462): reference 5000 -> 31095 from the p90 of visible capability; reads at 1000 88.5% -> 11.0%; but pooled displacement 2.73 -> 0.50 and no weight 0-1000 restores it above 1. The finding is written into EXPLORATION.md section The arms race (968b2615)."
+  },
   "ancient-chain-does-not-convert": {
    "rows": [
     {
@@ -369,6 +414,31 @@
   },
   "app-cpp-decomposition": {
    "resolution": "Complete 2026-08-10. app.cpp 3826 -> 1422 lines (-2404) across four VERBATIM extractions, one commit each: verify_api.cpp + app_capture.cpp (~1,180 lines), startup_screens.cpp (~580, matching STARTUP.md ownership), time_panel.{hpp,cpp} (~300), session_history.{hpp,cpp} (~230). Bodies were moved by line-range copy so logic reordering was not possible; the verify API's 60 registered function names were diffed byte-identical (scripts/verify/*.lua call them by name). Two forced changes, both recorded: frame_stats_instance lost its anonymous namespace (render() and the CSV tap now sit in different TUs) and the extracted system menu inlines the pause toggle rather than calling private app::dispatch_action - reviewed as character-equivalent."
+  },
+  "assimilation-lost-to-the-tail": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness"
+     ],
+     "requirement": "A holder's own assimilation gain is never lost to the anonymous tail: on the four-culture path the holder's share is nameable and nothing already gained is stranded.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ],
+   "resolution": "Reverted on main (73bd5938) after cold review: the holder-claims-the-smallest-slot shape evicts large named peoples on a one-unit gain (churned frontiers: named < unnamed by >100 per-mille 13% -> 80%) and strands the previous holder. Re-work on the tail-tracks-the-holder shape was stopped when Ben archived it; checkpoint 0c9fbd0e on worktree-agent-a56fcafdff713aafe (unverified)."
   },
   "band-ceiling-observable": {
    "rows": [
@@ -493,6 +563,21 @@
   },
   "body-market-index": {
    "resolution": "world.hpp gains mutable body_market_index + count/max-id stamp (markets are created, never destroyed — verified); markets_by_body returns the cached ref; market_for_tile/clear_markets allocation-free on the hot path, signature unchanged."
+  },
+  "breadcrumb-dropped": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "doc: header_graph --strict"
+     ],
+     "requirement": "The section and the per-tile half of Surfacing are gone; no citation dangles.",
+     "notes": "",
+     "result_metric": "the section, its banner and the per-tile half of Surfacing are gone; the ledger header no longer names two views; header_graph dangling 80 -> 79"
+    }
+   ],
+   "resolution": "Ben ruled DELETE on the builder in 2026-08-30; the design outlived the surface and now leaves with it."
   },
   "breakdown-to-city-states": {
    "rows": [
@@ -1109,6 +1194,31 @@
    ],
    "resolution": "The Empires phase opening now seeds a city state on any region already above the 300,000-head threshold (Ben's ruling on NR-835) and leaves the rest unorganised, gated by a new city_states_by_population_threshold flag (true only on generation's own round, so every history_sim_harness fixture isolating another mechanism is unaffected). A new ORGANISE verb grows a polity onto reachable unorganised ground it can supply (BL-922's capital reach), priced by kinship, refused outright against opposed cultures (conquest only); scheduled foundings arrive unorganised; a centre crossing the threshold on its own promotes to a new city state at any point in the run."
   },
+  "coastal-ground-cheaper": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "The cost of taking coastal ground is compared against inland ground across the sweep.",
+     "notes": "",
+     "result_metric": "deaths per region taken, 16 seeds at epoch 0: inland 3,084, coastal 2,613 (cheaper in 12/16 seeds), coastal overland 2,749, held-shore forage crossing 2,028, ration-fed crossing 3,162 pooled (median 2,075 vs 2,915 inland); 4,193 crossings, 0 starved."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "doc: CREEDS.md"
+     ],
+     "requirement": "The outcome is recorded: if coastal is not cheaper, CREEDS.md says the floor's redundancy with the port gate is legitimate; if it is, a number goes to Ben. No magnitude moves.",
+     "notes": "",
+     "result_metric": "coastal IS cheaper (about 15%, apparently from smaller garrisons, not the ration); per the ruling nothing went into CREEDS.md and the number goes to Ben (NR-886)."
+    }
+   ],
+   "resolution": "Built by lane A11 (5835389c); six record-only battle-trace fields added."
+  },
   "coastal-territory": {
    "rows": [
     {
@@ -1144,6 +1254,46 @@
      "evidence": "COMPLETE. All four digests reported and LEFT RED. The agent reproduced the four OLD values on a stashed baseline first, so the movement is attributable to this item alone."
     }
    ]
+  },
+  "collapse-doc-folded-and-retired": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "doc: header_graph --strict"
+     ],
+     "requirement": "docs/lore/COLLAPSE.md no longer exists; CIVILISATION.md carries the folded sections; header_graph dangling count not risen.",
+     "notes": "",
+     "result_metric": "docs/lore/COLLAPSE.md gone; CIVILISATION.md carries the ideological axis, the pattern library reseated on the three exits the design has, contagion as priced supply, and the affordability rungs; header_graph dangling 80 -> 78"
+    }
+   ],
+   "resolution": "The roster, culminations and matrix retire to docs/research/COLLAPSE_ROSTER.md as a mechanism reference; 23 citations repointed."
+  },
+  "colonisation-d1-d3-regression": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: colonisation_harness"
+     ],
+     "requirement": "colonisation_harness reports 0 failures across its three seeds on the merged tree.",
+     "notes": "",
+     "result_metric": "3/3 seeds dangling 0, mismatches 0; 0 failures on the merged tree"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: diff review"
+     ],
+     "requirement": "The cause is named at the verb that moved ownership without maintaining seat_region, fixed there, and the assertion is not weakened.",
+     "notes": "",
+     "result_metric": "culprit 3d58001d (schism verb): the apply loop demoted every seat in the residue block; fixed at the verb (seats in the block stay seats; block hinterland keeps its seat if it came along, else the new seat; parent ground whose seat left re-points at the parent capital). Assertion untouched."
+    }
+   ],
+   "resolution": "Bisected on seed 2 with the cached builder; fixed in the schism apply loop. Digest seedA/on moved 49FB45407FF7C3C0 -> 457483363D79D700 (seedB/on, seedA/off, 1960 unchanged); exploration_sim_harness R3b pin red by the same cause (battles 306->308, conquests 304->306, foundings 522->472, owner_changes 2174->2196). Not re-pinned; NR-875 asks Ben to authorise the wave re-bless."
   },
   "composite-standing-index": {
    "rows": [
@@ -1190,6 +1340,31 @@
     }
    ],
    "resolution": "Landed on main (worktree-agent-aae464e367f3fcb1d, merged 0a8f6de2). condition_set_harness 67/67, save_roundtrip clean (world_save_version bumped to 5, then 6 when BL-571 merged on top — see nation-garrisons' resolution)."
+  },
+  "consolidation-folds-every-seat": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sim_harness"
+     ],
+     "requirement": "exploration_sim_harness: a two-seat polity opens with both seats' stock in its treasury and the non-capital seat at 0.",
+     "notes": "",
+     "result_metric": "exploration_sim_harness R5.4b/R5.4c: a two-seat polity opens with both seats' stock in its treasury and the non-capital seat at 0, and a neighbour's seat folds into its own capital"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "exploration_sweep movement (treasury spread, readings 7-8) described for the wave re-bless.",
+     "notes": "",
+     "result_metric": "treasury mean 18.2M -> 32.5M, per-seed median 1.26M -> ~3M, post roads 34 -> 59 in 15/16 seeds, displacement identical line for line"
+    }
+   ],
+   "resolution": "Every seat a polity holds folds its stores into the capital at 1200 CE, as EXPLORATION.md says and Ben ruled (NR-871). The bigger purse buys roads first. No digest moved, which is itself the finding: the deep digest does not hash region treasury (BL-1009)."
   },
   "construction-panel-deferred-demolish": {
    "resolution": "Dismantle routes through ui_state pending_demolish (the selection-panel seam); bonus real fix: the old call passed selected_entity, which in the tile-fallback path is the TILE id, so tile-selected dismantles silently failed — now resolves found_id. Reopen/Close bool flips stay direct with an exemption comment."
@@ -1559,6 +1734,41 @@
     }
    ],
    "resolution": "First slice landed: reach/capital/market-share bands, player-exact + rival-banded ledger, no total row. standing_harness 41/41 PASS. Production axis deferred (R5) — no honest visible-information source exists yet."
+  },
+  "creed-classifier-one-scale": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "The consolidator/expansionist lean distribution is measured over ALL living polities on the 16-seed parity sweep.",
+     "notes": "",
+     "result_metric": "872 polities: consolidator lean 54-360 (median 156), expansion 590-910 (median 760); raw compare picks consolidator in 0/872."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "The classifier compares the two leans on one scale (per-mille rank among the round's living polities, as BL-955 does in the sim).",
+     "notes": "",
+     "result_metric": "ranked per seed with the sim's own rank function, top third on each lean."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "Reading 3 is re-taken and recorded, whatever it says.",
+     "notes": "",
+     "result_metric": "reading 3 treasury top-3 0c/16e -> 6c/4e/1 both; regions 0/16 -> 8/5/3."
+    }
+   ],
+   "resolution": "Built by lane A10 (5040c19c). EXPLORATION.md section Two ways to be strong and its open question rewritten."
   },
   "creeds-pantheon-per-culture": {
    "rows": [
@@ -2077,6 +2287,66 @@
   "determinism-iteration-sweep": {
    "resolution": "dispatch_convoys + order-book passes + centre walks id-sorted; market_for_body picks lowest id (was first hash hit — feeds convoy.source_market and the serialised trade-route record); state_hash extended with tile resource_remaining and w.units; two flagged econ sites verified order-independent and documented instead of sorted; stale hard_coded_world comment fixed."
   },
+  "digest-sees-the-money": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "The deep digest folds seeded sentiment (sorted pairs and values), road tiers, region and nation treasuries, the Exploration stocks (port, navy, standing army) and corridor tier counts.",
+     "notes": "",
+     "result_metric": "deep_digest(world, fixture) folds sentiment pairs, road_level per tile, region treasury / port_stock_q / standing_army, polity navy_stock, corridor tiers; nation treasury already via state_hash."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism (local, uncommitted)"
+     ],
+     "requirement": "A deliberate one-field perturbation of EACH newly covered field fails world_determinism.",
+     "notes": "",
+     "result_metric": "8/8 one-field perturbations fail world_determinism (the old digest missed 7)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "Digest values before and after recorded; the world itself is unchanged; the re-bless waits for Ben.",
+     "notes": "",
+     "result_metric": "coverage-only movement 983298AE -> 6B860490 (seedA/on) etc., world unchanged; re-blessed with the wave in 32e04a19."
+    }
+   ],
+   "resolution": "Built by lane A4 (69063518). Merge verified: the widened digests reproduced exactly on the integrated tree."
+  },
+  "digitisation-readings": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness"
+     ],
+     "requirement": "A harness prints all thirteen DIGITISATION.md readings over a 16-seed sweep as a spread, not a per-world verdict.",
+     "notes": "",
+     "result_metric": "digitisation_sim_harness over the 16 library seeds: density (cities beat goods in 6/16 worlds), advanced chains (0, see note), mixed cities partial (12/16 worlds checkered), far trade on 1660 flows (0.48/0.74/0.82 by count)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: digitisation_sim_harness"
+     ],
+     "requirement": "Each reading prints n/a honestly until the mechanism it reads exists; none is weakened to pass.",
+     "notes": "",
+     "result_metric": "nine readings print n/a with the missing mechanism named; a treasury-per-head proxy for inequality is labelled as not the reading."
+    }
+   ],
+   "resolution": "Built by lane A9 (4a7154cd). KNOWN FLAW: it generates at the app default epoch 0, whose ancient band allows no advanced recipe, so reading 3 is zero by construction; it should generate at 1960. Not changed (Ben stopped at wave A)."
+  },
   "displacement-clears-the-bar": {
    "rows": [
     {
@@ -2111,6 +2381,41 @@
     }
    ],
    "resolution": "Sprint 41 wave 3, authorised at Alarm 525 (NR-867)."
+  },
+  "displacement-volume-weighted": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "exploration_sweep prints the summed-count displacement and a per-seed volume-weighted variant beside the median; zero-neighbour seeds count only above a frontier floor and are otherwise reported as silent.",
+     "notes": "",
+     "result_metric": "pooled 1.58 (2262/1436), volume-weighted 3.88 (seed 10 dominates), median 1.33; silent floor 20 battles/span; 7 displaced, 1 displaced no-nb, 6 held, 2 silent"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: git diff exploration_sweep.json"
+     ],
+     "requirement": "exploration_sweep.json at the repo root carries the per-seed table for all eleven readings over 16 seeds and is checked in.",
+     "notes": "",
+     "result_metric": "exploration_sweep.json checked in, 16 rows, reproduced byte-identical on the merged tree before BL-981; regenerated after it"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "doc: docs/development/NEEDS_REVIEW.json"
+     ],
+     "requirement": "A NEEDS_REVIEW entry reports whether the weighted reading clears 1.0 at Alarm 525.",
+     "notes": "",
+     "result_metric": "NR-873 filed"
+    }
+   ],
+   "resolution": "The sprint-41 conclusion survives the volume correction on the pooled reading; six held seeds and two silent are on the face."
   },
   "drill-through-fold": {
    "rows": [
@@ -2259,8 +2564,104 @@
    ],
    "resolution": "Delivered. The Corporation-balances table now stretches the name column and fixes the Focus/Balance columns so identity + full balance read (no single-char collapse); the per-building table is removed (per-building profitability is the Corp Dashboard's job, BL-074). Verification surfaced the SAME SizingStretchProp collapse in the sibling Workforce, Stockpile-pools, and Markets tables in the same panel — fixed identically (name/resource column stretches, numeric columns fixed-width), completing the item's stated 'tables cramped… rows unreadable' goal rather than leaving a half-fix. Golden-verified (v009_economy_refit)."
   },
+  "empty-cultures-fold-into-parent": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: colonisation_harness"
+     ],
+     "requirement": "At the Colonisation/Empires boundary a culture holding no ground folds into its parent, keeping the lineage link.",
+     "notes": "",
+     "result_metric": "C17a/C17b: a daughter folds exactly when nothing on the map or in the founding schedule names it; ids stable; parent = living tree, coined_from = lineage, folded_into."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: colonisation_harness"
+     ],
+     "requirement": "Empty interior nodes are re-parented and no culture is orphaned (asserted).",
+     "notes": "",
+     "result_metric": "C17c/C17e: no orphan; the shipped validators reject an orphan and a folded culture with no lineage."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "The post-fold holding fraction is reported.",
+     "notes": "",
+     "result_metric": "tree 5,639 -> 813 (-85.5%); 99.8% of the folded tree holds ground at 400 BCE."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": "moved nothing: only 1 culture re-parented over 16 seeds; digests and sweep counters identical; confirmed on the integrated tree."
+    }
+   ],
+   "resolution": "Built by lane A8 (b253f151). The wizard lineage palette skips folded names and was not viewed live."
+  },
+  "endowment-spread-and-drift-golden": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: planetology_sweep"
+     ],
+     "requirement": "planetology_sweep asserts a minimum interquartile range of endowment per resource across accepted homeworlds and at least one bottom-decile resource per world; red on a forced-flat endowment (demonstrated locally), green on main.",
+     "notes": "",
+     "result_metric": "10 varying resources; IQR floor 0.10 (narrowest measured 0.129); 44% of worlds bottom-decile in some resource (measured 44.5%); red on forced-flat demonstrated"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: continent_drift"
+     ],
+     "requirement": "continent_drift asserts a digest over the reference seed's per-epoch snapshots; red on a deliberate one-epoch perturbation (demonstrated locally), green on main.",
+     "notes": "",
+     "result_metric": "drift digest 481BDCA5300AF14F over 21 epochs; red on a skipped epoch demonstrated; C6 ceiling 4x full pass"
+    }
+   ],
+   "resolution": "Both assertions green on the merged tree. Finding filed as NR-872: six metal endowments move with metallicity, so 55.5% of worlds are poor in nothing."
+  },
   "enum-switch-warning-sweep": {
    "resolution": "hired handled in severity_of + statement switch; construction_result::tech_locked maps to new corp_command_result::rejected_tech_locked (ACTIONS.json updated, mirror regenerated); corporation_generation explicit neutral cases (NR-126 holds the design question); 4 file-local IMGUI_DEFINE_MATH_OPERATORS dropped; unused/format fixes across src + tools. All touched files pass -Wall -Wextra clean per-slice; integrating build green."
+  },
+  "ephemeral-cultures-measured": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep",
+      "headless: colonisation_harness"
+     ],
+     "requirement": "history_sweep and colonisation_harness print cultures coined, holding at the boundary, and the ratio per seed.",
+     "notes": "",
+     "result_metric": "history_sweep and colonisation_harness print coined / holding at the boundary / holding at 1200 / empty leaves by depth; four keys per sweep row"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "doc: NEEDS_REVIEW.json"
+     ],
+     "requirement": "A NEEDS_REVIEW entry puts the two candidate rules to Ben with the numbers; no rule is built in this item.",
+     "notes": "",
+     "result_metric": "NR-879 carries rules A and B with the numbers; no rule built"
+    }
+   ],
+   "resolution": "Pooled 5,453 coined, 790 holding at the boundary (14.4%), 471 at 1200 CE (8.6%); the empty mass is 4,455 first-generation leaves against 208 interior nodes, and no cradle is ever empty. Holding falls a further 40% inside the Empires round, which neither candidate rule addresses."
   },
   "era-banded-baskets": {
    "rows": [
@@ -2491,6 +2892,21 @@
    ],
    "resolution": "Complete for BL-274 and BL-299; the no-elimination fix (pre-rebase id BL-308) PARTIAL and stays open. Hegemony became reachable (0/12 -> 1/12) but elimination did not (still 0/12), with the weakest power now measured at median 6 provinces, range 1..22 — a sharper diagnosis rather than a fix."
   },
+  "era-world-three-reds": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: era_world_harness"
+     ],
+     "requirement": "Each of R1, R2, R5 is diagnosed; the harness is green on main or each remaining red is named as a baseline in its own header and in DEVELOPMENT_PRACTICES.md with its cause.",
+     "notes": "",
+     "result_metric": "R1 and R2 were stale checks, restated and green; R5 is a real red (no furnace lights in any 1960 world: no polity passes capacity 4, the rung needs 5), named as a baseline in the harness header and in DEVELOPMENT_PRACTICES.md section Known harness baselines. 27 pass / 1 baseline."
+    }
+   ],
+   "resolution": "Built by lane A11 (545de009). Its owner is Digitisation industrialisation, which was archived unbuilt."
+  },
   "exploration-handoff-crosses": {
    "rows": [
     {
@@ -2688,6 +3104,31 @@
    ],
    "resolution": "Delivered 2026-07-07. Market-side feedback falls out of BL-078/095; on top, a narrow deterministic background-corp agency was added (idle a persistent loss-maker / switch a floored recipe), the player never auto-acted on. The already-live depletion throttle was reconciled in the docs. The scoped standing-rule exception was written into io-standing-rules.md on landing."
   },
+  "far-trade-reading": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: haulage_measure / campaign_lapse"
+     ],
+     "requirement": "On the landscape-search winner over a seed spread, at the epoch and after a year of play, the reading prints (a) volume DELIVERED and SOLD at a market other than the source pool's, (b) the share of it whose destination is not the seller's nearest market, (c) the price gap per delivered good at dispatch and at arrival.",
+     "notes": "",
+     "result_metric": "haulage_measure --far-trade; seeds 0-7 at 1960: ~2,950 convoys/yr, all intra-body, all delivered; (a) sold at destination 0.0 every seed; 95.6-98.2% of delivered volume past the nearest reachable market; gaps do not close (steel +94..+135 at dispatch and arrival). 6,727 arrivals, 0 mismatches."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: haulage_measure"
+     ],
+     "requirement": "On today's tree the reading reports same-body delivered volume honestly (expected ~0 under per-body pools) and names why.",
+     "notes": "",
+     "result_metric": "same-body sold-at-destination 0.0, named: every same-body arrival lands in the pool it left (seeds 5-7: 1136/1136 and 1265/1265)."
+    }
+   ],
+   "resolution": "Built by lane A1 (97b5af0b). Defaults taken: epoch 1960; \"at the epoch\" = first year of play; nearest = cheapest reachable by dispatcher pricing; sale counted cargo-first (upper bound). Filed as calls in NR-886."
+  },
   "fishing-wharf": {
    "rows": [
     {
@@ -2834,6 +3275,66 @@
    ],
    "resolution": "gather_army now pools a share of every HELD region's garrison (not just the staging hub plus half of its neighbours), each weighted by that region's network_supply_q read from the capital (BL-922) -- so roads and reach are now a real lever on force size. The defender's emergency levy stays local, unchanged."
   },
+  "force-upkeep-in-the-world": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sim_harness"
+     ],
+     "requirement": "exploration_sim_harness shows an over-built polity poorer every round and a cap-free allocation not buying an army every round.",
+     "notes": "",
+     "result_metric": "exploration_sim_harness: an over-built polity is poorer every round (R8.8), a 120-region realm's bill dwarfs its income (R8.12), the cap-free allocation buys 2 steps in 30 rounds on a short purse and holds after 32 on a long one (R8.19a/b), the levy draws and returns (R8.9b/R8.10)"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "exploration_sweep: treaty breaks above the 0.08% baseline; pooled displacement not below 1.0; movement reported.",
+     "notes": "",
+     "result_metric": "treaty breaks 10 -> 13 of ~5.9k; pooled displacement 1.64 on the item's own arm; movement reported, nothing re-blessed"
+    }
+   ],
+   "resolution": "A per-head bill from the treasury each round (1667 per 1000 heads-year, 1500 per 1000 units-year), the two scorer saturation caps deleted, and a paid army levied from the ground's manpower and returned on disband. The measurement outran the item: with no purse term in the scorer's hold, the median polity ends the span with a treasury in the hundreds (1.26M -> 211) and 14% of polity-rounds cannot pay. Structural, not a rate — NR-878 carries the call. It also refutes NR-861's premise: treaty breaks are bound by the treaty test's own terms, not by the purse."
+  },
+  "forest-is-the-fifth-branch": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "doc: tree_lint"
+     ],
+     "requirement": "A fifth Colonisation branch, Forest, teaches woodland and boreal, at about seven nodes, with rule-4 breadth and milestone requires_any sets updated.",
+     "notes": "",
+     "result_metric": "Forest (FO): 7 nodes, 3 majors / 4 minors, rings 1-3; tree 29 -> 36; milestone requires_any carry five majors."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "doc: COLONISATION_TREE.md"
+     ],
+     "requirement": "A table names which branch each of the twelve farm classes teaches; arid and stone are stated as hostile country that teaches nothing, deliberately.",
+     "notes": "",
+     "result_metric": "twelve-class table; arid and stone stated as hostile country that teaches nothing."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "doc: tree_lint"
+     ],
+     "requirement": "tree_lint is green on doc and store together; the highland gate atom decision is recorded either way.",
+     "notes": "",
+     "result_metric": "tree_lint OK on all four trees; highland atom not added (no sweep can show the need while the tree is unwired), recorded."
+    }
+   ],
+   "resolution": "Built by lane A10 (a42893ac). The item's \"Forest nodes held by forest peoples\" waits on a wired Colonisation tree."
+  },
   "frame-budget-hud": {
    "rows": [
     {
@@ -2904,6 +3405,31 @@
      "evidence": "COMPLETE 2026-09-03. Generation now reports per-pass wall clock and the span structure; world_determinism prints both. Measured on the merged tree, RELEASE harness path (build_lua_harness.bat -> build_gen/verify/), which memory io-headless-build-invocation names as the evidence path:\n\n  0 CE, 400 y      total 8200 ms = pre-settlement 443 + settlement 4 + ERA-1 323 + post-era 7428\n  0 CE, no era     total 6661 ms = pre-settlement 455 + settlement 3 + ERA-1   0 + post-era 6202\n  1960, two-span   total 7996 ms = pre-settlement 465 + settlement 2 + ERA-1 197 + post-era 7331\n\nTWO FINDINGS. (1) THE SECOND SPAN IS FREE, and in fact cheaper: 800 years at epoch 1960 costs 197 ms against 323 ms for 400 years at 0 CE. Cost tracks the region table the sim grows, not the years it walks, and at 1960 the settlement pass has already founded most regions - 506 sim foundings against 833. (2) THE ERA PASS COSTS 4x ITS OWN WALL CLOCK. Era on vs off at 0 CE is a ~1.5 s difference of which only 323 ms is the sim; the rest is the post-era passes working over the 833 regions it founded. Anyone budgeting the era off its own timer is wrong by four. Reported, never asserted.\n\nBUILD TYPE IS PART OF THE MEASUREMENT (cold review, 2026-09-03). The same passes in a Debug build/ tree price at 0 CE total 73130 ms with era-1 26189 ms, and 1960 two-span total 57792 ms with era-1 13838 ms. The era pass is 3.9% of a Release build and 36% of a Debug one - a ~9x difference in SHARE - so the derived ratio \"the era costs 4x its own wall clock\" is a Release fact and reads 1.45x in Debug. What reproduces across BOTH build types, and is the finding that matters, is the DIRECTION: the two-span 1960 world builds FASTER than the single-span 0 CE one (57.8 s vs 73.1 s in Debug, 8.0 s vs 8.2 s in Release). Quote no ratio from this row without its build type."
     }
    ]
+  },
+  "generation-corpus-reconcile": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "doc: the twelve files named in the item"
+     ],
+     "requirement": "Each of the twelve listed contradictions is either corrected in place or carried by a NEEDS_REVIEW entry stating both readings.",
+     "notes": "",
+     "result_metric": "8 corrected in place, 4 calls filed (NR-868..871), 1 already fixed on main"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: node tools/session/header_graph.js --strict"
+     ],
+     "requirement": "header_graph.js --strict reports no more dangling citations than before the change.",
+     "notes": "",
+     "result_metric": "header_graph --strict: 81 dangling before, 81 after (clean worktrees; the in-tree figure is inflated by agent worktrees)"
+    }
+   ],
+   "resolution": "Twelve contradictions reconciled; the 0.90 ratio deleted from code with province_capacity_probe per-body rows identical before and after."
   },
   "goldens-platform-dependent": {
    "rows": [
@@ -3179,6 +3705,31 @@
    ],
    "resolution": "Complete, all rows met. CMakeLists.txt now defaults CMAKE_BUILD_TYPE to Release on single-config generators only when the user has not chosen one, and every ctest test carries an explicit TIMEOUT (60s default, 120s for corp_terrain_matrix/econ_stability/data_creep_harness). Verified on WSL2/Ubuntu (Ninja) since the defect is single-config-generator-specific; MSVC/Windows is multi-config and was never affected. Note: this checkout's tools/verify/ tree predates BL-250's econ_stability timing sweep and does not contain data_creep_harness.cpp or font_glyph_harness.cpp at all (see resolution note on R3) - the long-timeout list names them anyway so they inherit the safe tier the moment they land, and cannot be measured here."
   },
+  "harnesses-read-the-validation-run": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: the six harnesses"
+     ],
+     "requirement": "No harness names the retired 80-tick warm start; each is re-read against the 12-tick settle and says whether its subject needs a longer history.",
+     "notes": "",
+     "result_metric": "no harness names app::pre_game_ticks; quarterly_return keeps 52 ticks (its 40-quarter cap needs history), the other five read the 12-tick settle."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: the six harnesses"
+     ],
+     "requirement": "Every band that moved is recorded with its cause; nothing is re-pinned silently.",
+     "notes": "",
+     "result_metric": "on 3-seed readings: spawn_solvency 1 -> 2 fails (R4 rivals field a standing force now red); acquisition_viability R1 accumulates 2/3 -> 1/3 (red); material_floor dead share 66.7% -> 33.7%; campaign_lapse window 13-20; player_seed_sweep --guard all pass."
+    }
+   ],
+   "resolution": "Built by lane A3 (11 commits, 7d534382..8be0c263). Two rows went honestly red; their calls are in NR-886."
+  },
   "header-chrome-tightening": {
    "rows": [
     {
@@ -3236,6 +3787,31 @@
     }
    ],
    "resolution": "Closed retroactively with the NR-075 cut audit (ratified by Ben 2026-08-09): BL-312/BL-313 landed in 9ecbbcf but were never flipped, so this group was never closed. Rows stand as pending-at-closure; the work shipped and the visual state was accepted in use — verification was overtaken by the closure, not performed."
+  },
+  "held-seeds-cause-measured": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "Every held seed carries one of four causes on the face and in exploration_sweep.json.",
+     "notes": "",
+     "result_metric": "every held seed carries a cause on the face and in exploration_sweep.json (held_cause, held_cause_facts, held_cause_census)"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "doc: NEEDS_REVIEW.json"
+     ],
+     "requirement": "A NEEDS_REVIEW entry summarises the census with the constant each cause implicates.",
+     "notes": "",
+     "result_metric": "NR-880 carries the census and the constant each cause implicates"
+    }
+   ],
+   "resolution": "Four of six held seeds are NO FRONTIER — by 1660 they have met one polity across a landmass, because the first crossing almost never happens: tens of thousands of unmet candidates, 2-8% clearing, one or two chosen in 460 years. One is NO EXPLORER; one fits none of the four labels. Cross-cutting: alarm saturates at 1000 on essentially every near pair, so the deterrence weight tuned in sprint 41 is acting as a flat constant."
   },
   "hire-gate-live-store": {
    "resolution": "corp_stockpile_total (unit_roster.cpp) and debit_from_corp (corp_command.cpp) retargeted to w.corp_body_pools via a lower_bound run in ascending body-id order; diagnosis (no crediting path to w.stockpiles) confirmed by repo-wide grep. corp_ai_harness ALL PASS incl. the 6 new BL-352 R4 labels (integration fix: scenarios plant the BL-325 S2 muster base the slice base predated)."
@@ -3467,6 +4043,41 @@
      "notes": "The combination is always a missing script or an authoring error and is never intended."
     }
    ]
+  },
+  "instruments-run-the-winner": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "code: grep generate_background_firms tools/verify"
+     ],
+     "requirement": "One shared helper builds the shipped start (generate, search, apply winner) and all nine named instruments call it.",
+     "notes": "",
+     "result_metric": "apply_shipped_landscape in harness_params.hpp; ten call sites across nine instruments converted (player_seed_sweep had a third)"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: demand_census"
+     ],
+     "requirement": "market_saturation exposes fraction_in_band and demand_census prints it per market and as a spread.",
+     "notes": "",
+     "result_metric": "fraction_in_band in market_saturation; demand_census median 0.10 ancient / 0.09 industrial"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: haulage_measure"
+     ],
+     "requirement": "haulage_measure is re-read on the winner and its movement against the 1055/802 baseline is recorded.",
+     "notes": "",
+     "result_metric": "haulage on the winner 2183 all / 1614 intra-body (seed candidate 1839/1411; baseline 1055/802); reproduced on the merged tree"
+    }
+   ],
+   "resolution": "Trade on the winner reads up, not down. Six instruments built but not run (campaign_lapse, acquisition_viability, material_floor, chain_conversion_probe, convoy_cargo_census, player_seed_sweep); their headline movements are owed. Haulage seed 4 scores composite 0 (the search cannot move there) — noted for BL-977."
   },
   "interactive-flow-acceptance": {
    "rows": [
@@ -4160,6 +4771,32 @@
    ],
    "resolution": "Landed on main (worktree-agent-a477567f226eaa377, merged b409fc6f). battle_engagement_harness 64/64 (new case B17), save_roundtrip clean. world_save_version collided with BL-570's own bump (both independently went 4->5) — resolved during merge into a single coherent bump to 6 covering both new fields."
   },
+  "nation-treasury-from-exploration": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: era_world_harness"
+     ],
+     "requirement": "era_world_harness: a nation folded from a richer polity starts richer; garrisons differentiate.",
+     "notes": "",
+     "result_metric": "era_world_harness R7a/R7d PASS: 38 nations from 42 folded polities, 0 chests unplaced, the median nation off the floor"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "doc: docs/generation/NATION_GENERATION.md",
+      "headless: world_determinism"
+     ],
+     "requirement": "The conversion is one named per-mille in NATION_GENERATION.md sec Pass 7; digest movement reported.",
+     "notes": "",
+     "result_metric": "NATION_GENERATION.md § Pass 7 names the per-mille; isolated digests 58DD9F4436B08894 / BB3823BED6EBF528, the other two unchanged"
+    }
+   ],
+   "resolution": "A polity's whole 1660 chest lands on the nation its anchored regions fold into, follows that seed through the size-floor merge, and converts once at 0.01 per mille — about thirteen quarters of the median nation's own levy. A nation no chest reached opens on the floor. era_world_harness's R1, R2 and R5 fail at the wave base too and are not this item's: BL-1010 carries them."
+  },
   "one-question-per-view-sweep": {
    "rows": [
     {
@@ -4471,6 +5108,43 @@
     }
    ]
   },
+  "pass-one-validator-in-production": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "code: diff review"
+     ],
+     "requirement": "pass_one_output_valid and exploration_output_valid run on the shipped generation path and a violation fails generation loudly.",
+     "notes": "",
+     "result_metric": "both validators run after each fold; violation recorded on generation_report (handoff_invalid, handoff_violation), stderr line, assert; world_determinism R3.6/R4.4 assert the flag false"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: grep"
+     ],
+     "requirement": "Grudges, corridors and the time-lapse come from the structs; the remaining hs.* reads in hard_coded_world.cpp are the narrative log, the report counters and the fixture capture, each justified in a comment beside it.",
+     "notes": "",
+     "result_metric": "kepler_grudges and the timelapse read from the struct; remaining hs.* reads justified in comments (narrative log, report counters, fixture capture)"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "headless: pass_one_handoff"
+     ],
+     "requirement": "Both structs carry the culture table at their close and the validator checks it equals creed_state, so the doc's \"the struct is the whole of what crosses\" holds by check; world_determinism digests are unchanged.",
+     "notes": "",
+     "result_metric": "cultures field on both structs; validator checks size, parentage, coining year, and equality with creed_state; digests unchanged; save_game_version 14->15, save_envelope_roundtrip PASS via the CMake tree"
+    }
+   ],
+   "resolution": "The doc's \"the struct is the whole of what crosses\" now holds by check."
+  },
   "pass6-density-retune": {
    "rows": [
     {
@@ -4697,6 +5371,41 @@
     }
    ],
    "resolution": "All 4 rows met. Play-zoom pan: Release 11.26 -> 4.98 ms, Debug 41.21 -> 6.74 ms work/frame; six goldens pixel-identical un-blessed against a baseline-blessed set. Whole-grid residual owned by BL-269."
+  },
+  "planetology-thermal-series": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: planetology_harness"
+     ],
+     "requirement": "planetology_harness asserts the series is deterministic, epoch 0 equals the present, and no RNG is consumed.",
+     "notes": "",
+     "result_metric": "planetology_harness R15: length, epoch-0 bit identity, seed purity, monotone fall, deepest > present"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: deposit_origin"
+     ],
+     "requirement": "deposit_origin shows withholding the thermal series moves fossil placement; D6 still holds.",
+     "notes": "",
+     "result_metric": "deposit_origin D6 holds (405 coal / 423 oil tiles move with drift); new D6b: withholding the series changes coal magnitude on 1335 tiles and petroleum on 2292"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "Digest movement measured in isolation and reported, not re-blessed.",
+     "notes": "",
+     "result_metric": "isolated digests C9021C22A9978DDD / D29C16275A2FB41F / 50D4C7DFE97B1160 / D63F0C1A13E5D59D; world deposits +0.086%"
+    }
+   ],
+   "resolution": "A 21-entry thermal series on planetology_state, one value per drift epoch, index 0 assigned from the present so the identity holds by construction. The fossil pre-pass scales the coal basin and oil shelf terms by the epoch's own budget. save_game_version 15 -> 16; save_envelope_roundtrip green at 15 before the bump, and the field is written and read in declaration order."
   },
   "pop-growth-market-aggregate": {
    "resolution": "economy_system.cpp aggregates the supply/demand basket across a body's markets, id-sorted; single-market bodies byte-identical to before. population_mvp gains test_multi_market_growth_aggregate."
@@ -5518,6 +6227,31 @@
    ],
    "resolution": "All 5 rows met. river_generation_harness + determinism_harness pass; CTest 37/37."
   },
+  "rivers-priced-in-walk": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: colonisation_harness"
+     ],
+     "requirement": "colonisation_harness shows a cradle on a river reaches inland earlier than with the river masked; C3/C3c hold.",
+     "notes": "",
+     "result_metric": "colonisation_harness 0 failures with new C16: inland ground arrives earlier on every world (6280 / 11022 / 4153 tiles), none later, mean lead 197 / 147 / 51 years; C3/C3c hold"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "Digest movement measured in isolation and reported.",
+     "notes": "",
+     "result_metric": "isolated digests moved on all four; deposit totals identical, so the movement is downstream of tile generation"
+    }
+   ],
+   "resolution": "The premise was stale: the walk already priced rivers at 22% against the coast's 30%, two literals where the design has one. Now one shared corridor constant at 30%, no direction pricing. Seed 0 coins 380 -> 444 cultures, all under the C15a ceiling."
+  },
   "road-gen-scales": {
    "rows": [
     {
@@ -5861,6 +6595,66 @@
    ],
    "resolution": "Complete, all rows met. BLACKBOARD serves the session actor only (ERR result=rejected_not_owner + END for others, lifted under --as any); remove_sell_order answers rejected_invalid for any order outside the caller's book, existing or not — order_book_harness R3.7 updated to the collapsed semantics (52/52), smoke.js sweeps the id space and never surfaces rejected_not_owner. Line-framing fix in both JS clients rode with this item (multi-line ops terminate on END alone)."
   },
+  "search-axes-live-and-reach-term": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: landscape_score_harness"
+     ],
+     "requirement": "landscape_score_harness: three road tiers score differently; two rosters score differently.",
+     "notes": "",
+     "result_metric": "landscape_score_harness: three road tiers score pairwise distinct and the reach level falls monotonically (14.942 / 14.823 / 14.749); two rosters distinct"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: landscape_search_harness"
+     ],
+     "requirement": "The search prints which axis each round's winner came from; startup cost reported before and after.",
+     "notes": "",
+     "result_metric": "the search prints the winning axis per round (reference seed: roster 0, placement 2, road tier 2) at 1124-1163 ms per evaluation against ~1.1 s before, so rounds stay at 6"
+    }
+   ],
+   "resolution": "The fifth term reads the mean reach cost per market and its spread is scored as an equal third beside completeness and balance; the in-reach count reading was measured, found non-monotone, and deleted. The roster axis is live: specialists are removed and regenerated per candidate, carrying the settlement record on the world so focus and ownership class survive. Two flags for Ben: the three-spread weighting is a tuning choice nobody ruled on, and world::gen_settlement is a generation-time index that is not on the save seam."
+  },
+  "seat-floor-reads-static-score": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep / corp_selection"
+     ],
+     "requirement": "The seat shortlist gates and orders on the static landscape score phase 6 computed for each seat, not on trailing net.",
+     "notes": "",
+     "result_metric": "shortlist gates (score > 0) and ranks on seat_landscape_score, the mean over holdings of the holding market's actual x balance; in src/world/spawn_seat.cpp."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --guard"
+     ],
+     "requirement": "The shortlist is non-empty on all 16 curated seeds.",
+     "notes": "",
+     "result_metric": "player_seed_sweep --guard, 16 curated seeds: 0 empty shortlists (the old floor was empty on 7/16; seed 0 reproduces \"0 of 8\")."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: live click"
+     ],
+     "requirement": "The seat card shows trailing figures as information; a live Release run seats from a non-empty shortlist (main session, live click).",
+     "notes": "",
+     "result_metric": "live click NOT RUN: the session stopped at wave A. Script: Release new game, seed 0, Begin; console should read \"shortlist 5 of 8 specialists\" with no VIABILITY FLOOR UNMET."
+    }
+   ],
+   "resolution": "Built by lane A12 (85de9545, 168f6fbb, 2f50c5cf). Solvency no longer gates (74/84 shortlisted seats have negative trailing net) -- a call in NR-886."
+  },
   "selectable-1960s-start": {
    "rows": [
     {
@@ -6017,6 +6811,76 @@
   },
   "sell-order-pool-overcommit": {
    "resolution": "Fixed in market_clearing.cpp: running per-(corp,body,resource) remainder at listing, per-order matched bookkeeping (ob_sell_entry.rem replaces the aggregate matched_sell map), zero-clamped debits. econ_harness 33/33 incl. BL351.1-6."
+  },
+  "share-readings-population-weighted": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "history_sweep prints every share reading twice (region-weighted, population-weighted) and writes both into history_sweep.json with the arc counter.",
+     "notes": "",
+     "result_metric": "both columns on the face and in history_sweep.json (*_pop_q siblings, arc counter); population from the BL-817 playback record, no sim change"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "The BL-907 closure scoreboard rows assert on the population-weighted reading.",
+     "notes": "",
+     "result_metric": "BL-907.2 asserts on top_share_pop_q; no verdict changed between columns"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: git diff history_sweep.json"
+     ],
+     "requirement": "history_sweep.json is regenerated over 16 seeds on the merged tree and checked in.",
+     "notes": "",
+     "result_metric": "history_sweep.json regenerated over 16 seeds on the merged tree and checked in"
+    }
+   ],
+   "resolution": "By population the largest polities are 2-5 points MORE concentrated than by region count (median 10% vs 8%; peak 13% vs 11%), while rose-and-fell counts drop 3x (74 -> 22 per world): most region-count risers were founding empty ground. Filed for Ben as NR-876."
+  },
+  "small-grudges-freeze": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness"
+     ],
+     "requirement": "No grudge score above grudge_floor is stationary across a round at any step_years.",
+     "notes": "",
+     "result_metric": "BL842a-c: no score above grudge_floor stationary at steps 1/4/5/10/20/50/100."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "The half-life at the bottom of the range is measured and reported, not assumed.",
+     "notes": "",
+     "result_metric": "half-life at step 4: score 8 -> 16 y, 60 -> 120 y, 150 -> 300 y, 1000 -> 244 y, 10000 -> 232 y."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": "grudge rows at 1200 CE 4,603 -> 4,312; battles 158,215 -> 154,146; re-blessed with the wave in 32e04a19."
+    }
+   ],
+   "resolution": "Built by lane A5 (e06b9c0b); cold review found it correct."
   },
   "sol2-startup-guard": {
    "rows": [
@@ -6317,6 +7181,61 @@
    ],
    "resolution": "Complete. rank_extraction_sites() (src/world/corp_ai.cpp) hoists the O(tiles) survey/richness/affinity scan out of the per-corp loop in run_corp_strategic_step, computed once per tick and read by every due corp; only the per-corp can_place_in_world filter (tech gate, logistics reach) and scoring still run per corp, over the already-truncated top-M list. Verified behaviour-preserving by stash-and-diff against unmodified main: ai_skill_harness's 5-seed/300-tick benchmark produces numerically identical net_worth curves and action-verb counts on both sides, including its pre-existing golden-band failures (seeds 1-4 'net-worth final' fail identically on both sides - tracked by NR-140, not caused or worsened by this item; not re-blessed here since it is out of this item's scope). econ_stability's BL-250 scaling sweep is the direct measurement: exponent 1.28 -> 1.18, worst 2x-size-step growth 3.17x -> 3.01x, all six harnesses/build targets green. BL-365 (background industry, ~80 corps) is now unblocked."
   },
+  "stratum-demand-ladder": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census"
+     ],
+     "requirement": "Household volume = heads / heads_per_demand_unit x basket[r] x elasticity, with heads_per_demand_unit DERIVED from the generated centre distribution and its derivation recorded.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census"
+     ],
+     "requirement": "Cumulative industrial rungs as ruled (1 staples; 2 clean water, medical supplies; 3 consumer goods; 4 refined fuel; 5 electronics); qualification scales rungs 4-5 only, normalised to the world mean.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: population_dynamics"
+     ],
+     "requirement": "An unmet top rung blocks promotion.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census"
+     ],
+     "requirement": "inject_background_demand no longer multiplies with market count or counts razed centres; electronics leaves it; the stopgap goods are labelled; demand_census before/after recorded.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ],
+   "resolution": "Cancelled unmerged (Ben, 2026-09-16: stop-and-archive). Lane A2 built it (010aab3c); cold review found six issues (save reader ranges, the search scoring unladdered demand, missing before/after measurements, an unruled ancient promotion gate, a fixable float red, a stale doc example). The fix round was stopped mid-way; its checkpoint is 579ad52b on worktree-agent-a7079dcfbbe7ac5c9."
+  },
   "strength-metric-reads-strategy-fairly": {
    "rows": [
     {
@@ -6394,6 +7313,31 @@
     }
    ],
    "resolution": "BL-926 built as designed: per-polity gross deaths/lifespans, breakdown pieces, the network_supply_q histogram, culture census, foundings by source, city-state series and civilisations formed all print on history_sweep.json (70-key row) and the harness face. The main-tree 16-seed baseline was captured BEFORE any other sprint-39 item, per R2, and is on file at C:\\Users\\benbo\\AppData\\Local\\Temp\\claude\\gen_sweep\\baseline\\sweep16.txt."
+  },
+  "tariff-derivation-hands-to-digitisation": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "The shipped arc's behaviour is unchanged (no tariffs) and the 1960 arc digest is unchanged.",
+     "notes": "",
+     "result_metric": "all four digests unchanged; law_harness 24/0; history_sim_harness at its baseline"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "doc: docs/generation/DIGITISATION.md"
+     ],
+     "requirement": "DIGITISATION.md records that the inputs cross and the derivation is owed there.",
+     "notes": "",
+     "result_metric": "DIGITISATION.md § The boundary states that scarcity, flows and preference cross in exploration_output and the derivation of protection_q is owed there"
+    }
+   ],
+   "resolution": "The industrial-timing derivation is gated to the two-span arc; the enactment seam (derive_national_protection -> seed_national_tariffs) stays, reading whatever Digitisation writes. A single-span world carries no tariff, which is now stated as a legitimate outcome rather than a gap."
   },
   "tariff-posture-and-consequence": {
    "rows": [
@@ -6649,6 +7593,41 @@
    ],
    "resolution": "Complete. is_barrier deleted; barrier_q is now graded land resistance + a separately-weighted ocean term (weight 750, chosen by sweep, Ben's call). Kepler's political map holds at 30 nations; Pallas's flat-zero barrier field is fixed. history_ladder_harness and world_audit green."
   },
+  "terrain-economic-gate": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: earthlike_tile_census"
+     ],
+     "requirement": "earthlike_tile_census asserts wide bands with required tails on the top-10% concentration of coal, petroleum, copper and iron over its sweep.",
+     "notes": "",
+     "result_metric": "coal/petroleum/copper/iron median bands [25,60]/[50,80]/[50,85]/[45,80], IQR floors 4.0/2.5/2.0/4.0; 120 seeds in 29 s; red on a flat field 8/8 demonstrated"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: survey_endowment_harness"
+     ],
+     "requirement": "survey_endowment_harness asserts determinism, rich-over-barren ordering, endowment 0.0 yields 0 in every region, and a non-flat per-region spread on the reference seed.",
+     "notes": "",
+     "result_metric": "survey_endowment_harness 34 PASS 0 FAIL on the merged tree; endowment-zero exercised on three airless bodies"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "doc: .claude/skills/verifier-headless/SKILL.md"
+     ],
+     "requirement": "The new harness is named in the verifier-headless skill.",
+     "notes": "",
+     "result_metric": "named in verifier-headless"
+    }
+   ],
+   "resolution": "survey_endowment exposed from settlement.cpp's anonymous namespace (no behaviour change); the census gates its four concentration figures."
+  },
   "terrain-underlay-on-lapse": {
    "rows": [
     {
@@ -6730,6 +7709,51 @@
     }
    ],
    "resolution": "Landed with BL-215; verified by scripts/verify/text_overflow_floor.lua (0 overflow records at the 1280x720 floor)."
+  },
+  "the-first-crossing": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "The sweep reports first-contact count per seed.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "A seed meeting one polity in 460 years is either explained as correct for its geography or is no longer the common case, with the measured cause named.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sweep"
+     ],
+     "requirement": "The held-seed label set covers seed 12's shape (a fifth label or a widened DETERRENCE-INERT).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": ""
+    }
+   ],
+   "resolution": "Archived unmerged with BL-1018 (eaf15a37 on the same branch). Finding kept in EXPLORATION.md: the scorer never reads contact; unmet ground is worse (supply 420 vs 548, mean score -12 vs +80); stay-home verbs win 78.6% of the rounds an unmet target clears the threshold."
   },
   "tick-length-parameter": {
    "rows": [
@@ -6856,6 +7880,68 @@
    ],
    "resolution": "Complete. Partially delivered 2026-08-01, reopened the same day by an independent review that found three parts undelivered (R3 estimator location, R6 the ledger closing itself, R7 per-recipe rows) and two rows marked complete on evidence that could not have been produced. All three were then delivered and evidenced: the estimator moved to src/world/ with a 26-assertion headless harness cross-checking it against economy_system's own arithmetic, processing expanded to one row per recipe with the recipe surviving to construction, and the ledger now survives the build it initiated."
   },
+  "tile-pass-reentry": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "headless: tile_height_retention"
+     ],
+     "requirement": "The split whole is bit-identical: tile_height_retention and world_determinism digests unchanged.",
+     "notes": "",
+     "result_metric": "tile_height_retention ALL PASS incl. the no-record path; world_determinism digests unchanged by this item"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: earthlike_tile_census"
+     ],
+     "requirement": "earthlike_tile_census --life-only reproduces the full run's fossil counts and reports the time ratio.",
+     "notes": "",
+     "result_metric": "--life-only reproduces every deposit on every tile 120/120 and the coal/petroleum bearing counts; 5.46 s vs 42.11 s per seed (0.130, 7.7x)"
+    }
+   ],
+   "resolution": "Split at the Body/Life boundary with the generation_record as the seam; the whole stays bit-identical. The endemic draws and the raw geological array cross on the record so the Life half is re-runnable."
+  },
+  "tiles-ride-plates": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: home_surface_bench"
+     ],
+     "requirement": "Cost measured FIRST against home_surface_bench's 1 s ceiling; the item is sliced or stopped if the frame exceeds it.",
+     "notes": "",
+     "result_metric": "home_surface_bench 493-559 ms mean against its 3 s ceiling (the brief's 1 s was stale); three frames per body 2.93 ms, under 1% of a preview"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: continent_drift",
+      "headless: deposit_origin"
+     ],
+     "requirement": "continent_drift epoch 0 stays bit-identical (C1) and gains a band-at-epoch check; deposit_origin D6 moves more ground.",
+     "notes": "",
+     "result_metric": "continent_drift ALL PASS with C7 digest unchanged and new P7/P7b/P7c; deposit_origin D6 unchanged"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "Digest movement measured in isolation and reported.",
+     "notes": "",
+     "result_metric": "zero digest movement in isolation"
+    }
+   ],
+   "resolution": "Pass 3 bands from the plate-carried position at epoch 0, so the present IS the frame's epoch 0 rather than a separate lookup proved equal to it. D6 does not move more ground and cannot from this change: the palaeo query already banded from the folded plate-carried latitude. Widening it would mean relaxing one of the four stated boundaries — pole flip, fractional-position moisture, past height — each a design call, none taken."
+  },
   "trade-across-kin-borders": {
    "rows": [
     {
@@ -6946,6 +8032,113 @@
     }
    ],
    "resolution": "Sprint 41 (Exploration trade), merged to main; see the item resolution in backlog.json and the DEVLOG entry for 2026-09-14."
+  },
+  "trade-rebased-on-reach": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: history_sim_harness"
+     ],
+     "requirement": "Era -1 trade income is paid on the count of distinct unlike trade classes a realm can reach, not on roaded pairs, and reads only difference.",
+     "notes": "",
+     "result_metric": "trade_income_per_class = 40/yr per reached unlike kind (farm/ore/port), reached = network_supply_q above sustainable_settlement_floor_q; T1a-e exact."
+    },
+    {
+     "id": "R2",
+     "status": "failed",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "A polity connected to unlike ground sustains campaigns a disconnected one cannot - measured.",
+     "notes": "",
+     "result_metric": "half-holds: realms reaching 2+ kinds pay more of their armies' upkeep in every size band (trade widens it 14-64 per-mille), but trade narrows the campaign-cost gap in 3 of 4 bands. Call in NR-886."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep"
+     ],
+     "requirement": "The re-measured trade share of production is recorded whatever it is.",
+     "notes": "",
+     "result_metric": "trade share of production 0.19% -> 3.86% median (3.15% pooled)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless"
+     ],
+     "requirement": "world_determinism digests and history_sweep counters measured before and after IN ISOLATION in this item's worktree; movement reported with its cause, never re-blessed (DELIVERY.md section The digest re-bless is one act per WAVE)",
+     "notes": "",
+     "result_metric": "measured in isolation (battles 158,215 -> 140,305; conquests 122,076 -> 109,793); re-blessed with the wave in 32e04a19."
+    }
+   ],
+   "resolution": "Built by lane A7 (a7be2835). With three classes a region earns at most 80/yr, so income grows with regions held rather than kinds reached -- a call in NR-886."
+  },
+  "tree-effects-generated": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "code: grep",
+      "headless: exploration_sim_harness"
+     ],
+     "requirement": "No node index or id literal remains in history_sim.*; a harness proves every store effect kind has a reader.",
+     "notes": "",
+     "result_metric": "tree_lint all four green with both headers fresh; the shared tree_effect.hpp vocabulary is the store's, and the harnesses assert every store effect kind has a reader or is on the stated unread list"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: history_sweep",
+      "headless: exploration_sweep"
+     ],
+     "requirement": "Sweeps re-read and the movement described, since effects that did nothing now do something.",
+     "notes": "",
+     "result_metric": "exploration span at w_want_q = 0 moved to 322/207/739/65/62/245920676/479/0/2410; both sweeps re-read on the integrated tree"
+    }
+   ],
+   "resolution": "The generator emits each node's effects as a static table and one apply folds them into the polity's modifier surface and verb availability; the three hand-wired nodes (a rim index, a sea-legs index, a strcmp on EX-WY-1a) are retired. The rim predicate still reads the generated rim constant, which is the store's own structure rather than a hand-typed literal."
+  },
+  "tree-roots-and-header-regen": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "code: node tools/session/tree_lint.js <tree>"
+     ],
+     "requirement": "tree_lint.js fails when a generated tree header differs from a regeneration of its store, and passes on main after regeneration.",
+     "notes": "",
+     "result_metric": "red on a stale header (term_count 12 vs 11 demonstrated), green on main; \"header checked\" on empire and exploration"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "code: node tools/session/tree_lint.js"
+     ],
+     "requirement": "CO-SP-1a and IN-SP-1a derive is_root true; every tree has exactly one root by the is_root derivation.",
+     "notes": "",
+     "result_metric": "both stores reoriented (edge declared on the node farther from the root); CO-SP-1a and IN-SP-1a sole roots; one-root rule asserted"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "code: git diff on src/world/*_tree_data.hpp"
+     ],
+     "requirement": "The empire and exploration headers regenerate byte-identical, so no world moves.",
+     "notes": "",
+     "result_metric": "git diff on both generated headers: 0 lines"
+    }
+   ],
+   "resolution": "The two unwired stores had declared edges outward, so 7 and 14 leaves derived as root; reoriented, lint asserts one root and a fresh header. Exploration store then deduplicated (30 edges declared twice) in the main session."
   },
   "ui-frame-recompute-caches": {
    "resolution": "Complete 2026-08-10. update_body_vision, the three marker maps, the industry lens pre-pass, the lens-key chrome, the selection-panel tile metrics and the tech-tree constellation geometry all stopped recomputing per frame; intra_body_path returns a const ref instead of copying the tile vector on every A* cache hit (all 8 call sites audited for lifetime - std::map references survive insertion, and no site holds one across a clear). Hover dwell converted from frame counts to wall-clock seconds. THE REVIEW BARRIER CAUGHT TWO REAL FAULTS HERE, both fixed before close: a float-accumulation off-by-one that moved the stick threshold from frame 150 to 151, and a tech-tree cache stamp (registry address + entry counts) that verify.new_world defeats while dangling every retained node pointer."
@@ -7198,6 +8391,31 @@
    ],
    "resolution": "Sprint 41 (Exploration trade), merged to main; see the item resolution in backlog.json and the DEVLOG entry for 2026-09-14."
   },
+  "warm-start-retired": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: haulage_measure"
+     ],
+     "requirement": "Startup time drops by the warm start's measured cost minus the validation run's; haulage stays above 1055/802.",
+     "notes": "",
+     "result_metric": "haulage_measure 2035 all / 1627 intra-body on the integrated tree against the 1055/802 baseline; the harness runs its own tick loop, so no app-side count can move it"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: econ_stability"
+     ],
+     "requirement": "Econ goldens re-blessed once with the movement described (authorised).",
+     "notes": "",
+     "result_metric": "econ_stability ALL PASS; no econ golden moved"
+    }
+   ],
+   "resolution": "pre_game_ticks is gone; the settle is phase 6's single validation run at 12 ticks, chosen as the first tick where the 4- and 8-tick trailing convoy means are both within 5% of the settled level. The per-frame batching stays as UI plumbing, not as the warm start. Two things the shorter settle exposed: the seat viability floor reads eight quarters and no specialist cleared it (NR-881), and six harnesses still simulate an 80-tick warm start (BL-1008)."
+  },
   "whole-firm-buyout": {
    "rows": [
     {
@@ -7305,6 +8523,21 @@
     }
    ],
    "resolution": "Complete, all rows met. One checked-parse helper (kv_get_checked, full-token + wide parse + domain range check) routes all 12 integer COMMAND fields; kv_getf moved to strtod with the same full-token rule and float-level finiteness; corp_verb_count and building_type_count declared beside their enums. smoke.js range family (11 cases incl. the type=200 segfault, verb=7xyz trailing junk, floor_price=abc garbage, target=64 from the review barrier): each rejected_invalid with a byte-identical state snapshot. ALL CHECKS PASSED."
+  },
+  "wizard-leaderboard-population-share": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "visual: live click"
+     ],
+     "requirement": "The board ranks by population share on a live run; the readout's peak matches history_sweep's peak_share_pop_q for the seed.",
+     "notes": "The first three access requests resolved to a deleted worktree path (the Start-menu entry for ProjectIo); granting the running process by basename reached the real build_rel executable.",
+     "result_metric": "LIVE CLICK 2026-09-16: build_rel, real presses menu -> New Game -> rounds 1-4. At 668 CE and again at 1200 CE the People column descends strictly (5.8, 5.4, 5.1, 4.7, 4.3) while Land does not (1.9, 1.3, 3.8, 5.2, 1.3) — rank 4 holds more land than rank 1 and ranks below it. The arc readout reads \"the largest empire held 7% of the world's people; 21 rose and fell back\". Round 3 (the migration, no polity samples) shows dashes in People and falls back to land order, as designed."
+    }
+   ],
+   "resolution": "The board ranks by share of people with land beside it, and the arc readout reads the same column. One thing blocked the item's own done-when rather than the build: BL-1007 — the sweep generates with struct defaults while the app loads the Lua config, so the two cannot be compared on one seed today."
   },
   "world-descriptor": {
    "rows": [

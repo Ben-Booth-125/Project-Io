@@ -10,6 +10,67 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-16 (late) — The queue emptied, the backlog cut, wave A built, and the rest archived
+
+**Runtime:** Design (the review queue), Corpus (the backlog cut), then Delivery — Full as one batch of
+twelve worktree lanes, stopped by Ben at the end of wave A.
+
+### The review queue: fifteen calls in one form
+Ben ruled every open entry (NR-807..884) in one elicitation form. The ones that moved docs: the
+**industrial arc is the live product** (CONCEPT.md, ROADMAP.md) while the player identity was left to
+its own ruling and raised as **NR-885** (the corpus says mercenary company, the seat work says
+corporation); **COLONIAL_ERA.md folded and retired** to docs/research (claim verbs and sea lanes to
+EXPLORATION.md, the search seed to DIGITISATION.md); **poverty is the brake** (NR-878); **a seeded
+grudge fades by design** (NR-829), which exposed that RELATIONS.md credited campaign sentiment with
+a job the generation-span carry does. The NR-877 re-bless was authorised and pinned.
+
+### The backlog cut
+Eighteen rows closed on a second form (four already delivered by later work, checked in code; BL-880's
+seat-canvas ruling written into STARTUP.md, which still said "no corp-selection stage"). Then wave A
+opened over the 16 items with no open prerequisite and no wall-clock measurement.
+
+### Wave A: what the lanes found
+| item | outcome |
+|---|---|
+| BL-1006 far-trade reading | 0.0 units sold at a destination on every seed: per-body pools send every same-body haul home |
+| BL-1009 digest sees the money | 8/8 new fields proven visible; the old digest missed 7 |
+| BL-982 Digitisation readings | 3 measured, 1 partial, 9 n/a; cities beat goods for firm density in only 6/16 worlds |
+| BL-1023 Forest branch | tree 29 -> 36 nodes; arid and stone stated as hostile country |
+| BL-1016 creed classifier | the raw compare picked a consolidator in 0/872 polities; by rank both kinds appear |
+| BL-1017 culture fold | tree -85.5%, and nothing moved: one culture re-parented in 16 seeds |
+| BL-1010 era_world reds | two stale checks; one real: no furnace lights in any 1960 world |
+| BL-1022 coastal cost | coastal ground is ~15% cheaper to take, via garrison size |
+| BL-1008 six harnesses | re-read on the 12-tick settle; two rows honestly red |
+| BL-1020 seat floor | old floor empty on 7/16 curated seeds, new floor on 0; live click not run |
+| BL-842 small grudges | min decrement above the floor; cold review found it correct |
+| BL-1021 trade re-base | trade 0.19% -> 3.86% of production; R2 half-holds |
+| BL-996 demand ladder | ARCHIVED: cold review found six issues; fix round stopped |
+| BL-841 assimilation | REVERTED: the slot claim evicts large peoples on a one-unit gain |
+| BL-1018/1019 alarm, first crossing | ARCHIVED: an unsaturated alarm collapses displacement (2.73 -> 0.50); finding kept in EXPLORATION.md |
+
+**Cold review earned its place again.** Two of the three world-movers it read were sent back on
+substance (BL-996, BL-841) after their lanes reported green. The digest also could not see BL-996's
+economy change at all (the search winner moved on 3 of 5 seeds with every digest identical).
+
+### The re-bless (32e04a19)
+Causes: BL-1009 (coverage), BL-842 and BL-1021 (world). Over 16 seeds the Empires round fights less
+(battles 158,215 -> 145,345) and the Exploration phase's shape holds (pooled displacement 2.73 ->
+2.67, displaced seeds 12 -> 12). The R3b pin fixture nearly stops fighting (322 -> 30) from BL-1021
+alone; it is the w_want_q = 0 variant and not the phase's reading.
+
+### Stopped
+Ben: *"This work is highly unstructured, so just leave it at wave A and we can reinvent anything
+important later. (So archive)."* The 24 items of waves B-D were archived unbuilt; each design stands in
+its authority doc. The calls left on merged work are **NR-886**.
+
+**Found and not filed** (reinvent if wanted): raw leans still steer the Exploration tree's node choice
+(the one-scale defect BL-1016 fixed in the sweep); sea legs sit at 580-820 on every polity, so the
+landlocked consolidator never appears; material_floor's reconciliation row passes on nothing at its
+default; spawn_solvency ticks with the player seated and skips the search; no non-SDL constant carries
+the 12-tick settle; population centres are generated exactly on their rung, so one loss demotes them;
+the Digitisation readings generate at epoch 0; the wizard's lineage palette (BL-1017) was never viewed
+live. Harness hazard: lanes shared one scratchpad and one lane overwrote another's build script.
+
 ## 2026-09-16 (after the sprint) — Measurement parity, sixteen saved worlds, and an evening at the live app
 
 **Runtime:** Delivery — Light, then a long live session with Ben watching the wizard. Everything

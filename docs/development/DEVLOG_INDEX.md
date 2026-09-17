@@ -3,7 +3,7 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 216 entries across 2 volume(s).
+One line per session, newest first — 218 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
@@ -207,10 +207,12 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-06-13 | [Layer 2: Primary canvases](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 1: ECS data model](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 0: Engine scaffolding](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
+| ? | [2026-09-16 (late) — The queue emptied, the backlog cut, wave A built, and the rest archived](DEVLOG.md) | BL-1006 BL-1008 BL-1009 BL-1010 BL-1016 BL-1017 BL-1018 BL-1020 BL-1021 BL-1022 BL-1023 BL-841 BL-842 BL-880 BL-982 BL-996 | DEVLOG.md |
 | ? | [2026-09-16 (after the sprint) — Measurement parity, sixteen saved worlds, and an evening at the live app](DEVLOG.md) | BL-1000 BL-1007 BL-1011 BL-1012 BL-1013 BL-1014 BL-914 BL-948 | DEVLOG.md |
 | ? | [2026-09-10 (sprint 37 closes) — The seven owed items, and a delegation bug caught mid-flight](DEVLOG.md) | BL-844 BL-849 BL-852 BL-853 BL-854 BL-855 BL-857 BL-859 BL-861 BL-868 BL-888 | DEVLOG.md |
 | ? | [2026-09-10 (sprint 38) — City states become empires, eight of nine](DEVLOG.md) | BL-823 BL-837 BL-861 BL-866 BL-867 BL-868 BL-869 BL-870 BL-871 BL-872 BL-873 BL-887 | DEVLOG.md |
 | ? | [2026-09-10 (sprint 40 opens) — Three trees, one grammar](DEVLOG.md) | BL-881 BL-886 | DEVLOG.md |
+| ? | [2026-09-09 (sprint 39 design) — The colonial round sets the demand, and the corporations come after](DEVLOG.md) | BL-750 BL-833 BL-871 BL-873 BL-874 BL-880 | DEVLOG.md |
 | ? | [2026-09-09 (sprint 37) — The world stops opening already full](DEVLOG.md) | BL-844 BL-855 BL-862 | DEVLOG.md |
 | ? | [2026-09-08/09 (sprint 35) — Generation gets two more rounds, and the measurements refute nearly everything](DEVLOG.md) | BL-816 BL-824 BL-825 BL-826 BL-827 BL-828 BL-834 BL-835 BL-840 | DEVLOG.md |
 | ? | [2026-09-07 (sprint 33 opens) — The corpus stops charging every session, and two tools are found lying](DEVLOG.md) | BL-079 BL-348 BL-424 BL-787 BL-788 BL-789 BL-790 BL-791 BL-792 BL-793 BL-794 BL-795 BL-796 BL-797 BL-798 BL-799 BL-801 BL-804 BL-806 BL-807 BL-808 BL-809 BL-810 BL-811 | DEVLOG.md |
