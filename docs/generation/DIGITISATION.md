@@ -43,9 +43,9 @@ this phase lands — never before, because a 1960 world with no Digitisation ope
 the sim did not simulate.
 
 **A 1960 epoch names a calendar, not a history.** The arc the flip selects is Exploration's handoff
-continued through this span — never the single 1560 → 1960 industrial pass that
-`GENERATION_STRATEGY.md` § Pass 2 records as superseded, which runs no Exploration and so hands this
-phase none of its inputs.
+continued through this span — never the single 1560 → 1960 industrial pass, which is superseded
+and runs no Exploration, and so hands this phase none of its inputs (`GENERATION_STRATEGY.md`
+§ Pass 2).
 
 **SETTLED (Ben, 2026-09-17, NR-888): the span runs on Exploration's 4-year band.** One decision
 round every four years, 75 rounds from 1660 to 1960. Measured on Exploration's forces alone, that
