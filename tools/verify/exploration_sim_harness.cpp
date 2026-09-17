@@ -574,20 +574,20 @@ int main()
         // commercial: fewer conquests, far more foundings, and subjection and
         // tribute rise sharply as realms that can pay hold subjects instead of
         // taking ground. Authorised against that shape, never against the hashes.
-        // LEFT RED 2026-09-16 BY BL-1021 (trade paid on kinds of ground reached),
-        // NOT RE-PINNED. The Exploration span's own params keep trade off; what
-        // moved is the Empires close it resumes from. Empires-round trade now pays
-        // every reached region per unlike kind its realm reaches, not per walked
-        // unlike corridor, so seats hand a different map and stock forward. Read
-        // after the change: battles 30, conquests 27, foundings 816, subjections
-        // 3, freed 0, tribute 228427344, treaties 354, broken 1, owner changes
-        // 2061. A re-pin is the wave's re-bless, not this item's.
-        // (BL-841 also read red here and was REVERTED on main after cold review,
-        // 2026-09-16; its re-work carries its own measurement.)
-        check(ex1.battles == 322 && ex1.conquests == 207 && ex1.foundings == 739
-           && ex1.subjections_formed == 65 && ex1.subjections_freed == 62
-           && ex1.tribute_remitted == 245920676 && ex1.treaties_formed == 479
-           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 2410,
+        // RE-PINNED 2026-09-16 (Ben, backlog wave A re-bless, authorised to measure and
+        // re-bless the merged world): 322/207/739/2410 -> 30/27/816/2061. ONE CAUSE moves
+        // this fixture -- BL-1021, Empires-round trade paid per unlike KIND of ground a
+        // realm reaches rather than per walked unlike corridor, so the 1200 close this
+        // span resumes from hands forward a different map and stock. BL-842 (small
+        // grudges decay) and BL-1009 (the widened digest) leave these counters exactly
+        // as they were; BL-841 was reverted after cold review. THIS FIXTURE IS THE
+        // w_want_q = 0 VARIANT AND IS NOT THE PHASE'S READING: its span nearly stops
+        // fighting (battles 322 -> 30), while exploration_sweep over the 16 parity seeds
+        // is the verdict on whether displacement survives (see the wave A DEVLOG entry).
+        check(ex1.battles == 30 && ex1.conquests == 27 && ex1.foundings == 816
+           && ex1.subjections_formed == 3 && ex1.subjections_freed == 0
+           && ex1.tribute_remitted == 228427344 && ex1.treaties_formed == 354
+           && ex1.treaties_broken == 1 && ex1.owner_changes.size() == 2061,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
