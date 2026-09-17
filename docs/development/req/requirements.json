@@ -5714,11 +5714,11 @@
      "id": "R5",
      "status": "pending",
      "verification": [
-      "code: app.cpp and harness_params.hpp pass no budget",
+      "code: git diff of src/core/app.cpp is empty or comment-only, reviewed against harness_params.hpp",
       "code: no `synthetic` symbol under src/",
       "code: write_world_snapshot and the save version unchanged"
      ],
-     "requirement": "No shipped path reaches a budget source: the app and its harness mirror pass none, the synthetic builder lives only under tools/verify, and the save format does not change.",
+     "requirement": "No shipped path reaches a budget source: app::start_new_game_prelude and the validation run take no behavioural change (the budget defaults to none), the harness mirror passes none, the synthetic builder lives only under tools/verify, and the save format does not change.",
      "notes": "",
      "result_metric": ""
     },
@@ -5728,7 +5728,7 @@
      "verification": [
       "review: code-reviewer (cold)"
      ],
-     "requirement": "A cold adversarial review of the seam finds no unresolved blocker, with particular attention to any way an empty budget could still move a byte.",
+     "requirement": "A cold adversarial review of the seam finds no unresolved blocker, with particular attention to any way an empty budget could still move a byte, and reviews app.cpp's new-game path and its harness copy as one unit.",
      "notes": "",
      "result_metric": ""
     }

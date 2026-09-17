@@ -18740,6 +18740,93 @@
         "design",
         "resolved"
       ]
+    },
+    "BL-1030": {
+      "glyph": "✓",
+      "sprint": "44",
+      "written": "2026-09-17",
+      "author": "Ben (2026-09-17: NR-888 gate \"cut and build\"; charter calls on an elicitation form — Rule A, capital kept, no-specialist world at sprint 45, nation balance dropped); Claude (item text, from a three-lane seam map with an adversarial cross-check)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "priority": "A",
+      "status": "complete",
+      "id": "BL-1030",
+      "short_name": "PLAYER_SEED_SWEEP_PARITY",
+      "difficulty": 2,
+      "requires": [],
+      "title": "player_seed_sweep builds and settles the world the app builds, through one shared harness helper",
+      "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+      "files": [
+        "tools/verify/harness_params.hpp",
+        "tools/verify/player_seed_sweep.cpp"
+      ],
+      "design": "DELIVERED 2026-09-17 (sprint 44), commit 0133ee2b, built in a worktree lane and cold-reviewed on main (mirror FAITHFUL on the default new-game path; src/ untouched). harness_params.hpp gains build_app_start_world (app::begin_new_game + start_new_game_prelude) and run_app_validation_settle (poll_worldgen's 12 ticks), citing app.cpp line by line; player_seed_sweep --seat/--guard/--digest run on them. Nine divergences fixed: no world_gen.lua config; no works.lua; setup_world's two world writes (seed_genesis_history, init_survey_states) skipped; no set_era; roster count hard-coded 8 (now the config's, same value, every other caller grep-checked); settle ticks numbered 1..12 not 0..11; current_day_tick written; the convoy credit/intercept given the tick instead of day tick 0; no run_firm_exits.\n\nBASELINE MOVE, NOT A REGRESSION (16 library seeds, --seat): shortlisted 81 of 158 specialists -> 109 of 170; shortlisted with a processor 90.1% -> 100%; shortlisted with negative trailing net 93.8% -> 74.3%; a different corporation seated on every seed. --guard ALL PASS before and after (S1-S6, S4 reproduces 4 of 4). Each 16-seed run ~55-61 min in Release.\n\nCOLD REVIEW MINOR, FIXED (next commit): the default table and --roster still build the bare world; both now print NOT THE SHIPPED START and the header says which modes are at parity.\n\n--- THE ORIGINAL ITEM ---\n\nWHY. Sprint 44 measures the charter budget and pins world bytes through player_seed_sweep, and it is not at app parity (cross-checked 2026-09-17): no scripts/world_gen.lua config, no scripts/works.lua registry, no set_era(era_band_for_epoch), no run_firm_exits in the settle, ticks numbered from 1, and a non-zero tick passed to credit_arrived_convoys/intercept_convoys where the app passes day tick 0 during validation (app.cpp:320-323, 560-606). harness_params.hpp also hard-codes corporation_count 8 instead of reading the config (latent: Lua says 8). Every number sprint 44 takes would describe an off-product world.\n\nTHE WORK. One shared helper in harness_params.hpp that builds a world in app order (config + works -> make_hard_coded_world -> recipes/economy -> set_era -> apply_shipped_landscape with the config's corporation_count) and one that runs the 12-tick validation settle as app::poll_worldgen does (firm exits, day tick 0 to the convoy calls, tick numbering from 0). player_seed_sweep uses both. Other harnesses are not migrated here; the helper says it exists for them.\n\nDONE WHEN. player_seed_sweep --guard and --seat run on the helpers over the 16 library seeds; the before and after tables are recorded in the close as a BASELINE MOVE, not a regression; S4 still reproduces; nothing under src/ changes.\n\nRUN CONDITIONS: Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify (MSVC /O2 — the toolchain every pin is bound to; never %TEMP%); serial, quiet machine, build tree quoted; tracked tables only via --out.",
+      "resolved": "2026-09-17",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "priority",
+        "status",
+        "id",
+        "short_name",
+        "difficulty",
+        "requires",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved"
+      ]
+    },
+    "BL-1031": {
+      "glyph": "✓",
+      "sprint": "44",
+      "written": "2026-09-17",
+      "author": "Ben (2026-09-17: NR-888 gate \"cut and build\"; charter calls on an elicitation form — Rule A, capital kept, no-specialist world at sprint 45, nation balance dropped); Claude (item text, from a three-lane seam map with an adversarial cross-check)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "priority": "A",
+      "status": "complete",
+      "id": "BL-1031",
+      "short_name": "LANDSCAPE_WORLD_PIN",
+      "difficulty": 2,
+      "requires": [
+        "BL-1030"
+      ],
+      "title": "player_seed_sweep pins the campaign world's bytes after the landscape search, the validation run and the seat, per library seed",
+      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+      "files": [
+        "tools/verify/player_seed_sweep.cpp"
+      ],
+      "design": "DELIVERED 2026-09-17 (sprint 44), commit ab6b162f. Pins for all 16 library seeds taken by --digest (2,638 s) on 0133ee2b with the digest code on top — src/ byte-identical to 03c50ee4, before the seam — MSVC 14.44.35207 Release /O2; every source row checked against the run output (16/16).\n\nPROOF RUN IN THE MAIN SESSION (the lane was stopped once the pins landed, to save two redundant full runs): --digest-check over the 16 seeds in a fresh process on main: 16/16 PASS, exit 0, 2,662 s. NON-VACUITY on seed 0, scratch builds never committed: (A) search seed xor 0x8A21F00D -> ...E: all four digests FAIL, exit 1; (B) validation ticks 12 -> 11: D_search and D_land PASS, D_settle and D_seat FAIL, exit 1 — each digest fails at its own phase.\n\nCOLD REVIEW: major — the pins prove world/* through harness_params.hpp's copy of app.cpp, not app.cpp; the comment now says so and BL-1032 is amended so app.cpp's new-game path takes no behavioural change and is reviewed against the copy. Minor, fixed: a --seeds subset printed PASS (now PARTIAL, exit 3, with \"k of 16 pinned seeds checked\"); a non-numeric seed token became seed 0 (now rejected, exit 2). Both verified.\n\n--- THE ORIGINAL ITEM ---\n\nWHY. Sprint 44's done-when says an empty charter budget reproduces today's world byte for byte, proven by a determinism check and not a re-bless. No such check exists: world_determinism and determinism_harness never call the search; landscape_search_harness R2/R3 and player_seed_sweep S4 are same-binary A/A; state_hash cannot see building tile, type or assets. The proof must hash world bytes on the tree BEFORE the seam.\n\nTHE WORK. --digest prints, per seed, four FNV-1a digests: D_search (winner candidate, every winner score term bit-exact, evaluations, accepted, and each path step's proposal and score); D_land (write_world_snapshot bytes right after apply_shipped_landscape); D_settle (snapshot bytes plus state_hash after the 12-tick validation run); D_seat (seated corp, floor flag, shortlist, each candidate's corp/landscape/trailing net/weight, plus snapshot bytes after the seat). The values for all 16 library seeds are pinned in the source with the commit and toolchain they were taken on; --digest-check fails any row that differs. Taken after BL-1030 and before any seam code.\n\nDONE WHEN. The pin table is in source for the 16 library seeds; --digest-check passes on the tree it was taken on and on a second run; a deliberate one-byte perturbation in a scratch build fails it (non-vacuity, recorded, not committed). Never re-pinned by BL-1032.\n\nRUN CONDITIONS: Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify (MSVC /O2 — the toolchain every pin is bound to; never %TEMP%); serial, quiet machine, build tree quoted; tracked tables only via --out.",
+      "resolved": "2026-09-17",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "priority",
+        "status",
+        "id",
+        "short_name",
+        "difficulty",
+        "requires",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved"
+      ]
     }
   }
 }

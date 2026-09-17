@@ -43,6 +43,8 @@ the work happens, and that is the durable record. What stays here is what is sti
 
 UPDATE 2026-09-17 (item 7): answered by BL-1029 (Digitisation readings at 1960). digitisation_sim_harness --through 1960 reads the shipped world continued to 1960 beside a fingerprint-checked 1660 control; "advanced chains" stays a STRUCTURAL ZERO there too, because the recipe band follows epoch_year, and now prints as one. The far-trade reading (haulage_measure) still runs epoch_year 1960, the superseded arc; it moves with the epoch flip. Items 1-6 unchanged.
 
+UPDATE 2026-09-17 (item 3): the "74 of 84 shortlisted seats negative" figure came from player_seed_sweep before it reached app parity (BL-1030). On the app's world, over the 16 library seeds: 109 of 170 specialists shortlisted, 81 of the 109 (74.3%) with negative trailing net, every shortlisted seat with a processor, and a different corporation seated on every seed. The call stands; its number moved.
+
 **Why it matters.** Each sits on code now on main and re-blessed. None blocks anything, because the backlog is empty; they are the questions to settle before any of that work is picked up again.
 
 > **Recommendation:** Take 1 and 2 whenever Exploration or the Era -1 economy is next touched; 3 before the seat canvas is designed (it sits beside NR-885); 4-7 can wait for the harness or item that next reads them.

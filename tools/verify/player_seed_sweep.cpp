@@ -28,6 +28,13 @@
 // is the same fixed sequence pregame_balance_harness uses, so a rerun reproduces
 // the table exactly.
 //
+// WHICH MODES ARE THE SHIPPED START (BL-1030, cold review 2026-09-17). --seat,
+// --guard, --digest and --digest-check build and settle the world in app order
+// (harness_params.hpp build_app_start_world / run_app_validation_settle). The
+// DEFAULT table and --roster still build make_hard_coded_world(p) bare, with
+// fallback prices, no works registry, no set_era and their own settle: a
+// different world under the same seed. Both print that on their face.
+//
 // Run: .\build\player_seed_sweep.exe [seed_count] [settle_ticks]
 //      .\build\player_seed_sweep.exe --seat  [seed_count] [--fast]
 //      .\build\player_seed_sweep.exe --guard [seed_count] [--fast]
@@ -194,7 +201,9 @@ int run_roster(uint32_t seed, const recipe_registry& reg)
     std::sort(rows.begin(), rows.end(),
               [](const corp_row& a, const corp_row& b) { return a.id < b.id; });
 
-    std::printf("player_seed_sweep --roster %u — every corporation's generated opening\n\n", seed);
+    std::printf("player_seed_sweep --roster %u — every corporation's generated opening\n", seed);
+    std::printf("NOT THE SHIPPED START: built bare (no world_gen.lua, works.lua or set_era, no landscape "
+                "search); --seat/--guard/--digest build the app's world.\n\n");
     std::printf("  #  kind  proc  extr  other  player  name\n");
     std::printf("---  ----  ----  ----  -----  ------  ----\n");
     int spec_total = 0, spec_proc = 0, bg_total = 0, bg_proc = 0;
@@ -374,7 +383,14 @@ struct seat_row
 // same-binary A/A (two builds in ONE process agree with each other, which a
 // change to the code moves in lockstep); and `state_hash` cannot see a
 // building's tile, type or assets. A pin taken on the tree BEFORE the seam and
-// compared on the tree after it is the check that sees both sides.
+// compared on the tree after it is the check that sees both sides OF world/*.
+//
+// WHAT IT DOES NOT SEE (cold review, 2026-09-17). Every digest is computed
+// through harness_params.hpp's hand-kept copy of app.cpp's new-game path, not
+// through app.cpp. A change to app.cpp that the copy does not mirror (or a copy
+// edit that cancels a world change) passes this check. So a change that touches
+// app::start_new_game_prelude or poll_worldgen's validation run is reviewed
+// together with the copy, diff against diff; the pin covers world/* only.
 //
 // FOUR DIGESTS, one per app phase, so a failing row names WHERE the world moved:
 //   D_search  the walk — the winner candidate and every term of its score, the
@@ -721,10 +737,20 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check)
         return threw ? 1 : 0;
     }
 
-    std::printf("\n%d/%zu rows PASS, %d FAIL, %d threw\n%s\n", passed, seeds.size(), failed,
-                threw, (failed == 0 && threw == 0 && passed > 0) ? "DIGEST CHECK PASS"
-                                                                 : "DIGEST CHECK FAILED");
-    return (failed == 0 && threw == 0 && passed > 0) ? 0 : 1;
+    // Coverage (cold review, 2026-09-17): a run over a subset of the pinned seeds
+    // is a quick check, not the proof. Only full coverage prints PASS and exits 0.
+    std::size_t covered = 0;
+    for (const world_digest_pin& p : k_world_digest_pins)
+        for (uint32_t s : seeds)
+            if (s == p.seed) { ++covered; break; }
+    const bool clean   = failed == 0 && threw == 0 && passed > 0;
+    const bool full    = covered == k_world_digest_pins.size();
+    std::printf("\n%d/%zu rows PASS, %d FAIL, %d threw; %zu of %zu pinned seeds checked\n%s\n",
+                passed, seeds.size(), failed, threw, covered, k_world_digest_pins.size(),
+                !clean ? "DIGEST CHECK FAILED"
+                       : full ? "DIGEST CHECK PASS"
+                              : "DIGEST CHECK PARTIAL - the rows checked pass, but pinned seeds were left out");
+    return !clean ? 1 : full ? 0 : 3;
 }
 
 int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
@@ -1057,8 +1083,17 @@ int main(int argc, char** argv)
                     if (comma == std::string::npos)
                         comma = csv.size();
                     if (comma > at)
-                        seeds.push_back(static_cast<uint32_t>(
-                            std::strtoul(csv.substr(at, comma - at).c_str(), nullptr, 10)));
+                    {
+                        // A token must be a whole number: strtoul would turn "4l"
+                        // into 4 and "x" into seed 0, a pinned row (cold review).
+                        const std::string tok = csv.substr(at, comma - at);
+                        if (tok.find_first_not_of("0123456789") != std::string::npos)
+                        {
+                            std::printf("--seeds: '%s' is not a seed number\n", tok.c_str());
+                            std::exit(2);
+                        }
+                        seeds.push_back(static_cast<uint32_t>(std::strtoul(tok.c_str(), nullptr, 10)));
+                    }
                     at = comma + 1;
                 }
             }
@@ -1134,8 +1169,10 @@ int main(int argc, char** argv)
         return run_seat(seeds, lua, fast, guard_mode, reproduce);
     }
 
-    std::printf("player_seed_sweep — %d seeds, %d settle ticks (%.2f in-game years)\n\n",
+    std::printf("player_seed_sweep — %d seeds, %d settle ticks (%.2f in-game years)\n",
                 n_seeds, settle_ticks, settle_ticks / 4.0);
+    std::printf("NOT THE SHIPPED START: built bare (no world_gen.lua, works.lua or set_era, no landscape "
+                "search, its own settle); --seat/--guard/--digest build the app's world.\n\n");
     std::printf("seed  proc  extr  other   opening      final  dipped  verdict\n");
     std::printf("----  ----  ----  -----  --------  ---------  ------  -------\n");
 
