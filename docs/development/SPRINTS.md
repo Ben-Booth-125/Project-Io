@@ -59,25 +59,6 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 43 — the 1960 baseline
-*Open · opened 2026-09-17 · Ben (2026-09-17, elicitation: "Sprint 43 items; 44-45 as goal rows"); Claude (cut from a seven-lane engine read with an adversarial cross-check)*
-
-**Goal.** Take every Digitisation reading, per seed, on the shipped world continued to 1960, beside a 1660 control, with the span's wall-clock cost and both inherited weaknesses counted, before any Digitisation mechanism is admitted.
-
-**Planned.**
-- BL-1026 (seed library re-read) — fingerprints re-blessed from a library-seed sweep; replacement candidates for seeds 4, 6, 12, 13 brought to Ben.
-- BL-1027 (span cost to 1960) — exploration_sweep --through; per-seed wall clock and profile split for each span half; a saturation line.
-- BL-1028 (weakness counters to 1960) — contact, binding, alarm saturation, displacement, the contact funnel, per half; digests unmoved.
-- BL-1029 (Digitisation readings at 1960) — digitisation_sim_harness --through with a fingerprint-checked 1660 control; honest SUMMARY and structural zeros.
-
-**Done when.** All four items terminal. The sixteen library seeds read at 1660 and 1960, per seed, with cost; world_determinism and the goldens bit-identical; a NEEDS_REVIEW decision entry puts W1 (displacement against a saturated alarm) and W2 (polities rarely meet) to Ben with the readings, and a second offers seed replacements.
-
-**Risk.** "Through 1960" means exploration_stop_year = 1960 at epoch 0, never epoch_year = 1960, which selects the superseded two-span arc with Exploration off. The stretched span runs Exploration's forces only, so a frozen or saturated 1960 world is an inherited finding, not a Digitisation result. BL-1028 may add pure counters to history_sim; a moved digest means one touched a decision. Readings 3 and 8's region half stay structural zeros whatever the span, and reading 3 cannot move until the epoch flip decouples arc from recipe band.
-
-THE PLAN OBEYS WHAT BROKE THE LAST ONE (archived 2026-09-16 as "highly unstructured"): one goal per sprint; work ordered by property, not by prerequisite depth across the whole backlog; the root before its leaves; every reading on one world config; any save-format or difficulty-5 work broken down and run alone with a cold review; an open design question gets its own measure item before its mechanism; timing work on a quiet machine, never beside a world-mover.
-
-RULINGS THAT SHAPE IT (Ben, 2026-09-17, elicitation): the seed library is re-blessed and its four lost seeds replaced rather than reworded; the weaknesses are measured here and ruled at the gate; neither blocks sprints 44-45.
-
 ### Sprint 44 — the corporate web's plumbing
 *Proposed · Ben (2026-09-17, elicitation: "Sprint 43 items; 44-45 as goal rows"); Claude (cut from a seven-lane engine read with an adversarial cross-check)*
 
@@ -165,7 +146,7 @@ OWED WHEN THE ITEMS ARE CUT, not before: whether consolidation and the near-home
 | 40 | exploration | CLOSED 2026-09-12. All fifteen planned items (BL-930..BL-944) built, independently verified and archived across six waves -- BL-945 stays parked for Digitisation. Every item rebuilt and reverified in the main session, not taken on a sub-agent self-report. |
 | 41 | Exploration trade | COMPLETE 2026-09-14. Nine items built and merged; the wave world shape authorised at Alarm 525 (NR-867); the wants claim weakened in EXPLORATION.md (NR-865). |
 | 42 | generation sharpened before Digitisation | CLOSED 2026-09-16. Twenty-five items delivered across two waves (wave 0: nine; wave 1: sixteen, one of them — BL-1000 — built but open on a live click). Every gate green on the integrated tree bar two knowns: the exploration R3b pin, held red as the wave re-bless NR-877 asks Ben to authorise, and era_world_harness's three reds, which pre-date the sprint (BL-1010). Five items moved the world and each was measured in isolation. Four design calls and one reading are in the queue as NR-878..881; four items of owed work are filed as BL-1007..1010. |
-| 43 | the 1960 baseline | OPEN 2026-09-17. Measure before mechanism: four harness items, one lane, no shipped world moves. Gate at close: Ben rules the two inherited weaknesses on per-seed readings. |
+| 43 | the 1960 baseline | CLOSED 2026-09-17. Four items delivered in one day, one lane plus one worktree port; no shipped world moved (digests identical). The gate is NR-888: W1, W2 and the clock, on the 1960 baseline. |
 | 44 | the corporate web's plumbing | PROPOSED 2026-09-17. Items cut at the sprint 43 gate. A per-centre charter budget reaches the landscape search, off by default; no world moves. |
 | 45 | industrialisation makes the web real | PROPOSED 2026-09-17. Items cut after sprint 44. Digitisation runs as its own span from exploration_output, cities accumulate industry points, and sprint 44's budget switches on — one re-bless, one cold review. |
 
@@ -173,4 +154,4 @@ OWED WHEN THE ITEMS ARE CUT, not before: whether consolidation and the near-home
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*61 sprints archived cold; 3 open/gated in the hot store.*
+*62 sprints archived cold; 2 open/gated in the hot store.*

@@ -857,6 +857,32 @@
         "WHAT THE WAVE ACTUALLY BOUGHT, since the item list does not say it: the generation stages now hand each other something a reader can check. The tile pipeline can re-run its Life half over a cached record, so tuning a fossil rule costs seconds instead of a full surface; both handoff structs are validated on the shipped path and carry the culture table; every node of the two wired technology trees does something; a nation opens with the money its history banked; every downstream instrument measures the landscape the player gets; and the settle is the search's own validation run rather than a warm start nobody could justify. What is still owed before Digitisation is measurement parity (BL-1007) and the digest's blind spots (BL-1009) — both are about instruments, which is where this sprint started."
       ]
     },
+    "43": {
+      "id": "43",
+      "theme": "the 1960 baseline",
+      "state": "closed",
+      "status_line": "CLOSED 2026-09-17. Four items delivered in one day, one lane plus one worktree port; no shipped world moved (digests identical). The gate is NR-888: W1, W2 and the clock, on the 1960 baseline.",
+      "opened_date": "2026-09-17",
+      "closed_date": "2026-09-17",
+      "author": "Ben (2026-09-17, elicitation: \"Sprint 43 items; 44-45 as goal rows\"); Claude (cut from a seven-lane engine read with an adversarial cross-check)",
+      "goal": "Take every Digitisation reading, per seed, on the shipped world continued to 1960, beside a 1660 control, with the span's wall-clock cost and both inherited weaknesses counted, before any Digitisation mechanism is admitted.",
+      "planned": [
+        "BL-1026 (seed library re-read) — fingerprints re-blessed from a library-seed sweep; replacement candidates for seeds 4, 6, 12, 13 brought to Ben.",
+        "BL-1027 (span cost to 1960) — exploration_sweep --through; per-seed wall clock and profile split for each span half; a saturation line.",
+        "BL-1028 (weakness counters to 1960) — contact, binding, alarm saturation, displacement, the contact funnel, per half; digests unmoved.",
+        "BL-1029 (Digitisation readings at 1960) — digitisation_sim_harness --through with a fingerprint-checked 1660 control; honest SUMMARY and structural zeros."
+      ],
+      "risk": "\"Through 1960\" means exploration_stop_year = 1960 at epoch 0, never epoch_year = 1960, which selects the superseded two-span arc with Exploration off. The stretched span runs Exploration's forces only, so a frozen or saturated 1960 world is an inherited finding, not a Digitisation result. BL-1028 may add pure counters to history_sim; a moved digest means one touched a decision. Readings 3 and 8's region half stay structural zeros whatever the span, and reading 3 cannot move until the epoch flip decouples arc from recipe band.",
+      "done_when": "All four items terminal. The sixteen library seeds read at 1660 and 1960, per seed, with cost; world_determinism and the goldens bit-identical; a NEEDS_REVIEW decision entry puts W1 (displacement against a saturated alarm) and W2 (polities rarely meet) to Ben with the readings, and a second offers seed replacements.",
+      "notes": "THE PLAN OBEYS WHAT BROKE THE LAST ONE (archived 2026-09-16 as \"highly unstructured\"): one goal per sprint; work ordered by property, not by prerequisite depth across the whole backlog; the root before its leaves; every reading on one world config; any save-format or difficulty-5 work broken down and run alone with a cold review; an open design question gets its own measure item before its mechanism; timing work on a quiet machine, never beside a world-mover.\n\nRULINGS THAT SHAPE IT (Ben, 2026-09-17, elicitation): the seed library is re-blessed and its four lost seeds replaced rather than reworded; the weaknesses are measured here and ruled at the gate; neither blocks sprints 44-45.",
+      "retro": {
+        "landed": "BL-1026 (seed library re-read): library sweep table, 16 fingerprints re-blessed, four seeds replaced on NR-887. BL-1027 (span cost to 1960): --through and --cost; 1660 -> 1960 costs less than 1200 -> 1660. BL-1028 (weakness counters to 1960): trace-only port of eaf15a37/6d7bb462 in a worktree, cold-reviewed, digests identical. BL-1029 (Digitisation readings at 1960): fingerprint-checked 1660 control, computed SUMMARY. Plus: the Industry tree ring defect and lint rule (88465334), and EXPLORATION.md's contact paragraph re-measured (9cb4cb7e).",
+        "slipped": "Nothing.",
+        "filed": "NR-887 (seed replacements, ruled the same day); NR-888 (the gate).",
+        "runtime": "Release, build_gen/verify. Library sweep 136-147 s; pool 295 s; through-1960 sweep with cost 399 s (twice); readings at 1960 1,401 s quiet, 2,057 s under load; world_determinism 184-425 s; history_sim_harness 295-637 s.",
+        "feedback": "Measure-first paid for itself twice. (1) The plan's premise was half wrong: three of seven research lanes said running to 1960 needed a third resumed sim call, and the handoff said it would un-zero advanced chains; the adversarial cross-check found the one-parameter continuation, and the readings confirmed chains stay a structural zero. (2) \"Polities rarely meet\" was an unmerged snapshot artefact; they meet, and what fails is binding. Two checks caught their own bugs before anything was believed: the seed re-read found 19 lost its reason (not in the ruling), and the first readings run's two prefix mismatches were the check comparing folded against raw flows. The cold review on the src/world port found no blocker. Serial, one-lane runs made every timing quotable."
+      }
+    },
     "2a": {
       "id": "2a",
       "theme": "Close out the v0.1.0 cut set",
