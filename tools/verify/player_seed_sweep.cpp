@@ -977,6 +977,18 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                 cmp("D_land",   pin->land,   d.land);
                 cmp("D_settle", pin->settle, d.settle);
                 cmp("D_seat",   pin->seat,   d.seat);
+                // The refusal is part of the contract, not only the bytes (cold
+                // re-review, 2026-09-17): a refused budget must RAISE both flags,
+                // and an empty or all-zero one must raise neither and write no
+                // report, or a digest-identical world hides a broken seam.
+                const bool search_refused = start->land.search.charter_refused;
+                const bool report_written = report.refused || report.points_budgeted != 0
+                                         || !report.charters.empty();
+                if (mode == charter_mode::refused && !(search_refused && report.refused))
+                    diffs += " REFUSAL-FLAG (the search or the apply did not report the refusal)";
+                if ((mode == charter_mode::empty || mode == charter_mode::zero)
+                    && (search_refused || report_written))
+                    diffs += " EMPTY-FLAG (an empty budget raised the refusal or wrote a report)";
                 if (diffs.empty())
                 {
                     ++passed;
