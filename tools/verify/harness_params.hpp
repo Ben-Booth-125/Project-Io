@@ -109,11 +109,14 @@ struct shipped_landscape
 
 /// The search params app.cpp passes, keyed from the world seed exactly as it
 /// keys them. `regenerate_specialists = true` since BL-977; the start's
-/// corporation count is `world_gen_config::corporation_count`, which every
-/// shipped config leaves at its default — pass the parsed value where an
-/// instrument has one.
-inline landscape_search_params shipped_search_params(std::uint32_t world_seed,
-                                                     int corporation_count = 8)
+/// corporation count is `world_gen_config::corporation_count` (app.cpp:1057
+/// reads the PARSED config). The default is that field's own default rather
+/// than a restated literal (BL-1030), so a caller with no parsed config gets
+/// the same number the config struct does; `build_app_start_world` below
+/// passes the parsed value.
+inline landscape_search_params shipped_search_params(
+    std::uint32_t world_seed,
+    int corporation_count = world_gen_config{}.corporation_count)
 {
     landscape_search_params sp;
     sp.regenerate_specialists  = true;
@@ -127,9 +130,14 @@ inline landscape_search_params shipped_search_params(std::uint32_t world_seed,
 /// make_hard_coded_world, with @p reg loaded — in app.cpp's order: load_economy's
 /// recipe pass, the search, the winner applied, the second recipe pass. Returns
 /// the walk and the firms it added, so an instrument can print what it measured.
-inline shipped_landscape apply_shipped_landscape(world& w, const recipe_registry& reg,
-                                                 std::uint32_t world_seed,
-                                                 bool search = true)
+///
+/// @p corporation_count is the search's starting roster (app.cpp:1057,
+/// `m_worldgen_cfg.corporation_count`). It defaults to `world_gen_config`'s own
+/// default — 8, the value scripts/world_gen.lua also authors — so every caller
+/// that omits it gets exactly what it got when this was a hard-coded 8 (BL-1030).
+inline shipped_landscape apply_shipped_landscape(
+    world& w, const recipe_registry& reg, std::uint32_t world_seed, bool search = true,
+    int corporation_count = world_gen_config{}.corporation_count)
 {
     shipped_landscape out;
     out.searched = search;
@@ -144,7 +152,7 @@ inline shipped_landscape apply_shipped_landscape(world& w, const recipe_registry
         before.push_back(kv.first);
     std::sort(before.begin(), before.end());
 
-    const landscape_search_params sp = shipped_search_params(world_seed);
+    const landscape_search_params sp = shipped_search_params(world_seed, corporation_count);
     if (search)
     {
         out.search = search_landscape(w, reg, sp);
@@ -193,4 +201,163 @@ inline void print_shipped_landscape(const shipped_landscape& s)
                 r.seed_candidate.placement_seed,
                 r.seed_score.composite, r.winner_score.composite,
                 r.evaluations, r.accepted, s.firms.size());
+}
+
+// ---------------------------------------------------------------------------
+// The campaign start, in app order (BL-1030)
+// ---------------------------------------------------------------------------
+// `apply_shipped_landscape` mirrors ONE phase of the start. An instrument whose
+// subject is the world the player is handed needs the whole sequence, and the
+// pieces around the search were each dropped somewhere: player_seed_sweep built
+// with no scripts/world_gen.lua config (C++ fallback prices), no scripts/works.lua
+// registry (the Era -1 sim ran with works disabled), no `set_era` (the registry
+// stayed on the `any` band, so every era's recipes were live), and settled with
+// ticks numbered from 1, no firm exits, and a non-zero day tick where the app
+// passes 0. Each is a different world wearing the same seed, and nothing failed.
+//
+// TWO HELPERS, one per app phase, so an instrument can read the world at the
+// seam between them (the landscape applied; the validation run closed):
+//
+//   * `build_app_start_world` — app::begin_new_game (the config and works,
+//     then generation) and app::start_new_game_prelude (setup_world's world
+//     mutations, load_economy, the search and its winner, the second recipe
+//     pass). Everything up to the moment the validation run is armed.
+//   * `run_app_validation_settle` — app::poll_worldgen's validation run: the
+//     `validation_ticks` calls to app::step_economy, with the tick state the app
+//     actually has at that point rather than the state a harness would assume.
+//
+// Both MIRROR app.cpp and cite it line by line; neither re-implements a system.
+// If a cited line moves or changes, this is the other half of that edit. The
+// presentation calls step_economy makes (standings cache, comms, counsel,
+// history recorders, strategy readout) take `const world&` and are not
+// mirrored — they cannot move a byte of the world.
+//
+// Written for player_seed_sweep; it exists so every instrument measuring the
+// shipped start can stop restating the sequence. Other harnesses are NOT
+// migrated by the item that added it, and their numbers are unchanged.
+
+#include "world/budget_system.hpp"     // apply_budget
+#include "world/corp_command.hpp"      // run_firm_exits
+#include "world/economy_system.hpp"    // run_economy_step, economy_report
+#include "world/history_log.hpp"       // seed_genesis_history
+#include "world/market_clearing.hpp"   // clear_markets
+#include "world/nation_step.hpp"       // run_nation_step
+#include "world/recipe_registry.hpp"   // recipe_registry, era_band_for_epoch
+#include "world/supply_system.hpp"     // dispatch/advance/credit convoys
+#include "world/survey_system.hpp"     // init_survey_states
+#include "world/tech_gate.hpp"         // advance_tech_gates
+#include "world/works_roster.hpp"      // works_registry
+
+/// `app::validation_ticks` (app.hpp:746), restated because app.hpp brings SDL.
+/// If the app's number moves, this one moves with it.
+inline constexpr int k_app_validation_ticks = 12;
+
+/// Everything the app holds for one campaign start that the world was built
+/// from. Owned by the caller, so two starts (a reproduction check) never share
+/// a registry or a config.
+struct app_start_world
+{
+    world_params      params{};   ///< app::m_active_world_params
+    world_gen_config  cfg{};      ///< app::m_worldgen_cfg
+    works_registry    works;      ///< app::m_works
+    recipe_registry   reg;        ///< app::m_registry
+    generation_report report{};   ///< app::m_generation_report
+    world             w;          ///< app::m_world
+    /// The search. `land.search.winner_score` is app::m_landscape_winner_score
+    /// (app.cpp:1066), the score the seat reads.
+    shipped_landscape land;
+};
+
+/// Build @p out as the app builds a campaign start from @p params, stopping
+/// where the app arms the validation run (app.cpp:653-655). @p lua plays
+/// app::m_lua: one long-lived state the scripts are (re)loaded into.
+inline void build_app_start_world(lua_state& lua, const world_params& params,
+                                  app_start_world& out)
+{
+    out.params = params;
+
+    // --- app::begin_new_game (app.cpp:502-557) -----------------------------
+    // app.cpp:504-506 — the world-gen config is PARSED and passed, not merely loaded.
+    lua.load("scripts/world_gen.lua");
+    out.cfg = world_gen_config{};
+    out.cfg.load_from_lua(lua);
+    // app.cpp:546 -> app::ensure_works_loaded (app.cpp:1132-1140), loaded once.
+    if (out.works.size() == 0)
+    {
+        lua.load("scripts/works.lua");
+        out.works.load_from_lua(lua);
+    }
+    // app.cpp:553-554 — the worker: report, config and works all passed. The
+    // progress sink is atomics the loading screen reads, never an input.
+    out.report = generation_report{};
+    out.w = make_hard_coded_world(params, &out.report, out.cfg, /*progress=*/nullptr,
+                                  &out.works);
+
+    // --- app::start_new_game_prelude (app.cpp:980-1100) --------------------
+    // app.cpp:1014 -> app::setup_world (app.cpp:1356-1511). Its world is already
+    // built (the app.cpp:1382 branch is not taken on this path); of the rest,
+    // only two calls write the world — the others frame the camera and the chat.
+    seed_genesis_history(out.w, out.report);   // app.cpp:1397
+    init_survey_states(out.w);                 // app.cpp:1509
+
+    // app.cpp:1016 -> app::load_economy (app.cpp:1142-1229).
+    lua.load("scripts/recipes.lua");           // app.cpp:1145
+    lua.load("scripts/economy.lua");           // app.cpp:1146
+    out.reg.load_from_lua(lua);                // app.cpp:1147
+    out.reg.set_era(era_band_for_epoch(params.epoch_year)); // app.cpp:1157
+    // app.cpp:1168 ensure_works_loaded: already loaded above. app.cpp:1172-1173
+    // (tech_tree.lua) and 1220-1228 (persona bench) write no world state, and
+    // app.cpp:1201-1213 only reads it.
+    assign_default_recipes(out.w, out.reg);    // app.cpp:1185
+
+    // app.cpp:1052-1073 — the search, the winner applied — and app.cpp:1084, the
+    // second recipe pass: apply_shipped_landscape is that block, given the
+    // PARSED config's roster count (app.cpp:1057).
+    out.land = apply_shipped_landscape(out.w, out.reg, params.seed, /*search=*/true,
+                                       out.cfg.corporation_count);
+}
+
+/// Run the validation run on @p w exactly as app::poll_worldgen does
+/// (app.cpp:575-606): `ticks` calls to app::step_economy (app.cpp:1231-1347),
+/// under the tick state the app has at that moment. Does NOT seat — the app
+/// seats after the run closes (app.cpp:603), and the caller does the same with
+/// `seat_player_corporation`.
+///
+/// THE TICK STATE, and why each value is what it is:
+///   * econ tick 0..ticks-1. app.cpp:655 sets m_econ_steps = 0 when the run is
+///     armed, and step_economy stamps `current_econ_tick = m_econ_steps++`
+///     (app.cpp:1250) — so the first validation tick is 0, not 1.
+///   * day tick 0, for every tick. The sim loop is rebuilt at app.cpp:1010 and
+///     only `sim_loop::tick()` advances its day counter; the frame loop skips
+///     that call on every screen but `in_game` (app.cpp:320-324), and the
+///     validation run happens on the `building` screen. So
+///     `m_sim_loop.day_tick()` (app.cpp:1301) is 0 throughout.
+///   * `world::current_day_tick` is NOT written. The app mirrors it only inside
+///     the in_game frame loop (app.cpp:401); through the validation run it keeps
+///     the value generation left, and this helper leaves it alone likewise.
+inline void run_app_validation_settle(world& w, const recipe_registry& reg,
+                                      int ticks = k_app_validation_ticks)
+{
+    constexpr int k_validation_day_tick = 0; // m_sim_loop.day_tick(), see above
+    for (int econ_step = 0; econ_step < ticks; ++econ_step)  // app.cpp:655, 579-583
+    {
+        w.current_econ_tick = econ_step;                                  // app.cpp:1250
+        lp_pool_map tick_lp_pools;                                        // app.cpp:1257
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // app.cpp:1258-1260
+                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
+        advance_convoys(w);                                               // app.cpp:1261
+        // app.cpp:1273-1275: `m_ui.spectating || m_validation_run`, and
+        // m_validation_run is true for every tick of this run (app.cpp:653).
+        economy_report report = run_economy_step(w, reg, /*spectating=*/true,
+                                                 &tick_lp_pools);
+        const auto flows = clear_markets(w, reg, report);                 // app.cpp:1277
+        apply_budget(w, reg, flows, report.workforce_contention,          // app.cpp:1279-1282
+                     &report.budgets, &report.buildings, &report.building_labour);
+        run_nation_step(w, reg, report, w.current_econ_tick);             // app.cpp:1289
+        advance_tech_gates(w);                                            // app.cpp:1295
+        // app.cpp:1300 compute_corp_standings reads a const world into a UI cache.
+        credit_arrived_convoys(w, k_validation_day_tick);                 // app.cpp:1301
+        run_firm_exits(w, reg.firm_exit(), &report.firm_exits);           // app.cpp:1306
+        // app.cpp:1314-1345: presentation over a const world; nothing to mirror.
+    }
 }

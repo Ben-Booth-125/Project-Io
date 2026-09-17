@@ -60,6 +60,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -262,39 +263,26 @@ int run_roster(uint32_t seed, const recipe_registry& reg)
 // hold for this question. `--fast` is for iteration only and says so in its
 // header line, exactly as spawn_solvency's does.
 
-/// BL-573: run_nation_step's template registry. Empty is correct — nothing here
-/// asks a contract question, and an empty roster opens no contracts.
-
-/// The app's settle tick, composed as `app::step_economy` composes it, with
-/// the one difference that IS BL-630: `spectating = true`. Nobody is seated
-/// through the settle, so the no-auto-act prohibition has no subject and
-/// every corp is scorer-driven (BL-409). A sweep that ran this false would
-/// measure a world one corp never acted in and call it the shipped spawn.
-void settle_tick(world& w, const recipe_registry& reg, int t)
-{
-    w.current_econ_tick = t;
-    w.current_day_tick  = t;
-    lp_pool_map lp;
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space), &lp);
-    advance_convoys(w);
-    economy_report rep = run_economy_step(w, reg, /*spectating=*/true, &lp);
-    auto flows = clear_markets(w, reg, rep);
-    apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
-                 &rep.building_labour);
-    run_nation_step(w, reg, rep, t);
-    advance_tech_gates(w);
-    credit_arrived_convoys(w, t);
-}
-
+/// THE SETTLE IS THE APP'S, through one shared helper (BL-1030, 2026-09-17).
+/// `run_app_validation_settle` (harness_params.hpp) is app::poll_worldgen's
+/// validation run tick for tick, spectating included (BL-630: nobody is seated
+/// through the settle, so every corp is scorer-driven). The local tick this
+/// file used to run had drifted from the app in four ways at once — ticks
+/// numbered from 1 rather than 0, `world::current_day_tick` written as the tick
+/// where the app leaves it untouched, the tick rather than day 0 passed to
+/// credit_arrived_convoys (and through it intercept_convoys), and no
+/// run_firm_exits — and the world it settled was itself built without the
+/// world-gen config, the works registry or the era band. The helper's comment
+/// carries the app.cpp line for each.
+///
 /// The settle: phase 6's single validation run, after which the app seats the
 /// player (ERAS.md § The opening position; app::poll_worldgen calls seat_player
-/// when it closes). Mirrors `app::validation_ticks`, restated because app.hpp
-/// brings SDL; if the app's number moves, this one moves with it. NOT a longer
-/// history by choice: the subject is the seat the game draws, and the one
-/// trailing window the draw reads (k_spawn_trailing_quarters, 8) fits inside the
-/// settle whole. Re-read under BL-1008, 2026-09-16 — see THE SETTLE RE-READ.
-constexpr int k_settle_ticks = 12;
+/// when it closes). `app::validation_ticks`, through the helper's restatement.
+/// NOT a longer history by choice: the subject is the seat the game draws, and
+/// the one trailing window the draw reads (k_spawn_trailing_quarters, 8) fits
+/// inside the settle whole. Re-read under BL-1008, 2026-09-16 — see THE SETTLE
+/// RE-READ (taken on the pre-BL-1030 settle).
+constexpr int k_settle_ticks = k_app_validation_ticks;
 
 // THE SETTLE RE-READ (BL-1008, 2026-09-16) — TAKEN BEFORE BL-1020 re-cut the floor
 // onto phase 6's static landscape score (merged the same day). The "WHAT MOVED"
@@ -365,26 +353,28 @@ struct seat_row
     bool      reproduce_checked = false;
 };
 
-/// Build one world, settle it, seat it. Returns the seat result plus the
-/// world, because the caller needs both to describe what was seated.
-spawn_seat_result build_and_seat(uint32_t seed, const recipe_registry& reg,
-                                 bool fast, world& out_world)
+/// Build one world, settle it, seat it — the app's campaign start end to end.
+/// Returns the seat result; @p out holds the world (and the registry, config
+/// and search it was built from), because the caller needs both to describe
+/// what was seated.
+spawn_seat_result build_and_seat(lua_state& lua, uint32_t seed, bool fast,
+                                 app_start_world& out)
 {
     world_params p = fast ? no_prehistory() : world_params{};
     p.seed = seed;
-    out_world = make_hard_coded_world(p);
-    // The app's own ordering: the landscape-search WINNER applied over the loaded
-    // registry (not the seed candidate — BL-979), the recipe authoring pass, then
-    // the validation run (app::start_new_game_prelude, app::poll_worldgen), then
-    // the seat on the WINNER'S STATIC SCORE (BL-1020) — the one the app keeps as
-    // `m_landscape_winner_score`.
-    const shipped_landscape land = apply_shipped_landscape(out_world, reg, seed);
-    for (int t = 1; t <= k_settle_ticks; ++t)
-        settle_tick(out_world, reg, t);
-    return seat_player_corporation(out_world, seed, land.search.winner_score);
+    // app::begin_new_game + app::start_new_game_prelude: config and works, the
+    // world, setup_world's writes, load_economy with its era band, the
+    // landscape-search WINNER (not the seed candidate — BL-979) and the second
+    // recipe pass (BL-1030; harness_params.hpp).
+    build_app_start_world(lua, p, out);
+    // app::poll_worldgen's validation run (BL-1030; harness_params.hpp).
+    run_app_validation_settle(out.w, out.reg);
+    // app::seat_player (app.cpp:933): the seat on the WINNER'S STATIC SCORE
+    // (BL-1020) — the one the app keeps as `m_landscape_winner_score`.
+    return seat_player_corporation(out.w, p.seed, out.land.search.winner_score);
 }
 
-int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, bool fast,
+int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
              bool assert_mode, int reproduce_seeds)
 {
     const int n_seeds = static_cast<int>(seeds.size());
@@ -394,7 +384,9 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
                      : "the shipped");
     std::printf("BL-630. The floor filters; the draw over the shortlist is BIASED, never gated.\n");
     std::printf("BL-1020. The floor reads phase 6's STATIC landscape score; balance and trail8 "
-                "are information.\n\n");
+                "are information.\n");
+    std::printf("BL-1030. Built and settled in app order: world_gen.lua config, works.lua, "
+                "set_era, the config's roster count, the validation run's own tick state.\n\n");
 
     std::printf("seed  spec  short  old  land    proc  pop%%  weight   balance   trail8  unmet  seated\n");
     std::printf("----  ----  -----  ---  ------  ----  ----  ------  --------  -------  -----  ------\n");
@@ -409,8 +401,11 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
         std::string seat_name = "-";
         try
         {
-            world w;
-            const spawn_seat_result res = build_and_seat(r.seed, reg, fast, w);
+            // Heap-held: a start carries a world, a registry, a config and a
+            // generation report, and two of them live at once under S4.
+            const auto start = std::make_unique<app_start_world>();
+            const spawn_seat_result res = build_and_seat(lua, r.seed, fast, *start);
+            const world& w = start->w;
 
             r.seated      = res.seated;
             r.floor_unmet = res.floor_unmet;
@@ -460,8 +455,8 @@ int run_seat(const std::vector<uint32_t>& seeds, const recipe_registry& reg, boo
             // S4's own row so nobody reads it as a full sweep.
             if (i < reproduce_seeds)
             {
-                world w2;
-                const spawn_seat_result res2 = build_and_seat(r.seed, reg, fast, w2);
+                const auto start2 = std::make_unique<app_start_world>();
+                const spawn_seat_result res2 = build_and_seat(lua, r.seed, fast, *start2);
                 // The ranked candidate list too, score for score: the static
                 // score is the gate and the order now (BL-1020), so a score that
                 // drifted between two builds would move the shortlist silently.
@@ -748,7 +743,10 @@ int main(int argc, char** argv)
             for (int i = 0; i < g_seeds; ++i)
                 seeds.push_back(static_cast<uint32_t>(i));
         }
-        return run_seat(seeds, reg, fast, guard_mode, reproduce);
+        // The same Lua state, as the app keeps one m_lua: build_app_start_world
+        // reloads world_gen.lua, works.lua, recipes.lua and economy.lua into it
+        // per start, in app order, and builds each start's own registry.
+        return run_seat(seeds, lua, fast, guard_mode, reproduce);
     }
 
     std::printf("player_seed_sweep — %d seeds, %d settle ticks (%.2f in-game years)\n\n",
