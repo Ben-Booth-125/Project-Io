@@ -22,34 +22,6 @@
    "category": "Generation",
    "priority": "A",
    "status": "designed",
-   "id": "BL-1032",
-   "short_name": "CHARTER_BUDGET_SEAM",
-   "difficulty": 4,
-   "requires": [
-    "BL-1031"
-   ],
-   "title": "A per-centre charter budget reaches the landscape search and charters specialists and background firms around each centre, off by default",
-   "authority_doc": "docs/generation/DIGITISATION.md",
-   "files": [
-    "src/world/charter_budget.hpp",
-    "src/world/landscape_search.hpp",
-    "src/world/landscape_search.cpp",
-    "src/world/corporation_generation.hpp",
-    "src/world/corporation_generation.cpp",
-    "tools/verify/harness_params.hpp"
-   ],
-   "design": "AMENDED 2026-09-17 (cold review of BL-1030/BL-1031): the pins prove world/* through harness_params.hpp's hand-kept copy of app.cpp's new-game path, not through app.cpp. So app::start_new_game_prelude and poll_worldgen's validation run take NO behavioural change in this item: the budget pointer defaults to none on landscape_search_params, the app passes nothing new, and any line the item does touch in app.cpp is reviewed diff against diff with the copy in harness_params.hpp.\n\nTHE DESIGN IS IN THE DOCS: DIGITISATION.md § 1 (the budget charters the whole web; one specialist per centre that affords one, richest first; nation balance dropped; charters stay near their centre; no budget and an empty budget are today's world), CORPORATION_GENERATION.md Pass 1, GENERATION_STRATEGY.md phase 6 point 3 (the roster axis is skipped on a budget world). This item is the plumbing; no price is chosen and nothing ships a source.\n\nSHAPE (from the 2026-09-17 seam map; the cross-check's corrections applied). charter_budget: points by population-centre entity id (ascending map), integer, entries <= 0 dropped, so empty and all-zero are one state that takes the legacy branch. charter_spend_params: firm price and specialist price in points (no shipped defaults; the search refuses a non-empty budget with a zero price), window radius 4 (the seat's population_radius precedent), province cap on/off. landscape_search_params gains the budget pointer and spend params; the search copies spend state per evaluation (threads share params). A new apply_landscape_candidate overload branches ONCE: null or empty runs today's calls verbatim; otherwise remove_specialist_roster then charter_web_from_budget. The 3- and 4-arg overloads and generate_corporations/generate_background_firms bodies are untouched. On a budget world the roster axis is skipped, never re-keyed: the axis count and the tag formula stay.\n\ncharter_web_from_budget (corporation_generation.cpp, new, reusing file-local helpers, editing no legacy body): centres by budget descending, ties lower id; home nation from tile_to_nation of the centre tile (none -> unspent, reason no_nation); region from nearest_region reconciled against that nation (mismatch -> the nation's nearest region to the centre, or the national-character fallback); a centre whose budget covers the specialist price charters one specialist (focus and ownership from the region, today's capital 400 +/-40%, no nation balancing); the remainder buys background firms by the existing gap selection under the per-resource cap 8, the province cap when on, and the 200-per-body cap; anchor rungs are the window around the centre tile (wrapped metric), then the centre's region window, then UNSPENT (reason window_exhausted), never nation-wide; leftovers counted by reason. RNG keyed per centre and role with salts that collide with none in use. The player is a seeded pick among budget specialists; with none, the report says no_specialists and nothing forces one (sprint 45 decides).\n\napp.cpp and harness_params.hpp change together and both pass no budget, with a comment naming the missing source (Beat 1). The synthetic budget builder lives only under tools/verify. No save-format change, no Lua key.\n\nDONE WHEN: requirements.json § charter-budget-seam, all rows.\n\nRUN CONDITIONS: Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify (MSVC /O2 — the toolchain every pin is bound to; never %TEMP%); serial, quiet machine, build tree quoted; tracked tables only via --out."
-  },
-  {
-   "glyph": "✓",
-   "sprint": "44",
-   "written": "2026-09-17",
-   "author": "Ben (2026-09-17: NR-888 gate \"cut and build\"; charter calls on an elicitation form — Rule A, capital kept, no-specialist world at sprint 45, nation balance dropped); Claude (item text, from a three-lane seam map with an adversarial cross-check)",
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "priority": "A",
-   "status": "designed",
    "id": "BL-1033",
    "short_name": "CHARTER_BUDGET_COST",
    "difficulty": 3,

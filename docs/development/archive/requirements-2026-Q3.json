@@ -1059,6 +1059,74 @@
    ],
    "resolution": "Complete, all rows met. ui::why_note — a closed-by-default toggle revealing exactly two lines. All three of the item's open questions settled and recorded. 4 goldens blessed and PASS at 0.0000%."
   },
+  "charter-budget-seam": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --digest-check"
+     ],
+     "requirement": "With no charter budget, every library seed's four digests (search path, world after the landscape, after the validation run, after the seat) equal the BL-1031 pins taken before the seam.",
+     "notes": "",
+     "result_metric": "--digest-check, 16 library seeds, no budget: 16/16 PASS, exit 0, 3,662 s (main session, integrated tree)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --digest-check --charter-budget empty"
+     ],
+     "requirement": "With an explicitly empty budget (and with one holding only zero entries), every digest equals the pins.",
+     "notes": "",
+     "result_metric": "--charter-budget empty: 16/16 PASS, exit 0, 3,396 s. --charter-budget zero (all-zero map): PASS on 46, 28, 0. Both take the legacy branch; the refusal flag stays clear and no report is written, asserted by the harness."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: landscape_search_harness",
+      "headless: world_determinism"
+     ],
+     "requirement": "landscape_search_harness R2 (thread invariance) and R3 (path replay) stay green, and world_determinism's digests are unchanged.",
+     "notes": "",
+     "result_metric": "landscape_search_harness PASS (0 failures, R2 thread invariance, R3 path replay). world_determinism ALL PASS; all four digests equal to the pre-seam values."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --charter-budget synthetic"
+     ],
+     "requirement": "Non-vacuity: a synthetic 1x budget changes the world digest after the landscape, charters at least one specialist and one background firm inside a centre's window, and counts every unspent point by reason.",
+     "notes": "",
+     "result_metric": "Seed 0, synthetic 1x: all four digests differ from the pin; 2 specialists and 79 firms, both kinds inside a centre window on 2 centres; points 87 = 87 spent, balanced. At 4x: 11 specialists, 81 firms, 219 points unspent as no_gap (NR-889)."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "code: git diff of src/core/app.cpp is empty or comment-only, reviewed against harness_params.hpp",
+      "code: no `synthetic` symbol under src/",
+      "code: write_world_snapshot and the save version unchanged"
+     ],
+     "requirement": "No shipped path reaches a budget source: app::start_new_game_prelude and the validation run take no behavioural change (the budget defaults to none), the harness mirror passes none, the synthetic builder lives only under tools/verify, and the save format does not change.",
+     "notes": "",
+     "result_metric": "git diff of src/core/app.cpp is 8 comment-only lines; no `synthetic` symbol added under src/; write_world_snapshot and the save version unchanged."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold adversarial review of the seam finds no unresolved blocker, with particular attention to any way an empty budget could still move a byte, and reviews app.cpp's new-game path and its harness copy as one unit.",
+     "notes": "",
+     "result_metric": "Cold review of the seam: no blocker, 2 majors, 6 minors. Fix round resolved all seven; the cold re-review confirmed each with file:line and found the legacy path untouched for null, empty, all-zero and refused budgets. Two residual minors are recorded in the item."
+    }
+   ],
+   "resolution": "The seam lands off by default and is pinned: an empty or all-zero budget, and a refused one, reproduce the pre-seam world on all 16 library seeds, while a synthetic budget visibly charters specialists and firms around centres. A refusal mutates nothing. Density is bounded by Pass 6's per-resource cap, which is NR-889's call and BL-1033's measurement."
+  },
   "charter-ownership-class": {
    "rows": [
     {

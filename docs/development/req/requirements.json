@@ -5664,8 +5664,20 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1032 - sprint 44 (2026-09-17)",
+   "batch": "sprint-44",
+   "resolved": "2026-09-17",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "charter-budget-cost",
+   "title": "BL-1033 - What a denser corporate web costs: the charter budget swept at 1x/2x/4x with the per-resource cap kept and lifted",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1033 - sprint 44 (2026-09-17)",
    "batch": "sprint-44",
    "resolved": null,
    "rows": [
@@ -5675,7 +5687,7 @@
      "verification": [
       "headless: player_seed_sweep --digest-check"
      ],
-     "requirement": "With no charter budget, every library seed's four digests (search path, world after the landscape, after the validation run, after the seat) equal the BL-1031 pins taken before the seam.",
+     "requirement": "The resource-cap switch moves no legacy byte: with no budget, an empty budget and a refused budget, the pinned digests hold.",
      "notes": "",
      "result_metric": ""
     },
@@ -5683,9 +5695,9 @@
      "id": "R2",
      "status": "pending",
      "verification": [
-      "headless: player_seed_sweep --digest-check --charter-budget empty"
+      "headless: player_seed_sweep --charter-cost"
      ],
-     "requirement": "With an explicitly empty budget (and with one holding only zero entries), every digest equals the pins.",
+     "requirement": "The cost table is taken on a QUIET machine, serially, in Release, with the build tree and run conditions recorded on its face, and is checked in.",
      "notes": "",
      "result_metric": ""
     },
@@ -5693,10 +5705,9 @@
      "id": "R3",
      "status": "pending",
      "verification": [
-      "headless: landscape_search_harness",
-      "headless: world_determinism"
+      "headless: player_seed_sweep --charter-cost"
      ],
-     "requirement": "landscape_search_harness R2 (thread invariance) and R3 (path replay) stay green, and world_determinism's digests are unchanged.",
+     "requirement": "Every row records its prices (firm points, specialist firm charters, specialist points) and its cap settings, and the specialist price is an axis with at least two rungs.",
      "notes": "",
      "result_metric": ""
     },
@@ -5704,9 +5715,9 @@
      "id": "R4",
      "status": "pending",
      "verification": [
-      "headless: player_seed_sweep --charter-budget synthetic"
+      "headless: player_seed_sweep --charter-cost"
      ],
-     "requirement": "Non-vacuity: a synthetic 1x budget changes the world digest after the landscape, charters at least one specialist and one background firm inside a centre's window, and counts every unspent point by reason.",
+     "requirement": "Per row: charters placed, unspent points by all seven reasons, specialists present, the largest one-nation share, holdings inside/outside the window, search ms per evaluation at thread count 1, ms per economy tick over the validation and live windows, and the seat shortlist size with its trailing-net spread.",
      "notes": "",
      "result_metric": ""
     },
@@ -5714,11 +5725,9 @@
      "id": "R5",
      "status": "pending",
      "verification": [
-      "code: git diff of src/core/app.cpp is empty or comment-only, reviewed against harness_params.hpp",
-      "code: no `synthetic` symbol under src/",
-      "code: write_world_snapshot and the save version unchanged"
+      "headless: player_seed_sweep --charter-cost"
      ],
-     "requirement": "No shipped path reaches a budget source: app::start_new_game_prelude and the validation run take no behavioural change (the budget defaults to none), the harness mirror passes none, the synthetic builder lives only under tools/verify, and the save format does not change.",
+     "requirement": "The province-cap unspent reason is proven to fire on a forced case, with points balanced and nothing refused.",
      "notes": "",
      "result_metric": ""
     },
@@ -5726,9 +5735,20 @@
      "id": "R6",
      "status": "pending",
      "verification": [
+      "code: no synthetic budget source under src/",
+      "doc: docs/development/NEEDS_REVIEW.md"
+     ],
+     "requirement": "The synthetic budget stays a harness input and is labelled as such on every face; the price readings and NR-889's cap question go to Ben as a review entry off the quiet table.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
       "review: code-reviewer (cold)"
      ],
-     "requirement": "A cold adversarial review of the seam finds no unresolved blocker, with particular attention to any way an empty budget could still move a byte, and reviews app.cpp's new-game path and its harness copy as one unit.",
+     "requirement": "A cold adversarial review finds no unresolved blocker, and the timing figures measure what they claim (a stated lower bound on the app's economy step).",
      "notes": "",
      "result_metric": ""
     }

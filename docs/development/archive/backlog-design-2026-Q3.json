@@ -18827,6 +18827,55 @@
         "design",
         "resolved"
       ]
+    },
+    "BL-1032": {
+      "glyph": "✓",
+      "sprint": "44",
+      "written": "2026-09-17",
+      "author": "Ben (2026-09-17: NR-888 gate \"cut and build\"; charter calls on an elicitation form — Rule A, capital kept, no-specialist world at sprint 45, nation balance dropped); Claude (item text, from a three-lane seam map with an adversarial cross-check)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "priority": "A",
+      "status": "complete",
+      "id": "BL-1032",
+      "short_name": "CHARTER_BUDGET_SEAM",
+      "difficulty": 4,
+      "requires": [
+        "BL-1031"
+      ],
+      "title": "A per-centre charter budget reaches the landscape search and charters specialists and background firms around each centre, off by default",
+      "authority_doc": "docs/generation/DIGITISATION.md",
+      "files": [
+        "src/world/charter_budget.hpp",
+        "src/world/landscape_search.hpp",
+        "src/world/landscape_search.cpp",
+        "src/world/corporation_generation.hpp",
+        "src/world/corporation_generation.cpp",
+        "tools/verify/harness_params.hpp"
+      ],
+      "design": "DELIVERED 2026-09-17 (sprint 44), commits d37c55c0 (seam) and 836d9e52 (fix round), plus 1906afb4 (the harness flag check). Built in a worktree lane, cold-reviewed twice: the first review found no blocker, two majors and six minors; the fix round resolved all seven and the re-review confirmed each, with the legacy path untouched.\n\nAS BUILT: charter_budget (map of centre id -> positive points; entries <= 0 dropped, so empty and all-zero are one state) and charter_spend_params (firm price in points, specialist price as a whole number of firm charters, window radius 4, province-cap switch, no shipped prices). landscape_search_params carries a budget pointer and the spend params; the search copies spend state per evaluation and skips the roster axis on a budget world only, with the axis count and the (round, axis) tag unchanged. A new apply_landscape_candidate overload branches once: null, empty or REFUSED runs today's calls verbatim and mutates nothing; otherwise charter_web_from_budget walks centres richest first, ties to the lower id, chartering one specialist where the budget affords one (nation from the centre tile, character region reconciled to that nation, today's 400 +/-40% capital, no nation balancing) and then that centre's firms by Pass 6's gap selection under the per-resource, province and 200-per-body caps. Anchors take a wrapped window around the centre, then the centre's own region, then the points go unspent; every unspent point is counted by one of seven reasons, holdings are reported by distance, and the player is a seeded pick among budget specialists with nothing forcing one. app.cpp takes only a comment naming the missing source.\n\nPROOF ON THE INTEGRATED TREE (main session, Release, MSVC 14.44.35207): --digest-check over all 16 library seeds with NO budget 16/16 PASS (3,662 s) and with an EMPTY budget 16/16 PASS (3,396 s); an all-zero budget PASS on 46, 28, 0; a REFUSED budget (zero firm price) PASS on seed 0 with both refusal flags raised and the world equal to the pins; world_determinism ALL PASS with seedA/on 099530C9B7A211D7, seedB/on 3C348D569EEF30EB, seedA/off 583A788BD8045DA0 and 1960/two-span 2EC67DAE697FBA02; landscape_search_harness PASS (thread invariance and path replay). Non-vacuity on seed 0: a synthetic 1x budget (harness input only) moves every digest, charters 2 specialists and 79 firms inside their centres' windows and balances its points; at 4x, 11 specialists and 81 firms with 219 points unspent as no_gap — the density finding NR-889 now carries.\n\n--- THE ORIGINAL ITEM ---\n\nAMENDED 2026-09-17 (cold review of BL-1030/BL-1031): the pins prove world/* through harness_params.hpp's hand-kept copy of app.cpp's new-game path, not through app.cpp. So app::start_new_game_prelude and poll_worldgen's validation run take NO behavioural change in this item: the budget pointer defaults to none on landscape_search_params, the app passes nothing new, and any line the item does touch in app.cpp is reviewed diff against diff with the copy in harness_params.hpp.\n\nTHE DESIGN IS IN THE DOCS: DIGITISATION.md § 1 (the budget charters the whole web; one specialist per centre that affords one, richest first; nation balance dropped; charters stay near their centre; no budget and an empty budget are today's world), CORPORATION_GENERATION.md Pass 1, GENERATION_STRATEGY.md phase 6 point 3 (the roster axis is skipped on a budget world). This item is the plumbing; no price is chosen and nothing ships a source.\n\nSHAPE (from the 2026-09-17 seam map; the cross-check's corrections applied). charter_budget: points by population-centre entity id (ascending map), integer, entries <= 0 dropped, so empty and all-zero are one state that takes the legacy branch. charter_spend_params: firm price and specialist price in points (no shipped defaults; the search refuses a non-empty budget with a zero price), window radius 4 (the seat's population_radius precedent), province cap on/off. landscape_search_params gains the budget pointer and spend params; the search copies spend state per evaluation (threads share params). A new apply_landscape_candidate overload branches ONCE: null or empty runs today's calls verbatim; otherwise remove_specialist_roster then charter_web_from_budget. The 3- and 4-arg overloads and generate_corporations/generate_background_firms bodies are untouched. On a budget world the roster axis is skipped, never re-keyed: the axis count and the tag formula stay.\n\ncharter_web_from_budget (corporation_generation.cpp, new, reusing file-local helpers, editing no legacy body): centres by budget descending, ties lower id; home nation from tile_to_nation of the centre tile (none -> unspent, reason no_nation); region from nearest_region reconciled against that nation (mismatch -> the nation's nearest region to the centre, or the national-character fallback); a centre whose budget covers the specialist price charters one specialist (focus and ownership from the region, today's capital 400 +/-40%, no nation balancing); the remainder buys background firms by the existing gap selection under the per-resource cap 8, the province cap when on, and the 200-per-body cap; anchor rungs are the window around the centre tile (wrapped metric), then the centre's region window, then UNSPENT (reason window_exhausted), never nation-wide; leftovers counted by reason. RNG keyed per centre and role with salts that collide with none in use. The player is a seeded pick among budget specialists; with none, the report says no_specialists and nothing forces one (sprint 45 decides).\n\napp.cpp and harness_params.hpp change together and both pass no budget, with a comment naming the missing source (Beat 1). The synthetic budget builder lives only under tools/verify. No save-format change, no Lua key.\n\nDONE WHEN: requirements.json § charter-budget-seam, all rows.\n\nRUN CONDITIONS: Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify (MSVC /O2 — the toolchain every pin is bound to; never %TEMP%); serial, quiet machine, build tree quoted; tracked tables only via --out.",
+      "resolved": "2026-09-17",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "priority",
+        "status",
+        "id",
+        "short_name",
+        "difficulty",
+        "requires",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved"
+      ]
     }
   }
 }
