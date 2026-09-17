@@ -1389,7 +1389,7 @@ int main(int argc, char** argv)
                 for (int g = 0; g < 8; ++g) h.unmet_lost_verb[g] = st.unmet_lost_to_verb_trace[g];
             };
             const auto read_at_stop = [&](const history_sim_state& st, const std::vector<region>& regs,
-                                          weakness_half& h) {
+                                          weakness_half& h, int64_t stop_year) {
                 for (const contact& c : st.contacts)
                 {
                     if (c.from >= c.to) continue;
@@ -1400,6 +1400,10 @@ int main(int argc, char** argv)
                         {
                             if (!((o.a == c.from && o.b == c.to) || (o.a == c.to && o.b == c.from))) continue;
                             if (o.kind < 0 || o.kind >= treaty_clause_count) continue;
+                            // Standing AT the stop: a clause is gone once a round reaches its
+                            // expires_year, and a run's last round falls before its stop, so
+                            // expire here as the handoff fold does (cold review, BL-1028).
+                            if (o.expires_year <= stop_year) continue;
                             any = true;
                             if (o.kind == static_cast<int32_t>(treaty_clause::non_aggression)) non_aggression = true;
                         }
@@ -1436,7 +1440,7 @@ int main(int argc, char** argv)
 
             weakness_half to_through;
             read_cumulative(traced, to_through);
-            read_at_stop(traced, ss_copy.regions, to_through);
+            read_at_stop(traced, ss_copy.regions, to_through, through_year);
 
             if (through_year > kHalfBoundary)
             {
@@ -1452,7 +1456,7 @@ int main(int argc, char** argv)
 
                 weakness_half a;
                 read_cumulative(traced_a, a);
-                read_at_stop(traced_a, ss_a.regions, a);
+                read_at_stop(traced_a, ss_a.regions, a, kHalfBoundary);
                 a.from_year = ep2.start_year; a.to_year = kHalfBoundary;
                 weakness_half b = weakness_minus(to_through, a);
                 b.from_year = kHalfBoundary;  b.to_year = through_year;
