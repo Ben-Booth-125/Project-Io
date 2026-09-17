@@ -32,6 +32,8 @@
 //      .\build\player_seed_sweep.exe --seat  [seed_count] [--fast]
 //      .\build\player_seed_sweep.exe --guard [seed_count] [--fast]
 //      .\build\player_seed_sweep.exe --guard --seeds 46,17,11 [--reproduce N] [--fast]
+//      .\build\player_seed_sweep.exe --digest       [--seeds 46,17,11]   (BL-1031)
+//      .\build\player_seed_sweep.exe --digest-check [--seeds 46,17,11]   (BL-1031)
 //
 // BL-630 (2026-08-26) ADDED THE MODE THIS FILE NOW LEADS WITH. The two default
 // conditions above ("worth playing" == a processor, and solvent) were written
@@ -56,12 +58,17 @@
 #include "world/supply_system.hpp"
 #include "world/tech_gate.hpp"
 #include "world/world.hpp"
+#include "world/world_save.hpp"
 
 #include <algorithm>
+#include <cinttypes>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <sstream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -353,12 +360,163 @@ struct seat_row
     bool      reproduce_checked = false;
 };
 
+// --- BL-1031: the world-bytes pin --------------------------------------------
+//
+// `player_seed_sweep --digest       [--seeds a,b,c]`  PRINTS four digests per seed.
+// `player_seed_sweep --digest-check [--seeds a,b,c]`  RECOMPUTES them and FAILS
+//                                                     (exit 1) on any row that
+//                                                     differs from the pin below.
+//
+// WHY (Sprint 44). The charter-budget seam must leave a world with an EMPTY
+// budget byte for byte where it was, proven by a check rather than a re-bless.
+// Nothing here could prove that: world_determinism and determinism_harness never
+// call the landscape search; landscape_search_harness R2/R3 and S4 above are
+// same-binary A/A (two builds in ONE process agree with each other, which a
+// change to the code moves in lockstep); and `state_hash` cannot see a
+// building's tile, type or assets. A pin taken on the tree BEFORE the seam and
+// compared on the tree after it is the check that sees both sides.
+//
+// FOUR DIGESTS, one per app phase, so a failing row names WHERE the world moved:
+//   D_search  the walk — the winner candidate and every term of its score, the
+//             evaluation and acceptance counts, and every path step's round,
+//             axis, proposal, full score and taken flag; plus the seed
+//             candidate, its score and the per-axis acceptance counts. NOT
+//             `round_ms`: that is wall time, and a digest over it would fail on
+//             a busy machine.
+//   D_land    write_world_snapshot's bytes the moment the landscape is applied —
+//             build_app_start_world returns with the winner laid and the second
+//             recipe pass run (app.cpp:1084), before any validation tick.
+//   D_settle  the snapshot bytes after the validation run, then `state_hash`
+//             (at `current_day_tick`, the tick the app's verify API hashes at).
+//   D_seat    the seat — the seated corp, the floor flag, the specialist and
+//             shortlist counts, and every ranked candidate's every field (corp,
+//             static landscape score, trailing net, weight, the shortlist flag
+//             and the rest) — then the snapshot bytes after the seat.
+//
+// FNV-1a 64 over RAW bytes, floats and doubles included, so a digest moves on a
+// last-bit change a printed `%.4f` would hide. Records are hashed FIELD BY FIELD,
+// never as a block, so struct padding cannot enter a digest (and `scalar`
+// refuses anything that is not a number or an enum).
+//
+// A PIN IS A CONTRACT (src/world/CLAUDE.md). A failing row is a finding to report
+// with its cause; it is never re-pinned by the change that moved it.
+
+struct fnv1a64
+{
+    std::uint64_t h = 0xCBF29CE484222325ull;
+
+    void bytes(const void* p, std::size_t n)
+    {
+        const auto* b = static_cast<const unsigned char*>(p);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            h ^= b[i];
+            h *= 0x00000100000001B3ull;
+        }
+    }
+    template <class T>
+    void scalar(T v)
+    {
+        static_assert(std::is_arithmetic_v<T> || std::is_enum_v<T>,
+                      "hash a record field by field, never as a block");
+        bytes(&v, sizeof v);
+    }
+    void flag(bool v) { scalar(static_cast<std::uint8_t>(v ? 1u : 0u)); }
+    void count(std::size_t n) { scalar(static_cast<std::uint64_t>(n)); }
+};
+
+void hash_candidate(fnv1a64& f, const landscape_candidate& c)
+{
+    f.scalar(c.corporation_count);
+    f.scalar(c.placement_seed);
+    f.scalar(c.road_tier);
+}
+
+/// Every term of a landscape score, per-market readings first.
+void hash_score(fnv1a64& f, const landscape_score& s)
+{
+    f.count(s.markets.size());
+    for (const market_score& m : s.markets)
+    {
+        f.scalar(m.market);
+        f.scalar(m.body);
+        f.scalar(m.completeness);
+        f.scalar(m.actual);
+        f.scalar(m.actual_closed);
+        f.scalar(m.extractors);
+        f.scalar(m.processors);
+        f.scalar(m.balanced);
+        f.scalar(m.glutted);
+        f.scalar(m.starved);
+        f.scalar(m.rated);
+        f.scalar(m.balance);
+        f.scalar(m.reach);
+    }
+    f.scalar(s.mean_completeness);
+    f.scalar(s.mean_actual);
+    f.scalar(s.mean_balance);
+    f.scalar(s.mean_reach);
+    f.scalar(s.realisation);
+    f.scalar(s.completeness_spread);
+    f.scalar(s.balance_spread);
+    f.scalar(s.reach_spread);
+    f.scalar(s.spread);
+    f.scalar(s.composite);
+    f.scalar(s.market_count);
+}
+
+/// The world's flat-binary save bytes, into @p f. Returns the byte count, so a
+/// digest row can show it hashed megabytes rather than an empty stream.
+std::size_t hash_snapshot(fnv1a64& f, const world& w)
+{
+    std::ostringstream os(std::ios::out | std::ios::binary);
+    write_world_snapshot(w, os);
+    const std::string bytes = os.str();
+    f.bytes(bytes.data(), bytes.size());
+    return bytes.size();
+}
+
+struct world_digests
+{
+    std::uint64_t search = 0;
+    std::uint64_t land   = 0;
+    std::uint64_t settle = 0;
+    std::uint64_t seat   = 0;
+    std::size_t   land_bytes   = 0;
+    std::size_t   settle_bytes = 0;
+    std::size_t   seat_bytes   = 0;
+};
+
+std::uint64_t digest_search(const landscape_search_result& r)
+{
+    fnv1a64 f;
+    hash_candidate(f, r.winner);
+    hash_score(f, r.winner_score);
+    f.scalar(r.evaluations);
+    f.scalar(r.accepted);
+    f.count(r.path.size());
+    for (const landscape_search_step& s : r.path)
+    {
+        f.scalar(s.round);
+        f.scalar(s.axis);
+        hash_candidate(f, s.proposal);
+        hash_score(f, s.score);
+        f.flag(s.accepted);
+    }
+    hash_candidate(f, r.seed_candidate);
+    hash_score(f, r.seed_score);
+    for (const int n : r.accepted_by_axis)
+        f.scalar(n);
+    return f.h;
+}
+
 /// Build one world, settle it, seat it — the app's campaign start end to end.
 /// Returns the seat result; @p out holds the world (and the registry, config
 /// and search it was built from), because the caller needs both to describe
-/// what was seated.
+/// what was seated. With @p dig, the four BL-1031 digests are taken at the
+/// seams between the phases; without it the path is exactly the seat sweep's.
 spawn_seat_result build_and_seat(lua_state& lua, uint32_t seed, bool fast,
-                                 app_start_world& out)
+                                 app_start_world& out, world_digests* dig = nullptr)
 {
     world_params p = fast ? no_prehistory() : world_params{};
     p.seed = seed;
@@ -367,11 +525,206 @@ spawn_seat_result build_and_seat(lua_state& lua, uint32_t seed, bool fast,
     // landscape-search WINNER (not the seed candidate — BL-979) and the second
     // recipe pass (BL-1030; harness_params.hpp).
     build_app_start_world(lua, p, out);
+    if (dig != nullptr)
+    {
+        dig->search = digest_search(out.land.search);
+        fnv1a64 f;
+        dig->land_bytes = hash_snapshot(f, out.w);
+        dig->land = f.h;
+    }
     // app::poll_worldgen's validation run (BL-1030; harness_params.hpp).
     run_app_validation_settle(out.w, out.reg);
+    if (dig != nullptr)
+    {
+        fnv1a64 f;
+        dig->settle_bytes = hash_snapshot(f, out.w);
+        f.scalar(out.w.state_hash(out.w.current_day_tick));
+        dig->settle = f.h;
+    }
     // app::seat_player (app.cpp:933): the seat on the WINNER'S STATIC SCORE
     // (BL-1020) — the one the app keeps as `m_landscape_winner_score`.
-    return seat_player_corporation(out.w, p.seed, out.land.search.winner_score);
+    spawn_seat_result res = seat_player_corporation(out.w, p.seed, out.land.search.winner_score);
+    if (dig != nullptr)
+    {
+        fnv1a64 f;
+        f.scalar(res.seated);
+        f.flag(res.floor_unmet);
+        f.scalar(res.specialist_count);
+        f.scalar(res.shortlist_size);
+        f.count(res.candidates.size());
+        for (const spawn_seat_candidate& c : res.candidates)
+        {
+            f.scalar(c.corp);
+            f.scalar(c.landscape);
+            f.scalar(c.holdings_scored);
+            f.flag(c.shortlisted);
+            f.scalar(c.balance);
+            f.flag(c.solvent);
+            f.scalar(c.trailing_net);
+            f.scalar(c.quarters_read);
+            f.flag(c.has_processor);
+            f.scalar(c.holdings);
+            f.scalar(c.holdings_near_pop);
+            f.scalar(c.population_share);
+            f.scalar(c.weight);
+        }
+        dig->seat_bytes = hash_snapshot(f, out.w);
+        dig->seat = f.h;
+    }
+    return res;
+}
+
+/// One pinned row.
+struct world_digest_pin
+{
+    std::uint32_t seed;
+    std::uint64_t search, land, settle, seat;
+};
+
+// THE PINS — the sixteen seed-library worlds (docs/generation/seed_library.json,
+// `node tools/session/seed_library.js --seed-list`), in library order.
+//
+// PROVENANCE. Taken 2026-09-17 by `player_seed_sweep --digest --seeds
+// 46,28,11,31,40,12,37,13,41,43,32,10,25,38,9,0` (2638 s), built on commit
+// 0133ee2b (BL-1030, the app-order helpers) with this item's digest code on top
+// and nothing else: src/ is byte-identical to 03c50ee4 (Sprint 44 cut), the
+// tree BEFORE the charter-budget seam. TOOLCHAIN: MSVC cl 14.44.35207 (VS 2022
+// BuildTools), Windows SDK 10.0.26100.0, Release /O2 /MD /DNDEBUG via
+// `bash tools/verify/build_lua_harness.sh player_seed_sweep`. The pins bind to
+// that toolchain; a different compiler or optimisation level is a different
+// floating-point program and may legitimately differ.
+//
+// NEVER RE-PINNED by the change a pin exists to check (BL-1032, the charter
+// budget seam). A row that fails is reported with its digest and its cause.
+const std::vector<world_digest_pin> k_world_digest_pins = {
+    //  seed  D_search               D_land                 D_settle               D_seat
+    { 46u, 0xE0620F5777CB3637ull, 0x326DFD72ED01E15Dull, 0x05B4865F46884E7Cull, 0x496E75B156DC9208ull },
+    { 28u, 0xA99FFD1314AFDD65ull, 0x7271F0D606D576C8ull, 0x265C48A23E313B1Aull, 0xAA35460CE5894594ull },
+    { 11u, 0x1F277B425CC6D6F5ull, 0x6D66DCD90344A565ull, 0x2E8907B0BBE768E7ull, 0x82A858E16FE9CA69ull },
+    { 31u, 0x4DCC349DEBD4278Dull, 0x568DBED7FCAB0473ull, 0x4AEB84A2E62A4536ull, 0xB58F31B1D2761E4Dull },
+    { 40u, 0xACCB76968FC11F44ull, 0x350CE11A11C2EF16ull, 0x4987C80D094C8DAEull, 0x2B509E9C965DD8BFull },
+    { 12u, 0x9171B81F5F1DB6CEull, 0x14FC25A425F1D81Eull, 0xFC9F8D4246024A2Full, 0x81E9BB11AB34278Bull },
+    { 37u, 0xE55EBAB721B6A6E6ull, 0xF38B46012662363Cull, 0xF175EAB9B7F2BF41ull, 0x94B3B7C1A92369E5ull },
+    { 13u, 0x8B45E33F6171F121ull, 0xBEBED327CE2A955Cull, 0x72797C2C57E94EB1ull, 0x0D38309D62D10FE3ull },
+    { 41u, 0x19A91514D3C43BCAull, 0x8DFD164F25D5150Bull, 0xC0EDD8B3B38193C6ull, 0x9CB3AC1F2EC21D7Full },
+    { 43u, 0xCB2F7D3D81A8A0C1ull, 0x53BB483612EFB3CDull, 0x557E96CF9F2BA372ull, 0x03D4B5D542CB228Bull },
+    { 32u, 0x6D64F3AD914488BDull, 0x4EDBFF18370691B6ull, 0xAE3347D83E077849ull, 0xFD384DA6A173808Full },
+    { 10u, 0xF8244965F92A0FF1ull, 0x809C8D803DF19C14ull, 0x8EA4043497A22AB7ull, 0x59D340FE15B12642ull },
+    { 25u, 0x63A5BE80FB7DF06Aull, 0x84A597D8EBE7EDFFull, 0xFEFD82C8BCDD4D22ull, 0x2F145BF320CFB58Bull },
+    { 38u, 0x4C17AE81C065C5F2ull, 0xAA0F18A56767FC70ull, 0x73239E8FE1A24AA3ull, 0x90D2AC55FC74A8D3ull },
+    {  9u, 0x0E9AD780ACBB9B84ull, 0x7C85420229BFEE4Dull, 0x23DBD6FA7E7D5955ull, 0xA2B82933E77D219Aull },
+    {  0u, 0x893B6977B1E9DC1Full, 0x1A24D230FDDF2C7Eull, 0xA392EFF987F374E2ull, 0x8BBEAB8453901456ull },
+};
+
+int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check)
+{
+    std::printf("player_seed_sweep %s — %zu seeds, the shipped spawn built, settled (%d ticks) "
+                "and seated in app order (BL-1030)\n",
+                check ? "--digest-check" : "--digest", seeds.size(), k_settle_ticks);
+    std::printf("BL-1031. FNV-1a 64: D_search the walk; D_land the snapshot as the landscape "
+                "lands; D_settle the snapshot + state_hash after the validation run; D_seat the "
+                "seat + the snapshot after it.\n");
+    if (check)
+        std::printf("Checked against %zu pinned rows in this source. A differing row FAILS and "
+                    "names its digest; it is never re-pinned by the change that moved it.\n",
+                    k_world_digest_pins.size());
+    std::printf("\nseed  D_search          D_land            D_settle          D_seat            "
+                "snapshot MB land/settle/seat%s\n", check ? "  verdict" : "");
+    std::fflush(stdout);
+
+    int failed = 0, threw = 0, passed = 0;
+    std::vector<world_digests> got(seeds.size());
+    std::vector<bool>          ok(seeds.size(), false);
+    for (std::size_t i = 0; i < seeds.size(); ++i)
+    {
+        const uint32_t seed = seeds[i];
+        try
+        {
+            const auto start = std::make_unique<app_start_world>();
+            build_and_seat(lua, seed, /*fast=*/false, *start, &got[i]);
+            ok[i] = true;
+        }
+        catch (const std::exception& e)
+        {
+            ++threw;
+            std::printf("%4u  THREW: %s\n", seed, e.what());
+            std::fflush(stdout);
+            continue;
+        }
+        catch (...)
+        {
+            ++threw;
+            std::printf("%4u  THREW: unknown\n", seed);
+            std::fflush(stdout);
+            continue;
+        }
+
+        const world_digests& d = got[i];
+        std::printf("%4u  %016" PRIX64 "  %016" PRIX64 "  %016" PRIX64 "  %016" PRIX64
+                    "  %.2f/%.2f/%.2f",
+                    seed, d.search, d.land, d.settle, d.seat,
+                    d.land_bytes / 1048576.0, d.settle_bytes / 1048576.0,
+                    d.seat_bytes / 1048576.0);
+        if (check)
+        {
+            const world_digest_pin* pin = nullptr;
+            for (const world_digest_pin& p : k_world_digest_pins)
+                if (p.seed == seed)
+                    pin = &p;
+            if (pin == nullptr)
+            {
+                ++failed;
+                std::printf("  FAIL no pinned row for this seed\n");
+            }
+            else
+            {
+                std::string diffs;
+                auto cmp = [&](const char* name, std::uint64_t pinned, std::uint64_t now) {
+                    if (pinned == now)
+                        return;
+                    char buf[96];
+                    std::snprintf(buf, sizeof buf, " %s (pinned %016" PRIX64 ")", name, pinned);
+                    diffs += buf;
+                };
+                cmp("D_search", pin->search, d.search);
+                cmp("D_land",   pin->land,   d.land);
+                cmp("D_settle", pin->settle, d.settle);
+                cmp("D_seat",   pin->seat,   d.seat);
+                if (diffs.empty())
+                {
+                    ++passed;
+                    std::printf("  PASS\n");
+                }
+                else
+                {
+                    ++failed;
+                    std::printf("  FAIL%s\n", diffs.c_str());
+                }
+            }
+        }
+        else
+        {
+            std::printf("\n");
+        }
+        std::fflush(stdout);
+    }
+
+    if (!check)
+    {
+        // Paste-ready: exactly the row shape of k_world_digest_pins.
+        std::printf("\n// pin rows\n");
+        for (std::size_t i = 0; i < seeds.size(); ++i)
+            if (ok[i])
+                std::printf("    { %2uu, 0x%016" PRIX64 "ull, 0x%016" PRIX64 "ull, 0x%016" PRIX64
+                            "ull, 0x%016" PRIX64 "ull },\n",
+                            seeds[i], got[i].search, got[i].land, got[i].settle, got[i].seat);
+        return threw ? 1 : 0;
+    }
+
+    std::printf("\n%d/%zu rows PASS, %d FAIL, %d threw\n%s\n", passed, seeds.size(), failed,
+                threw, (failed == 0 && threw == 0 && passed > 0) ? "DIGEST CHECK PASS"
+                                                                 : "DIGEST CHECK FAILED");
+    return (failed == 0 && threw == 0 && passed > 0) ? 0 : 1;
 }
 
 int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
@@ -669,7 +1022,9 @@ int main(int argc, char** argv)
     const bool roster_mode = (argc > 1 && std::string(argv[1]) == "--roster");
     const bool guard_mode  = (argc > 1 && std::string(argv[1]) == "--guard");
     const bool seat_mode   = (argc > 1 && std::string(argv[1]) == "--seat");
-    const bool mode_arg = roster_mode || guard_mode || seat_mode;
+    const bool digest_mode = (argc > 1 && std::string(argv[1]) == "--digest");
+    const bool check_mode  = (argc > 1 && std::string(argv[1]) == "--digest-check");
+    const bool mode_arg = roster_mode || guard_mode || seat_mode || digest_mode || check_mode;
     bool fast = false;
     for (int a = 1; a < argc; ++a)
         if (std::string(argv[a]) == "--fast")
@@ -681,10 +1036,34 @@ int main(int argc, char** argv)
         std::printf("usage: %s [seed_count] [settle_ticks] (both positive)\n"
                     "       %s --roster <seed>              (every corp's opening, one seed)\n"
                     "       %s --seat  [seed_count] [--fast] (REPORT the seat distribution)\n"
-                    "       %s --guard [seed_count] [--fast] (assert what the seat holds)\n",
-                    argv[0], argv[0], argv[0], argv[0]);
+                    "       %s --guard [seed_count] [--fast] (assert what the seat holds)\n"
+                    "       %s --digest       [--seeds a,b,c]  (print the BL-1031 world digests)\n"
+                    "       %s --digest-check [--seeds a,b,c]  (fail on any row differing from the pin)\n",
+                    argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
         return 2;
     }
+
+    // `--seeds a,b,c`, shared by the seat and digest modes.
+    const auto seeds_arg = [argc, argv]() {
+        std::vector<uint32_t> seeds;
+        for (int a = 2; a + 1 < argc; ++a)
+            if (std::string(argv[a]) == "--seeds")
+            {
+                const std::string csv = argv[a + 1];
+                std::size_t at = 0;
+                while (at <= csv.size())
+                {
+                    std::size_t comma = csv.find(',', at);
+                    if (comma == std::string::npos)
+                        comma = csv.size();
+                    if (comma > at)
+                        seeds.push_back(static_cast<uint32_t>(
+                            std::strtoul(csv.substr(at, comma - at).c_str(), nullptr, 10)));
+                    at = comma + 1;
+                }
+            }
+        return seeds;
+    };
 
     lua_state lua;
     lua.load("scripts/recipes.lua");
@@ -704,6 +1083,28 @@ int main(int argc, char** argv)
     if (roster_mode)
         return run_roster(static_cast<uint32_t>(argc > 2 ? std::atoi(argv[2]) : 0), reg);
 
+    // BL-1031 digest modes. The pins name the SHIPPED start only, so `--fast`
+    // is refused rather than silently compared against a different world. With
+    // no `--seeds`, both modes walk the pinned seeds in table order.
+    if (digest_mode || check_mode)
+    {
+        if (fast)
+        {
+            std::printf("--fast is refused in the digest modes: the pins are the shipped spawn's\n");
+            return 2;
+        }
+        std::vector<uint32_t> seeds = seeds_arg();
+        if (seeds.empty())
+            for (const world_digest_pin& p : k_world_digest_pins)
+                seeds.push_back(p.seed);
+        if (seeds.empty())
+        {
+            std::printf("no seeds: pass --seeds a,b,c (the pin table is empty)\n");
+            return 2;
+        }
+        return run_digest(seeds, lua, check_mode);
+    }
+
     // Same placement, same reason: a seat sweep against an empty registry would
     // measure a world where nothing can be processed, and every corp would fail
     // the viability floor for a reason that is not the world's.
@@ -712,27 +1113,11 @@ int main(int argc, char** argv)
         // `--seeds a,b,c` names the worlds outright — the curated library
         // (`node tools/session/seed_library.js`) is sixteen chosen seeds, not
         // 0..15. Otherwise the positional count sweeps 0..n-1 as it always has.
-        std::vector<uint32_t> seeds;
+        std::vector<uint32_t> seeds = seeds_arg();
         int reproduce = k_reproduce_seeds;
         for (int a = 2; a + 1 < argc; ++a)
             if (std::string(argv[a]) == "--reproduce")
                 reproduce = std::max(1, std::atoi(argv[a + 1]));
-        for (int a = 2; a + 1 < argc; ++a)
-            if (std::string(argv[a]) == "--seeds")
-            {
-                const std::string csv = argv[a + 1];
-                std::size_t at = 0;
-                while (at <= csv.size())
-                {
-                    std::size_t comma = csv.find(',', at);
-                    if (comma == std::string::npos)
-                        comma = csv.size();
-                    if (comma > at)
-                        seeds.push_back(static_cast<uint32_t>(
-                            std::strtoul(csv.substr(at, comma - at).c_str(), nullptr, 10)));
-                    at = comma + 1;
-                }
-            }
         if (seeds.empty())
         {
             int g_seeds = 24;
