@@ -45,6 +45,11 @@ only when a property of the opening map needs it.
 phases before it hand forward abstractions — shares, signals, flows — and this is the phase that
 must turn every one of them into something a player can click.
 
+**It is designed to what the world allows, not to what the player does** (Ben, 2026-09-17, ruling
+NR-885): *"for the digitisation round, it's less important what the player should be doing, and
+more important what the world allows."* The player's verbs are the campaign's business; this phase
+owns the ground they are used on.
+
 ---
 
 ## The boundary

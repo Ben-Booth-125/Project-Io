@@ -37,8 +37,8 @@ so later sessions don't have to reconstruct the sequence from filenames alone.
 
 First real exploration pass, scoped to one surface (the F9 tech tree panel — see
 `docs/ui/question_log.json`'s `tech_tree_panel` entry) rather than the whole game. Direction:
-industrial-schematic crossed with a supplier's parts catalog, reflecting that the player is a
-mercenary company that *procures* tech rather than researching it (`CONCEPT.md` § Modular tech
+industrial-schematic crossed with a supplier's parts catalog, reflecting that the player reaches
+tech by *procuring* its output (`CONCEPT.md` § Modular tech
 trees) — nodes as catalogued components, not a mystical RPG skill tree.
 
 | Render | What changed | Verdict |

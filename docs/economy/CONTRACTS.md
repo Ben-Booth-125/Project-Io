@@ -40,9 +40,8 @@ Under SYSTEMS.md § The progression chain — *each system's ceiling is the next
 of these in eight weeks and I need to know now"*, and it has no memory of who you are. The first
 time either matters, you need a counterparty.
 
-**What it opens.** Procurement opens equipment you do not manufacture — which is the whole shape of
-the mercenary company, who *procures* rather than produces. That is what couples this document to
-force: a company that buys its materiel rather than building it reaches military capability through
+**What it opens.** Procurement opens equipment you do not manufacture. That is what couples this document to
+force: a corporation that buys its materiel rather than building it reaches military capability through
 this seam, and through no other.
 
 **What it caps you at.** Reputation. It is the axis on which a company can price itself out of its

@@ -11,9 +11,9 @@
 
 Two pillars define the game's end goals: **Trade** and **Conflict**. Every other system creates the conditions, constraints, or capabilities that flow into one or both.
 
-The player is a **mercenary company** (Ben, 2026-08-12, NR-177; CONCEPT.md § Player identity) — an owner of assets and operations, whose motive is narrower than a governing body's (it does not legislate) and whose agency reaches force directly: what it can field, procured from independent suppliers. The operating **corporations** the player deals with are arm's-length counterparties, not a linked treasury or a shared economic arm; a corporation becomes the player's own only by **buyout**, which takes the firm whole (`docs/economy/FINANCE.md` § Whole-firm acquisition). Profit is the motive for every corporation, and that shapes the economic layer throughout.
+The player is a **corporation that holds a seat** (Ben, 2026-09-17, NR-885; CONCEPT.md § Player identity) — an operating firm like its rivals, whose role is to find the ground worth industrialising and build the machinery that gets to space. It does not legislate, and it procures its force from independent suppliers. The other **corporations** are its rivals and arm's-length counterparties, not a linked treasury or a shared economic arm; one becomes the player's own only by **buyout**, which takes the firm whole (`docs/economy/FINANCE.md` § Whole-firm acquisition). Profit is the motive for every corporation, and that shapes the economic layer throughout.
 
-Each system below therefore answers one test: **does it change what the company can field, or what it must answer to?** A system that can only ever move a cost or a price, touching neither, is built for the corporate player the identity moved away from.
+Each system below answers one test: **does it change what the company can field, or what it must answer to?** The company is the player's corporation (CONCEPT.md § Player identity).
 
 Systems are grouped into three supporting tiers below the pillars.
 
@@ -34,7 +34,7 @@ A corporation sells goods from any location to any market. Markets are pooled ex
 ### Conflict
 The player claims, defends, and invades territory through military force. Combat runs concurrently with the economy: supply routes are live targets, and active conflict on a body inhibits its trade connections. Territorial control is both a strategic objective and a source of ongoing economic pressure on opponents.
 
-The **mercenary company** is the actor that commands force — a corporation's levers stop at the economic, which is why force is a different kind of actor's business. BL-315 (conflict spine) owns the loop that makes this pillar load-bearing.
+A **corporation** commands force by procuring it, and the design test is what keeps that force from being flavour on an economy. BL-315 (conflict spine) owns the loop that makes this pillar load-bearing.
 
 There are **two battle resolvers**, and the split is deliberate (Ben, 2026-08-13). `resolve_battle` (`src/world/combat.cpp`) is nation-scale — class-matchup matrix × formation doctrine × terrain × supply × season, integer per-mille arithmetic, deterministic tie-break — and answers "region beats region, this year" for the Era −1 history sim. `resolve_campaign_battle` (`src/world/campaign_battle.cpp`) is campaign-scale — seeded rounds and priced withdrawal — and is opened by `run_battles` in the economy tick whenever hostile units share a province. Authority: `docs/military/MILITARY.md`.
 

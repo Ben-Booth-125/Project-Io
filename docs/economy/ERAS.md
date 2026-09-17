@@ -41,7 +41,7 @@ that say "era" in code, which already establishes those as separate axes. Nothin
 and the branch is live: `era_band_for_epoch` puts the recipe registry on the industrial band, and the
 prehistory sim runs to it in two spans, ancient then industrial (`docs/lore/HISTORY.md` § The
 epoch and the run). The 0 CE ancient
-start (Ben, 2026-08-12; NR-177 — the mercenary company, the antiquity prehistory) remains a supported
+start (Ben, 2026-08-12; NR-177 — the antiquity prehistory) remains a supported
 configuration on the same ladder; `docs/development/ROADMAP.md` § The two arcs owns which is the
 commercial product, and this document owns only the Era structure, which is the same on both.
 

@@ -362,7 +362,6 @@ the controls is worse than a slow one.
 seat worth weighing at all — the 2026-08-26 stage showed no balances because it ran before any
 had moved.
 
-**What the canvas is choosing is ruled separately.** Whether the seat is the firm the player
-*is*, or the base a mercenary company is hired from, is NR-885 (`../CONCEPT.md` § Player
-identity). The canvas states an answer on its first frame whether or not one has been given, so
-nothing on it is designed past the shortlist until that is ruled.
+**The canvas chooses the firm the player *is*** (Ben, 2026-09-17, NR-885; `../CONCEPT.md` §
+Player identity). The seat is an identity, not an address: the shortlist is a list of corporations,
+and picking one is becoming it.

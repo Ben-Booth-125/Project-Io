@@ -20,7 +20,7 @@ treasury, law authorship and the nation-behaviour grant (Ben, 2026-08-18). Where
 about a field, generation wins on how it is **set** and NATIONS.md wins on what it **means**.
 
 **Nations are backdrop to the player, not the player.** The player is a **law subject** — a
-mercenary company in the live arc (`docs/development/ROADMAP.md` § The two arcs) — so the
+corporation that holds a seat (`docs/CONCEPT.md` § Player identity) — so the
 mechanics a nation holds stay a nation's and do not become the player's levers.
 
 ---

@@ -34,7 +34,7 @@ A nation is a **territorial polity** in the campaign era. It owns tiles, it has 
 holds money, it states what it cares about, and it is the only actor that can author law.
 
 It is **not** the player, and the player is not accountable to it beyond what law and stance
-impose. Under the ancient arc the player is a mercenary company: a **law subject**, never a
+impose. The player is a corporation: a **law subject**, never a
 legislator (`docs/MANUAL.md` § 1.2, and SYSTEMS.md § Policy). A nation is the thing whose rules you
 operate inside, route around, pay to have changed, or price in.
 
@@ -397,7 +397,7 @@ It closes a circuit. The levy and the tariff **fill** a treasury; the budget is 
 makes a full loop — corp → nation → corp — instead of draining into a field no reader could account
 for.
 
-It also fits the player identity rather than straining it. A mercenary company is a **law subject,
+It also fits the player identity rather than straining it. A corporation is a **law subject,
 never a legislator**, which leaves it no lever of its own on the rules it works inside. Lobbying is
 the one mechanism that changes that without changing what the player is: **you do not pass the law,
 you pay someone who does.** The `lobby` verb is the *only* route to influence over a nation, and it

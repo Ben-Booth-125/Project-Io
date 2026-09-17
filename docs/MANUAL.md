@@ -8,9 +8,9 @@
 
 ## Preface
 
-Project Io is a single-player grand strategy game about running a **mercenary company** in a
-procedurally generated ancient world. You are not a nation and you do not rule anyone. You raise
-force, you sell its use, and you spend the proceeds on being able to sell more of it next time.
+Project Io is a single-player grand strategy game about running a **corporation** in a
+procedurally generated world that opens in 1960. You are not a nation and you do not rule anyone.
+You find the ground worth industrialising, you build on it, and you fight for it when you must.
 
 This manual is for two readers. If you are **playing**, sections 1 through 4 are yours — what the
 game is, how to start, and every control. If you are **building** it, section 4 maps each system to
@@ -38,26 +38,24 @@ your business.
 
 ### 1.2 The player
 
-You are a **mercenary company**. Three things follow from that, and they are the design's spine:
+You are a **corporation**, chosen from a shortlist of seats when the campaign begins. Three things
+follow from that, and they are the design's spine:
 
 - **You do not legislate.** Law, tax and policy are conditions you operate inside, not levers you
   pull. When a law makes your work harder, your options are to route around it, price it in, or
   take work somewhere else.
-- **You do not manufacture.** Equipment is bought from private companies who are counterparties,
-  not subsidiaries. They quote a price and a lead time, and they can refuse.
-- **You are paid for outcomes.** Not for effort, and not for time served.
+- **You do not manufacture your force.** Equipment is bought from private companies who are
+  counterparties, not subsidiaries. They quote a price and a lead time, and they can refuse.
+- **You build to industrialise.** Your holdings extract, refine and sell, and the machinery you
+  build is the road to space.
 
 ### 1.3 The loop
 
-> **Be contracted → field force → be paid → reinvest.**
+> **Buy → sell → build → contest.**
 
-A client offers a contract: a fact about the world it will pay to have become true, by a deadline.
-Take the river province before the season ends. Hold the pass. Break the siege.
-
-**The contract names the outcome and the fee. It never names the force.** Deciding whether the fee
-covers what the objective actually costs is the whole skill of the game, and it is why the loop is a
-strategy rather than a mission list. Underbid and you will send too little, lose the fight, and lose
-the fee and your standing with it.
+Find ground worth industrialising and build on it. Sell what it produces, and spend the proceeds on
+reaching further. Force is bought, not made, and it is how you contest ground that a rival or a
+nation will not give up.
 
 ### 1.4 The three pillars
 
@@ -80,12 +78,11 @@ over decades eventually gives.
 **There is no win screen and no lose screen.** The game does not end; your position gets better or
 worse.
 
-Losing is progressive and it is a spiral rather than an event. Lose a contract and your standing
-falls. With lower standing the fees on offer fall too, and fewer clients will deal with you at all.
-With smaller fees you can afford less force, which loses you the next contract. A company can die
-of this without ever losing a battle it could not have won.
+Losing is progressive and it is a spiral rather than an event. Lose ground and your income falls.
+With less income you can afford less upkeep and less force, which loses you the next piece of
+ground. A corporation can die of this without ever losing a battle it could not have won.
 
-The escape is the same as the trap, run backwards: stop taking work you cannot deliver, hold what
+The escape is the same as the trap, run backwards: stop reaching for what you cannot hold, hold what
 you have, and rebuild. That is a real strategic choice with a real cost in time.
 
 ### 1.6 Time
@@ -139,8 +136,8 @@ tiles**, of which roughly 18,000 are land.
    at home may be worth carrying.
 4. **Take stock of the money.** The Budget Ledger itemises income, expenditure, maintenance, wages
    and interest. Wages are the line that will kill you if you ignore it.
-5. **Take a contract you can afford to deliver.** Not the largest fee on offer. The largest fee you
-   can service with the force you already have.
+5. **Build where you can reach.** Not the richest ground on the map. The richest ground your roads
+   and your money can already serve.
 
 ---
 
@@ -229,7 +226,6 @@ Each ledger has one glyph on the left icon rail. Clicking an open ledger's glyph
 | Corporations table | Diplomacy | Everyone else's, as far as you can see it |
 | Economy | Workforce | Population and labour |
 | History | History | What has happened in the world |
-| Contracts | Checkmark | Your mercenary offers, active contracts, and history |
 
 Tax and wage tiers are set in the Budget Ledger with `-` / `+`, or by clicking a Roman numeral
 `I`–`V`.
@@ -356,37 +352,15 @@ intelligence channel.
 ### 4.9 Units and combat
 
 Units are hired at a military base from an era-keyed roster. A battle opens whenever hostile units
-share a province — declared hostility between corporations, or an active mercenary contract's own
-force standing in its target province against that nation's garrison, no declaration needed — and
-plays out over ticks in seeded rounds, with withdrawal priced rather than free.
+share a province — declared hostility between corporations — and plays out over ticks in seeded
+rounds, with withdrawal priced rather than free.
 Each round resolves unit class matchup by formation doctrine, modified by terrain, supply state and
 season. Winter costs the attacker attrition and the defender readiness. Your own battles show as a
 battle card and post a dispatch to the Field channel every tick.
 
 *Authority: `docs/military/MILITARY.md`; the rival's decisions are `docs/ai/AI_OPPONENT.md`.*
 
-### 4.10 Contracts
-
-Your income as a mercenary company. A contract is a predicate a client nation will pay to have
-become true by a deadline; you commit the force. Open the **Contracts ledger** (nav rail) for
-three views — **Offers**, **Active**, **History** — and accept an offer through its own
-force picker. Terminal states: **completed** (paid, standing up), **failed** (deposit forfeit,
-standing down hard), **cancelled** (deposit forfeit, standing down less — you walked away), and
-**abandoned** (same cost as cancelled, your own choice mid-contract).
-
-Offers come from a threatened nation's own budget: a nation that cannot afford to hold a
-contested border province against its highest-grudge neighbour posts the gap as work, deposit
-funded in full before the offer is even acceptable. The company you hire fights that neighbour's
-garrison directly — accepting a "take" offer and marching your committed force into the target
-province is what starts the fight; win it and hold the ground to the deadline and the contract
-pays. Every terminal event, and the deadline itself, posts to the Public channel; the Balance
-ledger's own "Contract income" line and the header runway both read the same payout the tick it
-lands.
-
-*Authority: `docs/economy/CONTRACTS.md`; `docs/military/MILITARY.md` § Nation garrisons for what
-you fight.*
-
-### 4.11 Procurement
+### 4.10 Procurement
 
 How you buy. Request a quote from a named supplier, accept it to open a contract, and pay a deposit
 plus a paced remainder. A supplier can **decline**, with a stated reason: no capacity, no input
@@ -395,7 +369,7 @@ around it. Asking for a quote also tells you something real about the supplier's
 
 *Authority: `docs/economy/CONTRACTS.md`.*
 
-### 4.12 Law and technology
+### 4.11 Law and technology
 
 A law is a predicate plus an effect, evaluated against the world, enacted by a nation and scoped to
 its territory. The extraction levy is enforced and visible as its own line in the budget; enacting
@@ -407,7 +381,7 @@ be legislated for.
 
 *Authority: `docs/politics/NATIONS.md` and `docs/META_LAYER.md`.*
 
-### 4.13 The opponent
+### 4.12 The opponent
 
 Rival companies run a deterministic scored-utility layer over the same command seam you use: they
 build, demolish, survey, road, hire, trade and place sell orders. Nations act in the same shape,
@@ -419,7 +393,7 @@ engine ships no HTTP client, no API key and no cloud dependency, and it never wi
 
 *Authority: `docs/ai/AI_OPPONENT.md`.*
 
-### 4.14 The pre-history
+### 4.13 The pre-history
 
 Before you arrive, the world runs — **2400 BCE to the 1960 campaign epoch, four thousand of those
 years simulated.** It runs in two passes with a coast between them.
@@ -455,7 +429,7 @@ not its constants — is what graduates into the campaign.
 
 *Authority: `docs/lore/HISTORY.md`; the simulation is `src/world/history_sim.{hpp,cpp}`.*
 
-### 4.15 Relations
+### 4.14 Relations
 
 Every actor — corporation or nation — holds a **sentiment** toward every other it has met, derived
 from conduct and decaying with time. On top of it sits **stance**: hostility you declare, friendship
