@@ -18648,6 +18648,52 @@
         "design",
         "resolved"
       ]
+    },
+    "BL-1028": {
+      "glyph": "✓",
+      "sprint": "43",
+      "written": "2026-09-17",
+      "author": "Ben (2026-09-17, cutting the Digitisation build plan: elicitation form); Claude (item text, from a seven-lane read of the engine with an adversarial cross-check)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "priority": "A",
+      "status": "complete",
+      "requires": [
+        "BL-1027"
+      ],
+      "id": "BL-1028",
+      "short_name": "WEAKNESS_COUNTERS_TO_1960",
+      "difficulty": 3,
+      "title": "Both inherited weaknesses counted per seed at 1660 and 1960 — contact, binding, alarm saturation and displacement — for Ben's ruling at the sprint 43 gate",
+      "authority_doc": "docs/generation/EXPLORATION.md",
+      "files": [
+        "tools/verify/exploration_sweep.cpp",
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "design": "DELIVERED 2026-09-17 (sprint 43). Built in a worktree lane (2531d2b4, fast-forwarded onto main) and cold-reviewed: no blocker, decision-freedom confirmed per change, the visible_capability_reference re-scale and R3b re-pin absent. One minor finding fixed in the main session (0d70dc0f): at-stop treaty counts now expire clauses at the stop year.\n\nPORTED, TRACE-ONLY: from eaf15a37 the contacts-raised-by-kind counter, class score traces and the unmet contest; from 6d7bb462 near_capability_trace, visible_capability_raw as a pure read, and the alarm-spread section. LEFT OUT: the 5000 -> 31095 reference re-scale, its R3b re-pin, both EXPLORATION.md edits and eaf15a37's census labels. exploration_sweep reports every reading per half when --through > 1660, off one extra traced run stopped at 1660, with a structural check that the 1660 run is a prefix of the longer one.\n\nDIGESTS UNMOVED, MEASURED IN THE MAIN SESSION: world_determinism seedA/on 099530C9B7A211D7, seedB/on 3C348D569EEF30EB, seedA/off 583A788BD8045DA0, 1960/two-span 2EC67DAE697FBA02 — identical to main at 0598782a, every PASS line identical; exploration_sim_harness ALL PASS unchanged (R3b pin); history_sim_harness at its tracked R3a2/R3a3 baseline, differing only in a timing column.\n\nREADINGS (16 library seeds, --through 1960, exploration_sweep_1960.json regenerated on the integrated tree, 399 s Release). Half A = 1200 -> 1660, half B = 1660 -> 1960. W1: near-home alarm reads at the ceiling 89.7% A / 88.5% B; near-home campaign candidates treaty-blocked 99.1% A / 99.7% B; displacement pooled 3.02 A -> 1.74 B, median 1.86 -> 1.16, below 1 in half B on seeds 46, 40, 13, 41, 38. W2: first contacts 844 by crossing + 406 inherited in A, 22 + 21 in B; 8 of 16 seeds raise no crossing after 1660; pairs first met since 1200 holding non-aggression 0 of 492 at 1660 and 0 of 506 at 1960 (any clause 7 and 8); unmet rounds that cleared the threshold went to another verb 88.2% A / 96.0% B. So polities DO meet before 1660; what fails is that a new contact never binds, and after 1660 contact nearly stops. Put to Ben at the sprint 43 gate.\n\n--- THE ORIGINAL ITEM ---\n\nWHY. NEXT_SESSION (2026-09-17) names two weaknesses Digitisation inherits: displacement held only against a saturated alarm (pooled 2.73 -> 0.50 when alarm tracked measured capability, no weight restoring it above 0.81), and polities rarely meet (stay-home verbs win 78.6% where an unmet target clears). RULED (Ben, 2026-09-17, elicitation): measure both in sprint 43 and rule at the gate. The evidence is weaker than the statement: the 78.6% and the corrected first-contact count (3..221 per seed) sit on unmerged commits eaf15a37 and 6d7bb462 on a world that is not main; main's sweep shows 412 first-crossing campaigns chosen over 16 seeds and 0 of 265 in-span pairs treaty-bound.\n\nTHE WORK. On the --through runs of BL-1027, report per seed for the 1200 -> 1660 half and the 1660 -> 1960 half: first contacts, split into battle crossings and inherited; pairs first met after 1200 that hold any treaty (met_pairs_bound); the share of alarm reads at the ceiling, beside near_alarm_max_q; pooled and median displacement; the contact-class campaign funnel (near / met in span / unmet: examined, in reach, cleared, chosen); trade-flow volume crossing landmasses. The existing counters are in exploration_sweep.cpp (near_alarm_max_q, met_pairs_bound, cross_landmass_volume, the displacement block). Port ONLY the trace-only halves of eaf15a37 (first contacts by kind, the unmet contest) and 6d7bb462 (the alarm spread) — never 6d7bb462's re-scaled visible_capability_reference, which moves the world.\n\nDETERMINISM. A counter the harness cannot read off state or trace sits on history_sim_state as a pure, decision-free counter in the BL-926 idiom. Proof is world_determinism and the goldens holding bit-identical, stated in the close; any moved digest means a counter touched a decision and the item is not done.\n\nDONE WHEN. The per-seed table at both halves, written to --out; digests unmoved; a NEEDS_REVIEW decision entry at the sprint 43 gate puts W1 (inherit, or revisit the capability reference) and W2 (inherit and produce contact in Digitisation, or a first-crossing force in Exploration) to Ben with these readings, read per seed, never the median.\n\nRUN CONDITIONS (sprint 43, all items): one lane, serial, in the main session; Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify, never %TEMP%; timings on a quiet machine with the build tree quoted; never write over a tracked sweep artefact (use --out). No item in this sprint changes a shipped world.",
+      "resolved": "2026-09-17",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "priority",
+        "status",
+        "requires",
+        "id",
+        "short_name",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved"
+      ]
     }
   }
 }

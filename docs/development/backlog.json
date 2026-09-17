@@ -23,31 +23,6 @@
    "priority": "A",
    "status": "designed",
    "requires": [
-    "BL-1027"
-   ],
-   "id": "BL-1028",
-   "short_name": "WEAKNESS_COUNTERS_TO_1960",
-   "difficulty": 3,
-   "title": "Both inherited weaknesses counted per seed at 1660 and 1960 — contact, binding, alarm saturation and displacement — for Ben's ruling at the sprint 43 gate",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "tools/verify/exploration_sweep.cpp",
-    "src/world/history_sim.hpp",
-    "src/world/history_sim.cpp"
-   ],
-   "design": "WHY. NEXT_SESSION (2026-09-17) names two weaknesses Digitisation inherits: displacement held only against a saturated alarm (pooled 2.73 -> 0.50 when alarm tracked measured capability, no weight restoring it above 0.81), and polities rarely meet (stay-home verbs win 78.6% where an unmet target clears). RULED (Ben, 2026-09-17, elicitation): measure both in sprint 43 and rule at the gate. The evidence is weaker than the statement: the 78.6% and the corrected first-contact count (3..221 per seed) sit on unmerged commits eaf15a37 and 6d7bb462 on a world that is not main; main's sweep shows 412 first-crossing campaigns chosen over 16 seeds and 0 of 265 in-span pairs treaty-bound.\n\nTHE WORK. On the --through runs of BL-1027, report per seed for the 1200 -> 1660 half and the 1660 -> 1960 half: first contacts, split into battle crossings and inherited; pairs first met after 1200 that hold any treaty (met_pairs_bound); the share of alarm reads at the ceiling, beside near_alarm_max_q; pooled and median displacement; the contact-class campaign funnel (near / met in span / unmet: examined, in reach, cleared, chosen); trade-flow volume crossing landmasses. The existing counters are in exploration_sweep.cpp (near_alarm_max_q, met_pairs_bound, cross_landmass_volume, the displacement block). Port ONLY the trace-only halves of eaf15a37 (first contacts by kind, the unmet contest) and 6d7bb462 (the alarm spread) — never 6d7bb462's re-scaled visible_capability_reference, which moves the world.\n\nDETERMINISM. A counter the harness cannot read off state or trace sits on history_sim_state as a pure, decision-free counter in the BL-926 idiom. Proof is world_determinism and the goldens holding bit-identical, stated in the close; any moved digest means a counter touched a decision and the item is not done.\n\nDONE WHEN. The per-seed table at both halves, written to --out; digests unmoved; a NEEDS_REVIEW decision entry at the sprint 43 gate puts W1 (inherit, or revisit the capability reference) and W2 (inherit and produce contact in Digitisation, or a first-crossing force in Exploration) to Ben with these readings, read per seed, never the median.\n\nRUN CONDITIONS (sprint 43, all items): one lane, serial, in the main session; Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify, never %TEMP%; timings on a quiet machine with the build tree quoted; never write over a tracked sweep artefact (use --out). No item in this sprint changes a shipped world."
-  },
-  {
-   "glyph": "✓",
-   "sprint": "43",
-   "written": "2026-09-17",
-   "author": "Ben (2026-09-17, cutting the Digitisation build plan: elicitation form); Claude (item text, from a seven-lane read of the engine with an adversarial cross-check)",
-   "blocked_on": null,
-   "parked": false,
-   "category": "Generation",
-   "priority": "A",
-   "status": "designed",
-   "requires": [
     "BL-1026",
     "BL-1027"
    ],
