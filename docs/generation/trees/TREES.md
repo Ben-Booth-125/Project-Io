@@ -184,7 +184,8 @@ the same shortfall shape every goods draw in the campaign takes.
 2026-09-18, not overturned; `../DIGITISATION.md` § Beat 2): the population of the polity's largest
 held centres, superlinearly, so innovation gathers where people do. It lives in the rate and never
 in the scorer, which may not carry a term that grows with the polity's size (§ The scorer). The
-spire-ring scaling applies to it as to every rate. PROPOSED (the BL-1038 build, listed on NR-891):
+spire-ring scaling applies to it as to every rate. SETTLED (Ben, 2026-09-18, NR-891, accepting the
+BL-1038 build):
 the three largest held regions' urban population, summed and capped, taken to the power 1.5
 through an integer square root. One centre would let a sacked capital zero a century's research;
 every centre would restate the realm's size under another name.

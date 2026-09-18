@@ -25,19 +25,20 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
 
 **Wave 0 — neutral, parallel worktrees**
 
-- [ ] **BL-1034 (world copies diverge)** — files: src/world/world.hpp/.cpp, tools/verify/world_copy_determinism.cpp (new). In flight from 2026-09-18.
+- [ ] **BL-1034 (world copies diverge)** — MERGED d61b6ae8, cold-reviewed; owed: R1 variants, R4 and the 16-seed --digest-check on the integrated main (chain 3). files: src/world/faithful_unordered_map.hpp (new), world.hpp, province.hpp, tools/verify/world_copy_determinism.cpp (new), world_digest.hpp (new).
   provides: a faithful world copy; the reproduction harness. consumes: harness_params.hpp's app-order build and settle (landed).
-- [ ] **BL-1036 (span boundary resume)** then **BL-1037 (resume road tier)** — lane A, generation-dev. files: src/world/history_sim.hpp/.cpp, era_minus_one.cpp, tools/verify/digitisation_sim_harness.cpp.
+- [ ] **BL-1036 (span boundary resume)** then **BL-1037 (resume road tier)** — MERGED 614a02e5, cold-reviewed, follow-ups 58193812; owed: the 16-seed --digest-check. Lane A, generation-dev. files: src/world/history_sim.hpp/.cpp, era_minus_one.cpp, tools/verify/digitisation_sim_harness.cpp.
   provides: resume_dated_objects, consolidation_year, near_home_cutoff_year, resume_seeds_corridor_tier (off), the fidelity mode. consumes: exploration_output (landed).
-- [ ] **BL-1038 (Industry tree wired)** — lane B, generation-dev. files: src/world/industry_tree_data.hpp (generated), history_sim.hpp/.cpp, tools/session/tree_lint.js, tools/verify/exploration_sim_harness.cpp. Shares history_sim.* with lane A in disjoint regions; the main session resolves the merge.
+- [ ] **BL-1038 (Industry tree wired)** — MERGED 29b74f69, fix round 191c212b, cold-reviewed; owed: the 16-seed --digest-check. Lane B, generation-dev. files: src/world/industry_tree_data.hpp (generated), history_sim.hpp/.cpp, tools/session/tree_lint.js, tools/verify/exploration_sim_harness.cpp. Shares history_sim.* with lane A in disjoint regions; the main session resolves the merge.
   provides: industry_tree_enabled (off), industry_open_year, the Industry mask triple and fold, the urban-mass rate, the fork-reachability lint. consumes: the amended industry_tree.json (this cut).
-- [ ] **BL-1039 (charter spend rules)** — lane C, economy-dev. Starts when BL-1034 lands (both edit player_seed_sweep and harness_params). files: src/world/charter_budget.hpp, corporation_generation.cpp, budget_system.hpp, tools/verify/player_seed_sweep.cpp, harness_params.hpp, charter_cost_sweep.json. Its timing rows run on a quiet machine, serially.
+- [ ] **BL-1039 (charter spend rules)** — BUILDING from 2026-09-18. Lane C, economy-dev. Started when BL-1034 landed (both edit player_seed_sweep and harness_params). files: src/world/charter_budget.hpp, corporation_generation.cpp, budget_system.hpp, tools/verify/player_seed_sweep.cpp, harness_params.hpp, charter_cost_sweep.json. Its timing rows run on a quiet machine, serially.
   provides: the sqrt cap rule, density_ceiling reason, the capital-from-unspent rule, per-good tallies. consumes: charter_budget / charter_spend_params (landed, BL-1032).
 
 **Wave 1 — the span and Beat 1, still behind switches**
 
-- [ ] **BL-1040 (Digitisation span)** — waits on BL-1036. files: era_minus_one.*, hard_coded_world.*, world_gen_config.hpp, history_sim.hpp, src/ui/startup_screens.cpp, digitisation_sim_harness.cpp, exploration_sweep.cpp.
-- [ ] **BL-1041 (industry points)** — waits on BL-1038 and BL-1040. files: settlement.hpp, history_sim.*, hard_coded_world.cpp, digitisation_sim_harness.cpp.
+- [ ] **BL-1040 (Digitisation span)** — BUILDING from 2026-09-18 (BL-1036 merged). files: era_minus_one.*, hard_coded_world.*, world_gen_config.hpp, history_sim.hpp, src/ui/startup_screens.cpp, digitisation_sim_harness.cpp, exploration_sweep.cpp.
+- [ ] **BL-1051 (span open survey)** — waits on BL-1040. Every region surveyed for fuel and forest at the span open; ground_forest and furnace_lit read from it (NR-891, NR-892). files: settlement.hpp/.cpp, hard_coded_world.cpp, history_sim.*, exploration_sim_harness.cpp, digitisation_sim_harness.cpp.
+- [ ] **BL-1041 (industry points)** — waits on BL-1038, BL-1040 and BL-1051 (its fuel factor reads BL-1051's survey). files: settlement.hpp, history_sim.*, hard_coded_world.cpp, digitisation_sim_harness.cpp.
 - [ ] **BL-1042 (stockpile to budget)** — waits on BL-1041 and BL-1039. files: population_generation.*, world.hpp, hard_coded_world.cpp, landscape_search.hpp, src/core/app.cpp, harness_params.hpp, verify_api.cpp, main.cpp, player_seed_sweep.cpp, world_determinism.cpp.
 
 **Wave 2 — measure, then Ben's calls**
@@ -46,4 +47,5 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
 
 **Wave 3 — ship**
 
-- [ ] **BL-1044 (Beat 1 ships)** — waits on BL-1037, BL-1043 and Ben's rulings. The one re-bless, the 1960 readings, the cold review.
+- [ ] **BL-1050 (order-dependent reads)** — built on a branch, merged only with BL-1044's switch flips (it moves the pins). Five readers walk sorted ids; `world_copy_determinism --copy-by snapshot` passes (NR-894).
+- [ ] **BL-1044 (Beat 1 ships)** — waits on BL-1037, BL-1043, BL-1050 and Ben's rulings. The one re-bless, the 1960 readings, the cold review.

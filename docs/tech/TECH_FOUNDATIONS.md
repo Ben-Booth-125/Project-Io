@@ -101,6 +101,14 @@ Real-time pacing is a speed multiplier (1×–5×, non-linear; 0 pauses). At 1×
 
 **What a save contains.** Three buckets: every authoritative container on `world` (including the entity-allocator cursor, or a load would re-issue live ids); the derived caches, which are *rebuilt* rather than written (`clear_derived_state`); and the app envelope — the sim clock, `world_params`, the `generation_report` in full, the per-tick histories and a narrow view slice. `world/*` stays SDL- and UI-free, so the headless harness (`tools/verify/save_roundtrip.cpp`) exercises the world half alone. `corp_modifiers` looks derived and is not: its stored order is the cross-tick earn order, and `modified_scalar` folds `add` against `multiply`, which do not commute, so a re-fold from `earned_techs` returns a different number. It is serialised directly (NR-510).
 
+**A loaded world replays byte for byte, and so does a copy (Ben, 2026-09-18, NR-894).** A world
+saved and loaded, or copied, ticks exactly as the original would have. A load re-inserts each
+unordered store in id order, and another standard library lays a store out differently, so a store's
+iteration order is never part of the state: no read may let it reach arithmetic, a tie-break or an
+output order, and a reader that needs an order walks sorted ids. World copies also keep their
+source's order (`faithful_unordered_map`), which makes a copy that would diverge fail loudly
+instead of silently.
+
 ### Tile and body data model
 All tiles for a body are **resident in memory simultaneously**. For the prototype — generated but bounded bodies and tile counts — this is the correct approach. Tile data is pure C++ structs packed into a contiguous array per body, accessed by coordinate index in O(1) with no query overhead.
 

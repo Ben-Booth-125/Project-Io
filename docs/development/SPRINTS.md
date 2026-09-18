@@ -71,9 +71,11 @@ and/or a version goal (v0.1.1 etc.).
 - BL-1038 (Industry tree wired) — every living polity enters at 1660, fuel reads a held seam, urban mass drives the rate; behind a switch. Neutral.
 - BL-1039 (charter spend rules) — square-root cap under a density ceiling, capital from unspent points, and the cost-table rows to set them. Neutral.
 - BL-1040 (Digitisation span) — its own call from exploration_output, wherever Exploration runs; behind a switch. Neutral.
+- BL-1051 (span open survey) — every region surveyed for fuel and forest at the span open; ground_forest and furnace_lit read from it (NR-891, NR-892). Neutral while the span is off.
 - BL-1041 (industry points) — Beat 1: located points on regions with centres, from scale, own fuel, Industry capacity and treasury paid in; no sink this cut.
 - BL-1042 (stockpile to budget) — region points reach campaign centres by the carve; the app and its harness mirror pass the budget. Neutral while the span is off.
 - BL-1043 (real-stockpile charter sweep) — prices, capital rate and the no-specialist world measured; ends in calls.
+- BL-1050 (order-dependent reads) — five readers stop letting hash order reach arithmetic, so a loaded world replays; merged with BL-1044, never alone (NR-894).
 - BL-1044 (Beat 1 ships) — span and budget on by default at epoch 0, prices pinned, the one re-bless, the 1960 readings, the cold review.
 
 **Done when.** Density-follows-cities and industrialisation readings taken at 1960 per seed on the sprint 43 harness; the charter budget is read only from the stockpile; one re-bless authorised by Ben against the shape; a cold review passed with its fix round budgeted.
@@ -87,6 +89,8 @@ RULED 2026-09-18 on the review queue (NR-886, NR-889, NR-890): BL-1034 comes fir
 CUT 2026-09-18 on a five-lane engine read (span resume, Industry tree, industry points, budget switch-on, prices and cap), each lane adversarially checked. RULINGS on the elicitation form the same day (Ben): the span runs on at epoch 0 and the flip waits for Beats 2-3; Beat 1's first cut stockpiles and takes treasury paid in as a DERIVED flow (no new § 11 verb), with no sink; every living polity enters the Industry tree at 1660; the Industry root is ungated; the re-bless carries the road-tier fix and no other shipped-world defect (BL-1045 and BL-1046 filed unscheduled); the cap scales by a square root under a density ceiling; the specialist's price is anchored to the seat menu; a specialist opens on its centre's UNSPENT POINTS (not the recommended keep-400 option); the no-specialist world is decided on the real sweep. PROPOSED and not overturned: 1200 anchors, the 1660 network priced for the span, the span's own seed, fuel reads any held seam, Furnace Practice links to the root plus a fork-reachability lint rule, urban mass drives Industry research, a region's own fuel sets its points rate (re-surveyed at 1660), points reach cities by the carve's slots, budget worlds ignore the Works charter terms, the per-province cap stays at 2. The epoch flip is filed as BL-1047 (design-owed: the superseded arc's fate).
 
 FOUND and recorded: the --through continuation that NR-888's figures came from priced trade on the network inherited at 1200 (DIGITISATION.md § Far pairs).
+
+REVIEW FORM 2026-09-18 (Ben): NR-891 readings accepted, but ground_forest gets a source now (BL-1051); NR-892 furnace_lit reads the Fuel Doctrine taken (BL-1051); NR-893 the Invest-frequency spread is accepted for Beat 1, read industrialisation first; NR-894 BL-1050 (order-independent reads, so a saved game replays) rides this sprint's re-bless. Filed from the wave 0 reviews and unscheduled: BL-1048 (tree rate scales unread), BL-1049 (civilisation index reuse at 1200).
 
 ## Where things stand
 
