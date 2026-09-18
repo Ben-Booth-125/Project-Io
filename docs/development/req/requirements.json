@@ -6130,6 +6130,68 @@
     }
    ],
    "resolution": ""
+  },
+  {
+   "brief": "span-open-survey",
+   "title": "BL-1051 - At the Digitisation span open every region is surveyed for fuel and forest, and the Industry scorer reads forest and a lit furnace from it",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1051 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "tool: seed_library.js --check",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "With the span switch off, every digest, fingerprint and pin is unmoved.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: the survey runs once at the span open, over every region, from tiles",
+      "code: energy_q and the gate means untouched"
+     ],
+     "requirement": "The span open fills two new region fields for every region — a surveyed fuel reading and a forest share (land tiles under forest cover, 0-1000, integer) — and nothing else reads them outside the Industry scorer and BL-1041.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: exploration_sim_harness"
+     ],
+     "requirement": "ground_forest reads the held-mean forest share and furnace_lit reads a Fuel Doctrine side held (T8.7.3 updated); a wooded polity with no seam takes Charcoal Iron on the term, not only because Coke is gated.",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960 (span)"
+     ],
+     "requirement": "Per library seed: the forest-share spread, the Fuel Doctrine split against BL-1038's pooled 404 / 118 / 340, and whether the charcoal polities are the wooded ones.",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no reader of the new fields outside the switch.",
+     "notes": ""
+    }
+   ],
+   "resolution": ""
   }
  ]
 }
