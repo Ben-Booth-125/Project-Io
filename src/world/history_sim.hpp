@@ -2891,21 +2891,42 @@ struct industry_scorer_reading
     int colonial_reach_q = 0; ///< 1000 iff a held region lies across a sea leg from the seat
     int many_peoples_q   = 0; ///< share of held regions whose plurality culture is not the polity's
 
+    /// BL-1051 — `ground_forest`: the span-open survey's forest share averaged
+    /// over held ground (`industry_ground_forest_q`). 0 wherever no held region
+    /// was surveyed, which is every path the Digitisation span does not run.
+    int ground_forest_q  = 0;
+
     /// `known` is PER NODE (TREES.md sec The scorer: "a neighbour already
     /// holds it"): the OR of the Industry masks of every living polity this
     /// one has met. A node whose bit is set here reads `known` at 1000.
     uint64_t known_mask  = 0;
 };
 
+/// BL-1051 — `ground_forest`'s reading (INDUSTRY_TREE.md sec The scorer, NR-891):
+/// the mean `region::survey_forest_q` over @p held's SURVEYED regions, 0-1000,
+/// integer. A region the span-open survey never saw (-1: the span did not run,
+/// or the span founded it after its open) is left out of the mean rather than
+/// read as bare ground, and with no surveyed held region the reading is 0 — so
+/// on every path without the span the term reads exactly the old pin.
+/// Independent of @p held's order.
+int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held);
+
+/// BL-1051 — `furnace_lit` (INDUSTRY_TREE.md sec The scorer, NR-892): has the
+/// polity taken a FUEL DOCTRINE side? The Fuel Doctrine is found off the
+/// generated table, never by id: it is the fork pair the ring-1 milestone (The
+/// Cheap Ton) requires one side of (`requires_fork_a` / `requires_fork_b`) —
+/// Coke Smelting and Charcoal Iron. False when the table carries no such pair.
+bool industry_fuel_doctrine_taken(uint64_t mask);
+
 /// Every scorer term's value for one polity, indexed by the generated
 /// `io::industry_tree::scorer_term` (never positionally — see the guard in
 /// history_sim.cpp). `known` is 0 here because it is per node;
-/// `choose_industry_node` reads it off `known_mask`. THREE TERMS ARE PINNED
-/// AT 0, named so their landing shows as a diff in exploration_sim_harness:
-/// `ground_forest` (no forest reading in the sim — INDUSTRY_TREE.md sec Open
-/// questions), `tariff_pressure` (no price at a market before the campaign)
-/// and `plague_struck` (the history sim runs no plague; the empire scorer
-/// pins it too).
+/// `choose_industry_node` reads it off `known_mask`. TWO TERMS ARE PINNED AT
+/// 0, named so their landing shows as a diff in exploration_sim_harness:
+/// `tariff_pressure` (no price at a market before the campaign) and
+/// `plague_struck` (the history sim runs no plague; the empire scorer pins it
+/// too). `ground_forest` reads `r.ground_forest_q` (BL-1051) and `furnace_lit`
+/// reads `industry_fuel_doctrine_taken(mask)`.
 void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
                           int (&out)[io::industry_tree::term_count]);
 

@@ -299,7 +299,7 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
 {
     const int win = std::max(3, gw / 45);
     float farm = 0.0f, ore = 0.0f, energy = 0.0f;
-    int cells = 0, water = 0;
+    int cells = 0, water = 0, forest = 0;
 
     for (int dr = -win; dr <= win; ++dr)
     {
@@ -311,6 +311,7 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
             if (!t) continue;
             ++cells;
             if (is_water(t->substrate)) { ++water; continue; } // BL-516
+            if (t->cover == terrain_cover::forest) ++forest;   // BL-1051: land only
 
             const auto& d = t->resource_deposit;
             farm   += d[static_cast<std::size_t>(resource_type::agricultural_produce)];
@@ -330,6 +331,10 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
     e.ore    = static_cast<int>(ore    * 1000.0f) / n;
     e.energy = static_cast<int>(energy * 1000.0f) / n;
     e.water  = (water * 1000) / n;
+    // BL-1051: over the LAND cells, so it is a share of ground, not of window.
+    // A window with no land reads 0 (nothing is wooded), never a division by 0.
+    const int land = cells - water;
+    e.forest = land > 0 ? (forest * 1000) / land : 0;
     return e;
 }
 
@@ -347,6 +352,34 @@ int score_against(int raw, int mean)
 {
     return clampi((raw * 500) / std::max(1, mean), 0, 1000);
 }
+
+} // namespace
+
+// BL-1051 — declared in settlement.hpp. Placed here, after `score_against`,
+// because the fuel reading is scored exactly as `energy_q` is.
+void survey_regions_at_span_open(const world& w, const std::vector<entity_id>& ids,
+                                 int gw, int gh, std::vector<region>& regions)
+{
+    if (regions.empty()) return;
+
+    // ONE PASS FOR THE RAW WINDOWS, ONE FOR THE SCORE: the fuel score is
+    // relative to the mean over every region surveyed here, so the mean must
+    // exist before any region is scored. Ascending region order, integer sums.
+    std::vector<int> raw_fuel(regions.size(), 0);
+    int64_t fuel_sum = 0;
+    for (std::size_t i = 0; i < regions.size(); ++i)
+    {
+        const endowment e = survey_endowment(w, ids, regions[i].col, regions[i].row, gw, gh);
+        raw_fuel[i] = e.energy;
+        fuel_sum += e.energy;
+        regions[i].survey_forest_q = clampi(e.forest, 0, 1000);
+    }
+    const int fuel_mean = static_cast<int>(fuel_sum / static_cast<int64_t>(regions.size()));
+    for (std::size_t i = 0; i < regions.size(); ++i)
+        regions[i].survey_fuel_q = score_against(raw_fuel[i], fuel_mean);
+}
+
+namespace {
 
 /// Argmax over the scored endowment, with an explicit fixed order so a tie is
 /// resolved by the class list rather than by container order.

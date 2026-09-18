@@ -6599,6 +6599,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             }
                             ir.threatened_q = clampi(threat, 0, 1000);
 
+                            // `ground_forest` (BL-1051): the span-open survey's
+                            // forest share, averaged over held ground that was
+                            // surveyed. No gate reads it, so only a pick needs
+                            // it; off the Digitisation span nothing is surveyed
+                            // and it reads 0, the old pin.
+                            ir.ground_forest_q = industry_ground_forest_q(ss.regions, held);
+
                             // `colonial_reach`: a held region the seat reaches
                             // only across water — `line_crosses_sea`, the SAME
                             // test that makes a campaign a sea leg.
@@ -8341,6 +8348,41 @@ bool industry_node_available(uint64_t mask, int node_idx)
     return true;
 }
 
+int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held)
+{
+    // A sum and a count, so the mean does not depend on `held`'s order.
+    // Unsurveyed ground (-1) is UNKNOWN, not bare, and stays out of both.
+    int64_t sum = 0;
+    int64_t surveyed = 0;
+    for (int hi : held)
+    {
+        if (hi < 0 || static_cast<std::size_t>(hi) >= regions.size()) continue;
+        const int f = regions[static_cast<std::size_t>(hi)].survey_forest_q;
+        if (f < 0) continue;
+        sum += std::min(f, 1000);
+        ++surveyed;
+    }
+    return surveyed > 0 ? static_cast<int>(clampi64(sum / surveyed, 0, 1000)) : 0;
+}
+
+bool industry_fuel_doctrine_taken(uint64_t mask)
+{
+    using namespace io::industry_tree;
+    // The Fuel Doctrine IS the fork the ring-1 milestone requires one side of
+    // (TREES.md sec Forks; INDUSTRY_TREE.md: The Cheap Ton needs Coke Smelting
+    // or Charcoal Iron). Reading it off `requires_fork_*` keeps this true if
+    // the store renumbers, and exploration_sim_harness T8.7.3 pins the ids.
+    for (int i = 0; i < node_count; ++i)
+    {
+        const node& n = nodes[i];
+        if (n.kind != node_kind::milestone || n.ring != 1 || n.requires_fork_a < 0) continue;
+        const bool a = (mask & (1ULL << n.requires_fork_a)) != 0;
+        const bool b = n.requires_fork_b >= 0 && (mask & (1ULL << n.requires_fork_b)) != 0;
+        return a || b;
+    }
+    return false;
+}
+
 void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
                           int (&out)[io::industry_tree::term_count])
 {
@@ -8354,7 +8396,7 @@ void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
     // means the store moved under the scorer and somebody should look. If one
     // fires after `gen_empire_tree_table.js industry`, re-read
     // INDUSTRY_TREE.md sec The scorer, give the new term a reading (or pin it
-    // at 0 by name, as three are below), then update these lines.
+    // at 0 by name, as two are below), then update these lines.
     static_assert(term_count == 22, "industry scorer terms changed: every term needs a reading here");
     static_assert(static_cast<int>(scorer_term::spire)           ==  0
                && static_cast<int>(scorer_term::reach_bound)     ==  1
@@ -8383,19 +8425,17 @@ void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
     const auto at = [&out](scorer_term t) -> int& { return out[static_cast<int>(t)]; };
     for (int& v : out) v = 0;
 
-    // `furnace_lit` — "the polity holds the spire's ring-1 major": the tree's
-    // root (the lint holds root == the spire's ring-1 major), found by its
-    // generated `is_root` flag, never by id or index.
-    bool furnace_lit = false;
-    for (int i = 0; i < node_count; ++i)
-        if (nodes[i].is_root && (mask & (1ULL << i))) { furnace_lit = true; break; }
+    // `furnace_lit` — the polity has taken a Fuel Doctrine side (BL-1051;
+    // NR-892: every investor holds the root, so the root was no reading at
+    // all). Found off the generated table's fork, never by id or index.
+    const bool furnace_lit = industry_fuel_doctrine_taken(mask);
 
     at(scorer_term::spire)            = 1000;
     at(scorer_term::reach_bound)      = r.reach_bound_q;
     at(scorer_term::furnace_lit)      = furnace_lit ? 1000 : 0;
     at(scorer_term::ground_ore)       = r.ground_ore_q;
     at(scorer_term::ground_fuel)      = r.fuel_seam_q;       // the seam, not the mean
-    at(scorer_term::ground_forest)    = 0; // PINNED: no forest reading in the sim (INDUSTRY_TREE.md sec Open questions)
+    at(scorer_term::ground_forest)    = r.ground_forest_q;   // BL-1051: the span-open survey, held mean
     at(scorer_term::tariff_pressure)  = 0; // PINNED: no landed price at a market before the campaign
     at(scorer_term::threatened)       = r.threatened_q;
     at(scorer_term::food_bound)       = r.food_bound_q;

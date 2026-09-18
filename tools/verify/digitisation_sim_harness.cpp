@@ -41,6 +41,13 @@
 // Without --through (1660) there is no span: the close and the control are the
 // same world.
 //
+// THE SPAN-OPEN SURVEY (BL-1051). In span mode a section after the span's own
+// table prints, per seed, the forest and fuel survey generation took over every
+// region the span opened on (`era_minus_one_fixture::digitisation_open_regions`)
+// and the Fuel Doctrine split at the close with each side's mean held forest --
+// the evidence that `ground_forest` makes the wooded polity choose Charcoal.
+// Evidence, not one of the thirteen readings.
+//
 // FOUR STATES, NEVER A FIFTH. A reading is MEASURED (its observable exists in
 // today's world and is computed off it), PARTIAL (one clause is measured, the
 // other prints n/a with its reason), a STRUCTURAL ZERO (the observable exists
@@ -412,6 +419,30 @@ struct seed_row
     int64_t span_foundings = 0;
     int64_t span_ms        = 0; ///< the span's run_history_sim call, wall clock (reported only)
 
+    // --- BL-1051: the span-open survey and the Fuel Doctrine (span mode) ----
+    // The survey is read off the table the span OPENED on
+    // (`era_minus_one_fixture::digitisation_open_regions`); the doctrine and
+    // the held forest off the span's own 1960 close. Evidence for the
+    // `ground_forest` term, not one of the thirteen readings.
+    bool   survey_ran        = false;
+    int    survey_regions    = 0;  ///< regions the span opened on
+    int    survey_unseen     = 0;  ///< ... of which the survey left at -1 (must be 0)
+    int    survey_forest[5]  = {}; ///< survey_forest_q min / p25 / med / p75 / max at the open
+    int    survey_forested   = 0;  ///< regions at the open with any forest (> 0)
+    int    survey_wooded     = 0;  ///< ... with at least half their land under forest (>= 500)
+    int    survey_fuel_med   = 0;  ///< survey_fuel_q median at the open (500 = the world's mean region)
+    int    survey_fuel_seam  = 0;  ///< regions whose survey_fuel_q clears the 250 seam bar
+    int    survey_seam_energy = 0; ///< ... and whose inherited energy_q clears it (the gate's reading)
+    int    close_regions     = 0;  ///< regions at the close
+    int    close_unsurveyed  = 0;  ///< ... founded after the open, so never surveyed (-1)
+    int    doctrine[3]       = {}; ///< living polities at the close: coke / charcoal / neither
+    /// Mean of each living polity's held-ground forest reading
+    /// (`industry_ground_forest_q` over the regions it holds at the close),
+    /// per doctrine group; NaN for an empty group.
+    double doctrine_forest[3] = { k_undef, k_undef, k_undef };
+    int    charcoal_seam_seen  = 0; ///< Charcoal polities that ever passed the seam gate (fuel_seen)
+    int    charcoal_seam_close = 0; ///< Charcoal polities holding a seam (energy_q >= 250) at the close
+
     // --- Reading 1: density follows cities (campaign world) -----------------
     int    markets        = 0;
     int    markets_urban  = 0;       ///< markets whose catchment holds any urban heads.
@@ -539,18 +570,23 @@ std::vector<uint32_t> library_seeds(const char* path)
 //   undone -- has the continued run's 1660 round's treaties, overlord graph
 //   and stocks exactly. What is left once the named sources are removed is
 //   what the resume LOSES, and it must be nothing.
-// GATE 3 (BL-1040 R5): THE SHIPPED SPAN IS THE REAL RESUME. V4 below -- the
-//   handoff as it is, the span's own seed and params, run to the span's own
-//   stop -- folded with `make_digitisation_output`, equals generation's own
+// GATE 3 (BL-1040 R5): THE SHIPPED SPAN IS THE REAL RESUME. V5 below -- the
+//   handoff as it is plus the span-open survey (BL-1051: generation surveys
+//   every region's tiles between the struct copy and the call, and captures
+//   the table it opened on), the span's own seed and params, run to the span's
+//   own stop -- folded with `make_digitisation_output`, equals generation's own
 //   1960 close (`era_minus_one_fixture::digitisation_handoff`) field for field
-//   and table for table, with the same battle, conquest and founding counts.
+//   and table for table, with the same battle, conquest and founding counts;
+//   and the opening table differs from the handoff in the survey's two fields
+//   only, with no region left unsurveyed.
 //   This is what makes the span "the real consumer of the resume" a checked
 //   claim: the resume gates 1 and 2 prove lossless is the resume the shipped
 //   world runs, and no settlement or creed state outside the struct reaches it.
 // REPORT: the one-round footprint of the real resume, the entry state the
 //   handoff differs from the continued run in, and the 1960 divergence
 //   against the continued run, attributed by source by adding them back one
-//   at a time (V0 all neutralised .. V4 the real resume on its own seed).
+//   at a time (V0 all neutralised .. V4 on the span's own seed .. V5 the real
+//   resume, with the span-open survey).
 //
 // NEVER GATED BIT FOR BIT AT 1960 AGAINST C. A lossless resume cannot equal
 // the continued run: a span reads its INHERITED corridor record until it
@@ -587,8 +623,9 @@ void region_fields(const region& a, const region& b, field_census& out)
     FID_CMP(creed_hold_years); FID_CMP(works_built); FID_CMP(work_capacity_mod);
     FID_CMP(work_manpower_mod); FID_CMP(work_reach_mod); FID_CMP(work_defence_mod);
     FID_CMP(work_industrial_mod);
+    FID_CMP(survey_fuel_q); FID_CMP(survey_forest_q); // BL-1051: the span-open survey
 }
-constexpr int k_region_fields = 51; // counts the FID_CMP lines above; keep them equal
+constexpr int k_region_fields = 53; // counts the FID_CMP lines above; keep them equal
 
 /// Every `polity` field, one by one (same caveat as `region_fields`).
 void polity_fields(const polity& a, const polity& b, field_census& out)
@@ -875,11 +912,33 @@ struct divergence
     int     overlord      = 0;
     int64_t battles       = 0; ///< this run's battles over its own span
     int64_t treasury      = 0; ///< this run's summed region treasury at its close
+    int     doctrine[3]   = {}; ///< BL-1051: living polities at its close, coke / charcoal / neither
 };
+
+/// BL-1051 — the Fuel Doctrine side a polity holds: 0 Coke Smelting, 1
+/// Charcoal Iron, 2 neither. By id: the harness names the pair it reports.
+int fuel_doctrine_side(const polity& q)
+{
+    static const int coke = [] {
+        for (int i = 0; i < io::industry_tree::node_count; ++i)
+            if (std::strcmp(io::industry_tree::nodes[i].id, "IN-MT-1a") == 0) return i;
+        return -1;
+    }();
+    static const int charcoal = [] {
+        for (int i = 0; i < io::industry_tree::node_count; ++i)
+            if (std::strcmp(io::industry_tree::nodes[i].id, "IN-MT-1b") == 0) return i;
+        return -1;
+    }();
+    if (coke >= 0 && ((q.industry_mask >> coke) & 1ULL) != 0) return 0;
+    if (charcoal >= 0 && ((q.industry_mask >> charcoal) & 1ULL) != 0) return 1;
+    return 2;
+}
 
 divergence diverge(const run_out& v, const run_out& c)
 {
     divergence d;
+    for (const polity& q : v.hs.polities)
+        if (q.alive) ++d.doctrine[fuel_doctrine_side(q)];
     const std::size_t n = std::min(v.ss.regions.size(), c.ss.regions.size());
     for (std::size_t i = 0; i < n; ++i)
         if (v.ss.regions[i].nation != c.ss.regions[i].nation) ++d.owner_regions;
@@ -921,16 +980,19 @@ struct seed_fidelity
     bool gate2 = false;
     round_diff real_round; ///< the real resume's one round, reported
 
-    // The 1960 divergence, V0..V4 against the continued run, each step
+    // The 1960 divergence, V0..V5 against the continued run, each step
     // against the variant before it, and the continued run's own numbers.
-    divergence v[5];
-    divergence step[5]; ///< step[k] = V_k against V_{k-1} (step[0] unused)
+    // BL-1051 added V5, the span-open survey, as its own step.
+    static constexpr int k_variants = 6;
+    divergence v[k_variants];
+    divergence step[k_variants]; ///< step[k] = V_k against V_{k-1} (step[0] unused)
     int        c_living = 0;
     int64_t    c_battles = 0;
     int64_t    c_treasury = 0;
+    int        c_doctrine[3] = {}; ///< BL-1051: the continued run's Fuel Doctrine split
     double     seconds = 0.0;
 
-    // Gate 3 (BL-1040) -- the shipped span against V4, the real resume.
+    // Gate 3 (BL-1040) -- the shipped span against V5, the real resume.
     std::vector<std::string> span_params_issues; ///< the captured params are not the span's derivation
     field_census span_regions, span_polities;
     std::vector<std::string> span_tables;        ///< "<table>: <first difference>" per table that differs
@@ -1177,11 +1239,20 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             v2.live   = nullptr;
             resume_spec v3 = v2;                 // + the dead-filter: the handoff as it is
             v3.record = &H.surviving_corridors;
-            resume_spec v4 = v3;                 // + the span's own seed: the real resume
+            resume_spec v4 = v3;                 // + the span's own seed
             v4.seed = own_seed;
-            const resume_spec* specs[5] = { &neutral, &v1, &v2, &v3, &v4 };
+            // BL-1051: + the span-open survey -- the real resume. Generation
+            // surveys every region's tiles between the struct copy and the
+            // call; a fixture carries no tiles, so V5 opens on the table
+            // generation captured (`digitisation_open_regions`), which the
+            // gate below holds to "the handoff plus exactly the survey".
+            const std::vector<region>& opened = fx.digitisation_open_regions.empty()
+                                                    ? H.regions : fx.digitisation_open_regions;
+            resume_spec v5 = v4;
+            v5.regions = &opened;
+            const resume_spec* specs[seed_fidelity::k_variants] = { &neutral, &v1, &v2, &v3, &v4, &v5 };
             run_out prev;
-            for (int k = 0; k < 5; ++k)
+            for (int k = 0; k < seed_fidelity::k_variants; ++k)
             {
                 run_out cur = resume(fx, H, *specs[k], stop, INT64_MIN, dp);
                 row.v[k] = diverge(cur, c_1960);
@@ -1189,10 +1260,10 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                 prev = std::move(cur);
             }
 
-            // ---- Gate 3 (BL-1040): the shipped span IS V4 ---------------------
-            // `prev` is V4: the handoff as it is, on the span's own seed and
-            // params, to the span's own stop. Folded by the span's own rule,
-            // it must be generation's 1960 close exactly.
+            // ---- Gate 3 (BL-1040): the shipped span IS V5 ---------------------
+            // `prev` is V5: the handoff as it is plus the span-open survey, on
+            // the span's own seed and params, to the span's own stop. Folded by
+            // the span's own rule, it must be generation's 1960 close exactly.
             const digitisation_output V = make_digitisation_output(prev.ss, prev.hs, &prev.cs);
             const digitisation_output& S = fx.digitisation_handoff;
             const history_sim_state&   T = fx.digitisation_state;
@@ -1201,6 +1272,27 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             const auto note = [&](const char* table, const std::string& d) {
                 if (!d.empty()) row.span_tables.push_back(std::string(table) + ": " + d);
             };
+            // BL-1051: the table the span opened on is the handoff plus the
+            // survey's two fields and nothing else, and the survey saw every
+            // region (none left at -1).
+            {
+                if (fx.digitisation_open_regions.empty())
+                    note("span opening", "generation captured no opening table");
+                std::vector<region> expect = H.regions;
+                int unsurveyed = 0;
+                if (expect.size() == opened.size())
+                    for (std::size_t i = 0; i < expect.size(); ++i)
+                    {
+                        expect[i].survey_fuel_q   = opened[i].survey_fuel_q;
+                        expect[i].survey_forest_q = opened[i].survey_forest_q;
+                        if (opened[i].survey_fuel_q < 0 || opened[i].survey_forest_q < 0) ++unsurveyed;
+                    }
+                const field_census beyond = census_of(expect, opened, region_fields);
+                if (!beyond.empty())
+                    note("span opening", "differs from the handoff beyond the survey: " + census_text(beyond));
+                if (unsurveyed > 0)
+                    note("span opening", std::to_string(unsurveyed) + " regions left unsurveyed");
+            }
             note("grudges",           table_diff(V.grudges, S.grudges, grudge_eq));
             note("contacts",          table_diff(V.contacts, S.contacts, contact_eq));
             note("surviving network", table_diff(V.surviving_corridors, S.surviving_corridors, corridor_eq));
@@ -1240,7 +1332,8 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             row.gate3 = row.span_params_issues.empty() && row.span_regions.empty()
                      && row.span_polities.empty() && row.span_tables.empty();
         }
-        for (const polity& q : c_1960.hs.polities) if (q.alive) ++row.c_living;
+        for (const polity& q : c_1960.hs.polities)
+            if (q.alive) { ++row.c_living; ++row.c_doctrine[fuel_doctrine_side(q)]; }
         for (const region& r : c_1960.ss.regions) row.c_treasury += r.treasury;
         row.c_battles = c_1960.hs.battles - fx.exploration_state.battles;
 
@@ -1303,41 +1396,52 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                 "    1660), attributed by source (REPORTED) ===\n");
     std::printf("  V0 all named sources neutralised, Exploration's seed | V1 + the 1660 close's market stamp |\n"
                 "  V2 + the 1660 corridor record, unfiltered, live counts seeded from it | V3 + the dead-filter\n"
-                "  (the handoff as it is) | V4 + the span's own seed (the real resume)\n");
+                "  (the handoff as it is) | V4 + the span's own seed | V5 + the span-open survey (BL-1051: the\n"
+                "  real resume; C never has it, so V5 against V4 is the survey's own footprint)\n");
     std::printf("  Against C: regions owned differently, living polities, treaty pairs differing, battles 1660-1960,\n"
-                "  summed region treasury (x1e3). By source: each variant against the one before it (the source's\n"
-                "  own footprint, 'regions owned differently / treaty pairs differing').\n");
+                "  summed region treasury (x1e3), the Fuel Doctrine coke/charcoal/neither over living polities.\n"
+                "  By source: each variant against the one before it (the source's own footprint, 'regions owned\n"
+                "  differently / treaty pairs differing').\n");
     for (const seed_fidelity& r : rows)
     {
         if (!r.ran) continue;
-        std::printf("  %5u  owner  V0..V4 %4d %4d %4d %4d %4d | living C %3d: %3d %3d %3d %3d %3d | treaty pairs "
-                    "%3d %3d %3d %3d %3d\n",
+        std::printf("  %5u  owner  V0..V5 %4d %4d %4d %4d %4d %4d | living C %3d: %3d %3d %3d %3d %3d %3d | treaty pairs "
+                    "%3d %3d %3d %3d %3d %3d\n",
                     r.seed, r.v[0].owner_regions, r.v[1].owner_regions, r.v[2].owner_regions,
-                    r.v[3].owner_regions, r.v[4].owner_regions,
+                    r.v[3].owner_regions, r.v[4].owner_regions, r.v[5].owner_regions,
                     r.c_living, r.v[0].living, r.v[1].living, r.v[2].living, r.v[3].living, r.v[4].living,
+                    r.v[5].living,
                     r.v[0].treaty_pairs, r.v[1].treaty_pairs, r.v[2].treaty_pairs, r.v[3].treaty_pairs,
-                    r.v[4].treaty_pairs);
-        std::printf("         battles C %4lld: %4lld %4lld %4lld %4lld %4lld | treasury C %lld: %lld %lld %lld %lld %lld\n",
+                    r.v[4].treaty_pairs, r.v[5].treaty_pairs);
+        std::printf("         battles C %4lld: %4lld %4lld %4lld %4lld %4lld %4lld | treasury C %lld: %lld %lld %lld %lld %lld %lld\n",
                     static_cast<long long>(r.c_battles), static_cast<long long>(r.v[0].battles),
                     static_cast<long long>(r.v[1].battles), static_cast<long long>(r.v[2].battles),
                     static_cast<long long>(r.v[3].battles), static_cast<long long>(r.v[4].battles),
+                    static_cast<long long>(r.v[5].battles),
                     static_cast<long long>(r.c_treasury / 1000), static_cast<long long>(r.v[0].treasury / 1000),
                     static_cast<long long>(r.v[1].treasury / 1000), static_cast<long long>(r.v[2].treasury / 1000),
-                    static_cast<long long>(r.v[3].treasury / 1000), static_cast<long long>(r.v[4].treasury / 1000));
+                    static_cast<long long>(r.v[3].treasury / 1000), static_cast<long long>(r.v[4].treasury / 1000),
+                    static_cast<long long>(r.v[5].treasury / 1000));
+        std::printf("         Fuel Doctrine coke/charcoal/neither: C %d/%d/%d | V4 %d/%d/%d | V5 %d/%d/%d\n",
+                    r.c_doctrine[0], r.c_doctrine[1], r.c_doctrine[2],
+                    r.v[4].doctrine[0], r.v[4].doctrine[1], r.v[4].doctrine[2],
+                    r.v[5].doctrine[0], r.v[5].doctrine[1], r.v[5].doctrine[2]);
         std::printf("         by source: market stamp %d/%d | 1660 record %d/%d | dead-filter %d/%d | seed %d/%d | "
-                    "residual %d/%d\n",
+                    "survey %d/%d | residual %d/%d\n",
                     r.step[1].owner_regions, r.step[1].treaty_pairs, r.step[2].owner_regions, r.step[2].treaty_pairs,
                     r.step[3].owner_regions, r.step[3].treaty_pairs, r.step[4].owner_regions, r.step[4].treaty_pairs,
+                    r.step[5].owner_regions, r.step[5].treaty_pairs,
                     r.v[0].owner_regions, r.v[0].treaty_pairs);
     }
     {
         // Attribution: each source's own footprint (the variant against the
         // one before it), spread over the seeds.
-        const char* names[5] = { "residual: V0 against C", "the close's market stamp: V1 against V0",
-                                 "the 1660 corridor record: V2 against V1", "the dead-filter: V3 against V2",
-                                 "the seed: V4 against V3" };
+        const char* names[seed_fidelity::k_variants] = {
+            "residual: V0 against C", "the close's market stamp: V1 against V0",
+            "the 1660 corridor record: V2 against V1", "the dead-filter: V3 against V2",
+            "the seed: V4 against V3", "the span-open survey: V5 against V4" };
         std::printf("  regions owned differently at 1960, per source:\n");
-        for (int k = 0; k < 5; ++k)
+        for (int k = 0; k < seed_fidelity::k_variants; ++k)
         {
             std::vector<double> inc;
             for (const seed_fidelity& r : rows)
@@ -1346,13 +1450,14 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             print_spread(names[k], inc);
         }
         std::printf("    (a footprint is measured against the variant before it; sources interact, so footprints\n"
-                    "     do not sum to V4's distance from C)\n");
+                    "     do not sum to V5's distance from C)\n");
     }
 
     int g3 = 0;
-    std::printf("\n=== GATE 3 (BL-1040 R5): the shipped Digitisation span IS the real resume (V4), field for field ===\n");
-    std::printf("  (generation's own 1960 close against V4 folded by make_digitisation_output; the span's params\n"
-                "   checked against its derivation; the shipped close's own validator re-run against the 1660 value)\n");
+    std::printf("\n=== GATE 3 (BL-1040 R5): the shipped Digitisation span IS the real resume (V5), field for field ===\n");
+    std::printf("  (generation's own 1960 close against V5 folded by make_digitisation_output; the span's params\n"
+                "   checked against its derivation; the shipped close's own validator re-run against the 1660 value;\n"
+                "   BL-1051: the table the span opened on is the handoff plus exactly the survey, every region seen)\n");
     for (const seed_fidelity& r : rows)
     {
         if (!r.ran) continue;
@@ -1751,6 +1856,60 @@ int main(int argc, char** argv)
             row.span_conquests = fx.digitisation_state.conquests;
             row.span_foundings = fx.digitisation_state.foundings;
             row.span_ms        = fx.ms_digitisation;
+
+            // ---- BL-1051: the span-open survey, and who took which fuel ----
+            const std::vector<region>& open_t = fx.digitisation_open_regions;
+            row.survey_ran     = !open_t.empty();
+            row.survey_regions = static_cast<int>(open_t.size());
+            std::vector<int> forest_v, fuel_v;
+            for (const region& rg : open_t)
+            {
+                if (rg.survey_forest_q < 0 || rg.survey_fuel_q < 0) { ++row.survey_unseen; continue; }
+                forest_v.push_back(rg.survey_forest_q);
+                fuel_v.push_back(rg.survey_fuel_q);
+                if (rg.survey_forest_q > 0)   ++row.survey_forested;
+                if (rg.survey_forest_q >= 500) ++row.survey_wooded;
+                if (rg.survey_fuel_q >= industry_fuel_seam_bar_q) ++row.survey_fuel_seam;
+                if (rg.energy_q      >= industry_fuel_seam_bar_q) ++row.survey_seam_energy;
+            }
+            std::sort(forest_v.begin(), forest_v.end());
+            std::sort(fuel_v.begin(), fuel_v.end());
+            const auto rank = [](const std::vector<int>& v, int pct) {
+                if (v.empty()) return 0;
+                return v[static_cast<std::size_t>((pct * (static_cast<int>(v.size()) - 1) + 50) / 100)];
+            };
+            const int pcts[5] = { 0, 25, 50, 75, 100 };
+            for (int k = 0; k < 5; ++k) row.survey_forest[k] = rank(forest_v, pcts[k]);
+            row.survey_fuel_med = rank(fuel_v, 50);
+
+            const std::vector<region>& close_t = fx.digitisation_handoff.regions;
+            row.close_regions = static_cast<int>(close_t.size());
+            for (const region& rg : close_t) if (rg.survey_forest_q < 0) ++row.close_unsurveyed;
+
+            // Held sets at the close, in ascending region order, by `nation`.
+            std::map<int, std::vector<int>> held_by;
+            for (std::size_t i = 0; i < close_t.size(); ++i)
+                if (close_t[i].nation >= 0) held_by[close_t[i].nation].push_back(static_cast<int>(i));
+            double forest_sum[3] = {};
+            for (const polity& q : fx.digitisation_handoff.polities)
+            {
+                if (!q.alive) continue;
+                const int side = fidelity::fuel_doctrine_side(q);
+                ++row.doctrine[side];
+                const auto it = held_by.find(q.id);
+                const std::vector<int> none;
+                const std::vector<int>& held = it != held_by.end() ? it->second : none;
+                forest_sum[side] += static_cast<double>(industry_ground_forest_q(close_t, held));
+                if (side == 1)
+                {
+                    if (q.industry_fuel_seen) ++row.charcoal_seam_seen;
+                    int seam = 0;
+                    for (int hi : held) seam = std::max(seam, close_t[static_cast<std::size_t>(hi)].energy_q);
+                    if (seam >= industry_fuel_seam_bar_q) ++row.charcoal_seam_close;
+                }
+            }
+            for (int s = 0; s < 3; ++s)
+                if (row.doctrine[s] > 0) row.doctrine_forest[s] = forest_sum[s] / row.doctrine[s];
         }
 
         const entity_id body = fx.ran ? fx.body : w.home_body;
@@ -2057,6 +2216,77 @@ int main(int argc, char** argv)
         if (!ms.empty())
             std::printf("  SPAN COST per seed: median %.0f ms, max %.0f ms, over %zu seeds (this harness build, serial)\n",
                         median_of(ms), *std::max_element(ms.begin(), ms.end()), ms.size());
+    }
+
+    // ============ BL-1051: the span-open survey and the Fuel Doctrine ========
+    if (span_mode)
+    {
+        std::printf("\n=== THE SPAN-OPEN SURVEY AND THE FUEL DOCTRINE, per seed (BL-1051; evidence, not a reading) ===\n");
+        std::printf("  survey (at the open, every region the span opened on): forest = survey_forest_q, the land share\n"
+                    "  of the window under forest, 0-1000 -- min/p25/med/p75/max, regions with any forest, regions at\n"
+                    "  >= 500; fuel = survey_fuel_q (500 = the world's mean region), its median, and regions clearing\n"
+                    "  the 250 seam bar on the survey vs on the inherited energy_q the fuel gate still reads.\n"
+                    "  close (1960): regions the span founded after its open are unsurveyed (-1, out of every mean);\n"
+                    "  the Fuel Doctrine side each living polity holds (IN-MT-1a coke / IN-MT-1b charcoal / neither),\n"
+                    "  the mean held-ground forest reading per side, and Charcoal polities that ever passed the seam\n"
+                    "  gate (fuel_seen) or hold a seam at the close -- they had Coke open and took Charcoal anyway.\n");
+        std::printf("  seed | open (unseen) | forest min/p25/med/p75/max | any / >=500 | fuel med | seams surv/energy_q |"
+                    " close (unsurv) | coke/charc/none | held forest coke / charc / none | charc: seam seen / now\n");
+        int p_doc[3] = {};
+        double p_forest_sum[3] = {};
+        int p_forested = 0, p_wooded = 0, p_open = 0, p_unseen = 0, p_close = 0, p_unsurv = 0;
+        int p_seen = 0, p_now = 0, seeds_charcoal_wooder = 0, seeds_compared = 0;
+        std::vector<double> med_forest;
+        for (const seed_row& r : rows)
+        {
+            if (!r.span_ran) continue;
+            const auto f = [](double x, char* buf, std::size_t n) {
+                if (std::isnan(x)) std::snprintf(buf, n, "  -");
+                else std::snprintf(buf, n, "%3.0f", x);
+            };
+            char fc[16], fch[16], fn[16];
+            f(r.doctrine_forest[0], fc, sizeof fc);
+            f(r.doctrine_forest[1], fch, sizeof fch);
+            f(r.doctrine_forest[2], fn, sizeof fn);
+            std::printf("  %4u | %5d (%3d)   | %3d/%3d/%3d/%3d/%4d       | %4d/%-4d   |   %4d   |   %4d / %-4d       |"
+                        " %5d (%4d)   | %3d/%3d/%3d     |   %s / %s / %s                 |   %3d / %-3d\n",
+                        r.seed, r.survey_regions, r.survey_unseen,
+                        r.survey_forest[0], r.survey_forest[1], r.survey_forest[2], r.survey_forest[3],
+                        r.survey_forest[4], r.survey_forested, r.survey_wooded, r.survey_fuel_med,
+                        r.survey_fuel_seam, r.survey_seam_energy, r.close_regions, r.close_unsurveyed,
+                        r.doctrine[0], r.doctrine[1], r.doctrine[2], fc, fch, fn,
+                        r.charcoal_seam_seen, r.charcoal_seam_close);
+            for (int s = 0; s < 3; ++s)
+            {
+                p_doc[s] += r.doctrine[s];
+                if (!std::isnan(r.doctrine_forest[s])) p_forest_sum[s] += r.doctrine_forest[s] * r.doctrine[s];
+            }
+            p_forested += r.survey_forested; p_wooded += r.survey_wooded; p_open += r.survey_regions;
+            p_unseen += r.survey_unseen; p_close += r.close_regions; p_unsurv += r.close_unsurveyed;
+            p_seen += r.charcoal_seam_seen; p_now += r.charcoal_seam_close;
+            med_forest.push_back(static_cast<double>(r.survey_forest[2]));
+            if (!std::isnan(r.doctrine_forest[0]) && !std::isnan(r.doctrine_forest[1]))
+            {
+                ++seeds_compared;
+                if (r.doctrine_forest[1] > r.doctrine_forest[0]) ++seeds_charcoal_wooder;
+            }
+        }
+        const auto pooled_mean = [&](int s) { return p_doc[s] > 0 ? p_forest_sum[s] / p_doc[s] : k_undef; };
+        std::printf("  POOLED survey: %d regions opened on, %d left unseen; %d with any forest (%.0f%%), %d at >= 500"
+                    " (%.0f%%); at the close %d of %d regions unsurveyed (founded in the span)\n",
+                    p_open, p_unseen, p_forested, p_open > 0 ? 100.0 * p_forested / p_open : 0.0, p_wooded,
+                    p_open > 0 ? 100.0 * p_wooded / p_open : 0.0, p_unsurv, p_close);
+        print_spread("median region forest share at the open, per world", med_forest);
+        std::printf("  POOLED Fuel Doctrine at the close: coke %d / charcoal %d / neither %d (living polities).\n"
+                    "         BL-1051 cites 404 / 118 / 340 for BL-1038's run, which this harness does not reproduce;\n"
+                    "         the like-for-like split WITHOUT the survey is --fidelity's V4 column (V5 is this run).\n",
+                    p_doc[0], p_doc[1], p_doc[2]);
+        std::printf("  ARE THE CHARCOAL POLITIES THE WOODED ONES? mean held forest, pooled over polities: coke %.0f,"
+                    " charcoal %.0f, neither %.0f;\n"
+                    "         charcoal wooder than coke on %d of %d seeds holding both sides; Charcoal polities that\n"
+                    "         ever passed the seam gate %d, holding a seam at the close %d (of %d)\n",
+                    pooled_mean(0), pooled_mean(1), pooled_mean(2), seeds_charcoal_wooder, seeds_compared,
+                    p_seen, p_now, p_doc[1]);
     }
 
     const auto collect = [&](double (*get)(const seed_row&)) {
@@ -2434,6 +2664,22 @@ int main(int argc, char** argv)
                              (long long)r.span_start, (long long)r.span_stop, (long long)r.span_rounds,
                              (long long)r.span_battles, (long long)r.span_conquests, (long long)r.span_foundings,
                              (long long)r.span_ms);
+                // BL-1051: the span-open survey and the Fuel Doctrine.
+                std::fprintf(f, "   \"survey_ran\": %s, \"survey_regions\": %d, \"survey_unseen\": %d, "
+                                "\"survey_forest\": [%d, %d, %d, %d, %d], \"survey_forested\": %d, "
+                                "\"survey_wooded\": %d, \"survey_fuel_med\": %d, \"survey_fuel_seam\": %d, "
+                                "\"survey_seam_energy\": %d, \"close_regions\": %d, \"close_unsurveyed\": %d, "
+                                "\"doctrine\": [%d, %d, %d], ",
+                             r.survey_ran ? "true" : "false", r.survey_regions, r.survey_unseen,
+                             r.survey_forest[0], r.survey_forest[1], r.survey_forest[2], r.survey_forest[3],
+                             r.survey_forest[4], r.survey_forested, r.survey_wooded, r.survey_fuel_med,
+                             r.survey_fuel_seam, r.survey_seam_energy, r.close_regions, r.close_unsurveyed,
+                             r.doctrine[0], r.doctrine[1], r.doctrine[2]);
+                put_rho("doctrine_forest_coke", r.doctrine_forest[0], ", ");
+                put_rho("doctrine_forest_charcoal", r.doctrine_forest[1], ", ");
+                put_rho("doctrine_forest_neither", r.doctrine_forest[2], ", ");
+                std::fprintf(f, "\"charcoal_seam_seen\": %d, \"charcoal_seam_close\": %d,\n",
+                             r.charcoal_seam_seen, r.charcoal_seam_close);
                 std::fprintf(f, "   \"markets\": %d, \"markets_urban\": %d, \"corps_on_body\": %d, ",
                              r.markets, r.markets_urban, r.corps_on_body);
                 put_rho("rho_firms_urban", r.rho_firms_urban, ", ");

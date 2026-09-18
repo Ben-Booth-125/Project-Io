@@ -355,12 +355,21 @@ struct era_minus_one_fixture
     // generation actually ran the span -- `world_params::
     // digitisation_span_enabled` set, Exploration run, and no stop knob that
     // ends generation before it; `digitisation_ran` says which, and every
-    // field below is the struct default otherwise. The span's INPUT needs no
-    // capture of its own: it is `exploration_handoff` above, the value the
-    // span resumed from.
+    // field below is the struct default otherwise. The span's INPUT is
+    // `exploration_handoff` above, the value the span resumed from, PLUS the
+    // span-open survey (BL-1051), which is why the region table it opened on
+    // is captured below rather than re-derived.
 
     /// True when generation actually ran the Digitisation span this call.
     bool digitisation_ran = false;
+
+    /// BL-1051 — the region table the span actually OPENED ON: the 1660
+    /// handoff's regions with `survey_regions_at_span_open` applied, captured
+    /// between the survey and the call. It differs from
+    /// `exploration_handoff.regions` in `survey_fuel_q` and `survey_forest_q`
+    /// and in nothing else, and a harness resuming the span must open on it
+    /// (the survey reads tiles, which a fixture does not carry).
+    std::vector<region> digitisation_open_regions;
 
     history_sim_params digitisation_params; ///< The span/clock the span ran on.
     uint32_t           digitisation_seed = 0;
