@@ -111,13 +111,15 @@ struct nation_params
     /// False disables the exemption and every undersized realm merges as before.
     bool keep_city_states = true;
 
-    /// BL-975 — THE 1660 TREASURIES CROSS THE FOLD.
+    /// BL-975 — THE LAST CLOSE'S TREASURIES CROSS THE FOLD.
     ///
     /// Indexed by POLITY ID (the same ids `seed_polities` carries): the
-    /// treasury each polity held at the Exploration span's close, in the sim's
-    /// material currency, summed over every region flying its flag
-    /// (`region::treasury` sits on the ground, and the flag over the ground at
-    /// 1660 owns the chest — settlement.hpp's own transfer-by-ownership rule).
+    /// treasury each polity held at the last simulated span's close — the
+    /// Exploration span's 1660 one, or the Digitisation span's 1960 one when
+    /// that span ran (BL-1053) — in the sim's material currency, summed over
+    /// every region flying its flag (`region::treasury` sits on the ground,
+    /// and the flag over the ground at that close owns the chest —
+    /// settlement.hpp's own transfer-by-ownership rule).
     /// Pass 2d credits each polity's whole sum ONCE, to the seed it folds to,
     /// and the credit follows that seed through the size-floor merge, so a
     /// realm absorbed for being small hands its chest to the realm that

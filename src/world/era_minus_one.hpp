@@ -293,7 +293,10 @@ struct era_minus_one_fixture
     /// True when generation actually ran the Exploration span this call.
     bool exploration_ran = false;
 
-    history_sim_params exploration_params; ///< The span/clock the Exploration round ran on.
+    /// The span/clock the Exploration round ran on. Its resume pointers are
+    /// NULL (BL-1053): they pointed into a local freed before generation
+    /// returned; a re-run sets its own onto the `pre_exploration_*` copies.
+    history_sim_params exploration_params;
     uint32_t           exploration_seed = 0;
 
     /// The directed contact table AS THE SPAN OPENED — `pass_one_output::
@@ -344,10 +347,21 @@ struct era_minus_one_fixture
     /// and the corridor set it actually handed `stamp_history_roads`,
     /// captured at those two consumption sites (populated whenever a fixture
     /// was asked for, whichever span supplied them). A harness binds these
-    /// against `exploration_handoff` to prove the 1660 values were the ones
-    /// read, rather than the 1200 ones.
+    /// against the LAST close that ran -- `digitisation_handoff` when the
+    /// Digitisation span ran (BL-1053), else `exploration_handoff` -- to prove
+    /// that close's values were the ones read, rather than an earlier span's.
     std::vector<grudge>           setup_grudges;
     std::vector<history_corridor> setup_corridors;
+
+    /// BL-1053: the two other setup reads of the history, captured at their
+    /// consumption sites on the same terms. The polity-indexed treasuries
+    /// world setup handed `generate_nations` (`nation_params::
+    /// polity_treasuries`), and the corridor record the market carve counted
+    /// junctions over (`kMarketJunctionDegree`) -- the second reader of the
+    /// record `setup_corridors` holds, captured separately so a harness sees
+    /// each consumer's own input rather than inferring one from the other.
+    std::vector<int64_t>          setup_polity_treasuries;
+    std::vector<history_corridor> setup_junction_corridors;
 
     // --- BL-1040: the Digitisation span's own capture ---------------------
     //
@@ -362,7 +376,9 @@ struct era_minus_one_fixture
     /// True when generation actually ran the Digitisation span this call.
     bool digitisation_ran = false;
 
-    history_sim_params digitisation_params; ///< The span/clock the span ran on.
+    /// The span/clock the span ran on. Resume pointers NULL, as above: a
+    /// re-run points them at `exploration_handoff`'s tables (BL-1053).
+    history_sim_params digitisation_params;
     uint32_t           digitisation_seed = 0;
 
     /// The 1960 close exactly as generation folded it

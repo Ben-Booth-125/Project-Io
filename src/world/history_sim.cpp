@@ -9785,7 +9785,8 @@ digitisation_output make_digitisation_output(const settlement_state&  ss,
 
 bool digitisation_output_valid(const digitisation_output& o, std::string* why,
                                const creed_state*        live,
-                               const exploration_output* from)
+                               const exploration_output* from,
+                               int64_t                   stop_year)
 {
     // 1. Every rule the Exploration close is held to.
     if (!exploration_output_valid(o, why, live)) return false;
@@ -9798,6 +9799,14 @@ bool digitisation_output_valid(const digitisation_output& o, std::string* why,
     // 2. The span ran: a close that opens and shuts on one year is a span
     //    that never played, and nothing downstream should read it as 1960.
     if (!(o.start_year < o.stop_year)) return fail("the span closes on the year it opens");
+
+    // 2b. BL-1053: and it ran to the year it was asked for. `stop_year` on
+    //     the fold is `start_year + years` -- the years the sim actually
+    //     played -- so a span that ended early reads as a close short of the
+    //     epoch here, rather than as a 1960 world world setup builds on.
+    if (stop_year != INT64_MIN && o.stop_year != stop_year)
+        return fail("the span closes in " + std::to_string(o.stop_year) + ", not on its stop year "
+                    + std::to_string(stop_year));
 
     if (from != nullptr)
     {
@@ -9841,6 +9850,76 @@ bool digitisation_output_valid(const digitisation_output& o, std::string* why,
             if (o.universal_creeds[i].name != from->universal_creeds[i].name
              || o.universal_creeds[i].founded_year != from->universal_creeds[i].founded_year)
                 return fail("universal creed " + std::to_string(i) + " is not the record the span resumed");
+
+        // 5. BL-1053: THE CONTACTS CONTINUE. A contact is dropped in one place
+        //    only -- when one of its pair is extinguished -- and the event that
+        //    joined a pair is never rewritten (`raise_contact` is a no-op on a
+        //    pair that exists). So every contact the resume carried between
+        //    two polities still alive at the close is still here, joined by
+        //    the same event. `o.contacts` is strictly sorted by (from, to):
+        //    rule 5 of `exploration_output_valid`, already passed above.
+        const std::size_t npol = o.polities.size();
+        for (const contact& c : from->contacts)
+        {
+            if (c.from >= npol || c.to >= npol) continue; // out of range on `from`: its own validator's call
+            if (!o.polities[c.from].alive || !o.polities[c.to].alive) continue;
+            const auto it = std::lower_bound(
+                o.contacts.begin(), o.contacts.end(), c,
+                [](const contact& x, const contact& y) {
+                    return x.from != y.from ? x.from < y.from : x.to < y.to;
+                });
+            if (it == o.contacts.end() || it->from != c.from || it->to != c.to)
+                return fail("the contact " + std::to_string(c.from) + " -> " + std::to_string(c.to)
+                            + " the span resumed is gone, with both polities alive at the close");
+            if (it->first.year != c.first.year || it->first.region != c.first.region
+             || it->first.kind != c.first.kind)
+                return fail("the contact " + std::to_string(c.from) + " -> " + std::to_string(c.to)
+                            + " changed the event that first joined it");
+        }
+
+        // 6. BL-1053: THE STANDING OBJECTS CONTINUE. An object the resume
+        //    carried whose term runs past the close leaves only by a cause
+        //    the sim records: a treaty break between its pair (which erases
+        //    every object the pair holds, and raises the defector's
+        //    `treaties_broken`), or -- for tribute -- the subject freed from
+        //    that overlord. Anything else missing was lost by the resume or
+        //    the fold. `o.dated_objects` is sorted by (a, b, kind,
+        //    expires_year): rule 8 of `exploration_output_valid`.
+        const auto obj_less = [](const dated_object& x, const dated_object& y) {
+            if (x.a != y.a) return x.a < y.a;
+            if (x.b != y.b) return x.b < y.b;
+            if (x.kind != y.kind) return x.kind < y.kind;
+            return x.expires_year < y.expires_year;
+        };
+        const auto broke_during_span = [&](int32_t p) {
+            return p >= 0 && static_cast<std::size_t>(p) < npol
+                && static_cast<std::size_t>(p) < from->polities.size()
+                && o.polities[static_cast<std::size_t>(p)].treaties_broken
+                       > from->polities[static_cast<std::size_t>(p)].treaties_broken;
+        };
+        for (const dated_object& d : from->dated_objects)
+        {
+            if (d.expires_year <= o.stop_year) continue; // its term ran out inside the span
+            if (std::binary_search(o.dated_objects.begin(), o.dated_objects.end(), d, obj_less))
+                continue;
+            if (broke_during_span(d.a) || broke_during_span(d.b)) continue;
+            if (d.kind == static_cast<int32_t>(treaty_clause::tribute))
+            {
+                // Freed: the subject no longer answers to this overlord. Or
+                // freed and taken again by the same one, which pays under a
+                // NEW term -- the same pair's tribute with another expiry.
+                if (d.a >= 0 && static_cast<std::size_t>(d.a) < npol
+                 && o.polities[static_cast<std::size_t>(d.a)].overlord != d.b)
+                    continue;
+                bool retaken = false;
+                for (const dated_object& e : o.dated_objects)
+                    if (e.a == d.a && e.b == d.b && e.kind == d.kind) { retaken = true; break; }
+                if (retaken) continue;
+            }
+            return fail("a dated object (kind " + std::to_string(d.kind) + ", " + std::to_string(d.a)
+                        + " / " + std::to_string(d.b) + ", to " + std::to_string(d.expires_year)
+                        + ") the span resumed is gone before its term, with no break or release recorded");
+        }
     }
 
     if (why) why->clear();

@@ -4637,10 +4637,14 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
 /// folded by `make_exploration_output` and held to its list by
 /// `exploration_output_valid`.
 ///
-/// ITS FIRST READER IS WORLD SETUP, not Digitisation: wherever the span ran,
-/// sentiment is seeded from `grudges` and roads are stamped from
-/// `surviving_corridors` here, so a campaign opening on the 1660 political
-/// map does not open on 1200's resentments and 1200's roads.
+/// ITS READER IS THE NEXT THING TO RUN. Where the Digitisation span runs, it
+/// resumes from this value and world setup reads the span's own close
+/// (`digitisation_output` below: the same tables, one span later) -- never
+/// this one (BL-1053). Where the span does not run, world setup reads this
+/// value: sentiment is seeded from `grudges`, roads are stamped and junction
+/// markets counted from `surviving_corridors`, and nations are credited the
+/// treasuries in `regions`, so a campaign opening on the 1660 political map
+/// does not open on 1200's resentments and 1200's roads.
 ///
 /// WHERE EACH ITEM ON THE DOC'S LIST LIVES, so the mapping is explicit rather
 /// than inferred:
@@ -4805,12 +4809,14 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
 /// added beside the inherited ones. DIGITISATION.md § What crosses into play
 /// is the list this grows toward, and is not this struct's claim today.
 ///
-/// ITS READERS. World setup reads the live settlement the span left (the
-/// population pass places centres from the 1960 demography); the struct itself
-/// is read by the fixture and the harnesses. World setup's hoisted records --
-/// the grudges, the corridor set, the treasuries -- are still Exploration's
-/// 1660 values when this span runs (hard_coded_world.cpp says so at the call
-/// site): switching them to this close is owed before the span ships on.
+/// ITS READER IS WORLD SETUP (BL-1053). When the span runs, every record world
+/// setup takes of the history is read off this close and none off the 1660
+/// one it resumed from: the grudges sentiment is seeded from, the surviving
+/// network roads are stamped and junction markets counted from, and the
+/// treasuries nations are credited (`region::treasury` in `regions`, summed
+/// under the flag flying over the ground at 1960). The live settlement the
+/// span left -- ownership, population, culture -- is the same close, read in
+/// place. The fixture and the harnesses read the struct too.
 struct digitisation_output : exploration_output
 {
 };
@@ -4825,12 +4831,31 @@ digitisation_output make_digitisation_output(const settlement_state&  ss,
 /// The enforcement half of `digitisation_output`. Every rule
 /// `exploration_output_valid` holds (the tables, the overlord graph, the
 /// holdings, the standing objects and flows, the culture table), PLUS what
-/// makes it a span's close: the span ran (`start_year < stop_year`) -- and,
-/// when @p from (the value it resumed from) is given, that it opened where
-/// @p from closed and continued it rather than restarting it: the region,
-/// polity, culture, civilisation and creed tables never shrink, a region
-/// never moves, a polity keeps its id, and a civilisation or creed record
-/// keeps its name and its year. Writes the first failure into @p why.
+/// makes it a span's close: the span ran (`start_year < stop_year`), and --
+/// when @p stop_year is given (anything but INT64_MIN) -- it ran all the way
+/// to that year, the `world_params::digitisation_stop_year` it was asked for.
+///
+/// When @p from (the value it resumed from) is given, that it opened where
+/// @p from closed and CONTINUED it rather than restarting it (BL-1053: checks
+/// that can fail, not fields that cannot change):
+///   - the region, polity, culture, civilisation and creed tables never
+///     shrink or renumber, and a civilisation or creed record keeps its name
+///     and year;
+///   - every contact @p from carries between two polities alive at the close
+///     is still there, with the same first-meeting event (the sim only ever
+///     drops a contact when one of its pair is extinguished, and never
+///     rewrites the event that joined it);
+///   - every dated object @p from carries whose term runs past the close is
+///     still standing, unless the sim recorded the cause of its going: one
+///     of its pair broke a treaty during the span (`polity::treaties_broken`
+///     rose), or, for tribute, the subject no longer answers to that
+///     overlord. A rule with material only on a close inside one treaty term
+///     (`treaty_term_years`, 80) of the open: at the shipped 1960 close every
+///     1660 object has expired, so there it checks nothing, and
+///     `digitisation_sim_harness --fidelity` exercises it on the one-round
+///     close instead.
+/// Writes the first failure into @p why.
 bool digitisation_output_valid(const digitisation_output& o, std::string* why,
                                const creed_state*        live = nullptr,
-                               const exploration_output* from = nullptr);
+                               const exploration_output* from = nullptr,
+                               int64_t                   stop_year = INT64_MIN);

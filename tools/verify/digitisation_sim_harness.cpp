@@ -936,6 +936,7 @@ struct seed_fidelity
     std::vector<std::string> span_tables;        ///< "<table>: <first difference>" per table that differs
     int64_t span_rounds = 0;
     double  span_ms     = 0.0;                   ///< generation's own span call, wall clock
+    int     controls_untried = 0;                ///< BL-1053 negative controls with no candidate here
     bool gate3 = false;
 };
 
@@ -974,6 +975,92 @@ std::vector<std::string> span_params_issues(const history_sim_params& dp, const 
     need(!ep.industry_tree_enabled, "the Industry tree is open in Exploration's own span");
     need(!dp.resume_seeds_corridor_tier, "BL-1037's switch is on");
     need(dseed == digitisation_sim_seed(wp) && dseed != eseed, "the span's seed is not its own fold");
+
+    // BL-1053: EVERY EMPIRES-ONLY SETTING IS OFF. The two base checks above
+    // read two fields; a span derived from the Empires round's params would
+    // pass them while running the Empires verb set, and a wrong derivation
+    // that is quiet in the first round is invisible to gates 1-3. So every
+    // field `era_minus_one_sim_params` moves off the struct default (for this
+    // world) must sit AT the default in the span's params -- the settings
+    // Exploration's derivation never turns on. The list is the Empires
+    // derivation's own override list; the ones it only reads from the world
+    // (the turbulence lean) are checked the same way.
+    {
+        const history_sim_params E = era_minus_one_sim_params(wp);
+        const history_sim_params B{};
+        int empires_only = 0;
+#define EMPIRES_ONLY(f)                                                                     \
+        do {                                                                                \
+            if (!(E.f == B.f)) {                                                            \
+                ++empires_only;                                                             \
+                if (!(dp.f == B.f)) out.push_back("an Empires-only setting is on: " #f);    \
+            }                                                                               \
+        } while (0)
+        EMPIRES_ONLY(amphibious_weight_crossing);
+        EMPIRES_ONLY(sea_legs_ration_q);
+        EMPIRES_ONLY(sea_legs_floor_q);
+        EMPIRES_ONLY(sea_legs_port_q);
+        EMPIRES_ONLY(trade_income_per_class);
+        EMPIRES_ONLY(army_upkeep_per_1000_heads);
+        EMPIRES_ONLY(unpaid_army_disband_q);
+        EMPIRES_ONLY(road_build_material_cost);
+        EMPIRES_ONLY(supply_upgrade_material_cost);
+        EMPIRES_ONLY(supply_upgrade_reach_gain_q);
+        EMPIRES_ONLY(supply_upgrade_threshold_q);
+        EMPIRES_ONLY(secession_supply_floor_q);
+        EMPIRES_ONLY(secession_min_regions);
+        EMPIRES_ONLY(universal_creed_humbled_cohesion_q);
+        EMPIRES_ONLY(universal_creed_min_trade_links);
+        EMPIRES_ONLY(universal_creed_network_floor_q);
+        EMPIRES_ONLY(universal_creed_hold_years);
+        EMPIRES_ONLY(universal_creed_convert_supply_q);
+        EMPIRES_ONLY(universal_creed_alien_penalty_q);
+        EMPIRES_ONLY(schism_min_regions);
+        EMPIRES_ONLY(centre_chain_reach);
+        EMPIRES_ONLY(centre_reach_rebate_q);
+        EMPIRES_ONLY(centre_reach_rebate_cap_q);
+        EMPIRES_ONLY(centre_reach_min_centres);
+        EMPIRES_ONLY(w_aggr_q);
+        EMPIRES_ONLY(w_fear_q);
+        EMPIRES_ONLY(fear_reference);
+        EMPIRES_ONLY(turbulence_lean);
+#undef EMPIRES_ONLY
+        // A list that checks nothing is a stale list, not a pass.
+        need(empires_only > 0, "no Empires-only setting found to check (the list above is stale)");
+    }
+    return out;
+}
+
+/// BL-1053: WORLD SETUP READS THE CLOSE IT BUILDS ON. What world setup was
+/// handed at each of its four reads of the history -- the grudges sentiment
+/// is seeded from, the corridor record roads are stamped from, the record
+/// junction markets are counted over, and the polity-indexed treasuries
+/// nations are credited -- against @p close, the last span's own fold. The
+/// treasuries are summed here from `close.regions` under the flag, by hand,
+/// rather than through generation's helper, so the check is not the code it
+/// checks. "" per table when equal; the vector holds one "<table>: <first
+/// difference>" per table that differs, and is empty when setup read the
+/// close table for table.
+std::vector<std::string> setup_diff(const era_minus_one_fixture& fx, const exploration_output& close)
+{
+    std::vector<std::string> out;
+    const auto note = [&](const char* table, const std::string& d) {
+        if (!d.empty()) out.push_back(std::string(table) + ": " + d);
+    };
+    note("grudges",             table_diff(fx.setup_grudges, close.grudges, grudge_eq));
+    note("stamped roads",       table_diff(fx.setup_corridors, close.surviving_corridors, corridor_eq));
+    note("junction corridors",  table_diff(fx.setup_junction_corridors, close.surviving_corridors, corridor_eq));
+
+    std::vector<int64_t> chests;
+    for (const region& rg : close.regions)
+    {
+        if (rg.nation < 0 || rg.treasury <= 0) continue;
+        const std::size_t pol = static_cast<std::size_t>(rg.nation);
+        if (pol >= chests.size()) chests.resize(pol + 1, 0);
+        chests[pol] += rg.treasury;
+    }
+    note("treasuries", table_diff(fx.setup_polity_treasuries, chests,
+                                  [](int64_t a, int64_t b) { return a == b; }));
     return out;
 }
 
@@ -1037,6 +1124,18 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
         }
         row.ran = true;
         row.span_params_issues = span_params_issues(dp, ep, H, wp, fx.digitisation_seed, fx.exploration_seed);
+        {
+            // BL-1053 negative control: the span's own params with ONE Empires
+            // setting switched on must be caught, by name.
+            history_sim_params wrong = dp;
+            wrong.trade_income_per_class = era_minus_one_sim_params(wp).trade_income_per_class;
+            const std::vector<std::string> caught =
+                span_params_issues(wrong, ep, H, wp, fx.digitisation_seed, fx.exploration_seed);
+            bool named = false;
+            for (const std::string& t : caught) named = named || t.find("trade_income_per_class") != std::string::npos;
+            if (!named)
+                row.span_params_issues.push_back("negative control: an Empires setting switched on was not caught");
+        }
         row.span_rounds = fx.digitisation_rounds;
         row.span_ms     = static_cast<double>(fx.ms_digitisation);
         const int64_t open = H.stop_year;      // 1660
@@ -1229,13 +1328,85 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                                  + ", conquests " + std::to_string(prev.hs.conquests) + " vs " + std::to_string(T.conquests)
                                  + ", foundings " + std::to_string(prev.hs.foundings) + " vs " + std::to_string(T.foundings));
             // And the shipped close passed its own validator, against the
-            // value it resumed from, on generation's path.
+            // value it resumed from and the stop year it was asked to reach
+            // (BL-1053), on generation's path.
             {
                 std::string why;
-                if (!digitisation_output_valid(S, &why, nullptr, &H))
+                if (!digitisation_output_valid(S, &why, nullptr, &H, wp.digitisation_stop_year))
                     note("digitisation_output_valid", why);
                 if (rep.handoff_invalid)
                     note("generation recorded a handoff violation", rep.handoff_violation);
+            }
+            // BL-1053: THE CONTINUITY RULES HOLD, AND CAN FAIL. Three negative
+            // controls, each of which the validator must refuse FOR ITS OWN
+            // REASON (the message names the rule): a resumed contact whose
+            // first event moved and a stop year one short, on copies of the
+            // shipped 1960 close; and a resumed standing object dropped with
+            // no break or release, on the ONE-ROUND close (the real resume
+            // run to 1664, folded by the span's rule) -- because a treaty's
+            // term is 80 years, no object standing at 1660 can still stand at
+            // 1960, so the object rule only has material on a close inside
+            // one term of the open. That 1664 close must itself pass, against
+            // the 1660 value and its own stop year: the positive half. A
+            // control with no candidate on this seed is noted, not failed.
+            {
+                const auto refuses = [&](const digitisation_output& bad, int64_t stop, const char* needle) {
+                    std::string why;
+                    return !digitisation_output_valid(bad, &why, nullptr, &H, stop)
+                        && why.find(needle) != std::string::npos;
+                };
+                const auto alive_in_s = [&](std::size_t p) { return p < S.polities.size() && S.polities[p].alive; };
+                const digitisation_output R1 = make_digitisation_output(r_one.ss, r_one.hs, &r_one.cs);
+                {
+                    std::string why;
+                    if (!digitisation_output_valid(R1, &why, &r_one.cs, &H, one))
+                        note("the one-round close (1664) fails its validator", why);
+                }
+
+                bool contact_tried = false;
+                for (std::size_t i = 0; i < S.contacts.size() && !contact_tried; ++i)
+                {
+                    const contact& c = S.contacts[i];
+                    if (!alive_in_s(c.from) || !alive_in_s(c.to)) continue;
+                    bool resumed = false;
+                    for (const contact& h : H.contacts) if (h.from == c.from && h.to == c.to) { resumed = true; break; }
+                    if (!resumed) continue;
+                    contact_tried = true;
+                    digitisation_output bad = S;
+                    bad.contacts[i].first.year += 1;
+                    if (!refuses(bad, wp.digitisation_stop_year, "contact"))
+                        note("negative control", "a resumed contact's moved first event was not refused");
+                }
+                if (!contact_tried) ++row.controls_untried;
+
+                bool object_tried = false;
+                for (std::size_t i = 0; i < R1.dated_objects.size() && !object_tried; ++i)
+                {
+                    const dated_object& d = R1.dated_objects[i];
+                    if (d.kind == static_cast<int32_t>(treaty_clause::trade_access)   // flows would fail first
+                     || d.kind == static_cast<int32_t>(treaty_clause::tribute)) continue;
+                    bool resumed = false;
+                    for (const dated_object& h : H.dated_objects)
+                        if (h.a == d.a && h.b == d.b && h.kind == d.kind && h.expires_year == d.expires_year)
+                        { resumed = true; break; }
+                    if (!resumed) continue;
+                    const auto broke = [&](int32_t p) {
+                        return p >= 0 && static_cast<std::size_t>(p) < R1.polities.size()
+                            && static_cast<std::size_t>(p) < H.polities.size()
+                            && R1.polities[static_cast<std::size_t>(p)].treaties_broken
+                                   > H.polities[static_cast<std::size_t>(p)].treaties_broken;
+                    };
+                    if (broke(d.a) || broke(d.b)) continue;
+                    object_tried = true;
+                    digitisation_output bad = R1;
+                    bad.dated_objects.erase(bad.dated_objects.begin() + static_cast<std::ptrdiff_t>(i));
+                    if (!refuses(bad, one, "dated object"))
+                        note("negative control", "a resumed standing object dropped without cause was not refused");
+                }
+                if (!object_tried) ++row.controls_untried;
+
+                if (!refuses(S, S.stop_year - 1, "stop year"))
+                    note("negative control", "a close one year past its asked-for stop year was not refused");
             }
             row.gate3 = row.span_params_issues.empty() && row.span_regions.empty()
                      && row.span_polities.empty() && row.span_tables.empty();
@@ -1362,7 +1533,8 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                     census_text(r.span_polities).c_str());
         for (const std::string& t : r.span_params_issues) std::printf(" | params: %s", t.c_str());
         for (const std::string& t : r.span_tables) std::printf(" | %s", t.c_str());
-        std::printf("\n");
+        std::printf(" | negative controls run: %d of 3%s\n", 3 - r.controls_untried,
+                    r.controls_untried > 0 ? " (the rest had no candidate on this seed)" : "");
     }
 
     double total = 0.0, worst = 0.0;
@@ -1709,6 +1881,7 @@ int main(int argc, char** argv)
 
     std::vector<seed_row> rows;
     rows.reserve(seeds.size());
+    std::size_t setup_checked = 0, setup_empty = 0; // BL-1053: the setup-diff line's tally
 
     for (uint32_t seed : seeds)
     {
@@ -1734,6 +1907,34 @@ int main(int argc, char** argv)
         const shipped_landscape land = apply_shipped_landscape(w, reg, wp.seed);
         std::printf("seed %u ", seed);
         print_shipped_landscape(land);
+
+        // BL-1053 -- THE SETUP-DIFF LINE. World setup's four reads of the
+        // history (grudges, stamped roads, junction corridors, treasuries)
+        // against the close this world is built on: the span's 1960 fold when
+        // it ran, else Exploration's own. Empty is the pass; any table named
+        // is setup reading a close the world does not stand on.
+        if (fx.exploration_ran)
+        {
+            const bool on_span = span_mode && fx.digitisation_ran;
+            const exploration_output& close = on_span ? fx.digitisation_handoff : fx.exploration_handoff;
+            const std::vector<std::string> d = fidelity::setup_diff(fx, close);
+            int64_t chest_close = 0, chest_1660 = 0;
+            for (const int64_t t : fx.setup_polity_treasuries) chest_close += t;
+            for (const region& rg : fx.exploration_handoff.regions) if (rg.nation >= 0 && rg.treasury > 0) chest_1660 += rg.treasury;
+            std::printf("seed %u SETUP-DIFF vs the %lld close (%s): %s | read: %zu grudges, %zu corridors, %zu junction "
+                        "corridors, %zu polity chests summing %lld (the 1660 close's: %zu grudges, %zu corridors, "
+                        "chests %lld)\n",
+                        seed, static_cast<long long>(close.stop_year),
+                        on_span ? "the Digitisation span's" : span_mode ? "Exploration's -- THE SPAN DID NOT RUN"
+                                                                        : "Exploration's",
+                        d.empty() ? "EMPTY" : "DIFFERS", fx.setup_grudges.size(), fx.setup_corridors.size(),
+                        fx.setup_junction_corridors.size(), fx.setup_polity_treasuries.size(),
+                        static_cast<long long>(chest_close), fx.exploration_handoff.grudges.size(),
+                        fx.exploration_handoff.surviving_corridors.size(), static_cast<long long>(chest_1660));
+            for (const std::string& t : d) std::printf("    setup-diff | %s\n", t.c_str());
+            ++setup_checked;
+            if (d.empty() && (on_span || !span_mode)) ++setup_empty;
+        }
         std::fflush(stdout);
 
         seed_row row;
@@ -2020,6 +2221,10 @@ int main(int argc, char** argv)
                     c, prefix,
                     r.handoff_ok ? "" : "  HANDOFF VIOLATION: ", r.handoff_ok ? "" : r.handoff_violation.c_str());
     }
+    std::printf("SETUP-DIFF (BL-1053): world setup read the close its world stands on, table for table (grudges,\n"
+                "  stamped roads, junction corridors, treasuries), on %zu of %zu seeds that ran Exploration%s\n",
+                setup_empty, setup_checked,
+                span_mode ? " -- the close is the Digitisation span's own" : "");
 
     // ======================= The span itself (BL-1040) ======================
     if (span_mode)
@@ -2083,8 +2288,9 @@ int main(int argc, char** argv)
                     "switched on: Exploration closes at 1660 as shipped, the span runs 1660 -> %lld as its own call\n"
                     "from the 1660 exploration_output (the span's own seed, Exploration's forces plus the Industry\n"
                     "tree), then world setup and the applied landscape search winner build on its close (the 12-tick\n"
-                    "validation run is not mirrored). World setup still reads Exploration's 1660 grudges, corridors\n"
-                    "and treasuries (BL-1040 scoped that switch out). Each line names its surface and year.\n\n", T, T);
+                    "validation run is not mirrored). World setup reads the span's close for its grudges, roads,\n"
+                    "junction markets and treasuries (BL-1053; the SETUP-DIFF lines above). Each line names its\n"
+                    "surface and year.\n\n", T, T);
     else if (continued_mode)
         std::printf("WHAT 'AT %lld' READS: A 1200-NETWORK RUN, NOT THE SPAN. The shipped world (epoch 0) with\n"
                     "Exploration's own call continued to %lld - Exploration's forces only, pricing corridor income and\n"

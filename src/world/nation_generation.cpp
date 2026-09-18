@@ -1046,7 +1046,8 @@ std::vector<entity_id> generate_nations(
     // settlement pass carves exactly as it did before this item.
     std::vector<int> fold(static_cast<std::size_t>(seed_count));
     for (int si = 0; si < seed_count; ++si) fold[static_cast<std::size_t>(si)] = si;
-    // BL-975 — THE CHEST CROSSES WITH THE FLAG. Parallel to `seeds`: the 1660
+    // BL-975 — THE CHEST CROSSES WITH THE FLAG. Parallel to `seeds`: the
+    // last close's (1660, or 1960 when the Digitisation span ran: BL-1053)
     // treasury (sim material currency, unconverted) each seed carries into
     // nationhood. Only a polity's REPRESENTATIVE seed carries anything, and it
     // carries the polity's whole sum once — the other seeds of the same polity
@@ -1081,7 +1082,7 @@ std::vector<entity_id> generate_nations(
                     owner_map[static_cast<std::size_t>(idx)] = fold[static_cast<std::size_t>(ni)];
             }
 
-            // BL-975: each polity's 1660 treasury lands on its representative
+            // BL-975: each polity's closing treasury lands on its representative
             // seed. A polity with an entry but no anchored seed (all its
             // ground unanchored) has no nation to credit and its chest is
             // lost with it — the history's own outcome, not a leak to patch.
@@ -1408,7 +1409,7 @@ void seed_nation_garrisons(world& w, const nation_garrison_params& params)
         // See nation_garrison_params' own comments for why `count_per_credit`
         // is a placeholder rather than a measured figure. The treasury read
         // here is REAL since BL-975: `generate_nations` Pass 7 credits each
-        // nation with its folded polities' 1660 chest (NATION_GENERATION.md
+        // nation with its folded polities' closing chest (NATION_GENERATION.md
         // § Pass 7), so a realm that arrived rich garrisons more than one
         // that arrived on the floor.
         const int count = std::clamp(
