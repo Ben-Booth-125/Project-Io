@@ -6560,8 +6560,24 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         ir.many_peoples_q = clampi((foreign_held * 1000) / n_held, 0, 1000);
                         if (ir.fuel_seam_q >= industry_fuel_seam_bar_q) q.industry_fuel_seen = true;
 
-                        if (q.industry_investing < 0
-                         || !industry_node_available(q.industry_mask, q.industry_investing))
+                        // RE-PICK when nothing is targeted, when the target
+                        // went dark under a fork, OR (Industry only) when its
+                        // gate closed since the pick — a seam region lost to
+                        // conquest or secession closes a `fuel` node that is
+                        // mid-purchase, so "no seam, no Railway" holds on
+                        // every round the target is funded, not only at the
+                        // pick (INDUSTRY_TREE.md sec Aims). The gate reads the
+                        // same `ir` means and seam filled above.
+                        //
+                        // ACCUMULATED PROGRESS IS LOST (reset to 0 below), the
+                        // same thing that happens when a fork closes under the
+                        // target. TREES.md sec State gives a polity ONE progress
+                        // integer, for the node it is investing in: carrying it
+                        // to the re-picked node would hand that node research
+                        // earned toward a different one, and there is no
+                        // per-node store to park it in until the seam returns.
+                        // The loss is the visible price of losing the seam.
+                        if (!industry_target_stands(q.industry_mask, q.industry_investing, ir))
                         {
                             // The readings only a re-pick needs, each a walk
                             // over the polity table or the held set.
@@ -6623,9 +6639,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             // THE RATE READS URBAN MASS (TREES.md sec State):
                             // the k largest held centres, clamped, then the
                             // integer superlinear transform — never the
-                            // industry slice the other two trees earn from.
+                            // industry slice the other two trees earn from —
+                            // scaled by the Industry spire ring held and the
+                            // research modifier exactly as the empire rate is.
                             const int64_t research_q = industry_research_per_year_q(
                                 industry_urban_mass(ss.regions, held),
+                                industry_spire_ring(q.industry_mask),
                                 tree_mod_q(q, io::tree_modifier_term::research), params);
                             q.industry_progress_q = static_cast<int32_t>(clampi64(
                                 static_cast<int64_t>(q.industry_progress_q) + research_q * step_years,
@@ -8247,21 +8266,41 @@ int64_t industry_urban_mass(const std::vector<region>& regions, const std::vecto
     return sum;
 }
 
-int64_t industry_research_per_year_q(int64_t urban_mass, int research_mod_q,
+int industry_spire_ring(uint64_t mask)
+{
+    // The empire rate's own loop (the Invest block, BL-912), over this table.
+    int ring = 0;
+    for (int i = 0; i < io::industry_tree::node_count; ++i)
+    {
+        const io::industry_tree::node& nd = io::industry_tree::nodes[i];
+        if (nd.kind == io::industry_tree::node_kind::milestone && (mask & (1ULL << i)))
+            ring = std::max(ring, static_cast<int>(nd.ring));
+    }
+    return ring;
+}
+
+int64_t industry_research_per_year_q(int64_t urban_mass, int spire_ring, int research_mod_q,
                                      const history_sim_params& params)
 {
     // CLAMP FIRST, then transform. The cap is the design's own bound (a
     // param); 2^32 heads is the arithmetic's, so that whatever the param says
-    // Mc * isqrt(Mc) stays under 2^48 and each scaling below under 2^61.
+    // Mc * isqrt(Mc) stays under 2^48, and with the spire ring clamped to 6
+    // and the research modifier to 4000 no product below passes 2^62.
     const int64_t cap = clampi64(params.industry_urban_mass_cap, 0, 1LL << 32);
     const int64_t mc  = clampi64(urban_mass, 0, cap);
     const int64_t ref = std::max<int64_t>(1, isqrt64(std::max<int64_t>(1, params.industry_urban_mass_reference)));
     const int64_t superlinear = (mc * isqrt64(mc)) / ref;      // Mc x sqrt(Mc / reference)
     const int64_t fraction    = clampi(params.industry_research_fraction_q, 0, 1000);
-    const int64_t rate        = (superlinear * fraction) / 1000;
-    // The `research` modifier, exactly as the empire and exploration flows
-    // apply it (BL-973): every held research node scales every tree's rate.
-    return (rate * (1000 + clampi(research_mod_q, 0, 4000))) / 1000;
+    // FROM HERE ON, THE EMPIRE RATE'S OWN SCALING, factor for factor and in
+    // its order (TREES.md sec State: a research rate is scaled by the spire
+    // ring held and by contact degree; the Industry tree swaps only the base,
+    // the industry slice, for urban mass). Contact degree is 0 here as it is
+    // in every tree — the inert `(1000 + 0 * 40) / 1000` is not written out.
+    // The `research` modifier is every tree's reader of itself (BL-973).
+    const int64_t rate = (superlinear * fraction) / 1000
+                             * (1000 + clampi(spire_ring, 0, 6) * 150) / 1000
+                             * (1000 + clampi(research_mod_q, 0, 4000)) / 1000;
+    return rate;
 }
 
 bool industry_node_available(uint64_t mask, int node_idx)
@@ -8423,6 +8462,15 @@ int choose_industry_node(uint64_t mask, const industry_scorer_reading& r)
         if (score > best_score) { best_score = score; best_idx = i; }
     }
     return best_idx;
+}
+
+bool industry_target_stands(uint64_t mask, int investing, const industry_scorer_reading& r)
+{
+    if (investing < 0 || investing >= io::industry_tree::node_count) return false;
+    if (!industry_node_available(mask, investing)) return false; // a fork closed under it
+    // The gate, on THIS round's reading: a seam lost since the pick closes a
+    // `fuel` node exactly as it would have refused it at the pick.
+    return industry_gate_open(io::industry_tree::nodes[investing].gate, r);
 }
 
 // ---------------------------------------------------------------------------

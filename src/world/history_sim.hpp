@@ -492,6 +492,8 @@ struct history_sim_params
     ///     Mc     = min(M, industry_urban_mass_cap)            CLAMPED FIRST
     ///     rate_q = Mc * isqrt64(Mc) / isqrt64(reference)
     ///              * industry_research_fraction_q / 1000
+    ///              * (1000 + spire_ring * 150) / 1000      the empire's own
+    ///                                                      spire scaling
     ///
     /// i.e. `fraction x Mc x sqrt(Mc / reference)`: linear-equivalent at the
     /// reference mass, x2.83 for twice the mass, x0.35 for half. Superlinear so
@@ -516,6 +518,12 @@ struct history_sim_params
     /// mass a year, which is the same order per head as the empire's 60
     /// per mille of the industry slice. The cap sits at the measured
     /// maxima, so it binds on the few largest realms only.
+    ///
+    /// The spire-ring factor (BL-1038 fix round) lifts a polity past The
+    /// Cheap Ton by x1.15 and past The Renewed Line by x1.45; re-read on the
+    /// same 16 seeds it moved the pooled rim holders 86 -> 121 and left the
+    /// leader's median (38 nodes) and the median polity's (6 -> 7) nearly
+    /// where they were, so the constants above are kept.
     int     industry_research_fraction_q   = 6;
     int64_t industry_urban_mass_reference  = 200000;
     int64_t industry_urban_mass_cap        = 600000;
@@ -2824,13 +2832,22 @@ int64_t isqrt64(int64_t v);
 /// picked, so the reading is independent of `held`'s order.
 int64_t industry_urban_mass(const std::vector<region>& regions, const std::vector<int>& held);
 
+/// The highest ring of any Industry MILESTONE in @p mask, 0 with none held —
+/// the "spire ring held" TREES.md sec State scales a research rate by, read
+/// exactly as the empire rate reads it off `empire_mask` (a milestone lives on
+/// the spire by the lint's rule, so the kind is the test).
+int industry_spire_ring(uint64_t mask);
+
 /// Research earned per year toward the Industry node being invested in:
 /// clamp @p urban_mass to `industry_urban_mass_cap` FIRST, then the integer
 /// superlinear transform `Mc * isqrt64(Mc) / isqrt64(reference)`, times
-/// `industry_research_fraction_q / 1000`, times the polity's `research`
-/// modifier `(1000 + clamp(mod, 0, 4000)) / 1000` exactly as the other two
-/// trees apply it. Never negative.
-int64_t industry_research_per_year_q(int64_t urban_mass, int research_mod_q,
+/// `industry_research_fraction_q / 1000`, then the SAME scaling the EMPIRE
+/// rate applies after its base (TREES.md sec State: the Industry tree swaps
+/// only the industry slice for urban mass): the spire ring held
+/// `(1000 + spire_ring * 150) / 1000`, contact degree at 0 (inert, as in
+/// every tree), and the `research` modifier `(1000 + clamp(mod, 0, 4000)) /
+/// 1000`. Each factor truncates in the empire's order. Never negative.
+int64_t industry_research_per_year_q(int64_t urban_mass, int spire_ring, int research_mod_q,
                                      const history_sim_params& params);
 
 /// True iff `node_idx` is a legal Invest target for a polity holding `mask`
@@ -2895,6 +2912,18 @@ bool industry_gate_open(io::industry_tree::gate_atom g, const industry_scorer_re
 /// throughout, tie-broken on the lower node index. -1 when nothing is
 /// available. The same kind bonus and cost shape the other two trees use.
 int choose_industry_node(uint64_t mask, const industry_scorer_reading& r);
+
+/// Does the Industry node a polity is investing in still stand as a target
+/// THIS round? True iff @p investing is a node, still available under the five
+/// rules, AND its endowment gate is still open on this round's reading. The
+/// Invest block re-picks when this is false.
+///
+/// THE GATE HALF IS INDUSTRY-ONLY. The empire and exploration trees check a
+/// gate only at pick, so a target bought on a seam the polity has since lost
+/// is still finished there. INDUSTRY_TREE.md sec Aims says a polity without a
+/// seam cannot take Railway, and that holds only if the gate is read every
+/// round the target is funded, not once when it was chosen.
+bool industry_target_stands(uint64_t mask, int investing, const industry_scorer_reading& r);
 
 /// THE RIM (BL-1038): has this polity crossed IN-SP-3m, "The Renewed Line"?
 /// Its `open "campaign tree"` effect is classified `tree_gate` by

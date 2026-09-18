@@ -350,7 +350,14 @@ struct exploration_row
     int                  industry_alive      = 0;
     int                  industry_invested   = 0; ///< living polities holding at least one node
     int                  industry_rim        = 0; ///< living polities holding IN-SP-3m
-    int                  industry_fuel_never = 0; ///< living polities that never passed the seam gate
+    /// The fuel gate, split (fix round). "Had an Industry round" is read as
+    /// `industry_investing >= 0 || industry_mask != 0`: the first round always
+    /// targets the ungated root, after which a polity is investing or holds a
+    /// node, and a polity minted mid-run starts at the defaults — so the
+    /// reading is exact without a sim field of its own.
+    int                  industry_had_round   = 0; ///< living polities with at least one Industry round
+    int                  industry_fuel_never  = 0; ///< ...of those, never passed the seam gate
+    int                  industry_no_round    = 0; ///< living polities with no Industry round at all
     std::vector<int>     industry_nodes;          ///< nodes held, one per living polity
     int                  industry_forks[3][3] = {};
     std::vector<int64_t> urban_mass_open;         ///< top-k urban mass per living polity at the open year (--through > 1660 only)
@@ -957,7 +964,13 @@ int main(int argc, char** argv)
                 row.industry_nodes.push_back(held_n);
                 if (held_n > 0) ++row.industry_invested;
                 if (polity_holds_industry_rim(q)) ++row.industry_rim;
-                if (!q.industry_fuel_seen) ++row.industry_fuel_never;
+                // Had an Industry round? See `industry_had_round`'s comment.
+                if (q.industry_investing >= 0 || q.industry_mask != 0)
+                {
+                    ++row.industry_had_round;
+                    if (!q.industry_fuel_seen) ++row.industry_fuel_never;
+                }
+                else ++row.industry_no_round;
                 for (int f = 0; f < nf; ++f)
                 {
                     const bool a = (q.industry_mask >> fork_a[f]) & 1ULL;
@@ -968,12 +981,12 @@ int main(int argc, char** argv)
             std::sort(row.industry_nodes.begin(), row.industry_nodes.end());
             row.urban_mass_close = living_urban_masses(ss_copy.regions, traced.polities);
             std::printf("  industry seed %d: alive %d invested %d | nodes held min/p25/med/p75/max %lld/%lld/%lld/%lld/%lld"
-                        " | rim %d | never passed fuel %d/%d | forks",
+                        " | rim %d | had a round %d, of which never passed fuel %d | no round %d | forks",
                         i, row.industry_alive, row.industry_invested,
                         pct_of_sorted(row.industry_nodes, 0), pct_of_sorted(row.industry_nodes, 25),
                         pct_of_sorted(row.industry_nodes, 50), pct_of_sorted(row.industry_nodes, 75),
                         pct_of_sorted(row.industry_nodes, 100), row.industry_rim,
-                        row.industry_fuel_never, row.industry_alive);
+                        row.industry_had_round, row.industry_fuel_never, row.industry_no_round);
             for (int f = 0; f < nf; ++f)
                 std::printf(" %s %d / %s %d / neither %d%s", io::industry_tree::nodes[fork_a[f]].id,
                             row.industry_forks[f][0], io::industry_tree::nodes[fork_b[f]].id,
@@ -1703,20 +1716,25 @@ int main(int argc, char** argv)
     {
         std::printf("\n--- the Industry tree (BL-1038), switch on from %lld, read at %lld ---\n",
                     static_cast<long long>(industry_open), static_cast<long long>(through_year));
-        std::printf("  seed | alive | invested | nodes min/p25/med/p75/max | rim | never fuel | Fuel coke/charcoal/- |"
-                    " Labour cleared/smallholder/- | Works arsenal/private/- | urban@1660 med/max | urban@close med/max\n");
+        std::printf("  'had round' = at least one Industry round (investing or holding); 'no fuel' counts only those;"
+                    " 'no round' never invested after the open year.\n");
+        std::printf("  seed | alive | invested | nodes min/p25/med/p75/max | rim | had round | no fuel (of had) | no round |"
+                    " Fuel coke/charcoal/- | Labour cleared/smallholder/- | Works arsenal/private/- | urban@1660 med/max |"
+                    " urban@close med/max\n");
         std::vector<int> pooled_nodes;
-        int p_alive = 0, p_inv = 0, p_rim = 0, p_never = 0, p_forks[3][3] = {};
+        int p_alive = 0, p_inv = 0, p_rim = 0, p_never = 0, p_had = 0, p_noround = 0, p_forks[3][3] = {};
         std::vector<int> seed_max, seed_med;
         for (const exploration_row& r : rows)
         {
             if (!r.industry_ran) continue;
-            std::printf("  %4u | %5d | %8d | %3lld/%3lld/%3lld/%3lld/%3lld | %3d | %3d (%3.0f%%) | %3d/%3d/%3d | %3d/%3d/%3d | %3d/%3d/%3d | %lld/%lld | %lld/%lld\n",
+            std::printf("  %4u | %5d | %8d | %3lld/%3lld/%3lld/%3lld/%3lld | %3d | %9d | %3d (%3.0f%%) | %8d | %3d/%3d/%3d | %3d/%3d/%3d | %3d/%3d/%3d | %lld/%lld | %lld/%lld\n",
                         r.seed, r.industry_alive, r.industry_invested,
                         pct_of_sorted(r.industry_nodes, 0), pct_of_sorted(r.industry_nodes, 25),
                         pct_of_sorted(r.industry_nodes, 50), pct_of_sorted(r.industry_nodes, 75),
-                        pct_of_sorted(r.industry_nodes, 100), r.industry_rim, r.industry_fuel_never,
-                        r.industry_alive > 0 ? 100.0 * r.industry_fuel_never / r.industry_alive : 0.0,
+                        pct_of_sorted(r.industry_nodes, 100), r.industry_rim, r.industry_had_round,
+                        r.industry_fuel_never,
+                        r.industry_had_round > 0 ? 100.0 * r.industry_fuel_never / r.industry_had_round : 0.0,
+                        r.industry_no_round,
                         r.industry_forks[0][0], r.industry_forks[0][1], r.industry_forks[0][2],
                         r.industry_forks[1][0], r.industry_forks[1][1], r.industry_forks[1][2],
                         r.industry_forks[2][0], r.industry_forks[2][1], r.industry_forks[2][2],
@@ -1724,7 +1742,7 @@ int main(int argc, char** argv)
                         pct_of_sorted(r.urban_mass_close, 50), pct_of_sorted(r.urban_mass_close, 100));
             pooled_nodes.insert(pooled_nodes.end(), r.industry_nodes.begin(), r.industry_nodes.end());
             p_alive += r.industry_alive; p_inv += r.industry_invested; p_rim += r.industry_rim;
-            p_never += r.industry_fuel_never;
+            p_never += r.industry_fuel_never; p_had += r.industry_had_round; p_noround += r.industry_no_round;
             for (int f = 0; f < 3; ++f) for (int s = 0; s < 3; ++s) p_forks[f][s] += r.industry_forks[f][s];
             if (!r.industry_nodes.empty())
             {
@@ -1736,11 +1754,13 @@ int main(int argc, char** argv)
         std::sort(seed_max.begin(), seed_max.end());
         std::sort(seed_med.begin(), seed_med.end());
         std::printf("  POOLED: alive %d, invested %d, nodes held min/p25/med/p75/max %lld/%lld/%lld/%lld/%lld of %d,"
-                    " rim %d, never passed fuel %d (%.0f%%)\n",
+                    " rim %d; had an Industry round %d, of which never passed fuel %d (%.0f%%); never had a round %d"
+                    " (%.0f%% of alive)\n",
                     p_alive, p_inv, pct_of_sorted(pooled_nodes, 0), pct_of_sorted(pooled_nodes, 25),
                     pct_of_sorted(pooled_nodes, 50), pct_of_sorted(pooled_nodes, 75),
-                    pct_of_sorted(pooled_nodes, 100), io::industry_tree::node_count, p_rim, p_never,
-                    p_alive > 0 ? 100.0 * p_never / p_alive : 0.0);
+                    pct_of_sorted(pooled_nodes, 100), io::industry_tree::node_count, p_rim, p_had, p_never,
+                    p_had > 0 ? 100.0 * p_never / p_had : 0.0, p_noround,
+                    p_alive > 0 ? 100.0 * p_noround / p_alive : 0.0);
         std::printf("  POOLED forks: Fuel coke %d / charcoal %d / neither %d; Labour cleared %d / smallholder %d /"
                     " neither %d; Works arsenal %d / private %d / neither %d\n",
                     p_forks[0][0], p_forks[0][1], p_forks[0][2], p_forks[1][0], p_forks[1][1], p_forks[1][2],

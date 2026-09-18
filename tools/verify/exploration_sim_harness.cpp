@@ -39,7 +39,9 @@
 //        nothing consumes it), the pinned stubs named on the face, the seam
 //        fuel gate, the urban-mass rate (isqrt, top-k, clamp, superlinear),
 //        industry_mask 0 on the shipped world, the switch inert before its
-//        open year, and a switch-on span deterministic and fork-exclusive
+//        open year, and a switch-on span deterministic and fork-exclusive;
+//        the fix round adds the empire's spire-ring factor on the rate
+//        (T8.9.7/8) and the gate re-read on every funded round (T8.14)
 //
 // Headless: world/* logic only, no SDL and no Lua.
 // ---------------------------------------------------------------------------
@@ -2048,23 +2050,74 @@ int main()
 
         const history_sim_params hp;
         const int64_t ref = hp.industry_urban_mass_reference, cap = hp.industry_urban_mass_cap;
-        const int64_t at_ref = industry_research_per_year_q(ref, 0, hp);
-        const int64_t half   = industry_research_per_year_q(ref / 2, 0, hp);
-        std::printf("      rate/yr: mass %lld -> %lld, mass %lld -> %lld, mass %lld (cap) -> %lld\n",
+        // rate(mass, spire ring, research modifier)
+        const auto rate = [&hp](int64_t m, int spire, int mod) { return industry_research_per_year_q(m, spire, mod, hp); };
+        const int64_t at_ref = rate(ref, 0, 0);
+        const int64_t half   = rate(ref / 2, 0, 0);
+        std::printf("      rate/yr at spire ring 0: mass %lld -> %lld, mass %lld -> %lld, mass %lld (cap) -> %lld;"
+                    " cap at spire ring 3 -> %lld\n",
                     static_cast<long long>(ref / 2), static_cast<long long>(half),
                     static_cast<long long>(ref), static_cast<long long>(at_ref),
-                    static_cast<long long>(cap),
-                    static_cast<long long>(industry_research_per_year_q(cap, 0, hp)));
+                    static_cast<long long>(cap), static_cast<long long>(rate(cap, 0, 0)),
+                    static_cast<long long>(rate(cap, 3, 0)));
         check(at_ref == (ref * hp.industry_research_fraction_q) / 1000,
-              "T8.9.3  at the reference mass the rate is linear-equivalent: fraction x reference");
-        check(at_ref > 2 * half && industry_research_per_year_q(2 * ref, 0, hp) > 2 * at_ref,
+              "T8.9.3  at the reference mass (spire ring 0) the rate is linear-equivalent: fraction x reference");
+        check(at_ref > 2 * half && rate(2 * ref, 0, 0) > 2 * at_ref,
               "T8.9.4  superlinear: doubling the urban mass more than doubles the rate");
-        check(industry_research_per_year_q(cap, 0, hp) == industry_research_per_year_q(cap * 10, 0, hp)
-           && industry_research_per_year_q(INT64_MAX, 0, hp) == industry_research_per_year_q(cap, 0, hp),
+        check(rate(cap, 0, 0) == rate(cap * 10, 0, 0) && rate(INT64_MAX, 0, 0) == rate(cap, 0, 0)
+           && rate(INT64_MAX, 6, 4000) == rate(cap, 6, 4000),
               "T8.9.5  the mass is CLAMPED before the transform: 10x the cap (and INT64_MAX) earn the cap's rate");
-        check(industry_research_per_year_q(0, 0, hp) == 0 && industry_research_per_year_q(-100, 0, hp) == 0
-           && industry_research_per_year_q(ref, 1000, hp) == 2 * at_ref,
+        check(rate(0, 3, 4000) == 0 && rate(-100, 0, 0) == 0 && rate(ref, 0, 1000) == 2 * at_ref,
               "T8.9.6  no mass earns nothing, and the `research` modifier scales the rate as it scales the other trees'");
+
+        // T8.9.7 (fix round): THE SPIRE RING, applied as the EMPIRE rate
+        // applies it — `(1000 + ring * 150) / 1000` after the base and before
+        // the research modifier, each factor truncating in that order.
+        bool spire_ok = true;
+        for (int s = 0; s <= 3; ++s)
+            for (int mod : { 0, 250, 1000 })
+            {
+                const int64_t base = (rate(cap, 0, 0));
+                const int64_t want = base * (1000 + s * 150) / 1000 * (1000 + mod) / 1000;
+                spire_ok = spire_ok && rate(cap, s, mod) == want;
+            }
+        check(spire_ok && rate(ref, 1, 0) > at_ref && rate(ref, 3, 0) > rate(ref, 2, 0),
+              "T8.9.7  the spire ring scales the Industry rate by (1000 + 150 x ring) / 1000, the empire's own factor");
+        const int sp1m = find_industry_node("IN-SP-1m"), sp2m = find_industry_node("IN-SP-2m");
+        const int sp3m = find_industry_node("IN-SP-3m"), sp3a = find_industry_node("IN-SP-3a");
+        check(industry_spire_ring(0) == 0 && industry_spire_ring(1ULL << sp3a) == 0
+           && industry_spire_ring(1ULL << sp1m) == 1
+           && industry_spire_ring((1ULL << sp1m) | (1ULL << sp2m)) == 2
+           && industry_spire_ring((1ULL << sp1m) | (1ULL << sp2m) | (1ULL << sp3m)) == 3,
+              "T8.9.8  industry_spire_ring is the highest milestone ring held (a ring-3 major alone counts 0)");
+    }
+
+    // T8.14 (fix round): THE GATE IS RE-READ EVERY FUNDED ROUND, Industry only.
+    // A polity investing in Railway (fuel) keeps it while it holds a seam and
+    // loses it the round the seam is gone; the re-pick then never offers a
+    // fuel node. A fork closing under the target still drops it as before.
+    {
+        const uint64_t mk = 1ULL << in_root; // Railway hangs off the root
+        industry_scorer_reading with_seam;
+        with_seam.fuel_seam_q = 1000;
+        industry_scorer_reading seam_lost = with_seam;
+        seam_lost.fuel_seam_q = industry_fuel_seam_bar_q - 1;
+        check(industry_target_stands(mk, in_rail, with_seam),
+              "T8.14.1  a Railway target stands while the polity holds a seam at or over the bar");
+        check(!industry_target_stands(mk, in_rail, seam_lost),
+              "T8.14.2  the round the seam is lost, the Railway target no longer stands (the block re-picks)");
+        const int repick = choose_industry_node(mk, seam_lost);
+        check(repick >= 0 && io::industry_tree::nodes[repick].gate != io::industry_tree::gate_atom::fuel,
+              "T8.14.3  the re-pick without a seam never lands on a fuel-gated node");
+        check(industry_target_stands(mk, in_mt1e, seam_lost),
+              "T8.14.4  an ungated target (Furnace Practice) is untouched by the seam");
+        check(!industry_target_stands(mk | (1ULL << in_mt1e) | (1ULL << in_coke), in_char, with_seam)
+           && !industry_target_stands(mk, -1, with_seam),
+              "T8.14.5  a fork closed under the target, or no target, still does not stand");
+        std::printf("      NOTE  a target dropped this way LOSES its accumulated progress (reset to 0 at the\n"
+                    "            re-pick), as a fork closing under it does: one progress integer per tree,\n"
+                    "            for the node being bought (TREES.md sec State). The empire and exploration\n"
+                    "            trees still read a gate at the pick only.\n");
     }
 
     // T8.10-T8.13: on the REAL generated world.
@@ -2129,6 +2182,7 @@ int main()
         check(same_run(s1, s2), "T8.12  a switch-on span is deterministic: same fixture twice, identical record and masks");
 
         int alive = 0, holders = 0, rim = 0, seen_fuel = 0, both_sides = 0;
+        int had_round = 0, round_no_fuel = 0, proxy_bad = 0;
         int fork_side[3][3] = {}; // [fork][0 = first side, 1 = second, 2 = neither]
         std::vector<int> held_n;
         const int pairs[3][2] = { {in_coke, in_char}, {in_ld1b, in_ld1c}, {in_ch2d, in_ch2e} };
@@ -2141,6 +2195,13 @@ int main()
             if (n > 0) ++holders;
             if (polity_holds_industry_rim(q)) ++rim;
             if (q.industry_fuel_seen) ++seen_fuel;
+            // "Had an Industry round", with no sim field of its own: the
+            // first round always targets the ungated root, and from then on a
+            // polity is either investing or holds a node. A polity minted
+            // mid-run starts with every Industry field at its default.
+            const bool had = q.industry_investing >= 0 || q.industry_mask != 0;
+            if (had) { ++had_round; if (!q.industry_fuel_seen) ++round_no_fuel; }
+            else if (q.industry_fuel_seen || q.industry_progress_q != 0) ++proxy_bad;
             for (int p = 0; p < 3; ++p)
             {
                 const bool a = (q.industry_mask >> pairs[p][0]) & 1ULL;
@@ -2155,6 +2216,10 @@ int main()
                     "%d/%d/%d/%d/%d, rim %d, ever passed the fuel gate %d\n",
                     static_cast<long long>(open), static_cast<long long>(stop), alive, holders,
                     pct(0), pct(25), pct(50), pct(75), pct(100), rim, seen_fuel);
+        std::printf("      fuel gate: %d had an Industry round, %d of them never passed it; %d never had a round\n",
+                    had_round, round_no_fuel, alive - had_round);
+        check(proxy_bad == 0 && seen_fuel <= had_round,
+              "T8.13.3  the 'had an Industry round' reading is consistent: no polity outside it carries fuel_seen or progress");
         std::printf("      forks (first/second/neither): Fuel coke %d / charcoal %d / %d, Labour cleared %d / "
                     "smallholder %d / %d, Works arsenal %d / private %d / %d\n",
                     fork_side[0][0], fork_side[0][1], fork_side[0][2], fork_side[1][0], fork_side[1][1],
