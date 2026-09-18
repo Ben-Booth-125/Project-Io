@@ -3017,6 +3017,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 bs.goods.push_back(static_cast<std::uint16_t>(r));
 
         const int g = static_cast<int>(bs.goods.size());
+        // 0 under `lifted`: its c is refused unless 0 (it applies no per-good cap).
         bs.reference_points = (g > 0)
             ? static_cast<int64_t>(spend.per_resource_firm_cap) * g
                   * static_cast<int64_t>(spend.firm_price_points)
@@ -3373,7 +3374,14 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         int64_t remainder = 0;
         for (int r = 0; r < charter_unspent_reason_count; ++r)
             remainder += cc.unspent[static_cast<std::size_t>(r)];
-        const float capital = static_cast<float>(remainder) * spend.capital_per_point;
+        // WIDE FIRST, NARROWED ONLY INSIDE THE BALANCE'S DOMAIN (BL-1039 fix
+        // round). `charter_spend_refusal` — checked at this function's top and at
+        // the landscape overload, both before any mutation — refused any spend
+        // whose richest centre's points x the rate leave a float's finite range,
+        // and a remainder never exceeds its centre's points, so this product is
+        // inside it and the cast below cannot make an infinite balance.
+        const double capital_wide = charter_unspent_capital_wide(remainder, spend.capital_per_point);
+        const float  capital      = static_cast<float>(capital_wide);
 
         corporation_component& corp = w.corporations.at(d.corp);
         corp.starting_capital = capital;

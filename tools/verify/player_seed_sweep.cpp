@@ -780,6 +780,81 @@ void print_charter_bodies(const charter_spend_report& rep, const char* indent)
 ///    remainder (the report's unspent rows for that centre, summed) x the rate,
 ///    on the corporation as chartered — and, AT LAND, its balance too — with the
 ///    zero-capital count and the capitalised total re-counted.
+/// BL-1039 fix round — THE BALANCE, as a failing check on every budget row
+/// (refused rows included). Empty when balanced; otherwise every clause that
+/// broke. Re-derived from the INPUT and the records, not from the report's totals
+/// alone:
+///  * points budgeted = the budget's own total;
+///  * points spent = the prices on the charter records;
+///  * points unspent = the unspent rows summed BY REASON;
+///  * budgeted = spent + unspent;
+///  * PER CENTRE, the budget's points minus its charters' prices = its unspent rows.
+std::string charter_balance_failure(const charter_budget& budget, const charter_spend_report& rep)
+{
+    std::string out;
+    char buf[200];
+    const auto add = [&](const char* s) { if (out.size() < 1200) { out += ' '; out += s; out += ';'; } };
+
+    long long by_records = 0;
+    std::map<entity_id, long long> left;
+    for (const auto& [centre, pts] : budget.points())
+        left[centre] = pts;
+    for (const charter_record& r : rep.charters)
+    {
+        by_records += r.price;
+        left[r.centre] -= r.price;
+    }
+    long long by_reason = 0;
+    std::map<entity_id, long long> rows;
+    for (const charter_unspent& u : rep.unspent)
+    {
+        by_reason += u.points;
+        rows[u.centre] += u.points;
+    }
+    if (rep.points_budgeted != budget.total())
+    {
+        std::snprintf(buf, sizeof buf, "budgeted %lld, the budget totals %lld",
+                      static_cast<long long>(rep.points_budgeted), static_cast<long long>(budget.total()));
+        add(buf);
+    }
+    if (rep.points_spent != by_records)
+    {
+        std::snprintf(buf, sizeof buf, "spent %lld, the charters' prices sum to %lld",
+                      static_cast<long long>(rep.points_spent), by_records);
+        add(buf);
+    }
+    if (rep.points_unspent != by_reason)
+    {
+        std::snprintf(buf, sizeof buf, "unspent %lld, the reasons sum to %lld",
+                      static_cast<long long>(rep.points_unspent), by_reason);
+        add(buf);
+    }
+    if (budget.total() != by_records + by_reason)
+    {
+        std::snprintf(buf, sizeof buf, "the budget's %lld != %lld spent + %lld unspent by reason",
+                      static_cast<long long>(budget.total()), by_records, by_reason);
+        add(buf);
+    }
+    for (const auto& [centre, l] : left)
+    {
+        const long long r = rows.count(centre) ? rows[centre] : 0;
+        if (l != r)
+        {
+            std::snprintf(buf, sizeof buf, "centre %u: budget minus its charters' prices %lld, its "
+                          "unspent rows %lld", centre, l, r);
+            add(buf);
+        }
+    }
+    for (const auto& [centre, r] : rows)
+        if (left.count(centre) == 0)
+        {
+            std::snprintf(buf, sizeof buf, "centre %u: %lld unspent points on a centre the budget "
+                          "never named", centre, r);
+            add(buf);
+        }
+    return out;
+}
+
 struct charter_rule_check
 {
     bool        pass = true;
@@ -923,9 +998,21 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
     }
 
     // --- the capital ---
+    // TWO REMAINDERS per centre. `unspent_by_centre` sums the report's unspent
+    // rows — the same tally production sums, so on its own it is circular. The
+    // INDEPENDENT one (BL-1039 fix round) is what the budget gave the centre
+    // minus the prices on its charter records, specialist and firms: it reads
+    // only the input and what was chartered. The capital is checked against the
+    // independent one; the two agreeing is `charter_balance_failure`'s per-centre
+    // check, run on every budget row.
     std::map<entity_id, long long> unspent_by_centre;
     for (const charter_unspent& u : rep.unspent)
         unspent_by_centre[u.centre] += u.points;
+    std::map<entity_id, long long> remainder_by_centre;
+    for (const auto& [centre, pts] : budget.points())
+        remainder_by_centre[centre] = pts;
+    for (const charter_record& r : rep.charters)
+        remainder_by_centre[r.centre] -= r.price;
     long long zero = 0, capitalised = 0;
     for (const charter_record& r : rep.charters)
     {
@@ -944,8 +1031,18 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
                 failed("draw: a specialist's recorded capital disagrees with its corporation");
             continue;
         }
-        const long long remainder = unspent_by_centre.count(r.centre) ? unspent_by_centre[r.centre] : 0;
-        const float expected = static_cast<float>(remainder) * spend.capital_per_point;
+        const long long remainder = remainder_by_centre.count(r.centre) ? remainder_by_centre[r.centre] : -1;
+        const long long by_rows   = unspent_by_centre.count(r.centre) ? unspent_by_centre[r.centre] : 0;
+        if (remainder != by_rows)
+        {
+            std::snprintf(buf, sizeof buf, "centre %u: budget minus its charters' prices leaves %lld, "
+                          "its unspent rows say %lld", r.centre, remainder, by_rows);
+            failed(buf);
+        }
+        const double wide     = charter_unspent_capital_wide(remainder, spend.capital_per_point);
+        const float  expected = static_cast<float>(wide);
+        if (!charter_capital_in_balance_domain(wide))
+            failed("a capital outside the balance's range reached the world (the spend should have been refused)");
         if (r.capital_points != remainder || r.capital != expected
             || corp->second.starting_capital != expected
             || (at_land && corp->second.balance != expected))
@@ -1111,10 +1208,11 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
         pts[static_cast<std::size_t>(u.reason)] += u.points;
         ++ctr[static_cast<std::size_t>(u.reason)];
     }
-    std::printf("      points: budgeted %lld = spent %lld + unspent %lld [%s]; unspent by reason:",
+    const std::string unbalanced = charter_balance_failure(budget, rep);
+    std::printf("      points: budgeted %lld = spent %lld + unspent %lld [%s%s]; unspent by reason:",
                 static_cast<long long>(rep.points_budgeted), static_cast<long long>(rep.points_spent),
                 static_cast<long long>(rep.points_unspent),
-                rep.points_budgeted == rep.points_spent + rep.points_unspent ? "balanced" : "UNBALANCED");
+                unbalanced.empty() ? "balanced" : "UNBALANCED:", unbalanced.c_str());
     for (int r = 0; r < charter_unspent_reason_count; ++r)
         std::printf(" %s %lld (%d centres)%s",
                     charter_unspent_reason_name(static_cast<charter_unspent_reason>(r)),
@@ -1150,7 +1248,7 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                 "snapshot MB land/settle/seat%s\n", check ? "  verdict" : "");
     std::fflush(stdout);
 
-    int failed = 0, threw = 0, passed = 0;
+    int failed = 0, threw = 0, passed = 0, unbalanced_rows = 0;
     std::vector<world_digests> got(seeds.size());
     std::vector<bool>          ok(seeds.size(), false);
     for (std::size_t i = 0; i < seeds.size(); ++i)
@@ -1191,6 +1289,10 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                 // be recorded and re-checked across a change to the budget path.
                 charter.spend.resource_cap_rule =
                     resource_cap ? charter_cap_rule::fixed : charter_cap_rule::lifted;
+                // Lifted reads no per-good cap, so it carries none (a set one is
+                // refused). Unread by the spend, so the digests do not move.
+                if (!resource_cap)
+                    charter.spend.per_resource_firm_cap = 0;
                 // `refused`: the same budget, and a price with no default left
                 // at its default — the refusal a caller that forgets a price gets.
                 if (mode == charter_mode::refused)
@@ -1226,6 +1328,12 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                     seed, d.search, d.land, d.settle, d.seat,
                     d.land_bytes / 1048576.0, d.settle_bytes / 1048576.0,
                     d.seat_bytes / 1048576.0);
+        // BL-1039 fix round: a budget row that does not balance FAILS, in both
+        // modes — checked from the budget and the records, not the report's totals.
+        const std::string unbalanced = (mode != charter_mode::none && !budget.empty())
+            ? charter_balance_failure(budget, report) : std::string();
+        if (!unbalanced.empty())
+            ++unbalanced_rows;
         if (check)
         {
             const world_digest_pin* pin = nullptr;
@@ -1263,6 +1371,8 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                 if ((mode == charter_mode::empty || mode == charter_mode::zero)
                     && (search_refused || report_written))
                     diffs += " EMPTY-FLAG (an empty budget raised the refusal or wrote a report)";
+                if (!unbalanced.empty())
+                    diffs += " UNBALANCED:" + unbalanced;
                 if (diffs.empty())
                 {
                     ++passed;
@@ -1277,7 +1387,7 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
         }
         else
         {
-            std::printf("\n");
+            std::printf("%s%s\n", unbalanced.empty() ? "" : "  UNBALANCED:", unbalanced.c_str());
         }
         if (mode != charter_mode::none)
             print_charter_report(start->w, mode, budget, charter.spend, report, start->land.search,
@@ -1294,7 +1404,10 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                 std::printf("    { %2uu, 0x%016" PRIX64 "ull, 0x%016" PRIX64 "ull, 0x%016" PRIX64
                             "ull, 0x%016" PRIX64 "ull },\n",
                             seeds[i], got[i].search, got[i].land, got[i].settle, got[i].seat);
-        return threw ? 1 : 0;
+        if (unbalanced_rows > 0)
+            std::printf("\n%d budget row(s) UNBALANCED — a failing check (BL-1039 fix round)\n",
+                        unbalanced_rows);
+        return (threw || unbalanced_rows > 0) ? 1 : 0;
     }
 
     // Coverage (cold review, 2026-09-17): a run over a subset of the pinned seeds
@@ -1575,6 +1688,7 @@ struct cost_row
     long long    specialist_price_points = 0;
     long long   points_budgeted = 0, points_spent = 0, points_unspent = 0;
     bool        balanced = true;
+    std::string balance_fail;   ///< every broken clause (charter_balance_failure); empty = balanced
     bool        refused  = false;
     std::array<long long, charter_unspent_reason_count> unspent_by_reason{};
     int         budget_centres = 0;
@@ -1657,6 +1771,10 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         charter.budget              = budget;
         charter.spend               = synthetic_charter_spend();
         charter.spend.resource_cap_rule = cfg.resource_cap_rule;
+        // Lifted reads no per-good cap, so it carries none (a set one is refused)
+        // and reports no B_ref; unread by the spend, so the world does not move.
+        if (cfg.resource_cap_rule == charter_cap_rule::lifted)
+            charter.spend.per_resource_firm_cap = 0;
         charter.spend.density_ceiling   =
             cfg.resource_cap_rule == charter_cap_rule::sqrt_capital ? cfg.density_ceiling : 0;
         charter.spend.province_cap  = cfg.province_cap;
@@ -1741,7 +1859,11 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         row.points_budgeted = report.points_budgeted;
         row.points_spent    = report.points_spent;
         row.points_unspent  = report.points_unspent;
-        row.balanced        = report.points_budgeted == report.points_spent + report.points_unspent;
+        // BL-1039 fix round: re-derived from the budget and the records, and a
+        // FAILING check on every budget row (run_charter_cost), not the forced
+        // row's alone.
+        row.balance_fail    = charter_balance_failure(*budget, report);
+        row.balanced        = row.balance_fail.empty();
         for (const charter_unspent& u : report.unspent)
             row.unspent_by_reason[static_cast<std::size_t>(u.reason)] += u.points;
         row.budget_centres = static_cast<int>(budget->points().size());
@@ -2070,10 +2192,12 @@ void write_cost_json(const std::string& path, const cost_options& opt,
             if (r.budget_row)
             {
                 std::fprintf(f, ",\n          \"budget\": { \"points_budgeted\": %lld, \"points_spent\": %lld, "
-                                "\"points_unspent\": %lld, \"balanced\": %s, \"refused\": %s, "
+                                "\"points_unspent\": %lld, \"balanced\": %s, \"balance_fail\": \"%s\", "
+                                "\"refused\": %s, "
                                 "\"centres\": %d, \"richest_centre_points\": %d, "
                                 "\"centres_affording_specialist\": %d, \"unspent_by_reason\": {",
                              r.points_budgeted, r.points_spent, r.points_unspent, b(r.balanced),
+                             json_escape(r.balance_fail).c_str(),
                              b(r.refused), r.budget_centres, r.richest_centre_points,
                              r.centres_affording_specialist);
                 for (int i = 0; i < charter_unspent_reason_count; ++i)
@@ -2371,10 +2495,11 @@ void print_cost_row(const cost_row& r)
                 r.val_sum.median, r.val_sum.mean, r.live_sum.median, r.live_sum.mean,
                 r.shortlist, r.trail_min, r.trail_median, r.trail_max, 100.0 * r.trail_neg_share,
                 r.strategic_evals_due_mean);
-    std::printf("  %-52s   points %lld = %lld + %lld [%s]; generation %.0f ms; landscape phase %.0f ms "
+    std::printf("  %-52s   points %lld = %lld + %lld [%s%s]; generation %.0f ms; landscape phase %.0f ms "
                 "(search %.0f ms); row wall %.0f ms; seated %u%s\n",
                 "", r.points_budgeted, r.points_spent, r.points_unspent,
-                r.budget_row ? (r.balanced ? "balanced" : "UNBALANCED") : "no budget",
+                r.budget_row ? (r.balanced ? "balanced" : "UNBALANCED — FAILS the run:") : "no budget",
+                r.budget_row ? r.balance_fail.c_str() : "",
                 r.base_ms, r.landscape_ms, r.search_ms, r.wall_ms,
                 r.seated, r.floor_unmet ? " (floor UNMET)" : "");
     std::printf("  %-52s   corps/bg AT LAND %d/%d, AT SEAT %d/%d; busiest body AT LAND %u: %d corps, "
@@ -2612,7 +2737,8 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
     std::fflush(stdout);
 
     std::vector<cost_seed> results;
-    bool any_threw = false, forced_failed = false, digest_failed = false, rules_failed = false;
+    bool any_threw = false, forced_failed = false, digest_failed = false, rules_failed = false,
+         balance_failed = false;
 
     for (const uint32_t seed : seeds)
     {
@@ -2786,6 +2912,8 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
                     run_cost_config(lua, seed, c, &budgets.at(c.scale), opt.live_ticks, row);
                     if (!row.rule_check.pass)
                         rules_failed = true;
+                    if (row.budget_row && !row.stopped_at_land && !row.balanced)
+                        balance_failed = true;
                 }
                 catch (const std::exception& e)
                 {
@@ -2841,6 +2969,8 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
                         forced_failed = true;
                     if (!row.rule_check.pass)
                         rules_failed = true;
+                    if (row.budget_row && !row.stopped_at_land && !row.balanced)
+                        balance_failed = true;
                 }
                 catch (const std::exception& e)
                 {
@@ -2882,13 +3012,14 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
     std::printf("\n%zu seeds in %.0f s (%.0f s per seed). %s\n", seeds.size(), total_s,
                 seeds.empty() ? 0.0 : total_s / static_cast<double>(seeds.size()), written.c_str());
     std::printf("none-row digests: %s. forced province cap: %s. spend rules and capital (BL-1039, "
-                "checked at land on every budget row): %s. %s\n",
+                "checked at land on every budget row): %s. points balance on every budget row: %s. %s\n",
                 digest_failed ? "DIFFER from the pins on some seed (this mode is NOT measuring the shipped start)"
                               : "match wherever a pin exists",
                 !opt.forced ? "not run" : forced_failed ? "FAIL on some seed" : "PASS on every seed",
                 rules_failed ? "FAIL on some row" : "PASS on every row",
+                balance_failed ? "FAIL — UNBALANCED on some row" : "PASS",
                 any_threw ? "SOMETHING THREW." : "nothing threw.");
-    return (any_threw || forced_failed || digest_failed || rules_failed) ? 1 : 0;
+    return (any_threw || forced_failed || digest_failed || rules_failed || balance_failed) ? 1 : 0;
 }
 
 int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
