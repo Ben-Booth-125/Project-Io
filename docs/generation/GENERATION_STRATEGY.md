@@ -31,8 +31,9 @@ The subject docs:
   driven by the pre-national history ladder.
 - **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
   market-based and non-hegemonic. **The campaign epoch is 1960 on the arc generation runs (Ben, 2026-09-08); 0 CE remains the
-  ancient arc's epoch (Ben, 2026-08-12, NR-177); `world_params::epoch_year` selects between them,
-  and which arc the default descriptor selects is NR-869's call** — § Pass 2 is the economy
+  ancient arc's epoch (Ben, 2026-08-12, NR-177). The default flips to 1960 once the Digitisation
+  span runs by default, and the superseded 1560 → 1960 arc is retired, so `epoch_year` names a
+  calendar and never chooses a history (Ben, 2026-09-18; `DIGITISATION.md`)** — § Pass 2 is the economy
   pass owns the calendar, and the clock rebases at the handoff (`../economy/ERAS.md`) — and
   generation runs a stepped pre-campaign history whose span § Pass 2 is the economy pass states
   (3,600 years, 2400 BCE → 1200 CE, divided at 400 BCE — Ben, 2026-09-09), followed by the
@@ -247,7 +248,7 @@ the world's serialisation seam; the save file records it so a load rebuilds the 
 |---|---|---|
 | `seed` (`uint32_t`) | XOR-folded into each **per-body seed literal** (`params.seed ^ 0xC1D0001u`, …). Seed `0` yields the bare literals, so the **default descriptor is the reference world**. | cheap |
 | `abundance` (`sparse`/`lean`/`standard`) | A **deposit-density scalar** applied as a pure post-multiply in `generate_body_tiles` Pass 6 (`0.40` / `0.65` / `1.00`). Consumes no RNG, so `standard` (1.0) is bit-identical to the unscaled surface. | cheap, isolated |
-| `epoch_year` (`int64_t`) | The campaign epoch, `0` by default. `1960` selects the parked space arc; the generators key on it. | cheap |
+| `epoch_year` (`int64_t`) | The campaign epoch: its calendar and its recipe band. It chooses no history — the arc that once keyed on it is retired (Ben, 2026-09-18). | cheap |
 | `prehistory_years` (`int`) | Years of year-tick prehistory the antiquity branch simulates before the epoch (400, at 4 years a tick). A **scope knob, not a tuning dial**: `0` skips the pass, which is how harnesses that do not test the era avoid paying for it. Part of the params, so determinism is untouched. | the most expensive pass |
 | `body_count` (`int`) | **Reserved.** The body set is hand-authored prototype *profiles* (hot inner planet / homeworld / moon / metallic asteroid — their **names** are generated per seed, BL-257, body naming); a true count knob needs the generator to synthesise variable body profiles. The field exists so the descriptor is forward-shaped. | heaviest |
 | `preferences` (`world_preferences`) | The New World wizard's input: eight **leans** (`any`/`low`/`mid`/`high`), resolved against the seed by `resolve_preferences` with reject-and-reroll until the homeworld clears the strict Earth-like floor. Preferences, not parameters — see `PLANETOLOGY.md` § Preferences, not parameters. | cheap |
@@ -906,9 +907,10 @@ passes before the search runs, not an axis the search trades against.
 - Pass 2 → the political map: the same outputs `generate_nations` reads today, plus the
   **polity map itself** — which polity held each region at the epoch, so a realm arrives as one
   nation rather than as a Voronoi cell per region — plus a nation's **tariff posture**, enacted
-  as an ordinary `import_tariff` law at world setup where pass 2's polity ended up protective,
-  and its **colonial ties**, which seed the order book's preferred-seller relationships so a
-  colony's chains close through its metropole before they close anywhere else.
+  as an ordinary `import_tariff` law at world setup where pass 2's polity ended up protective.
+  (Colonial ties no longer seed preferred-seller relationships: that half was superseded on
+  2026-09-09, because nothing on the buy side emits orders — `EXPLORATION.md` § The colonial tie
+  is a sea lane.)
 
   **The fold is what makes phase 5 a finalisation.** Before it, the political map was re-derived
   from the region anchors as though the history had not just drawn one, and every empire the sim

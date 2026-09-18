@@ -6128,6 +6128,24 @@
         "docs/generation/trees/INDUSTRY_TREE.md"
       ],
       "resolution": "RULED (Ben, 2026-09-18, wave 1 form): (1) REVERT to the 400 +/-40% draw — the unspent-points rule is removed (BL-1039 round 2); (2) the ceiling fills goods in turn; (3) B net of specialist prices, B_ref = 8 x goods x firm price; (4) furnace_lit reads Coke Smelting held; (5) forest scored as fuel is — the best held forest share against the world mean; (6) Default A kept; (7) Default B kept; (8) the bar ends full at (12/12). DIGITISATION.md § 1 and § Beat 1, CORPORATION_GENERATION.md Pass 4 and Pass 6, INDUSTRY_TREE.md § The scorer carry it; BL-1039 round 2 and BL-1041 build it."
+    },
+    "NR-898": {
+      "id": "NR-898",
+      "title": "TWELVE CALLS shaping sprint 46: bring the generation work into the wizard, hand off cleanly to the game, retire the previous method",
+      "raised": "2026-09-18",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Ben (2026-09-18): \"open another sprint for retiring the previous generation method, and ensuring our work carries directly to the game\" and \"bringing our work into the wizard, and cleanly handing off to the main game; a select corporation screen after this\". A three-lane read (legacy paths, handoff-to-play, backlog coverage), each adversarially checked.",
+      "what": "Attention to date was partial: the flip was ruled (NR-869) and held by BL-1047 (unscheduled, stale cites, missing couplings); the continuity pass holds five items; the play list (DIGITISATION.md § What crosses into play) had almost none — 11 of 15 rows had no open item, most archived unbuilt on 2026-09-16. Found: region industrialisation is a structural zero on the shipped arc (every nation 'Isolationist' on screen); tariffs enact zero even after the span turns on; the game plays the ancient roster at 0 CE on a 1960-grown world; the wizard throws its world away and Begin rebuilds; BL-879 closed complete with its seed clause unbuilt; capital markets enter play zero-priced (plausible, unmeasured); the spans after 1200 run without several Empires forces, undocumented; MANUAL.md still describes the superseded arc.",
+      "why_it_matters": "It sets sprint 46: the order of the flip, what retires, and which handoff rows the game receives.",
+      "options": [],
+      "recommendation": "Recommendations were taken on every call but (12), where Ben put the select-corporation screen at the end of sprint 46 rather than its own sprint.",
+      "files": [
+        "docs/generation/DIGITISATION.md",
+        "docs/generation/GENERATION_STRATEGY.md",
+        "docs/ui/STARTUP.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-18, sprint 46 form): (1) the EPOCH FLIP lands IN SPRINT 46, once the superseded arc is retired and the epoch gates decoupled — re-ruling NR-869's 'waits for Beats 2 and 3' (their items were archived unbuilt); (2) RETIRE the superseded 1560->1960 arc OUTRIGHT (no legacy field); (3) RETIRE the three narrative passes that ran only on it (ruptures, the Charter Act and border accord, the 1951 common tongue); (4) INDUSTRIALISATION reads Beat 1's industry points (national ideology, qualification, focus, the corporation focus pivot), not the calendar-anchored Stage 4 lag; (5) HAND THE BUILT WORLD to Begin (the game starts on the world the wizard built; re-files BL-1025); (6) wizard ROUND 6 PLAYS THE SPAN (re-files BL-997); (7) CARRY ALL EIGHT play-list rows offered: price field and household demand weights, tariff posture, culture lens, GDP/treasury/grudges on the nation summary, the search seed from network strength (BL-879's unmet clause), sea lanes, the depletion retrofit, campaign tech state; (8) STRIKE the preferred-seller rows (the 2026-09-09 supersession stands); (9) the post-1200 verb set: MEASURE each Empires force in the spans, then decide; (10) TWO re-blesses: sprint 45's (BL-1044), then sprint 46's; (11) the continuity-pass items stay AFTER Digitisation; (12) the SELECT-CORPORATION screen comes at the END of sprint 46 (BL-880 was its cancelled first design). Carried by the sprint 46 row in sprints.json (proposed; items filed at the cut) and BL-1047 (amended)."
     }
   }
 }

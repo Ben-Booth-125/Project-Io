@@ -97,6 +97,31 @@ From BL-1040's cold review (2026-09-18): BL-1053 filed and scheduled ahead of BL
 
 WAVE 1 FORM (Ben, 2026-09-18, NR-895): capital REVERTS to the 400 +/-40% draw (the unspent-points rule opened 10 of 11 specialists with nothing on a synthetic budget); the ceiling fills goods in turn; B net of specialist prices, B_ref = 8 x goods x firm price; furnace_lit reads Coke Smelting held; forest scored as fuel is; BL-1041's defaults A and B kept; the building screen's bar ends full. Also 2026-09-18: the wizard's Loading-the-X-round wait gained a progress bar (Ben), and the timed charter rows run first thing 2026-09-19.
 
+### Sprint 46 — the generation reaches the game
+*Proposed · Ben (2026-09-18, sprint 46 form); Claude (cut from a three-lane read with an adversarial check per lane)*
+
+**Goal.** The wizard shows the whole arc and the game begins on the world it built: round 6 plays the Digitisation span, Begin adopts the wizard's world, every row of DIGITISATION.md § What crosses into play carries into the campaign or is stated deferred, the superseded 1560->1960 arc and its narrative passes are retired, and the default epoch flips to 1960 on the industrial roster. The select-corporation screen closes the sprint.
+
+**Planned.**
+- BL-1047 (epoch flip gates) — amended: decouple every epoch coupling (the four >=1700 gates, the settlement stop year, the Empires start year, the demography anchor), flip the default to 1960, rework the save seam.
+- Retire the two-span arc and its sim machinery, and the three narrative passes (ruptures, Charter Act, common tongue).
+- Harnesses onto worlds the game builds (the no-prehistory 1960 harnesses, the warm-start survivors, --epoch 1960 tools); calibration provenance restated.
+- Industrialisation reads Beat 1's points (ideology, qualification, focus, the corporation pivot).
+- Begin adopts the wizard's built world (re-files BL-1025).
+- Round 6 plays the Digitisation span (re-files BL-997).
+- A play-handoff contract: every play-list row carried or stated deferred, world setup reads only it.
+- Carry rows: price field and demand weights; tariff posture; culture lens; GDP, treasury and grudges on the nation summary; the search seed from network strength (BL-879); sea lanes; the depletion retrofit; campaign tech state (design-owed: per-corporation tech from the nation's Industry mask, NR scope flag).
+- Capital-market shells: census, then price or fold them.
+- The post-1200 verb set measured, then decided.
+- The generation doc sweep (superseded arc, preferred sellers, stale warm-start and tariff lines, MANUAL.md).
+- The select-corporation screen, designed with Ben first, built last.
+
+**Done when.** Round 6 plays; Begin opens on the wizard's world byte for byte; each play-list row carries (with a reading) or is stated deferred in the contract; no path reads epoch_year to choose an arc; the default epoch is 1960 on the industrial roster; one re-bless authorised by Ben; a cold review passed; the select-corporation screen checked live.
+
+**Risk.** The largest sprint yet: eight carry rows, a retirement, the flip and two new surfaces. Its re-bless follows sprint 45's (Ben: two re-blesses), so every world-mover in it lands behind switches and turns on together. Tariffs are weak in play even when enacted (matched-trade tariffs rarely fire; convoy-arrival duty was cancelled). Campaign tech state has no per-nation consumer today.
+
+RULED (Ben, 2026-09-18, sprint 46 form): (1) the EPOCH FLIP lands IN SPRINT 46, once the superseded arc is retired and the epoch gates decoupled — re-ruling NR-869's 'waits for Beats 2 and 3' (their items were archived unbuilt); (2) RETIRE the superseded 1560->1960 arc OUTRIGHT (no legacy field); (3) RETIRE the three narrative passes that ran only on it (ruptures, the Charter Act and border accord, the 1951 common tongue); (4) INDUSTRIALISATION reads Beat 1's industry points (national ideology, qualification, focus, the corporation focus pivot), not the calendar-anchored Stage 4 lag; (5) HAND THE BUILT WORLD to Begin (the game starts on the world the wizard built; re-files BL-1025); (6) wizard ROUND 6 PLAYS THE SPAN (re-files BL-997); (7) CARRY ALL EIGHT play-list rows offered: price field and household demand weights, tariff posture, culture lens, GDP/treasury/grudges on the nation summary, the search seed from network strength (BL-879's unmet clause), sea lanes, the depletion retrofit, campaign tech state; (8) STRIKE the preferred-seller rows (the 2026-09-09 supersession stands); (9) the post-1200 verb set: MEASURE each Empires force in the spans, then decide; (10) TWO re-blesses: sprint 45's (BL-1044), then sprint 46's; (11) the continuity-pass items stay AFTER Digitisation; (12) the SELECT-CORPORATION screen comes at the END of sprint 46 (BL-880 was its cancelled first design).
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -165,9 +190,10 @@ WAVE 1 FORM (Ben, 2026-09-18, NR-895): capital REVERTS to the 400 +/-40% draw (t
 | 43 | the 1960 baseline | CLOSED 2026-09-17. Four items delivered in one day, one lane plus one worktree port; no shipped world moved (digests identical). The gate is NR-888: W1, W2 and the clock, on the 1960 baseline. |
 | 44 | the corporate web's plumbing | CLOSED 2026-09-18. Four items: harness parity, a world-bytes pin, the charter-budget seam (off by default, 16/16 pins held), and the cost sweep. No shipped world moved. NR-889 (the density cap) carries the cost readings for Ben. |
 | 45 | industrialisation makes the web real | OPEN 2026-09-18. Ten items in three waves: world copies, the span boundary, the Industry tree and the charter rules first, all behind switches; then the span, Beat 1 and the stockpile budget; then the real-stockpile sweep and one re-bless that turns it all on at epoch 0. |
+| 46 | the generation reaches the game | PROPOSED 2026-09-18 (Ben's sprint 46 form, NR-898). Starts after sprint 45's re-bless (BL-1044). Items are cut at the start of the next session. |
 
 **Next up.** SPRINT 43 OPEN (2026-09-17): the 1960 baseline — BL-1026 (seed library re-read), then BL-1027 (span cost to 1960), BL-1028 (weakness counters to 1960), BL-1029 (Digitisation readings at 1960), serially in one lane. Sprints 44 (the corporate web's plumbing) and 45 (industrialisation makes the web real) are proposed goal rows; their items are cut at the gates.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*63 sprints archived cold; 1 open/gated in the hot store.*
+*63 sprints archived cold; 2 open/gated in the hot store.*

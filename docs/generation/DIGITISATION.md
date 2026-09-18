@@ -51,6 +51,12 @@ campaign epoch is 1960 (Ben, 2026-09-08), and the default world descriptor selec
 this phase lands — never before, because a 1960 world with no Digitisation opens on a 300-year gap
 the sim did not simulate.
 
+**SETTLED (Ben, 2026-09-18, sprint 46 form, re-timing NR-869): the flip does not wait for Beats 2
+and 3.** It lands once this span runs by default and the superseded arc is retired, so that no
+reading of `epoch_year` chooses a history. The superseded 1560 → 1960 arc and the three narrative
+passes that ran only on it (the ruptures, the Charter Act, the 1951 common tongue) are retired
+outright.
+
 **A 1960 epoch names a calendar, not a history.** The arc the flip selects is Exploration's handoff
 continued through this span — never the single 1560 → 1960 industrial pass, which is superseded
 and runs no Exploration, and so hands this phase none of its inputs (`GENERATION_STRATEGY.md`
@@ -612,7 +618,6 @@ prices. Every property in Part I needs a stated rule for crossing that gap.
 | Scarcity signal per good per market | Starting price per market | Base price scaled by the signal, inside the band |
 | Culture preference × population shares | Household demand weight per market | Population-weighted preference over the catchment |
 | Culture shares on regions and centres | Province culture for the lens | Population-weighted blend (property 4) |
-| Trade flows per seller, buyer, good | Preferred-seller relationships | One relationship per flow above a threshold |
 | Corridor throughput and rail rung | Road tiers on tiles | The existing stamp, one rung higher |
 | Held-and-worked duration, class, throughput | `tile_component::resource_remaining` | The depletion formula (§ Spend is estimated at the end) |
 | Standing wars and patron links | A war condition on provinces | Property 3 |
@@ -690,7 +695,6 @@ The epoch's handoff, and nothing else:
   from carried force.
 - **The corporate web**: firms and installations the search spent from each city's charter budget.
 - **The price field** and **household demand weights** per market.
-- **Preferred-seller relationships** from surviving flows and colonial ties.
 - **Tariff posture** as `import_tariff` laws.
 - **Road tiers** with the rail rung, stamped from corridors.
 - **Culture shares** per region and per centre, for the lens and for demand.
