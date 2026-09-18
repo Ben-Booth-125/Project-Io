@@ -175,18 +175,17 @@ int remove_specialist_roster(world& w);
 ///    when that region is the centre nation's own, and otherwise nothing.
 ///  * A centre whose budget >= the specialist price (`firm_price_points x
 ///    specialist_firm_charters`) charters EXACTLY ONE specialist: focus and
-///    ownership from the character region (Passes 2 and 2b), stockpile, name
-///    and HQ, and its capital by `spend.capital_rule` — `draw`, today's 400 +/-
-///    40%; or `unspent_points`, the centre's unspent remainder after its firms x
-///    `capital_per_point`, written after the walk (BL-1039). NO nation
-///    balancing, no diversity reroll. The remainder buys background firms at the
-///    firm price by Pass 6's gap selection (construction first, then the
-///    biggest gap under the body's per-good cap: `per_resource_firm_cap` under
-///    `fixed`, none under `lifted`, the square-root rule under `sqrt_capital`),
-///    under the budget path's per-province cap 2 when `spend.province_cap`, the
+///    ownership from the character region (Passes 2 and 2b), today's capital
+///    (400 +/- 40%, the focus premium included), stockpile, name and HQ. NO
+///    nation balancing, no diversity reroll. The remainder buys background
+///    firms at the firm price by Pass 6's gap selection — construction first,
+///    then the biggest gap under the body's per-good cap (`per_resource_firm_cap`
+///    under `fixed`, none under `lifted`), or under `sqrt_capital` the goods IN
+///    TURN, a firm per good each pass up to the square-root cap (BL-1039) — under
+///    the budget path's per-province cap 2 when `spend.province_cap`, the
 ///    `density_ceiling` under `sqrt_capital`, and the `max_firms_per_body`
-///    runaway guard. Each body's capital B, its goods with demand G, B_ref and
-///    the per-good cap are FIXED BEFORE THE WALK (`charter_sqrt_per_good_cap`).
+///    runaway guard. Each body's firm points B, its goods with demand G, B_ref
+///    and the per-good cap are FIXED BEFORE THE WALK (`charter_sqrt_per_good_cap`).
 ///  * Anchor rungs: the centre nation's tiles within `spend.window_radius` of
 ///    the centre tile (column-wrapped), then the anchor region's window (empty
 ///    when the nearest region is a neighbour's), then UNSPENT — never nation-wide.

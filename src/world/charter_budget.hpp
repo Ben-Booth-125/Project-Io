@@ -21,7 +21,6 @@
 #include "entity.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <map>
@@ -82,11 +81,21 @@ private:
 /// cap scales by a SQUARE ROOT of the body's charter capital, under a named
 /// DENSITY CEILING"); see `charter_sqrt_per_good_cap` for the formula and what
 /// B, B_ref and G are.
+///
+/// THE FILL ORDER IS A PROPERTY OF THE RULE (Ben, 2026-09-18: "fill goods in
+/// turn: a firm per good each pass, up to its cap; the ceiling trims every good
+/// evenly"). Under `sqrt_capital` background firms ALWAYS go to the goods IN
+/// TURN — whether or not the ceiling ends up binding, because that is not known
+/// until the walk ends and an order that switched on it would be neither
+/// legible nor stable. The two legacy rules keep Pass 6's biggest-gap-first
+/// order verbatim; their worlds are pinned. See `charter_web_from_budget`.
 enum class charter_cap_rule : std::uint8_t
 {
-    fixed        = 0, ///< `per_resource_firm_cap` firms per good per body, flat
-    lifted       = 1, ///< no per-good cap (the construction yard's count bound still applies)
-    sqrt_capital = 2, ///< max(cap, floor(cap x sqrt(B / B_ref))), under `density_ceiling`
+    fixed        = 0, ///< `per_resource_firm_cap` firms per good per body, flat; biggest gap first
+    lifted       = 1, ///< no per-good cap (the construction yard's count bound still applies);
+                      ///< biggest gap first
+    sqrt_capital = 2, ///< max(cap, floor(cap x sqrt(B / B_ref))), under `density_ceiling`;
+                      ///< goods filled IN TURN
 };
 
 inline const char* charter_cap_rule_name(charter_cap_rule r)
@@ -100,31 +109,6 @@ inline const char* charter_cap_rule_name(charter_cap_rule r)
     return "?";
 }
 
-/// Where a budget specialist's starting capital comes from (BL-1039).
-enum class charter_capital_rule : std::uint8_t
-{
-    /// Today's seeded draw, 400 +/- 40% (`corporation_params`), the processing
-    /// and trade premium included — CORPORATION_GENERATION.md Pass 4 as written.
-    draw           = 0,
-    /// The ruled rule (DIGITISATION.md § 1 and Pass 4 AMENDED FORWARD, Ben
-    /// 2026-09-18): the centre's UNSPENT points x `capital_per_point`. The
-    /// remainder is what the centre could not spend after its specialist and its
-    /// firms — every reason counted (`window_exhausted`, `province_cap`,
-    /// `no_gap`, `body_cap`, `density_ceiling`, `remainder`). A centre that spent
-    /// everything opens a specialist with nothing, and the report counts it.
-    unspent_points = 1,
-};
-
-inline const char* charter_capital_rule_name(charter_capital_rule r)
-{
-    switch (r)
-    {
-    case charter_capital_rule::draw:           return "draw";
-    case charter_capital_rule::unspent_points: return "unspent_points";
-    }
-    return "?";
-}
-
 /// How a budget is spent. THE PRICES HAVE NO SHIPPED DEFAULT (DIGITISATION.md
 /// § 1: "the price of a specialist and of a firm are measured against live-play
 /// cost before either is fixed"). They default to 0, and a NON-EMPTY budget with
@@ -134,14 +118,18 @@ inline const char* charter_capital_rule_name(charter_capital_rule r)
 /// the legacy calls and reports every point unspent as `refused`. An empty budget
 /// is never refused — it is today's world, whatever the prices.
 ///
-/// THE SAME CONTRACT COVERS THE CAPS AND THE CAPITAL RATE (BL-1039). The body
-/// guard, the per-good cap, the density ceiling and the capital rate are all
-/// the budget path's OWN numbers — no longer restated from Pass 6, whose
-/// constants they do not follow — and none has a shipped default: each is 0
-/// until a caller sets it, and a non-empty budget whose rule READS a number <= 0
-/// is refused. A number set under a rule that does NOT read it (a ceiling under
-/// a legacy cap rule, a rate under the draw) is refused too, so no row can carry
-/// a setting that silently did nothing.
+/// THE SAME CONTRACT COVERS THE CAPS (BL-1039). The body guard, the per-good cap
+/// and the density ceiling are the budget path's OWN numbers — no longer
+/// restated from Pass 6, whose constants they do not follow — and none has a
+/// shipped default: each is 0 until a caller sets it, and a non-empty budget
+/// whose rule READS a number <= 0 is refused. A number set under a rule that
+/// does NOT read it (a ceiling under a legacy cap rule, a per-good cap under
+/// `lifted`) is refused too, so no row can carry a setting that silently did
+/// nothing.
+///
+/// A BUDGET SPECIALIST'S CAPITAL IS TODAY'S DRAW (Ben, 2026-09-18): 400 +/- 40%
+/// with the processing/trade premium, CORPORATION_GENERATION.md Pass 4 as
+/// written. There is no capital parameter here.
 ///
 /// A SPECIALIST'S PRICE IS A WHOLE NUMBER OF FIRM CHARTERS (DIGITISATION.md § 1:
 /// "a specialist's price — a fixed number of firm charters"), so it is not a free
@@ -182,16 +170,6 @@ struct charter_spend_params
     /// a legacy rule it must be 0 (they carry no ceiling).
     std::int32_t density_ceiling = 0;
 
-    /// Where a budget specialist's starting capital comes from.
-    charter_capital_rule capital_rule = charter_capital_rule::draw;
-    /// Credits of starting capital per unspent point, under `unspent_points`:
-    /// must be finite and > 0 there, and 0 under `draw`; and the richest centre's
-    /// points x this rate must stay inside the float balance's range, or the whole
-    /// spend is refused (`charter_capital_in_balance_domain`). PROPOSED (DIGITISATION.md
-    /// § 1): the rate that makes one specialist's price in points worth today's
-    /// 400 credits — a caller's number, never a default here.
-    float capital_per_point = 0.0f;
-
     /// Points one specialist costs: the firm price times the firm charters it is
     /// worth. Widened, so no pair of int32 inputs overflows it; a price above any
     /// int32 budget entry is simply never affordable.
@@ -226,58 +204,66 @@ inline std::int64_t charter_isqrt(std::int64_t x)
 ///     per-good cap = max(c, floor(c x sqrt(B / B_ref)))
 ///     B_ref        = c x |G| x firm_price_points
 ///
+/// B AND B_REF ARE IN THE SAME UNITS — points spent on FIRMS (Ben, 2026-09-18):
+///
 /// c  = `per_resource_firm_cap` (8 in every measured row) — the legacy cap is
-///      both the floor and the base, so a body whose capital is exactly what the
-///      legacy cap would spend keeps the legacy cap.
-/// B  = the body's CHARTER CAPITAL: every point budgeted to a centre on the body
-///      whose tile a nation owns (a `no_nation` centre's points can buy nothing,
-///      so they buy no density either), specialists' prices included.
+///      both the floor and the base.
+/// B  = the body's points for FIRMS: over every centre on the body whose tile a
+///      nation owns (a `no_nation` centre's points can buy nothing), its points
+///      NET OF THE SPECIALIST PRICE where it affords one, in whole firm
+///      charters — `charter_centre_firm_points`. Known before the walk: a centre
+///      that affords a specialist sets its price aside whether or not the
+///      specialist then finds ground, exactly as the walk does.
 /// G  = the GOODS WITH DEMAND on the body — every good whose demand, all three
 ///      halves the gap selection reads (consumer + building upkeep +
 ///      construction), is > 0, measured ONCE before the walk. See
 ///      `charter_web_from_budget` for why it is fixed there.
-/// B_ref = the points the legacy cap would spend on that body: c firms on each
-///      demanded good, at the firm price. PROPOSED — B_ref's definition is Ben's
-///      call (BL-1039's review entry).
+/// B_ref = the points the legacy cap spends on firms on that body: c firms on
+///      each demanded good, at the firm price.
+///
+/// SO cap(B_ref) == c EXACTLY: at B = B_ref = c x |G| x fp the integer below is
+/// c x (c |G| fp) / (|G| fp) = c^2 with no remainder, isqrt(c^2) = c, and
+/// max(c, c) = c. A body whose firm spend is the legacy firm spend keeps the
+/// legacy cap; only a body that spends MORE on firms earns more per good
+/// (charter_refusal_probe proves it over a grid of c, |G| and firm prices).
 ///
 /// Exact integer arithmetic: floor(sqrt(y)) = isqrt(floor(y)) for y >= 0, and
 /// c^2 x B / B_ref = c x B / (|G| x fp). A body with no demanded good (|G| = 0)
 /// has no reference and keeps c. A cap too large for int32 — or a c x B past
 /// int64 — saturates at int32's maximum: any cap at or above the density ceiling
 /// already binds nothing.
-inline std::int32_t charter_sqrt_per_good_cap(std::int32_t c, std::int64_t capital_points,
+inline std::int32_t charter_sqrt_per_good_cap(std::int32_t c, std::int64_t firm_points,
                                               int goods_with_demand, std::int32_t firm_price_points)
 {
-    if (c <= 0 || goods_with_demand <= 0 || firm_price_points <= 0 || capital_points <= 0)
+    if (c <= 0 || goods_with_demand <= 0 || firm_price_points <= 0 || firm_points <= 0)
         return c;
     const std::int64_t denom = static_cast<std::int64_t>(goods_with_demand)
                              * static_cast<std::int64_t>(firm_price_points);
     constexpr std::int64_t k_max = std::numeric_limits<std::int64_t>::max();
-    if (capital_points > k_max / c)
+    if (firm_points > k_max / c)
         return std::numeric_limits<std::int32_t>::max();
-    const std::int64_t y    = (static_cast<std::int64_t>(c) * capital_points) / denom;
+    const std::int64_t y    = (static_cast<std::int64_t>(c) * firm_points) / denom;
     const std::int64_t root = charter_isqrt(y);
     const std::int64_t cap  = std::max<std::int64_t>(c, root);
     return static_cast<std::int32_t>(
         std::min<std::int64_t>(cap, std::numeric_limits<std::int32_t>::max()));
 }
 
-/// THE UNSPENT-POINTS CAPITAL, taken WIDE (BL-1039 fix round): @p remainder x
-/// @p rate in double, so nothing narrows before the range is known. Production
-/// and every check compute it through this one function.
-inline double charter_unspent_capital_wide(std::int64_t remainder, float rate)
+/// B's per-centre term (see `charter_sqrt_per_good_cap`): @p points NET OF THE
+/// SPECIALIST PRICE when they afford it, rounded down to whole firm charters and
+/// expressed in points. What the walk sets aside for firms at this centre
+/// (`firm_points`), less the remainder no firm can be bought with. 0 when the
+/// firm price is not positive (such a spend is refused anyway).
+inline std::int64_t charter_centre_firm_points(std::int32_t points, const charter_spend_params& s)
 {
-    return static_cast<double>(remainder) * static_cast<double>(rate);
-}
-
-/// True when @p capital (a wide product) is inside the balance's real domain:
-/// `corporation_component::balance` is a float, and a capital is never negative,
-/// so [0, FLT_MAX] and finite. Outside it the narrowing cast would make an
-/// infinite or meaningless balance — the spend is refused instead, never clamped.
-inline bool charter_capital_in_balance_domain(double capital)
-{
-    return std::isfinite(capital) && capital >= 0.0
-        && capital <= static_cast<double>(std::numeric_limits<float>::max());
+    const std::int64_t fp = s.firm_price_points;
+    if (fp <= 0 || points <= 0)
+        return 0;
+    std::int64_t left = points;
+    const std::int64_t sp = s.specialist_price_points();
+    if (sp > 0 && left >= sp)
+        left -= sp;
+    return (left / fp) * fp;
 }
 
 /// Why a point was not spent. Ordered: a report sorts (centre, reason) on it.
@@ -346,14 +332,9 @@ struct charter_record
     /// from it across the whole nation, so a reader measures the spill here.
     std::vector<entity_id> holdings;
 
-    /// A SPECIALIST'S starting capital as chartered (0 on a firm). Under
-    /// `unspent_points`, `capital_points` is the centre's unspent remainder the
-    /// capital was computed on (so capital == capital_points x the rate);
-    /// under `draw` it is -1 (the capital is the seeded draw).
-    float        capital        = 0.0f;
-    std::int64_t capital_points = -1;
-    /// The good a FIRM was chartered for (a resource index, as the gap selection
-    /// picked it); 0xFFFF on a specialist.
+    /// The good a FIRM was chartered for (a resource index, as the selection —
+    /// biggest gap first, or in turn under `sqrt_capital` — picked it); 0xFFFF on
+    /// a specialist.
     std::uint16_t good = 0xFFFF;
 };
 
@@ -362,8 +343,10 @@ struct charter_record
 struct charter_body_record
 {
     entity_id    body = null_entity;
-    /// B: points budgeted to nation-resolved centres on this body.
-    std::int64_t capital_points = 0;
+    /// B: the body's points for FIRMS — over its nation-resolved centres, net
+    /// of each affordable specialist price, in whole firm charters
+    /// (`charter_centre_firm_points`). The same units as B_ref.
+    std::int64_t firm_points = 0;
     /// |G|: goods with demand on the body before the walk (see
     /// `charter_sqrt_per_good_cap`), and which they are (resource indices, ascending).
     int                        goods_with_demand = 0;
@@ -378,8 +361,8 @@ struct charter_body_record
     /// The density ceiling in force (0: none — every legacy rule).
     std::int32_t density_ceiling = 0;
     /// Background firms the walk chartered on this body, in all and per good
-    /// (indexed by resource; the good each was chartered FOR, as the gap
-    /// selection picked it).
+    /// (indexed by resource; the good each was chartered FOR, as the selection
+    /// picked it).
     std::int32_t firms = 0;
     std::vector<std::int32_t> firms_by_good;   ///< size resource_count
 };
@@ -409,17 +392,10 @@ struct charter_spend_report
     std::int64_t points_spent    = 0;
     std::int64_t points_unspent  = 0;  ///< always points_budgeted - points_spent
 
-    /// BL-1039: the rules the spend ran on, per body (ascending body id).
-    charter_cap_rule     cap_rule     = charter_cap_rule::fixed;
-    charter_capital_rule capital_rule = charter_capital_rule::draw;
+    /// BL-1039: the cap rule the spend ran on, and each body's rule and firms
+    /// per good (ascending body id).
+    charter_cap_rule                 cap_rule = charter_cap_rule::fixed;
     std::vector<charter_body_record> bodies;
-
-    /// BL-1039, under `unspent_points`: specialists whose centre left nothing
-    /// unspent and so opened with ZERO capital, and the unspent points that
-    /// became capital. Those points stay counted as UNSPENT by their reasons —
-    /// they chartered nothing — so `points_unspent` still balances.
-    int          specialists_zero_capital = 0;
-    std::int64_t unspent_points_capitalised = 0;
 };
 
 /// Null when @p s may spend @p b; otherwise why not. An EMPTY budget is never
@@ -435,8 +411,8 @@ inline const char* charter_spend_refusal(const charter_budget& b, const charter_
         return "specialist_firm_charters must be > 0 on a non-empty charter budget (no shipped default)";
     if (s.window_radius < 0)
         return "window_radius must be >= 0";
-    // BL-1039 — the caps and the capital rate: the budget path's own numbers,
-    // no shipped default, refused where read and <= 0, refused where set and unread.
+    // BL-1039 — the caps: the budget path's own numbers, no shipped default,
+    // refused where read and <= 0, refused where set and unread.
     if (s.max_firms_per_body <= 0)
         return "max_firms_per_body must be > 0 on a non-empty charter budget (no shipped default)";
     switch (s.resource_cap_rule)
@@ -465,35 +441,6 @@ inline const char* charter_spend_refusal(const charter_budget& b, const charter_
         break;
     default:
         return "resource_cap_rule is not a known rule";
-    }
-    switch (s.capital_rule)
-    {
-    case charter_capital_rule::draw:
-        if (s.capital_per_point != 0.0f)
-            return "capital_per_point is read only by the unspent_points capital rule; the draw "
-                   "with a rate set would silently ignore it";
-        break;
-    case charter_capital_rule::unspent_points:
-    {
-        if (!std::isfinite(s.capital_per_point) || !(s.capital_per_point > 0.0f))
-            return "capital_per_point must be finite and > 0 under the unspent_points capital rule "
-                   "(no shipped default)";
-        // THE CAPITAL'S RANGE, decided here — before any mutation — so a spend
-        // whose capital could leave the balance's domain is refused WHOLE, never
-        // clamped (BL-1039 fix round). A specialist's remainder is at most its
-        // centre's points, so the richest entry bounds every capital the spend can
-        // write; the product is taken wide (`charter_unspent_capital_wide`) and
-        // compared against the float balance's finite range before any narrowing.
-        std::int32_t richest = 0;
-        for (const auto& kv : b.points())
-            richest = std::max(richest, kv.second);
-        if (!charter_capital_in_balance_domain(charter_unspent_capital_wide(richest, s.capital_per_point)))
-            return "capital_per_point x the richest centre's points leaves the balance's range (a "
-                   "float); the capital would overflow";
-        break;
-    }
-    default:
-        return "capital_rule is not a known rule";
     }
     return nullptr;
 }
