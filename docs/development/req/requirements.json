@@ -6061,72 +6061,80 @@
       "headless: player_seed_sweep --digest-check (main session)"
      ],
      "requirement": "With digitisation_span_enabled off (its default), every world_determinism digest, every seed-library fingerprint and every BL-1031 pin is unmoved.",
-     "notes": ""
+     "notes": "The 16-seed --digest-check runs after BL-1039 merges, covering both.",
+     "result_metric": "Span off, on 9bc9bb9a (main session): world_determinism ALL PASS, digests unchanged; exploration_sweep --out then seed_library.js --check --from: 0 moved, 0 absent, 16 unchanged."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness (span mode)"
      ],
      "requirement": "With the switch on, the span runs as a third call after the Exploration fold and before population centres are generated: 75 decision rounds, 1660 to 1956, on every library seed, resumed from exploration_output.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --through 1960: the span ran 75 rounds, 1660-1960, on 16/16 seeds (lane run); the main session re-ran seeds 28, 40 and 38 and reproduced the lane's counters exactly (121/121/92, 151/76/92, 76/1/213 battles/conquests/foundings; Industry 11/325, 17/401, 21/471)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the span params start from exploration_sim_params",
       "code: the run predicate"
      ],
      "requirement": "The span's params derive from exploration_sim_params (never the Empires derivation), take their own seed fold, enable the Industry tree from 1660, and keep BL-1037's switch off; the span runs if and only if Exploration ran, never keyed on epoch_year, so the superseded arc runs no Digitisation.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Cold review (2026-09-18): params from exploration_sim_params, own seed, anchors at 1200, Industry from the span start, BL-1037 off, no Empires-only setting copied; the span sits inside the block that ran Exploration, so it never runs on the superseded arc and stop_after_exploration stops it."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --through 1960 (span mode)"
      ],
      "requirement": "The thirteen readings are taken on THIS span, per library seed, beside the 1660 control; the continued-Exploration run stays available and is labelled a 1200-network run.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "The thirteen readings on the span per seed beside the 1660 control (16/16 controls matched their fingerprints, lane run); main-session spot of 3 seeds: measured 3, partial 2, structural zero 1, n/a 7. --continued is labelled a 1200-network run in its header, per-seed title, summary and JSON (not on each reading line; the cold review calls R4 met in substance)."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --fidelity"
      ],
      "requirement": "BL-1036's fidelity gates still pass on 16 of 16 seeds with the span as the real consumer of the resume.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --fidelity, 16 library seeds (main session, 9bc9bb9a): gate 1 16/16, gate 2 16/16, gate 3 (shipped span == the resume) 16/16, 770.9 s, worst seed 214.2 s. FIDELITY PASS."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: stop_after_exploration respected",
       "code: stop_after_digitisation and wizard label 14"
      ],
      "requirement": "stop_after_exploration still stops before the span (so exploration_sweep and the fingerprints stay cheap and unmoved); a stop_after_digitisation stop and the wizard's fourteenth label exist.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Cold review: stop_after_exploration is read at the span's own gate; stop_after_digitisation and the fourteenth label exist. The loading bar's denominator changed with them (12/15), which BL-1053 corrects."
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: span cost per seed"
      ],
      "requirement": "The span's cost per library seed is recorded (median and maximum, Release, serial).",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Span cost per seed, Release harness build, serial: median 2366 ms, max 15069 ms over 16 seeds (lane run; machine not certified quiet); main-session spot on 3 light seeds: median 295 ms, max 339 ms."
     },
     {
      "id": "R8",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds no shipped path reaching the span while the switch is off.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Cold review (code-reviewer, 2026-09-18): nothing blocking with the switch off; the 1660 records world setup still reads, and the harness/validator tightening, are BL-1053."
     }
    ],
    "resolution": ""
