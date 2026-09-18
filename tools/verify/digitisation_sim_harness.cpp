@@ -429,19 +429,51 @@ struct seed_row
     int    survey_unseen     = 0;  ///< ... of which the survey left at -1 (must be 0)
     int    survey_forest[5]  = {}; ///< survey_forest_q min / p25 / med / p75 / max at the open
     int    survey_forested   = 0;  ///< regions at the open with any forest (> 0)
-    int    survey_wooded     = 0;  ///< ... with at least half their land under forest (>= 500)
+    int    survey_wooded     = 0;  ///< ... whose forest score is at or above the world's mean (>= 500)
     int    survey_fuel_med   = 0;  ///< survey_fuel_q median at the open (500 = the world's mean region)
     int    survey_fuel_seam  = 0;  ///< regions whose survey_fuel_q clears the 250 seam bar
-    int    survey_seam_energy = 0; ///< ... and whose inherited energy_q clears it (the gate's reading)
+    int    survey_seam_energy = 0; ///< ... and whose inherited energy_q clears it (the gate's reading before BL-1041's DEFAULT B)
     int    close_regions     = 0;  ///< regions at the close
     int    close_unsurveyed  = 0;  ///< ... founded after the open, so never surveyed (-1)
     int    doctrine[3]       = {}; ///< living polities at the close: coke / charcoal / neither
     /// Mean of each living polity's held-ground forest reading
-    /// (`industry_ground_forest_q` over the regions it holds at the close),
-    /// per doctrine group; NaN for an empty group.
+    /// (`industry_ground_forest_q` over the regions it holds at the close:
+    /// its best held forest score since the 2026-09-18 ruling), per doctrine
+    /// group; NaN for an empty group.
     double doctrine_forest[3] = { k_undef, k_undef, k_undef };
     int    charcoal_seam_seen  = 0; ///< Charcoal polities that ever passed the seam gate (fuel_seen)
-    int    charcoal_seam_close = 0; ///< Charcoal polities holding a seam (energy_q >= 250) at the close
+    int    charcoal_seam_close = 0; ///< Charcoal polities holding a seam (the gate's reading >= 250) at the close
+
+    // --- BL-1041: reading 8, industry points (span mode) --------------------
+    // Read off the span's 1960 close (`digitisation_handoff.regions`, the
+    // located stock) and its own counters (`digitisation_state`). The points
+    // have no sink, so the region table must hold exactly what the counters
+    // credited (`points_ledger_ok`).
+    bool    points_on          = false; ///< the span ran with industry_points_enabled
+    bool    points_rejected    = false; ///< the run's constants were out of domain (nothing credited)
+    int64_t points_total       = 0;     ///< summed over every region at the close
+    int64_t points_scale       = 0;     ///< credited by the scale accrual, all rounds
+    int64_t points_treasury    = 0;     ///< credited from capital treasuries, all rounds
+    int64_t treasury_debited   = 0;     ///< ... and the treasury units that took out of capitals
+    int64_t points_refused     = 0;     ///< credits refused (must be 0)
+    bool    points_ledger_ok   = false; ///< points_total == points_scale + points_treasury
+    int     points_regions     = 0;     ///< regions holding any points at the close
+    int     centre_regions     = 0;     ///< regions with centres at the close
+    double  points_region_gini = k_undef; ///< over regions holding points
+    double  points_top_region  = k_undef; ///< the largest region's share of the total
+    int     points_polities    = 0;     ///< living polities whose held ground holds points
+    int     living_close       = 0;     ///< living polities at the close
+    double  points_polity_gini = k_undef; ///< over living polities (held-ground sums; 0s included)
+    double  points_top_polity  = k_undef; ///< the largest polity's share of the held total
+    double  points_unheld      = k_undef; ///< share of the total standing on ground nobody holds
+    double  treasury_share     = k_undef; ///< points_treasury / (scale + treasury)
+    int     fuel_factor[5]     = {};    ///< fuel factor per mille over centre regions: min/p25/med/p75/max
+    int     fuel_at_floor      = 0;     ///< centre regions whose reading is 0 (factor at the floor)
+    double  rho_points_urban   = k_undef; ///< Spearman(points, urban heads) over regions with points or centres
+    double  rho_intensity_fuel = k_undef; ///< Spearman(points per urban head, fuel factor) over centre regions with points
+    double  inherited_share    = k_undef; ///< share of the total on regions the span founded (inherited fuel)
+    int     inherited_regions  = 0;     ///< ... how many such regions hold points
+    int64_t ns_points          = 0;     ///< the scale accrual's wall clock over the span (reported only)
 
     // --- Reading 1: density follows cities (campaign world) -----------------
     int    markets        = 0;
@@ -624,8 +656,9 @@ void region_fields(const region& a, const region& b, field_census& out)
     FID_CMP(work_manpower_mod); FID_CMP(work_reach_mod); FID_CMP(work_defence_mod);
     FID_CMP(work_industrial_mod);
     FID_CMP(survey_fuel_q); FID_CMP(survey_forest_q); // BL-1051: the span-open survey
+    FID_CMP(industry_points);                         // BL-1041: the located stock
 }
-constexpr int k_region_fields = 53; // counts the FID_CMP lines above; keep them equal
+constexpr int k_region_fields = 54; // counts the FID_CMP lines above; keep them equal
 
 /// Every `polity` field, one by one (same caveat as `region_fields`).
 void polity_fields(const polity& a, const polity& b, field_census& out)
@@ -791,6 +824,13 @@ run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture
     {
         hp.industry_tree_enabled = span_forces->industry_tree_enabled;
         hp.industry_open_year    = span_forces->industry_open_year;
+        // BL-1041: industry points open with the tree (inert before its open
+        // year, so C to the top of 1660 is still Exploration's shipped run),
+        // and the two ruled defaults (A, B) ride along -- both inert here, where
+        // nothing was surveyed, but the forces are the span's.
+        hp.industry_points_enabled              = span_forces->industry_points_enabled;
+        hp.industry_survey_inherits_at_founding = span_forces->industry_survey_inherits_at_founding;
+        hp.industry_fuel_gate_reads_survey      = span_forces->industry_fuel_gate_reads_survey;
     }
     run_out r;
     r.ss = fx.pre_exploration_settlement;
@@ -887,6 +927,7 @@ round_diff compare_round(const run_out& x, const run_out& y)
         if (a.standing_army_owner != b.standing_army_owner) ++f["standing_army_owner"];
         if (a.population != b.population)                   ++f["population"];
         if (a.nation != b.nation)                           ++f["nation"];
+        if (a.industry_points != b.industry_points)         ++f["industry_points"]; // BL-1041
         if (!f.empty()) ++d.regions_any;
         for (const auto& [k, n] : f) d.stock_fields[k] += n;
     }
@@ -1903,13 +1944,98 @@ int main(int argc, char** argv)
                 if (side == 1)
                 {
                     if (q.industry_fuel_seen) ++row.charcoal_seam_seen;
+                    // BL-1041: the seam as the span's gate read it -- the fuel
+                    // reading under DEFAULT B, energy_q with it off.
+                    const bool b_on = fx.digitisation_params.industry_fuel_gate_reads_survey;
                     int seam = 0;
-                    for (int hi : held) seam = std::max(seam, close_t[static_cast<std::size_t>(hi)].energy_q);
+                    for (int hi : held)
+                    {
+                        const region& hr = close_t[static_cast<std::size_t>(hi)];
+                        seam = std::max(seam, b_on ? industry_fuel_reading_q(hr) : hr.energy_q);
+                    }
                     if (seam >= industry_fuel_seam_bar_q) ++row.charcoal_seam_close;
                 }
             }
             for (int s = 0; s < 3; ++s)
                 if (row.doctrine[s] > 0) row.doctrine_forest[s] = forest_sum[s] / row.doctrine[s];
+
+            // ---- BL-1041: reading 8, industry points at the close ----------
+            const history_sim_params& dpp = fx.digitisation_params;
+            const history_sim_state&  dst = fx.digitisation_state;
+            row.points_on       = dpp.industry_points_enabled;
+            row.points_rejected = dst.industry_points_params_rejected;
+            row.points_scale    = dst.industry_points_from_scale;
+            row.points_treasury = dst.industry_points_from_treasury;
+            row.treasury_debited = dst.treasury_spent_on_industry;
+            row.points_refused  = dst.industry_points_refused;
+            row.ns_points       = fx.ns_digitisation_industry_points;
+            const std::size_t open_n = open_t.size();
+            int64_t inherited_pts = 0, unheld_pts = 0;
+            std::vector<double> reg_pts, rho_p, rho_u, int_p, int_f;
+            std::vector<int> factors;
+            std::map<int, int64_t> by_polity;
+            for (std::size_t i = 0; i < close_t.size(); ++i)
+            {
+                const region& rg = close_t[i];
+                row.points_total += rg.industry_points;
+                if (rg.centres > 0)
+                {
+                    ++row.centre_regions;
+                    const int fr = industry_fuel_reading_q(rg);
+                    factors.push_back(industry_points_fuel_factor_q(fr, dpp));
+                    if (fr == 0) ++row.fuel_at_floor;
+                    if (rg.industry_points > 0 && rg.urban_population > 0)
+                    {
+                        int_p.push_back(static_cast<double>(rg.industry_points)
+                                        / static_cast<double>(rg.urban_population));
+                        int_f.push_back(static_cast<double>(factors.back()));
+                    }
+                }
+                if (rg.industry_points > 0 || rg.centres > 0)
+                {
+                    rho_p.push_back(static_cast<double>(rg.industry_points));
+                    rho_u.push_back(static_cast<double>(rg.urban_population));
+                }
+                if (rg.industry_points <= 0) continue;
+                ++row.points_regions;
+                reg_pts.push_back(static_cast<double>(rg.industry_points));
+                if (i >= open_n) { inherited_pts += rg.industry_points; ++row.inherited_regions; }
+                if (rg.nation >= 0) by_polity[rg.nation] += rg.industry_points;
+                else unheld_pts += rg.industry_points;
+            }
+            row.points_ledger_ok = row.points_total == row.points_scale + row.points_treasury;
+            if (row.points_total > 0)
+            {
+                const double tot = static_cast<double>(row.points_total);
+                row.points_region_gini = gini(reg_pts);
+                row.points_top_region  = *std::max_element(reg_pts.begin(), reg_pts.end()) / tot;
+                row.inherited_share    = static_cast<double>(inherited_pts) / tot;
+                row.points_unheld      = static_cast<double>(unheld_pts) / tot;
+                row.treasury_share     = static_cast<double>(row.points_treasury)
+                                       / static_cast<double>(row.points_scale + row.points_treasury);
+            }
+            // Per LIVING polity, zeros included: a realm with no points is part
+            // of the spread, not missing from it.
+            std::vector<double> pol_pts;
+            int64_t held_total = 0;
+            for (const polity& q : fx.digitisation_handoff.polities)
+            {
+                if (!q.alive) continue;
+                ++row.living_close;
+                const auto it = by_polity.find(q.id);
+                const int64_t v = it != by_polity.end() ? it->second : 0;
+                if (v > 0) ++row.points_polities;
+                pol_pts.push_back(static_cast<double>(v));
+                held_total += v;
+            }
+            row.points_polity_gini = gini(pol_pts);
+            if (held_total > 0)
+                row.points_top_polity = *std::max_element(pol_pts.begin(), pol_pts.end())
+                                      / static_cast<double>(held_total);
+            std::sort(factors.begin(), factors.end());
+            for (int k = 0; k < 5; ++k) row.fuel_factor[k] = rank(factors, pcts[k]);
+            row.rho_points_urban   = spearman(rho_p, rho_u);
+            row.rho_intensity_fuel = spearman(int_p, int_f);
         }
 
         const entity_id body = fx.ran ? fx.body : w.home_body;
@@ -2222,14 +2348,17 @@ int main(int argc, char** argv)
     if (span_mode)
     {
         std::printf("\n=== THE SPAN-OPEN SURVEY AND THE FUEL DOCTRINE, per seed (BL-1051; evidence, not a reading) ===\n");
-        std::printf("  survey (at the open, every region the span opened on): forest = survey_forest_q, the land share\n"
-                    "  of the window under forest, 0-1000 -- min/p25/med/p75/max, regions with any forest, regions at\n"
-                    "  >= 500; fuel = survey_fuel_q (500 = the world's mean region), its median, and regions clearing\n"
-                    "  the 250 seam bar on the survey vs on the inherited energy_q the fuel gate still reads.\n"
+        std::printf("  survey (at the open, every region the span opened on): forest = survey_forest_q, the window's\n"
+                    "  land share under forest SCORED against the open's mean share as fuel is (500 = the world's mean\n"
+                    "  region; Ben 2026-09-18) -- min/p25/med/p75/max, regions with any forest, regions at or above the\n"
+                    "  mean (>= 500); fuel = survey_fuel_q (500 = the world's mean region), its median, and regions\n"
+                    "  clearing the 250 seam bar on the survey vs on the inherited energy_q (the gate's reading before\n"
+                    "  BL-1041's DEFAULT B; with B on, every Industry fuel read takes the survey).\n"
                     "  close (1960): regions the span founded after its open are unsurveyed (-1, out of every mean);\n"
                     "  the Fuel Doctrine side each living polity holds (IN-MT-1a coke / IN-MT-1b charcoal / neither),\n"
-                    "  the mean held-ground forest reading per side, and Charcoal polities that ever passed the seam\n"
-                    "  gate (fuel_seen) or hold a seam at the close -- they had Coke open and took Charcoal anyway.\n");
+                    "  per side the mean over its polities of ground_forest (each polity's BEST held forest score),\n"
+                    "  and Charcoal polities that ever passed the seam gate (fuel_seen) or hold a seam at the close --\n"
+                    "  they had Coke open and took Charcoal anyway.\n");
         std::printf("  seed | open (unseen) | forest min/p25/med/p75/max | any / >=500 | fuel med | seams surv/energy_q |"
                     " close (unsurv) | coke/charc/none | held forest coke / charc / none | charc: seam seen / now\n");
         int p_doc[3] = {};
@@ -2272,21 +2401,75 @@ int main(int argc, char** argv)
             }
         }
         const auto pooled_mean = [&](int s) { return p_doc[s] > 0 ? p_forest_sum[s] / p_doc[s] : k_undef; };
-        std::printf("  POOLED survey: %d regions opened on, %d left unseen; %d with any forest (%.0f%%), %d at >= 500"
-                    " (%.0f%%); at the close %d of %d regions unsurveyed (founded in the span)\n",
+        std::printf("  POOLED survey: %d regions opened on, %d left unseen; %d with any forest (%.0f%%), %d scoring at or"
+                    " above the mean (%.0f%%); at the close %d of %d regions unsurveyed (founded in the span)\n",
                     p_open, p_unseen, p_forested, p_open > 0 ? 100.0 * p_forested / p_open : 0.0, p_wooded,
                     p_open > 0 ? 100.0 * p_wooded / p_open : 0.0, p_unsurv, p_close);
-        print_spread("median region forest share at the open, per world", med_forest);
+        print_spread("median region forest score at the open, per world", med_forest);
         std::printf("  POOLED Fuel Doctrine at the close: coke %d / charcoal %d / neither %d (living polities).\n"
                     "         BL-1051 cites 404 / 118 / 340 for BL-1038's run, which this harness does not reproduce;\n"
                     "         the like-for-like split WITHOUT the survey is --fidelity's V4 column (V5 is this run).\n",
                     p_doc[0], p_doc[1], p_doc[2]);
-        std::printf("  ARE THE CHARCOAL POLITIES THE WOODED ONES? mean held forest, pooled over polities: coke %.0f,"
-                    " charcoal %.0f, neither %.0f;\n"
+        std::printf("  ARE THE CHARCOAL POLITIES THE WOODED ONES? mean ground_forest (best held forest score), pooled\n"
+                    "         over polities: coke %.0f, charcoal %.0f, neither %.0f;\n"
                     "         charcoal wooder than coke on %d of %d seeds holding both sides; Charcoal polities that\n"
                     "         ever passed the seam gate %d, holding a seam at the close %d (of %d)\n",
                     pooled_mean(0), pooled_mean(1), pooled_mean(2), seeds_charcoal_wooder, seeds_compared,
                     p_seen, p_now, p_doc[1]);
+    }
+
+    // ============ BL-1041: readings 8 and 9, per seed =========================
+    if (span_mode)
+    {
+        std::printf("\n=== READINGS 8 AND 9, per seed - industry points at the close, and the urban share (BL-1041) ===\n");
+        std::printf("  points = industry points standing on regions at the close (a located stock, no sink this cut);\n"
+                    "  ledger = the region table holds exactly what the span credited; treas = the share paid in from\n"
+                    "  capital treasuries; reg/pol = regions / living polities holding points, with a Gini over each\n"
+                    "  (polities: every living one, zeros included) and the largest one's share; fuel factor = per mille\n"
+                    "  over regions with centres, min/med/max, and how many sit at the floor (reading 0);\n"
+                    "  rho(p,urb) = Spearman(points, urban heads) over regions with points or centres -- 1.000 would\n"
+                    "  mean points only restate headcount; rho(int,fuel) = Spearman(points per urban head, fuel factor);\n"
+                    "  inher = share on ground the span founded (fuel inherited under DEFAULT A); cost = the scale\n"
+                    "  accrual's own wall clock over the span. [9] urban share of heads at 1660 -> the close.\n");
+        std::printf("  seed |       points ledger treas | reg  gini  top | pol/liv  gini  top | fuel min/med/max flr |"
+                    " rho(p,urb) rho(int,fuel) | inher (reg) | cost ms | [9] urban%% K -> C  verdict\n");
+        for (const seed_row& r : rows)
+        {
+            if (!r.span_ran) continue;
+            const auto f3 = [](double x, char* b, std::size_t n) {
+                if (std::isnan(x)) std::snprintf(b, n, "    -");
+                else std::snprintf(b, n, "%5.3f", x);
+            };
+            char tg[16], rg[16], rt[16], pg[16], pt[16], rpu[16], rif[16], ih[16];
+            f3(r.treasury_share, tg, sizeof tg);
+            f3(r.points_region_gini, rg, sizeof rg);
+            f3(r.points_top_region, rt, sizeof rt);
+            f3(r.points_polity_gini, pg, sizeof pg);
+            f3(r.points_top_polity, pt, sizeof pt);
+            f3(r.rho_points_urban, rpu, sizeof rpu);
+            f3(r.rho_intensity_fuel, rif, sizeof rif);
+            f3(r.inherited_share, ih, sizeof ih);
+            const double u0 = r.at_1660.heads > 0
+                ? 100.0 * static_cast<double>(r.at_1660.urban_heads) / static_cast<double>(r.at_1660.heads) : 0.0;
+            const double u1 = r.at_close.heads > 0
+                ? 100.0 * static_cast<double>(r.at_close.urban_heads) / static_cast<double>(r.at_close.heads) : 0.0;
+            const bool u_ok = usable(r) && r.at_1660.heads > 0 && r.at_close.heads > 0;
+            // Compared at the precision the fraction itself carries: a rise
+            // is a strictly larger share of heads, never a rounded one.
+            const bool rose = u_ok && static_cast<double>(r.at_close.urban_heads) * static_cast<double>(r.at_1660.heads)
+                                    > static_cast<double>(r.at_1660.urban_heads) * static_cast<double>(r.at_close.heads);
+            const char* verdict = !u_ok ? "unusable handoff" : rose ? "rising" : "FAILING (flat or falling)";
+            std::printf("  %4u | %12lld %6s %5s | %3d %s %s | %3d/%-3d %s %s |    %4d/%4d/%4d %3d |"
+                        "      %s         %s | %s (%3d) | %7.1f | %5.2f -> %5.2f  %s%s%s\n",
+                        r.seed, static_cast<long long>(r.points_total),
+                        !r.points_on ? "off" : r.points_rejected ? "REJ" : r.points_ledger_ok ? "ok" : "BROKEN",
+                        tg, r.points_regions, rg, rt, r.points_polities, r.living_close, pg, pt,
+                        r.fuel_factor[0], r.fuel_factor[2], r.fuel_factor[4], r.fuel_at_floor,
+                        rpu, rif, ih, r.inherited_regions, static_cast<double>(r.ns_points) / 1.0e6,
+                        u0, u1, verdict,
+                        r.points_refused > 0 ? "  REFUSED CREDITS: " : "",
+                        r.points_refused > 0 ? std::to_string(r.points_refused).c_str() : "");
+        }
     }
 
     const auto collect = [&](double (*get)(const seed_row&)) {
@@ -2487,8 +2670,66 @@ int main(int argc, char** argv)
             lit_1660  += static_cast<std::size_t>(r.at_1660.industrialised_regions);
             lit_close += static_cast<std::size_t>(r.at_close.industrialised_regions);
         }
-        std::printf("[ 8] Industrialisation - n/a: industry points do not exist (Beat 1: cities make industry\n"
-                    "     points), so there is no holding to be uneven and no fuel gate to show in it.\n");
+        if (!span_mode)
+        {
+            std::printf("[ 8] Industrialisation - n/a: industry points exist only inside the Digitisation span\n"
+                        "     (BL-1041), and this run %s, so there is no holding to be uneven.\n",
+                        continued_mode ? "is a 1200-network run with Exploration's forces only"
+                                       : "stops at 1660 (run with --through 1960)");
+        }
+        else
+        {
+            // BL-1041 -- the points ARE the reading's observable: a located
+            // stock, credited on regions with centres from scale, their own
+            // fuel, Industry capacity and treasury paid in. The spread is
+            // printed per seed above; this is the spread of those per-seed
+            // numbers. Judgement, not a gate.
+            std::size_t ran = 0, ledger_ok = 0, refused = 0, rejected = 0;
+            for (const seed_row& r : rows)
+            {
+                if (!r.span_ran || !r.points_on) continue;
+                ++ran;
+                if (r.points_ledger_ok) ++ledger_ok;
+                if (r.points_refused > 0) ++refused;
+                if (r.points_rejected) ++rejected;
+            }
+            std::printf("[ 8] Industrialisation - MEASURED: industry points at the %lld close (BL-1041), the uneven\n"
+                        "     holding the reading asks for, over %zu worlds that ran the span with points on\n"
+                        "     (region table == credited on %zu; worlds with a refused credit %zu, with rejected\n"
+                        "     constants %zu -- each must be 0 / all):\n", T, ran, ledger_ok, refused, rejected);
+            const auto span_collect = [&](double (*get)(const seed_row&)) {
+                std::vector<double> v;
+                for (const seed_row& r : rows) v.push_back(r.span_ran && r.points_on ? get(r) : k_undef);
+                return v;
+            };
+            print_spread("points per world at the close",
+                         span_collect([](const seed_row& r) { return static_cast<double>(r.points_total); }));
+            print_spread("Gini of points over regions holding any",
+                         span_collect([](const seed_row& r) { return r.points_region_gini; }));
+            print_spread("largest region's share of the world's points",
+                         span_collect([](const seed_row& r) { return r.points_top_region; }));
+            print_spread("Gini of points over living polities (zeros in)",
+                         span_collect([](const seed_row& r) { return r.points_polity_gini; }));
+            print_spread("largest polity's share of held points",
+                         span_collect([](const seed_row& r) { return r.points_top_polity; }));
+            print_spread("share paid in from capital treasuries",
+                         span_collect([](const seed_row& r) { return r.treasury_share; }));
+            print_spread("median fuel factor over centre regions (per mille)",
+                         span_collect([](const seed_row& r) { return static_cast<double>(r.fuel_factor[2]); }));
+            print_spread("fuel factor spread, max - min (per mille)",
+                         span_collect([](const seed_row& r) {
+                             return static_cast<double>(r.fuel_factor[4] - r.fuel_factor[0]); }));
+            print_spread("rho(points, urban heads) - 1.0 would be headcount",
+                         span_collect([](const seed_row& r) { return r.rho_points_urban; }));
+            print_spread("rho(points per urban head, fuel factor)",
+                         span_collect([](const seed_row& r) { return r.rho_intensity_fuel; }));
+            print_spread("share on ground the span founded (inherited fuel)",
+                         span_collect([](const seed_row& r) { return r.inherited_share; }));
+            print_spread("share on ground nobody holds",
+                         span_collect([](const seed_row& r) { return r.points_unheld; }));
+            print_spread("the scale accrual's cost over the span (ms)",
+                         span_collect([](const seed_row& r) { return static_cast<double>(r.ns_points) / 1.0e6; }));
+        }
         std::printf("     region half - STRUCTURAL ZERO: Stage 4's per-region lag is computed only for a settlement\n"
                     "     stop at or after 1700, and the shipped world's settlement stops at epoch 0, so no region can\n"
                     "     light a furnace however far the span runs. Regions industrialised, summed over the spread:\n"
@@ -2517,7 +2758,26 @@ int main(int argc, char** argv)
     // ---- 9 ------------------------------------------------------------------
     if (past_1660)
     {
-        std::printf("[ 9] Migration - PARTIAL\n");
+        // BL-1041: a world whose urban share did not rise FAILS this reading,
+        // and a world with no cross-border stream fails its second clause --
+        // printed as failing, never n/a: the reading's observable exists (the
+        // share, and a stream count of zero), so a world that does not show
+        // it is a refusal measured, not a reading nobody took.
+        std::size_t r9_usable = 0, r9_rising = 0;
+        std::string r9_failing;
+        for (const seed_row& r : rows)
+        {
+            if (!usable(r) || r.at_1660.heads <= 0 || r.at_close.heads <= 0) continue;
+            ++r9_usable;
+            const bool up = static_cast<double>(r.at_close.urban_heads) * static_cast<double>(r.at_1660.heads)
+                          > static_cast<double>(r.at_1660.urban_heads) * static_cast<double>(r.at_close.heads);
+            if (up) ++r9_rising;
+            else r9_failing += (r9_failing.empty() ? "" : " ") + std::to_string(r.seed);
+        }
+        std::printf("[ 9] Migration - FAILING on %zu of %zu worlds (urban share flat or falling%s), and on every world\n"
+                    "     for its second clause (no cross-border stream)\n",
+                    r9_usable - r9_rising, r9_usable,
+                    r9_failing.empty() ? "" : (": seeds " + r9_failing).c_str());
         std::printf("     urban share rising - MEASURED off region urban_population / population at the 1660 control\n"
                     "     and the %lld close:\n", T);
         print_spread("urban share of heads, 1660 control",
@@ -2537,9 +2797,10 @@ int main(int argc, char** argv)
             const double b = static_cast<double>(r.at_close.urban_heads) / static_cast<double>(r.at_close.heads);
             if (b > a) ++rising;
         }
-        std::printf("     urban share rose across the span in %zu of %zu worlds with a usable handoff\n", rising, handoffs);
-        std::printf("     at least one cross-border stream - n/a: generation runs no cross-border migration stream\n"
-                    "     (the PROPOSED Beat 2 mechanism).\n\n");
+        std::printf("     urban share rose across the span in %zu of %zu worlds with a usable handoff; FAILING on the\n"
+                    "     other %zu\n", rising, handoffs, handoffs - std::min(rising, handoffs));
+        std::printf("     at least one cross-border stream - FAILING on every world: 0 streams measured, because\n"
+                    "     generation runs no cross-border migration stream (the PROPOSED Beat 2 mechanism).\n\n");
     }
     else
     {
@@ -2601,19 +2862,37 @@ int main(int argc, char** argv)
 
     // ---- SUMMARY (BL-1029: the states are computed, not hand-typed) ----------
     {
-        std::string measured = "1, 7", partial = "5", zero, na = "2, 4, 6, 8, 11, 12, 13";
+        // BL-1041: 8 is measured wherever the span ran (its points); 9 is
+        // measured past 1660 -- both clauses have an observable, the urban
+        // share and a stream count of 0 -- and its verdict is FAILING where
+        // the reading refuses it, printed at [9] and below, never n/a.
+        std::string measured = "1, 7", partial = "5", zero, na = span_mode ? "2, 4, 6, 11, 12, 13"
+                                                                      : "2, 4, 6, 8, 11, 12, 13";
         if (r3_structural_zero) zero = "3"; else measured = "1, 3, 7";
-        if (past_1660) { measured += ", 10"; partial += ", 9"; }
+        if (span_mode) measured += ", 8";
+        if (past_1660) { measured += ", 9, 10"; }
         else           { na += ", 9, 10"; }
         const auto count = [](const std::string& list) {
             return list.empty() ? 0 : 1 + static_cast<int>(std::count(list.begin(), list.end(), ','));
         };
+        std::size_t r9_n = 0, r9_up = 0;
+        for (const seed_row& r : rows)
+        {
+            if (!usable(r) || r.at_1660.heads <= 0 || r.at_close.heads <= 0) continue;
+            ++r9_n;
+            if (static_cast<double>(r.at_close.urban_heads) * static_cast<double>(r.at_1660.heads)
+              > static_cast<double>(r.at_1660.urban_heads) * static_cast<double>(r.at_close.heads)) ++r9_up;
+        }
         std::printf("SUMMARY at %lld (%s)  measured %d (%s) | partial %d (%s) | structural zero %d (%s) | n/a %d (%s);\n"
                     "         6 prints a labelled proxy; 8 prints its region half as a structural zero and its polity\n"
-                    "         half as evidence. Prefix: %zu of %zu fingerprinted controls matched.\n",
+                    "         half as evidence%s. Prefix: %zu of %zu fingerprinted controls matched.\n",
                     T, close_name, count(measured), measured.c_str(), count(partial), partial.c_str(),
                     count(zero), zero.empty() ? "-" : zero.c_str(), count(na), na.c_str(),
+                    span_mode ? ", beside its points" : "",
                     prefix_checked - prefix_failed, prefix_checked);
+        if (past_1660)
+            std::printf("         9 is FAILING on %zu of %zu worlds (urban share flat or falling) and on every world for\n"
+                        "         its stream clause (0 cross-border streams).\n", r9_n - r9_up, r9_n);
     }
 
     // ---- JSON (BL-1029) -----------------------------------------------------
@@ -2680,6 +2959,30 @@ int main(int argc, char** argv)
                 put_rho("doctrine_forest_neither", r.doctrine_forest[2], ", ");
                 std::fprintf(f, "\"charcoal_seam_seen\": %d, \"charcoal_seam_close\": %d,\n",
                              r.charcoal_seam_seen, r.charcoal_seam_close);
+                // BL-1041: reading 8, industry points at the close.
+                std::fprintf(f, "   \"points_on\": %s, \"points_rejected\": %s, \"points_total\": %lld, "
+                                "\"points_scale\": %lld, \"points_treasury\": %lld, \"treasury_debited\": %lld, "
+                                "\"points_refused\": %lld, "
+                                "\"points_ledger_ok\": %s, \"points_regions\": %d, \"centre_regions\": %d, "
+                                "\"points_polities\": %d, \"living_close\": %d, "
+                                "\"fuel_factor\": [%d, %d, %d, %d, %d], \"fuel_at_floor\": %d, "
+                                "\"inherited_regions\": %d, \"ns_points\": %lld, ",
+                             r.points_on ? "true" : "false", r.points_rejected ? "true" : "false",
+                             (long long)r.points_total, (long long)r.points_scale, (long long)r.points_treasury,
+                             (long long)r.treasury_debited,
+                             (long long)r.points_refused, r.points_ledger_ok ? "true" : "false",
+                             r.points_regions, r.centre_regions, r.points_polities, r.living_close,
+                             r.fuel_factor[0], r.fuel_factor[1], r.fuel_factor[2], r.fuel_factor[3],
+                             r.fuel_factor[4], r.fuel_at_floor, r.inherited_regions, (long long)r.ns_points);
+                put_rho("points_region_gini", r.points_region_gini, ", ");
+                put_rho("points_top_region", r.points_top_region, ", ");
+                put_rho("points_polity_gini", r.points_polity_gini, ", ");
+                put_rho("points_top_polity", r.points_top_polity, ", ");
+                put_rho("points_unheld", r.points_unheld, ", ");
+                put_rho("treasury_share", r.treasury_share, ", ");
+                put_rho("rho_points_urban", r.rho_points_urban, ", ");
+                put_rho("rho_intensity_fuel", r.rho_intensity_fuel, ", ");
+                put_rho("inherited_share", r.inherited_share, ",\n");
                 std::fprintf(f, "   \"markets\": %d, \"markets_urban\": %d, \"corps_on_body\": %d, ",
                              r.markets, r.markets_urban, r.corps_on_body);
                 put_rho("rho_firms_urban", r.rho_firms_urban, ", ");

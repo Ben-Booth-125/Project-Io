@@ -393,4 +393,9 @@ struct era_minus_one_fixture
     /// or a branch -- the same rule the BL-754 timings above obey, for the
     /// same reason. Say which build type produced a figure when quoting it.
     int64_t ms_digitisation = 0;
+
+    /// BL-1041: the span's industry-point scale accrual alone
+    /// (`history_sim_profile::ns_industry_points`), in nanoseconds, summed
+    /// over its rounds. Same footing as `ms_digitisation`: reported only.
+    int64_t ns_digitisation_industry_points = 0;
 };

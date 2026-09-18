@@ -454,6 +454,19 @@ history_sim_params digitisation_sim_params(const world_params& params)
     hp.industry_tree_enabled = true;
     hp.industry_open_year    = hp.start_year;
 
+    // BL-1041 — INDUSTRY POINTS, IN THIS SPAN ONLY (DIGITISATION.md sec Beat
+    // 1). They open with the Industry tree, at the span's own open year, and
+    // accrue on every region with centres plus a share of each capital's
+    // surplus; the constants are the struct's (history_sim.hpp says why each).
+    // Two defaults ride with them (RULED, Ben 2026-09-18, wave 1 form), each
+    // its own switch: A, a region the span founds inherits its parent's
+    // surveyed fuel at a discount; B, every Industry fuel read (the gate, its
+    // re-check, the seam flag, `ground_fuel`) takes the survey rather than
+    // energy_q. Both are inert wherever nothing was surveyed.
+    hp.industry_points_enabled              = true;
+    hp.industry_survey_inherits_at_founding = true; // DEFAULT A
+    hp.industry_fuel_gate_reads_survey      = true; // DEFAULT B
+
     // `resume_seeds_corridor_tier` (BL-1037) keeps its struct default, OFF:
     // it moves every resumed span, and BL-1044 turns it on with the re-bless.
     return hp;

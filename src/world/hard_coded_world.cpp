@@ -1417,6 +1417,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
                         // runs the sim, and it is read only for a harness.
                         fixture->digitisation_rounds  = history_sim_last_profile().decision_rounds;
                         fixture->ms_digitisation      = span_ms;
+                        // BL-1041: the points' own accrual cost, same footing.
+                        fixture->ns_digitisation_industry_points =
+                            history_sim_last_profile().ns_industry_points;
                     }
                 }
             }
