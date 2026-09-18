@@ -24,7 +24,21 @@
 //   farther from the root (BL-974);
 //   where a generated header exists on disk (src/world/<tree>_tree_data.hpp), the table
 //   regenerated in memory from the store matches it byte for byte, line endings normalised —
-//   a stale header is a failure naming the regeneration command (BL-974).
+//   a stale header is a failure naming the regeneration command (BL-974);
+//   FORK REACHABILITY (BL-1038, the check BL-930's commit asked for): each side of every fork
+//   can still be bought while its partner is refused, under the SIM's availability rules
+//   (history_sim.cpp `*_node_available`: excludes, the ring lock read off `open "ring N"`,
+//   rule 2's OR travel with the root exempt, a milestone's `requires` AND set and its
+//   `requires_fork` either-side), with every endowment gate assumed satisfiable — a gate is
+//   a question about the map, a fork side no map can reach is a question about the store.
+//   The graph-only reachability above cannot see this: the pre-cut industry store had
+//   Charcoal Iron reachable as a graph node, yet only THROUGH Furnace Practice, which was
+//   itself reachable only through Coke Smelting — the partner that closes Charcoal.
+//
+// Run on a store other than the canonical one (a pre-cut store from git, say) with
+//   node tools/session/tree_lint.js <tree> --store <path>
+// The generated-header comparison is skipped then (the header transcribes the canonical
+// store, not the override), and the summary line says so.
 
 const fs = require('fs');
 const path = require('path');
@@ -53,11 +67,86 @@ const EFFECT_KEYS = new Set(['sea_legs', 'post_roads']);
 const KINDS = new Set(['minor', 'major', 'milestone']);
 const CAP = 64;
 
-function lintTree(name, spec) {
+// FORK REACHABILITY (BL-1038). The sim's availability test, transcribed from
+// history_sim.cpp's `empire_node_available` / `exploration_node_available` /
+// `industry_node_available` (one shape, three trees), over a held SET of ids:
+//   - never a held node, never a node whose fork partner is held;
+//   - ring r > 1 only once a held node carries `open "ring r"`;
+//   - rule 2: the root (own `links` empty, gen.isRootNode) is exempt; any other node with a
+//     neighbour needs one neighbour held;
+//   - a milestone needs its whole `requires` set and, where it has one, either side of its
+//     `requires_fork`. (`requires_any` is honoured too, though no invested store uses it and
+//     the generator does not emit it; a store that adopts it gets the stricter reading.)
+// Endowment gates are NOT applied: every gate is assumed satisfiable.
+function forkReachabilityFailures(nodes, byId, adj) {
+  const opensRing = new Map(); // ring -> Set of node ids carrying `open "ring N"`
+  for (const n of nodes) for (const e of (n.effects || [])) {
+    const m = e.kind === 'open' ? /^ring (\d+)$/.exec(e.target || '') : null;
+    if (!m) continue;
+    const r = Number(m[1]);
+    if (!opensRing.has(r)) opensRing.set(r, new Set());
+    opensRing.get(r).add(n.id);
+  }
+  const available = (held, n) => {
+    if (held.has(n.id)) return false;
+    if (n.excludes != null && held.has(n.excludes)) return false;
+    if (n.ring > 1) {
+      const openers = opensRing.get(n.ring);
+      if (!openers || ![...openers].some(x => held.has(x))) return false;
+    }
+    const nb = adj.get(n.id);
+    if (!gen.isRootNode(n) && nb.size > 0 && ![...nb].some(x => held.has(x))) return false;
+    if (n.kind === 'milestone') {
+      for (const r of (n.requires || [])) if (!held.has(r)) return false;
+      if (Array.isArray(n.requires_fork) && n.requires_fork.length === 2
+          && !n.requires_fork.some(x => held.has(x))) return false;
+      if (n.requires_any && Array.isArray(n.requires_any.of)
+          && n.requires_any.of.filter(x => held.has(x)).length < n.requires_any.count) return false;
+    }
+    return true;
+  };
+  // Monotone closure: buy everything available and not refused, until nothing moves. With one
+  // side of EVERY fork refused up front no excludes can bite mid-closure, so the order of
+  // purchase cannot change the fixed point.
+  const closure = refused => {
+    const held = new Set();
+    let moved = true;
+    while (moved) {
+      moved = false;
+      for (const n of nodes) {
+        if (refused.has(n.id) || !available(held, n)) continue;
+        held.add(n.id);
+        moved = true;
+      }
+    }
+    return held;
+  };
+  const pairs = nodes.filter(n => n.excludes != null && byId.has(n.excludes) && n.id < n.excludes)
+                     .map(n => [n.id, n.excludes]);
+  const out = [];
+  for (let p = 0; p < pairs.length; ++p) {
+    const others = pairs.filter((_, q) => q !== p);
+    for (const [side, partner] of [[pairs[p][0], pairs[p][1]], [pairs[p][1], pairs[p][0]]]) {
+      // Reachable if SOME choice of side at every other fork lets it be bought: a side that
+      // needs its sibling fork resolved one way is still reachable.
+      let reached = false;
+      for (let mask = 0; mask < (1 << others.length) && !reached; ++mask) {
+        const refused = new Set([partner]);
+        others.forEach(([a, b], k) => refused.add((mask >> k) & 1 ? a : b));
+        reached = closure(refused).has(side);
+      }
+      if (!reached) out.push(`fork: ${side} can never be bought while its partner ${partner} is refused — `
+        + `under the sim's availability rules (gates assumed open) no path reaches it except through the side it excludes`);
+    }
+  }
+  return out;
+}
+
+function lintTree(name, spec, storeOverride) {
   let failures = 0;
   const fail = msg => { failures++; console.error(`  FAIL  [${name}] ${msg}`); };
 
-  const storePath = path.join(dir, spec.store);
+  const storePath = storeOverride ? path.resolve(storeOverride) : path.join(dir, spec.store);
   const docPath = path.join(dir, spec.doc);
   if (!fs.existsSync(storePath)) { fail(`store missing: ${spec.store}`); return failures; }
   let store;
@@ -245,6 +334,9 @@ function lintTree(name, spec) {
     if (shared.length === 0) fail(`${n.id} / ${o.id}: fork does not share a linked minor`);
   }
 
+  // Fork reachability under the sim's rules (BL-1038) — see forkReachabilityFailures.
+  for (const msg of forkReachabilityFailures(nodes, byId, adj)) fail(msg);
+
   // Reachability from the root (spire ring-1 major).
   const rootNode = spire.find(n => n.ring === 1 && n.kind === 'major');
   if (rootNode) {
@@ -274,7 +366,7 @@ function lintTree(name, spec) {
   // while the generator writes LF.
   let headerChecked = false;
   const headerPath = gen.headerPath(name);
-  if (fs.existsSync(headerPath)) {
+  if (!storeOverride && fs.existsSync(headerPath)) {
     headerChecked = true;
     const norm = s => s.replace(/\r\n/g, '\n');
     try {
@@ -303,15 +395,24 @@ function lintTree(name, spec) {
   const counts = { minor: 0, major: 0, milestone: 0 };
   for (const n of nodes) if (counts[n.kind] != null) counts[n.kind]++;
   const forks = nodes.filter(n => n.excludes != null).length / 2;
-  console.log(`${failures ? 'FAIL' : 'OK  '} ${name}: ${nodes.length}/${CAP} nodes — ${counts.major} major, ${counts.minor} minor, ${counts.milestone} milestone, ${forks} fork(s), ${rings} rings, ${branches.size - 1} branches + spire${headerChecked ? ', header checked' : ''}${failures ? `, ${failures} failure(s)` : ''}`);
+  console.log(`${failures ? 'FAIL' : 'OK  '} ${name}: ${nodes.length}/${CAP} nodes — ${counts.major} major, ${counts.minor} minor, ${counts.milestone} milestone, ${forks} fork(s), ${rings} rings, ${branches.size - 1} branches + spire${headerChecked ? ', header checked' : ''}${storeOverride ? `, store ${storeOverride} (header not compared)` : ''}${failures ? `, ${failures} failure(s)` : ''}`);
   return failures;
 }
 
-const which = process.argv[2] || 'all';
+const args = process.argv.slice(2);
+let storeOverride = null;
+const storeAt = args.indexOf('--store');
+if (storeAt >= 0) {
+  storeOverride = args[storeAt + 1];
+  if (!storeOverride) { console.error('--store needs a path'); process.exit(2); }
+  args.splice(storeAt, 2);
+}
+const which = args[0] || 'all';
+if (storeOverride && which === 'all') { console.error('--store names one tree\'s store; pass the tree too'); process.exit(2); }
 const names = which === 'all' ? Object.keys(TREES) : [which];
 let total = 0;
 for (const n of names) {
   if (!TREES[n]) { console.error(`unknown tree ${n}`); process.exit(2); }
-  total += lintTree(n, TREES[n]);
+  total += lintTree(n, TREES[n], storeOverride);
 }
 process.exit(total ? 1 : 0);

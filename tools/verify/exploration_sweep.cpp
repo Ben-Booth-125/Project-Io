@@ -54,6 +54,13 @@
 //   --cost         BL-1027: time two UNTRACED re-runs per seed from the fixture,
 //                  to 1660 and to --through, with the sim's profile split, and
 //                  report the 1660 -> Y half as their difference.
+//   --industry-open Y  BL-1038 TUNING ONLY: the traced re-run (and its half-A
+//                  prefix) runs with history_sim_params::industry_tree_enabled
+//                  on from year Y. Prints, per seed and pooled, the Industry
+//                  nodes held, fork sides taken, rim holders, the share of
+//                  living polities that never passed the seam fuel gate, and
+//                  the urban mass the rate reads at 1660 and at the close.
+//                  Pair with --through 1960. Writes the tuning table.
 //
 // BL-1018 adds the ALARM SPREAD: the raw visible capability every near-home
 // treaty read saw over the traced run, its quantiles, and the alarm those
@@ -335,6 +342,20 @@ struct exploration_row
 
     bool traced_matches_untraced = false; ///< The acceptance check: re-run reproduces battles/conquests/foundings bit for bit.
 
+    // --- BL-1038: the Industry tree, when --industry-open ran ----------------
+    /// Read off the traced re-run's close (the switch on from the open year).
+    /// `industry_forks[f][s]`: fork f in node-table order, s = 0 first side
+    /// held, 1 second side held, 2 neither.
+    bool                 industry_ran        = false;
+    int                  industry_alive      = 0;
+    int                  industry_invested   = 0; ///< living polities holding at least one node
+    int                  industry_rim        = 0; ///< living polities holding IN-SP-3m
+    int                  industry_fuel_never = 0; ///< living polities that never passed the seam gate
+    std::vector<int>     industry_nodes;          ///< nodes held, one per living polity
+    int                  industry_forks[3][3] = {};
+    std::vector<int64_t> urban_mass_open;         ///< top-k urban mass per living polity at the open year (--through > 1660 only)
+    std::vector<int64_t> urban_mass_close;        ///< the same at the traced close
+
     // --- BL-1027: the span's cost, when --cost ran ---------------------------
     /// One untraced re-run from the fixture, stopped at a given year: its wall
     /// clock, the sim's own profile split, and what the world looked like at
@@ -595,6 +616,34 @@ double per_century(int64_t count, int64_t years)
     return years > 0 ? (static_cast<double>(count) * 100.0) / static_cast<double>(years) : 0.0;
 }
 
+/// BL-1038: the Industry rate's input for every LIVING polity, read the way
+/// the sim reads it (`industry_urban_mass` over the regions it holds, held =
+/// `region::nation`), sorted ascending. What the rate earns from is what the
+/// sizing rule is tuned against, so the sweep prints it beside the outcome.
+std::vector<int64_t> living_urban_masses(const std::vector<region>& regions,
+                                         const std::vector<polity>& polities)
+{
+    std::vector<std::vector<int>> held(polities.size());
+    for (std::size_t i = 0; i < regions.size(); ++i)
+    {
+        const int n = regions[i].nation;
+        if (n >= 0 && static_cast<std::size_t>(n) < held.size()) held[static_cast<std::size_t>(n)].push_back(static_cast<int>(i));
+    }
+    std::vector<int64_t> out;
+    for (std::size_t p = 0; p < polities.size(); ++p)
+        if (polities[p].alive) out.push_back(industry_urban_mass(regions, held[p]));
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+/// The value at percentile @p pct (0-100) of an ascending vector, or -1 empty.
+template <typename T>
+long long pct_of_sorted(const std::vector<T>& v, int pct)
+{
+    if (v.empty()) return -1;
+    return static_cast<long long>(v[(v.size() - 1) * static_cast<std::size_t>(pct) / 100]);
+}
+
 } // namespace
 
 
@@ -647,6 +696,7 @@ int main(int argc, char** argv)
     std::string out_path;            // BL-1026: --out; empty means the default name.
     int64_t through_year = 1660;     // BL-1027: --through; the Exploration call's stop.
     bool    run_cost     = false;    // BL-1027: --cost.
+    int64_t industry_open = 0;       // BL-1038: --industry-open; 0 = the switch stays off.
     bool want_override = false;
     int  want_override_q = 0;
     std::vector<std::pair<std::string, long long>> param_sets;
@@ -682,6 +732,12 @@ int main(int argc, char** argv)
         if (std::strcmp(argv[a], "--cost") == 0)
         {
             run_cost = true;
+            continue;
+        }
+        if (std::strcmp(argv[a], "--industry-open") == 0 && a + 1 < argc)
+        {
+            industry_open = std::atoll(argv[++a]);
+            if (industry_open <= 0) { std::printf("--industry-open needs a calendar year\n"); std::exit(2); }
             continue;
         }
         if (std::strcmp(argv[a], "--set") == 0 && a + 1 < argc)
@@ -725,6 +781,19 @@ int main(int argc, char** argv)
     if (want_override && want_override_q >= 0)
         std::printf("NOTE: --w_want_q=%d overrides the traced re-run's want lean (tuning only).\n",
                     want_override_q);
+    if (industry_open > 0)
+    {
+        // A tuning override like --set: the traced re-run (and the half-A
+        // re-run built from it) differ from generation's own run by
+        // construction, so the structural traced-vs-untraced check is waived
+        // and the table goes to exploration_sweep.tuning.json.
+        if (!want_override) want_override_q = -1;
+        want_override = true;
+        std::printf("NOTE: --industry-open %lld turns the Industry tree ON in the traced re-run from %lld\n"
+                    "      (history_sim_params::industry_tree_enabled, BL-1038; tuning only -- every shipped\n"
+                    "      path keeps it off). The Industry readings describe the traced close.\n",
+                    static_cast<long long>(industry_open), static_cast<long long>(industry_open));
+    }
 
     std::printf("=== exploration sweep (BL-937) - %d seeds, 1200 -> %lld CE ===\n\n", seed_count,
                 static_cast<long long>(through_year));
@@ -830,6 +899,11 @@ int main(int argc, char** argv)
         ep2.resume_corridors = &fx.pre_exploration_corridors;
         if (want_override && want_override_q >= 0) ep2.w_want_q = want_override_q;
         apply_sets(ep2);
+        if (industry_open > 0)
+        {
+            ep2.industry_tree_enabled = true;          // BL-1038, tuning only
+            ep2.industry_open_year    = industry_open;
+        }
 
         settlement_state ss_copy = fx.pre_exploration_settlement;
         creed_state       cs_copy = fx.pre_exploration_creeds;
@@ -858,6 +932,54 @@ int main(int argc, char** argv)
             }
             row.post_roads_built        = traced.post_roads_built;
             row.treasury_spent_on_roads = traced.treasury_spent_on_roads;
+        }
+
+        // --- BL-1038: THE INDUSTRY TREE at the traced close ------------------
+        // Per living polity: nodes held, fork sides taken, the rim, and whether
+        // it EVER passed the seam gate on an Industry-investing round
+        // (`polity::industry_fuel_seen`). Forks are found off the generated
+        // table's `excludes`, never by id.
+        if (industry_open > 0)
+        {
+            int fork_a[3] = {-1, -1, -1}, fork_b[3] = {-1, -1, -1}, nf = 0;
+            for (int n = 0; n < io::industry_tree::node_count && nf < 3; ++n)
+            {
+                const int x = io::industry_tree::nodes[n].excludes;
+                if (x > n) { fork_a[nf] = n; fork_b[nf] = x; ++nf; }
+            }
+            row.industry_ran = true;
+            for (const polity& q : traced.polities)
+            {
+                if (!q.alive) continue;
+                ++row.industry_alive;
+                int held_n = 0;
+                for (uint64_t m = q.industry_mask; m != 0; m &= m - 1) ++held_n;
+                row.industry_nodes.push_back(held_n);
+                if (held_n > 0) ++row.industry_invested;
+                if (polity_holds_industry_rim(q)) ++row.industry_rim;
+                if (!q.industry_fuel_seen) ++row.industry_fuel_never;
+                for (int f = 0; f < nf; ++f)
+                {
+                    const bool a = (q.industry_mask >> fork_a[f]) & 1ULL;
+                    const bool b = (q.industry_mask >> fork_b[f]) & 1ULL;
+                    ++row.industry_forks[f][a ? 0 : b ? 1 : 2];
+                }
+            }
+            std::sort(row.industry_nodes.begin(), row.industry_nodes.end());
+            row.urban_mass_close = living_urban_masses(ss_copy.regions, traced.polities);
+            std::printf("  industry seed %d: alive %d invested %d | nodes held min/p25/med/p75/max %lld/%lld/%lld/%lld/%lld"
+                        " | rim %d | never passed fuel %d/%d | forks",
+                        i, row.industry_alive, row.industry_invested,
+                        pct_of_sorted(row.industry_nodes, 0), pct_of_sorted(row.industry_nodes, 25),
+                        pct_of_sorted(row.industry_nodes, 50), pct_of_sorted(row.industry_nodes, 75),
+                        pct_of_sorted(row.industry_nodes, 100), row.industry_rim,
+                        row.industry_fuel_never, row.industry_alive);
+            for (int f = 0; f < nf; ++f)
+                std::printf(" %s %d / %s %d / neither %d%s", io::industry_tree::nodes[fork_a[f]].id,
+                            row.industry_forks[f][0], io::industry_tree::nodes[fork_b[f]].id,
+                            row.industry_forks[f][1], row.industry_forks[f][2], f + 1 < nf ? " ;" : "");
+            std::printf(" | urban mass at close med/max %lld/%lld\n",
+                        pct_of_sorted(row.urban_mass_close, 50), pct_of_sorted(row.urban_mass_close, 100));
         }
 
         // BL-949: does the road spend track the polities that built? Capital
@@ -1454,6 +1576,18 @@ int main(int argc, char** argv)
                     ss_a, &cs_a, fx.terrain.view(), fx.gw, fx.gh, ep_a,
                     fx.exploration_seed, /*year_progress=*/nullptr, fx.works, /*tap=*/nullptr);
 
+                // BL-1038: what the Industry rate reads at 1660, off the same
+                // prefix run (the switch cannot have fired before its open
+                // year, so this is the rate's opening input).
+                if (industry_open > 0)
+                {
+                    row.urban_mass_open = living_urban_masses(ss_a.regions, traced_a.polities);
+                    std::printf("  industry seed %d: urban mass (top-%d) at 1660 over %zu living: p25/med/p75/max %lld/%lld/%lld/%lld\n",
+                                i, industry_research_top_k, row.urban_mass_open.size(),
+                                pct_of_sorted(row.urban_mass_open, 25), pct_of_sorted(row.urban_mass_open, 50),
+                                pct_of_sorted(row.urban_mass_open, 75), pct_of_sorted(row.urban_mass_open, 100));
+                }
+
                 weakness_half a;
                 read_cumulative(traced_a, a);
                 read_at_stop(traced_a, ss_a.regions, a, kHalfBoundary);
@@ -1557,6 +1691,66 @@ int main(int argc, char** argv)
 
         row.ok = true;
         rows.push_back(row);
+    }
+
+    // -----------------------------------------------------------------------
+    // BL-1038 — THE INDUSTRY TREE, per seed and pooled. REPORTED, not gated:
+    // the sizing rule (TREES.md sec Sizes: the leading polity finishes just
+    // before the phase ends, the median reaches halfway) is the reading the
+    // rate's first-cut constants are judged against, and that is a call.
+    // -----------------------------------------------------------------------
+    if (industry_open > 0)
+    {
+        std::printf("\n--- the Industry tree (BL-1038), switch on from %lld, read at %lld ---\n",
+                    static_cast<long long>(industry_open), static_cast<long long>(through_year));
+        std::printf("  seed | alive | invested | nodes min/p25/med/p75/max | rim | never fuel | Fuel coke/charcoal/- |"
+                    " Labour cleared/smallholder/- | Works arsenal/private/- | urban@1660 med/max | urban@close med/max\n");
+        std::vector<int> pooled_nodes;
+        int p_alive = 0, p_inv = 0, p_rim = 0, p_never = 0, p_forks[3][3] = {};
+        std::vector<int> seed_max, seed_med;
+        for (const exploration_row& r : rows)
+        {
+            if (!r.industry_ran) continue;
+            std::printf("  %4u | %5d | %8d | %3lld/%3lld/%3lld/%3lld/%3lld | %3d | %3d (%3.0f%%) | %3d/%3d/%3d | %3d/%3d/%3d | %3d/%3d/%3d | %lld/%lld | %lld/%lld\n",
+                        r.seed, r.industry_alive, r.industry_invested,
+                        pct_of_sorted(r.industry_nodes, 0), pct_of_sorted(r.industry_nodes, 25),
+                        pct_of_sorted(r.industry_nodes, 50), pct_of_sorted(r.industry_nodes, 75),
+                        pct_of_sorted(r.industry_nodes, 100), r.industry_rim, r.industry_fuel_never,
+                        r.industry_alive > 0 ? 100.0 * r.industry_fuel_never / r.industry_alive : 0.0,
+                        r.industry_forks[0][0], r.industry_forks[0][1], r.industry_forks[0][2],
+                        r.industry_forks[1][0], r.industry_forks[1][1], r.industry_forks[1][2],
+                        r.industry_forks[2][0], r.industry_forks[2][1], r.industry_forks[2][2],
+                        pct_of_sorted(r.urban_mass_open, 50), pct_of_sorted(r.urban_mass_open, 100),
+                        pct_of_sorted(r.urban_mass_close, 50), pct_of_sorted(r.urban_mass_close, 100));
+            pooled_nodes.insert(pooled_nodes.end(), r.industry_nodes.begin(), r.industry_nodes.end());
+            p_alive += r.industry_alive; p_inv += r.industry_invested; p_rim += r.industry_rim;
+            p_never += r.industry_fuel_never;
+            for (int f = 0; f < 3; ++f) for (int s = 0; s < 3; ++s) p_forks[f][s] += r.industry_forks[f][s];
+            if (!r.industry_nodes.empty())
+            {
+                seed_max.push_back(r.industry_nodes.back());
+                seed_med.push_back(static_cast<int>(pct_of_sorted(r.industry_nodes, 50)));
+            }
+        }
+        std::sort(pooled_nodes.begin(), pooled_nodes.end());
+        std::sort(seed_max.begin(), seed_max.end());
+        std::sort(seed_med.begin(), seed_med.end());
+        std::printf("  POOLED: alive %d, invested %d, nodes held min/p25/med/p75/max %lld/%lld/%lld/%lld/%lld of %d,"
+                    " rim %d, never passed fuel %d (%.0f%%)\n",
+                    p_alive, p_inv, pct_of_sorted(pooled_nodes, 0), pct_of_sorted(pooled_nodes, 25),
+                    pct_of_sorted(pooled_nodes, 50), pct_of_sorted(pooled_nodes, 75),
+                    pct_of_sorted(pooled_nodes, 100), io::industry_tree::node_count, p_rim, p_never,
+                    p_alive > 0 ? 100.0 * p_never / p_alive : 0.0);
+        std::printf("  POOLED forks: Fuel coke %d / charcoal %d / neither %d; Labour cleared %d / smallholder %d /"
+                    " neither %d; Works arsenal %d / private %d / neither %d\n",
+                    p_forks[0][0], p_forks[0][1], p_forks[0][2], p_forks[1][0], p_forks[1][1], p_forks[1][2],
+                    p_forks[2][0], p_forks[2][1], p_forks[2][2]);
+        std::printf("  SIZING (per seed): leader's nodes med %lld (range %lld-%lld); median polity's nodes med %lld"
+                    " (range %lld-%lld). The rule asks the leader to finish (%d, one side per fork) and the"
+                    " median to reach halfway.\n",
+                    pct_of_sorted(seed_max, 50), pct_of_sorted(seed_max, 0), pct_of_sorted(seed_max, 100),
+                    pct_of_sorted(seed_med, 50), pct_of_sorted(seed_med, 0), pct_of_sorted(seed_med, 100),
+                    io::industry_tree::node_count - 3);
     }
 
     // -----------------------------------------------------------------------
@@ -3156,6 +3350,8 @@ int main(int argc, char** argv)
                 { std::fprintf(f, "\"w_want_q=%d\"", want_override_q); first = false; }
                 for (const auto& kv : param_sets)
                 { std::fprintf(f, "%s\"%s=%lld\"", first ? "" : ", ", kv.first.c_str(), kv.second); first = false; }
+                if (industry_open > 0) // BL-1038
+                { std::fprintf(f, "%s\"industry_open=%lld\"", first ? "" : ", ", static_cast<long long>(industry_open)); first = false; }
             }
             std::fprintf(f, "],\n \"structural_failures\": %d,\n", g_failures);
 
