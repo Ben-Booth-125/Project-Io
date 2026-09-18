@@ -883,6 +883,32 @@
         "feedback": "Measure-first paid for itself twice. (1) The plan's premise was half wrong: three of seven research lanes said running to 1960 needed a third resumed sim call, and the handoff said it would un-zero advanced chains; the adversarial cross-check found the one-parameter continuation, and the readings confirmed chains stay a structural zero. (2) \"Polities rarely meet\" was an unmerged snapshot artefact; they meet, and what fails is binding. Two checks caught their own bugs before anything was believed: the seed re-read found 19 lost its reason (not in the ruling), and the first readings run's two prefix mismatches were the check comparing folded against raw flows. The cold review on the src/world port found no blocker. Serial, one-lane runs made every timing quotable."
       }
     },
+    "44": {
+      "id": "44",
+      "theme": "the corporate web's plumbing",
+      "state": "closed",
+      "status_line": "CLOSED 2026-09-18. Four items: harness parity, a world-bytes pin, the charter-budget seam (off by default, 16/16 pins held), and the cost sweep. No shipped world moved. NR-889 (the density cap) carries the cost readings for Ben.",
+      "opened_date": "2026-09-17",
+      "closed_date": "2026-09-18",
+      "author": "Ben (2026-09-17, elicitation: \"Sprint 43 items; 44-45 as goal rows\"); Claude (cut from a seven-lane engine read with an adversarial cross-check)",
+      "goal": "A per-centre charter budget reaches the landscape search and charters specialists and background firms around each centre, with the path off by default and its live-play cost measured before any conversion constant is chosen.",
+      "planned": [
+        "BL-1030 (player_seed_sweep parity) — one shared harness helper builds and settles the world in app order.",
+        "BL-1031 (landscape world pin) — four digests per library seed, pinned in source before the seam.",
+        "BL-1032 (charter budget seam) — the plumbing, off by default; the pins must hold with no budget and an empty one.",
+        "BL-1033 (charter budget cost) — synthetic 1x/2x/4x; search ms per evaluation, ms per tick, unspent by reason, shortlist."
+      ],
+      "risk": "Background firm placement is population-blind today (corporation_generation.cpp:2366-2374), so density following the city is a new placement rule, not a tuning change. The seat reads specialists, and the budget charters them (Ben, 2026-09-17), so the seat shortlist moves with the budget: NR-886 item 3 (solvency no longer gates the seat) sits on this path. The integration seam is two-sided — app.cpp and harness_params.hpp change together, and the direct callers of the firm pass (verify_api.cpp, main.cpp, three harnesses) must name the legacy path.",
+      "done_when": "An empty budget reproduces today's world byte for byte, proven by a determinism check, not a re-bless. A synthetic budget at 1x, 2x and 4x charters specialists and background firms around centres through the existing anchor_window seam, with unplaced budget counted. Milliseconds per economy tick and per search evaluation reported at each density; seat shortlist size and trailing-net spread reported, not gated. No save-format change.",
+      "notes": "RULINGS (Ben, 2026-09-17, elicitation): the budget charters the whole web, specialists included (DIGITISATION.md § 1); the path stays off until Beat 1's industry points switch it on, with no stand-in source in between. OPEN, measured here rather than argued: budget per firm, the split between specialists and background firms, whether a budget is spent whole.\n\nCUT 2026-09-17 on the NR-888 gate. RULINGS on the form the same day: Rule A (one specialist per centre that affords one, richest first); specialist capital kept at today's 400 +/-40% for this sprint; the no-specialist world decided at sprint 45; Pass 1 nation balance dropped on the budget path. PROPOSED and not overturned: no budget = empty budget = today's world; charters stay near their centre or go unspent; roster axis skipped on budget worlds; province cap measured on and off; synthetic budgets harness-only and never population-weighted.",
+      "retro": {
+        "landed": "BL-1030 (player_seed_sweep parity): nine divergences from app.cpp fixed; the seat baseline moved (109 of 170 shortlisted, not 81 of 158). BL-1031 (landscape world pin): four digests per seed, pinned for the 16 library seeds before the seam; tamper tests show each fails at its own phase. BL-1032 (charter budget seam): off by default; 16/16 pins held with no budget and with an empty one, all-zero and refused budgets too. BL-1033 (charter budget cost): 33 rows over 0/28/46.",
+        "slipped": "Nothing. BL-1034 (world copies diverge) was found and filed, not scheduled.",
+        "filed": "NR-889 (the density cap: measure first, now measured); NR-890 (scheduling BL-1034); BL-1034.",
+        "runtime": "About a day of wall clock, most of it harness runs: a 16-seed digest check is ~55 min, a player_seed_sweep 16-seed table ~1 h, the cost sweep ~5 h of run time. Stage 1 was trimmed by ~2 h once its pins landed. The PC slept overnight mid-sweep (22:07 -> 09:03); the straddled row was re-run.",
+        "feedback": "Cold review paid on every lane: stage 1 caught that the pin proves world/* through the harness copy of app.cpp, not app.cpp; the seam's review caught a refused budget wiping the roster; the cost instrument's caught a missing price ladder and a counsel column mislabelled as a cost. Two things to carry: long sweeps need the machine kept awake; and a brief that asks for full 16-seed tables before and after a change costs hours — ask whether a subset would answer the question."
+      }
+    },
     "2a": {
       "id": "2a",
       "theme": "Close out the v0.1.0 cut set",

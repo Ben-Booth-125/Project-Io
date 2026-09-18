@@ -5676,83 +5676,11 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1033 - sprint 44 (2026-09-17)",
    "batch": "sprint-44",
-   "resolved": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: player_seed_sweep --digest-check"
-     ],
-     "requirement": "The resource-cap switch moves no legacy byte: with no budget, an empty budget and a refused budget, the pinned digests hold.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: player_seed_sweep --charter-cost"
-     ],
-     "requirement": "The cost table is taken on a QUIET machine, serially, in Release, with the build tree and run conditions recorded on its face, and is checked in.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "headless: player_seed_sweep --charter-cost"
-     ],
-     "requirement": "Every row records its prices (firm points, specialist firm charters, specialist points) and its cap settings, and the specialist price is an axis with at least two rungs.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "headless: player_seed_sweep --charter-cost"
-     ],
-     "requirement": "Per row: charters placed, unspent points by all seven reasons, specialists present, the largest one-nation share, holdings inside/outside the window, search ms per evaluation at thread count 1, ms per economy tick over the validation and live windows, and the seat shortlist size with its trailing-net spread.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "headless: player_seed_sweep --charter-cost"
-     ],
-     "requirement": "The province-cap unspent reason is proven to fire on a forced case, with points balanced and nothing refused.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R6",
-     "status": "pending",
-     "verification": [
-      "code: no synthetic budget source under src/",
-      "doc: docs/development/NEEDS_REVIEW.md"
-     ],
-     "requirement": "The synthetic budget stays a harness input and is labelled as such on every face; the price readings and NR-889's cap question go to Ben as a review entry off the quiet table.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R7",
-     "status": "pending",
-     "verification": [
-      "review: code-reviewer (cold)"
-     ],
-     "requirement": "A cold adversarial review finds no unresolved blocker, and the timing figures measure what they claim (a stated lower bound on the app's economy step).",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-09-18",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   }
  ]
 }

@@ -89,8 +89,13 @@ against the pinned 265C48A23E313B1A). Latent today — the search copies but nev
 as **BL-1034** with **NR-890**, scheduling Ben's call.
 
 ### Left open
-NR-886 (four of seven calls), NR-889 (the density cap, on the sweep's table), NR-890 (scheduling
-BL-1034). BL-1033 closes on the quiet sweep; sprint 44 closes with it.
+NR-886 (four of seven calls), NR-889 (the density cap), NR-890 (scheduling BL-1034).
+
+**Closed the next morning (2026-09-18).** The cost sweep ran 33 rows over seeds 0/28/46 (the PC slept
+22:07 -> 09:03 mid-run; the one straddled row was re-run). Keeping the cap freezes firms at 81 a body
+and leaves 208-228 of 348 points unspent at 4x; lifting it reaches the 200-per-body guard at 4-6x the
+legacy live tick; clustering alone costs up to 6x on seed 28. The readings and a recommendation (keep
+the cap for now) are on NR-889. BL-1033 and sprint 44 closed.
 
 ---
 

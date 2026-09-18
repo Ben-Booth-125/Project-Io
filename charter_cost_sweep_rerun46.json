@@ -1,0 +1,64 @@
+{
+  "tool": "player_seed_sweep --charter-cost",
+  "item": "BL-1033",
+  "aborted": null,
+  "synthetic_test_input": true,
+  "synthetic_note": "SYNTHETIC TEST INPUT: seeded weights, never population; 1x = the none row's chartered count on the same seed. Never a density-follows-cities reading.",
+  "build": "Release (NDEBUG)",
+  "msc_full_ver": 194435228,
+  "note": "re-run of seed 46 2x rcap off pcap on sp4: the original row straddled a PC sleep 22:07-09:03; machine in use (not quiet)",
+  "argv": ["C:\\Users\\benbo\\Project-Io\\build_gen\\verify\\player_seed_sweep.exe", "--charter-cost", "--seeds", "46", "--budget-scales", "2", "--resource-cap", "off", "--province-cap", "on", "--specialist-prices", "4", "--no-extra", "--no-forced", "--out", "charter_cost_sweep_rerun46.json", "--note", "re-run of seed 46 2x rcap off pcap on sp4: the original row straddled a PC sleep 22:07-09:03; machine in use (not quiet)"],
+  "validation_ticks": 12,
+  "live_ticks": 8,
+  "search_thread_count": 1,
+  "firm_price_points": 1,
+  "specialist_prices_firm_charters": [4],
+  "ladder_scales": [2],
+  "price_note": "Every row carries firm_price_points, specialist_firm_charters and specialist_price_points (= firm x charters); null on the none row, which spends no budget. specialist_prices_firm_charters[0] is the base price; later entries are ladder rungs run at ladder_scales.",
+  "timing_note": "tick_ms times app::step_economy laps 0-5 only (phase 5 = standings + convoy credit + firm exits, compute_corp_standings mirrored). Laps 6-8 - agency comms, battle dispatches, persona counsel, the history recorders, the strategy readout - are NOT run and NOT timed, so val and live ms per tick are a LOWER BOUND on the app's step_economy that widens with density. Wall clock: only as clean as the machine was quiet.",
+  "strategic_evals_due_note": "A COUNT, not a cost driver: corporations corp_strategic_eval_due names at each live tick's day tick. post_persona_counsel evaluates at most the one open-channel corporation per tick (BL-398, session_history.cpp:206-220), so its live cost does not scale with corporation count.",
+  "tick_phases": ["convoys", "run_economy_step", "clear_markets", "apply_budget+nation_step", "tech_gates", "standings+credit+firm_exits"],
+  "unspent_reasons": ["no_nation", "window_exhausted", "province_cap", "no_gap", "body_cap", "remainder", "refused"],
+  "seeds": [
+    {
+      "seed": 46,
+      "threw": false,
+      "error": "",
+      "legacy_1x": 89,
+      "legacy_specialists": 8,
+      "legacy_firms": 81,
+      "configs": [
+        {
+          "label": "none (legacy)", "kind": "none", "scale": 1, "resource_cap": true, "province_cap": true, "window_radius": 4,
+          "firm_price_points": null, "specialist_firm_charters": null, "specialist_price_points": null,
+          "threw": false, "error": "", "wall_ms": 480533.1, "generation_ms": 111960.3, "build_only": false, "stopped_at_land": false,
+          "landscape": { "specialists": 8, "firms": 81, "any_specialist": true, "specialist_nations": 7, "largest_nation_share": 0.2500, "largest_nation": 59499,
+            "corporations_at_land": 89, "background_at_land": 81, "busiest_body_at_land": 15124, "busiest_body_corporations_at_land": 89, "busiest_body_background_at_land": 81 },
+          "search": { "evaluations": 19, "accepted": 4, "seed_eval_ms": 2003.2, "proposal_mean_ms": 1987.4, "search_ms": 37776.7, "landscape_phase_ms": 37802.4, "round_ms": [2003.2, 6012.0, 5989.7, 6040.8, 5901.1, 5933.9, 5896.2] },
+          "validation_ticks": { "n": 12, "median_ms": 10067.76, "mean_ms": 17613.13, "min_ms": 4797.03, "max_ms": 97686.96, "tick_ms": [4797.03, 97686.96, 8737.81, 9890.35, 8774.32, 10963.32, 9511.73, 10031.11, 10104.41, 11848.74, 16037.48, 12974.34], "phase_ms_sum": { "convoys": 140897.27, "run_economy_step": 69389.65, "clear_markets": 857.98, "apply_budget+nation_step": 211.22, "tech_gates": 0.68, "standings+credit+firm_exits": 0.80 }, "lower_bound": true },
+          "live_ticks": { "n": 8, "median_ms": 14757.45, "mean_ms": 14855.41, "min_ms": 12970.97, "max_ms": 17271.79, "tick_ms": [14185.81, 13117.47, 17271.79, 14340.98, 15435.71, 12970.97, 16346.67, 15173.91], "phase_ms_sum": { "convoys": 62137.44, "run_economy_step": 56007.50, "clear_markets": 559.30, "apply_budget+nation_step": 137.82, "tech_gates": 0.45, "standings+credit+firm_exits": 0.81 }, "between_ticks_ms_sum": 0.01, "lower_bound": true },
+          "seat": { "seated": 65057, "floor_unmet": false, "specialists": 8, "shortlist": 6, "trailing_net_n": 6, "trailing_net_min": -1662.9, "trailing_net_median": -30.4, "trailing_net_max": 1006.1, "trailing_net_negative_share": 0.6667, "corporations_at_seat": 89, "background_at_seat": 81,
+            "busiest_body_at_seat": 15124, "busiest_body_corporations_at_seat": 89, "busiest_body_background_at_seat": 81 },
+          "strategic_evals_due": { "count_not_cost": true, "mean": 22.50, "per_live_tick": [22, 23, 22, 23, 22, 23, 22, 23] },
+          "digests": { "search": "E0620F5777CB3637", "land": "326DFD72ED01E15D", "settle": "05B4865F46884E7C", "seat": "496E75B156DC9208", "pinned": true, "match": true, "diff": "" }
+        },
+        {
+          "label": "synthetic 2x rcap off pcap on sp4", "kind": "synthetic", "scale": 2, "resource_cap": false, "province_cap": true, "window_radius": 4,
+          "firm_price_points": 1, "specialist_firm_charters": 4, "specialist_price_points": 4,
+          "threw": false, "error": "", "wall_ms": 718864.5, "generation_ms": 113500.0, "build_only": false, "stopped_at_land": false,
+          "budget": { "points_budgeted": 178, "points_spent": 178, "points_unspent": 0, "balanced": true, "refused": false, "centres": 128, "richest_centre_points": 18, "centres_affording_specialist": 5, "unspent_by_reason": { "no_nation": 0, "window_exhausted": 0, "province_cap": 0, "no_gap": 0, "body_cap": 0, "remainder": 0, "refused": 0 },
+            "holdings_specialist": { "anchor_in": 5, "anchor_out": 0, "secondary_in": 8, "secondary_out": 3, "unresolved": 0, "farthest_tiles": 4.47 }, "holdings_firm": { "anchor_in": 158, "anchor_out": 0, "secondary_in": 255, "secondary_out": 51, "unresolved": 0, "farthest_tiles": 8.06 },
+            "holdings_inside_window": 426, "holdings_outside_window": 54 },
+          "landscape": { "specialists": 5, "firms": 158, "any_specialist": true, "specialist_nations": 5, "largest_nation_share": 0.2000, "largest_nation": 59447,
+            "corporations_at_land": 163, "background_at_land": 158, "busiest_body_at_land": 15124, "busiest_body_corporations_at_land": 163, "busiest_body_background_at_land": 158 },
+          "search": { "evaluations": 13, "accepted": 2, "seed_eval_ms": 2020.1, "proposal_mean_ms": 2072.1, "search_ms": 26885.9, "landscape_phase_ms": 26902.8, "round_ms": [2020.1, 4141.8, 4084.0, 4165.6, 4200.5, 4151.2, 4122.7] },
+          "validation_ticks": { "n": 12, "median_ms": 24841.95, "mean_ms": 31922.38, "min_ms": 8482.19, "max_ms": 123028.34, "tick_ms": [8482.19, 123028.34, 26747.22, 24387.19, 31773.48, 21781.68, 21989.17, 26791.44, 25296.71, 20912.69, 22040.28, 29838.14], "phase_ms_sum": { "convoys": 251621.07, "run_economy_step": 130366.62, "clear_markets": 854.52, "apply_budget+nation_step": 223.98, "tech_gates": 1.47, "standings+credit+firm_exits": 0.89 }, "lower_bound": true },
+          "live_ticks": { "n": 8, "median_ms": 25215.95, "mean_ms": 24422.43, "min_ms": 16880.88, "max_ms": 33608.23, "tick_ms": [27606.91, 25334.38, 26715.90, 33608.23, 22915.39, 16880.88, 17220.23, 25097.52], "phase_ms_sum": { "convoys": 83493.62, "run_economy_step": 111164.56, "clear_markets": 596.46, "apply_budget+nation_step": 123.28, "tech_gates": 0.89, "standings+credit+firm_exits": 0.63 }, "between_ticks_ms_sum": 0.01, "lower_bound": true },
+          "seat": { "seated": 65116, "floor_unmet": false, "specialists": 5, "shortlist": 3, "trailing_net_n": 3, "trailing_net_min": -64.4, "trailing_net_median": -29.2, "trailing_net_max": 86.9, "trailing_net_negative_share": 0.6667, "corporations_at_seat": 163, "background_at_seat": 158,
+            "busiest_body_at_seat": 15124, "busiest_body_corporations_at_seat": 163, "busiest_body_background_at_seat": 158 },
+          "strategic_evals_due": { "count_not_cost": true, "mean": 40.50, "per_live_tick": [41, 40, 41, 40, 41, 40, 41, 40] }
+        }
+      ]
+    }
+  ]
+}

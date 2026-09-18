@@ -18876,6 +18876,53 @@
         "design",
         "resolved"
       ]
+    },
+    "BL-1033": {
+      "glyph": "✓",
+      "sprint": "44",
+      "written": "2026-09-17",
+      "author": "Ben (2026-09-17: NR-888 gate \"cut and build\"; charter calls on an elicitation form — Rule A, capital kept, no-specialist world at sprint 45, nation balance dropped); Claude (item text, from a three-lane seam map with an adversarial cross-check)",
+      "blocked_on": null,
+      "parked": false,
+      "category": "Generation",
+      "priority": "A",
+      "status": "complete",
+      "id": "BL-1033",
+      "short_name": "CHARTER_BUDGET_COST",
+      "difficulty": 3,
+      "requires": [
+        "BL-1032"
+      ],
+      "title": "What a denser corporate web costs: player_seed_sweep charters a synthetic budget at 1x, 2x and 4x and times the search and the economy tick",
+      "authority_doc": "docs/generation/DIGITISATION.md",
+      "files": [
+        "tools/verify/player_seed_sweep.cpp",
+        "tools/verify/harness_params.hpp",
+        "src/world/charter_budget.hpp",
+        "src/world/corporation_generation.cpp"
+      ],
+      "design": "DELIVERED 2026-09-18 (sprint 44). Instrument 8a8cf8c3 (built in a worktree lane, cold-reviewed twice, both fix rounds resolved; the two residual minors fixed in the main session). The sweep: player_seed_sweep --charter-cost --seeds 0,28,46, Release, serial, 33 rows, exit 0, nothing threw; every legacy row matched its BL-1031 pin; the forced province cap PASSED on every seed (74-76 points unspent as province_cap, balanced). charter_cost_sweep.json is checked in. The PC slept 22:07 -> 09:03 during seed 46's 2x cap-off row (one 10.9 h \"tick\"); that row was re-run (charter_cost_sweep_rerun46.json, machine in use) and holds the same 1.7x ratio to its legacy row.\n\nREADINGS (BL-1033, charter_cost_sweep.json, seeds 0/28/46, Release, serial; synthetic TEST budget, seeded weights, never population; firm price 1 point; live ms is the median economy tick over 8 ticks after the seat, a stated LOWER BOUND on the app's step — comms, history recorders and the strategy readout are not timed):\n  specialists/firms and live tick         seed 0          seed 28         seed 46\n  legacy (no budget)                     6/81   3.1 s    6/81   4.2 s    8/81  11.1 s\n  1x  cap kept                           2/79   6.4 s    3/75  15.7 s    2/81   8.6 s\n  2x  cap kept                           5/81   8.1 s    6/81  25.7 s    5/81   7.4 s\n  4x  cap kept                          11/81   6.7 s   11/81  28.0 s   11/81  10.5 s\n  1x  cap lifted                         2/79   7.2 s    3/75  14.5 s    2/81   8.8 s\n  2x  cap lifted                         5/154 14.3 s    6/150 23.1 s    5/158 20.3 s*\n  4x  cap lifted                        11/200 18.5 s   11/200 26.8 s   11/200 43.6 s\n  2x  cap kept,   specialist price 8     2/81   6.3 s    2/81  16.8 s    2/81   7.6 s\n  2x  cap lifted, specialist price 8     2/158 11.8 s    2/158 20.7 s    2/162 18.4 s\n  * straddled a PC sleep; re-run (machine in use): 25.2 s against that run's legacy 14.8 s, the same 1.7x.\nWHAT IT SAYS. (1) Keeping the cap freezes background firms at 81 a body on every seed whatever the budget; at 4x, 208-228 of 348 points go unspent as no_gap and only specialists grow (2 -> 5 -> 11). (2) Lifting it buys firms up to the 200-per-body anti-runaway (85-110 points then unspent as body_cap), so at 4x the runaway guard, not the city, sets density. (3) Density costs 4-6x the legacy live tick at 4x lifted. (4) WHERE firms stand also costs: on seed 28 even the cap-kept rows run 3.7-6.7x the legacy tick with FEWER firms, so clustering around cities is itself a cost, not only the count. (5) The search barely moves (0.8-2.2 s per evaluation, flat by density on each seed). (6) The specialist price is a clean dial: at 8 firm charters a 2x budget buys 2 specialists instead of 5-6. (7) The province cap is not what binds at density (at most 19 points), and turning it off changes ticks by under 10%.\n\nThe readings and a recommendation are on NR-889 for Ben's ruling.\n\n--- THE ORIGINAL ITEM ---\n\nAMENDED 2026-09-17 (Ben, NR-889: measure first): the sweep also runs the per-resource firm cap KEPT and LIFTED on budget worlds. That needs a budget-path-only switch in charter_spend_params (e.g. resource_cap on/off, default on) read by charter_web_from_budget; the legacy Pass 6 body and every legacy digest stay untouched, proven by --digest-check on the pinned seeds. Report per density per cap setting: firms chartered, unspent by reason (no_gap should fall when lifted), the 200-per-body cap hits, search ms per evaluation and ms per tick. The NR-889 ruling is taken off that table.\n\nWHY. DIGITISATION.md hard part 7 and § Open questions: the charter prices are measured against live-play cost before either is fixed. The only figures today are ~0.9 s per validation tick and ~1-2.5 s per search evaluation in Release.\n\nTHE WORK. --charter-budget synthetic --budget-scale 1|2|4 [--province-cap on|off] [--specialist-price K]. The budget is SYNTHETIC TEST INPUT, printed as such on every header line and never read for density-follows-cities: 1x charters today's chartered count on that seed (specialists plus background firms, measured first), spread over non-razed centres by seeded per-centre weights (never population), integer by largest remainder; firm price 1 point; specialist price from a small ladder (e.g. 4 and 8). Per seed per density: specialists and firms chartered, unspent by reason, whether any specialist exists, the largest one-nation share of specialists, search ms per evaluation at thread count 1 (round_ms), ms per economy tick over the 12 validation ticks and an 8-tick live window after the seat, shortlist size and the trailing-net spread. JSON via --out.\n\nDONE WHEN. The table over the library seeds (at least the three the pin run shows fastest, all 16 if the clock allows) is checked in; a NEEDS_REVIEW entry puts the price readings and the specialist-count behaviour to Ben for sprint 45. A static check shows no `synthetic` symbol under src/.\n\nRUN CONDITIONS: Release harness builds via `bash tools/verify/build_lua_harness.sh <name>` into build_gen/verify (MSVC /O2 — the toolchain every pin is bound to; never %TEMP%); serial, quiet machine, build tree quoted; tracked tables only via --out.",
+      "resolved": "2026-09-18",
+      "_row_keys": [
+        "glyph",
+        "sprint",
+        "written",
+        "author",
+        "blocked_on",
+        "parked",
+        "category",
+        "priority",
+        "status",
+        "id",
+        "short_name",
+        "difficulty",
+        "requires",
+        "title",
+        "authority_doc",
+        "files",
+        "design",
+        "resolved"
+      ]
     }
   }
 }

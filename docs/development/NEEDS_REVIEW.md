@@ -62,13 +62,27 @@ READINGS TAKEN ON YOUR BEHALF in the seam (reversible, none moves today's world)
 
 UPDATE 2026-09-17 (Ben, elicitation): measure first. BL-1033 runs the per-resource cap kept and lifted side by side on budget worlds; the call is ruled on its tick cost and unspent points. The entry stays open until then.
 
-**Why it matters.** BL-1033 (charter budget cost) measures tick cost at 1x/2x/4x. Under (a) the 4x world is barely denser than 1x and the cost reading understates what Beat 1 could ask for; under (b) or (c) the measurement must lift the cap to mean anything. Better ruled before BL-1033 runs.
+READINGS (BL-1033, charter_cost_sweep.json, seeds 0/28/46, Release, serial; synthetic TEST budget, seeded weights, never population; firm price 1 point; live ms is the median economy tick over 8 ticks after the seat, a stated LOWER BOUND on the app's step — comms, history recorders and the strategy readout are not timed):
+  specialists/firms and live tick         seed 0          seed 28         seed 46
+  legacy (no budget)                     6/81   3.1 s    6/81   4.2 s    8/81  11.1 s
+  1x  cap kept                           2/79   6.4 s    3/75  15.7 s    2/81   8.6 s
+  2x  cap kept                           5/81   8.1 s    6/81  25.7 s    5/81   7.4 s
+  4x  cap kept                          11/81   6.7 s   11/81  28.0 s   11/81  10.5 s
+  1x  cap lifted                         2/79   7.2 s    3/75  14.5 s    2/81   8.8 s
+  2x  cap lifted                         5/154 14.3 s    6/150 23.1 s    5/158 20.3 s*
+  4x  cap lifted                        11/200 18.5 s   11/200 26.8 s   11/200 43.6 s
+  2x  cap kept,   specialist price 8     2/81   6.3 s    2/81  16.8 s    2/81   7.6 s
+  2x  cap lifted, specialist price 8     2/158 11.8 s    2/158 20.7 s    2/162 18.4 s
+  * straddled a PC sleep; re-run (machine in use): 25.2 s against that run's legacy 14.8 s, the same 1.7x.
+WHAT IT SAYS. (1) Keeping the cap freezes background firms at 81 a body on every seed whatever the budget; at 4x, 208-228 of 348 points go unspent as no_gap and only specialists grow (2 -> 5 -> 11). (2) Lifting it buys firms up to the 200-per-body anti-runaway (85-110 points then unspent as body_cap), so at 4x the runaway guard, not the city, sets density. (3) Density costs 4-6x the legacy live tick at 4x lifted. (4) WHERE firms stand also costs: on seed 28 even the cap-kept rows run 3.7-6.7x the legacy tick with FEWER firms, so clustering around cities is itself a cost, not only the count. (5) The search barely moves (0.8-2.2 s per evaluation, flat by density on each seed). (6) The specialist price is a clean dial: at 8 firm charters a 2x budget buys 2 specialists instead of 5-6. (7) The province cap is not what binds at density (at most 19 points), and turning it off changes ticks by under 10%.
+
+**Why it matters.** Beat 1 (sprint 45) produces real budgets; this ruling decides whether capital beyond breadth x 8 buys firms or stays unspent, and what that costs every live tick. The readings are in.
 
 - (a) keep the per-resource cap on budget worlds; capital beyond it stays unspent
 - (b) lift the per-resource cap on budget worlds; the 200-per-body cap and market absorption bound density
 - (c) scale the cap with the body's charter capital
 
-> **Recommendation:** Measure (a) and (b) side by side in BL-1033 before ruling: the cost sweep already runs the province cap on and off, and the per-resource cap is the same kind of switch. Rule after reading tick cost and unspent points at 4x under both.
+> **Recommendation:** Keep the cap (a) for now. Lifting it multiplies an already-slow tick 4-6x and hands density to the 200-per-body runaway guard rather than to the city; and clustering alone already costs up to 6x on one seed. Revisit (b) or (c) when the economy tick is cheaper, with this table as the baseline. The specialist price sits between 4 and 8 firm charters depending on how many seats you want a rich world to offer.
 
 *Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`, `docs/generation/DIGITISATION.md`, `tools/verify/player_seed_sweep.cpp`*
 

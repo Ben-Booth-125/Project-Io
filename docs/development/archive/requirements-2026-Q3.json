@@ -1059,6 +1059,82 @@
    ],
    "resolution": "Complete, all rows met. ui::why_note — a closed-by-default toggle revealing exactly two lines. All three of the item's open questions settled and recorded. 4 goldens blessed and PASS at 0.0000%."
   },
+  "charter-budget-cost": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --digest-check"
+     ],
+     "requirement": "The resource-cap switch moves no legacy byte: with no budget, an empty budget and a refused budget, the pinned digests hold.",
+     "notes": "",
+     "result_metric": "Lane: --digest-check PASS with no budget (46, 28, 0), an empty budget and a refused one (seed 0). Sweep: every legacy row matched its pin on 0, 28 and 46."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --charter-cost"
+     ],
+     "requirement": "The cost table is taken on a QUIET machine, serially, in Release, with the build tree and run conditions recorded on its face, and is checked in.",
+     "notes": "",
+     "result_metric": "charter_cost_sweep.json checked in: serial, Release, MSVC 14.44.35207, --note records the conditions. One row straddled a PC sleep; re-run and recorded beside it (charter_cost_sweep_rerun46.json)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --charter-cost"
+     ],
+     "requirement": "Every row records its prices (firm points, specialist firm charters, specialist points) and its cap settings, and the specialist price is an axis with at least two rungs.",
+     "notes": "",
+     "result_metric": "Every row carries firm_price_points, specialist_firm_charters, specialist_price_points, resource_cap and province_cap; specialist prices 4 and 8."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --charter-cost"
+     ],
+     "requirement": "Per row: charters placed, unspent points by all seven reasons, specialists present, the largest one-nation share, holdings inside/outside the window, search ms per evaluation at thread count 1, ms per economy tick over the validation and live windows, and the seat shortlist size with its trailing-net spread.",
+     "notes": "",
+     "result_metric": "Per row: landscape counts, budget with seven unspent reasons and holding distances, search ms/eval, validation and live tick ms (median, mean, each tick, phases), seat shortlist and trailing-net spread."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "headless: player_seed_sweep --charter-cost"
+     ],
+     "requirement": "The province-cap unspent reason is proven to fire on a forced case, with points balanced and nothing refused.",
+     "notes": "",
+     "result_metric": "Forced province cap PASS on every seed: province_cap 76 / 76 / 74 points, balanced, not refused."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "code: no synthetic budget source under src/",
+      "doc: docs/development/NEEDS_REVIEW.md"
+     ],
+     "requirement": "The synthetic budget stays a harness input and is labelled as such on every face; the price readings and NR-889's cap question go to Ben as a review entry off the quiet table.",
+     "notes": "",
+     "result_metric": "No synthetic source under src/; SYNTHETIC TEST INPUT on every face; readings and a recommendation on NR-889."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold adversarial review finds no unresolved blocker, and the timing figures measure what they claim (a stated lower bound on the app's economy step).",
+     "notes": "",
+     "result_metric": "Two cold reviews, no blocker; fix rounds resolved all findings; timing figures documented as a lower bound (untimed: comms, history recorders, strategy readout; counsel's bounded half)."
+    }
+   ],
+   "resolution": "The cost table is in. Keeping Pass 6's cap freezes firms at 81 a body and leaves capital unspent; lifting it reaches the 200-per-body guard at 4-6x the legacy live tick. NR-889 carries the readings for Ben's ruling."
+  },
   "charter-budget-seam": {
    "rows": [
     {
