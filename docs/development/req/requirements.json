@@ -6192,6 +6192,86 @@
     }
    ],
    "resolution": ""
+  },
+  {
+   "brief": "setup-reads-span-close",
+   "title": "BL-1053 - When the Digitisation span runs, world setup reads its 1960 close, not Exploration's 1660 one",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1053 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "tool: seed_library.js --check",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "With the span switch off, every digest, fingerprint and pin is unmoved.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960 (span, setup diff)"
+     ],
+     "requirement": "With the span on, world setup's treasuries, grudges, stamped roads and junction corridors equal the span's 1960 close, table for table, on every library seed; a harness line prints the diff and it is empty.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: nation treasury credit"
+     ],
+     "requirement": "A polity founded after 1660 is credited its 1960 treasury, and one conquered after 1660 is not credited a chest it no longer holds.",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness --fidelity"
+     ],
+     "requirement": "span_params_issues checks every Empires-only setting is off in the span's params; the validator checks contacts and dated objects for continuity and that the span stopped at digitisation_stop_year; fidelity still passes 16 of 16.",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "code: no pointer into freed Exploration state",
+      "code: stop-year guard"
+     ],
+     "requirement": "The captured span params hold no pointer into state freed before the function returns, and a span whose stop year is not after Exploration's is refused before it runs.",
+     "notes": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "live: the loading screen"
+     ],
+     "requirement": "The loading bar counts only the stages that will run, so a campaign start without the span reads as it did before BL-1040.",
+     "notes": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no setup read of a 1660 record left on the span path.",
+     "notes": ""
+    }
+   ],
+   "resolution": ""
   }
  ]
 }
