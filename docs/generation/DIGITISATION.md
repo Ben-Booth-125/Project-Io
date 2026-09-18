@@ -67,8 +67,15 @@ a world grown through Exploration is grown on to 1960, and the flip changes the 
 **The span is its own call, resumed from `exploration_output`, and the resume loses nothing the
 struct carries.** Treaty clauses and tribute cross as dated objects, and trade flows rebuild from
 them in the first round. A resume that dropped them would re-form every treaty on an empty flow
-table, which inflates each pair's trade value and binds pairs the history never bound. PROPOSED
-(listed to Ben 2026-09-18, not overturned):
+table, which inflates each pair's trade value and binds pairs the history never bound.
+
+**A resumed span still differs from a run continued past 1660, by four named sources and no
+others:** its own seed; the road network it reopens on, which is the corridor record that survived
+1660 rather than the live road counts a continued run still holds; the markets the 1660 close
+stamps; and the close's filter on corridors held only by the dead. So the span is never gated bit
+for bit against a continued run. A fidelity check neutralises each source by name, requires the
+two to agree once all are removed, and reports what each one moves. PROPOSED (listed to Ben
+2026-09-18, not overturned):
 
 - **Consolidation and the near-home cutoff stay anchored at 1200.** The sweep of seat stores into
   the capital happens once, and a pair met after 1200 stays far however late a span opens.

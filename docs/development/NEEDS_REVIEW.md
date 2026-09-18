@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*2 entries — 2 open, 0 resolved.*
+*3 entries — 3 open, 0 resolved.*
 
 ---
 
@@ -59,6 +59,21 @@ INDUSTRY_TREE.md § The scorer defines furnace_lit as 'the polity holds the spir
 > **Recommendation:** Read the Fuel Doctrine taken. It is already recorded in the mask, it separates polities, and it matches the doc's cause.
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/trees/INDUSTRY_TREE.md`*
+
+### NR-893 — CALL: the Industry spread is set by how often the Invest verb wins, not by the research rate
+*question · raised 2026-09-18 · from BL-1038 (Industry tree wired) build lane and fix round; exploration_sweep --through 1960 --industry-open 1660 over the 16 library seeds (lane figures, merged as 191c212b; the main session re-runs them before quoting them as evidence).*
+
+With the Industry switch on from 1660, at 1960: 862 living polities, 553 hold an Industry node; nodes held pooled 0/0/6/27/42 of 45 (min/p25/median/p75/max); the leader holds a median 38 and finishes the tree in several seeds; the median polity holds a median 7 (range 0-19). 290 living polities (34%) never had an Industry round at all. WHY: research accrues only on rounds the Invest verb wins (history_sim.cpp case sim_verb::invest), Invest's score is divided by the band already held, and each win buys at most one node — progress resets to 0 on purchase and the surplus is discarded. So the spread between leaders and the rest is set by verb frequency, and re-pricing the rate moves the leaders, not the median. The same rule governs the Empire and Exploration trees.
+
+**Why it matters.** Beat 1 reads Industry capacity nodes as a multiplier on industry points, and INDUSTRY_TREE.md says the 1960 spread is manufactured by the fuel gate and the pace. If a third of polities never invest, their cities build points on scale, fuel and treasury alone, and the Works fork is untaken by most (502 of 862 take neither side).
+
+- Accept for Beat 1: a polity that never invests still builds points from scale, fuel and treasury; read the industrialisation reading before changing anything.
+- Carry surplus progress past a purchase, in every tree: removes the one-node-per-round cap; moves every shipped world (Empire and Exploration share the rule).
+- Let Industry research accrue every round as a flow (TREES.md § State: research is a flow), with Invest choosing only the node: Industry only, so no shipped world moves; widens who reaches ring 1.
+
+> **Recommendation:** Accept for Beat 1 and read BL-1041's industrialisation reading first. If points turn out to track headcount because capacity is flat for most polities, take the Industry-only flow.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/trees/TREES.md`, `docs/generation/trees/INDUSTRY_TREE.md`*
 
 ---
 

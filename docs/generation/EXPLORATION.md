@@ -142,6 +142,11 @@ with no reason. The pair is what makes a trade route a consequence rather than a
 at four uses, a Road above it, and no tier beyond. A phase about throughput is where the next rung
 belongs, bought with capital rather than earned by traffic, which is Ben's *"upgrade of roads"*.
 
+**A resumed corridor reopens at the rung it was recorded at (Ben, 2026-09-18).** A span that opens
+from a handoff seeds each corridor at its recorded rung: a bought rung is never demoted to the rung
+its walks alone would earn, and a walk the record counts but the road never took is never promoted
+past it. Otherwise a post road reopens as a Road and can be bought a second time.
+
 **THE VISUAL IS A FILTER ON THAT NUMBER, NOT A SECOND SIMULATION (Ben, 2026-09-11).** *"We also
 want to visualise fleets and caravans moving, this can be heavily abstracted since the pace of our
 time-lapse is too fast, so we will just render examples when a threshold supply is reached."* A

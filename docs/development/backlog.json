@@ -408,6 +408,30 @@
     "src/world/history_sim.cpp"
    ],
    "design": "FOUND 2026-09-18 by the BL-1038 cold review. TREES.md § State scales a polity's research rate 'by the spire ring it holds and by its contact degree'. The empire rate applies the spire ring (history_sim.cpp ~l.6255, x1.45 at ring 3) and multiplies by a contact_degree hard-coded to 0; the Exploration rate (~l.6374) applies neither. The BL-1038 fix round applies the spire ring to the Industry rate only. BL-908's contact table exists and the Industry scorer's `known` term already reads it, so the inert multiplier is a choice, not a gap in the data.\n\nTHE WORK. Apply the spire ring to the Exploration rate; read contact degree (distinct living polities met, clamped as the empire formula already clamps it) in every tree's rate; or amend TREES.md if either scale is not wanted. Either code change moves every shipped world, so it waits for a re-bless it can ride; sprint 45's carries only BL-1037 (Ben, 2026-09-18)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-18",
+   "author": "Claude (found by the BL-1036 cold review, 2026-09-18)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1049",
+   "short_name": "CIVILISATION_INDEX_REUSE_AT_1200",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Exploration's 1200 resume restarts the civilisation and creed tables at zero while regions keep their old indices into them",
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "tools/verify/digitisation_sim_harness.cpp"
+   ],
+   "design": "FOUND 2026-09-18 by the BL-1036 cold review. BL-1036 carries the civilisation and universal-creed tables across the 1660 resume, but Exploration's own resume at 1200 still passes neither table (hard_coded_world.cpp:1142-1146; the KNOWN GAP comment at the new resume params in history_sim.hpp). So the tables restart at 0 in 1200 while regions and polities keep their pre-1200 indices into them. A pre-1200 civilisation index then resolves to whatever Exploration coins first; a pair already recorded before 1200 is recorded again under a new name, coined from the Exploration span's own seed; and make_exploration_output hands that table on, so the 1660 resume inherits the misalignment. Nothing reads the indices as table offsets today (only >= 0 checks), so nothing crashes: the damage is to data truth and to the world log.\n\nTHE WORK. Pass the Empires span's civilisation and creed tables to the 1200 resume, as BL-1036 does at 1660, and add a count to digitisation_sim_harness --fidelity of regions whose civilisation index is at or past the handoff table's size, plus duplicate member pairs. MOVES SHIPPED WORLDS: deep_digest folds the prose history log, and dropping the duplicate civilisation lines changes it. Not on sprint 45's re-bless, which carries only BL-1037 (Ben, 2026-09-18)."
   }
  ]
 }

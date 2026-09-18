@@ -532,7 +532,7 @@ void region_fields(const region& a, const region& b, field_census& out)
     FID_CMP(work_manpower_mod); FID_CMP(work_reach_mod); FID_CMP(work_defence_mod);
     FID_CMP(work_industrial_mod);
 }
-constexpr int k_region_fields = 54;
+constexpr int k_region_fields = 51; // counts the FID_CMP lines above; keep them equal
 
 /// Every `polity` field, one by one (same caveat as `region_fields`).
 void polity_fields(const polity& a, const polity& b, field_census& out)

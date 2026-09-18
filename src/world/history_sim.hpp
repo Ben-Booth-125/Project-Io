@@ -2026,7 +2026,8 @@ struct history_sim_params
     int deterrence_alarm_weight_q = 525;
 
     /// Flat penalty on `treaty_value_q` for a pair that met only DURING this
-    /// span (a frontier contact, `contact::first.year >= start_year`) — the
+    /// span (a frontier contact, `contact::first.year >= near_home_cutoff_year`,
+    /// which a span sets explicitly — BL-1036) — the
     /// other half of the same mechanism: a fleet pointed at ground with no
     /// visible defender meets no deterrent, so a frontier pair should not
     /// bind a non-aggression clause as readily as a long-known neighbour.
@@ -2231,7 +2232,9 @@ struct trade_flow
 /// item builds EARN: every living polity's capital seat (`region::treasury`)
 /// draws income from its held ground's endowment, the inherited corridor
 /// network, and the trade flowing through its market (BL-954; `history_sim_params::treasury_*_income_q`),
-/// and — ONCE, on the round at @p year == @p params.start_year, the phase's
+/// and — ONCE, on the round at @p year == @p params.consolidation_year (a
+/// span sets it explicitly; its INT64_MIN default means NEVER, so a direct
+/// caller that sets only `start_year` gets no consolidation — BL-1036), the phase's
 /// visible opening act — the seat's accumulated `material_stock` is folded
 /// into it (EXPLORATION.md sec Capital arrives: "material becomes capital").
 /// Also refreshes every market's scarcity signal (`refresh_market_scarcity`,
@@ -2277,7 +2280,9 @@ struct culture_good_preference; // defined further down
 /// BL-955 — WHAT THE ALLOCATION READS beyond the region/polity tables. Every
 /// pointer may be null, and a null reads as "no signal" rather than an error:
 ///   - @c state   : its `contacts` give the near-home Alarm (contacts whose
-///                  first year predates `params.start_year`, read through
+///                  first year predates `params.near_home_cutoff_year`
+///                  — INT64_MIN by default, so no pair is near-home unless a
+///                  span sets it, BL-1036 — read through
 ///                  `deterrence_alarm_q`). Its `polities` MUST be the same
 ///                  vector the upkeep call mutates (as `run_history_sim`
 ///                  passes it); the Alarm is read in a pre-pass before any
