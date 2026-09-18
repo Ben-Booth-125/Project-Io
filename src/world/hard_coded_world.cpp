@@ -1330,6 +1330,26 @@ world make_hard_coded_world(world_params params, generation_report* report,
                     // equals `kepler_exploration.cultures` row for row.
                     kepler_settlement.regions = kepler_exploration.regions;
 
+                    // BL-1051 -- THE SPAN-OPEN SURVEY (INDUSTRY_TREE.md sec The
+                    // scorer, "Forest is surveyed"). Every region the span
+                    // opens on is surveyed ONCE, from its own tiles, for fuel
+                    // and forest -- here because this is the one place both
+                    // the tiles and the 1660 region table are live (the sim has
+                    // neither `world&` nor tile ids by design). It writes two
+                    // NEW fields and nothing else: `energy_q`, the treasury
+                    // endowment and every gate mean stay as Exploration left
+                    // them. INSIDE THE SWITCH, so with the span off neither
+                    // field is ever written and no digest can see it.
+                    //
+                    // AFTER the struct copy above, so the 1660 handoff value
+                    // itself stays exactly the close Exploration folded (its
+                    // validator and the seed library read it); the survey is
+                    // what the span opens ON, not part of what Exploration hands.
+                    survey_regions_at_span_open(w, kepler_tiles, home_grid_width, home_grid_height,
+                                                kepler_settlement.regions);
+                    if (fixture != nullptr)
+                        fixture->digitisation_open_regions = kepler_settlement.regions;
+
                     if (progress != nullptr)
                     {
                         progress->label.store(14, std::memory_order_relaxed); // the digitisation span

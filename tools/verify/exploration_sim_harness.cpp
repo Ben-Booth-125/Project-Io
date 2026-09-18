@@ -1943,7 +1943,9 @@ int main()
     }
 
     // T8.7: THE PINNED STUBS, on the face. Every reading maxed, every term
-    // printed: the three pinned terms must still read 0.
+    // printed: the two pinned terms must still read 0. (BL-1051 gave
+    // `ground_forest` a source, so it left the pinned list and joined the
+    // live one; the mask holds a Fuel Doctrine side so `furnace_lit` is lit.)
     {
         industry_scorer_reading r;
         r.reach_bound_q = r.manpower_bound_q = r.food_bound_q = r.stores_low_q = 1000;
@@ -1951,35 +1953,80 @@ int main()
         r.ground_ore_q = r.ground_farm_q = r.ground_port_q = r.fuel_seam_q = 1000;
         r.threatened_q = r.fuel_bound_q = r.labour_bound_q = r.credit_bound_q = 1000;
         r.colonial_reach_q = r.many_peoples_q = 1000;
+        r.ground_forest_q = 1000;
         r.known_mask = ~0ULL;
         int v[io::industry_tree::term_count];
-        industry_term_values(1ULL << in_root, r, v);
-        std::printf("      term values, every reading at its max:\n       ");
+        industry_term_values((1ULL << in_root) | (1ULL << in_coke), r, v);
+        std::printf("      term values, every reading at its max (root + Coke Smelting held):\n       ");
         for (int t = 0; t < io::industry_tree::term_count; ++t)
             std::printf(" %s=%d%s", io::industry_tree::term_names[t], v[t], (t % 6 == 5) ? "\n       " : "");
         std::printf("\n");
         using T = io::industry_tree::scorer_term;
         const auto at = [&v](T t) { return v[static_cast<int>(t)]; };
-        std::printf("      PINNED AT 0: ground_forest=%d (no forest reading in the sim), tariff_pressure=%d\n"
-                    "                   (no landed price before the campaign), plague_struck=%d (the history\n"
-                    "                   sim runs no plague). `known` reads 0 in the table by design: it is per\n"
-                    "                   node, off known_mask.\n",
-                    at(T::ground_forest), at(T::tariff_pressure), at(T::plague_struck));
-        check(at(T::ground_forest) == 0 && at(T::tariff_pressure) == 0 && at(T::plague_struck) == 0,
-              "T8.7.1  ground_forest, tariff_pressure and plague_struck stay pinned at 0 with every input maxed");
+        std::printf("      PINNED AT 0: tariff_pressure=%d (no landed price before the campaign),\n"
+                    "                   plague_struck=%d (the history sim runs no plague). `known` reads 0 in\n"
+                    "                   the table by design: it is per node, off known_mask.\n",
+                    at(T::tariff_pressure), at(T::plague_struck));
+        check(at(T::tariff_pressure) == 0 && at(T::plague_struck) == 0,
+              "T8.7.1  tariff_pressure and plague_struck stay pinned at 0 with every input maxed");
         bool live = true;
         for (int t = 0; t < io::industry_tree::term_count; ++t)
         {
             const T tt = static_cast<T>(t);
-            if (tt == T::ground_forest || tt == T::tariff_pressure || tt == T::plague_struck || tt == T::known)
+            if (tt == T::tariff_pressure || tt == T::plague_struck || tt == T::known)
                 continue;
             live = live && v[t] == 1000;
         }
-        check(live, "T8.7.2  every other term (threatened, labour_bound, furnace_lit, credit_bound, ... ) is live at 1000");
-        int v0[io::industry_tree::term_count];
+        check(live, "T8.7.2  every other term (ground_forest, threatened, labour_bound, furnace_lit, ... ) is live at 1000");
+
+        // T8.7.3 (BL-1051, NR-892): `furnace_lit` reads a FUEL DOCTRINE SIDE
+        // taken, not the root -- every investor holds the root, so the root
+        // told the scorer nothing. Each node alone: exactly Coke Smelting and
+        // Charcoal Iron light it; the root, Furnace Practice and every other
+        // node do not. This also pins the fork `industry_fuel_doctrine_taken`
+        // finds off the table (The Cheap Ton's requires_fork) to those two ids.
+        bool only_the_doctrine = true;
+        for (int i = 0; i < io::industry_tree::node_count; ++i)
+        {
+            int vi[io::industry_tree::term_count];
+            industry_term_values(1ULL << i, r, vi);
+            const bool lit = vi[static_cast<int>(T::furnace_lit)] == 1000;
+            if (lit != (i == in_coke || i == in_char)) only_the_doctrine = false;
+        }
+        int v0[io::industry_tree::term_count], vr[io::industry_tree::term_count], vch[io::industry_tree::term_count];
         industry_term_values(0, r, v0);
-        check(at(T::furnace_lit) == 1000 && v0[static_cast<int>(T::furnace_lit)] == 0,
-              "T8.7.3  furnace_lit reads the root held (1000 with IN-SP-1a, 0 without)");
+        industry_term_values((1ULL << in_root) | (1ULL << in_mt1e), r, vr);
+        industry_term_values((1ULL << in_root) | (1ULL << in_mt1e) | (1ULL << in_char), r, vch);
+        const int fl = static_cast<int>(T::furnace_lit);
+        std::printf("      furnace_lit: nothing %d, root + Furnace Practice %d, + Charcoal Iron %d, root + Coke %d\n",
+                    v0[fl], vr[fl], vch[fl], at(T::furnace_lit));
+        check(only_the_doctrine && v0[fl] == 0 && vr[fl] == 0 && vch[fl] == 1000 && at(T::furnace_lit) == 1000,
+              "T8.7.3  furnace_lit reads a Fuel Doctrine side held: 1000 with IN-MT-1a or IN-MT-1b, 0 with the root alone");
+
+        // T8.7.5 (BL-1051): `ground_forest`'s reading is the held MEAN over
+        // SURVEYED regions -- unsurveyed ground (-1) stays out rather than
+        // reading as bare, and nothing surveyed reads 0 (the old pin).
+        {
+            std::vector<region> rg(5);
+            rg[0].survey_forest_q = 1000;
+            rg[1].survey_forest_q = 0;
+            rg[2].survey_forest_q = 500;
+            rg[3].survey_forest_q = -1;  // founded after the span opened
+            rg[4].survey_forest_q = 300; // not held
+            const std::vector<int> held_fwd = {0, 1, 2, 3};
+            const std::vector<int> held_rev = {3, 2, 1, 0};
+            const std::vector<int> held_none_surveyed = {3};
+            const int m_fwd = industry_ground_forest_q(rg, held_fwd);
+            const int m_rev = industry_ground_forest_q(rg, held_rev);
+            const int m_uns = industry_ground_forest_q(rg, held_none_surveyed);
+            const int m_emp = industry_ground_forest_q(rg, {});
+            std::vector<region> never(3); // the struct default: no span, never surveyed
+            const int m_off = industry_ground_forest_q(never, {0, 1, 2});
+            std::printf("      ground_forest held mean: {1000,0,500,unsurveyed} -> %d (reversed %d); only unsurveyed"
+                        " -> %d; none held -> %d; no span -> %d\n", m_fwd, m_rev, m_uns, m_emp, m_off);
+            check(m_fwd == 500 && m_rev == 500 && m_uns == 0 && m_emp == 0 && m_off == 0,
+                  "T8.7.5  ground_forest reads the mean survey_forest_q over surveyed held ground, order-free; unsurveyed -> 0");
+        }
 
         // `known` is per node: Patent Grants reads 1000 only when a met polity
         // holds IT. Hold its ring-1 neighbour, give ONE competitor a live
@@ -2016,6 +2063,54 @@ int main()
                     none.fuel_seam_q, no_seam >= 0 ? io::industry_tree::nodes[no_seam].id : "-");
         check(with_seam == in_coke, "T8.8.2  a held seam (ground_fuel 1000) buys Coke Smelting");
         check(no_seam == in_char,   "T8.8.3  no seam: Coke is gated out and Charcoal Iron answers the fuel question");
+    }
+
+    // T8.8.4 (BL-1051, NR-891): THE WOODED POLITY CHOOSES CHARCOAL, it is not
+    // pushed there. T8.8.3 wins by default -- with every reading at 0,
+    // Charcoal Iron's bare -3 takes the tie on node index. Here a rival term is
+    // live (Machine Tools held, so Interchangeable Parts reads `threatened`),
+    // Coke's seam gate is shut in BOTH cases, and only the held ground's forest
+    // differs, fed through the real reading off a region table: bare ground
+    // loses the fuel question to the rival; wooded ground takes Charcoal Iron.
+    {
+        const int in_mt1c = find_industry_node("IN-MT-1c"); // Machine Tools
+        const int in_mt1d = find_industry_node("IN-MT-1d"); // Interchangeable Parts
+        const uint64_t mk = (1ULL << in_root) | (1ULL << in_mt1e) | (1ULL << in_mt1c);
+
+        // Two three-region realms on the same poor fuel (energy_q 100 < the
+        // 250 seam bar everywhere), one wooded, one open.
+        std::vector<region> rg(6);
+        const int wood[6] = { 800, 700, 900,  0, 50, 0 };
+        for (int i = 0; i < 6; ++i) { rg[i].energy_q = 100; rg[i].survey_forest_q = wood[i]; }
+        const std::vector<int> wooded = {0, 1, 2}, open_ground = {3, 4, 5};
+
+        const auto reading_for = [&](const std::vector<int>& held) {
+            industry_scorer_reading r;
+            for (int hi : held) r.fuel_seam_q = std::max(r.fuel_seam_q, rg[static_cast<std::size_t>(hi)].energy_q);
+            r.threatened_q    = 500; // the rival: Interchangeable Parts scores 500 - 100 - 1 = 399
+            r.ground_forest_q = industry_ground_forest_q(rg, held);
+            return r;
+        };
+        const industry_scorer_reading rw = reading_for(wooded), ro = reading_for(open_ground);
+        const int pick_w = choose_industry_node(mk, rw);
+        const int pick_o = choose_industry_node(mk, ro);
+        const bool coke_shut = !industry_gate_open(io::industry_tree::gate_atom::fuel, rw)
+                            && !industry_gate_open(io::industry_tree::gate_atom::fuel, ro);
+        std::printf("      no seam (fuel %d), a rival reading threatened 500: wooded ground (forest %d) -> %s;"
+                    " open ground (forest %d) -> %s\n", rw.fuel_seam_q,
+                    rw.ground_forest_q, pick_w >= 0 ? io::industry_tree::nodes[pick_w].id : "-",
+                    ro.ground_forest_q, pick_o >= 0 ? io::industry_tree::nodes[pick_o].id : "-");
+        check(in_mt1c >= 0 && in_mt1d >= 0 && coke_shut && pick_w == in_char && pick_o != in_char,
+              "T8.8.4  no seam either way: the wooded polity takes Charcoal Iron on ground_forest, the open one does not");
+
+        // What a seam does to the same wooded realm, printed rather than
+        // asserted: Coke reads the seam, Charcoal the forest, and the larger
+        // term takes the fork (an exact tie breaks on node index, Coke first).
+        industry_scorer_reading rs = rw;
+        rs.fuel_seam_q = 1000;
+        const int pick_s = choose_industry_node(mk, rs);
+        std::printf("      NOTE  the same wooded realm WITH a seam (ground_fuel %d vs ground_forest %d) -> %s\n",
+                    rs.fuel_seam_q, rs.ground_forest_q, pick_s >= 0 ? io::industry_tree::nodes[pick_s].id : "-");
     }
 
     // T8.9: THE RATE -- isqrt64 exact, top-k, clamp first, superlinear.

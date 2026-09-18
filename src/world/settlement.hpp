@@ -265,6 +265,34 @@ struct region
     int port_q = 0;
     region_class dominant = region_class::none;
 
+    // --- BL-1051: the span-open survey -------------------------------------
+    // INDUSTRY_TREE.md sec The scorer (Ben, 2026-09-18, NR-891). `energy_q`
+    // above is surveyed only for ground the pre-sim settlement pass drew; a
+    // region the sim founds inherits its parent's reading x0.7, which is about
+    // two regions in three on a long arc. These two fields are the SAME window
+    // survey, taken over every region's own tiles, once, at the Digitisation
+    // span's open (`survey_regions_at_span_open`). They are NEW fields rather
+    // than a rewrite of `energy_q` so Exploration, the empire tree, the
+    // treasury endowment and every gate mean are untouched.
+    //
+    // -1 IS "NOT SURVEYED", and it is the honest value in two places: on every
+    // path where the span does not run (the fields are never written), and on
+    // a region the span itself founds after its open (the sim has no tiles).
+    // A reader must treat -1 as unknown, never as zero.
+    //
+    // READ ONLY BY the Industry scorer (`industry_ground_forest_q`) and, for
+    // the fuel reading, BL-1041's points rate. GENERATION SCRATCH, NOT SAVED:
+    // `w_region` does not write them, the same footing as `treasury` below.
+
+    /// Coal + petroleum under the window, 0-1000, scored against the mean over
+    /// every region at the span open (500 = that world's average region), or
+    /// -1 when not surveyed.
+    int survey_fuel_q = -1;
+
+    /// Share of the window's land tiles under forest cover, 0-1000, or -1 when
+    /// not surveyed. An absolute share, not a world-relative score.
+    int survey_forest_q = -1;
+
     int64_t founded_year = 0;     ///< Calendar year settled (negative = before epoch year 0).
     int64_t industrial_year = 0;  ///< Calendar year the furnaces lit; 0 when never.
     bool    industrialised = false;
@@ -907,6 +935,15 @@ struct settlement_state
 struct endowment
 {
     int farm = 0, ore = 0, energy = 0, water = 0; ///< Per-tile mean × 1000.
+
+    /// BL-1051 — the share of the window's LAND cells under
+    /// `terrain_cover::forest`, 0-1000. Land cells are the divisor, not the
+    /// whole window: a coastal forest is as wooded as an inland one, and the
+    /// harbour discount above is `classify`'s business, not the forest's. Cover
+    /// only, never density (a closed canopy and a thin wood both count). Read
+    /// by `survey_regions_at_span_open` alone; the settlement pass computes and
+    /// ignores it.
+    int forest = 0;
 };
 
 /// Survey the window centred on (`col`, `row`): `farm` reads agricultural
@@ -918,6 +955,23 @@ struct endowment
 /// then re-weighs. `ids` is the body's raster-order tile list.
 endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
                            int col, int row, int gw, int gh);
+
+/// BL-1051 — THE SPAN-OPEN SURVEY (INDUSTRY_TREE.md sec The scorer, "Forest is
+/// surveyed"). Survey EVERY region in @p regions once, over the window
+/// `survey_endowment` reads, and write exactly two fields on each:
+/// `region::survey_fuel_q` (coal + petroleum, scored against the mean over
+/// every region surveyed in this call, exactly as `energy_q` is scored against
+/// the settlement pass's mean) and `region::survey_forest_q` (the window's
+/// land share under forest cover). Nothing else on a region is read or written:
+/// `energy_q`, the treasury endowment and every gate mean stay as the history
+/// left them.
+///
+/// Called once, by generation, at the Digitisation span's open (the one place
+/// both the tiles and the 1660 region table are live), and only when that span
+/// runs. Pure and integer: the same tiles and the same region table give the
+/// same fields on every machine. `ids` is the body's raster-order tile list.
+void survey_regions_at_span_open(const world& w, const std::vector<entity_id>& ids,
+                                 int gw, int gh, std::vector<region>& regions);
 
 /// Settle the body: place regions, inherit each one's cradle culture, survey
 /// its ancient endowment, and industrialise the ones the ground can pay for.
