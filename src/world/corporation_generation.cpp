@@ -2570,11 +2570,18 @@ constexpr uint32_t k_charter_salt_firm_name    = 0x6F1B4E89u;
 constexpr uint32_t k_charter_salt_firm_stock   = 0x84C3D75Bu;
 constexpr uint32_t k_charter_salt_player       = 0x2E97A3F1u;
 
-// Pass 6's caps, restated because they are function-local constants inside
-// `generate_background_firms` and that body is not edited. Same values; if
-// Pass 6's move, these move with them.
-constexpr int k_charter_max_firms_per_body    = 200;
-constexpr int k_charter_per_resource_firm_cap = 8;
+// THE BUDGET PATH'S CAPS ARE ITS OWN (BL-1039). The body guard and the per-good
+// cap are no longer restated from Pass 6 here: they are `charter_spend_params`
+// fields with no shipped default (`max_firms_per_body`, `per_resource_firm_cap`,
+// with `resource_cap_rule` and `density_ceiling`), so a budget world's density is
+// set by its caller and ruled on the cost table, and nothing here follows Pass
+// 6's function-local constants in `generate_background_firms` — which stay
+// exactly as they are for every world without a budget.
+//
+// The per-province cap is the one number still held here. It is the budget
+// path's own constant, NOT a copy that tracks Pass 6's: DIGITISATION.md § 1
+// (PROPOSED, 2026-09-18, not overturned) keeps it at 2 on a budget world until
+// real budgets show whether they concentrate, and it moves only on that reading.
 constexpr int k_charter_per_province_firm_cap = 2;
 
 /// A fresh std::mt19937 for one (centre, role): a KEYED draw, the checkpoint
@@ -2789,13 +2796,36 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
     return {};
 }
 
-/// Per-body state of the firm charters — Pass 6's per-body tallies.
+/// Per-body state of the firm charters — Pass 6's per-body tallies, and the
+/// body's density rule, FIXED BEFORE THE WALK (BL-1039).
 struct charter_body_state
 {
     std::array<float, resource_count> consumer_demand{};
     std::array<int, resource_count>   firms_by_resource{};
     std::map<uint32_t, int>           firms_by_province;
     int                               firms = 0;
+
+    /// B: points budgeted to nation-resolved centres on this body.
+    int64_t                           capital_points = 0;
+    /// G: goods with demand before the walk (resource indices, ascending).
+    std::vector<std::uint16_t>        goods;
+    /// B_ref = c x |G| x firm price.
+    int64_t                           reference_points = 0;
+    /// Firms per good per body; -1 = no per-good cap (`lifted`).
+    int32_t                           per_good_cap = -1;
+    /// Background firms per body before `density_ceiling`; 0 = no ceiling.
+    int32_t                           density_ceiling = 0;
+};
+
+/// A specialist chartered under `unspent_points`, whose capital and stockpile
+/// wait until its centre's firms have spent what they can.
+struct charter_deferred_capital
+{
+    entity_id        corp       = null_entity;
+    std::size_t      centre_idx = 0;   ///< into `centres`
+    std::size_t      record_idx = 0;   ///< into the report's charters, before the final sort
+    industrial_focus focus      = industrial_focus::extraction;
+    entity_id        home_body  = null_entity;
 };
 
 } // namespace
@@ -2942,7 +2972,74 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     for (const auto& kv : w.buildings)
         occupied.insert(kv.second.tile);
 
-    const corporation_params capital_params;   // today's starting capital: 400 +/- 40%
+    // --- EACH BODY'S DENSITY RULE, FIXED BEFORE THE WALK (BL-1039) -----------
+    // Every body holding a nation-resolved budgeted centre gets its state here,
+    // before any charter lands, and three things are read ONCE:
+    //
+    //  * B, the body's charter capital: the points of its nation-resolved
+    //    centres (a `no_nation` centre's points can buy nothing on it).
+    //  * G, the GOODS WITH DEMAND on the body: every good whose demand is > 0
+    //    across all three halves the gap selection below reads — the consumer
+    //    baskets, building upkeep and construction. FIXED HERE, AND WHY: the
+    //    selection re-measures upkeep and construction demand PER FIRM (BL-708,
+    //    BL-709), because each firm it places draws upkeep and adds to the
+    //    building stock. Read later, G would drift as the walk's own firms land
+    //    — a mine that draws power would put power into G and raise the very
+    //    reference the cap is measured against, mid-walk. Read now, it is the
+    //    demand of the world the budget spends INTO (the base installations,
+    //    the world-gen roster already removed), and B_ref cannot move under it.
+    //    All three halves, not the consumer half alone, because the legacy cap
+    //    spends 8 firms on an upkeep or construction good exactly as on a
+    //    household one, and B_ref is what that cap would spend.
+    //  * B_ref and the per-good cap (`charter_sqrt_per_good_cap`), and the
+    //    density ceiling.
+    //
+    // The consumer half is also what Pass 6 captures once per body; it reads
+    // only the population centres, which no charter moves, so taking it here
+    // rather than at the body's first firm reads the same numbers.
+    std::map<entity_id, charter_body_state> bodies;
+    for (const charter_centre& cc : centres)
+        if (cc.nation != null_entity)
+            bodies[cc.body].capital_points += cc.points;
+    for (auto& [body_id, bs] : bodies)
+    {
+        bs.consumer_demand = body_demand(w, reg, body_id);
+        std::array<float, resource_count> demand = bs.consumer_demand;
+        const std::array<float, resource_count> upkeep = body_upkeep_demand(w, reg, body_id);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            demand[r] += upkeep[r];
+        const std::array<float, resource_count> construction_need =
+            body_construction_demand(w, reg, body_id);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            demand[r] += construction_need[r];
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (demand[r] > 0.0f)
+                bs.goods.push_back(static_cast<std::uint16_t>(r));
+
+        const int g = static_cast<int>(bs.goods.size());
+        bs.reference_points = (g > 0)
+            ? static_cast<int64_t>(spend.per_resource_firm_cap) * g
+                  * static_cast<int64_t>(spend.firm_price_points)
+            : 0;
+        switch (spend.resource_cap_rule)
+        {
+        case charter_cap_rule::fixed:
+            bs.per_good_cap = spend.per_resource_firm_cap;
+            break;
+        case charter_cap_rule::lifted:
+            bs.per_good_cap = -1;
+            break;
+        case charter_cap_rule::sqrt_capital:
+            bs.per_good_cap = charter_sqrt_per_good_cap(spend.per_resource_firm_cap,
+                                                        bs.capital_points, g,
+                                                        spend.firm_price_points);
+            bs.density_ceiling = spend.density_ceiling;
+            break;
+        }
+    }
+
+    const corporation_params capital_params;   // the draw: today's starting capital, 400 +/- 40%
+    std::vector<charter_deferred_capital> deferred;
 
     // `assets` is read BEFORE it is moved into the corporation, so the record
     // holds every holding's tile as placed (anchor first).
@@ -2963,8 +3060,6 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         rep.points_spent += price;
         chartered.push_back(corp_id);
     };
-
-    std::map<entity_id, charter_body_state> bodies;
 
     // --- ONE WALK (DIGITISATION.md § 1) ---------------------------------------
     // Each centre in spend order "charters exactly one specialist; what remains
@@ -3018,11 +3113,21 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             }
             else
             {
-                std::mt19937 capital_rng =
-                    charter_stream(seed, k_charter_salt_spec_capital, cc.centre);
-                const float capital = compute_capital(capital_params.base_capital,
-                                                      capital_params.wealth_variance, focus,
-                                                      capital_rng);
+                // THE CAPITAL (BL-1039). Under `draw`, today's seeded 400 +/- 40%,
+                // exactly as before. Under `unspent_points` it is not known yet —
+                // it is what this centre's firms leave unspent — so the specialist
+                // opens at 0 here and its capital and stockpile are written after
+                // the walk (`deferred`), from the centre's final unspent tally.
+                const bool draw_capital = spend.capital_rule == charter_capital_rule::draw;
+                float capital = 0.0f;
+                if (draw_capital)
+                {
+                    std::mt19937 capital_rng =
+                        charter_stream(seed, k_charter_salt_spec_capital, cc.centre);
+                    capital = compute_capital(capital_params.base_capital,
+                                              capital_params.wealth_variance, focus,
+                                              capital_rng);
+                }
                 std::mt19937 name_rng = charter_stream(seed, k_charter_salt_spec_name, cc.centre);
 
                 corporation_component corp;
@@ -3042,18 +3147,26 @@ std::vector<entity_id> charter_web_from_budget(world& w,
 
                 const entity_id corp_id = w.create_entity();
                 record(corp_id, cc, /*specialist=*/true, rung, assets, price);
+                rep.charters.back().capital = capital;
                 corp.assets = std::move(assets);
                 w.corporations[corp_id] = std::move(corp);
 
-                std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_spec_stock, cc.centre);
-                const auto stock = generate_starting_stockpile(focus, capital,
-                                                               capital_params.base_capital,
-                                                               stock_rng);
-                if (home_body != null_entity)
+                if (draw_capital)
                 {
-                    stockpile_component& pool = w.pool_for(corp_id, home_body);
-                    for (std::size_t r = 0; r < resource_count; ++r)
-                        pool.quantities[r] += stock[r];
+                    std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_spec_stock, cc.centre);
+                    const auto stock = generate_starting_stockpile(focus, capital,
+                                                                   capital_params.base_capital,
+                                                                   stock_rng);
+                    if (home_body != null_entity)
+                    {
+                        stockpile_component& pool = w.pool_for(corp_id, home_body);
+                        for (std::size_t r = 0; r < resource_count; ++r)
+                            pool.quantities[r] += stock[r];
+                    }
+                }
+                else
+                {
+                    deferred.push_back({ corp_id, oi, rep.charters.size() - 1, focus, home_body });
                 }
             }
         }
@@ -3069,16 +3182,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         if (n_firms <= 0)
             continue;
 
-        auto bit = bodies.find(cc.body);
-        if (bit == bodies.end())
-        {
-            charter_body_state fresh;
-            // The CONSUMER half of the body's demand, fixed for the body — as
-            // Pass 6 captures it once per body before its first firm.
-            fresh.consumer_demand = body_demand(w, reg, cc.body);
-            bit = bodies.emplace(cc.body, std::move(fresh)).first;
-        }
-        charter_body_state& bs = bit->second;
+        // Every nation-resolved centre's body was given its state before the
+        // walk, the consumer half of its demand included (see above).
+        charter_body_state& bs = bodies.at(cc.body);
 
         std::mt19937 asset_rng = charter_stream(seed, k_charter_salt_firm_asset, cc.centre);
         std::mt19937 name_rng  = charter_stream(seed, k_charter_salt_firm_name,  cc.centre);
@@ -3088,9 +3194,18 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         {
             const int32_t left = (n_firms - k) * spend.firm_price_points;
 
-            if (bs.firms >= k_charter_max_firms_per_body)
+            // The runaway guard first, so a runaway is always named as one; the
+            // density ceiling sits below it (refused otherwise), so under
+            // `sqrt_capital` the ceiling is what binds and the guard stays a
+            // backstop. No legacy rule carries a ceiling.
+            if (bs.firms >= spend.max_firms_per_body)
             {
                 cc.unspent[static_cast<std::size_t>(charter_unspent_reason::body_cap)] += left;
+                break;
+            }
+            if (bs.density_ceiling > 0 && bs.firms >= bs.density_ceiling)
+            {
+                cc.unspent[static_cast<std::size_t>(charter_unspent_reason::density_ceiling)] += left;
                 break;
             }
 
@@ -3099,10 +3214,12 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // per-resource cap masks; construction capacity provisioned first,
             // then the biggest absolute gap). See that body for the reasoning.
             //
-            // BL-1033: `spend.resource_cap` false lifts the per-resource cap on
-            // THIS copy only — neither the mask below nor the yard's cap test
-            // applies. The yard's `want_yards` bound, the province cap, the body
-            // cap and the no_gap stop are unchanged.
+            // THE PER-GOOD CAP is the body's, fixed before the walk (BL-1039):
+            // `per_resource_firm_cap` under `fixed` (BL-1033's cap kept), none
+            // under `lifted` (cap lifted — neither the mask below nor the yard's
+            // cap test applies), the square-root rule's under `sqrt_capital`. The
+            // yard's `want_yards` bound, the province cap, the body guard and the
+            // no_gap stop are the same under every rule.
             std::array<float, resource_count> production = {};
             accumulate_body_production(w, reg, cc.body, production);
 
@@ -3116,9 +3233,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 demand[r] += construction_need[r];
 
             std::array<float, resource_count> selectable = production;
-            if (spend.resource_cap)
+            if (bs.per_good_cap >= 0)
                 for (std::size_t r = 0; r < resource_count; ++r)
-                    if (bs.firms_by_resource[r] >= k_charter_per_resource_firm_cap)
+                    if (bs.firms_by_resource[r] >= bs.per_good_cap)
                         selectable[r] = std::max(selectable[r], demand[r]);
 
             std::size_t gap_r    = resource_count;
@@ -3128,8 +3245,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     static_cast<std::size_t>(resource_type::construction_capacity);
                 const int ci = best_construction_recipe(reg);
                 if (ci >= 0
-                    && (!spend.resource_cap
-                        || bs.firms_by_resource[cap_i] < k_charter_per_resource_firm_cap))
+                    && (bs.per_good_cap < 0
+                        || bs.firms_by_resource[cap_i] < bs.per_good_cap))
                 {
                     const float per_yard =
                         reg.recipe_at(building_type::processing_facility, ci).outputs[cap_i];
@@ -3216,6 +3333,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
 
             const entity_id corp_id = w.create_entity();
             record(corp_id, cc, /*specialist=*/false, rung, assets, spend.firm_price_points);
+            rep.charters.back().good = static_cast<std::uint16_t>(gap_r);
             corp.assets = std::move(assets);
             w.corporations[corp_id] = std::move(corp);
             ++bs.firms;
@@ -3232,6 +3350,68 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     pool.quantities[r] += stock[r];
             }
         }
+    }
+
+    // --- the UNSPENT-POINTS capital (BL-1039) ---------------------------------
+    // DIGITISATION.md § 1 and CORPORATION_GENERATION.md Pass 4 (AMENDED FORWARD,
+    // Ben 2026-09-18): a budget specialist opens on what its centre could NOT
+    // spend after its specialist and its firms — every reason summed — at the
+    // caller's rate. Each centre is walked once, so its tally is final by the
+    // time the walk ends, and this is the same number read the moment its own
+    // firms stopped. Those points chartered nothing, so they stay UNSPENT by
+    // their reasons (the report still balances); they are also counted as
+    // capitalised. A centre that spent everything opens a specialist with 0.
+    //
+    // The stockpile follows the capital, as under the draw, and keeps the draw's
+    // scale reference (`base_capital`, 400): a specialist whose remainder is worth
+    // today's 400 credits holds today's stockpile; generate_starting_stockpile's
+    // own [0.5, 2] clamp bounds the rest. The cast to float is exact for any
+    // remainder below 2^24 points.
+    for (const charter_deferred_capital& d : deferred)
+    {
+        const charter_centre& cc = centres[d.centre_idx];
+        int64_t remainder = 0;
+        for (int r = 0; r < charter_unspent_reason_count; ++r)
+            remainder += cc.unspent[static_cast<std::size_t>(r)];
+        const float capital = static_cast<float>(remainder) * spend.capital_per_point;
+
+        corporation_component& corp = w.corporations.at(d.corp);
+        corp.starting_capital = capital;
+        corp.balance          = capital;
+        charter_record& rec = rep.charters[d.record_idx];
+        rec.capital        = capital;
+        rec.capital_points = remainder;
+        rep.unspent_points_capitalised += remainder;
+        if (remainder == 0)
+            ++rep.specialists_zero_capital;
+
+        std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_spec_stock, cc.centre);
+        const auto stock = generate_starting_stockpile(d.focus, capital,
+                                                       capital_params.base_capital, stock_rng);
+        if (d.home_body != null_entity)
+        {
+            stockpile_component& pool = w.pool_for(d.corp, d.home_body);
+            for (std::size_t r = 0; r < resource_count; ++r)
+                pool.quantities[r] += stock[r];
+        }
+    }
+
+    // --- each body's rule and what the walk put on it (BL-1039) ---------------
+    rep.cap_rule     = spend.resource_cap_rule;
+    rep.capital_rule = spend.capital_rule;
+    for (const auto& [body_id, bs] : bodies)   // std::map: ascending body id
+    {
+        charter_body_record br;
+        br.body              = body_id;
+        br.capital_points    = bs.capital_points;
+        br.goods_with_demand = static_cast<int>(bs.goods.size());
+        br.goods             = bs.goods;
+        br.reference_points  = bs.reference_points;
+        br.per_good_cap      = bs.per_good_cap;
+        br.density_ceiling   = bs.density_ceiling;
+        br.firms             = bs.firms;
+        br.firms_by_good.assign(bs.firms_by_resource.begin(), bs.firms_by_resource.end());
+        rep.bodies.push_back(std::move(br));
     }
 
     // --- the player: a seeded pick among the budget's specialists ------------

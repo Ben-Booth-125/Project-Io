@@ -13,7 +13,7 @@
 
 /// Debt interest charged per economy tick on a negative balance (BL-073). An
 /// economy tick is one quarter (k_ticks_per_year = 4), so this is the per-quarter
-/// rate: ~2 %/qtr ≈ 8 %/yr. A negative balance compounds once per tick by this
+/// rate: 1.5 %/qtr ≈ 6.1 %/yr compounded. A negative balance compounds once per tick by this
 /// factor; a non-negative balance is never charged. Single source of truth — both
 /// the live budget loop and the econ_bankruptcy harness read this constant, so they
 /// can never drift. Interest is a pure function of balance × rate (deterministic).

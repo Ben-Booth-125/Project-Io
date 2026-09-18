@@ -175,12 +175,18 @@ int remove_specialist_roster(world& w);
 ///    when that region is the centre nation's own, and otherwise nothing.
 ///  * A centre whose budget >= the specialist price (`firm_price_points x
 ///    specialist_firm_charters`) charters EXACTLY ONE specialist: focus and
-///    ownership from the character region (Passes 2 and 2b), today's capital
-///    (400 +/- 40%), stockpile, name and HQ. NO nation balancing, no diversity
-///    reroll. The remainder buys background firms at the firm price by Pass 6's
-///    gap selection (construction first, then the biggest gap under the
-///    per-resource cap 8 when `spend.resource_cap`), under the per-province cap
-///    2 when `spend.province_cap`, and the 200-per-body cap.
+///    ownership from the character region (Passes 2 and 2b), stockpile, name
+///    and HQ, and its capital by `spend.capital_rule` — `draw`, today's 400 +/-
+///    40%; or `unspent_points`, the centre's unspent remainder after its firms x
+///    `capital_per_point`, written after the walk (BL-1039). NO nation
+///    balancing, no diversity reroll. The remainder buys background firms at the
+///    firm price by Pass 6's gap selection (construction first, then the
+///    biggest gap under the body's per-good cap: `per_resource_firm_cap` under
+///    `fixed`, none under `lifted`, the square-root rule under `sqrt_capital`),
+///    under the budget path's per-province cap 2 when `spend.province_cap`, the
+///    `density_ceiling` under `sqrt_capital`, and the `max_firms_per_body`
+///    runaway guard. Each body's capital B, its goods with demand G, B_ref and
+///    the per-good cap are FIXED BEFORE THE WALK (`charter_sqrt_per_good_cap`).
 ///  * Anchor rungs: the centre nation's tiles within `spend.window_radius` of
 ///    the centre tile (column-wrapped), then the anchor region's window (empty
 ///    when the nearest region is a neighbour's), then UNSPENT — never nation-wide.
@@ -189,7 +195,8 @@ int remove_specialist_roster(world& w);
 ///    tile so a reader can measure the spill.
 ///  * What is not spent is counted by reason: `window_exhausted`,
 ///    `province_cap` (the windows had anchorable ground and the cap took all of
-///    it), `no_gap`, `body_cap`, `remainder` — never scattered.
+///    it), `no_gap`, `body_cap`, `density_ceiling`, `remainder` — never
+///    scattered. The report carries each body's rule and its firms per good.
 ///  * The player is a seeded pick among the budget's specialists; with none,
 ///    nobody is picked and the report says `no_specialists`.
 ///
