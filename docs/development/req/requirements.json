@@ -6178,44 +6178,49 @@
       "headless: player_seed_sweep --digest-check (main session)"
      ],
      "requirement": "With the span switch off, every digest, fingerprint and pin is unmoved.",
-     "notes": ""
+     "notes": "The 16-seed --digest-check and a fingerprint re-check run after BL-1039 round 2 and BL-1041 merge.",
+     "result_metric": "world_determinism ALL PASS, digests unchanged (main session, chain 7 on f98c2cea (BL-1039 fix round, BL-1051, BL-1053 merged)); lane: seed_library --check 0 moved."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the survey runs once at the span open, over every region, from tiles",
       "code: energy_q and the gate means untouched"
      ],
      "requirement": "The span open fills two new region fields for every region — a surveyed fuel reading and a forest share (land tiles under forest cover, 0-1000, integer) — and nothing else reads them outside the Industry scorer and BL-1041.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Cold review: the survey runs once at the span open over every region from tiles, after the handoff copy; the -1 sentinel never enters a mean or gate; nothing outside the Industry scorer reads the fields (survey_fuel_q reserved for BL-1041)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: exploration_sim_harness"
      ],
      "requirement": "ground_forest reads the held-mean forest share and furnace_lit reads a Fuel Doctrine side held (T8.7.3 updated); a wooded polity with no seam takes Charcoal Iron on the term, not only because Coke is gated.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "exploration_sim_harness ALL PASS including T8.7.3, T8.7.5 and T8.8.4 (main session, chain 7 on f98c2cea (BL-1039 fix round, BL-1051, BL-1053 merged)). Superseded in part by Ben's wave 1 rulings (furnace_lit = Coke held; forest scored as fuel), which BL-1041 builds and re-tests."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --through 1960 (span)"
      ],
      "requirement": "Per library seed: the forest-share spread, the Fuel Doctrine split against BL-1038's pooled 404 / 118 / 340, and whether the charcoal polities are the wooded ones.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Lane --through 1960, 16 seeds: Fuel Doctrine coke/charcoal/neither 391/132/333; the survey moved 14 polities coke->charcoal on 9 seeds, none the other way; mean held forest coke 209 / charcoal 231. --fidelity V5 gates 16/16 (main session, chain 7 on f98c2cea (BL-1039 fix round, BL-1051, BL-1053 merged))."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds no reader of the new fields outside the switch.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Cold review (2026-09-18): nothing blocking; furnace_lit constancy and the unlike fuel/forest scales went to Ben (NR-895) and are ruled."
     }
    ],
    "resolution": ""
@@ -6240,44 +6245,49 @@
       "headless: player_seed_sweep --digest-check (main session)"
      ],
      "requirement": "With the span switch off, every digest, fingerprint and pin is unmoved.",
-     "notes": ""
+     "notes": "The 16-seed --digest-check runs after BL-1039 round 2 and BL-1041 merge.",
+     "result_metric": "world_determinism ALL PASS, digests unchanged (main session, chain 7 on f98c2cea (BL-1039 fix round, BL-1051, BL-1053 merged)); lane: seed_library --check 0 moved."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --through 1960 (span, setup diff)"
      ],
      "requirement": "With the span on, world setup's treasuries, grudges, stamped roads and junction corridors equal the span's 1960 close, table for table, on every library seed; a harness line prints the diff and it is empty.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Lane --through 1960: the setup diff is EMPTY on 16/16 seeds (grudges, corridors, chests read from the 1960 close)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: nation treasury credit"
      ],
      "requirement": "A polity founded after 1660 is credited its 1960 treasury, and one conquered after 1660 is not credited a chest it no longer holds.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Code read plus the lane's ad hoc check on seeds 28, 40, 38, 32: a polity with no ground at 1960 is credited nothing."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --fidelity"
      ],
      "requirement": "span_params_issues checks every Empires-only setting is off in the span's params; the validator checks contacts and dated objects for continuity and that the span stopped at digitisation_stop_year; fidelity still passes 16 of 16.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "--fidelity on the merged tree: gates 1, 2 and 3 16/16, 765.8 s (main session, chain 7 on f98c2cea (BL-1039 fix round, BL-1051, BL-1053 merged)); lane: four negative tests refused on all 16 seeds."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: no pointer into freed Exploration state",
       "code: stop-year guard"
      ],
      "requirement": "The captured span params hold no pointer into state freed before the function returns, and a span whose stop year is not after Exploration's is refused before it runs.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Lane ad hoc check: a stop year of 1660 is refused before the span runs; captured params hold no resume pointer."
     },
     {
      "id": "R6",
