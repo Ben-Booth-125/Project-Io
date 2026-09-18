@@ -510,7 +510,10 @@ void app::begin_new_game()
 
     m_worldgen_progress.stage.store(0, std::memory_order_relaxed);
     m_worldgen_progress.label.store(0, std::memory_order_relaxed);
-    m_worldgen_progress.stage_count.store(generation_stage_label_count,
+    // BL-1053: the stages THIS run will report, never the label count --
+    // generation publishes the same figure at its first line, and a total
+    // taken from the label table left the bar short of its end.
+    m_worldgen_progress.stage_count.store(generation_stage_count(m_worldgen_cfg),
                                           std::memory_order_relaxed);
     m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
     m_worldgen_progress.sub_total.store(0, std::memory_order_relaxed);
@@ -688,7 +691,9 @@ void app::draw_building_screen()
 
         // The bar is honest about being coarse: it advances a pass at a time, and
         // one pass (the ancient era) is most of the wall clock. A smooth bar here
-        // would be a lie told at 60 Hz.
+        // would be a lie told at 60 Hz. Its total is the stages this run reports
+        // (`generation_stage_count`, BL-1053), so it ends full: the history is
+        // one stage whichever spans it runs, re-captioned per span.
         const float frac = std::clamp(static_cast<float>(done) / static_cast<float>(total), 0.0f, 1.0f);
         ImGui::ProgressBar(frac, {420.0f, 18.0f}, "");
         ImGui::Dummy({420.0f, 6.0f});

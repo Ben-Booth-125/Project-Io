@@ -278,7 +278,8 @@ void app::launch_wizard_history_run(int lapse_index)
     generation_progress& prog = m_wiz_history_progress[lapse_index];
     prog.stage.store(0, std::memory_order_relaxed);
     prog.label.store(0, std::memory_order_relaxed);
-    prog.stage_count.store(generation_stage_label_count, std::memory_order_relaxed);
+    // `stage_count` is published below, once this round's stop is known
+    // (BL-1053): it is the stages the round's run will report, not a table size.
     prog.sub_progress.store(0, std::memory_order_relaxed);
     prog.sub_total.store(0, std::memory_order_relaxed);
     prog.lapse_tap = &tap; // BL-914: null-safe in run_history_sim/make_hard_coded_world.
@@ -335,6 +336,11 @@ void app::launch_wizard_history_run(int lapse_index)
     if (lapse_index == 0)      hist_cfg.stop_after_migration   = true;
     else if (lapse_index == 1) hist_cfg.stop_after_ancient_era = true;
     else                       hist_cfg.stop_after_exploration = true;
+
+    // BL-1053: the stages this stopped run will report (7 for the Culture
+    // round, 8 for the other two), published before the worker starts so the
+    // total never reads as the label table's size. Generation restates it.
+    prog.stage_count.store(generation_stage_count(hist_cfg), std::memory_order_relaxed);
 
     auto run = [this, hist_cfg, lapse_index, params = m_pending_world_params]() {
         generation_report rep;

@@ -435,6 +435,16 @@ inline const char* const generation_stage_labels[] = {
 inline constexpr int generation_stage_label_count =
     static_cast<int>(sizeof(generation_stage_labels) / sizeof(generation_stage_labels[0]));
 
+/// BL-1053: how many stages a `make_hard_coded_world` call on @p cfg will
+/// REPORT -- the number of times it advances `generation_progress::stage`,
+/// which is what `stage_count` must hold for the bar to reach its end. Never
+/// the label count above: some labels caption a stage rather than being one
+/// (the exploration age and the Digitisation span re-caption the history's
+/// single stage), and one is never published. Set by generation itself at its
+/// first line; a caller that publishes `stage_count` before the worker starts
+/// uses this so the two agree.
+int generation_stage_count(const world_gen_config& cfg);
+
 /// What the generation pass recorded about each body, for the staged generation
 /// screen and the planet report.
 ///
