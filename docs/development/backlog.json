@@ -432,6 +432,35 @@
     "tools/verify/digitisation_sim_harness.cpp"
    ],
    "design": "FOUND 2026-09-18 by the BL-1036 cold review. BL-1036 carries the civilisation and universal-creed tables across the 1660 resume, but Exploration's own resume at 1200 still passes neither table (hard_coded_world.cpp:1142-1146; the KNOWN GAP comment at the new resume params in history_sim.hpp). So the tables restart at 0 in 1200 while regions and polities keep their pre-1200 indices into them. A pre-1200 civilisation index then resolves to whatever Exploration coins first; a pair already recorded before 1200 is recorded again under a new name, coined from the Exploration span's own seed; and make_exploration_output hands that table on, so the 1660 resume inherits the misalignment. Nothing reads the indices as table offsets today (only >= 0 checks), so nothing crashes: the damage is to data truth and to the world log.\n\nTHE WORK. Pass the Empires span's civilisation and creed tables to the 1200 resume, as BL-1036 does at 1660, and add a count to digitisation_sim_harness --fidelity of regions whose civilisation index is at or past the handoff table's size, plus duplicate member pairs. MOVES SHIPPED WORLDS: deep_digest folds the prose history log, and dropping the duplicate civilisation lines changes it. Not on sprint 45's re-bless, which carries only BL-1037 (Ben, 2026-09-18)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-18",
+   "author": "Claude (found by the BL-1034 lane and its cold review, 2026-09-18)",
+   "requires": [
+    "BL-1034"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1050",
+   "short_name": "ORDER_DEPENDENT_READS",
+   "category": "Determinism",
+   "priority": "S",
+   "difficulty": 3,
+   "title": "The tick and the landscape search read unordered stores in hash order where the order reaches arithmetic or a tie-break, so a saved-and-loaded world ticks differently",
+   "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+   "files": [
+    "src/world/budget_system.cpp",
+    "src/world/market_clearing.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/standing.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/world_save.cpp",
+    "tools/verify/world_copy_determinism.cpp"
+   ],
+   "design": "FOUND 2026-09-18 by BL-1034 (world copies diverge) and its cold review. BL-1034 made a world COPY iterate in its source's order (faithful_unordered_map), so a copy ticks byte for byte. It did not remove the order dependence: a SAVED-AND-LOADED world re-inserts its stores in ascending id order (world_save.cpp:711-728), gets a different layout, and on seed 28 settles to D_settle 4663417C6733EBDE against the pinned 265C48A23E313B1A (world_copy_determinism --copy-by snapshot). A build on libstdc++ or libc++ would likewise tick differently from MSVC. The standing rule is byte-identical replay.\n\nTHE READERS (cold review; everything else in economy, budget, markets, supply, corp AI, nation step, nation AI, network upkeep, logistics, tech gates and battle sorts ids first or writes per key): (1) budget_system.cpp:22 body_mean_habitability — a float sum over population_centres; called from budget_system.cpp:112, economy_system.cpp:531, corp_ai.cpp:361, building_profit.cpp:53 and :179, and two UI panels. (2) market_clearing.cpp:259-290 inject_population_demand — mc.demand[r] += in population_centres order, many centres to one market. (3) corp_ai.cpp:2034-2080 — the haul destination is a strict score > best over w.markets with no market-id tie-break, so an exact tie goes to hash order. (4) standing.cpp:28 total_income — a float sum over the cash_flow map (UI market share only). (5) corporation_generation.cpp:1021-1049 accumulate_body_production and :1076-1110 body_upkeep_demand — float sums over w.buildings feeding the gap loop in the landscape search's evaluations; the comment at :1083-1087 wrongly calls float accumulation order-independent.\n\nTHE WORK. Walk each of those in sorted-id order (as the rest of the tick already does), or accumulate in an order-free way, and give the haul choice a market-id tie-break. Enforce the rule: a lint that every unordered store on world and its components is faithful_unordered_map, and that no reader walks one where the order reaches arithmetic. DONE WHEN world_copy_determinism --copy-by snapshot passes on the 16 library seeds (a loaded world ticks as the unsaved one). MOVES SHIPPED WORLDS (the pins move), so it needs Ben's re-bless authorisation — NR-894 asks whether it rides sprint 45's."
   }
  ]
 }

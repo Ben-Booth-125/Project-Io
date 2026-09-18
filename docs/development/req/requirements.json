@@ -5770,12 +5770,13 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism"
      ],
      "requirement": "world_determinism's four digests are unchanged: the Exploration caller passes no dated objects and anchors equal to its own start year.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "world_determinism ALL PASS, digests seedA/on 099530C9B7A211D7, seedB/on 3C348D569EEF30EB, seedA/off 583A788BD8045DA0, 1960/two-span 2EC67DAE697FBA02 — equal to the values recorded at 836d9e52 (main session, 614a02e5)."
     },
     {
      "id": "R2",
@@ -5784,54 +5785,60 @@
       "headless: player_seed_sweep --digest-check"
      ],
      "requirement": "Every library seed's four digests equal the BL-1031 pins with no budget (16 seeds, or a stated subset with the reason).",
-     "notes": ""
+     "notes": "The 16-seed --digest-check runs on the integrated main (chain 3, 2026-09-18).",
+     "result_metric": ""
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: exploration_sim_harness",
       "headless: history_sim_harness"
      ],
      "requirement": "exploration_sim_harness is green and history_sim_harness holds its tracked 2-failure baseline (R3a2/R3a3), nothing new.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "exploration_sim_harness ALL PASS; history_sim_harness FAILURES (2): R3a2 and R3a3 only, the tracked baseline (main session, 614a02e5)."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness (fidelity mode)"
      ],
      "requirement": "On all 16 library seeds a span resumed from exploration_output at 1660 opens with state equal to the struct, field by field, dated objects included.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --fidelity over the 16 library seeds: gate 1 (opening == struct) 16 of 16 (main session, 614a02e5; 472 s, worst seed 133 s)."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness (fidelity mode)"
      ],
      "requirement": "After one resumed round, treaties, the overlord graph and stocks equal the continued run's 1660 round apart from the named network sources; the 1960 divergence against --through is printed and attributed by source, never gated bit for bit.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Gate 2 (one neutralised round == the continued run's 1660 round) 16 of 16; divergence to 1960 printed by source: market stamp up to 808 regions, 1660 record up to 615, dead-filter 0 on every seed, seed up to 790; residual 0 on every seed (main session, 614a02e5)."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "partial",
      "verification": [
       "code: every consolidation and near-home site reads the explicit params",
       "code: civilisation and universal-creed tables carry"
      ],
      "requirement": "No site keys consolidation or the near-home cutoff on params.start_year; the civilisation and universal-creed tables cross a resume without index reuse; only living polities are noted as founded at a resumed open.",
-     "notes": ""
+     "notes": "NOT MET at the 1200 boundary: Exploration's own resume still restarts the civilisation and creed tables at 0 while regions keep their indices, and the 1660 handoff inherits that table (cold review, 2026-09-18). Carrying them at 1200 moves shipped worlds; filed as BL-1049, unscheduled.",
+     "result_metric": "Every consolidation and near-home site reads the explicit params (cold review: all six former start_year reads replaced); only living polities are noted as founded at a resumed open; the tables cross the 1660 resume."
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds no resumed field dropped and no change to the Exploration path.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Cold review (code-reviewer, 2026-09-18): nothing blocking; follow-ups committed in 58193812; the 1200 index reuse filed as BL-1049."
     }
    ],
    "resolution": ""
@@ -5855,25 +5862,28 @@
       "headless: player_seed_sweep --digest-check"
      ],
      "requirement": "With the switch off (its default), every digest and pin is unmoved.",
-     "notes": ""
+     "notes": "The 16-seed --digest-check runs on the integrated main (chain 3).",
+     "result_metric": "world_determinism ALL PASS, digests seedA/on 099530C9B7A211D7, seedB/on 3C348D569EEF30EB, seedA/off 583A788BD8045DA0, 1960/two-span 2EC67DAE697FBA02 — equal to the values recorded at 836d9e52 with the switch off (main session, 614a02e5)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness or exploration_sweep (switch on)"
      ],
      "requirement": "With the switch on, per library seed: the corridors whose resumed tier changed, by span (1200 and 1660); none reopens below the tier it was bought to; no rung is bought twice.",
-     "notes": ""
+     "notes": "The cold review notes the gate is close to tautological (live counts never fall), so it is a regression guard rather than independent evidence. Lane figures, switch off: refused walks promoted at 1200 on every seed (2-110), bought rungs demoted at 1200 on none, post roads demoted at 1660 on 12 seeds and re-bought on 9.",
+     "result_metric": "digitisation_sim_harness --resume-tier over the 16 library seeds: RESUME-TIER PASS, switch-on invariants (nothing below, above or re-crossed at 1200 and 1660) hold on 16 of 16 (main session, 614a02e5; 240 s)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review confirms both directions of the old error (bought rungs demoted, refused walks promoted) are resolved.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Cold review (code-reviewer, 2026-09-18): correct in both directions and inert when off."
     }
    ],
    "resolution": ""
@@ -5897,52 +5907,58 @@
       "headless: player_seed_sweep --digest-check"
      ],
      "requirement": "With industry_tree_enabled off (its default), every digest and pin is unmoved.",
-     "notes": ""
+     "notes": "The 16-seed --digest-check runs on the integrated main (chain 3).",
+     "result_metric": "world_determinism ALL PASS, digests seedA/on 099530C9B7A211D7, seedB/on 3C348D569EEF30EB, seedA/off 583A788BD8045DA0, 1960/two-span 2EC67DAE697FBA02 — equal to the values recorded at 836d9e52 with the switch off (main session, 58193812, after the fix round)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "tool: tree_lint.js all"
      ],
      "requirement": "tree_lint passes on every tree with the new fork-reachability rule, and the rule FAILS on the pre-cut industry store (Charcoal Iron unreachable), so it is not vacuous.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "tree_lint.js all: OK on all four trees; tree_lint.js industry --store <the 45cdb8f3 store>: FAIL \"IN-MT-1b can never be bought while its partner IN-MT-1a is refused\" (main session)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: exploration_sim_harness (Industry block)"
      ],
      "requirement": "Every keyed Industry effect is read, availability and both fork sides are reachable, the rim is detectable, pinned stubs are stated on the face, and industry_mask is 0 at 1660 on a shipped world.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "exploration_sim_harness ALL PASS including the T8 Industry block, T8.9.7-8, T8.13.3 and T8.14 from the fix round (main session, 58193812)."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: a 1660->1960 run with the switch on"
      ],
      "requirement": "Per library seed: the distribution of Industry nodes held, fork sides taken, rim holders, and the share of polities that never pass the fuel gate.",
-     "notes": ""
+     "notes": "The spread is set by Invest frequency, not the rate: NR-893.",
+     "result_metric": "exploration_sweep --through 1960 --industry-open 1660, 16 library seeds (main session, 58193812): alive 862, invested 553, nodes held 0/0/6/27/42 of 45, rim 121; had an Industry round 572, of which never passed fuel 127 (22%); never had a round 290 (34%); forks Fuel coke 404 / charcoal 118 / neither 340, Labour 229/44/589, Works arsenal 208 / private 152 / neither 502."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: empire and exploration scorers untouched"
      ],
      "requirement": "The empire and exploration term_value arrays and gate readings are unchanged; the any-held-seam fuel reading and the urban-mass rate apply to the Industry tree only; the rate clamps its sum before the integer transform.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Cold review: the empire and exploration scorers, gates, term_value arrays and rates are untouched; the any-held-seam reading, urban-mass rate and gate re-check apply to Industry only."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds no shared reader moved while the switch is off.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Cold review (code-reviewer, 2026-09-18): nothing blocking; fix round merged as 191c212b; term readings on NR-891, furnace_lit on NR-892."
     }
    ],
    "resolution": ""

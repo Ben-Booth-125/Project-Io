@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*3 entries — 3 open, 0 resolved.*
+*4 entries — 4 open, 0 resolved.*
 
 ---
 
@@ -74,6 +74,21 @@ With the Industry switch on from 1660, at 1960: 862 living polities, 553 hold an
 > **Recommendation:** Accept for Beat 1 and read BL-1041's industrialisation reading first. If points turn out to track headcount because capacity is flat for most polities, take the Industry-only flow.
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/trees/TREES.md`, `docs/generation/trees/INDUSTRY_TREE.md`*
+
+### NR-894 — CALL: a saved game ticks differently from an unsaved one — does the order-independence fix (BL-1050) ride sprint 45's re-bless?
+*question · raised 2026-09-18 · from BL-1034 (world copies diverge) and its cold review, 2026-09-18.*
+
+BL-1034 is merged (d61b6ae8): a world COPY now iterates in its source's order, so copies tick byte for byte, and the BL-1031 pins held 16/16. Two things remain. (1) A SAVED-AND-LOADED world still ticks differently from one never saved (seed 28: D_settle 4663417C6733EBDE against the pin 265C48A23E313B1A), because five readers in the tick and the landscape search let hash order reach a float sum or a tie-break (BL-1050 lists them). A build on another standard library would diverge the same way. (2) The shipped landscape search copies the base world for each of its 19 evaluations, and two order-dependent sums sit on that path, so BL-1034 changed what those copies compute: the 16 library seeds did not move, but a seed outside the library could place a different firm near a zero gap and lay a different world. The main session is measuring non-library seeds before and after BL-1034 to put a number on (2).
+
+**Why it matters.** Byte-identical replay is a standing rule, and a save that does not replay is the plainest way a player would meet a broken one. BL-1050's fix moves the pins, so it is a re-bless decision; sprint 45 spends exactly one re-bless (BL-1044), and you ruled it carries BL-1037 alone.
+
+- Add BL-1050 to sprint 45's re-bless: saves and copies both replay; BL-1034's change to the search copies becomes moot, since order no longer reaches arithmetic. One more cause in the re-bless.
+- Keep sprint 45's re-bless as ruled; take BL-1050 in a later re-bless. Saves keep diverging until then; BL-1034 stays merged as a correction to the search's copies.
+- Revert BL-1034 until a re-bless can carry the whole determinism fix, so today's shipped search is untouched.
+
+> **Recommendation:** Add BL-1050 to sprint 45's re-bless. It is the legible fix the standing rules prefer to BL-1034's copy-twice mechanism, it closes the save/load divergence, and one attributable cause more is cheaper than a second re-bless. Keep faithful_unordered_map as a tripwire.
+
+*Files: `src/world/faithful_unordered_map.hpp`, `src/world/landscape_search.cpp`, `src/world/budget_system.cpp`, `src/world/world_save.cpp`*
 
 ---
 
