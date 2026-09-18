@@ -14,6 +14,9 @@ float body_mean_habitability(const world& w, entity_id body)
 {
     // Mirrors the accumulation apply_budget's batch used, filtered to one body, so
     // the estimate and the live budget loop read an identical mean (bit-for-bit).
+    // ORDER-DEPENDENT: a float sum in `population_centres` iteration order. That
+    // order is why a world copy must keep it (BL-1034, faithful_unordered_map.hpp):
+    // a reordered copy moved this mean two ULP on seed 28 and every wage with it.
     float sum = 0.0f;
     int   count = 0;
     for (const auto& [cid, pcc] : w.population_centres)

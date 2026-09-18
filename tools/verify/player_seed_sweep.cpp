@@ -76,6 +76,7 @@
 #include "world/tech_gate.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
+#include "world_digest.hpp"       // fnv1a64, hash_snapshot, world_state_digest (BL-1034)
 
 #include <algorithm>
 #include <array>
@@ -429,34 +430,12 @@ struct seat_row
 // FNV-1a 64 over RAW bytes, floats and doubles included, so a digest moves on a
 // last-bit change a printed `%.4f` would hide. Records are hashed FIELD BY FIELD,
 // never as a block, so struct padding cannot enter a digest (and `scalar`
-// refuses anything that is not a number or an enum).
+// refuses anything that is not a number or an enum). The hasher and the
+// snapshot/settle recipe live in world_digest.hpp (BL-1034), shared with
+// world_copy_determinism so both instruments hash a world the same way.
 //
 // A PIN IS A CONTRACT (src/world/CLAUDE.md). A failing row is a finding to report
 // with its cause; it is never re-pinned by the change that moved it.
-
-struct fnv1a64
-{
-    std::uint64_t h = 0xCBF29CE484222325ull;
-
-    void bytes(const void* p, std::size_t n)
-    {
-        const auto* b = static_cast<const unsigned char*>(p);
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            h ^= b[i];
-            h *= 0x00000100000001B3ull;
-        }
-    }
-    template <class T>
-    void scalar(T v)
-    {
-        static_assert(std::is_arithmetic_v<T> || std::is_enum_v<T>,
-                      "hash a record field by field, never as a block");
-        bytes(&v, sizeof v);
-    }
-    void flag(bool v) { scalar(static_cast<std::uint8_t>(v ? 1u : 0u)); }
-    void count(std::size_t n) { scalar(static_cast<std::uint64_t>(n)); }
-};
 
 void hash_candidate(fnv1a64& f, const landscape_candidate& c)
 {
@@ -496,17 +475,6 @@ void hash_score(fnv1a64& f, const landscape_score& s)
     f.scalar(s.spread);
     f.scalar(s.composite);
     f.scalar(s.market_count);
-}
-
-/// The world's flat-binary save bytes, into @p f. Returns the byte count, so a
-/// digest row can show it hashed megabytes rather than an empty stream.
-std::size_t hash_snapshot(fnv1a64& f, const world& w)
-{
-    std::ostringstream os(std::ios::out | std::ios::binary);
-    write_world_snapshot(w, os);
-    const std::string bytes = os.str();
-    f.bytes(bytes.data(), bytes.size());
-    return bytes.size();
 }
 
 struct world_digests
@@ -556,10 +524,7 @@ void digest_at_land(const app_start_world& out, world_digests& dig)
 
 void digest_at_settle(const app_start_world& out, world_digests& dig)
 {
-    fnv1a64 f;
-    dig.settle_bytes = hash_snapshot(f, out.w);
-    f.scalar(out.w.state_hash(out.w.current_day_tick));
-    dig.settle = f.h;
+    dig.settle = world_state_digest(out.w, &dig.settle_bytes);
 }
 
 void digest_at_seat(const app_start_world& out, const spawn_seat_result& res, world_digests& dig)

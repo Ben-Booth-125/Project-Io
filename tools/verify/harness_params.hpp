@@ -318,13 +318,16 @@ struct app_start_world
 /// is exactly this followed by `apply_app_start_landscape` ON THE SAME OBJECT,
 /// so the two paths are one sequence and the BL-1031 digest pins check both.
 ///
-/// DO NOT BUILD THIS ONCE AND COPY IT to lay several landscapes. MEASURED
-/// 2026-09-17 on seed 28: a copied base matched the pins at D_search and D_land
-/// and DIFFERED at D_settle and D_seat. A throwaway probe split the cause: a
-/// COPIED `world` settles to D_settle 18F78EB9B2B20F29 against the pin's
-/// 265C48A23E313B1A whether it is copied before the landscape or after it, while
-/// the original world settled with a COPIED `recipe_registry` matches the pin.
-/// So a world copy does not tick byte for byte as its original.
+/// COPYING THE RESULT WAS UNSAFE UNTIL BL-1034. MEASURED 2026-09-17 on seed 28:
+/// a copied base matched the pins at D_search and D_land and DIFFERED at
+/// D_settle and D_seat — a COPIED `world` settled to D_settle 18F78EB9B2B20F29
+/// against the pin's 265C48A23E313B1A whether it was copied before the landscape
+/// or after it, while the original settled with a COPIED `recipe_registry`
+/// matched. The cause was the copy's iteration order (MSVC reverses every shared
+/// bucket of an unordered_map it copies) meeting an order-dependent float sum in
+/// the tick; world's stores now copy in order (faithful_unordered_map.hpp), and
+/// tools/verify/world_copy_determinism.cpp is the check that a copy settles as
+/// its original. A SAVE ROUND TRIP is not a copy and still reorders them.
 inline void build_app_base_world(lua_state& lua, const world_params& params,
                                  app_start_world& out)
 {
@@ -366,7 +369,8 @@ inline void build_app_base_world(lua_state& lua, const world_params& params,
 }
 
 /// The second half of `build_app_start_world`: the landscape phase, on the world
-/// `build_app_base_world` left in the same @p out (never a copy — see above).
+/// `build_app_base_world` left in the same @p out (the app's own sequence; see above
+/// for what copying it cost before BL-1034).
 inline void apply_app_start_landscape(app_start_world& out,
                                       const harness_charter_input& charter = {})
 {
@@ -471,57 +475,84 @@ inline double ms_between(clk::time_point a, clk::time_point b)
 /// itself (app.cpp:1329,1337), but it still runs the agency comms, the history
 /// recorders and the strategy readout, so a val ms per tick here is a LOWER
 /// BOUND on the app's validation tick that widens with density.
-inline void run_app_validation_settle(world& w, const recipe_registry& reg,
-                                      int ticks = k_app_validation_ticks,
-                                      app_tick_timing* timing = nullptr)
+/// ONE validation tick, econ step @p econ_step — the body `run_app_validation_settle`
+/// loops, split out (BL-1034) so an instrument can step two worlds in lockstep and
+/// read each between laps. Everything above about the tick state holds here.
+///
+/// @p after_lap, when set, is called after each lap with its index into
+/// `k_app_tick_phase_names`. It is a READ hook (world_copy_determinism digests the
+/// world there) and must not write the world. A hooked tick's @p timing would
+/// count the hook inside the next lap, so an instrument times OR hooks, not both.
+inline void run_app_validation_tick(world& w, const recipe_registry& reg, int econ_step,
+                                    app_tick_timing* timing = nullptr,
+                                    void (*after_lap)(const world&, int lap, void* ctx) = nullptr,
+                                    void* after_lap_ctx = nullptr)
 {
     using harness_timing_detail::clk;
     using harness_timing_detail::ms_between;
     constexpr int k_validation_day_tick = 0; // m_sim_loop.day_tick(), see above
-    for (int econ_step = 0; econ_step < ticks; ++econ_step)  // app.cpp:655, 579-583
+    const auto lap_done = [&](int lap) {
+        if (after_lap != nullptr)
+            after_lap(w, lap, after_lap_ctx);
+    };
+
+    const clk::time_point t0 = clk::now();
+    w.current_econ_tick = econ_step;                                  // app.cpp:1258
+    lp_pool_map tick_lp_pools;                                        // app.cpp:1265
+    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // app.cpp:1266-1268
+                     reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
+    advance_convoys(w);                                               // app.cpp:1269
+    const clk::time_point t1 = clk::now();
+    lap_done(0);
+    // app.cpp:1281-1283: `m_ui.spectating || m_validation_run`, and
+    // m_validation_run is true for every tick of this run (app.cpp:653).
+    economy_report report = run_economy_step(w, reg, /*spectating=*/true,
+                                             &tick_lp_pools);
+    const clk::time_point t2 = clk::now();
+    lap_done(1);
+    const auto flows = clear_markets(w, reg, report);                 // app.cpp:1285
+    const clk::time_point t3 = clk::now();
+    lap_done(2);
+    apply_budget(w, reg, flows, report.workforce_contention,          // app.cpp:1287-1290
+                 &report.budgets, &report.buildings, &report.building_labour);
+    run_nation_step(w, reg, report, w.current_econ_tick);             // app.cpp:1297
+    const clk::time_point t4 = clk::now();
+    lap_done(3);
+    advance_tech_gates(w);                                            // app.cpp:1303
+    const clk::time_point t5 = clk::now();
+    lap_done(4);
+    // Phase 5, the app's lap(5) (app.cpp:1315): standings + convoy credit + exits.
+    // compute_corp_standings reads a const world into the app's UI cache; the
+    // harness discards it (nothing in a world reads that cache).
+    (void)compute_corp_standings(w, flows);                           // app.cpp:1308
+    credit_arrived_convoys(w, k_validation_day_tick);                 // app.cpp:1309
+    run_firm_exits(w, reg.firm_exit(), &report.firm_exits);           // app.cpp:1314
+    const clk::time_point t6 = clk::now();
+    lap_done(5);
+    // app.cpp:1317-1354, laps 6-8: agency comms, the history recorders and the
+    // strategy readout (counsel and battle dispatches are suppressed through
+    // this run by the app). Presentation over a const world, NOT mirrored and
+    // NOT TIMED — so tick_ms is a lower bound on the app's tick.
+    if (timing != nullptr)
     {
-        const clk::time_point t0 = clk::now();
-        w.current_econ_tick = econ_step;                                  // app.cpp:1258
-        lp_pool_map tick_lp_pools;                                        // app.cpp:1265
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),   // app.cpp:1266-1268
-                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
-        advance_convoys(w);                                               // app.cpp:1269
-        const clk::time_point t1 = clk::now();
-        // app.cpp:1281-1283: `m_ui.spectating || m_validation_run`, and
-        // m_validation_run is true for every tick of this run (app.cpp:653).
-        economy_report report = run_economy_step(w, reg, /*spectating=*/true,
-                                                 &tick_lp_pools);
-        const clk::time_point t2 = clk::now();
-        const auto flows = clear_markets(w, reg, report);                 // app.cpp:1285
-        const clk::time_point t3 = clk::now();
-        apply_budget(w, reg, flows, report.workforce_contention,          // app.cpp:1287-1290
-                     &report.budgets, &report.buildings, &report.building_labour);
-        run_nation_step(w, reg, report, w.current_econ_tick);             // app.cpp:1297
-        const clk::time_point t4 = clk::now();
-        advance_tech_gates(w);                                            // app.cpp:1303
-        const clk::time_point t5 = clk::now();
-        // Phase 5, the app's lap(5) (app.cpp:1315): standings + convoy credit + exits.
-        // compute_corp_standings reads a const world into the app's UI cache; the
-        // harness discards it (nothing in a world reads that cache).
-        (void)compute_corp_standings(w, flows);                           // app.cpp:1308
-        credit_arrived_convoys(w, k_validation_day_tick);                 // app.cpp:1309
-        run_firm_exits(w, reg.firm_exit(), &report.firm_exits);           // app.cpp:1314
-        const clk::time_point t6 = clk::now();
-        // app.cpp:1317-1354, laps 6-8: agency comms, the history recorders and the
-        // strategy readout (counsel and battle dispatches are suppressed through
-        // this run by the app). Presentation over a const world, NOT mirrored and
-        // NOT TIMED — so tick_ms is a lower bound on the app's tick.
-        if (timing != nullptr)
-        {
-            timing->tick_ms.push_back(ms_between(t0, t6));
-            timing->phase_ms[0] += ms_between(t0, t1);
-            timing->phase_ms[1] += ms_between(t1, t2);
-            timing->phase_ms[2] += ms_between(t2, t3);
-            timing->phase_ms[3] += ms_between(t3, t4);
-            timing->phase_ms[4] += ms_between(t4, t5);
-            timing->phase_ms[5] += ms_between(t5, t6);
-        }
+        timing->tick_ms.push_back(ms_between(t0, t6));
+        timing->phase_ms[0] += ms_between(t0, t1);
+        timing->phase_ms[1] += ms_between(t1, t2);
+        timing->phase_ms[2] += ms_between(t2, t3);
+        timing->phase_ms[3] += ms_between(t3, t4);
+        timing->phase_ms[4] += ms_between(t4, t5);
+        timing->phase_ms[5] += ms_between(t5, t6);
     }
+}
+
+/// The validation run itself (documented above): econ steps 0..ticks-1, each one
+/// `run_app_validation_tick`.
+inline void run_app_validation_settle(world& w, const recipe_registry& reg,
+                                      int ticks = k_app_validation_ticks,
+                                      app_tick_timing* timing = nullptr)
+{
+    for (int econ_step = 0; econ_step < ticks; ++econ_step)  // app.cpp:655, 579-583
+        run_app_validation_tick(w, reg, econ_step, timing);
 }
 
 /// A LIVE WINDOW after the seat — BL-1033. @p ticks economy ticks as the app
