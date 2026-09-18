@@ -142,6 +142,41 @@ history_sim_params exploration_sim_params(const world_params& params);
 /// seed nor a caller-invented one.
 uint32_t exploration_sim_seed(const world_params& params);
 
+// ---------------------------------------------------------------------------
+// BL-1040 — the Digitisation span's own derivations, on the same footing as
+// Exploration's: this file derives the SPAN and the SEED; the resume pointers
+// (every table of the closing `exploration_output`) are per-call state the
+// caller sets immediately before `run_history_sim`.
+//
+// THERE IS NO `digitisation_span_enabled(params)` PREDICATE HERE, AND THAT IS
+// THE POINT. The span runs if and only if Exploration ran (Ben, 2026-09-18),
+// so the call site nests it inside the block that ran Exploration and gates it
+// on `world_params::digitisation_span_enabled` alone. A params-only predicate
+// would be a second reading of Exploration's own gate -- one more place for
+// the two to drift, and one more place an epoch test could creep back in.
+// ---------------------------------------------------------------------------
+
+/// The `history_sim_params` the Digitisation span runs on. STARTS FROM
+/// `exploration_sim_params` (struct defaults plus Exploration's overrides),
+/// NEVER the Empires derivation -- copying the wrong base silently changes the
+/// verb set (supply upgrades, universal creeds, army upkeep). Then only:
+///   - the span: `start_year = params.exploration_stop_year` (1660, wherever
+///     Exploration closed), `stop_year = params.digitisation_stop_year`
+///     (1960), one band at Exploration's 4-year cadence (NR-888): 75 rounds;
+///   - the Industry tree ON from the span's own open (BL-1038, TREES.md sec
+///     Milestones), and on in this span only.
+/// Both 1200 anchors (`consolidation_year`, `near_home_cutoff_year`) are
+/// Exploration's, unchanged: consolidation happens once and a pair met after
+/// 1200 stays far however late a span opens (Ben, 2026-09-18). BL-1037's
+/// `resume_seeds_corridor_tier` keeps its default (off); BL-1044 turns it on
+/// with the re-bless.
+history_sim_params digitisation_sim_params(const world_params& params);
+
+/// The seed generation hands the Digitisation span: its own constant, own
+/// additive fold, so polity temperaments re-roll at 1660 as they did at 1200
+/// (DIGITISATION.md, PROPOSED 2026-09-18, not overturned).
+uint32_t digitisation_sim_seed(const world_params& params);
+
 /// EXACTLY what generation handed `run_history_sim`, captured at its own call
 /// site — the arguments, and the three counts the run produced.
 ///
@@ -313,4 +348,40 @@ struct era_minus_one_fixture
     /// read, rather than the 1200 ones.
     std::vector<grudge>           setup_grudges;
     std::vector<history_corridor> setup_corridors;
+
+    // --- BL-1040: the Digitisation span's own capture ---------------------
+    //
+    // Same discipline as the Exploration capture above. Populated only when
+    // generation actually ran the span -- `world_params::
+    // digitisation_span_enabled` set, Exploration run, and no stop knob that
+    // ends generation before it; `digitisation_ran` says which, and every
+    // field below is the struct default otherwise. The span's INPUT needs no
+    // capture of its own: it is `exploration_handoff` above, the value the
+    // span resumed from.
+
+    /// True when generation actually ran the Digitisation span this call.
+    bool digitisation_ran = false;
+
+    history_sim_params digitisation_params; ///< The span/clock the span ran on.
+    uint32_t           digitisation_seed = 0;
+
+    /// The 1960 close exactly as generation folded it
+    /// (`make_digitisation_output`), default-constructed when the span did
+    /// not run.
+    digitisation_output digitisation_handoff;
+
+    /// The span's own full sim output, as generation's untraced call produced
+    /// it -- its counters (battles, subjections formed and freed) count THIS
+    /// span only, because a resumed run starts them at zero.
+    history_sim_state digitisation_state;
+
+    /// Decision rounds the span ran (`history_sim_profile::decision_rounds`,
+    /// read straight after the call): 75 at the defaults, 1660 -> 1956.
+    int64_t digitisation_rounds = 0;
+
+    /// Wall clock of the span's `run_history_sim` call alone, in
+    /// milliseconds. REPORTED, NEVER ASSERTED, and never folded into a digest
+    /// or a branch -- the same rule the BL-754 timings above obey, for the
+    /// same reason. Say which build type produced a figure when quoting it.
+    int64_t ms_digitisation = 0;
 };

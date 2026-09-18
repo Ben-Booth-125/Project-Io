@@ -418,3 +418,53 @@ uint32_t exploration_sim_seed(const world_params& params)
     // (`0x415C1E17u`) nor a bare re-use of the world seed.
     return (params.seed ^ 0x3720A7E1u) + params.era_seed * 0x9E3779B9u;
 }
+
+// ---------------------------------------------------------------------------
+// BL-1040 — the Digitisation span
+// ---------------------------------------------------------------------------
+
+history_sim_params digitisation_sim_params(const world_params& params)
+{
+    // THE BASE IS EXPLORATION'S, and the one line below is the whole of that
+    // decision: struct defaults plus Exploration's overrides (the upkeep step,
+    // the want weight, the carried opening behaviour, and both 1200 anchors).
+    // Never `era_minus_one_sim_params` -- that is the Empires round's verb set.
+    history_sim_params hp = exploration_sim_params(params);
+
+    // THE SPAN. It opens where Exploration closed and runs to the epoch, on
+    // Exploration's own 4-year band (Ben, 2026-09-17, NR-888): at the defaults
+    // 1660 -> 1960, 75 decision rounds (1660, 1664, ... 1956).
+    hp.start_year      = params.exploration_stop_year;
+    hp.stop_year       = params.digitisation_stop_year;
+    hp.tick_bands[0]   = {hp.stop_year, 4};
+    hp.tick_band_count = 1;
+
+    // THE 1200 ANCHORS ARE NOT TOUCHED. `exploration_sim_params` set both to
+    // `empires_stop_year`, and they stay there: the sweep of seat stores into
+    // the capital happens once, and a pair met after 1200 stays far however
+    // late a span opens (DIGITISATION.md, PROPOSED 2026-09-18, not
+    // overturned). Re-anchoring them at 1660 would consolidate a second time
+    // and call every pair met during Exploration near home.
+
+    // THE INDUSTRY TREE, IN THIS SPAN ONLY (BL-1038; TREES.md sec Milestones:
+    // it opens at its root to every living polity at 1660). Opened at the
+    // span's own start, which is 1660 at the defaults -- the tree belongs to
+    // this span, so a harness that moves the span's open moves the tree's
+    // with it rather than leaving a gap or an overlap.
+    hp.industry_tree_enabled = true;
+    hp.industry_open_year    = hp.start_year;
+
+    // `resume_seeds_corridor_tier` (BL-1037) keeps its struct default, OFF:
+    // it moves every resumed span, and BL-1044 turns it on with the re-bless.
+    return hp;
+}
+
+uint32_t digitisation_sim_seed(const world_params& params)
+{
+    // Own constant, own additive fold, on the shape of the two seeds above --
+    // neither the Empires round's (`0x415C1E17u`) nor Exploration's
+    // (`0x3720A7E1u`). The constant is the one BL-1036's fidelity harness
+    // stood in with before this span existed, adopted so its reported
+    // "own seed" source means the same run before and after.
+    return (params.seed ^ 0x5D1C7A11u) + params.era_seed * 0x9E3779B9u;
+}

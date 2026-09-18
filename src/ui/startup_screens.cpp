@@ -324,6 +324,13 @@ void app::launch_wizard_history_run(int lapse_index)
     // Note this is set on the COPY the worker takes, never on the campaign's:
     // `begin_new_game` builds a whole world from its own config, and a world
     // stopped at any of these points has no nations, roads or corporations in it.
+    //
+    // BL-1040: `stop_after_exploration` also keeps the Digitisation span out
+    // of round 5's run (generation gates the span on it), so this round plays
+    // Exploration's record alone whatever `digitisation_span_enabled` says.
+    // The Digitisation round's own stop, `stop_after_digitisation`, exists for
+    // the day that round plays a record; it is a placeholder today
+    // (`draw_pass_round_placeholder`) and launches no generation.
     world_gen_config hist_cfg = cfg;
     if (lapse_index == 0)      hist_cfg.stop_after_migration   = true;
     else if (lapse_index == 1) hist_cfg.stop_after_ancient_era = true;

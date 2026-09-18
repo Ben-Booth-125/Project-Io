@@ -81,7 +81,32 @@ struct world_gen_config
     /// `stop_after_ancient_era` is not.
     ///
     /// Default false: every existing caller is unaffected.
+    ///
+    /// BL-1040: IT ALSO STOPS BEFORE THE DIGITISATION SPAN. The span sits
+    /// between the Exploration fold and population centres, which is ahead of
+    /// this knob's own return, so the call site gates the span on this knob
+    /// directly -- the Exploration round's launch, `exploration_sweep` and the
+    /// seed-library fingerprints never pay for a span they would discard, and
+    /// never read a world it moved.
     bool stop_after_exploration = false;
+
+    /// STOP GENERATION ONCE THE DIGITISATION SPAN HAS RUN (BL-1040), before
+    /// borders, roads and companies are built -- the next rung of the ladder
+    /// `stop_after_exploration` sits on, same contract, one span later. A
+    /// caller that wants the 1960 close (a harness reading
+    /// `era_minus_one_fixture::digitisation_handoff`, the wizard's Digitisation
+    /// round once it plays a record) stops here rather than paying for world
+    /// setup it discards.
+    ///
+    /// When the span does not run (`world_params::digitisation_span_enabled`
+    /// off, or Exploration did not run) this stops at the same point
+    /// `stop_after_exploration` does, on the world as generation left it.
+    ///
+    /// THE WORLD IS NOT USABLE WHEN THIS IS SET, for the same reason
+    /// `stop_after_ancient_era` is not.
+    ///
+    /// Default false: every existing caller is unaffected.
+    bool stop_after_digitisation = false;
 
     /// STOP GENERATION ONCE THE MIGRATION HAS RUN, before the Empires round's
     /// history sim ever starts (BL-871).

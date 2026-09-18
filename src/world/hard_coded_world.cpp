@@ -1277,6 +1277,128 @@ world make_hard_coded_world(world_params params, generation_report* report,
                         if (be.id == kepler)
                             be.exploration_timelapse = as_timelapse(kepler_exploration_hs);
                 }
+
+                // --------------------------------------------------------
+                // BL-1040 — THE DIGITISATION SPAN, exploration_stop_year ->
+                // digitisation_stop_year (1660 -> 1960), as its OWN call to
+                // the same engine, resumed from `kepler_exploration` above.
+                //
+                // THE RUN PREDICATE IS THIS BLOCK'S NESTING. It sits inside
+                // the block that ran Exploration, so it runs if and only if
+                // Exploration ran (Ben, 2026-09-18) -- never on an epoch test
+                // of its own; on the superseded arc (epoch >= 1700) Exploration
+                // is off and this never opens. Its own gates are the switch
+                // (default off until BL-1044) and `stop_after_exploration`,
+                // which must stop BEFORE this span: that knob's own return
+                // sits below population centres, past this call, so it is
+                // read here -- the Exploration round's launch, exploration_
+                // sweep and the seed-library fingerprints never pay for it.
+                //
+                // AFTER THE EXPLORATION FOLD AND VALIDATOR, BEFORE POPULATION
+                // CENTRES: centres materialise from the 1960 demography, and
+                // everything downstream that reads `kepler_settlement` (the
+                // 1200-close market stand, nations, `gen_settlement`) reads
+                // the 1960 map.
+                if (params.digitisation_span_enabled && !gen_cfg.stop_after_exploration)
+                {
+                    // PARAMS FROM EXPLORATION'S DERIVATION, never the Empires
+                    // round's (era_minus_one.cpp says why), with every table
+                    // of the 1660 struct as the resume -- BL-1036's lossless
+                    // set: polities, grudges, contacts, the surviving corridor
+                    // record, the standing treaties and tribute, and the
+                    // civilisation and creed records so the numbering
+                    // continues. Trade flows rebuild from the treaties in the
+                    // span's first round (the resume pointer's comment).
+                    history_sim_params dp = digitisation_sim_params(params);
+                    dp.resume_polities         = &kepler_exploration.polities;
+                    dp.resume_grudges          = &kepler_exploration.grudges;
+                    dp.resume_contacts         = &kepler_exploration.contacts;
+                    dp.resume_corridors        = &kepler_exploration.surviving_corridors;
+                    dp.resume_dated_objects    = &kepler_exploration.dated_objects;
+                    dp.resume_civilisations    = &kepler_exploration.civilisations;
+                    dp.resume_universal_creeds = &kepler_exploration.universal_creeds;
+                    const uint32_t dseed = digitisation_sim_seed(params);
+
+                    // THE SPAN OPENS ON THE STRUCT. The region table the
+                    // resume reads is the handoff's own (equal to the live one
+                    // at this line -- the fold copied it -- so this moves
+                    // nothing today, and it keeps the struct the source if a
+                    // later fold ever differs from the live settlement). The
+                    // creeds stay the LIVE table: the span coins and folds
+                    // cultures in place, the naming passes below read it, and
+                    // the Exploration validator above has just proved it
+                    // equals `kepler_exploration.cultures` row for row.
+                    kepler_settlement.regions = kepler_exploration.regions;
+
+                    if (progress != nullptr)
+                    {
+                        progress->label.store(14, std::memory_order_relaxed); // the digitisation span
+                        progress->sub_progress.store(0, std::memory_order_relaxed);
+                        progress->sub_total.store(
+                            static_cast<int>(dp.stop_year - dp.start_year),
+                            std::memory_order_relaxed);
+                    }
+
+                    const gen_clock::time_point t_span_begin = gen_clock::now(); // reported only
+                    const history_sim_state kepler_digitisation_hs = run_history_sim(
+                        kepler_settlement, &kepler_creeds, terr.view(),
+                        home_grid_width, home_grid_height, dp, dseed,
+                        progress != nullptr ? &progress->sub_progress : nullptr,
+                        works,
+                        progress != nullptr ? progress->lapse_tap : nullptr);
+                    const int64_t span_ms = ms_between(t_span_begin, gen_clock::now());
+
+                    if (progress != nullptr)
+                        progress->sub_total.store(0, std::memory_order_relaxed);
+
+                    // The span's wars join the world log, as Exploration's do.
+                    kepler_settlement.history.insert(kepler_settlement.history.end(),
+                                                     kepler_digitisation_hs.history.begin(),
+                                                     kepler_digitisation_hs.history.end());
+
+                    // THE 1960 CLOSE, folded while the run and the now-final
+                    // settlement are both live, and validated on the shipped
+                    // path against the live creeds AND against the 1660 value
+                    // it resumed from (BL-969's discipline, one span later).
+                    const digitisation_output kepler_digitisation = make_digitisation_output(
+                        kepler_settlement, kepler_digitisation_hs, &kepler_creeds);
+                    {
+                        std::string why;
+                        if (!digitisation_output_valid(kepler_digitisation, &why, &kepler_creeds,
+                                                       &kepler_exploration))
+                            record_handoff_violation("digitisation_output", why);
+                    }
+
+                    // WHAT WORLD SETUP READS OF THIS CLOSE, TODAY: the live
+                    // settlement it leaves (1960 ownership, population,
+                    // treasury, culture) -- population centres, naming, the
+                    // market stand, nations and `gen_settlement` all read
+                    // `kepler_settlement`. NOT YET the three hoisted records:
+                    // `kepler_corridors`, `kepler_grudges` and
+                    // `kepler_polity_treasuries` still hold Exploration's 1660
+                    // values set a few lines above. BL-1040 scoped that switch
+                    // out; it is owed before the span ships on (BL-1044), and
+                    // it is three assignments off `kepler_digitisation`, on
+                    // the pattern of Exploration's own block.
+
+                    // No report fields: `generation_report` is on the save seam
+                    // (a field there is a `save_game_version` bump), and the
+                    // wizard's Digitisation round, the one reader a span
+                    // time-lapse would have, does not play a record yet.
+                    if (fixture != nullptr)
+                    {
+                        fixture->digitisation_ran     = true;
+                        fixture->digitisation_params  = dp;
+                        fixture->digitisation_seed    = dseed;
+                        fixture->digitisation_handoff = kepler_digitisation;
+                        fixture->digitisation_state   = kepler_digitisation_hs;
+                        // The profile is a process-wide accumulator the NEXT
+                        // run resets; nothing between the call and this line
+                        // runs the sim, and it is read only for a harness.
+                        fixture->digitisation_rounds  = history_sim_last_profile().decision_rounds;
+                        fixture->ms_digitisation      = span_ms;
+                    }
+                }
             }
 
             // Report what the era actually produced, into the generation record
@@ -1450,7 +1572,20 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // BL-946: the wizard's new Exploration round's own stop point, one round
     // later than the Empires round's above -- same contract, same reason.
+    // (It stopped the Digitisation span too, at the span's own gate: the span
+    // runs ahead of this line, so this return alone could not.)
     if (gen_cfg.stop_after_exploration)
+    {
+        if (report)
+            for (generation_report::body_entry& be : report->bodies)
+                if (be.id == kepler) { be.settlement = kepler_settlement; break; }
+        return w;
+    }
+
+    // BL-1040: one span later -- the Digitisation span has run (when it was
+    // enabled and Exploration ran), and nothing of world setup has. Same
+    // contract as the two stops above.
+    if (gen_cfg.stop_after_digitisation)
     {
         if (report)
             for (generation_report::body_entry& be : report->bodies)

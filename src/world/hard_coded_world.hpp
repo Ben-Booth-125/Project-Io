@@ -156,7 +156,37 @@ struct world_params
     /// harness that wants to bind a shorter span.
     int64_t         exploration_stop_year = 1660;
 
-    int             body_count = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
+    /// BL-1040 — RUN THE DIGITISATION SPAN, `exploration_stop_year` ->
+    /// `digitisation_stop_year`, as its OWN call to the same engine, resumed
+    /// from the Exploration span's `exploration_output` (DIGITISATION.md, the
+    /// span paragraphs).
+    ///
+    /// THE RUN PREDICATE IS "EXPLORATION RAN", NEVER THE EPOCH (Ben,
+    /// 2026-09-18): the span runs wherever Exploration runs, whatever
+    /// `epoch_year` says, and nowhere else. On the superseded arc (epoch >=
+    /// 1700) Exploration is off, so this span is too. The call site nests it
+    /// inside the block that ran Exploration, so the predicate is structural
+    /// rather than a second reading of the same conditions.
+    ///
+    /// OFF BY DEFAULT, and it stays off until BL-1044's re-bless turns it on:
+    /// the span rewrites `region::nation`, population and treasury to the 1960
+    /// map before population centres are placed, so every generation golden
+    /// and every post-generation reading would move with it. With it off, a
+    /// world is byte-identical to one built before this field existed.
+    ///
+    /// NOT ON THE SAVE SEAM, on exactly the footing of `exploration_sim_enabled`
+    /// and `exploration_stop_year` above: `w_world_params` writes neither of
+    /// those, and a scope knob that decides which history generation plays is
+    /// not a property a loaded campaign re-reads.
+    bool digitisation_span_enabled = false;
+
+    /// The calendar year the Digitisation span closes: the campaign epoch the
+    /// span grows the world to (DIGITISATION.md: "1660 -> 1960 CE, 300
+    /// years"). A field on the same footing as `exploration_stop_year`, for a
+    /// harness that wants to bind a shorter span.
+    int64_t         digitisation_stop_year = 1960;
+
+    int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a
     // *consequence* of its habitable land area and the minimum-viable-territory floor
     // (nation_params in world/nation_generation.hpp), not a value the player pre-sets.
@@ -400,6 +430,7 @@ inline const char* const generation_stage_labels[] = {
     "Placing companies",    // 11
     "Finishing",            // 12
     "Running the exploration age", // 13 — 1200 -> 1660, after the ancient era
+    "Running the digitisation span", // 14 — 1660 -> 1960, after the exploration age (BL-1040)
 };
 inline constexpr int generation_stage_label_count =
     static_cast<int>(sizeof(generation_stage_labels) / sizeof(generation_stage_labels[0]));
