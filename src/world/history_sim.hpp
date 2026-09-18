@@ -139,6 +139,8 @@ struct polity;
 struct grudge;
 struct contact;
 struct history_corridor;
+struct dated_object;    // BL-1036's resume pointers, on the same footing.
+struct universal_creed; // (`civilisation` is complete already: creeds.hpp.)
 
 /// Scorer weights and loop bounds. Defaults are PLACEHOLDERS, not tuned
 /// values: BL-277 records that the `w_*` weights are BL-275 sweep outputs
@@ -1721,6 +1723,93 @@ struct history_sim_params
     const std::vector<history_corridor>* resume_corridors = nullptr;
 
     // -----------------------------------------------------------------------
+    // BL-1036 — A SPAN RESUMED FROM A HANDOFF STRUCT LOSES NOTHING THE STRUCT
+    // CARRIES (DIGITISATION.md, "The span is its own call, resumed from
+    // `exploration_output`").
+    // -----------------------------------------------------------------------
+    //
+    // Three more tables cross beside BL-931's four. Each is null by default,
+    // and the Exploration caller leaves all three null, so every existing run
+    // -- the shipped Exploration span included -- opens exactly as before.
+
+    /// Treaty clauses and tribute standing at the prior span's close
+    /// (`exploration_output::dated_objects`), copied into this run's table at
+    /// the top. TRADE FLOWS NEED NO POINTER OF THEIR OWN: round 1's upkeep
+    /// rebuilds `trade_flows` from these objects before anything reads a flow
+    /// (the upkeep call precedes treaty formation's `pair_trade_value_q`).
+    /// Null here re-forms every treaty against an EMPTY table, which inflates
+    /// each pair's trade value (it subtracts only OTHER partners' flows),
+    /// binds pairs the history never bound, and expires the re-formed set
+    /// together one term later. The Exploration caller passes null because
+    /// the Empires span forms no treaty to carry.
+    const std::vector<dated_object>* resume_dated_objects = nullptr;
+
+    /// The civilisation and universal-creed records that the carried
+    /// `region::civilisation`, `region::universal_creed` and
+    /// `polity::universal_creed` indices point into. Copied at the top, so a
+    /// record coined in this span takes the NEXT free index instead of
+    /// reusing 0, and a pair the prior span already settled is found rather
+    /// than recorded twice.
+    ///
+    /// THE EXPLORATION CALLER LEAVES BOTH NULL, AND THAT IS A KNOWN GAP, NOT
+    /// A CHOICE: its 1200 resume still restarts both tables at 0.
+    /// `pass_one_output` does not carry them, and carrying them there would
+    /// drop a twice-recorded civilisation's line from the world log -- a
+    /// digest mover, so it rides a re-bless rather than this item.
+    const std::vector<civilisation>*    resume_civilisations    = nullptr;
+    const std::vector<universal_creed>* resume_universal_creeds = nullptr;
+
+    /// THE TWO 1200 ANCHORS, EXPLICIT (DIGITISATION.md: "Consolidation and the
+    /// near-home cutoff stay anchored at 1200"). Before this item both were
+    /// read off `start_year`, which is right only for the span that opens at
+    /// 1200: a span opening at 1660 would sweep every seat's stores into the
+    /// capital a second time, and would call every pair met after 1200 near
+    /// home.
+    ///
+    /// `consolidation_year` -- the ONE decision round on which every held
+    /// seat's `material_stock` folds into its capital's treasury
+    /// (EXPLORATION.md sec Capital arrives). A span that does not open on it
+    /// never consolidates, which is exactly "once".
+    ///
+    /// `near_home_cutoff_year` -- a pair whose recorded first contact is
+    /// strictly before this year is NEAR HOME (BL-941): the Alarm read, the
+    /// treaty value's near-home term and its break re-score all key on it.
+    ///
+    /// INT64_MIN (the default) is "never" for both: no round consolidates and
+    /// no pair is near home. Every DECISION read of either sits in the upkeep
+    /// step and its treaty block, which run only under
+    /// `exploration_upkeep_enabled`; the one other read is a trace-only
+    /// diagnostic (BL-950's campaign class). The Exploration caller sets
+    /// both to its own start year (`empires_stop_year`), so it is
+    /// byte-identical to the `start_year` reads these replace.
+    int64_t consolidation_year    = INT64_MIN;
+    int64_t near_home_cutoff_year = INT64_MIN;
+
+    // --- BL-1036: the resume-fidelity instrumentation -----------------------
+    //
+    // Both default off and neither is set by any generation caller. They exist
+    // so `digitisation_sim_harness --fidelity` can PROVE a resume loses
+    // nothing, rather than assert it: one reads the run, the other lets the
+    // harness hand a resume the continued run's own live network.
+
+    /// When a run reaches the TOP of this year -- before the year's first act
+    /// -- it copies its whole working state into `history_sim_state::capture`
+    /// (see `history_sim_capture`). On a resumed run, `capture_year ==
+    /// start_year` is the OPENING state; on a continued run it is the state
+    /// that year's round opens on. READ BY NOTHING in the sim: a captured and
+    /// an uncaptured run agree in every other output. INT64_MIN = never.
+    int64_t capture_year = INT64_MIN;
+
+    /// FIDELITY ORACLE ONLY. On a resumed run, seed the live road counts from
+    /// these rows' `uses` verbatim -- a row of zero uses still creates the
+    /// edge, because an edge's PRESENCE is itself read ("a walked corridor")
+    /// -- instead of from `resume_corridors`. The harness passes a continued
+    /// run's `history_sim_capture::live_roads`, which is how it separates what
+    /// the handoff's corridor record changes from what the resume itself
+    /// loses. Null (every real caller) seeds from `resume_corridors`.
+    const std::vector<history_corridor>* resume_live_roads = nullptr;
+
+    // -----------------------------------------------------------------------
     // BL-931 — THE ROUND-LEVEL UPKEEP STEP.
     // -----------------------------------------------------------------------
     //
@@ -2906,9 +2995,44 @@ inline constexpr int treaty_clause_count = 5;
 struct history_sim_state; // forward declaration: defined immediately below.
 bool has_treaty_clause(const history_sim_state& s, int x, int y, treaty_clause clause);
 
+/// BL-1036 -- ONE RUN'S WHOLE WORKING STATE AT THE TOP OF ONE YEAR, copied
+/// when `history_sim_params::capture_year` is reached (`captured` says it
+/// was). Instrumentation for the resume-fidelity check: on a resumed run it
+/// is the span's OPENING, which must equal the handoff struct it resumed
+/// from field for field; on a continued run it is what that year's round
+/// opens on, which is what a resume at that year must reproduce.
+///
+/// READ BY NOTHING IN THE SIM, and empty unless asked for.
+struct history_sim_capture
+{
+    bool    captured = false;
+    int64_t year     = 0;
+
+    std::vector<region>           regions;          ///< `ss.regions`, whole.
+    std::vector<int>              owner;            ///< The sim's working owner map.
+    std::vector<polity>           polities;
+    std::vector<grudge>           grudges;
+    std::vector<contact>          contacts;
+    std::vector<history_corridor> supply_corridors; ///< The RECORD income and trade read.
+    std::vector<dated_object>     dated_objects;
+    std::vector<trade_flow>       trade_flows;
+    std::vector<civilisation>     civilisations;
+    std::vector<universal_creed>  universal_creeds;
+
+    /// The LIVE road network reach reads -- every edge in the sim's live
+    /// count map as (a, b, uses = the live count, tier = the rung that count
+    /// stands at), sorted by (a, b). Not the record above: the record's
+    /// `uses` counts walks, the live count is what a purchase or a refused
+    /// promotion moved.
+    std::vector<history_corridor> live_roads;
+};
+
 struct history_sim_state
 {
     std::vector<polity> polities;
+
+    /// BL-1036: see `history_sim_capture`. Empty unless the run was asked.
+    history_sim_capture capture;
 
     /// WHY A WORLD NEVER FIGHTS (BL-384's real question), counted only under
     /// `params.trace_battles`.
@@ -4329,6 +4453,19 @@ struct exploration_output
     /// among `dated_objects` above and both parties are alive in `polities`.
     /// Sorted ascending by (seller, buyer, good).
     std::vector<trade_flow> trade_flows;
+
+    /// BL-1036 -- the civilisation and universal-creed records this span's
+    /// run held at its close, in index order: the tables the carried
+    /// `region::civilisation`, `region::universal_creed` and
+    /// `polity::universal_creed` indices were assigned against during the
+    /// span. A resumed span copies both (`history_sim_params::
+    /// resume_civilisations` / `resume_universal_creeds`), so its next record
+    /// takes the next free index. NOT RANGE-VALIDATED, and that is the known
+    /// gap `resume_civilisations` names: the Exploration span itself resumes
+    /// at 1200 without the Empires tables, so an index an Empires-era record
+    /// was given can sit on a region here with no row to point at.
+    std::vector<civilisation>    civilisations;
+    std::vector<universal_creed> universal_creeds;
 
     int64_t start_year = 0;
     int64_t stop_year  = 0;

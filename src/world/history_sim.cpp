@@ -857,8 +857,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             water_want[i] = want;
 
             // NEAR-HOME ALARM: the max over every contact this polity made
-            // BEFORE the span opened (BL-941's near-home read), walked in the
-            // table's own sorted order.
+            // before the near-home cutoff (BL-941's near-home read; BL-1036
+            // anchors it at 1200 explicitly rather than at the span's own
+            // open), walked in the table's own sorted order.
             if (st != nullptr && i <= 0xFFFE)
             {
                 const uint16_t self = static_cast<uint16_t>(i);
@@ -867,7 +868,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 int alarm = 0;
                 for (; it != st->contacts.end() && it->from == self; ++it)
                 {
-                    if (it->first.year >= params.start_year) continue;
+                    if (it->first.year >= params.near_home_cutoff_year) continue;
                     alarm = std::max(alarm, deterrence_alarm_q(regions, *st, params,
                                                                static_cast<int>(i), it->to));
                 }
@@ -887,10 +888,13 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
 
         // ---- CONSOLIDATION: THE PHASE'S OPENING ACT, ONCE (EXPLORATION.md
         // sec Capital arrives: "At 1200 CE every seat's stores flow to the
-        // capital, once"). Fires exactly on the round at the span's own start
-        // year -- which for every caller before this item is unreachable,
-        // because `exploration_upkeep_enabled` is false throughout the
-        // Empire span.
+        // capital, once"). Fires exactly on the round at
+        // `params.consolidation_year` -- the Exploration span's own start
+        // year, which it sets explicitly (BL-1036). A span that opens later
+        // (Digitisation, at 1660) keeps the 1200 anchor and so never reaches
+        // it: the sweep happened once, and a second one would be a second
+        // windfall. Unreachable on the Empire span too, because
+        // `exploration_upkeep_enabled` is false throughout it.
         //
         // BL-998 (Ben, 2026-09-15, NR-871): EVERY seat the polity holds, not
         // the capital alone. A polity's hinterland seats each carry their own
@@ -899,7 +903,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // other held seat kept its hoard on the ground, unseen by the spend
         // scorer. "Once" is literal: the non-capital seats are zeroed here and
         // accumulate again as the round runs -- nothing sweeps them later.
-        if (year == params.start_year)
+        if (year == params.consolidation_year)
         {
             int64_t folded = 0;
             for (region& r : regions)
@@ -1494,6 +1498,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (params.resume_contacts != nullptr) out.contacts = *params.resume_contacts;
         if (params.resume_corridors != nullptr)
             out.supply_corridors = *params.resume_corridors;
+
+        // BL-1036: the three tables BL-931's four left behind. Copied as
+        // handed -- the handoff sorts its dated objects and the sim appends in
+        // formation order, and every read of the table is order-free (a
+        // clause lookup, a sorted pair set, an expiry filter). Round 1's own
+        // `expire_dated_objects` still runs before any read.
+        if (params.resume_dated_objects != nullptr)
+            out.dated_objects = *params.resume_dated_objects;
+        if (params.resume_civilisations != nullptr)
+            out.civilisations = *params.resume_civilisations;
+        if (params.resume_universal_creeds != nullptr)
+            out.universal_creeds = *params.resume_universal_creeds;
     }
     else
     {
@@ -1829,7 +1845,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // ever walked it. Seeded from `uses` (the record's own traffic, the one
     // number that crosses), walked in the record's own sorted order; the map
     // is point-looked-up only, so the order cannot reach an output anyway.
-    if (params.resume_polities != nullptr && params.resume_corridors != nullptr)
+    if (params.resume_polities != nullptr && params.resume_live_roads != nullptr)
+    {
+        // BL-1036 FIDELITY ORACLE: a continued run's own live network, handed
+        // over verbatim (see `history_sim_params::resume_live_roads`). A row
+        // of zero uses still creates its edge -- presence is read.
+        for (const history_corridor& c : *params.resume_live_roads)
+        {
+            if (c.a == c.b || c.uses < 0) continue;
+            if (c.a >= owner_index_limit || c.b >= owner_index_limit) continue;
+            road_uses_live[edge_key(c.a, c.b)] += c.uses;
+        }
+    }
+    else if (params.resume_polities != nullptr && params.resume_corridors != nullptr)
     {
         for (const history_corridor& c : *params.resume_corridors)
         {
@@ -2595,8 +2623,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
     // BL-916: every opening polity is FOUNDED at the start year, at its seat.
     // Ascending id, which is the order the seed above allocated them in.
+    //
+    // BL-1036: A RESUMED SPAN NOTES ONLY THE LIVING. It inherits the prior
+    // span's whole polity table, the dead included (their ids stay valid for
+    // every index that names them), and noting a realm that fell centuries
+    // ago as founded at this span's open put a ghost on the replay. The event
+    // layer only -- `note_event` is read by nothing in the sim and is off
+    // under `record_playback == false`, so no decision and no digest moves.
     for (const polity& q : out.polities)
+    {
+        if (params.resume_polities != nullptr && !q.alive) continue;
         note_event(lapse_event_kind::founded, q.capital, q.id, -1);
+    }
 
 
     // --- THE PLAYBACK RECORD (BL-817) -------------------------------------
@@ -2744,9 +2782,46 @@ history_sim_state run_history_sim(settlement_state&         ss,
         for (const region& r : ss.regions)
             want_culture_count = std::max(want_culture_count, r.culture.plurality() + 1);
 
+    // BL-1036 -- THE FIDELITY CAPTURE (`history_sim_params::capture_year`).
+    // Pure reads into `out.capture`, which nothing below ever reads back. The
+    // live road map is unordered, so its entries are collected and SORTED by
+    // (a, b) before they land -- the copy's order is a property of the
+    // integers, never of the map's layout.
+    const auto capture_state = [&](int64_t at_year) {
+        history_sim_capture& cap = out.capture;
+        cap.captured         = true;
+        cap.year             = at_year;
+        cap.regions          = ss.regions;
+        cap.owner            = owner;
+        cap.polities         = out.polities;
+        cap.grudges          = out.grudges;
+        cap.contacts         = out.contacts;
+        cap.supply_corridors = out.supply_corridors;
+        cap.dated_objects    = out.dated_objects;
+        cap.trade_flows      = out.trade_flows;
+        cap.civilisations    = out.civilisations;
+        cap.universal_creeds = out.universal_creeds;
+        cap.live_roads.clear();
+        cap.live_roads.reserve(road_uses_live.size());
+        for (const auto& kv : road_uses_live)
+        {
+            history_corridor c;
+            c.a    = static_cast<uint16_t>(kv.first >> 32);
+            c.b    = static_cast<uint16_t>(kv.first & 0xFFFFFFFFull);
+            c.uses = kv.second;
+            c.tier = static_cast<uint8_t>(road_tier_for_uses(kv.second));
+            cap.live_roads.push_back(c);
+        }
+        std::sort(cap.live_roads.begin(), cap.live_roads.end(),
+                  [](const history_corridor& x, const history_corridor& y2) {
+                      return x.a != y2.a ? x.a < y2.a : x.b < y2.b;
+                  });
+    };
+
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
         event_year = y; // BL-916: the recorder's clock, read by `note_event` alone.
+        if (y == params.capture_year) capture_state(y); // BL-1036: read-only.
 
         // Loading-screen sink only — never read back, so the sim stays pure.
         if (year_progress != nullptr)
@@ -3428,7 +3503,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             if (params.trace_battles)
                 for (const contact& c : out.contacts)
                 {
-                    if (c.from >= c.to || c.first.year >= params.start_year) continue;
+                    if (c.from >= c.to || c.first.year >= params.near_home_cutoff_year) continue;
                     if (c.to >= out.polities.size()
                      || !out.polities[c.from].alive || !out.polities[c.to].alive) continue;
                     out.near_capability_trace.push_back(visible_capability_raw(ss.regions, out, c.to));
@@ -3451,11 +3526,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const polity& pa = out.polities[static_cast<std::size_t>(a)];
                 const polity& pb = out.polities[static_cast<std::size_t>(b)];
                 // BL-941 -- NEAR HOME is whether this pair's own contact
-                // predates the span (a long-known neighbour) rather than
-                // being formed during it (a frontier pair). `c` is already
-                // this pair's canonical contact row, so its own `first.year`
-                // is the fact, not a second lookup.
-                const bool near_home = c.first.year < params.start_year;
+                // predates the near-home cutoff (a long-known neighbour)
+                // rather than coming after it (a frontier pair). BL-1036: the
+                // cutoff is 1200 explicitly, never this span's own open, so a
+                // pair met after 1200 stays far however late a span opens.
+                // `c` is already this pair's canonical contact row, so its own
+                // `first.year` is the fact, not a second lookup.
+                const bool near_home = c.first.year < params.near_home_cutoff_year;
                 const int alarm_a = deterrence_alarm_q(ss.regions, out, params, a, b);
                 const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
                 const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
@@ -3516,7 +3593,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // BL-941 -- same near-home read as formation, off the
                     // pair's own recorded first contact (not `c`, since this
                     // loop walks bound pairs rather than the contact table).
-                    const bool near_home = contact_first_year(out, a, b) < params.start_year;
+                    const bool near_home =
+                        contact_first_year(out, a, b) < params.near_home_cutoff_year; // BL-1036
                     const int alarm_a = deterrence_alarm_q(ss.regions, out, params, a, b);
                     const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
                     const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
@@ -4443,7 +4521,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int dclass = params.trace_battles
                         ? [&]() {
                               const int64_t fy = contact_first_year(out, q.id, to);
-                              return fy == INT64_MAX ? 2 : (fy < params.start_year ? 0 : 1);
+                              return fy == INT64_MAX ? 2
+                                   : (fy < params.near_home_cutoff_year ? 0 : 1); // BL-1036
                           }()
                         : 0;
                     if (params.trace_battles) ++out.campaign_class_trace[dclass][0];
@@ -8986,6 +9065,12 @@ exploration_output make_exploration_output(const settlement_state&  ss,
 
     o.holdings            = derive_holdings(o.regions, o.polities);
     o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
+
+    // BL-1036: the records the carried civilisation and creed indices point
+    // into, copied whole and in index order so a resumed span continues the
+    // numbering rather than restarting it (see the field comment for the gap).
+    o.civilisations    = hs.civilisations;
+    o.universal_creeds = hs.universal_creeds;
     return o;
 }
 
