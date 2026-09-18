@@ -5688,74 +5688,74 @@
    "difficulty": 3,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1034 - sprint 45 (2026-09-18)",
    "batch": "sprint-45",
-   "resolved": null,
+   "resolved": "2026-09-18",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_copy_determinism --seed 28"
      ],
      "requirement": "On library seed 28, a world copied from the app-order base world, before the landscape and after it, settles through the 12-tick validation run byte for byte with its original, compared every tick.",
      "notes": "The failing case filed with the item: the copy digested D_settle 18F78EB9B2B20F29 against the pinned 265C48A23E313B1A.",
-     "result_metric": ""
+     "result_metric": "world_copy_determinism --seed 28: PASS copied at base (272.5 s), at land (233.7 s) and by assignment (249.7 s); D_settle 265C48A23E313B1A on both sides, 0 stores out of order (main session, 26c8ec6e)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_copy_determinism --seeds all"
      ],
      "requirement": "The same holds on all 16 library seeds, or on a stated subset with the reason the rest were not run.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "world_copy_determinism --seeds all: 16/16 PASS, 12 ticks each, 0 stores out of order (lane run on 1c5d60b1, 5551 s contended); the main session re-ran seed 28 three ways (R1)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep --digest-check"
      ],
      "requirement": "The original path does not move: every library seed's four digests equal the BL-1031 pins with no charter budget. The pins are never re-taken; a fix that moves them is a world-mover and waits on Ben.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "player_seed_sweep --digest-check on the integrated main 26c8ec6e (BL-1034, BL-1036, BL-1037, BL-1038 and its fix round): 16/16 rows PASS against the BL-1031 pins, 0 threw, 4289 s (machine contended) — main session, 2026-09-18."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "headless: landscape_search_harness"
      ],
      "requirement": "world_determinism's digests are unchanged, and landscape_search_harness R2 (thread invariance) and R3 (path replay) stay green: the search copies the base world for every evaluation, so a changed copy is read there first.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "world_determinism ALL PASS on 26c8ec6e, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged. landscape_search_harness PASS — R2.2-R2.8 thread invariance at 2/3/4/8 threads, R3.1 path replay (main session)."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the fix site names the member and the mechanism"
      ],
      "requirement": "The unfaithful member is named, with why a copy read it differently, in a comment at the fix; the reproduction is a committed harness, not a one-off.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "faithful_unordered_map.hpp names MSVC's per-bucket reversal and the order-dependent sum; budget_system.cpp carries the comment at body_mean_habitability; world_copy_determinism is committed (cold review confirmed)."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review of the diff finds no copy path left unfaithful and no change to the original path.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Cold review (code-reviewer, 2026-09-18): no correctness bug in the copy; the original path is untouched except the landscape search's evaluation copies (moot once BL-1050 lands); the order dependence and save/load divergence filed as BL-1050, riding sprint 45's re-bless (NR-894)."
     }
    ],
-   "resolution": ""
+   "resolution": "A copied world ticks byte for byte as its original; the pins held. The order dependence itself is BL-1050."
   },
   {
    "brief": "span-boundary-resume",
@@ -5763,10 +5763,10 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1036 - sprint 45 (2026-09-18)",
    "batch": "sprint-45",
-   "resolved": null,
+   "resolved": "2026-09-18",
    "rows": [
     {
      "id": "R1",
@@ -5780,13 +5780,13 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep --digest-check"
      ],
      "requirement": "Every library seed's four digests equal the BL-1031 pins with no budget (16 seeds, or a stated subset with the reason).",
      "notes": "The 16-seed --digest-check runs on the integrated main (chain 3, 2026-09-18).",
-     "result_metric": ""
+     "result_metric": "player_seed_sweep --digest-check on the integrated main 26c8ec6e (BL-1034, BL-1036, BL-1037, BL-1038 and its fix round): 16/16 rows PASS against the BL-1031 pins, 0 threw, 4289 s (machine contended) — main session, 2026-09-18."
     },
     {
      "id": "R3",
@@ -5841,7 +5841,7 @@
      "result_metric": "Cold review (code-reviewer, 2026-09-18): nothing blocking; follow-ups committed in 58193812; the 1200 index reuse filed as BL-1049."
     }
    ],
-   "resolution": ""
+   "resolution": "Delivered with R6 partial: the 1200 index reuse is BL-1049 (continuity pass)."
   },
   {
    "brief": "resume-road-tier",
@@ -5849,21 +5849,21 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1037 - sprint 45 (2026-09-18)",
    "batch": "sprint-45",
-   "resolved": null,
+   "resolved": "2026-09-18",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "headless: player_seed_sweep --digest-check"
      ],
      "requirement": "With the switch off (its default), every digest and pin is unmoved.",
      "notes": "The 16-seed --digest-check runs on the integrated main (chain 3).",
-     "result_metric": "world_determinism ALL PASS, digests seedA/on 099530C9B7A211D7, seedB/on 3C348D569EEF30EB, seedA/off 583A788BD8045DA0, 1960/two-span 2EC67DAE697FBA02 — equal to the values recorded at 836d9e52 with the switch off (main session, 614a02e5)."
+     "result_metric": "world_determinism ALL PASS on 26c8ec6e, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged. player_seed_sweep --digest-check on the integrated main 26c8ec6e (BL-1034, BL-1036, BL-1037, BL-1038 and its fix round): 16/16 rows PASS against the BL-1031 pins, 0 threw, 4289 s (machine contended) — main session, 2026-09-18."
     },
     {
      "id": "R2",
@@ -5886,7 +5886,7 @@
      "result_metric": "Cold review (code-reviewer, 2026-09-18): correct in both directions and inert when off."
     }
    ],
-   "resolution": ""
+   "resolution": "Delivered behind a switch that BL-1044 turns on."
   },
   {
    "brief": "industry-tree-wired",
@@ -5894,21 +5894,21 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1038 - sprint 45 (2026-09-18)",
    "batch": "sprint-45",
-   "resolved": null,
+   "resolved": "2026-09-18",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "headless: player_seed_sweep --digest-check"
      ],
      "requirement": "With industry_tree_enabled off (its default), every digest and pin is unmoved.",
      "notes": "The 16-seed --digest-check runs on the integrated main (chain 3).",
-     "result_metric": "world_determinism ALL PASS, digests seedA/on 099530C9B7A211D7, seedB/on 3C348D569EEF30EB, seedA/off 583A788BD8045DA0, 1960/two-span 2EC67DAE697FBA02 — equal to the values recorded at 836d9e52 with the switch off (main session, 58193812, after the fix round)."
+     "result_metric": "world_determinism ALL PASS on 26c8ec6e, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged. player_seed_sweep --digest-check on the integrated main 26c8ec6e (BL-1034, BL-1036, BL-1037, BL-1038 and its fix round): 16/16 rows PASS against the BL-1031 pins, 0 threw, 4289 s (machine contended) — main session, 2026-09-18."
     },
     {
      "id": "R2",
@@ -5961,7 +5961,7 @@
      "result_metric": "Cold review (code-reviewer, 2026-09-18): nothing blocking; fix round merged as 191c212b; term readings on NR-891, furnace_lit on NR-892."
     }
    ],
-   "resolution": ""
+   "resolution": "Delivered behind a switch; the Digitisation span turns it on inside itself."
   },
   {
    "brief": "charter-spend-rules",
