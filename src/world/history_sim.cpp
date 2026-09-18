@@ -6624,10 +6624,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         ir.ground_farm_q    = ground_farm_q;
                         ir.ground_port_q    = ground_port_q;
 
-                        // THE SEAM (INDUSTRY_TREE.md sec Aims, PROPOSED
-                        // 2026-09-18): the richest held energy_q, so a realm
-                        // holding one coalfield passes however much else it
-                        // holds. And LABOUR (`labour_bound`): of the held
+                        // THE SEAM (INDUSTRY_TREE.md sec Aims): the richest
+                        // held region's fuel -- the span-open survey under
+                        // DEFAULT B below, energy_q with it off or where
+                        // nothing was surveyed -- so a realm holding one
+                        // coalfield passes however much else it holds. And
+                        // LABOUR (`labour_bound`): of the held
                         // non-subsistence surplus (`manpower_ceiling` — the
                         // budget muster and industry share, settlement.hpp sec
                         // Materials and labour), the share standing under arms,
@@ -6702,9 +6704,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             }
                             ir.threatened_q = clampi(threat, 0, 1000);
 
-                            // `ground_forest` (BL-1051): the span-open survey's
-                            // forest share, averaged over held ground that was
-                            // surveyed. No gate reads it, so only a pick needs
+                            // `ground_forest` (BL-1051; Ben 2026-09-18, wave 1
+                            // form): the BEST held surveyed region's forest
+                            // score (the share scored against the span-open
+                            // mean, as fuel is). No gate reads it, so only a pick needs
                             // it; off the Digitisation span nothing is surveyed
                             // and it reads 0, the old pin.
                             ir.ground_forest_q = industry_ground_forest_q(ss.regions, held);
@@ -8501,6 +8504,14 @@ int industry_points_fuel_factor_q(int fuel_reading_q, const history_sim_params& 
 int industry_tree_industrial_q(uint64_t industry_mask)
 {
     using namespace io::industry_tree;
+    // KNOWN DRIFT, OPEN (BL-1041 cold review): DIGITISATION.md sec Beat 1 reads
+    // "Industry tree CAPACITY nodes held", and the store tags every node's
+    // diffusion kind (capacity / practice / artifact; TREES.md sec Diffusion
+    // follows kind). The GENERATED table (`industry_tree_data.hpp`) does not
+    // carry that kind, so this fold cannot filter on it and sums the
+    // `industrial` modifier of every held node -- practice nodes included
+    // (IN-MT-1e +30, IN-LD-1b +80, IN-LD-1c -40, IN-CH-2b +40, IN-CH-2c +20).
+    // Filtering needs the generator to emit the kind first.
     int sum = 0;
     for (int i = 0; i < node_count; ++i)
     {
@@ -8658,7 +8669,7 @@ void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
     at(scorer_term::furnace_lit)      = furnace_lit ? 1000 : 0;
     at(scorer_term::ground_ore)       = r.ground_ore_q;
     at(scorer_term::ground_fuel)      = r.fuel_seam_q;       // the seam, not the mean
-    at(scorer_term::ground_forest)    = r.ground_forest_q;   // BL-1051: the span-open survey, held mean
+    at(scorer_term::ground_forest)    = r.ground_forest_q;   // the span-open survey, best held score (the seam's shape)
     at(scorer_term::tariff_pressure)  = 0; // PINNED: no landed price at a market before the campaign
     at(scorer_term::threatened)       = r.threatened_q;
     at(scorer_term::food_bound)       = r.food_bound_q;
