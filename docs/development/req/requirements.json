@@ -6281,12 +6281,13 @@
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "live: the loading screen"
      ],
      "requirement": "The loading bar counts only the stages that will run, so a campaign start without the span reads as it did before BL-1040.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Live check (Ben, 2026-09-18, the Debug app at 2387af55 on the BenQ): the building screen steps (1/12) to (12/12) and ends full; the wizard's Loading-the-X-round bars shown too. Ben: \"Looks good. We can close that.\""
     },
     {
      "id": "R7",
