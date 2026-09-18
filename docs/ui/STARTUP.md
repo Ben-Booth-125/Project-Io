@@ -258,7 +258,11 @@ very fast calculation."*
 
 So a pass round is two moments, and they do not overlap. **The wait** is one centred line —
 *Loading the Culture round*, *Loading the Empires round*, *Loading the Exploration round* — and
-nothing else on the surface: no map, no board, no stage list, no year counter. **The lapse**
+under it a progress bar (Ben, 2026-09-18: *"wire in a progress bar for 'Loading x round'"*), and
+nothing else on the surface: no map, no board, no stage list, no year counter. The bar is the
+building screen's pair, read from the round's own run: an outer bar over the passes the run
+reports, which only moves forward, and a thinner one under it for the sim's years within a span,
+drawn only while a span is counting them. **The lapse**
 begins when the record is whole and plays it from its first year at the pace the player chose.
 The calculation is fast and jerky; the lapse is paced and readable; showing the first as though
 it were the second made the second impossible to follow, and hid the hand-over between rounds

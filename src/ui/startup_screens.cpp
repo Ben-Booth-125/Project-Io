@@ -1311,6 +1311,37 @@ void app::draw_generation_screen()
                     if (w > sz.x)
                         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - sz.x) * 0.5f);
                     ImGui::TextUnformatted(label);
+
+                    // THE WAIT HAS A BAR (Ben, 2026-09-18: "wire in a progress bar
+                    // for 'Loading x round'"). The same pair the building screen
+                    // draws (app::draw_building_screen), from the round's own
+                    // `generation_progress`: the outer bar counts the passes this
+                    // run reports, so it only moves forward; the inner one is the
+                    // sim's year counter inside a span, drawn only while a span
+                    // reports it, and it restarts when a round runs a second span.
+                    // Still no pass captions — the 2026-09-16 ruling above stands:
+                    // the wait says it is a wait, and now how far along it is.
+                    const generation_progress& prog = m_wiz_history_progress[lapse_index];
+                    const int   done  = prog.stage.load(std::memory_order_relaxed);
+                    const int   total = std::max(1, prog.stage_count.load(std::memory_order_relaxed));
+                    const float bar_w = std::min(420.0f, w);
+                    const float bar_x = std::max(0.0f, (w - bar_w) * 0.5f);
+                    ImGui::Dummy({w, 10.0f});
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + bar_x);
+                    ImGui::ProgressBar(std::clamp(static_cast<float>(done) / static_cast<float>(total),
+                                                  0.0f, 1.0f),
+                                       {bar_w, 18.0f}, "");
+                    const int sub_total = prog.sub_total.load(std::memory_order_relaxed);
+                    if (sub_total > 0)
+                    {
+                        const int sub_done = prog.sub_progress.load(std::memory_order_relaxed);
+                        ImGui::Dummy({w, 4.0f});
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + bar_x);
+                        ImGui::ProgressBar(std::clamp(static_cast<float>(sub_done)
+                                                          / static_cast<float>(sub_total),
+                                                      0.0f, 1.0f),
+                                           {bar_w, 10.0f}, "");
+                    }
                 }
             }
             else if (rec.empty())
