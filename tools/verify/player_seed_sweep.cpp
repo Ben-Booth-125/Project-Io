@@ -43,8 +43,13 @@
 //      .\build\player_seed_sweep.exe --digest-check [--seeds 46,17,11]   (BL-1031)
 //      ... --digest / --digest-check [--charter-budget none|empty|zero|synthetic|refused]
 //                                    [--charter-scale X]                    (BL-1032)
+//                                    [--resource-cap on|off]                (BL-1039: the two
+//                                     legacy cap rules on a synthetic budget, for their digests)
 //      .\build\player_seed_sweep.exe --charter-cost [--seeds 0,28,46] [--budget-scales 1,2,4]
-//                                    [--resource-cap on|off|both] [--province-cap on|off|both]
+//                                    [--resource-cap on|off|both|sqrt|<list>]
+//                                    [--density-ceilings 120,160]           (BL-1039, sqrt only)
+//                                    [--capital draw|unspent|both]          (BL-1039)
+//                                    [--province-cap on|off|both]
 //                                    [--specialist-prices 4,8] [--ladder-scales 2|all]
 //                                    [--no-extra] [--no-forced] [--forced-only]
 //                                    [--forced-radius 4] [--forced-pick sparse|richest]
@@ -69,6 +74,7 @@
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/resource_names.hpp" // name_of — per-good tallies (BL-1039)
 #include "world/settlement.hpp"   // nearest_region (the forced row's pick)
 #include "world/nation_step.hpp"
 #include "world/spawn_seat.hpp"
@@ -722,6 +728,257 @@ void measure_charter_spill(const world& w, const charter_spend_report& rep, int 
     }
 }
 
+/// BL-1039 — "good:n" for every good with a firm, in resource order; "-" for none.
+std::string firms_by_good_text(const std::vector<std::int32_t>& by_good)
+{
+    std::string out;
+    for (std::size_t r = 0; r < by_good.size(); ++r)
+        if (by_good[r] > 0)
+        {
+            if (!out.empty())
+                out += ' ';
+            out += resource_names::name_of(static_cast<resource_type>(r));
+            out += ':';
+            out += std::to_string(by_good[r]);
+        }
+    return out.empty() ? std::string("-") : out;
+}
+
+/// BL-1039 — one line per body: the density rule the spend fixed before its walk
+/// (B, G, B_ref, the per-good cap, the ceiling) and the firms it chartered, per good.
+void print_charter_bodies(const charter_spend_report& rep, const char* indent)
+{
+    for (const charter_body_record& b : rep.bodies)
+    {
+        std::string goods;
+        for (const std::uint16_t g : b.goods)
+        {
+            if (!goods.empty())
+                goods += ',';
+            goods += resource_names::name_of(static_cast<resource_type>(g));
+        }
+        std::printf("%sbody %u: B %lld pts; G %d goods with demand [%s]; B_ref %lld pts; per-good cap %d%s; "
+                    "density ceiling %d%s; firms %d — by good: %s\n",
+                    indent, b.body, static_cast<long long>(b.capital_points), b.goods_with_demand,
+                    goods.c_str(), static_cast<long long>(b.reference_points),
+                    static_cast<int>(b.per_good_cap), b.per_good_cap < 0 ? " (none: lifted)" : "",
+                    static_cast<int>(b.density_ceiling), b.density_ceiling == 0 ? " (none)" : "",
+                    static_cast<int>(b.firms), firms_by_good_text(b.firms_by_good).c_str());
+    }
+}
+
+/// BL-1039 — the spend's rules, RE-DERIVED from the budget, the report's own
+/// records and the world, never read back from the numbers under test alone:
+///  * B per body from the budget and the world's centre tiles and nations;
+///    B_ref = c x |G| x firm price; the per-good cap by its DEFINITION as an
+///    integer inequality (k^2 B_ref <= c^2 B < (k+1)^2 B_ref, or c when that k
+///    <= c), not by calling the function that set it;
+///  * firms per good re-tallied from the firm records (each record's good and
+///    its anchor tile's body) against the body rows; no good past its cap, no
+///    body past its ceiling or its guard;
+///  * under `unspent_points`, every specialist's capital = its centre's unspent
+///    remainder (the report's unspent rows for that centre, summed) x the rate,
+///    on the corporation as chartered — and, AT LAND, its balance too — with the
+///    zero-capital count and the capitalised total re-counted.
+struct charter_rule_check
+{
+    bool        pass = true;
+    std::string fail;
+    int         specialists = 0, zero_capital = 0, missing = 0;
+    long long   capitalised = 0;
+};
+
+charter_rule_check check_charter_rules(const world& w, const charter_budget& budget,
+                                       const charter_spend_report& rep,
+                                       const charter_spend_params& spend, bool at_land)
+{
+    charter_rule_check out;
+    const auto failed = [&](const std::string& why) {
+        out.pass = false;
+        if (out.fail.size() < 1200)
+            out.fail += " " + why + ";";
+    };
+    char buf[256];
+
+    // --- B, re-derived ---
+    std::map<entity_id, long long> capital_by_body;
+    for (const auto& [centre, pts] : budget.points())
+    {
+        const auto ct = w.population_centre_tile.find(centre);
+        if (ct == w.population_centre_tile.end())
+            continue;
+        const auto t = w.tiles.find(ct->second);
+        const auto own = w.tile_to_nation.find(ct->second);
+        if (t == w.tiles.end() || own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
+            continue;
+        capital_by_body[t->second.body] += pts;
+    }
+    if (capital_by_body.size() != rep.bodies.size())
+    {
+        std::snprintf(buf, sizeof buf, "%zu bodies hold nation-resolved budget, report has %zu",
+                      capital_by_body.size(), rep.bodies.size());
+        failed(buf);
+    }
+
+    // --- firms per good, re-tallied from the records ---
+    std::map<entity_id, std::vector<std::int32_t>> tally;
+    for (const charter_record& r : rep.charters)
+    {
+        if (r.specialist)
+            continue;
+        const auto t = w.tiles.find(r.anchor_tile);
+        if (t == w.tiles.end() || r.good >= resource_count)
+        {
+            failed("a firm record with no anchor body or no good");
+            continue;
+        }
+        auto& v = tally[t->second.body];
+        v.resize(resource_count, 0);
+        ++v[r.good];
+    }
+
+    const long long c = spend.per_resource_firm_cap;
+    for (const charter_body_record& b : rep.bodies)
+    {
+        const auto cb = capital_by_body.find(b.body);
+        if (cb == capital_by_body.end() || cb->second != b.capital_points)
+        {
+            std::snprintf(buf, sizeof buf, "body %u: B %lld, re-derived %lld", b.body,
+                          static_cast<long long>(b.capital_points),
+                          cb == capital_by_body.end() ? -1LL : cb->second);
+            failed(buf);
+        }
+        const long long g = b.goods_with_demand;
+        if (g != static_cast<long long>(b.goods.size()))
+            failed("goods_with_demand disagrees with the goods list");
+        const long long bref = g > 0 ? c * g * spend.firm_price_points : 0;
+        if (bref != b.reference_points)
+        {
+            std::snprintf(buf, sizeof buf, "body %u: B_ref %lld, c x |G| x fp = %lld", b.body,
+                          static_cast<long long>(b.reference_points), bref);
+            failed(buf);
+        }
+        // The per-good cap, by its definition.
+        const long long k = b.per_good_cap;
+        switch (spend.resource_cap_rule)
+        {
+        case charter_cap_rule::fixed:
+            if (k != c) failed("fixed rule: per-good cap is not per_resource_firm_cap");
+            break;
+        case charter_cap_rule::lifted:
+            if (k != -1) failed("lifted rule: a per-good cap is set");
+            break;
+        case charter_cap_rule::sqrt_capital:
+        {
+            const long long B = b.capital_points;
+            bool ok = true;
+            if (g == 0 || B <= 0)
+                ok = (k == c);
+            else if (k > c)
+                ok = k * k * bref <= c * c * B && c * c * B < (k + 1) * (k + 1) * bref;
+            else
+                ok = (k == c) && c * c * B < (c + 1) * (c + 1) * bref;
+            if (!ok)
+            {
+                std::snprintf(buf, sizeof buf, "body %u: per-good cap %lld is not max(c, floor(c "
+                              "sqrt(B/B_ref))) for c %lld, B %lld, B_ref %lld", b.body, k, c, B, bref);
+                failed(buf);
+            }
+            if (b.density_ceiling != spend.density_ceiling)
+                failed("sqrt rule: the body's ceiling is not the spend's");
+            break;
+        }
+        }
+        if (spend.resource_cap_rule != charter_cap_rule::sqrt_capital && b.density_ceiling != 0)
+            failed("a legacy rule carries a density ceiling");
+
+        std::vector<std::int32_t> mine = tally.count(b.body) ? tally[b.body]
+                                                             : std::vector<std::int32_t>(resource_count, 0);
+        long long sum = 0;
+        for (std::size_t r = 0; r < b.firms_by_good.size(); ++r)
+        {
+            sum += b.firms_by_good[r];
+            if (r >= mine.size() || mine[r] != b.firms_by_good[r])
+            {
+                std::snprintf(buf, sizeof buf, "body %u: %s firms %d, records say %d", b.body,
+                              resource_names::name_of(static_cast<resource_type>(r)).c_str(),
+                              static_cast<int>(b.firms_by_good[r]),
+                              r < mine.size() ? static_cast<int>(mine[r]) : -1);
+                failed(buf);
+            }
+            if (k >= 0 && b.firms_by_good[r] > k)
+            {
+                std::snprintf(buf, sizeof buf, "body %u: %s holds %d firms, past its cap %lld", b.body,
+                              resource_names::name_of(static_cast<resource_type>(r)).c_str(),
+                              static_cast<int>(b.firms_by_good[r]), k);
+                failed(buf);
+            }
+        }
+        if (sum != b.firms)
+            failed("firms by good do not sum to the body's firms");
+        if (b.density_ceiling > 0 && b.firms > b.density_ceiling)
+            failed("a body past its density ceiling");
+        if (b.firms > spend.max_firms_per_body)
+            failed("a body past its runaway guard");
+    }
+
+    // --- the capital ---
+    std::map<entity_id, long long> unspent_by_centre;
+    for (const charter_unspent& u : rep.unspent)
+        unspent_by_centre[u.centre] += u.points;
+    long long zero = 0, capitalised = 0;
+    for (const charter_record& r : rep.charters)
+    {
+        if (!r.specialist)
+            continue;
+        ++out.specialists;
+        const auto corp = w.corporations.find(r.corp);
+        if (corp == w.corporations.end())
+        {
+            ++out.missing;
+            continue;
+        }
+        if (spend.capital_rule == charter_capital_rule::draw)
+        {
+            if (r.capital_points != -1 || corp->second.starting_capital != r.capital)
+                failed("draw: a specialist's recorded capital disagrees with its corporation");
+            continue;
+        }
+        const long long remainder = unspent_by_centre.count(r.centre) ? unspent_by_centre[r.centre] : 0;
+        const float expected = static_cast<float>(remainder) * spend.capital_per_point;
+        if (r.capital_points != remainder || r.capital != expected
+            || corp->second.starting_capital != expected
+            || (at_land && corp->second.balance != expected))
+        {
+            std::snprintf(buf, sizeof buf, "specialist %u (centre %u): capital %.4f / starting %.4f / "
+                          "balance %.4f on %lld recorded points; expected %lld x %.4f = %.4f",
+                          r.corp, r.centre, static_cast<double>(r.capital),
+                          static_cast<double>(corp->second.starting_capital),
+                          static_cast<double>(corp->second.balance),
+                          static_cast<long long>(r.capital_points), remainder,
+                          static_cast<double>(spend.capital_per_point), static_cast<double>(expected));
+            failed(buf);
+        }
+        if (remainder == 0)
+            ++zero;
+        capitalised += remainder;
+    }
+    if (spend.capital_rule == charter_capital_rule::unspent_points)
+    {
+        out.zero_capital = static_cast<int>(zero);
+        out.capitalised  = capitalised;
+        if (zero != rep.specialists_zero_capital)
+            failed("the zero-capital count disagrees with the report's");
+        if (capitalised != rep.unspent_points_capitalised)
+            failed("the capitalised total disagrees with the report's");
+    }
+    else if (rep.specialists_zero_capital != 0 || rep.unspent_points_capitalised != 0)
+    {
+        failed("the draw reported capitalised points");
+    }
+    return out;
+}
+
 void print_charter_report(const world& w, charter_mode mode, const charter_budget& budget,
                           const charter_spend_params& spend, const charter_spend_report& rep,
                           const landscape_search_result& search,
@@ -739,12 +996,20 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
     std::printf("      charter budget %s — SYNTHETIC TEST INPUT (seeded weights, never population): "
                 "scale %.2f x 1x %zu legacy corporations (%zu specialists + %zu firms) = %lld points "
                 "over %zu centres; firm price %d, specialist %d firm charters (= %lld points), "
-                "window radius %d, province cap %s, resource cap %s\n",
+                "window radius %d, province cap %s, resource cap %s (per-good cap %d, density "
+                "ceiling %d, guard %d), capital %s (rate %.4f cr/pt)\n",
                 charter_mode_name(mode), scale, legacy_specialists + legacy_firms, legacy_specialists,
                 legacy_firms, static_cast<long long>(budget.total()), budget.points().size(),
                 spend.firm_price_points, spend.specialist_firm_charters,
                 static_cast<long long>(spend.specialist_price_points()), spend.window_radius,
-                spend.province_cap ? "on" : "off", spend.resource_cap ? "on" : "off");
+                spend.province_cap ? "on" : "off",
+                spend.resource_cap_rule == charter_cap_rule::fixed    ? "on (fixed)"
+                : spend.resource_cap_rule == charter_cap_rule::lifted ? "off (lifted)"
+                                                                      : "sqrt_capital",
+                static_cast<int>(spend.per_resource_firm_cap), static_cast<int>(spend.density_ceiling),
+                static_cast<int>(spend.max_firms_per_body),
+                charter_capital_rule_name(spend.capital_rule),
+                static_cast<double>(spend.capital_per_point));
     {
         std::int32_t richest = 0;
         int affords = 0;
@@ -855,10 +1120,13 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
                     charter_unspent_reason_name(static_cast<charter_unspent_reason>(r)),
                     pts[static_cast<std::size_t>(r)], ctr[static_cast<std::size_t>(r)],
                     r + 1 < charter_unspent_reason_count ? "," : "\n");
+    if (!rep.refused)
+        print_charter_bodies(rep, "      ");
 }
 
 int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
-               charter_mode mode = charter_mode::none, double charter_scale = 1.0)
+               charter_mode mode = charter_mode::none, double charter_scale = 1.0,
+               bool resource_cap = true)
 {
     std::printf("player_seed_sweep %s — %zu seeds, the shipped spawn built, settled (%d ticks) "
                 "and seated in app order (BL-1030)\n",
@@ -918,6 +1186,11 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                     legacy->w, seed,
                     static_cast<std::int64_t>(legacy_specialists + legacy_firms), charter_scale);
                 charter.spend = synthetic_charter_spend();
+                // BL-1039: `--resource-cap on|off` selects the two LEGACY rules,
+                // BL-1033's cap kept (fixed) and cap lifted, so their digests can
+                // be recorded and re-checked across a change to the budget path.
+                charter.spend.resource_cap_rule =
+                    resource_cap ? charter_cap_rule::fixed : charter_cap_rule::lifted;
                 // `refused`: the same budget, and a price with no default left
                 // at its default — the refusal a caller that forgets a price gets.
                 if (mode == charter_mode::refused)
@@ -1094,6 +1367,18 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
 // it spans and no second rung absorbs the charters, so the default pick reads
 // exactly that ground.
 //
+// BL-1039 — THE RULED RULES, as more matrix axes. `--resource-cap` also takes
+// `sqrt` (the square-root per-good cap, DIGITISATION.md § 1), which runs once per
+// `--density-ceilings` entry and has no default ceiling; `on` and `off` are the
+// legacy fixed and lifted rules, unchanged. `--capital unspent` opens each budget
+// specialist on its centre's unspent points at `proposed_capital_per_point` (400
+// credits per specialist price; harness_params.hpp); `draw` (the default) is
+// today's 400 +/- 40%. Every budget row prints its rule, one line per body (B, G,
+// B_ref, the per-good cap, firms PER GOOD) and its capital, and checks them at
+// land (`check_charter_rules`: a FAIL fails the run); every full row prints the
+// seated corporation's balance and solvent flag. The default matrix is BL-1033's,
+// unchanged.
+//
 // THE DEFAULT MATRIX is eleven rows per seed — ten full rows and one build-only
 // row, sized so three seeds stay affordable:
 //   none; 1x, 2x, 4x x rcap on/off at sp4 (pcap on); 2x x rcap on/off at sp8
@@ -1143,7 +1428,13 @@ struct cost_config
     enum class kind { none, synthetic, forced };
     kind   k             = kind::none;
     double scale         = 1.0;
-    bool   resource_cap  = true;
+    /// The per-good cap rule (BL-1039): `fixed` is BL-1033's "rcap on", `lifted`
+    /// its "rcap off", `sqrt_capital` the ruled square root under `density_ceiling`.
+    charter_cap_rule resource_cap_rule = charter_cap_rule::fixed;
+    std::int32_t     density_ceiling   = 0;   ///< sqrt_capital only
+    /// The capital rule (BL-1039); under `unspent_points` the rate is
+    /// `proposed_capital_per_point` of the row's specialist price.
+    charter_capital_rule capital_rule  = charter_capital_rule::draw;
     bool   province_cap  = true;
     int    window_radius = 4;
     /// The specialist's price as a whole number of firm charters (a --specialist-prices
@@ -1159,17 +1450,32 @@ struct cost_config
     entity_id   forced_centre      = null_entity;
 };
 
+/// "on" / "off" for the two legacy rules — BL-1033's labels, kept so its rows
+/// read the same — and "sqrt cN" for the square root under ceiling N.
+std::string cost_cap_label(const cost_config& c)
+{
+    switch (c.resource_cap_rule)
+    {
+    case charter_cap_rule::fixed:  return "on";
+    case charter_cap_rule::lifted: return "off";
+    case charter_cap_rule::sqrt_capital:
+        return "sqrt c" + std::to_string(static_cast<int>(c.density_ceiling));
+    }
+    return "?";
+}
+
 std::string cost_config_label(const cost_config& c)
 {
-    char buf[128];
+    char buf[160];
     switch (c.k)
     {
     case cost_config::kind::none:
         return "none (legacy)";
     case cost_config::kind::synthetic:
-        std::snprintf(buf, sizeof buf, "synthetic %gx rcap %s pcap %s sp%d", c.scale,
-                      c.resource_cap ? "on" : "off", c.province_cap ? "on" : "off",
-                      static_cast<int>(c.specialist_firm_charters));
+        std::snprintf(buf, sizeof buf, "synthetic %gx rcap %s pcap %s sp%d%s", c.scale,
+                      cost_cap_label(c).c_str(), c.province_cap ? "on" : "off",
+                      static_cast<int>(c.specialist_firm_charters),
+                      c.capital_rule == charter_capital_rule::unspent_points ? " cap-unspent" : "");
         return buf;
     case cost_config::kind::forced:
         std::snprintf(buf, sizeof buf, "forced pcap (%gx on 1 centre, r%d, sp%d)", c.scale,
@@ -1276,6 +1582,16 @@ struct cost_row
     int         centres_affording_specialist = 0;
     charter_spill spec_spill, firm_spill;
 
+    // --- BL-1039: the rules the spend ran on, and what they did ---
+    std::int32_t per_resource_firm_cap = 0, max_firms_per_body = 0, density_ceiling = 0;
+    float        capital_per_point = 0.0f;
+    std::vector<charter_body_record> bodies;
+    charter_rule_check rule_check;              ///< taken AS THE LANDSCAPE LANDS
+    int          specialists_zero_capital = 0;
+    long long    unspent_points_capitalised = 0;
+    /// Every budget specialist as chartered: (corp, capital), ascending corp id.
+    std::vector<std::pair<entity_id, float>> specialist_capitals;
+
     // --- the landscape as it landed ---
     std::size_t specialists = 0, firms = 0;
     bool        any_specialist = false;
@@ -1302,6 +1618,12 @@ struct cost_row
     int       seat_specialists = 0, shortlist = 0;
     int       trail_n = 0;
     double    trail_min = 0.0, trail_median = 0.0, trail_max = 0.0, trail_neg_share = 0.0;
+    /// BL-1039: the SEATED corporation's balance at the seat and its solvent flag
+    /// (spawn_seat_candidate's: balance > 0), and how many of the spend's
+    /// specialists stand solvent at the seat (budget rows).
+    float     seat_balance = 0.0f;
+    bool      seat_solvent = false, seat_found = false;
+    int       specialists_at_seat = 0, specialists_solvent_at_seat = 0;
 
     // --- the none row's fidelity check ---
     bool          digested = false, pinned = false, digest_match = false;
@@ -1334,14 +1656,25 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
     {
         charter.budget              = budget;
         charter.spend               = synthetic_charter_spend();
-        charter.spend.resource_cap  = cfg.resource_cap;
+        charter.spend.resource_cap_rule = cfg.resource_cap_rule;
+        charter.spend.density_ceiling   =
+            cfg.resource_cap_rule == charter_cap_rule::sqrt_capital ? cfg.density_ceiling : 0;
         charter.spend.province_cap  = cfg.province_cap;
         charter.spend.window_radius = cfg.window_radius;
         charter.spend.specialist_firm_charters = cfg.specialist_firm_charters;
+        // The rate follows the row's specialist price, so it is set after it.
+        charter.spend.capital_rule      = cfg.capital_rule;
+        charter.spend.capital_per_point =
+            cfg.capital_rule == charter_capital_rule::unspent_points
+                ? proposed_capital_per_point(charter.spend) : 0.0f;
         charter.report              = &report;
         row.firm_price_points        = charter.spend.firm_price_points;
         row.specialist_firm_charters = charter.spend.specialist_firm_charters;
         row.specialist_price_points  = static_cast<long long>(charter.spend.specialist_price_points());
+        row.per_resource_firm_cap    = charter.spend.per_resource_firm_cap;
+        row.max_firms_per_body       = charter.spend.max_firms_per_body;
+        row.density_ceiling          = charter.spend.density_ceiling;
+        row.capital_per_point        = charter.spend.capital_per_point;
     }
 
     // A budget row with no points would take the legacy branch and measure
@@ -1420,6 +1753,17 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         }
         measure_charter_spill(w, report, charter.spend.window_radius, row.spec_spill,
                               row.firm_spill);
+
+        // BL-1039: the rules and the capital, checked NOW — as the landscape
+        // lands, before any tick moves a balance (a refused row has no records).
+        row.bodies                     = report.bodies;
+        row.specialists_zero_capital   = report.specialists_zero_capital;
+        row.unspent_points_capitalised = report.unspent_points_capitalised;
+        for (const charter_record& r : report.charters)
+            if (r.specialist)
+                row.specialist_capitals.emplace_back(r.corp, r.capital);
+        if (!report.refused)
+            row.rule_check = check_charter_rules(w, *budget, report, charter.spend, /*at_land=*/true);
     }
 
     if (cfg.k == cost_config::kind::none)
@@ -1462,6 +1806,23 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
     row.floor_unmet      = res.floor_unmet;
     row.seat_specialists = res.specialist_count;
     row.shortlist        = res.shortlist_size;
+    for (const spawn_seat_candidate& c : res.candidates)
+        if (c.corp == res.seated)
+        {
+            row.seat_found   = true;
+            row.seat_balance = c.balance;
+            row.seat_solvent = c.solvent;
+        }
+    for (const auto& [sid, cap] : row.specialist_capitals)
+    {
+        (void)cap;
+        const auto it = run->w.corporations.find(sid);
+        if (it == run->w.corporations.end())
+            continue;
+        ++row.specialists_at_seat;
+        if (it->second.balance > 0.0f)   // spawn_seat_candidate's `solvent`
+            ++row.specialists_solvent_at_seat;
+    }
     {
         std::vector<double> trail;
         for (const spawn_seat_candidate& c : res.candidates)
@@ -1522,7 +1883,12 @@ std::string json_escape(const std::string& in)
 struct cost_options
 {
     std::vector<double> scales = { 1.0, 2.0, 4.0 };
-    std::vector<bool>   resource_caps = { true, false };
+    /// --resource-cap on|off|both|sqrt, or a comma list of on/off/sqrt (BL-1039).
+    /// `sqrt` runs once per --density-ceilings entry; the ceiling has no default.
+    std::vector<charter_cap_rule> resource_caps = { charter_cap_rule::fixed, charter_cap_rule::lifted };
+    std::vector<std::int32_t>     density_ceilings;
+    /// --capital draw|unspent|both (BL-1039). Default draw: BL-1033's matrix.
+    std::vector<charter_capital_rule> capital_rules = { charter_capital_rule::draw };
     std::vector<bool>   province_caps = { true };
     /// --specialist-prices: firm charters per specialist. [0] is the BASE price
     /// (the full scale cross, the extra row, the forced row); the rest are LADDER
@@ -1577,7 +1943,7 @@ void write_cost_json(const std::string& path, const cost_options& opt,
     }
     const auto b = [](bool v) { return v ? "true" : "false"; };
     std::fprintf(f, "{\n  \"tool\": \"player_seed_sweep --charter-cost\",\n");
-    std::fprintf(f, "  \"item\": \"BL-1033\",\n");
+    std::fprintf(f, "  \"item\": \"BL-1033, BL-1039\",\n");
     if (aborted_reason != nullptr)
         std::fprintf(f, "  \"aborted\": {\"reason\": \"%s\", \"seed\": %u, \"complete\": false},\n",
                      json_escape(aborted_reason).c_str(), aborted_seed);
@@ -1631,6 +1997,20 @@ void write_cost_json(const std::string& path, const cost_options& opt,
                              "one open-channel corporation per tick (BL-398, "
                              "session_history.cpp:206-220), so its live cost does not scale with "
                              "corporation count.").c_str());
+    std::fprintf(f, "  \"rules_note\": \"%s\",\n",
+                 json_escape("BL-1039. resource_cap_rule: fixed = BL-1033's rcap on (per_resource_firm_cap "
+                             "per good per body), lifted = rcap off (no per-good cap), sqrt_capital = "
+                             "max(c, floor(c sqrt(B / B_ref))) under density_ceiling, with c = "
+                             "per_resource_firm_cap, B = points budgeted to nation-resolved centres on "
+                             "the body, G = goods whose consumer + upkeep + construction demand is > 0 "
+                             "on the body BEFORE the walk, B_ref = c x |G| x firm price (PROPOSED). "
+                             "capital_rule: draw = 400 +/- 40%; unspent_points = the centre's unspent "
+                             "remainder after its specialist and firms x capital_per_point (PROPOSED "
+                             "rate: 400 / the specialist's price in points); capitalised points stay "
+                             "counted unspent. bodies[].firms_by_good: firms per good as the gap "
+                             "selection chartered them. checks: taken as the landscape lands. seat: the "
+                             "seated corporation's balance after the validation run and solvent = "
+                             "balance > 0.").c_str());
     std::fprintf(f, "  \"tick_phases\": [");
     for (int i = 0; i < k_app_tick_phase_count; ++i)
         std::fprintf(f, "%s\"%s\"", i ? ", " : "", k_app_tick_phase_names[i]);
@@ -1655,10 +2035,21 @@ void write_cost_json(const std::string& path, const cost_options& opt,
                              : r.cfg.k == cost_config::kind::synthetic ? "synthetic" : "forced";
             const char* sep  = ri + 1 < s.rows.size() ? "," : "";
             std::fprintf(f, "        {\n");
+            // `resource_cap` keeps BL-1033's boolean for the two legacy rules and
+            // is null under sqrt_capital, which is neither.
+            const char* rcap = r.cfg.resource_cap_rule == charter_cap_rule::fixed    ? "true"
+                             : r.cfg.resource_cap_rule == charter_cap_rule::lifted   ? "false"
+                                                                                     : "null";
             std::fprintf(f, "          \"label\": \"%s\", \"kind\": \"%s\", \"scale\": %g, "
-                            "\"resource_cap\": %s, \"province_cap\": %s, \"window_radius\": %d,\n",
-                         json_escape(r.label).c_str(), kind, r.cfg.scale,
-                         b(r.cfg.resource_cap), b(r.cfg.province_cap), r.cfg.window_radius);
+                            "\"resource_cap\": %s, \"resource_cap_rule\": \"%s\", "
+                            "\"density_ceiling\": %d, \"capital_rule\": \"%s\", "
+                            "\"province_cap\": %s, \"window_radius\": %d,\n",
+                         json_escape(r.label).c_str(), kind, r.cfg.scale, rcap,
+                         charter_cap_rule_name(r.cfg.resource_cap_rule),
+                         static_cast<int>(r.cfg.resource_cap_rule == charter_cap_rule::sqrt_capital
+                                              ? r.cfg.density_ceiling : 0),
+                         charter_capital_rule_name(r.cfg.capital_rule),
+                         b(r.cfg.province_cap), r.cfg.window_radius);
             if (r.budget_row)
                 std::fprintf(f, "          \"firm_price_points\": %d, \"specialist_firm_charters\": %d, "
                                 "\"specialist_price_points\": %lld,\n",
@@ -1704,6 +2095,53 @@ void write_cost_json(const std::string& path, const cost_options& opt,
                                  + r.firm_spill.anchor_in + r.firm_spill.second_in,
                              r.spec_spill.anchor_out + r.spec_spill.second_out
                                  + r.firm_spill.anchor_out + r.firm_spill.second_out);
+                // BL-1039: the rules, per body, the capital and the at-land checks.
+                std::fprintf(f, ",\n          \"rules\": { \"per_resource_firm_cap\": %d, "
+                                "\"max_firms_per_body\": %d, \"density_ceiling\": %d, "
+                                "\"capital_per_point\": %.6f }",
+                             static_cast<int>(r.per_resource_firm_cap),
+                             static_cast<int>(r.max_firms_per_body), static_cast<int>(r.density_ceiling),
+                             static_cast<double>(r.capital_per_point));
+                std::fprintf(f, ",\n          \"bodies\": [");
+                for (std::size_t bi = 0; bi < r.bodies.size(); ++bi)
+                {
+                    const charter_body_record& br = r.bodies[bi];
+                    std::fprintf(f, "%s\n            { \"body\": %u, \"capital_points\": %lld, "
+                                    "\"goods_with_demand\": %d, \"goods\": [",
+                                 bi ? "," : "", br.body, static_cast<long long>(br.capital_points),
+                                 br.goods_with_demand);
+                    for (std::size_t gi = 0; gi < br.goods.size(); ++gi)
+                        std::fprintf(f, "%s\"%s\"", gi ? ", " : "",
+                                     resource_names::name_of(static_cast<resource_type>(br.goods[gi])).c_str());
+                    std::fprintf(f, "], \"reference_points\": %lld, \"per_good_cap\": %d, "
+                                    "\"density_ceiling\": %d, \"firms\": %d, \"firms_by_good\": {",
+                                 static_cast<long long>(br.reference_points),
+                                 static_cast<int>(br.per_good_cap), static_cast<int>(br.density_ceiling),
+                                 static_cast<int>(br.firms));
+                    bool first_good = true;
+                    for (std::size_t g = 0; g < br.firms_by_good.size(); ++g)
+                        if (br.firms_by_good[g] > 0)
+                        {
+                            std::fprintf(f, "%s\"%s\": %d", first_good ? " " : ", ",
+                                         resource_names::name_of(static_cast<resource_type>(g)).c_str(),
+                                         static_cast<int>(br.firms_by_good[g]));
+                            first_good = false;
+                        }
+                    std::fprintf(f, " } }");
+                }
+                std::fprintf(f, "%s]", r.bodies.empty() ? "" : "\n          ");
+                std::fprintf(f, ",\n          \"capital\": { \"rule\": \"%s\", \"specialists\": %zu, "
+                                "\"zero_capital\": %d, \"unspent_points_capitalised\": %lld, "
+                                "\"by_specialist\": [",
+                             charter_capital_rule_name(r.cfg.capital_rule), r.specialist_capitals.size(),
+                             r.specialists_zero_capital, r.unspent_points_capitalised);
+                for (std::size_t si2 = 0; si2 < r.specialist_capitals.size(); ++si2)
+                    std::fprintf(f, "%s{ \"corp\": %u, \"capital\": %.4f }", si2 ? ", " : "",
+                                 r.specialist_capitals[si2].first,
+                                 static_cast<double>(r.specialist_capitals[si2].second));
+                std::fprintf(f, "] }");
+                std::fprintf(f, ",\n          \"checks_at_land\": { \"pass\": %s, \"fail\": \"%s\" }",
+                             b(r.rule_check.pass), json_escape(r.rule_check.fail).c_str());
                 if (r.cfg.k == cost_config::kind::forced)
                     std::fprintf(f, ",\n          \"forced_province_cap_pass\": %s, \"forced_pick\": \"%s\", "
                                     "\"forced_centre\": %u",
@@ -1755,6 +2193,9 @@ void write_cost_json(const std::string& path, const cost_options& opt,
             };
             ticks("validation_ticks", r.val, r.val_sum, false);
             ticks("live_ticks", r.live, r.live_sum, true);
+            char seat_bal[48] = "null";
+            if (r.seat_found && std::isfinite(r.seat_balance))
+                std::snprintf(seat_bal, sizeof seat_bal, "%.4f", static_cast<double>(r.seat_balance));
             std::fprintf(f, ",\n          \"seat\": { \"seated\": %u, \"floor_unmet\": %s, "
                             "\"specialists\": %d, \"shortlist\": %d, \"trailing_net_n\": %d, "
                             "\"trailing_net_min\": %.1f, \"trailing_net_median\": %.1f, "
@@ -1762,11 +2203,15 @@ void write_cost_json(const std::string& path, const cost_options& opt,
                             "\"corporations_at_seat\": %d, \"background_at_seat\": %d,\n"
                             "            \"busiest_body_at_seat\": %u, "
                             "\"busiest_body_corporations_at_seat\": %d, "
-                            "\"busiest_body_background_at_seat\": %d }",
+                            "\"busiest_body_background_at_seat\": %d,\n"
+                            "            \"seat_balance\": %s, \"seat_solvent\": %s, "
+                            "\"budget_specialists_standing\": %d, \"budget_specialists_solvent\": %d }",
                          r.seated, b(r.floor_unmet), r.seat_specialists, r.shortlist, r.trail_n,
                          r.trail_min, r.trail_median, r.trail_max, r.trail_neg_share,
                          r.at_seat.corps, r.at_seat.background, r.at_seat.busiest,
-                         r.at_seat.busiest_corps, r.at_seat.busiest_background);
+                         r.at_seat.busiest_corps, r.at_seat.busiest_background, seat_bal,
+                         r.seat_found ? b(r.seat_solvent) : "null",
+                         r.specialists_at_seat, r.specialists_solvent_at_seat);
             // A COUNT, kept apart from the timings (strategic_evals_due_note).
             std::fprintf(f, ",\n          \"strategic_evals_due\": { \"count_not_cost\": true, "
                             "\"mean\": %.2f, \"per_live_tick\": [", r.strategic_evals_due_mean);
@@ -1815,21 +2260,61 @@ void print_cost_table_header(const cost_options& opt)
                 "counsel, the history recorders and the strategy readout are NOT timed | shortlist, "
                 "trailing net over it, negative share | evalsDue = strategic evals due per live tick "
                 "(count) — NOT a cost: BL-398 bounds counsel's export and evaluation to the one "
-                "open-channel corporation per tick, so only its sort and channel walk follow density\n",
+                "open-channel corporation per tick, so only its sort and channel walk follow density. "
+                "BL-1039: ceil = unspent as density_ceiling; under each budget row, the rule line "
+                "(per-good cap rule, ceiling, guard, capital rule and rate), one line per body (B, "
+                "G, B_ref, per-good cap, firms per good), the capital line and the at-land checks, "
+                "and on every full row the seated corporation's balance and solvent flag\n",
                 static_cast<int>(spend.firm_price_points), ladder.c_str());
-    std::printf("  %-40s %3s %3s %4s | %4s %5s | %6s %6s %6s %6s %6s %6s | %4s %5s | %11s | %9s | "
+    std::printf("  %-52s %3s %3s %4s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s | %4s %5s | %11s | %9s | "
                 "%5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
                 "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window", "body",
-                "remain", "nonat", "anyS", "natSh", "hold in/out", "corps/bg", "evals", "seed_ms",
-                "prop_ms", "val med/mean", "live med/mean", "short", "trail8 min/med/max", "neg%",
-                "evalsDue");
+                "ceil", "remain", "nonat", "anyS", "natSh", "hold in/out", "corps/bg", "evals",
+                "seed_ms", "prop_ms", "val med/mean", "live med/mean", "short", "trail8 min/med/max",
+                "neg%", "evalsDue");
+}
+
+/// BL-1039 — the rows' rule, body, capital and check lines (budget rows only).
+void print_cost_row_rules(const cost_row& r)
+{
+    if (!r.budget_row || r.refused)
+        return;
+    std::printf("  %-52s   rule: per-good cap %s (c %d), density ceiling %d, guard %d; capital %s "
+                "(rate %.4f cr/pt)\n", "",
+                charter_cap_rule_name(r.cfg.resource_cap_rule), static_cast<int>(r.per_resource_firm_cap),
+                static_cast<int>(r.density_ceiling), static_cast<int>(r.max_firms_per_body),
+                charter_capital_rule_name(r.cfg.capital_rule), static_cast<double>(r.capital_per_point));
+    char indent[80];
+    std::snprintf(indent, sizeof indent, "  %-52s   ", "");
+    charter_spend_report bodies_only;
+    bodies_only.bodies = r.bodies;
+    print_charter_bodies(bodies_only, indent);
+    std::string caps;
+    for (const auto& [sid, cap] : r.specialist_capitals)
+    {
+        char buf[48];
+        std::snprintf(buf, sizeof buf, "%s%u:%.1f", caps.empty() ? "" : " ", sid,
+                      static_cast<double>(cap));
+        caps += buf;
+    }
+    if (r.cfg.capital_rule == charter_capital_rule::unspent_points)
+        std::printf("  %-52s   capital (unspent points x rate): %zu specialists, %d opened with ZERO, "
+                    "%lld unspent points capitalised (still counted unspent); corp:capital %s\n", "",
+                    r.specialist_capitals.size(), r.specialists_zero_capital,
+                    r.unspent_points_capitalised, caps.empty() ? "-" : caps.c_str());
+    else
+        std::printf("  %-52s   capital (draw, 400 +/- 40%%): %zu specialists; corp:capital %s\n", "",
+                    r.specialist_capitals.size(), caps.empty() ? "-" : caps.c_str());
+    std::printf("  %-52s   checks at land (B, B_ref, the cap by definition, firms per good re-tallied, "
+                "ceiling, guard, capital = remainder x rate): %s%s\n", "",
+                r.rule_check.pass ? "PASS" : "FAIL:", r.rule_check.pass ? "" : r.rule_check.fail.c_str());
 }
 
 void print_cost_row(const cost_row& r)
 {
     if (r.threw)
     {
-        std::printf("  %-40s THREW: %s\n", r.label.c_str(), r.error.c_str());
+        std::printf("  %-52s THREW: %s\n", r.label.c_str(), r.error.c_str());
         return;
     }
     char fp[16] = "-", sfc[16] = "-", spts[24] = "-";
@@ -1841,7 +2326,7 @@ void print_cost_row(const cost_row& r)
     }
     if (r.stopped_at_land)
     {
-        std::printf("  %-40s %3s %3s %4s | stopped as the landscape landed: nothing measured\n",
+        std::printf("  %-52s %3s %3s %4s | stopped as the landscape landed: nothing measured\n",
                     r.label.c_str(), fp, sfc, spts);
         return;
     }
@@ -1857,11 +2342,12 @@ void print_cost_row(const cost_row& r)
                           + r.firm_spill.second_out);
     char corps[32];
     std::snprintf(corps, sizeof corps, "%d/%d", r.at_land.corps, r.at_land.background);
-    std::printf("  %-40s %3s %3s %4s | %4zu %5zu | %6lld %6lld %6lld %6lld %6lld %6lld | %4s %5.2f | "
+    std::printf("  %-52s %3s %3s %4s | %4zu %5zu | %6lld %6lld %6lld %6lld %6lld %6lld %6lld | %4s %5.2f | "
                 "%11s | %9s | %5d %7.0f %7.0f",
                 r.label.c_str(), fp, sfc, spts, r.specialists, r.firms,
                 u(charter_unspent_reason::no_gap), u(charter_unspent_reason::province_cap),
                 u(charter_unspent_reason::window_exhausted), u(charter_unspent_reason::body_cap),
+                u(charter_unspent_reason::density_ceiling),
                 u(charter_unspent_reason::remainder), u(charter_unspent_reason::no_nation),
                 r.any_specialist ? "yes" : "NO", r.largest_nation_share, hold, corps,
                 r.evaluations, r.seed_eval_ms, r.proposal_mean_ms);
@@ -1869,10 +2355,11 @@ void print_cost_row(const cost_row& r)
     {
         std::printf(" | %15s | %15s | build only%s\n", "-", "-",
                     !r.budget_row ? "" : r.forced_pass ? ": PASS" : ": FAIL");
-        std::printf("  %-40s   busiest body AT LAND %u: %d corps, %d bg; AT SEAT: not reached (build only)\n",
+        std::printf("  %-52s   busiest body AT LAND %u: %d corps, %d bg; AT SEAT: not reached (build only)\n",
                     "", r.at_land.busiest, r.at_land.busiest_corps, r.at_land.busiest_background);
+        print_cost_row_rules(r);
         if (r.digested)
-            std::printf("  %-40s   digests D_search %016" PRIX64 " D_land %016" PRIX64 " — %s\n", "",
+            std::printf("  %-52s   digests D_search %016" PRIX64 " D_land %016" PRIX64 " — %s\n", "",
                         r.dig.search, r.dig.land,
                         !r.pinned ? "no pinned row for this seed"
                         : r.digest_match ? "MATCH the BL-1031 pins (search and land only: build-only row)"
@@ -1884,19 +2371,31 @@ void print_cost_row(const cost_row& r)
                 r.val_sum.median, r.val_sum.mean, r.live_sum.median, r.live_sum.mean,
                 r.shortlist, r.trail_min, r.trail_median, r.trail_max, 100.0 * r.trail_neg_share,
                 r.strategic_evals_due_mean);
-    std::printf("  %-40s   points %lld = %lld + %lld [%s]; generation %.0f ms; landscape phase %.0f ms "
+    std::printf("  %-52s   points %lld = %lld + %lld [%s]; generation %.0f ms; landscape phase %.0f ms "
                 "(search %.0f ms); row wall %.0f ms; seated %u%s\n",
                 "", r.points_budgeted, r.points_spent, r.points_unspent,
                 r.budget_row ? (r.balanced ? "balanced" : "UNBALANCED") : "no budget",
                 r.base_ms, r.landscape_ms, r.search_ms, r.wall_ms,
                 r.seated, r.floor_unmet ? " (floor UNMET)" : "");
-    std::printf("  %-40s   corps/bg AT LAND %d/%d, AT SEAT %d/%d; busiest body AT LAND %u: %d corps, "
+    std::printf("  %-52s   corps/bg AT LAND %d/%d, AT SEAT %d/%d; busiest body AT LAND %u: %d corps, "
                 "%d bg; busiest body AT SEAT %u: %d corps, %d bg\n",
                 "", r.at_land.corps, r.at_land.background, r.at_seat.corps, r.at_seat.background,
                 r.at_land.busiest, r.at_land.busiest_corps, r.at_land.busiest_background,
                 r.at_seat.busiest, r.at_seat.busiest_corps, r.at_seat.busiest_background);
+    // BL-1039: the seat's balance and solvent flag, on every full row.
+    if (r.seat_found)
+        std::printf("  %-52s   seat: corp %u balance %.1f, solvent %s", "", r.seated,
+                    static_cast<double>(r.seat_balance), r.seat_solvent ? "yes" : "NO");
+    else
+        std::printf("  %-52s   seat: corp %u not among the ranked candidates", "", r.seated);
+    if (r.budget_row)
+        std::printf("; budget specialists solvent at the seat: %d of %d standing\n",
+                    r.specialists_solvent_at_seat, r.specialists_at_seat);
+    else
+        std::printf("\n");
+    print_cost_row_rules(r);
     const auto phases = [&](const char* name, const app_tick_timing& t) {
-        std::printf("  %-40s   %s phase ms sums (lower bound):", "", name);
+        std::printf("  %-52s   %s phase ms sums (lower bound):", "", name);
         for (int i = 0; i < k_app_tick_phase_count; ++i)
             std::printf(" %s %.0f", k_app_tick_phase_names[i], t.phase_ms[i]);
         std::printf("\n");
@@ -1908,7 +2407,7 @@ void print_cost_row(const cost_row& r)
         const std::string verdict = !r.pinned ? "no pinned row for this seed (copy fidelity unchecked)"
             : r.digest_match ? "MATCH the BL-1031 pins: this row is the shipped start"
                              : "DIFFER from the pins:" + r.digest_diff;
-        std::printf("  %-40s   digests %016" PRIX64 " %016" PRIX64 " %016" PRIX64 " %016" PRIX64
+        std::printf("  %-52s   digests %016" PRIX64 " %016" PRIX64 " %016" PRIX64 " %016" PRIX64
                     " — %s\n", "", r.dig.search, r.dig.land, r.dig.settle, r.dig.seat,
                     verdict.c_str());
     }
@@ -2058,11 +2557,25 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
     const std::int32_t base_price = opt.specialist_prices.front();
     const auto caps_text = [&]() {
         std::string t = " x resource cap";
-        for (const bool v : opt.resource_caps)
-            t += v ? " on" : " off";
+        for (const charter_cap_rule v : opt.resource_caps)
+        {
+            if (v != charter_cap_rule::sqrt_capital)
+            {
+                t += v == charter_cap_rule::fixed ? " on" : " off";
+                continue;
+            }
+            t += " sqrt(c=" + std::to_string(static_cast<int>(base_spend.per_resource_firm_cap))
+               + ", ceilings";
+            for (const std::int32_t c : opt.density_ceilings)
+                t += " " + std::to_string(static_cast<int>(c));
+            t += ", guard " + std::to_string(static_cast<int>(base_spend.max_firms_per_body)) + ")";
+        }
         t += " x province cap";
         for (const bool v : opt.province_caps)
             t += v ? " on" : " off";
+        t += " x capital";
+        for (const charter_capital_rule v : opt.capital_rules)
+            t += v == charter_capital_rule::draw ? " draw" : " unspent";
         return t;
     };
     const std::vector<double>& ladder_scales = opt.ladder_all ? opt.scales : opt.ladder_scales;
@@ -2099,7 +2612,7 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
     std::fflush(stdout);
 
     std::vector<cost_seed> results;
-    bool any_threw = false, forced_failed = false, digest_failed = false;
+    bool any_threw = false, forced_failed = false, digest_failed = false, rules_failed = false;
 
     for (const uint32_t seed : seeds)
     {
@@ -2219,17 +2732,27 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
             std::vector<cost_config> matrix;
             const auto add_cross = [&](const std::vector<double>& scales, std::int32_t price) {
                 for (const double s : scales)
-                    for (const bool rc : opt.resource_caps)
-                        for (const bool pc : opt.province_caps)
-                        {
-                            cost_config c;
-                            c.k            = cost_config::kind::synthetic;
-                            c.scale        = s;
-                            c.resource_cap = rc;
-                            c.province_cap = pc;
-                            c.specialist_firm_charters = price;
-                            matrix.push_back(c);
-                        }
+                    for (const charter_cap_rule rc : opt.resource_caps)
+                    {
+                        // `sqrt` runs once per ceiling; a legacy rule carries none.
+                        const std::vector<std::int32_t> ceilings =
+                            rc == charter_cap_rule::sqrt_capital ? opt.density_ceilings
+                                                                 : std::vector<std::int32_t>{ 0 };
+                        for (const std::int32_t ceiling : ceilings)
+                            for (const bool pc : opt.province_caps)
+                                for (const charter_capital_rule cr : opt.capital_rules)
+                                {
+                                    cost_config c;
+                                    c.k                 = cost_config::kind::synthetic;
+                                    c.scale             = s;
+                                    c.resource_cap_rule = rc;
+                                    c.density_ceiling   = ceiling;
+                                    c.province_cap      = pc;
+                                    c.capital_rule      = cr;
+                                    c.specialist_firm_charters = price;
+                                    matrix.push_back(c);
+                                }
+                    }
             };
             if (!opt.forced_only)
             {
@@ -2240,16 +2763,17 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
             if (opt.extra && !opt.forced_only)
             {
                 const bool present = std::any_of(matrix.begin(), matrix.end(), [&](const cost_config& c) {
-                    return c.scale == 4.0 && !c.resource_cap && !c.province_cap
-                        && c.specialist_firm_charters == base_price;
+                    return c.scale == 4.0 && c.resource_cap_rule == charter_cap_rule::lifted
+                        && !c.province_cap && c.specialist_firm_charters == base_price
+                        && c.capital_rule == charter_capital_rule::draw;
                 });
                 if (!present)
                 {
                     cost_config c;
-                    c.k            = cost_config::kind::synthetic;
-                    c.scale        = 4.0;
-                    c.resource_cap = false;
-                    c.province_cap = false;
+                    c.k                 = cost_config::kind::synthetic;
+                    c.scale             = 4.0;
+                    c.resource_cap_rule = charter_cap_rule::lifted;
+                    c.province_cap      = false;
                     c.specialist_firm_charters = base_price;
                     matrix.push_back(c);
                 }
@@ -2260,6 +2784,8 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
                 try
                 {
                     run_cost_config(lua, seed, c, &budgets.at(c.scale), opt.live_ticks, row);
+                    if (!row.rule_check.pass)
+                        rules_failed = true;
                 }
                 catch (const std::exception& e)
                 {
@@ -2280,7 +2806,7 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
                 c.k             = cost_config::kind::forced;
                 c.scale         = 1.0;
                 c.window_radius = opt.forced_radius;
-                c.resource_cap  = true;
+                c.resource_cap_rule = charter_cap_rule::fixed;
                 c.province_cap  = true;
                 c.specialist_firm_charters = base_price;
                 c.legacy_specialists = cs.legacy_specialists;
@@ -2313,6 +2839,8 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
                     run_cost_config(lua, seed, c, &concentrated, opt.live_ticks, row);
                     if (!row.forced_pass)
                         forced_failed = true;
+                    if (!row.rule_check.pass)
+                        rules_failed = true;
                 }
                 catch (const std::exception& e)
                 {
@@ -2353,12 +2881,14 @@ int run_charter_cost(const std::vector<uint32_t>& seeds, lua_state& lua, const c
                                                      : "JSON: " + opt.out_path;
     std::printf("\n%zu seeds in %.0f s (%.0f s per seed). %s\n", seeds.size(), total_s,
                 seeds.empty() ? 0.0 : total_s / static_cast<double>(seeds.size()), written.c_str());
-    std::printf("none-row digests: %s. forced province cap: %s. %s\n",
+    std::printf("none-row digests: %s. forced province cap: %s. spend rules and capital (BL-1039, "
+                "checked at land on every budget row): %s. %s\n",
                 digest_failed ? "DIFFER from the pins on some seed (this mode is NOT measuring the shipped start)"
                               : "match wherever a pin exists",
                 !opt.forced ? "not run" : forced_failed ? "FAIL on some seed" : "PASS on every seed",
+                rules_failed ? "FAIL on some row" : "PASS on every row",
                 any_threw ? "SOMETHING THREW." : "nothing threw.");
-    return (any_threw || forced_failed || digest_failed) ? 1 : 0;
+    return (any_threw || forced_failed || digest_failed || rules_failed) ? 1 : 0;
 }
 
 int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
@@ -2756,9 +3286,21 @@ int main(int argc, char** argv)
         // BL-1032: `--charter-budget none|empty|zero|synthetic|refused`, `--charter-scale X`.
         charter_mode mode  = charter_mode::none;
         double       scale = 1.0;
+        bool         rcap  = true;
         for (int a = 2; a < argc; ++a)
         {
             const std::string arg = argv[a];
+            if (arg == "--resource-cap")
+            {
+                if (a + 1 >= argc || (std::string(argv[a + 1]) != "on"
+                                      && std::string(argv[a + 1]) != "off"))
+                {
+                    std::printf("--resource-cap: needs on|off in the digest modes\n");
+                    return 2;
+                }
+                rcap = std::string(argv[++a]) == "on";
+                continue;
+            }
             if (arg == "--charter-budget" || arg == "--charter-scale")
             {
                 if (a + 1 >= argc)
@@ -2793,7 +3335,7 @@ int main(int argc, char** argv)
                 }
             }
         }
-        return run_digest(seeds, lua, check_mode, mode, scale);
+        return run_digest(seeds, lua, check_mode, mode, scale, rcap);
     }
 
     // BL-1033 cost mode. The shipped spawn only, like the digest modes, and for
@@ -2829,7 +3371,8 @@ int main(int argc, char** argv)
             if (arg != "--budget-scales" && arg != "--resource-cap" && arg != "--province-cap"
                 && arg != "--live-ticks" && arg != "--out" && arg != "--note"
                 && arg != "--forced-radius" && arg != "--forced-pick"
-                && arg != "--specialist-prices" && arg != "--ladder-scales")
+                && arg != "--specialist-prices" && arg != "--ladder-scales"
+                && arg != "--density-ceilings" && arg != "--capital")
             {
                 std::printf("--charter-cost: unknown argument '%s'\n", arg.c_str());
                 return 2;
@@ -2910,11 +3453,91 @@ int main(int argc, char** argv)
                     at = comma + 1;
                 }
             }
-            else if (arg == "--resource-cap" || arg == "--province-cap")
+            else if (arg == "--province-cap")
             {
-                if (!on_off(val, arg == "--resource-cap" ? opt.resource_caps : opt.province_caps))
+                if (!on_off(val, opt.province_caps))
                 {
                     std::printf("%s: '%s' is not on|off|both\n", arg.c_str(), val.c_str());
+                    return 2;
+                }
+            }
+            else if (arg == "--resource-cap")
+            {
+                // BL-1039: on (fixed) | off (lifted) | both | sqrt, or a comma list
+                // of on/off/sqrt. `sqrt` needs --density-ceilings (no default).
+                opt.resource_caps.clear();
+                std::size_t at = 0;
+                while (at <= val.size())
+                {
+                    std::size_t comma = val.find(',', at);
+                    if (comma == std::string::npos)
+                        comma = val.size();
+                    const std::string tok = val.substr(at, comma - at);
+                    std::vector<charter_cap_rule> add;
+                    if (tok == "on")        add = { charter_cap_rule::fixed };
+                    else if (tok == "off")  add = { charter_cap_rule::lifted };
+                    else if (tok == "both") add = { charter_cap_rule::fixed, charter_cap_rule::lifted };
+                    else if (tok == "sqrt") add = { charter_cap_rule::sqrt_capital };
+                    else
+                    {
+                        std::printf("--resource-cap: '%s' is not on|off|both|sqrt\n", tok.c_str());
+                        return 2;
+                    }
+                    for (const charter_cap_rule r : add)
+                    {
+                        if (std::find(opt.resource_caps.begin(), opt.resource_caps.end(), r)
+                            != opt.resource_caps.end())
+                        {
+                            std::printf("--resource-cap: '%s' is listed twice\n",
+                                        charter_cap_rule_name(r));
+                            return 2;
+                        }
+                        opt.resource_caps.push_back(r);
+                    }
+                    at = comma + 1;
+                }
+            }
+            else if (arg == "--density-ceilings")
+            {
+                // BL-1039: firms per body under the square root, each a whole
+                // number in [1, guard - 1] — the ceiling sits below the guard.
+                const int guard = static_cast<int>(synthetic_charter_spend().max_firms_per_body);
+                opt.density_ceilings.clear();
+                std::size_t at = 0;
+                while (at <= val.size())
+                {
+                    std::size_t comma = val.find(',', at);
+                    if (comma == std::string::npos)
+                        comma = val.size();
+                    const std::string tok = val.substr(at, comma - at);
+                    const int n = std::atoi(tok.c_str());
+                    if (tok.empty() || tok.size() > 6
+                        || tok.find_first_not_of("0123456789") != std::string::npos
+                        || n <= 0 || n >= guard)
+                    {
+                        std::printf("--density-ceilings: '%s' is not a whole number in [1, %d] (below "
+                                    "the %d-per-body guard)\n", tok.c_str(), guard - 1, guard);
+                        return 2;
+                    }
+                    if (std::find(opt.density_ceilings.begin(), opt.density_ceilings.end(), n)
+                        != opt.density_ceilings.end())
+                    {
+                        std::printf("--density-ceilings: %d is listed twice\n", n);
+                        return 2;
+                    }
+                    opt.density_ceilings.push_back(static_cast<std::int32_t>(n));
+                    at = comma + 1;
+                }
+            }
+            else if (arg == "--capital")
+            {
+                if (val == "draw")         opt.capital_rules = { charter_capital_rule::draw };
+                else if (val == "unspent") opt.capital_rules = { charter_capital_rule::unspent_points };
+                else if (val == "both")    opt.capital_rules = { charter_capital_rule::draw,
+                                                                 charter_capital_rule::unspent_points };
+                else
+                {
+                    std::printf("--capital: '%s' is not draw|unspent|both\n", val.c_str());
                     return 2;
                 }
             }
@@ -2952,6 +3575,20 @@ int main(int argc, char** argv)
                 opt.out_path = val;
             else
                 opt.note = val;
+        }
+        // BL-1039: the ceiling has no default, and a ceiling nothing reads is refused.
+        const bool has_sqrt = std::find(opt.resource_caps.begin(), opt.resource_caps.end(),
+                                        charter_cap_rule::sqrt_capital) != opt.resource_caps.end();
+        if (has_sqrt && opt.density_ceilings.empty())
+        {
+            std::printf("--resource-cap sqrt needs --density-ceilings N[,M...]: the density ceiling "
+                        "has no default\n");
+            return 2;
+        }
+        if (!has_sqrt && !opt.density_ceilings.empty())
+        {
+            std::printf("--density-ceilings is read only by --resource-cap sqrt\n");
+            return 2;
         }
         return run_charter_cost(seeds, lua, opt);
     }
