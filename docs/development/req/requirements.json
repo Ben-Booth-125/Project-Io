@@ -6280,6 +6280,85 @@
     }
    ],
    "resolution": ""
+  },
+  {
+   "brief": "industry-points",
+   "title": "BL-1041 - Beat 1: regions with centres accrue located industry points from 1660 to 1960, from scale, their own fuel, Industry capacity and treasury paid in",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1041 - sprint 45 (2026-09-18)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "tool: seed_library.js --check",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "With the span off, every digest, fingerprint and pin is unmoved; points accrue only inside the Digitisation span.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: the accrual"
+     ],
+     "requirement": "Each round every region with centres is credited, on itself (order-independent, int64), scale x its fuel factor (soft, with a floor) x (1000 + the Industry industrial modifier)/1000; the fuel factor reads the span-open survey, and a region founded after the open reads a stated inheritance.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: treasury paid in"
+     ],
+     "requirement": "A fixed share of the capital treasury's surplus after the round's army and navy bills converts to points on the capital's own region each round — a consequence, no scored choice, no new verb.",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960 (reading 8)"
+     ],
+     "requirement": "Reading 8 per library seed: points spread across regions and polities, the treasury-paid share of points, the fuel factor's spread, and rho(points, urban heads) printed.",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960 (reading 9)"
+     ],
+     "requirement": "Reading 9 (Migration) is reported as failing where it fails, never n/a.",
+     "notes": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness --fidelity"
+     ],
+     "requirement": "The fidelity gates still pass 16 of 16.",
+     "notes": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no point credited outside the span and no narrowing without a range check.",
+     "notes": ""
+    }
+   ],
+   "resolution": ""
   }
  ]
 }
