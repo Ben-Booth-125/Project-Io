@@ -168,8 +168,9 @@ struct charter_spend_params
     /// `no_gap` stop still apply.
     charter_cap_rule resource_cap_rule = charter_cap_rule::fixed;
     /// Firms per good per body: the flat cap under `fixed`, and the floor AND the
-    /// base of the square root under `sqrt_capital`. Unread under `lifted`.
-    /// Must be > 0 on a non-empty budget under `fixed` or `sqrt_capital`.
+    /// base of the square root under `sqrt_capital`. Must be > 0 on a non-empty
+    /// budget under `fixed` or `sqrt_capital`; unread under `lifted`, so it must
+    /// be 0 there (refused otherwise) and a lifted body reports no B_ref.
     std::int32_t per_resource_firm_cap = 0;
     /// The ANTI-RUNAWAY guard: background firms a body may carry, counted as
     /// `body_cap`. Must be > 0 on a non-empty budget.
@@ -184,7 +185,9 @@ struct charter_spend_params
     /// Where a budget specialist's starting capital comes from.
     charter_capital_rule capital_rule = charter_capital_rule::draw;
     /// Credits of starting capital per unspent point, under `unspent_points`:
-    /// must be finite and > 0 there, and 0 under `draw`. PROPOSED (DIGITISATION.md
+    /// must be finite and > 0 there, and 0 under `draw`; and the richest centre's
+    /// points x this rate must stay inside the float balance's range, or the whole
+    /// spend is refused (`charter_capital_in_balance_domain`). PROPOSED (DIGITISATION.md
     /// § 1): the rate that makes one specialist's price in points worth today's
     /// 400 credits — a caller's number, never a default here.
     float capital_per_point = 0.0f;
@@ -257,6 +260,24 @@ inline std::int32_t charter_sqrt_per_good_cap(std::int32_t c, std::int64_t capit
     const std::int64_t cap  = std::max<std::int64_t>(c, root);
     return static_cast<std::int32_t>(
         std::min<std::int64_t>(cap, std::numeric_limits<std::int32_t>::max()));
+}
+
+/// THE UNSPENT-POINTS CAPITAL, taken WIDE (BL-1039 fix round): @p remainder x
+/// @p rate in double, so nothing narrows before the range is known. Production
+/// and every check compute it through this one function.
+inline double charter_unspent_capital_wide(std::int64_t remainder, float rate)
+{
+    return static_cast<double>(remainder) * static_cast<double>(rate);
+}
+
+/// True when @p capital (a wide product) is inside the balance's real domain:
+/// `corporation_component::balance` is a float, and a capital is never negative,
+/// so [0, FLT_MAX] and finite. Outside it the narrowing cast would make an
+/// infinite or meaningless balance — the spend is refused instead, never clamped.
+inline bool charter_capital_in_balance_domain(double capital)
+{
+    return std::isfinite(capital) && capital >= 0.0
+        && capital <= static_cast<double>(std::numeric_limits<float>::max());
 }
 
 /// Why a point was not spent. Ordered: a report sorts (centre, reason) on it.
@@ -347,7 +368,8 @@ struct charter_body_record
     /// `charter_sqrt_per_good_cap`), and which they are (resource indices, ascending).
     int                        goods_with_demand = 0;
     std::vector<std::uint16_t> goods;
-    /// B_ref = c x |G| x firm price (0 when |G| is 0). Reported under every rule;
+    /// B_ref = c x |G| x firm price (0 when |G| is 0, and under `lifted`, which
+    /// carries no c). Reported under `fixed` and `sqrt_capital`;
     /// read only by `sqrt_capital`.
     std::int64_t reference_points = 0;
     /// The per-good cap in force on this body: c under `fixed`, the rule's under
@@ -423,6 +445,12 @@ inline const char* charter_spend_refusal(const charter_budget& b, const charter_
     case charter_cap_rule::lifted:
         if (s.resource_cap_rule == charter_cap_rule::fixed && s.per_resource_firm_cap <= 0)
             return "per_resource_firm_cap must be > 0 under the fixed cap rule (no shipped default)";
+        // Unread under `lifted` (no per-good cap), so a value there is refused:
+        // a lifted row must not carry a c it never applied, nor report a B_ref
+        // built from one (BL-1039 fix round).
+        if (s.resource_cap_rule == charter_cap_rule::lifted && s.per_resource_firm_cap != 0)
+            return "per_resource_firm_cap is not read under the lifted cap rule; a lifted spend with "
+                   "a cap set would silently ignore it";
         if (s.density_ceiling != 0)
             return "density_ceiling is read only by the sqrt_capital cap rule; a legacy rule with a "
                    "ceiling set would silently ignore it";
@@ -446,10 +474,24 @@ inline const char* charter_spend_refusal(const charter_budget& b, const charter_
                    "with a rate set would silently ignore it";
         break;
     case charter_capital_rule::unspent_points:
+    {
         if (!std::isfinite(s.capital_per_point) || !(s.capital_per_point > 0.0f))
             return "capital_per_point must be finite and > 0 under the unspent_points capital rule "
                    "(no shipped default)";
+        // THE CAPITAL'S RANGE, decided here — before any mutation — so a spend
+        // whose capital could leave the balance's domain is refused WHOLE, never
+        // clamped (BL-1039 fix round). A specialist's remainder is at most its
+        // centre's points, so the richest entry bounds every capital the spend can
+        // write; the product is taken wide (`charter_unspent_capital_wide`) and
+        // compared against the float balance's finite range before any narrowing.
+        std::int32_t richest = 0;
+        for (const auto& kv : b.points())
+            richest = std::max(richest, kv.second);
+        if (!charter_capital_in_balance_domain(charter_unspent_capital_wide(richest, s.capital_per_point)))
+            return "capital_per_point x the richest centre's points leaves the balance's range (a "
+                   "float); the capital would overflow";
         break;
+    }
     default:
         return "capital_rule is not a known rule";
     }
