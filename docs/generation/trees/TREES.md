@@ -119,9 +119,13 @@ rule 4's breadth without naming which breadth.
 **The last milestone unlocks the next tree.** The chain is Colonisation → Empire → Exploration
 → Industry (Ben, 2026-09-11: *"Exploration and industry use different trees"*). A polity
 holding Empire's rim milestone at 1200 CE enters the **Exploration** tree at its root the
-moment that phase opens; a polity holding Exploration's rim at 1660 enters the Industry tree;
-a culture holding Colonisation's rim milestone at 400 BCE seeds a polity that starts the Empire
-tree at its root. A polity that never
+moment that phase opens; a culture holding Colonisation's rim milestone at 400 BCE seeds a polity
+that starts the Empire tree at its root.
+
+**The Industry tree is the exception: it opens at its root to every living polity at 1660 (Ben,
+2026-09-18).** Exploration's rim needs held coast, so entering on that rim would exclude every
+landlocked polity for good, against the rule below. So the 1960 spread in this tree comes from its
+fuel gate and its research rate, and a rim holder's lead is what Exploration already gave it. A polity that never
 reached the rim starts the next tree **late**, at the root, once it holds the prior milestone —
 never excluded, only behind. That is how the 1960 spread is manufactured: not by denying a tree,
 but by how many rounds were left when it opened.
@@ -175,6 +179,11 @@ polity's research rate is a **fraction of its industry slice**, scaled by the sp
 and by its contact degree. It costs labour, so a polity that musters hard researches slowly; a
 polity with nothing binding it researches fastest; and a starved one is behind, never broken —
 the same shortfall shape every goods draw in the campaign takes.
+
+**The Industry tree's rate reads urban mass instead of the industry slice.** PROPOSED (listed to Ben
+2026-09-18, not overturned; `../DIGITISATION.md` § Beat 2): the population of the polity's largest
+held centres, superlinearly, so innovation gathers where people do. It lives in the rate and never
+in the scorer, which may not carry a term that grows with the polity's size (§ The scorer).
 
 Before universities and printing the concept of a research point is anachronistic, which is why it
 is a derived flow here and a produced resource only once `../../economy/RESEARCH.md` has a

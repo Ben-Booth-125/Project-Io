@@ -634,7 +634,8 @@ and what preference different cultures develop for these goods."*
 - **Standing treaties and their remaining terms** — the diplomatic position 1660 opens on.
 - **Ports, navies and standing armies**, at whatever level upkeep left them.
 - **The contact and want tables**, grown: a world that has met itself, mostly.
-- **Exploration tree masks** — who enters the Industry tree early and who enters late.
+- **Exploration tree masks** — what each polity brings into the Industry tree, which every living
+  polity enters at 1660 (`trees/TREES.md` § Milestones, and how a tree unlocks the next).
 - **The grudge table and the surviving network**, grown across the span and filtered over this
   span's dead, exactly as the Empire handoff filters its own.
 

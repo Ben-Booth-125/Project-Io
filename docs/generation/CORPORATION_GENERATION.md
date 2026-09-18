@@ -73,7 +73,8 @@ background firms, so the specialist roster is spent from the budgets rather than
 (`DIGITISATION.md` § 1). The shortlist the seat is chosen from follows where capital accumulated.
 On that path a specialist's home nation is its centre's nation, one specialist per centre rich enough
 to afford one, and **the balancing factor above does not apply** (Ben, 2026-09-17): a nation whose
-cities built capital holds the seats it bought.
+cities built capital holds the seats it bought. A specialist's price is anchored to the seat menu
+(Ben, 2026-09-18): the median library world offers about as many seats as a world with no budget.
 
 ### Pass 2 — Industrial focus assignment
 
@@ -298,6 +299,11 @@ Each corporation receives starting capital drawn from a seeded range. A tunable
 focus receive slightly higher starting capital to offset their lack of direct resource
 access.
 
+**AMENDED FORWARD (Ben, 2026-09-18): on a charter-budget world a specialist opens on its centre's
+unspent points.** What its centre could not spend on firms around it becomes its starting capital
+at a stated rate, in place of the seeded draw (`DIGITISATION.md` § 1). Worlds without a budget keep
+the draw above.
+
 **Pre-game operating history.** Corporations do not open cold. At campaign start the economy
 is run forward a fixed number of **pre-game ticks** — phase 6's single validation run of the
 winning landscape (`app::validation_ticks`; the length and its measurement are
@@ -369,7 +375,9 @@ and anything editing that basket is editing the size of the background economy.
 **AMENDED FORWARD (Ben, 2026-09-18, NR-889): on a Digitisation world the cap scales with capital.**
 Where a charter budget places the web, the per-resource cap above is no longer fixed at 8: it
 scales with the body's charter capital, so a richer body stands more firms per good
-(`DIGITISATION.md` § 1). Worlds without a budget keep the cap exactly as ruled on 2026-09-06.
+(`DIGITISATION.md` § 1). It scales by a square root, under a named density ceiling below the
+200-per-body guard (Ben, 2026-09-18). Worlds without a budget keep the cap exactly as ruled on
+2026-09-06.
 
 **AMENDED FORWARD (Ben, 2026-09-15): density follows the city on a Digitisation world.** The opening
 map wants *many companies around population centres*, which breadth cannot place. Where the

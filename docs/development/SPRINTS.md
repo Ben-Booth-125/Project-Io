@@ -60,20 +60,33 @@ and/or a version goal (v0.1.1 etc.).
 ## Open now
 
 ### Sprint 45 — industrialisation makes the web real
-*Proposed · Ben (2026-09-17, elicitation: "Sprint 43 items; 44-45 as goal rows"); Claude (cut from a seven-lane engine read with an adversarial cross-check)*
+*Open · opened 2026-09-18 · Ben (2026-09-17, elicitation: "Sprint 43 items; 44-45 as goal rows"); Claude (cut from a seven-lane engine read with an adversarial cross-check)*
 
 **Goal.** The Digitisation span runs 1660 -> 1960 from the exploration_output struct, the Industry tree is invested in, large cities accumulate located industry points, and each centre's unspent points become the charter budget that sprint 44's path spends, so property 1 reads density following cities as a consequence.
 
 **Planned.**
-- BL-1034 (world copies diverge) — FIRST, ahead of Beat 1 (Ben, 2026-09-18, NR-890).
+- BL-1034 (world copies diverge) — FIRST (NR-890); in flight in a worktree from 2026-09-18.
+- BL-1036 (span boundary resume) — dated objects cross, the 1200 anchors become explicit params, a fidelity check replaces bit-for-bit equivalence. Neutral.
+- BL-1037 (resume road tier) — a bought rung reopens at its bought tier, behind a switch the re-bless turns on.
+- BL-1038 (Industry tree wired) — every living polity enters at 1660, fuel reads a held seam, urban mass drives the rate; behind a switch. Neutral.
+- BL-1039 (charter spend rules) — square-root cap under a density ceiling, capital from unspent points, and the cost-table rows to set them. Neutral.
+- BL-1040 (Digitisation span) — its own call from exploration_output, wherever Exploration runs; behind a switch. Neutral.
+- BL-1041 (industry points) — Beat 1: located points on regions with centres, from scale, own fuel, Industry capacity and treasury paid in; no sink this cut.
+- BL-1042 (stockpile to budget) — region points reach campaign centres by the carve; the app and its harness mirror pass the budget. Neutral while the span is off.
+- BL-1043 (real-stockpile charter sweep) — prices, capital rate and the no-specialist world measured; ends in calls.
+- BL-1044 (Beat 1 ships) — span and budget on by default at epoch 0, prices pinned, the one re-bless, the 1960 readings, the cold review.
 
 **Done when.** Density-follows-cities and industrialisation readings taken at 1960 per seed on the sprint 43 harness; the charter budget is read only from the stockpile; one re-bless authorised by Ben against the shape; a cold review passed with its fix round budgeted.
 
-**Risk.** A span resumed from the struct is not mechanism-free: consolidation fires on the round where year == start_year, near-home classifies contacts by first.year < start_year, and the resume path carries only polities, grudges, contacts and corridors, so treaties, tribute and trade flows drop at 1660 unless a resume path is added (history_sim.cpp:888-916, 870, 1481-1497). Wiring the Industry tree follows BL-930 (exploration tree) and BL-973 (tree effects) across the store, lint, generator, tree_effect.hpp and history_sim; the Works-fork lean needs new effect keys in three synchronised lists. Moves every shipped world the moment the budget turns on.
+**Risk.** A span resumed from the struct is not mechanism-free: consolidation fires on the round where year == start_year, near-home classifies contacts by first.year < start_year, and the resume path carries only polities, grudges, contacts and corridors, so treaties, tribute and trade flows drop at 1660 unless a resume path is added (history_sim.cpp:888-916, 870, 1481-1497). Wiring the Industry tree follows BL-930 (exploration tree) and BL-973 (tree effects) across the store, lint, generator, tree_effect.hpp and history_sim; the Works-fork lean needs new effect keys in three synchronised lists. Moves every shipped world the moment the budget turns on. ADDED AT THE CUT (2026-09-18): the capital-from-unspent-points ruling can open specialists with nothing where a city spends its whole budget on firms — a 0 balance cannot dispatch convoys (supply_system.cpp:594) — so BL-1043 counts zero-capital specialists. Every world-mover (BL-1037's switch, the span, the budget) lands behind a switch and turns on together in BL-1044, so the sprint spends one re-bless.
 
 OWED WHEN THE ITEMS ARE CUT, not before: whether consolidation and the near-home cutoff re-anchor at 1660; the resume path for dated objects and trade flows; the span's clock (DIGITISATION.md names none, and sprint 43 measures at Exploration's 4-year band); whether the three sinks (rail, mechanised force, works) come in the first cut or points only stockpile. The epoch flip (NR-869) stays the phase's done-when, and it must select this span, never the superseded arc (DIGITISATION.md, opening: a 1960 epoch names a calendar).
 
 RULED 2026-09-18 on the review queue (NR-886, NR-889, NR-890): BL-1034 comes first. On a budget world the per-resource cap SCALES WITH THE BODY'S CHARTER CAPITAL (DIGITISATION.md § 1) — the scaling rule is this sprint's to set against charter_cost_sweep.json. The specialist's price is chosen here on real stockpiles, not the synthetic test budget. The seat's solvency question (NR-886 item 3: 74.3% of the shortlist with negative trailing net on the app's world) is decided together with the specialist-capital call (whether a charter price becomes starting capital).
+
+CUT 2026-09-18 on a five-lane engine read (span resume, Industry tree, industry points, budget switch-on, prices and cap), each lane adversarially checked. RULINGS on the elicitation form the same day (Ben): the span runs on at epoch 0 and the flip waits for Beats 2-3; Beat 1's first cut stockpiles and takes treasury paid in as a DERIVED flow (no new § 11 verb), with no sink; every living polity enters the Industry tree at 1660; the Industry root is ungated; the re-bless carries the road-tier fix and no other shipped-world defect (BL-1045 and BL-1046 filed unscheduled); the cap scales by a square root under a density ceiling; the specialist's price is anchored to the seat menu; a specialist opens on its centre's UNSPENT POINTS (not the recommended keep-400 option); the no-specialist world is decided on the real sweep. PROPOSED and not overturned: 1200 anchors, the 1660 network priced for the span, the span's own seed, fuel reads any held seam, Furnace Practice links to the root plus a fork-reachability lint rule, urban mass drives Industry research, a region's own fuel sets its points rate (re-surveyed at 1660), points reach cities by the carve's slots, budget worlds ignore the Works charter terms, the per-province cap stays at 2. The epoch flip is filed as BL-1047 (design-owed: the superseded arc's fate).
+
+FOUND and recorded: the --through continuation that NR-888's figures came from priced trade on the network inherited at 1200 (DIGITISATION.md § Far pairs).
 
 ## Where things stand
 
@@ -142,7 +155,7 @@ RULED 2026-09-18 on the review queue (NR-886, NR-889, NR-890): BL-1034 comes fir
 | 42 | generation sharpened before Digitisation | CLOSED 2026-09-16. Twenty-five items delivered across two waves (wave 0: nine; wave 1: sixteen, one of them — BL-1000 — built but open on a live click). Every gate green on the integrated tree bar two knowns: the exploration R3b pin, held red as the wave re-bless NR-877 asks Ben to authorise, and era_world_harness's three reds, which pre-date the sprint (BL-1010). Five items moved the world and each was measured in isolation. Four design calls and one reading are in the queue as NR-878..881; four items of owed work are filed as BL-1007..1010. |
 | 43 | the 1960 baseline | CLOSED 2026-09-17. Four items delivered in one day, one lane plus one worktree port; no shipped world moved (digests identical). The gate is NR-888: W1, W2 and the clock, on the 1960 baseline. |
 | 44 | the corporate web's plumbing | CLOSED 2026-09-18. Four items: harness parity, a world-bytes pin, the charter-budget seam (off by default, 16/16 pins held), and the cost sweep. No shipped world moved. NR-889 (the density cap) carries the cost readings for Ben. |
-| 45 | industrialisation makes the web real | PROPOSED 2026-09-17. Items cut after sprint 44. Digitisation runs as its own span from exploration_output, cities accumulate industry points, and sprint 44's budget switches on — one re-bless, one cold review. |
+| 45 | industrialisation makes the web real | OPEN 2026-09-18. Ten items in three waves: world copies, the span boundary, the Industry tree and the charter rules first, all behind switches; then the span, Beat 1 and the stockpile budget; then the real-stockpile sweep and one re-bless that turns it all on at epoch 0. |
 
 **Next up.** SPRINT 43 OPEN (2026-09-17): the 1960 baseline — BL-1026 (seed library re-read), then BL-1027 (span cost to 1960), BL-1028 (weakness counters to 1960), BL-1029 (Digitisation readings at 1960), serially in one lane. Sprints 44 (the corporate web's plumbing) and 45 (industrialisation makes the web real) are proposed goal rows; their items are cut at the gates.
 

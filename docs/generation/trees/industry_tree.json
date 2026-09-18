@@ -1,7 +1,7 @@
 {
   "_schema": "tree/io-v1",
   "_note": [
-    "The Industry tree — the economy pass, 1560 → 1960 (TREES.md § The store). Invested: the Invest verb takes one node a round, chosen by the scorer.",
+    "The Industry tree — the economy pass, 1660 → 1960 (TREES.md § The store). Invested: the Invest verb takes one node a round, chosen by the scorer.",
     "INDUSTRY_TREE.md is the authority; this file transcribes its tables. tree_lint.js cross-checks the two both ways and enforces the five rules.",
     "Ids carry branch and ring (IN-<BR>-<ring><seq>; seq m is the ring's milestone). Links are undirected and stored once, on the node farther from the root; the root IN-SP-1a lists none, and that empty list is how the generated table derives is_root (tree_lint holds exactly one).",
     "Magnitudes (per_mille) are authored by judgement and are placeholders; the sweep re-prices them. Names are generic mechanism nouns — real history is a mechanism reference, never a name source; earth_ref is calibration prose only."
@@ -74,7 +74,7 @@
       "ring": 1,
       "branch": "SP",
       "links": [],
-      "gate": "fuel",
+      "gate": null,
       "diffusion": "capacity",
       "excludes": null,
       "requires": [],
@@ -91,7 +91,7 @@
       ],
       "pursued_when": {
         "term": "spire",
-        "situation": "ring 2 has just opened and the fuel trade is running; the engine is the one node every ring-2 branch is adjacent to"
+        "situation": "ring 1 has just opened and the fuel trade is running; the engine is the one node every ring-1 branch is adjacent to"
       },
       "earth_ref": "1712 → 1780s; the master node"
     },
@@ -257,6 +257,7 @@
       "ring": 1,
       "branch": "MT",
       "links": [
+        "IN-SP-1a",
         "IN-MT-1a"
       ],
       "gate": null,

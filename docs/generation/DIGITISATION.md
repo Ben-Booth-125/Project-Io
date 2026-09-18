@@ -33,6 +33,14 @@
 > ruled that Beat 3 carries its own displacement force, that this phase binds far pairs itself,
 > and that the span runs on Exploration's 4-year band.
 
+> ⟳ **What changed (2026-09-18, cutting sprint 45 — remove once reviewed):** Ben ruled on an
+> elicitation form that the span runs whatever the epoch, and that treasury is paid into industry
+> points as a consequence, not a choice. He also ruled on the charter terms: the per-resource cap
+> scales by a square root under a density ceiling, a specialist's price is anchored to the seat
+> menu, and a specialist opens on its centre's unspent points. The Industry tree now opens to every
+> living polity at 1660, with its root ungated (`trees/TREES.md`, `trees/INDUSTRY_TREE.md`). The
+> proposals the form listed and Ben did not overturn are marked PROPOSED where they land.
+
 **Digitisation is the fourth and last simulated span: 1660 → 1960 CE, 300 years.** It opens the
 instant Exploration closes and ends at the epoch, so the world it produces is the world the
 campaign opens on (`GENERATION_STRATEGY.md` § Pass 2).
@@ -51,6 +59,23 @@ and runs no Exploration, and so hands this phase none of its inputs (`GENERATION
 round every four years, 75 rounds from 1660 to 1960. Measured on Exploration's forces alone, that
 costs less than the 460 years before it; a 1-year band costs about four times as much and is not
 taken unless a mechanism this phase adds is shown to need the grain.
+
+**SETTLED (Ben, 2026-09-18, elicitation): the span runs wherever Exploration runs, whatever the
+epoch.** The epoch names a calendar and a recipe band; it never decides whether this span runs. So
+a world grown through Exploration is grown on to 1960, and the flip changes the calendar alone.
+
+**The span is its own call, resumed from `exploration_output`, and the resume loses nothing the
+struct carries.** Treaty clauses and tribute cross as dated objects, and trade flows rebuild from
+them in the first round. A resume that dropped them would re-form every treaty on an empty flow
+table, which inflates each pair's trade value and binds pairs the history never bound. PROPOSED
+(listed to Ben 2026-09-18, not overturned):
+
+- **Consolidation and the near-home cutoff stay anchored at 1200.** The sweep of seat stores into
+  the capital happens once, and a pair met after 1200 stays far however late a span opens.
+- **The span prices corridor income and land trade on the network that survived 1660**, fixed for
+  the span, as Exploration priced its own on the network it inherited. A refresh every round waits
+  for rail, where property 7 would show it.
+- **The span takes its own seed**, so polity temperaments re-roll at 1660 as they did at 1200.
 
 **This phase is designed backwards, from the map it leaves.** Ben, 2026-09-15: *"While the wizard
 visibly should show these happening, the real aim of our functions on this round is to seed the
@@ -84,7 +109,7 @@ markets that trade named goods in a simplified form."*
 | Ports, navies, standing armies and their upkeep | Industrialisation, railways, mechanised force |
 | Treaties, subjects, trade provinces | Decolonisation, world war, and **corporations as live-play actors** |
 | War that destroys armies and spares civilians | War that kills people |
-| The Exploration tree | The **Industry** tree, gated behind Exploration's rim |
+| The Exploration tree | The **Industry** tree, open to every living polity at 1660 |
 | Migration as the Culture phase's diffusion | Migration into cities and across borders |
 | — | Tariff posture by 1960; national political character hardened |
 
@@ -163,22 +188,45 @@ specialist; what remains buys background firms around it; what cannot be spent s
 counted. So the number of specialists is the number of centres rich enough to afford one, and it
 rises with capital rather than being set by a count. **Pass 1's balancing across nations does not
 apply on this path:** a nation whose cities accumulated capital holds the seats that capital
-bought. The price of a specialist and of a firm are measured against live-play cost before either
-is fixed; a specialist keeps today's starting capital until that measurement is read.
+bought. The price of a firm charter is measured against live-play cost before it is fixed; a
+specialist's price and its starting capital follow the rulings below.
 
 **SETTLED (Ben, 2026-09-18, NR-889): on a budget world the per-resource firm cap SCALES WITH THE
 BODY'S CHARTER CAPITAL.** Pass 6 caps a body at 8 firms per demanded good, which froze firm count
 however rich a world became; lifting the cap outright handed density to the 200-per-body runaway
 guard at four to six times the live tick. So a richer body earns a higher per-good cap — capital
-buys density, and breadth still decides which goods. The scaling rule is set in sprint 45 against
-the cost table (`charter_cost_sweep.json`), and the specialist's price is chosen there on real
-stockpiles, not on the synthetic test budget.
+buys density, and breadth still decides which goods. The scaling rule is set against the cost
+table (`charter_cost_sweep.json`), and the specialist's price on real stockpiles, not on the
+synthetic test budget.
+
+**SETTLED (Ben, 2026-09-18, elicitation): the cap scales by a SQUARE ROOT of the body's charter
+capital, under a named DENSITY CEILING.** Capital buys density with diminishing returns. The ceiling
+sits below the 200-per-body runaway guard and counts what it refuses under its own unspent reason,
+so the guard goes back to catching runaways only. The constants are read off the cost table once it
+holds rows between 81 and 150 firms and a tally of firms per good, neither of which it has today.
+
+**SETTLED (Ben, 2026-09-18, elicitation): a specialist's price is anchored to the SEAT MENU.** The
+price, in firm charters, is the one at which the median library world offers about as many seats as
+a world with no budget does. The number is read on real stockpiles.
+
+**SETTLED (Ben, 2026-09-18, elicitation): a specialist opens on its centre's UNSPENT POINTS.** What
+a centre could not spend on firms around it — because its ground ran out — is the money its
+specialist starts with. So a rich city with little ground opens a rich specialist, and a city that
+spent its budget on a dense web opens a lean one. This is the capital call that NR-886 tied the
+seat's solvency to; solvency is read on real stockpiles. PROPOSED: the rate makes one specialist's price in points
+worth today's starting capital, 400 credits, and it is read on real stockpiles together with how
+many specialists open with nothing.
 
 **PROPOSED (listed to Ben 2026-09-17, not overturned): a charter stays near its centre.** A firm is
 anchored inside a window around its centre and then its centre's region; a charter that finds no
 ground there is counted unspent rather than scattered across the nation, because a scattered firm
 is capital that left the city that built it. **No budget and an empty budget are the same world as
 today's**: the population-blind placement stands until a budget with something in it arrives.
+
+PROPOSED (listed to Ben 2026-09-18, not overturned): **the per-province cap stays at 2** on a
+budget world until real budgets show whether they concentrate; and **a budget world does not read
+the Works charter terms** (`trees/INDUSTRY_TREE.md` § What the tree hands the 1960 campaign), because
+a specialist stands wherever its centre can afford one.
 
 **SETTLED (Ben, 2026-09-15, elicitation): terminal demand keeps universal PRESENCE and takes a
 cultural WEIGHT.** `../economy/MARKETS.md` § Three properties the set has to hold (property 5)
@@ -369,9 +417,24 @@ is a war over something real.
 | Input | Read from | Why |
 |---|---|---|
 | Centre scale | The population map, grown by beat 2 | Large cities build; Ben's own condition |
-| Fuel within reach | The Industry tree's `fuel` gate | *The map, not the scorer, decides who industrialises* |
-| Capital paid in | The polity treasury | Property 2's wealth leverage, as a purchase |
+| Fuel within reach | The region's own surveyed fuel; the Industry tree's `fuel` gate decides who climbs past the engine | *The map, not the scorer, decides who industrialises* |
+| Capital paid in | A share of the capital treasury's surplus, each round | Property 2's wealth leverage, as a consequence |
 | Tree capacity | Industry tree capacity nodes held | Technique multiplies what a city can do |
+
+**SETTLED (Ben, 2026-09-18, elicitation): capital is paid in as a CONSEQUENCE, not a choice.** Each
+round a fixed share of the capital treasury's surplus after the round's bills converts to industry
+points. No polity scores it, so it adds no verb to the grant register (`../ai/AI_OPPONENT.md` § 11).
+It is also the one input that is neither headcount nor fixed ground: points from scale and fuel
+alone would be headcount by another name, which § 1 forbids. PROPOSED: the points land on the
+capital's own region, where the treasury stands.
+
+**PROPOSED (listed to Ben 2026-09-18, not overturned): the stock sits on each region that holds
+centres.** The sim holds a city as counts on its region, not as an entity, so *one number per
+centre* is one number per region with centres; it reaches the campaign's centres at the handoff
+(Part III). A region's own fuel sets its rate as a soft factor with a floor, so a large unfuelled
+city still builds and the fuel reading is a finding rather than a tautology. Ground the sim founded
+is surveyed again at 1660, because a founding inherits its parent's fuel at a discount rather than
+a survey of its own.
 
 **SETTLED (Ben, 2026-09-15, elicitation): three sinks, and what is not spent charters firms.**
 
@@ -412,6 +475,9 @@ one rule:
 arrive having met — 1,250 new contact pairs across the seed library by 1660 — but not one pair
 first met after 1200 holds a non-aggression clause, and continued past 1660 on Exploration's own
 forces contact nearly stops: 43 new pairs in 300 years (BL-1028, weakness counters to 1960).
+That continuation priced corridor income and land trade on the network inherited at 1200, because
+a span reads its inherited corridor record until it closes, so it measures Exploration's forces on
+a frozen network.
 Emigration's line needs contact, far trade (property 7) needs relationships between distant
 polities, and a world war spreads only through bindings that reach across the map. So this phase
 raises contact and binds far pairs itself — through trade, migration and alliance — rather than
@@ -425,11 +491,13 @@ checkered provinces**, and it is why the lens and the beat share a cause.
 **War is a push, and displacement is how a war moves people** (§ War kills people). Refugees are an
 emigration stream with war as its push, so a war visibly empties toward the nearest safe city.
 
-**Innovation reads urban mass, not total population.** A polity's Industry tree investment reads
-the population of its largest centres, superlinearly, rather than the population of its ground.
-That turns Ben's *"centred around larger population centres"* into one input change on the
-scorer's established shape (`trees/TREES.md` § The scorer). It also gives the leaderboard a
-research column that no longer restates population — the reason Empires refused one.
+**Innovation reads urban mass, not total population.** PROPOSED (listed to Ben 2026-09-18, not
+overturned): a polity's Industry research rate reads the population of its largest held centres,
+superlinearly, rather than the industry slice of its ground. That turns Ben's *"centred around
+larger population centres"* into one input change to the tree's RATE, never to the scorer, which
+may not carry a term that grows with size (`trees/TREES.md` § State, and where research comes
+from). It also gives the leaderboard a research column that no longer restates population — the
+reason Empires refused one.
 
 **The pull is industry-point output, because the sim holds no wage.** The campaign carries wages;
 the sim does not, and industry points at the destination are the nearest thing it holds.
@@ -521,7 +589,7 @@ prices. Every property in Part I needs a stated rule for crossing that gap.
 
 | Sim quantity | Campaign field | PROPOSED projection |
 |---|---|---|
-| Industry points at a centre | Firms and installations near it | The landscape search spends the stockpile as its budget (below) |
+| Industry points at a centre | Firms and installations near it | The landscape search spends the stockpile as its budget (below); a region's points reach its campaign centres by the carve's slots, and a carved centre dropped when its body is built out takes its share unspent (PROPOSED, 2026-09-18, not overturned) |
 | Scarcity signal per good per market | Starting price per market | Base price scaled by the signal, inside the band |
 | Culture preference × population shares | Household demand weight per market | Population-weighted preference over the catchment |
 | Culture shares on regions and centres | Province culture for the lens | Population-weighted blend (property 4) |
@@ -650,10 +718,11 @@ Measured rather than argued:
 - **Whether a colony can hold a colony** (carried from `EXPLORATION.md`).
 - **The depletion formula itself** — writing it down is the work.
 - **How a charter budget converts to firms** — the price of a firm charter and of a specialist in
-  budget points, and the rule by which the per-resource cap scales with a body's charter capital,
-  each set against live-play cost before it is fixed (the split and the scaling itself are settled
+  budget points, and the square root's constants and the density ceiling, each set against
+  live-play cost before it is fixed (the split, the rule's form and the price's anchor are settled
   in § 1).
-- **Whether a specialist's charter price becomes its starting capital**, once that price is measured.
+- **The rate that turns a centre's unspent points into its specialist's capital**, and how many
+  specialists open with nothing at that rate.
 - **What a world gets when no centre can afford a specialist** — decided when Beat 1's real
   stockpiles exist, not on a synthetic budget.
 

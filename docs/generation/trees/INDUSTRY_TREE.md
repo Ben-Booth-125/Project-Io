@@ -17,7 +17,8 @@
 The Industry tree is the last of the four trees `TREES.md` defines, and it runs inside
 **digitisation, 1660 → 1960** (`../DIGITISATION.md`) — not the whole economy pass. The pass split
 in two on 2026-09-11 and the exploration half took its own tree (`EXPLORATION_TREE.md`), so
-this tree's root is gated behind **Exploration's rim milestone**, never Empire's. It is
+this tree follows Exploration's, never Empire's, and opens at its root to **every living polity at
+1660** (`TREES.md` § Milestones, and how a tree unlocks the next). It is
 **invested**: the Era −1 sim's polities are the actors, and the Invest verb takes one node a
 round, chosen by the scorer.
 
@@ -49,10 +50,20 @@ every object below is either a gate that binds or a fork that locks in. The rim 
 campaign: a polity's held set becomes its nation's capacity vector, and the gaps between held
 sets are the 1960 spread.
 
-**Capacity gates bind here as nowhere else.** A `fuel` gate on the whole spire is the mechanism of
-the great divergence — a polity with no seam under held ground climbs the spire only by trade,
-which is slower and can be cut. That is the one place the map, rather than the scorer, decides
-who industrialises.
+**Capacity gates bind here as nowhere else.** A `fuel` gate on the spire above its root is the
+mechanism of the great divergence — a polity with no seam under held ground climbs past the engine
+only by trade, which is slower and can be cut. That is the one place the map, rather than the
+scorer, decides who industrialises.
+
+**The root is open to every polity (Ben, 2026-09-18).** Every living polity enters this tree at
+its root in 1660 (`TREES.md` § Milestones), and the engine carries no gate. So a polity with no seam
+still enters, and answers the fuel question with Charcoal Iron, the route that accepts the smelting
+ceiling. Without a seam it cannot take Railway, and so cannot reach The Cheap Ton. Furnace
+Practice hangs off the root, which is what makes both sides of the Fuel Doctrine reachable.
+
+**The gate reads a seam, not an average.** PROPOSED (listed to Ben 2026-09-18, not overturned):
+`fuel` passes when any held region's fuel clears the bar. A mean over held ground fails a large
+realm that holds one coalfield, and *no seam under held ground* is a claim about any region.
 
 ---
 
@@ -68,7 +79,7 @@ replaces the grid.
 
 | id | node | kind | ring | links | gate | diffusion | effect | pursued when |
 |---|---|---|---|---|---|---|---|---|
-| IN-SP-1a | Atmospheric & Rotative Steam | major | 1 | IN-SP-1m | fuel | capacity | modifier industrial +150; upgrade Water Mill | `spire` — ring 1 has just opened and the fuel trade is running; the engine is the one node every ring-1 branch is adjacent to |
+| IN-SP-1a | Atmospheric & Rotative Steam | major | 1 | IN-SP-1m | — | capacity | modifier industrial +150; upgrade Water Mill | `spire` — ring 1 has just opened and the fuel trade is running; the engine is the one node every ring-1 branch is adjacent to |
 | IN-SP-1m | The Cheap Ton · requires IN-MV-1a; Fuel Doctrine taken | milestone | 1 | IN-SP-1a IN-SP-2a | — | capacity | open ring 2 | `spire` — the smelting doctrine is taken and a rail head is built; the ton moves, and ring 2 is the only place relief remains |
 | IN-SP-2a | High-Pressure & Compound Engines | major | 2 | IN-SP-2m | fuel | capacity | modifier industrial +120; modifier reach +60 | `reach_bound` — holdings sit past free_holdings along a rail and a coast; the engine that moves is what administers the same breadth cheaper |
 | IN-SP-2m | The Scheduled World · requires IN-MV-2a IN-MV-2b; Works Doctrine taken | milestone | 2 | IN-SP-2a IN-SP-3a | — | capacity | open ring 3 | `spire` — steamship and wire are held and the heavy plant has an owner; arrival is a printed promise |
@@ -89,7 +100,7 @@ Fuel Doctrine fork sits at ring 1 off Furnace Practice, and The Cheap Ton requir
 
 | id | node | kind | ring | links | gate | diffusion | effect | pursued when |
 |---|---|---|---|---|---|---|---|---|
-| IN-MT-1e | Furnace Practice | minor | 1 | IN-MT-1a IN-MT-1b | — | practice | modifier industrial +30 | `ground_ore` — ore is held and the blast furnace is worked; the fuel question is next |
+| IN-MT-1e | Furnace Practice | minor | 1 | IN-SP-1a IN-MT-1a IN-MT-1b | — | practice | modifier industrial +30 | `ground_ore` — ore is held and the blast furnace is worked; the fuel question is next |
 | IN-MT-1a | Coke Smelting · excludes IN-MT-1b | major | 1 | IN-MT-1e IN-MT-2a IN-MV-1b | fuel | capacity | unlock Blast Works; modifier industrial +120; retire the charcoal route | `ground_fuel` — coal seams under held ground and the forest thin; scale is the endowment's answer |
 | IN-MT-1b | Charcoal Iron · excludes IN-MT-1a | major | 1 | IN-MT-1e | — | capacity | modifier industrial +60; upgrade Ore Pits; modifier defence +40 | `ground_forest` — forest on held ground and no seam worth a pit; quality is the endowment's answer and the ceiling is accepted |
 | IN-MT-1c | Machine Tools | major | 1 | IN-MT-1d IN-SP-1a | ore_q | capacity | modifier industrial +100; modifier research +40 | `tariff_pressure` — a neighbour's machine-made goods land cheaper than the polity's own at its market; the toolroom closes the gap a tariff only covers |
@@ -301,6 +312,11 @@ assignment.
 | **Private Works** | a specialist corporation may be chartered here, by registration | may be chartered, by sovereign grant — a guest, not a citizen |
 | **State Arsenal** | no specialist corporation may be chartered; firms register and lease the plant | no specialist corporation; firms operate at the sovereign's pleasure |
 | **neither side taken** | the nation never faced the question; reads as State Arsenal without the plant | the same |
+
+**A charter-budget world does not read these terms.** PROPOSED (listed to Ben 2026-09-18, not
+overturned): where a centre's budget charters the web, a specialist stands wherever its centre can
+afford one (`../DIGITISATION.md` § 1). Read as written, the bottom row would deny a specialist to
+every nation that never took a Works side, and how many those are is unmeasured.
 
 **Demography.** Labour Doctrine × Farm Mechanisation × Soil Chemistry set a nation's growth rate,
 urban share and the unrest it inherits; Health sets the mortality side of the same transition.
