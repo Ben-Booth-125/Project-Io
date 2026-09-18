@@ -372,6 +372,166 @@ int main()
         }
     }
 
+    // --- E5 the span-open survey on a COAL-POOR body (BL-1041) -----------------
+    // `survey_regions_at_span_open` scores `survey_fuel_q` against the mean
+    // over every region it surveys. Before BL-1041 that mean was an integer
+    // (`sum / n`), which is harmless on a body whose raw fuel runs into the
+    // thousands and ruinous on a coal-poor one: a true mean of 1.52 truncated
+    // to 1 and scored an about-average region at 1000, the ceiling. A
+    // SYNTHETIC body isolates exactly that: 25 regions on a 40x40 all-land
+    // grid, windows disjoint (half-width 3), and ONE coal tile under each
+    // anchor sized so the raw window read is 1 on twelve regions and 2 on
+    // thirteen -- sum 38, true mean 1.52. The expected score is computed here
+    // from `survey_endowment`'s own raw reads with the exact rational mean,
+    // `raw * 500 * n / sum`, and every region must carry it; the truncated
+    // rule would give 500 / 1000, which E5b and E5c pin as refused.
+    std::printf("\nE5: the span-open survey on a synthetic coal-poor body (25 regions, true fuel mean 1.52)\n");
+    {
+        constexpr int sgw = 40, sgh = 40;
+        world sw;
+        const entity_id sbody = sw.create_entity();
+        std::vector<entity_id> sids(static_cast<std::size_t>(sgw * sgh), null_entity);
+        for (int r = 0; r < sgh; ++r)
+            for (int c = 0; c < sgw; ++c)
+            {
+                const entity_id id = sw.create_entity();
+                tile_component t{};
+                t.body         = sbody;
+                t.grid_x       = c;
+                t.grid_y       = r;
+                t.substrate    = terrain_substrate::sedimentary;
+                t.landform     = terrain_landform::plains;
+                t.hazard_level = 0.0f;
+                t.habitability = 1.0f;
+                sw.tiles.emplace(id, t);
+                sids[static_cast<std::size_t>(r * sgw + c)] = id;
+            }
+        std::vector<region> sregions;
+        int k = 0;
+        for (int gy = 0; gy < 5; ++gy)
+            for (int gx = 0; gx < 5; ++gx, ++k)
+            {
+                region rg;
+                rg.col    = 3 + gx * 8; // windows [col-3, col+3] never overlap
+                rg.row    = 3 + gy * 8;
+                rg.anchor = rg.row * sgw + rg.col;
+                sregions.push_back(rg);
+                // 0.06 x 1000 / 49 cells = raw 1; 0.10 x 1000 / 49 = raw 2.
+                tile_component& at = sw.tiles.at(sids[static_cast<std::size_t>(rg.anchor)]);
+                at.resource_deposit[static_cast<std::size_t>(resource_type::coal)] = (k < 12) ? 0.06f : 0.10f;
+            }
+
+        std::vector<int> raw;
+        int64_t sum = 0;
+        for (const region& rg : sregions)
+        {
+            raw.push_back(survey_endowment(sw, sids, rg.col, rg.row, sgw, sgh).energy);
+            sum += raw.back();
+        }
+        const int64_t n = static_cast<int64_t>(sregions.size());
+        survey_regions_at_span_open(sw, sids, sgw, sgh, sregions);
+
+        int ones = 0, twos = 0, exact = 0, twos_below_ceiling = 0;
+        for (std::size_t i = 0; i < sregions.size(); ++i)
+        {
+            const int64_t expect = sum > 0 ? std::min<int64_t>((raw[i] * 500LL * n) / sum, 1000) : 0;
+            if (sregions[i].survey_fuel_q == expect) ++exact;
+            if (raw[i] == 1) ++ones;
+            if (raw[i] == 2) { ++twos; if (sregions[i].survey_fuel_q < 1000) ++twos_below_ceiling; }
+        }
+        std::printf("  raw fuel reads: %d at 1, %d at 2, sum %lld over %lld regions (integer mean %lld)\n",
+                    ones, twos, static_cast<long long>(sum), static_cast<long long>(n),
+                    static_cast<long long>(sum / n));
+        check(ones == 12 && twos == 13 && sum == 38,
+              "E5a  the synthetic body reads as built: 12 regions at raw 1, 13 at raw 2 (sum 38, mean 1.52)");
+        check(exact == static_cast<int>(n),
+              "E5b  every region's survey_fuel_q is raw*500*n/sum against the EXACT mean (raw 1 -> 328, raw 2 -> 657)");
+        check(twos_below_ceiling == twos,
+              "E5c  an about-average region (raw 2, 1.3x the mean) reads below 1000 -- the truncated mean of 1 put it at the ceiling");
+    }
+
+    // --- E6 the forest score, scored as fuel is (Ben, 2026-09-18, wave 1 form) --
+    // `survey_forest_q` is the window's land share under forest SCORED against
+    // the exact mean share of every region at the open -- the fuel rule. A
+    // synthetic body with no fuel at all and thin forest: 25 disjoint windows
+    // of 49 land tiles, one forest tile in twelve of them (share 20 per mille)
+    // and two in thirteen (40): sum 760, true mean 30.4. Exact scores 328 and
+    // 657; the truncated mean (30) would give 333 and 666, which E6c refuses.
+    // No coal anywhere: every region's fuel scores 0 (surveyed, not -1).
+    std::printf("\nE6: the span-open forest score on a synthetic forest-poor, fuel-less body (true share mean 30.4)\n");
+    {
+        constexpr int sgw = 40, sgh = 40;
+        world sw;
+        const entity_id sbody = sw.create_entity();
+        std::vector<entity_id> sids(static_cast<std::size_t>(sgw * sgh), null_entity);
+        for (int r = 0; r < sgh; ++r)
+            for (int c = 0; c < sgw; ++c)
+            {
+                const entity_id id = sw.create_entity();
+                tile_component t{};
+                t.body         = sbody;
+                t.grid_x       = c;
+                t.grid_y       = r;
+                t.substrate    = terrain_substrate::sedimentary;
+                t.landform     = terrain_landform::plains;
+                t.hazard_level = 0.0f;
+                t.habitability = 1.0f;
+                sw.tiles.emplace(id, t);
+                sids[static_cast<std::size_t>(r * sgw + c)] = id;
+            }
+        std::vector<region> sregions;
+        int k = 0;
+        for (int gy = 0; gy < 5; ++gy)
+            for (int gx = 0; gx < 5; ++gx, ++k)
+            {
+                region rg;
+                rg.col    = 3 + gx * 8;
+                rg.row    = 3 + gy * 8;
+                rg.anchor = rg.row * sgw + rg.col;
+                sregions.push_back(rg);
+                const int wooded_tiles = (k < 12) ? 1 : 2;
+                for (int f = 0; f < wooded_tiles; ++f)
+                {
+                    tile_component& ft = sw.tiles.at(sids[static_cast<std::size_t>(rg.row * sgw + rg.col + 1 + f)]);
+                    ft.cover         = terrain_cover::forest;
+                    ft.cover_density = 128;
+                }
+            }
+
+        std::vector<int> share;
+        int64_t sum = 0;
+        for (const region& rg : sregions)
+        {
+            share.push_back(survey_endowment(sw, sids, rg.col, rg.row, sgw, sgh).forest);
+            sum += share.back();
+        }
+        const int64_t n = static_cast<int64_t>(sregions.size());
+        survey_regions_at_span_open(sw, sids, sgw, sgh, sregions);
+
+        int at20 = 0, at40 = 0, exact = 0, not_truncated = 0, fuel_zero = 0;
+        for (std::size_t i = 0; i < sregions.size(); ++i)
+        {
+            const int64_t expect = sum > 0 ? std::min<int64_t>((share[i] * 500LL * n) / sum, 1000) : 0;
+            const int64_t truncated = std::min<int64_t>((share[i] * 500LL) / std::max<int64_t>(1, sum / n), 1000);
+            if (sregions[i].survey_forest_q == expect) ++exact;
+            if (sregions[i].survey_forest_q != truncated) ++not_truncated;
+            if (share[i] == 20) ++at20;
+            if (share[i] == 40) ++at40;
+            if (sregions[i].survey_fuel_q == 0) ++fuel_zero;
+        }
+        std::printf("  forest shares: %d at 20, %d at 40, sum %lld over %lld regions (integer mean %lld);"
+                    " scores %d / %d\n", at20, at40, static_cast<long long>(sum), static_cast<long long>(n),
+                    static_cast<long long>(sum / n), sregions[0].survey_forest_q, sregions[24].survey_forest_q);
+        check(at20 == 12 && at40 == 13 && sum == 760,
+              "E6a  the synthetic body reads as built: 12 windows at share 20, 13 at 40 (sum 760, mean 30.4)");
+        check(exact == static_cast<int>(n),
+              "E6b  every region's survey_forest_q is share*500*n/sum against the EXACT mean (20 -> 328, 40 -> 657)");
+        check(not_truncated == static_cast<int>(n),
+              "E6c  no region reads the truncated-mean score (333 / 666): forest is scored with fuel's exact-mean fix");
+        check(fuel_zero == static_cast<int>(n),
+              "E6d  a body with no fuel at all scores every surveyed region's fuel 0 (surveyed, never -1)");
+    }
+
     std::printf("\n=== survey_endowment harness: %d PASS, %d FAIL ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

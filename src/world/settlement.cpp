@@ -355,28 +355,59 @@ int score_against(int raw, int mean)
 
 } // namespace
 
-// BL-1051 — declared in settlement.hpp. Placed here, after `score_against`,
-// because the fuel reading is scored exactly as `energy_q` is.
+// BL-1051 — declared in settlement.hpp. Placed here, beside `score_against`,
+// because both readings are scored on `energy_q`'s scale -- 500 at the mean,
+// 1000 at twice it -- but against the EXACT mean (BL-1041).
+namespace {
+
+/// `raw * 500 / (sum / n)`, taken as `raw * 500 * n / sum` in 64-bit integers
+/// so the division happens once, last, capped at 1000; 0 when the sum is 0.
+///
+/// BL-1041 (from BL-1051's cold review): NOT `score_against(raw, sum / n)`. An
+/// integer-truncated mean loses up to one whole unit, which is nothing on a
+/// rich body (a mean in the thousands) and up to half the scale on a poor one:
+/// a true mean of 1.9 truncates to 1 and an about-average region reads 1000,
+/// and a mean under 1 truncates to 0. Bounds: `raw` is a per-tile mean x1000
+/// or a per-mille share (well under 2^31) and `n` a region count, so the
+/// product stays far inside int64.
+int score_against_exact_mean(int raw, int64_t sum, int64_t n)
+{
+    if (sum <= 0) return 0;
+    const int64_t r = std::max(raw, 0);
+    return static_cast<int>(clampi64((r * 500 * n) / sum, 0, 1000));
+}
+
+} // namespace
+
 void survey_regions_at_span_open(const world& w, const std::vector<entity_id>& ids,
                                  int gw, int gh, std::vector<region>& regions)
 {
     if (regions.empty()) return;
 
-    // ONE PASS FOR THE RAW WINDOWS, ONE FOR THE SCORE: the fuel score is
-    // relative to the mean over every region surveyed here, so the mean must
-    // exist before any region is scored. Ascending region order, integer sums.
-    std::vector<int> raw_fuel(regions.size(), 0);
-    int64_t fuel_sum = 0;
+    // ONE PASS FOR THE RAW WINDOWS, ONE FOR THE SCORES: each score is relative
+    // to the mean over every region surveyed here, so the mean must exist
+    // before any region is scored. Ascending region order, integer sums.
+    std::vector<int> raw_fuel(regions.size(), 0), raw_forest(regions.size(), 0);
+    int64_t fuel_sum = 0, forest_sum = 0;
     for (std::size_t i = 0; i < regions.size(); ++i)
     {
         const endowment e = survey_endowment(w, ids, regions[i].col, regions[i].row, gw, gh);
-        raw_fuel[i] = e.energy;
-        fuel_sum += e.energy;
-        regions[i].survey_forest_q = clampi(e.forest, 0, 1000);
+        raw_fuel[i]   = std::max(e.energy, 0);
+        raw_forest[i] = clampi(e.forest, 0, 1000); // the land share under forest, per mille
+        fuel_sum     += raw_fuel[i];
+        forest_sum   += raw_forest[i];
     }
-    const int fuel_mean = static_cast<int>(fuel_sum / static_cast<int64_t>(regions.size()));
+    // FOREST IS SCORED AS FUEL IS (Ben, 2026-09-18, wave 1 form; INDUSTRY_TREE.md
+    // sec The scorer): the share against the mean share of every region at the
+    // open, not the plain share -- a plain share read about 212 on the median
+    // region and let almost any seam outweigh any forest. The same exact-mean
+    // rule as fuel, so a forest-poor body does not read 1000 everywhere.
+    const int64_t n_regions = static_cast<int64_t>(regions.size());
     for (std::size_t i = 0; i < regions.size(); ++i)
-        regions[i].survey_fuel_q = score_against(raw_fuel[i], fuel_mean);
+    {
+        regions[i].survey_fuel_q   = score_against_exact_mean(raw_fuel[i],   fuel_sum,   n_regions);
+        regions[i].survey_forest_q = score_against_exact_mean(raw_forest[i], forest_sum, n_regions);
+    }
 }
 
 namespace {
@@ -1057,6 +1088,10 @@ settlement_state run_settlement(const planetology_state& pl,
             sf += e.farm; so += e.ore; se += e.energy; sw += e.water;
         }
         const int n = static_cast<int>(raw.size());
+        // KNOWN EDGE, KEPT (it moves shipped worlds): each mean truncates, so on a
+        // class-poor body (mean under ~10) scores inflate, and under 1 the mean
+        // reads 0; the span-open survey scores against the exact mean instead
+        // (`survey_regions_at_span_open`, BL-1041).
         const int mf = static_cast<int>(sf / n), mo = static_cast<int>(so / n);
         const int me = static_cast<int>(se / n), mw = static_cast<int>(sw / n);
 

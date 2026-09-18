@@ -919,6 +919,10 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             seat.treasury = clampi64(seat.treasury + folded, 0, 1LL << 48);
         }
 
+        // BL-1041: the purse as the round's earn finds it -- the base the
+        // round's SURPLUS (earn less the army and navy bills) is read against.
+        const int64_t purse_before_earn = seat.treasury;
+
         // ---- ONGOING EARN: endowment, the inherited network, a market. ----
         // "Fed by what the polity already holds and already reaches" — read
         // fresh every round rather than cached, so ground lost or gained this
@@ -1023,6 +1027,53 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 }
                 seat.treasury -= std::min(paid_sum, seat.treasury);
                 if (spend) spend->navy_upkeep += paid_sum;
+            }
+        }
+
+        // ---- BL-1041 -- CAPITAL PAID IN, AS A CONSEQUENCE. -----------------
+        // DIGITISATION.md sec Beat 1 (RULED, Ben 2026-09-18): "each round a
+        // fixed share of the capital treasury's surplus after the round's bills
+        // converts to industry points." No polity scores it, so it is no verb.
+        // THE SURPLUS is the purse's net rise across this round's earn and its
+        // army and navy bills -- the round's income left over once the force
+        // standing has been paid for -- floored at 0: a round whose bills eat
+        // its earn pays nothing in, and the stock the purse already held is
+        // never taxed a second time. The share LEAVES the treasury (a
+        // conversion, not a copy) and lands on the capital's own region, where
+        // the treasury stands; the scored purchase below reads what is left.
+        // A treasury unit is `industry_points_per_treasury_unit` points (a
+        // unit choice, history_sim.hpp says why). Only inside the span (the switch,
+        // from its open year) and only on in-domain constants; a conversion
+        // that would carry the capital past `industry_points_ceiling` is
+        // refused whole and counted -- nothing moves.
+        if (params.industry_points_enabled && year >= params.industry_open_year
+            && industry_points_params_valid(params))
+        {
+            const int64_t surplus = std::max<int64_t>(seat.treasury - purse_before_earn, 0);
+            // surplus <= 2^48 (the treasury's own clamp) and share <= 1000, so
+            // the product stays under 2^58; `paid_in` <= 2^48, and times the
+            // exchange rate (<= 10^4 < 2^14) the credit stays under 2^62.
+            const int64_t paid_in = (surplus * params.industry_points_treasury_share_q) / 1000;
+            if (paid_in > 0)
+            {
+                const int64_t credit = paid_in * params.industry_points_per_treasury_unit;
+                // Refused whole: past the ceiling, or (never on a sane purse,
+                // whose base is >= 0) more than the purse holds.
+                if (seat.industry_points > industry_points_ceiling - credit
+                    || paid_in > seat.treasury)
+                {
+                    if (spend) ++spend->industry_points_refused;
+                }
+                else
+                {
+                    seat.treasury        -= paid_in;
+                    seat.industry_points += credit;
+                    if (spend)
+                    {
+                        spend->industry_points_paid_in   += credit;
+                        spend->industry_treasury_debited += paid_in;
+                    }
+                }
             }
         }
 
@@ -3407,6 +3458,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // the upkeep call is gated on `exploration_upkeep_enabled` so the
         // Empire span — every caller before this item — never takes it.
         expire_dated_objects(out.dated_objects, y);
+
+        // ---- BL-1041: INDUSTRY POINTS, THE SCALE ACCRUAL ------------------
+        //
+        // DIGITISATION.md sec Beat 1. Every region with centres is credited on
+        // itself, once a round, off the round's OPENING state (ahead of the
+        // upkeep and every polity's turn, so no polity's act this round moves
+        // another region's credit). Behind its switch and from the span's own
+        // open year, so every other span never enters; a run whose constants
+        // left their domain credits nothing and says so. The treasury half is
+        // inside `run_exploration_upkeep`, after the bills it is a share of.
+        if (params.industry_points_enabled && y >= params.industry_open_year)
+        {
+            if (!industry_points_params_valid(params))
+            {
+                out.industry_points_params_rejected = true;
+            }
+            else
+            {
+                const scoped_ns prof_points(prof.ns_industry_points); // report-only
+                const industry_points_round pr =
+                    accrue_industry_points(ss.regions, out.polities, params, step_years);
+                out.industry_points_from_scale += pr.credited;
+                out.industry_points_refused    += pr.refused;
+            }
+        }
+
         if (params.exploration_upkeep_enabled)
         {
             // BL-955: the paid standing army's raw invariant, checked every
@@ -3445,6 +3522,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.navy_upkeep_unpaid_rounds     += upkeep_spend.navy_unpaid;
             out.levy_heads_raised             += upkeep_spend.levy_raised;
             out.levy_heads_returned           += upkeep_spend.levy_returned;
+            // BL-1041: the treasury paid into industry points on capitals.
+            out.industry_points_from_treasury += upkeep_spend.industry_points_paid_in;
+            out.treasury_spent_on_industry    += upkeep_spend.industry_treasury_debited;
+            out.industry_points_refused       += upkeep_spend.industry_points_refused;
             out.port_steps_bought += upkeep_spend.port_steps;
             out.navy_steps_bought += upkeep_spend.navy_steps;
             out.army_steps_bought += upkeep_spend.army_steps;
@@ -6087,10 +6168,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 // Daughter ground is a decayed inheritance of the parent's —
                 // good land begets good land, but never better than its parent.
+                // The seam's keep: one constant, so the fuel survey's inheritance
+                // (BL-1041 DEFAULT A, below) cannot drift from energy_q's.
+                constexpr int daughter_seam_keep_q = 700;
                 np.farm_q = (src.farm_q * 850) / 1000;
                 np.ore_q  = (src.ore_q  * 700) / 1000;
                 np.port_q = (src.port_q * 700) / 1000;
-                np.energy_q = (src.energy_q * 700) / 1000;
+                np.energy_q = (src.energy_q * daughter_seam_keep_q) / 1000;
+                // BL-1041 DEFAULT A (RULED, Ben 2026-09-18, wave 1 form): ground
+                // founded after the span-open survey has no tiles to survey, so
+                // it inherits its parent's SURVEYED fuel at the same discount,
+                // exactly as `energy_q` inherits. Only where the parent was
+                // surveyed (>= 0): off the span nothing is, and this is inert.
+                // The forest survey is not inherited (a daughter's woods are
+                // not its parent's); it stays -1, "not surveyed".
+                if (params.industry_survey_inherits_at_founding && src.survey_fuel_q >= 0)
+                    np.survey_fuel_q = (std::min(src.survey_fuel_q, 1000) * daughter_seam_keep_q) / 1000;
                 np.settle_score_q = (src.settle_score_q * 800) / 1000;
                 // BL-826: a daughter is founded WHOLLY by its founders. A
                 // settling party carries one people, so the shares start pure
@@ -6540,12 +6633,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         // Materials and labour), the share standing under arms,
                         // i.e. the hands the works cannot have. A realm with no
                         // surplus at all reads 0: nothing is being withheld.
+                        // BL-1041 DEFAULT B (RULED, Ben 2026-09-18, wave 1 form):
+                        // the seam reads each held region's FUEL READING -- the
+                        // span-open survey where it has one, energy_q where it
+                        // has none -- so the gate, its re-check, `fuel_seen` and
+                        // `ground_fuel` (all of which read this one field) agree
+                        // with the points' fuel factor and with the Charcoal
+                        // side's surveyed forest. With nothing surveyed (every
+                        // path but the span) it IS the energy_q max.
+                        const bool seam_reads_survey = params.industry_fuel_gate_reads_survey;
                         int64_t ceiling_sum = 0, under_arms = 0;
                         int foreign_held = 0;
                         for (int hi : held)
                         {
                             const region& hp = ss.regions[static_cast<std::size_t>(hi)];
-                            ir.fuel_seam_q = std::max(ir.fuel_seam_q, clampi(hp.energy_q, 0, 1000));
+                            ir.fuel_seam_q = std::max(ir.fuel_seam_q,
+                                seam_reads_survey ? industry_fuel_reading_q(hp) : clampi(hp.energy_q, 0, 1000));
                             const int64_t ceiling = manpower_ceiling(hp.population, hp.work_manpower_mod);
                             ceiling_sum += ceiling;
                             under_arms  += std::min(std::max<int64_t>(hp.army_stock, 0), ceiling);
@@ -8350,37 +8453,157 @@ bool industry_node_available(uint64_t mask, int node_idx)
 
 int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held)
 {
-    // A sum and a count, so the mean does not depend on `held`'s order.
-    // Unsurveyed ground (-1) is UNKNOWN, not bare, and stays out of both.
-    int64_t sum = 0;
-    int64_t surveyed = 0;
+    // THE BEST HELD FOREST SCORE (Ben, 2026-09-18, wave 1 form; INDUSTRY_TREE.md
+    // sec The scorer: "scored as fuel is"). The same shape as the seam: the
+    // MAX over held ground, so the Fuel Doctrine weighs a realm's best wood
+    // against its best coal, like with like. A max is order-free by itself.
+    // Unsurveyed ground (-1) is UNKNOWN, not bare, and stays out; with nothing
+    // surveyed held the reading is 0, the old pin.
+    int best = 0;
     for (int hi : held)
     {
         if (hi < 0 || static_cast<std::size_t>(hi) >= regions.size()) continue;
         const int f = regions[static_cast<std::size_t>(hi)].survey_forest_q;
         if (f < 0) continue;
-        sum += std::min(f, 1000);
-        ++surveyed;
+        best = std::max(best, std::min(f, 1000));
     }
-    return surveyed > 0 ? static_cast<int>(clampi64(sum / surveyed, 0, 1000)) : 0;
+    return best;
 }
 
-bool industry_fuel_doctrine_taken(uint64_t mask)
+// ---------------------------------------------------------------------------
+// BL-1041 — industry points
+// ---------------------------------------------------------------------------
+
+bool industry_points_params_valid(const history_sim_params& p)
+{
+    return p.industry_points_per_million_urban_heads_year >= 0
+        && p.industry_points_per_million_urban_heads_year <= 1000000
+        && p.industry_points_per_treasury_unit >= 1 && p.industry_points_per_treasury_unit <= 10000
+        && p.industry_points_fuel_floor_q     >= 0 && p.industry_points_fuel_floor_q     <= 1000
+        && p.industry_points_treasury_share_q >= 0 && p.industry_points_treasury_share_q <= 1000;
+}
+
+int industry_fuel_reading_q(const region& r)
+{
+    // -1 is "not surveyed" (settlement.hpp), never "no fuel": such ground reads
+    // the energy_q it was founded with, which is the best survey there is.
+    if (r.survey_fuel_q >= 0) return std::min(r.survey_fuel_q, 1000);
+    return clampi(r.energy_q, 0, 1000);
+}
+
+int industry_points_fuel_factor_q(int fuel_reading_q, const history_sim_params& p)
+{
+    const int floor_q = p.industry_points_fuel_floor_q; // in domain: the caller validated
+    const int f       = clampi(fuel_reading_q, 0, 1000); // the reading's own 0-1000 scale
+    return floor_q + ((1000 - floor_q) * f) / 1000;
+}
+
+int industry_tree_industrial_q(uint64_t industry_mask)
 {
     using namespace io::industry_tree;
-    // The Fuel Doctrine IS the fork the ring-1 milestone requires one side of
-    // (TREES.md sec Forks; INDUSTRY_TREE.md: The Cheap Ton needs Coke Smelting
-    // or Charcoal Iron). Reading it off `requires_fork_*` keeps this true if
-    // the store renumbers, and exploration_sim_harness T8.7.3 pins the ids.
+    int sum = 0;
     for (int i = 0; i < node_count; ++i)
     {
+        if (!(industry_mask & (1ULL << i))) continue;
         const node& n = nodes[i];
-        if (n.kind != node_kind::milestone || n.ring != 1 || n.requires_fork_a < 0) continue;
-        const bool a = (mask & (1ULL << n.requires_fork_a)) != 0;
-        const bool b = n.requires_fork_b >= 0 && (mask & (1ULL << n.requires_fork_b)) != 0;
-        return a || b;
+        for (int r = 0; r < static_cast<int>(n.effects_n); ++r)
+        {
+            const io::tree_effect& e = effects[n.effects_begin + r];
+            if (e.kind == io::tree_effect_kind::modifier
+             && e.term == io::tree_modifier_term::industrial)
+                sum += e.per_mille;
+        }
     }
-    return false;
+    return sum;
+}
+
+int64_t industry_points_scale_credit(const region& r, int industrial_q,
+                                     const history_sim_params& p, int step_years)
+{
+    if (r.centres <= 0) return 0; // only a region with centres builds
+    const int64_t heads = r.urban_population;
+    if (heads < 0 || heads > industry_points_urban_heads_max) return -1;
+    if (step_years < 1 || step_years > industry_points_step_years_max) return -1;
+    // The tree multiplier's DOMAIN (see the header): outside it is a table
+    // defect, refused rather than clamped into a plausible number.
+    const int64_t tree_mult_q = 1000 + static_cast<int64_t>(industrial_q);
+    if (tree_mult_q < 100 || tree_mult_q > 5000) return -1;
+
+    // Staged so no product leaves int64: heads (<= 2^31) x rate (<= 10^6)
+    // x years (<= 10^3) < 2.2e18, then divided before each further factor.
+    int64_t pts = (heads * p.industry_points_per_million_urban_heads_year
+                   * static_cast<int64_t>(step_years)) / 1000000;
+    pts = (pts * industry_points_fuel_factor_q(industry_fuel_reading_q(r), p)) / 1000;
+    pts = (pts * tree_mult_q) / 1000;
+    return pts;
+}
+
+industry_points_round accrue_industry_points(std::vector<region>&       regions,
+                                             const std::vector<polity>& polities,
+                                             const history_sim_params&  p,
+                                             int                        step_years)
+{
+    // The holder's capacity, once per polity per round, indexed like the
+    // table (every creation site assigns id = index; checked, and a region
+    // whose holder does not resolve reads 0, like unheld ground).
+    std::vector<int> industrial(polities.size(), 0);
+    for (std::size_t i = 0; i < polities.size(); ++i)
+        if (polities[i].id == static_cast<int>(i))
+            industrial[i] = industry_tree_industrial_q(polities[i].industry_mask);
+
+    industry_points_round out;
+    for (region& r : regions)
+    {
+        if (r.centres <= 0) continue;
+        const int ind = (r.nation >= 0 && static_cast<std::size_t>(r.nation) < industrial.size())
+                            ? industrial[static_cast<std::size_t>(r.nation)] : 0;
+        const int64_t credit = industry_points_scale_credit(r, ind, p, step_years);
+        if (credit < 0 || r.industry_points > industry_points_ceiling - credit)
+        {
+            ++out.refused; // nothing moves on this region
+            continue;
+        }
+        r.industry_points += credit;
+        out.credited      += credit;
+    }
+    return out;
+}
+
+namespace {
+
+/// Compile-time string equality over the generated table's ids.
+constexpr bool industry_id_is(const char* a, const char* b)
+{
+    while (*a != '\0' && *a == *b) { ++a; ++b; }
+    return *a == *b;
+}
+
+/// A node's index in `io::industry_tree::nodes`, found BY ID at compile time,
+/// or -1. Never a magic index: a store edit that renumbers the table moves
+/// this with it, and one that drops the id fails the static_assert below.
+constexpr int industry_node_by_id(const char* id)
+{
+    for (int i = 0; i < io::industry_tree::node_count; ++i)
+        if (industry_id_is(io::industry_tree::nodes[i].id, id)) return i;
+    return -1;
+}
+
+/// IN-MT-1a, Coke Smelting: the node `furnace_lit` reads.
+constexpr int industry_coke_smelting_index = industry_node_by_id("IN-MT-1a");
+static_assert(industry_coke_smelting_index >= 0 && industry_coke_smelting_index < 64,
+              "IN-MT-1a (Coke Smelting) is not in the Industry store: `furnace_lit` reads it BY ID "
+              "(INDUSTRY_TREE.md sec The scorer) -- re-read the scorer before renaming it");
+
+} // namespace
+
+bool industry_coke_smelting_held(uint64_t mask)
+{
+    // Ben, 2026-09-18 (wave 1 form): `furnace_lit` is COKE SMELTING HELD -- a
+    // coal-fired furnace. It read "a Fuel Doctrine side held" (NR-892), and
+    // that was 1000 at every pick that reads the term: all three readers
+    // (Electrification, Synthetic Chemistry, Plant Registry) sit behind The
+    // Cheap Ton, which requires a side. exploration_sim_harness T8.7.3 pins it.
+    return (mask & (1ULL << industry_coke_smelting_index)) != 0;
 }
 
 void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
@@ -8425,10 +8648,10 @@ void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
     const auto at = [&out](scorer_term t) -> int& { return out[static_cast<int>(t)]; };
     for (int& v : out) v = 0;
 
-    // `furnace_lit` — the polity has taken a Fuel Doctrine side (BL-1051;
-    // NR-892: every investor holds the root, so the root was no reading at
-    // all). Found off the generated table's fork, never by id or index.
-    const bool furnace_lit = industry_fuel_doctrine_taken(mask);
+    // `furnace_lit` — the polity holds Coke Smelting (Ben, 2026-09-18, wave 1
+    // form; before it, a Fuel Doctrine side, which every reader held by
+    // construction). Found by id at compile time, never by a magic index.
+    const bool furnace_lit = industry_coke_smelting_held(mask);
 
     at(scorer_term::spire)            = 1000;
     at(scorer_term::reach_bound)      = r.reach_bound_q;

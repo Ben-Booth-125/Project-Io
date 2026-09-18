@@ -278,19 +278,25 @@ struct region
     // -1 IS "NOT SURVEYED", and it is the honest value in two places: on every
     // path where the span does not run (the fields are never written), and on
     // a region the span itself founds after its open (the sim has no tiles).
-    // A reader must treat -1 as unknown, never as zero.
+    // A reader must treat -1 as unknown, never as zero. BL-1041 DEFAULT A
+    // (RULED, Ben 2026-09-18): a region founded after the open inherits its
+    // parent's `survey_fuel_q` x0.7, as `energy_q` inherits; the forest score
+    // is not inherited and stays -1 there.
     //
-    // READ ONLY BY the Industry scorer (`industry_ground_forest_q`) and, for
-    // the fuel reading, BL-1041's points rate. GENERATION SCRATCH, NOT SAVED:
-    // `w_region` does not write them, the same footing as `treasury` below.
+    // READ ONLY BY the Industry scorer (the seam through
+    // `industry_fuel_reading_q`, and `industry_ground_forest_q`) and BL-1041's
+    // points rate. GENERATION SCRATCH, NOT SAVED: `w_region` does not write
+    // them, the same footing as `treasury` below.
 
-    /// Coal + petroleum under the window, 0-1000, scored against the mean over
-    /// every region at the span open (500 = that world's average region), or
-    /// -1 when not surveyed.
+    /// Coal + petroleum under the window, 0-1000, scored against the EXACT mean
+    /// over every region at the span open (500 = that world's average region,
+    /// 1000 = twice it or more), or -1 when not surveyed.
     int survey_fuel_q = -1;
 
-    /// Share of the window's land tiles under forest cover, 0-1000, or -1 when
-    /// not surveyed. An absolute share, not a world-relative score.
+    /// The window's land share under forest cover, SCORED AS FUEL IS (Ben,
+    /// 2026-09-18, wave 1 form): against the exact mean share of every region
+    /// at the span open, 500 = that world's average region, capped at 1000;
+    /// or -1 when not surveyed. A world-relative score, not the plain share.
     int survey_forest_q = -1;
 
     int64_t founded_year = 0;     ///< Calendar year settled (negative = before epoch year 0).
@@ -419,6 +425,33 @@ struct region
     /// little stays poor. GENERATION SCRATCH, NOT SAVED, same footing as
     /// `material_stock`/`network_supply_q` above.
     int64_t treasury = 0;
+
+    // --- BL-1041: industry points --------------------------------------------
+    // DIGITISATION.md sec Beat 1 (SET, Ben 2026-09-15: "large city centres
+    // build industry points which can be consumed for appropriate tasks, or
+    // stockpiled until the end of the phase"). A LOCATED stock, exactly like
+    // `treasury` and `material_stock` above and for the same reason: a
+    // conqueror who takes the ground takes the works standing on it, so a
+    // capture needs no transfer rule -- `nation` changing above is the whole
+    // of it. PROPOSED (listed to Ben 2026-09-18, not overturned): the sim holds
+    // a city as counts on its region, so "one number per centre" is one number
+    // per region with centres, and it reaches the campaign's centres at the
+    // handoff.
+
+    /// Industry points standing on this region. Credited ONLY inside the
+    /// Digitisation span (`history_sim_params::industry_points_enabled`, from
+    /// `industry_open_year`), by two consequences and no choice: every round,
+    /// on every region with `centres > 0`, its urban scale x its fuel factor x
+    /// its holder's Industry-tree industrial capacity
+    /// (`accrue_industry_points`); and, on a living polity's `capital`, a
+    /// fixed share of the treasury's surplus after the round's army and navy
+    /// bills (`run_exploration_upkeep`). Never spent: this cut carries no sink,
+    /// and nothing in the sim reads it (DIGITISATION.md: three sinks, later).
+    /// Zero on every path the span does not run. GENERATION SCRATCH, NOT SAVED:
+    /// `w_region` does not write it, the same footing as `treasury` -- its one
+    /// reader is the 1960 handoff (the charter budget, Part III), which must
+    /// range-check before any narrowing.
+    int64_t industry_points = 0;
 
     // --- BL-939: the scarcity signal -----------------------------------------
     // EXPLORATION.md sec There is no price here, only a scarcity signal.
@@ -960,9 +993,11 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
 /// surveyed"). Survey EVERY region in @p regions once, over the window
 /// `survey_endowment` reads, and write exactly two fields on each:
 /// `region::survey_fuel_q` (coal + petroleum, scored against the mean over
-/// every region surveyed in this call, exactly as `energy_q` is scored against
-/// the settlement pass's mean) and `region::survey_forest_q` (the window's
-/// land share under forest cover). Nothing else on a region is read or written:
+/// every region surveyed in this call on `energy_q`'s scale -- 500 at the
+/// mean, 1000 at twice it -- but against the EXACT mean, where `energy_q`'s
+/// truncates: BL-1041) and `region::survey_forest_q` (the window's land share
+/// under forest cover, scored the same way against the mean share: Ben,
+/// 2026-09-18, wave 1 form). Nothing else on a region is read or written:
 /// `energy_q`, the treasury endowment and every gate mean stay as the history
 /// left them.
 ///

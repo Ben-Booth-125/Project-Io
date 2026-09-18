@@ -528,6 +528,108 @@ struct history_sim_params
     int64_t industry_urban_mass_reference  = 200000;
     int64_t industry_urban_mass_cap        = 600000;
 
+    // -----------------------------------------------------------------------
+    // BL-1041 — INDUSTRY POINTS, A LOCATED STOCK (DIGITISATION.md sec Beat 1).
+    // -----------------------------------------------------------------------
+    //
+    // Every decision round inside the span, from `industry_open_year`:
+    //
+    //   SCALE (`accrue_industry_points`), on EVERY region with `centres > 0`,
+    //   credited to that region itself:
+    //
+    //     points = urban_population * industry_points_per_million_urban_heads_year
+    //                                                   * step_years / 1000000
+    //              * fuel_factor_q / 1000
+    //              * (1000 + industry industrial per-mille) / 1000
+    //
+    //     fuel_factor_q = floor + (1000 - floor) * fuel_reading_q / 1000
+    //     fuel_reading_q = `industry_fuel_reading_q(region)` (the span-open
+    //                      survey, or energy_q where nothing was surveyed)
+    //
+    //   The industrial per-mille is the INDUSTRY TREE's own industrial
+    //   modifiers held by the region's holder (`industry_tree_industrial_q`)
+    //   -- "Industry tree capacity nodes held" (the doc's table) -- never the
+    //   shared surface, which also carries the Empire tree's industrial
+    //   nodes. Unheld ground reads 0.
+    //
+    //   TREASURY PAID IN (`run_exploration_upkeep`), on a living polity's
+    //   `capital`: `industry_points_treasury_share_q` per mille of the round's
+    //   SURPLUS -- the purse's net rise across the round's earn and its army
+    //   and navy bills, floored at 0 -- leaves the treasury and lands as
+    //   points, `industry_points_per_treasury_unit` to the unit. RULED a
+    //   consequence (Ben, 2026-09-18): no polity scores it, so it is no verb.
+    //
+    // OFF BY DEFAULT, and only `digitisation_sim_params` turns it on: with the
+    // switch off no region's `industry_points` is written and no treasury is
+    // debited, so every other span is bit for bit what it was.
+    //
+    // REJECT, NEVER CLAMP (`industry_points_params_valid`): a run whose
+    // constants below leave their stated domain credits NOTHING for the whole
+    // run and says so (`history_sim_state::industry_points_params_rejected`),
+    // and a credit that would carry a region past `industry_points_ceiling`
+    // is refused and counted rather than truncated.
+
+    /// The switch. Read by the round's accrual and the upkeep's conversion.
+    bool industry_points_enabled = false;
+
+    /// Points per MILLION urban heads per year, at full fuel and no Industry
+    /// capacity. Domain 0-1000000 (a million heads is the grain so a rate
+    /// under one point per thousand heads is still an integer). 1000 -- one
+    /// point per thousand city heads a year -- DEFINES THE POINT: a centre of
+    /// `region_centre_heads` (10,000) at full fuel builds 10 a year, 3,000
+    /// over the span. The treasury's exchange rate below is set against it.
+    int64_t industry_points_per_million_urban_heads_year = 1000;
+
+    /// Points one TREASURY unit converts to (domain 1-10000, so a conversion
+    /// of up to the treasury's own 2^48 ceiling stays inside int64). 1000. A
+    /// UNIT CHOICE, NOT A FINDING, and it is what sets reading 8's
+    /// treasury-paid share: sized so the treasury term and the scale term are
+    /// the same order on the library's median world. MEASURED (BL-1041, the 16
+    /// library seeds to 1960, share 250): capitals paid in about 10k-126k
+    /// treasury units per world over the span (median ~47k) while cities built
+    /// about 11M-50M points at the rate above (median ~21M) -- three orders
+    /// apart at 1:1, where the treasury could not move a single region's rank
+    /// and points would be headcount by another name (DIGITISATION.md sec 1).
+    /// At 1000 the treasury-paid share runs 0.16-0.82 (median 0.69): a
+    /// property of each world (how its capitals' surplus ran against its
+    /// cities), scaled as a whole by this constant.
+    int64_t industry_points_per_treasury_unit = 1000;
+
+    /// The fuel factor's FLOOR, per mille (domain 0-1000). A city standing on
+    /// no fuel at all still builds at this share of a coalfield city's rate,
+    /// so "a large unfuelled city still builds and the fuel reading is a
+    /// finding rather than a tautology" (DIGITISATION.md sec Beat 1). 250: fuel
+    /// is at most a x4 lever -- large enough that a seam shows in the spread,
+    /// small enough that a city's size is never cancelled by its ground.
+    int     industry_points_fuel_floor_q = 250;
+
+    /// Per mille of a capital treasury's round SURPLUS (after the army and
+    /// navy bills) converted to points on the capital's own region (domain
+    /// 0-1000). 250: the state keeps three quarters of what the purse clears
+    /// to buy ports, fleets and standing men with, so the round's own spend
+    /// is not starved; a quarter is paid into the works.
+    int     industry_points_treasury_share_q = 250;
+
+    /// DEFAULT A (RULED, Ben 2026-09-18, wave 1 form). A region the span FOUNDS
+    /// after its open has no survey of its own (the sim has no tiles); with
+    /// this on it inherits its parent's `survey_fuel_q` at the same x0.7
+    /// discount `energy_q` inherits at, and only where the parent was
+    /// surveyed (>= 0) -- so off the span, where nothing is surveyed, the
+    /// founding is untouched. Off: the daughter stays -1 and the fuel reading
+    /// falls back to its inherited `energy_q`.
+    bool industry_survey_inherits_at_founding = false;
+
+    /// DEFAULT B (RULED, Ben 2026-09-18, wave 1 form: "inside the span every
+    /// fuel read in this tree takes the same survey"). The Industry tree's
+    /// SEAM (the `fuel` gate, its re-check in `industry_target_stands`,
+    /// `industry_fuel_seen`, and the `ground_fuel` term, which all read one
+    /// field) reads `industry_fuel_reading_q` -- the
+    /// span-open survey, energy_q where a region was never surveyed -- so the
+    /// gate and the points agree about who has coal. Off: the seam reads
+    /// `energy_q` as BL-1038 built it. Industry tree only; the empire and
+    /// exploration gates are untouched either way.
+    bool industry_fuel_gate_reads_survey = false;
+
     /// WHERE A POLITY'S INVESTMENT GOES (BL-767). The Invest verb raises ONE
     /// domain a round, and these two weights decide which.
     ///
@@ -2274,6 +2376,14 @@ struct exploration_upkeep_spend
     /// unpaid decay this call.
     int64_t levy_raised     = 0;
     int64_t levy_returned   = 0;
+    /// BL-1041: the treasury paid into industry on capitals this call
+    /// (`history_sim_params::industry_points_treasury_share_q`) -- the POINTS
+    /// it credited, the TREASURY UNITS it debited -- and the conversions
+    /// refused because the capital's stock would have passed
+    /// `industry_points_ceiling` (nothing moves on a refusal).
+    int64_t industry_points_paid_in  = 0;
+    int64_t industry_treasury_debited = 0;
+    int64_t industry_points_refused  = 0;
 };
 
 struct history_sim_state;       // defined further down
@@ -2879,8 +2989,13 @@ struct industry_scorer_reading
     int ground_port_q    = 0;    ///< held mean — `coastal`, `coastal_holdings`, `ground_port`.
 
     /// THE SEAM: the MAX `energy_q` over held ground. The `fuel` gate
-    /// (`>= industry_fuel_seam_bar_q`) and the `ground_fuel` term both read
-    /// it — "coal seams under held ground" is a claim about a region.
+    /// (`>= industry_fuel_seam_bar_q`), the re-check in
+    /// `industry_target_stands`, `polity::industry_fuel_seen` and the
+    /// `ground_fuel` term all read it — "coal seams under held ground" is a
+    /// claim about a region. BL-1041 DEFAULT B
+    /// (`history_sim_params::industry_fuel_gate_reads_survey`): the MAX
+    /// `industry_fuel_reading_q` instead, so every one of those reads the
+    /// span-open survey where a region has one and `energy_q` where none does.
     int fuel_seam_q      = 0;
 
     // --- Terms this phase adds (INDUSTRY_TREE.md sec The scorer)
@@ -2891,9 +3006,10 @@ struct industry_scorer_reading
     int colonial_reach_q = 0; ///< 1000 iff a held region lies across a sea leg from the seat
     int many_peoples_q   = 0; ///< share of held regions whose plurality culture is not the polity's
 
-    /// BL-1051 — `ground_forest`: the span-open survey's forest share averaged
-    /// over held ground (`industry_ground_forest_q`). 0 wherever no held region
-    /// was surveyed, which is every path the Digitisation span does not run.
+    /// BL-1051 — `ground_forest`: the BEST held region's span-open forest
+    /// score (`industry_ground_forest_q`; scored as fuel is, Ben 2026-09-18,
+    /// wave 1 form). 0 wherever no held region was surveyed, which is every
+    /// path the Digitisation span does not run.
     int ground_forest_q  = 0;
 
     /// `known` is PER NODE (TREES.md sec The scorer: "a neighbour already
@@ -2902,21 +3018,102 @@ struct industry_scorer_reading
     uint64_t known_mask  = 0;
 };
 
-/// BL-1051 — `ground_forest`'s reading (INDUSTRY_TREE.md sec The scorer, NR-891):
-/// the mean `region::survey_forest_q` over @p held's SURVEYED regions, 0-1000,
-/// integer. A region the span-open survey never saw (-1: the span did not run,
-/// or the span founded it after its open) is left out of the mean rather than
-/// read as bare ground, and with no surveyed held region the reading is 0 — so
-/// on every path without the span the term reads exactly the old pin.
+/// `ground_forest`'s reading (INDUSTRY_TREE.md sec The scorer: NR-891, and
+/// "scored as fuel is", Ben 2026-09-18, wave 1 form): the BEST (max)
+/// `region::survey_forest_q` over @p held's SURVEYED regions, 0-1000 -- the
+/// same shape as the seam, so the Fuel Doctrine weighs best wood against best
+/// coal. `survey_forest_q` is itself a score against the span-open mean (500
+/// at the world's mean region). A region the survey never saw (-1: the span
+/// did not run, or the span founded it after its open) is left out rather
+/// than read as bare ground, and with no surveyed held region the reading is
+/// 0 — so on every path without the span the term reads exactly the old pin.
 /// Independent of @p held's order.
 int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held);
 
-/// BL-1051 — `furnace_lit` (INDUSTRY_TREE.md sec The scorer, NR-892): has the
-/// polity taken a FUEL DOCTRINE side? The Fuel Doctrine is found off the
-/// generated table, never by id: it is the fork pair the ring-1 milestone (The
-/// Cheap Ton) requires one side of (`requires_fork_a` / `requires_fork_b`) —
-/// Coke Smelting and Charcoal Iron. False when the table carries no such pair.
-bool industry_fuel_doctrine_taken(uint64_t mask);
+/// `furnace_lit` (INDUSTRY_TREE.md sec The scorer; Ben, 2026-09-18, wave 1
+/// form): does the polity hold COKE SMELTING (IN-MT-1a), a coal-fired
+/// furnace? Found BY ID at compile time (a static_assert fails the build if
+/// the store drops the id), never by a magic index. It read "a Fuel Doctrine
+/// side held" (NR-892) before, which every reader of the term held by
+/// construction: all three sit behind The Cheap Ton, which requires a side.
+bool industry_coke_smelting_held(uint64_t mask);
+
+// ---------------------------------------------------------------------------
+// BL-1041 — industry points (DIGITISATION.md sec Beat 1)
+// ---------------------------------------------------------------------------
+
+/// No region's `industry_points` may pass this: a credit that would carry it
+/// over is REFUSED and counted (`history_sim_state::industry_points_refused`),
+/// never truncated. 2^60 leaves the int64 headroom of 8x for any later sum.
+inline constexpr int64_t industry_points_ceiling = 1LL << 60;
+
+/// The urban headcount the scale accrual accepts: the product
+/// `heads x rate x step_years` must stay inside int64 at the params' own
+/// domain ceilings (2^31 x 10^6 x 10^3 ~ 2.1e18 < 9.2e18). A region above it
+/// is REFUSED, not clamped. Far above any sim region (population seeds are
+/// capped at 2^30 heads).
+inline constexpr int64_t industry_points_urban_heads_max = 1LL << 31;
+
+/// The step the accrual accepts, in years: the int64 bound above assumes it.
+/// Every band the sim runs is far inside it (the span's is 4).
+inline constexpr int     industry_points_step_years_max  = 1000;
+
+/// Are the run's industry-point constants inside their stated domains? The
+/// rate 0-10^6 per million heads-year, the exchange rate 1-10^4 points per
+/// treasury unit, the fuel floor and the treasury share 0-1000 per mille.
+/// False REJECTS the whole run's accrual and conversion
+/// (`history_sim_state::industry_points_params_rejected`), never clamps.
+bool industry_points_params_valid(const history_sim_params& p);
+
+/// The FUEL READING of one region, 0-1000 (500 = the world's mean region):
+/// its span-open survey (`survey_fuel_q`, inherited at a founding under
+/// DEFAULT A) where it has one, else its `energy_q` -- the settlement pass's
+/// survey or its founding inheritance -- on every path the span did not
+/// survey. ONE FUNCTION, read by the points' fuel factor and (DEFAULT B) the
+/// Industry tree's seam, so the two cannot disagree about who has coal.
+int industry_fuel_reading_q(const region& r);
+
+/// The fuel factor, per mille: `floor + (1000 - floor) * fuel_reading / 1000`
+/// (`history_sim_params::industry_points_fuel_floor_q`). Soft and linear, so
+/// no seam threshold appears in the points: a reading of 0 builds at the
+/// floor, the world's mean region (500) midway, twice the mean (1000) at full.
+int industry_points_fuel_factor_q(int fuel_reading_q, const history_sim_params& p);
+
+/// The INDUSTRY TREE's own industrial capacity: the summed per-mille of every
+/// `industrial` modifier on the Industry nodes held in @p industry_mask, read
+/// off the generated table in its fixed order. Not `tree_mod_q`, which also
+/// sums the Empire tree's industrial nodes -- the doc's input is "Industry
+/// tree capacity nodes held". May be negative (a node can trade capacity away).
+int industry_tree_industrial_q(uint64_t industry_mask);
+
+/// One region's scale credit for one round, or -1 when the credit is REFUSED
+/// (its urban headcount or the step is outside the accrual's domain). 0 for a
+/// region with no centres. `industrial_q` is its holder's
+/// `industry_tree_industrial_q` (0 for unheld ground); the tree multiplier
+/// `1000 + industrial_q` is held to [100, 5000] per mille -- a DOMAIN, not a
+/// tuning clamp: the table's industrial nodes sum to well inside it, and a
+/// holder whose tree left it would be a table defect, refused (-1) like any
+/// other out-of-domain input. Integer, staged so no intermediate overflows.
+int64_t industry_points_scale_credit(const region& r, int industrial_q,
+                                     const history_sim_params& p, int step_years);
+
+/// What one round's scale accrual did.
+struct industry_points_round
+{
+    int64_t credited = 0; ///< points credited over every region this round
+    int64_t refused  = 0; ///< credits refused (domain or ceiling); nothing moved for them
+};
+
+/// THE ROUND'S SCALE ACCRUAL: every region with `centres > 0` is credited, ON
+/// ITSELF, `industry_points_scale_credit` against its holder's Industry-tree
+/// industrial capacity. ORDER-INDEPENDENT BY CONSTRUCTION: each region's credit
+/// reads only its own fields and its holder's mask, and writes only its own
+/// stock, so walking the table in any order gives the same table. The caller
+/// gates it (the switch, the open year, and `industry_points_params_valid`).
+industry_points_round accrue_industry_points(std::vector<region>&       regions,
+                                             const std::vector<polity>& polities,
+                                             const history_sim_params&  p,
+                                             int                        step_years);
 
 /// Every scorer term's value for one polity, indexed by the generated
 /// `io::industry_tree::scorer_term` (never positionally — see the guard in
@@ -2926,7 +3123,7 @@ bool industry_fuel_doctrine_taken(uint64_t mask);
 /// `tariff_pressure` (no price at a market before the campaign) and
 /// `plague_struck` (the history sim runs no plague; the empire scorer pins it
 /// too). `ground_forest` reads `r.ground_forest_q` (BL-1051) and `furnace_lit`
-/// reads `industry_fuel_doctrine_taken(mask)`.
+/// reads `industry_coke_smelting_held(mask)`.
 void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
                           int (&out)[io::industry_tree::term_count]);
 
@@ -3797,6 +3994,26 @@ struct history_sim_state
     int64_t levy_heads_raised   = 0;
     int64_t levy_heads_returned = 0;
 
+    /// BL-1041: INDUSTRY POINTS credited this run, by source, summed over
+    /// every round -- the scale accrual (`accrue_industry_points`) and the
+    /// treasury paid in on capitals (`run_exploration_upkeep`). No sink exists,
+    /// so the two sum to the points standing on the regions at the close; a
+    /// reader can hold the region table to that. Zero off the span.
+    int64_t industry_points_from_scale    = 0;
+    int64_t industry_points_from_treasury = 0;
+    /// ... and the TREASURY UNITS that conversion took out of capitals (the
+    /// points above divided by `industry_points_per_treasury_unit`): the
+    /// observable for how hard paying in draws on the round's other spend.
+    int64_t treasury_spent_on_industry    = 0;
+    /// Credits REFUSED rather than truncated: a region whose stock would pass
+    /// `industry_points_ceiling`, or whose urban headcount left the accrual's
+    /// stated domain. Must be 0; nothing moves on a refusal.
+    int64_t industry_points_refused       = 0;
+    /// True when the run's industry-point constants left their stated domain
+    /// (`industry_points_params_valid`): the WHOLE run then credits nothing
+    /// and debits no treasury -- rejected, never clamped.
+    bool    industry_points_params_rejected = false;
+
     /// BL-955: stock steps bought this run, by kind — with the allocation a
     /// polity buys at most one per round, so these count CHOICES made.
     int64_t port_steps_bought  = 0;
@@ -3960,6 +4177,10 @@ struct history_sim_profile
     int64_t ns_reach      = 0; ///< `rebuild_reach` (the heapless Dijkstra), also a subset.
     int64_t decision_rounds = 0; ///< Years on which the decision gate opened.
     int64_t reach_rebuilds  = 0; ///< Calls to `rebuild_reach`.
+    /// BL-1041: `accrue_industry_points`, the round's scale accrual (a subset
+    /// of `ns_decisions`). The treasury conversion is a few integer ops per
+    /// polity inside the upkeep and is not split out.
+    int64_t ns_industry_points = 0;
 };
 
 /// The accumulators above, for the run that just finished.
