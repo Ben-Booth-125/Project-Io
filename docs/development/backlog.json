@@ -334,7 +334,7 @@
    "files": [
     "src/world/history_sim.cpp"
    ],
-   "design": "FOUND 2026-09-18 by the sprint 45 engine read (Industry tree lane, checked). Exploration investing is gated only on polity_holds_empire_rim (history_sim.cpp:6285-6290) and nothing resets masks between spans, so a polity that reaches the Empire rim before 1200 invests in the Exploration tree inside the Empires span. TREES.md § Milestones says a rim holder enters the next tree 'the moment that phase opens'. The code or the doc is wrong, and the fix is work.\n\nNOT ON SPRINT 45's RE-BLESS (Ben, 2026-09-18, elicitation: offered as a rider, not taken). Fixing it moves every shipped world's Empires round, so it waits for a re-bless of its own or a later one it can ride. Gate Exploration investing on the phase (year >= empires_stop_year) as well as the rim, then measure what early investors lose."
+   "design": "CONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass run after each generation round is done — this one after Digitisation — not built mid-sprint.\n\nFOUND 2026-09-18 by the sprint 45 engine read (Industry tree lane, checked). Exploration investing is gated only on polity_holds_empire_rim (history_sim.cpp:6285-6290) and nothing resets masks between spans, so a polity that reaches the Empire rim before 1200 invests in the Exploration tree inside the Empires span. TREES.md § Milestones says a rim holder enters the next tree 'the moment that phase opens'. The code or the doc is wrong, and the fix is work.\n\nNOT ON SPRINT 45's RE-BLESS (Ben, 2026-09-18, elicitation: offered as a rider, not taken). Fixing it moves every shipped world's Empires round, so it waits for a re-bless of its own or a later one it can ride. Gate Exploration investing on the phase (year >= empires_stop_year) as well as the rim, then measure what early investors lose."
   },
   {
    "status": "designed",
@@ -355,7 +355,7 @@
    "files": [
     "src/world/history_sim.cpp"
    ],
-   "design": "FOUND 2026-09-18 by the sprint 45 engine read (industry-points lane, checked). When a capital falls the loser re-seats at held.front() and the treasury stays on the captured region (history_sim.cpp:3784-3806). The conqueror's upkeep reads only regions[q.capital].treasury, and consolidation fires once, at the span's start (cpp:886, :902-916), so a captured treasury is neither the loser's nor the winner's — it is stranded. EXPLORATION.md's located-stock rule says a conqueror who takes the seat takes the stores standing in it.\n\nNOT ON SPRINT 45's RE-BLESS (Ben, 2026-09-18, elicitation: offered as a rider, not taken). Beat 1's industry points do not inherit the defect, because they are read per region at the handoff. Fix: fold a captured seat's treasury into the conqueror's capital at capture (or state that it stays and why), then measure; it moves shipped worlds."
+   "design": "CONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass run after each generation round is done — this one after Digitisation — not built mid-sprint.\n\nFOUND 2026-09-18 by the sprint 45 engine read (industry-points lane, checked). When a capital falls the loser re-seats at held.front() and the treasury stays on the captured region (history_sim.cpp:3784-3806). The conqueror's upkeep reads only regions[q.capital].treasury, and consolidation fires once, at the span's start (cpp:886, :902-916), so a captured treasury is neither the loser's nor the winner's — it is stranded. EXPLORATION.md's located-stock rule says a conqueror who takes the seat takes the stores standing in it.\n\nNOT ON SPRINT 45's RE-BLESS (Ben, 2026-09-18, elicitation: offered as a rider, not taken). Beat 1's industry points do not inherit the defect, because they are read per region at the handoff. Fix: fold a captured seat's treasury into the conqueror's capital at capture (or state that it stays and why), then measure; it moves shipped worlds."
   },
   {
    "status": "design-owed",
@@ -409,7 +409,7 @@
    "files": [
     "src/world/history_sim.cpp"
    ],
-   "design": "FOUND 2026-09-18 by the BL-1038 cold review. TREES.md § State scales a polity's research rate 'by the spire ring it holds and by its contact degree'. The empire rate applies the spire ring (history_sim.cpp ~l.6255, x1.45 at ring 3) and multiplies by a contact_degree hard-coded to 0; the Exploration rate (~l.6374) applies neither. The BL-1038 fix round applies the spire ring to the Industry rate only. BL-908's contact table exists and the Industry scorer's `known` term already reads it, so the inert multiplier is a choice, not a gap in the data.\n\nTHE WORK. Apply the spire ring to the Exploration rate; read contact degree (distinct living polities met, clamped as the empire formula already clamps it) in every tree's rate; or amend TREES.md if either scale is not wanted. Either code change moves every shipped world, so it waits for a re-bless it can ride; sprint 45's carries only BL-1037 (Ben, 2026-09-18)."
+   "design": "CONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass run after each generation round is done — this one after Digitisation — not built mid-sprint.\n\nFOUND 2026-09-18 by the BL-1038 cold review. TREES.md § State scales a polity's research rate 'by the spire ring it holds and by its contact degree'. The empire rate applies the spire ring (history_sim.cpp ~l.6255, x1.45 at ring 3) and multiplies by a contact_degree hard-coded to 0; the Exploration rate (~l.6374) applies neither. The BL-1038 fix round applies the spire ring to the Industry rate only. BL-908's contact table exists and the Industry scorer's `known` term already reads it, so the inert multiplier is a choice, not a gap in the data.\n\nTHE WORK. Apply the spire ring to the Exploration rate; read contact degree (distinct living polities met, clamped as the empire formula already clamps it) in every tree's rate; or amend TREES.md if either scale is not wanted. Either code change moves every shipped world, so it waits for a re-bless it can ride; sprint 45's carries only BL-1037 (Ben, 2026-09-18)."
   },
   {
    "status": "designed",
@@ -433,7 +433,7 @@
     "src/world/history_sim.hpp",
     "tools/verify/digitisation_sim_harness.cpp"
    ],
-   "design": "FOUND 2026-09-18 by the BL-1036 cold review. BL-1036 carries the civilisation and universal-creed tables across the 1660 resume, but Exploration's own resume at 1200 still passes neither table (hard_coded_world.cpp:1142-1146; the KNOWN GAP comment at the new resume params in history_sim.hpp). So the tables restart at 0 in 1200 while regions and polities keep their pre-1200 indices into them. A pre-1200 civilisation index then resolves to whatever Exploration coins first; a pair already recorded before 1200 is recorded again under a new name, coined from the Exploration span's own seed; and make_exploration_output hands that table on, so the 1660 resume inherits the misalignment. Nothing reads the indices as table offsets today (only >= 0 checks), so nothing crashes: the damage is to data truth and to the world log.\n\nTHE WORK. Pass the Empires span's civilisation and creed tables to the 1200 resume, as BL-1036 does at 1660, and add a count to digitisation_sim_harness --fidelity of regions whose civilisation index is at or past the handoff table's size, plus duplicate member pairs. MOVES SHIPPED WORLDS: deep_digest folds the prose history log, and dropping the duplicate civilisation lines changes it. Not on sprint 45's re-bless, which carries only BL-1037 (Ben, 2026-09-18)."
+   "design": "CONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass run after each generation round is done — this one after Digitisation — not built mid-sprint.\n\nFOUND 2026-09-18 by the BL-1036 cold review. BL-1036 carries the civilisation and universal-creed tables across the 1660 resume, but Exploration's own resume at 1200 still passes neither table (hard_coded_world.cpp:1142-1146; the KNOWN GAP comment at the new resume params in history_sim.hpp). So the tables restart at 0 in 1200 while regions and polities keep their pre-1200 indices into them. A pre-1200 civilisation index then resolves to whatever Exploration coins first; a pair already recorded before 1200 is recorded again under a new name, coined from the Exploration span's own seed; and make_exploration_output hands that table on, so the 1660 resume inherits the misalignment. Nothing reads the indices as table offsets today (only >= 0 checks), so nothing crashes: the damage is to data truth and to the world log.\n\nTHE WORK. Pass the Empires span's civilisation and creed tables to the 1200 resume, as BL-1036 does at 1660, and add a count to digitisation_sim_harness --fidelity of regions whose civilisation index is at or past the handoff table's size, plus duplicate member pairs. MOVES SHIPPED WORLDS: deep_digest folds the prose history log, and dropping the duplicate civilisation lines changes it. Not on sprint 45's re-bless, which carries only BL-1037 (Ben, 2026-09-18)."
   },
   {
    "status": "designed",
@@ -492,6 +492,33 @@
     "tools/verify/digitisation_sim_harness.cpp"
    ],
    "design": "RULED (Ben, 2026-09-18, the review form): NR-891 — give ground_forest a source now, so the forest polity chooses Charcoal Iron rather than being pushed to it; NR-892 — furnace_lit reads the Fuel Doctrine taken (Coke Smelting or Charcoal Iron held), because every investor holds the root. INDUSTRY_TREE.md § The scorer carries both.\n\nWHY ONE SURVEY. Nothing in the sim reads forest (terrain_cover::forest exists on tiles, components.hpp:557, with a 0-255 density), and a region's energy_q is surveyed only for ground the pre-sim settlement pass drew: a sim-founded region inherits its parent's reading x0.7 (history_sim.cpp:5978-5981), about two regions in three on a long arc. BL-1041's points rate needs a real fuel reading on the same ground. So one between-span survey, at the Digitisation span open in hard_coded_world.cpp where world& and the tiles exist, fills two NEW region fields for EVERY region: a surveyed fuel reading and a forest share (the share of land tiles in the survey window under forest cover, 0-1000, integer, as survey_endowment already works). energy_q, the treasury endowment and every gate mean stay untouched, so Exploration and the empire tree are unaffected.\n\nTHE READINGS (Industry scorer only, behind industry_tree_enabled): ground_forest = the forest share averaged over held regions; furnace_lit = 1000 when the polity holds IN-MT-1a or IN-MT-1b, else 0. Update T8.7.3 (it asserts the old root reading) and add a forest check: a wooded polity with no seam takes Charcoal on the term, not only because Coke is gated.\n\nDONE WHEN. Span switch off: world_determinism, seed_library --check and --digest-check unmoved. Span on: per library seed, the forest-share spread, the Fuel Doctrine split (coke / charcoal / neither) against BL-1038's run (404 / 118 / 340 pooled), and whether charcoal polities are the wooded ones."
+  },
+  {
+   "status": "design-owed",
+   "glyph": "~",
+   "sprint": null,
+   "written": "2026-09-18",
+   "author": "Ben (2026-09-18: \"push that into the culture round\", then \"just backlog that\"); Claude (item text)",
+   "requires": [
+    "BL-1051"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1052",
+   "short_name": "FOREST_AS_A_STOCK",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 4,
+   "title": "Forest as a stock the culture round seeds and history clears, so the 1660 forest share says whose woods survived",
+   "authority_doc": "docs/generation/COLONISATION.md",
+   "files": [
+    "src/world/colonisation.cpp",
+    "src/world/settlement.hpp",
+    "src/world/settlement.cpp",
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "design": "CONTINUITY PASS (Ben, 2026-09-18): held for the continuity pass run after each generation round is done — this one after Digitisation — not built mid-sprint.\n\nTHE IDEA (Ben, 2026-09-18, on NR-891's forest ruling): push forest into the culture round. WHY IT MATTERS ONLY AS A STOCK: nothing in Era -1 writes tile cover (the sim sees cover through a read-only sim_terrain_view), so a forest share surveyed at 400 BCE equals one surveyed at 1660 — BL-1051's span-open survey is equivalent while forest is static. The idea pays off if the culture round SEEDS each region's forest from cover and settlement and farming CLEAR it: COLONISATION.md already says woodland is 'cleared before it is farmed' (farm_class::woodland; crossing cost x2.5; forest as predator ground) but prices clearing as a cost and never removes forest. Then the 1660 share says whose woods survived, and Charcoal Iron is the answer of the polity that kept them — coke winning where the woods ran out.\n\nOWED BEFORE IT IS BUILT. (1) It is Era -1 mechanism in three spans (culture, empires, exploration). (2) If history clears forest, the 1960 tiles must show it or the opening map contradicts the Industry reading — a Part III downscale rule, and a campaign-map world-mover. (3) Clearing must stay read-only to every existing reader (colonisation cost, farm capacity) or it moves every shipped world. CHEAP STEP IF TAKEN: survey forest where a region is born — the settlement pass beside farm/ore/energy, and a founding from the terrain view (unlike fuel, the sim can read cover) — and let the stock start there."
   }
  ]
 }
