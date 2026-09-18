@@ -1,6 +1,7 @@
 #pragma once
 
 #include "entity.hpp"
+#include "faithful_unordered_map.hpp" // tile_province (BL-1034: a copied world ticks as its source)
 
 #include <cstddef>
 #include <cstdint>
@@ -379,7 +380,7 @@ struct province_partition
 
     /// Land tile -> owning province id. Derived from `provinces` (rebuilt on
     /// read, never serialised separately) — every land tile appears exactly once.
-    std::unordered_map<entity_id, uint32_t> tile_province;
+    faithful_unordered_map<entity_id, uint32_t> tile_province;
 
     /// Owning province id for @p tile, or 0 when the tile is off-body or
     /// otherwise unpartitioned. WATER IS NO LONGER ONE OF THOSE CASES (BL-516):
