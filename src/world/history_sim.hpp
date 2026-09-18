@@ -56,6 +56,7 @@
 #include "works_roster.hpp"
 #include "empire_tree_data.hpp" // BL-912 — the empire tree's generated node table
 #include "exploration_tree_data.hpp" // BL-930 — the exploration tree's generated node table
+#include "industry_tree_data.hpp" // BL-1038 — the industry tree's generated node table
 
 #include <array>
 #include <atomic>
@@ -456,6 +457,66 @@ struct history_sim_params
     /// 60 (6%) is a first guess sized so the Empire tree's ~48 nodes are
     /// reachable, not exhausted, by a leading polity over 400 BCE-1200 CE.
     int empire_research_fraction_q = 60;
+
+    // -----------------------------------------------------------------------
+    // BL-1038 — THE INDUSTRY TREE, INVESTED BEHIND A SWITCH.
+    // -----------------------------------------------------------------------
+    //
+    // TREES.md sec Milestones: the Industry tree opens at its root to EVERY
+    // living polity at 1660 (Ben, 2026-09-18) — no rim gate, unlike the
+    // Exploration tree's entry on the Empire rim. OFF BY DEFAULT, and it must
+    // stay off on every shipped path until the one re-bless (BL-1044): Industry
+    // modifiers sum into the SHARED `polity::tree_mod_q`, which feeds defence,
+    // cohesion, the materials pull-forward and every tree's research rate, so
+    // a node bought here moves the whole world. With the switch off no code
+    // path below reads or writes an Industry field, and `industry_mask` stays
+    // 0, so its fold in `apply_tree_effects` adds nothing.
+
+    /// The switch. Read only by the Invest verb's Industry block.
+    bool industry_tree_enabled = false;
+
+    /// The calendar year the Industry tree opens (the Digitisation span's
+    /// own start, 1660). A round at or after it invests; one before it does
+    /// not, so a run with the switch on that stops at or before this year is
+    /// the switch-off run bit for bit (exploration_sim_harness pins that).
+    int64_t industry_open_year = 1660;
+
+    /// THE INDUSTRY RESEARCH RATE (TREES.md sec State: "the Industry tree's
+    /// rate reads urban mass instead of the industry slice", PROPOSED
+    /// 2026-09-18, not overturned). Per year, before the `research` modifier:
+    ///
+    ///     M      = urban_population summed over the polity's
+    ///              `industry_research_top_k` largest held regions
+    ///     Mc     = min(M, industry_urban_mass_cap)            CLAMPED FIRST
+    ///     rate_q = Mc * isqrt64(Mc) / isqrt64(reference)
+    ///              * industry_research_fraction_q / 1000
+    ///
+    /// i.e. `fraction x Mc x sqrt(Mc / reference)`: linear-equivalent at the
+    /// reference mass, x2.83 for twice the mass, x0.35 for half. Superlinear so
+    /// innovation gathers where people do; a RATE, never a scorer term — the
+    /// scorer may not carry anything that grows with the polity's size
+    /// (TREES.md sec The scorer). The cap is what keeps the transform from
+    /// running away (a clamped sum cannot overflow the product, and one giant
+    /// city cannot finish the tree in a decade). FIRST-CUT MAGNITUDES — the
+    /// sweep re-prices them against the sizing rule (TREES.md sec Sizes: the
+    /// leading polity finishes just before 1960, the median reaches halfway).
+    ///
+    /// MEASURED ONCE (exploration_sweep --through 1960 --industry-open 1660,
+    /// the 16 library seeds, 2026-09-18). The top-3 urban mass of a living
+    /// polity at 1660 has per-seed medians 69k-278k (median of medians ~214k)
+    /// and maxima 499k-654k. The first guess (reference 100k, fraction 60)
+    /// did not bind: every polity above ~200k earned a whole node per Invest
+    /// round, so the spread was set by how often Invest won, not by urban
+    /// mass. The reference is therefore the measured median mass, rounded,
+    /// and the fraction sized so the cap-mass leader earns ~25k a 4-year
+    /// round (a ring-2 major a round, a ring-3 milestone in three) and so
+    /// needs most of the span's rounds to finish — 6 per mille of urban
+    /// mass a year, which is the same order per head as the empire's 60
+    /// per mille of the industry slice. The cap sits at the measured
+    /// maxima, so it binds on the few largest realms only.
+    int     industry_research_fraction_q   = 6;
+    int64_t industry_urban_mass_reference  = 200000;
+    int64_t industry_urban_mass_cap        = 600000;
 
     /// WHERE A POLITY'S INVESTMENT GOES (BL-767). The Invest verb raises ONE
     /// domain a round, and these two weights decide which.
@@ -2409,6 +2470,35 @@ struct polity
     int32_t exploration_progress_q = 0;
 
     // -----------------------------------------------------------------------
+    // BL-1038 — THE INDUSTRY TREE, the third triple, same shape again.
+    // -----------------------------------------------------------------------
+    //
+    // `industry_mask` bit i is set iff this polity holds
+    // `industry_tree::nodes[i]` (docs/generation/trees/industry_tree.json via
+    // the generated `industry_tree_data.hpp`). Written ONLY by the Invest
+    // verb's Industry block, which runs only while
+    // `history_sim_params::industry_tree_enabled` is set and the round's year
+    // has reached `industry_open_year` — so on every shipped path all three
+    // stay at their defaults and the fold reads a zero mask. NOT SERIALISED,
+    // same footing as the other two triples: `polity` does not cross the save
+    // seam.
+    uint64_t industry_mask = 0;
+
+    /// Index into `industry_tree::nodes`, or -1 when nothing is targeted.
+    int16_t industry_investing = -1;
+
+    /// Progress toward `industry_investing`'s cost. Same currency as
+    /// `empire_progress_q`, earned at the Industry rate (urban mass).
+    int32_t industry_progress_q = 0;
+
+    /// Has this polity EVER, on an Industry-investing round, held ground with
+    /// a fuel seam that clears the gate's bar? Written only by the Industry
+    /// block; read by nothing in the sim — the sweep's "never passes the fuel
+    /// gate" share reads it, which is why it is a fact on the polity rather
+    /// than a closing-map reconstruction (ground changes hands).
+    bool industry_fuel_seen = false;
+
+    // -----------------------------------------------------------------------
     // BL-934 — THE OVERLORD LINK. A colony is a LIVE POLITY with one field
     // pointing at somebody else, never a region annotation and never a new
     // actor class (EXPLORATION.md sec A colony is a subject).
@@ -2456,7 +2546,8 @@ struct polity
     // -----------------------------------------------------------------------
     //
     // DERIVED, NEVER AUTHORED: `apply_tree_effects` rewrites both fields
-    // from `empire_mask` and `exploration_mask` at the top of every round
+    // from `empire_mask`, `exploration_mask` and (BL-1038) `industry_mask` —
+    // zero on every shipped path — at the top of every round
     // and again the instant a node is bought, walking the generated
     // `effects[]` tables (tree_effect.hpp is the vocabulary). Nothing else
     // writes them, and nothing in the sim names a node — a reader asks for
@@ -2464,8 +2555,8 @@ struct polity
     // the masks: recomputable from them, and this struct does not cross the
     // save seam.
 
-    /// Per-term sum of held `modifier` effects' per-mille, both trees,
-    /// indexed by `io::tree_modifier_term`. A term with no reader in the
+    /// Per-term sum of held `modifier` effects' per-mille, every invested
+    /// tree, indexed by `io::tree_modifier_term`. A term with no reader in the
     /// sim is still summed here (the surface is generic); which terms are
     /// read is `tree_effect_reader_of`'s to say.
     int32_t tree_mod_q[io::tree_modifier_term_count] = {};
@@ -2572,6 +2663,139 @@ inline bool polity_holds_exploration_rim(const polity& q)
 }
 
 // ---------------------------------------------------------------------------
+// The industry tree (BL-1038) — availability, the scorer, the rim, the rate
+// ---------------------------------------------------------------------------
+//
+// Same five-rule availability as the other two trees, over
+// `io::industry_tree`. What differs is ALL in the Industry tree's own reading,
+// and none of it touches the empire or exploration scorers:
+//
+//   - ENTRY. Every living polity invests from `industry_open_year`; there is
+//     no rim gate (TREES.md sec Milestones, the Industry exception).
+//   - THE FUEL GATE READS A SEAM (INDUSTRY_TREE.md sec Aims, PROPOSED
+//     2026-09-18): `fuel` passes when ANY held region's `energy_q` clears
+//     `industry_fuel_seam_bar_q`, not the held mean. The empire scorer keeps
+//     its mean reading; the exploration scorer keeps its open fuel gate.
+//   - THE RATE READS URBAN MASS (TREES.md sec State), never the industry
+//     slice, and never the scorer (`industry_research_per_year_q`).
+
+/// The bar a held region's `energy_q` must clear for the Industry tree's
+/// `fuel` gate. The same 250/1000 placeholder bar the empire scorer's gates
+/// use (TREES.md sec Effects: "magnitudes are authored by judgement") —
+/// only WHAT it is compared against differs: one region, not the mean.
+inline constexpr int industry_fuel_seam_bar_q = 250;
+
+/// How many held regions the Industry rate reads (`industry_urban_mass`).
+///
+/// THREE, AND WHY. The doc's reading is "the population of the polity's
+/// largest held centres" — concentration, not breadth. k = 1 makes the rate
+/// hostage to one city (a sacked capital zeroes a century's research) and
+/// cannot tell a one-city realm from a realm of great cities; k = all held
+/// regions makes the rate the realm's total urban headcount, i.e. its SIZE,
+/// which is breadth wearing a density label. Three is a seat and its two
+/// largest rivals: a small realm (most living polities hold a handful of
+/// regions) sums nearly all of its urban ground, and a large one stops
+/// earning research for breadth past its third city — it earns it by making
+/// those cities denser. A named constant rather than a param because it is
+/// the definition of the reading, not a magnitude the sweep re-prices.
+inline constexpr int industry_research_top_k = 3;
+
+/// Integer square root: the largest r with r*r <= v, for v >= 0 (0 for any
+/// v <= 0). Exact over the whole int64_t range — Newton's iteration from a
+/// power-of-two overestimate, no floating point, so it is bit-identical on
+/// every machine. src/world had none before BL-1038.
+int64_t isqrt64(int64_t v);
+
+/// The Industry rate's input: `urban_population` summed over the
+/// `industry_research_top_k` largest of @p held's regions. UNCLAMPED — the
+/// clamp belongs to the transform (`industry_research_per_year_q`). The sum of
+/// the k largest values is the same whichever of several equal values is
+/// picked, so the reading is independent of `held`'s order.
+int64_t industry_urban_mass(const std::vector<region>& regions, const std::vector<int>& held);
+
+/// Research earned per year toward the Industry node being invested in:
+/// clamp @p urban_mass to `industry_urban_mass_cap` FIRST, then the integer
+/// superlinear transform `Mc * isqrt64(Mc) / isqrt64(reference)`, times
+/// `industry_research_fraction_q / 1000`, times the polity's `research`
+/// modifier `(1000 + clamp(mod, 0, 4000)) / 1000` exactly as the other two
+/// trees apply it. Never negative.
+int64_t industry_research_per_year_q(int64_t urban_mass, int research_mod_q,
+                                     const history_sim_params& params);
+
+/// True iff `node_idx` is a legal Invest target for a polity holding `mask`
+/// in the INDUSTRY tree — the same five-rule test `empire_node_available`
+/// runs, over `io::industry_tree::nodes`.
+bool industry_node_available(uint64_t mask, int node_idx);
+
+/// Everything the Industry scorer reads, as one value, so a harness can set
+/// a reading by name rather than by position in a 20-argument call. Every
+/// field is 0-1000 unless said otherwise; the Invest block fills it.
+struct industry_scorer_reading
+{
+    // --- The shared core, derived exactly as the empire scorer's inputs are
+    int reach_bound_q    = 0;
+    int manpower_bound_q = 0;
+    int food_bound_q     = 0;
+    int stores_low_q     = 0;
+    int cohesion_q       = 1000; ///< `cohesion_low` reads 1000 - this.
+    int surplus_q        = 0;
+    int ground_ore_q     = 0;    ///< held MEAN — the `ore_q` gate reads it, as the empire's does.
+    int ground_farm_q    = 0;    ///< held mean — `arable`, `ground_farm`.
+    int ground_port_q    = 0;    ///< held mean — `coastal`, `coastal_holdings`, `ground_port`.
+
+    /// THE SEAM: the MAX `energy_q` over held ground. The `fuel` gate
+    /// (`>= industry_fuel_seam_bar_q`) and the `ground_fuel` term both read
+    /// it — "coal seams under held ground" is a claim about a region.
+    int fuel_seam_q      = 0;
+
+    // --- Terms this phase adds (INDUSTRY_TREE.md sec The scorer)
+    int threatened_q     = 0; ///< the heaviest grudge a living polity holds against this one
+    int fuel_bound_q     = 0; ///< the seat market's unmet energy want
+    int labour_bound_q   = 0; ///< share of the held non-subsistence surplus standing under arms
+    int credit_bound_q   = 0; ///< how far the seat's purse falls short of one road's price
+    int colonial_reach_q = 0; ///< 1000 iff a held region lies across a sea leg from the seat
+    int many_peoples_q   = 0; ///< share of held regions whose plurality culture is not the polity's
+
+    /// `known` is PER NODE (TREES.md sec The scorer: "a neighbour already
+    /// holds it"): the OR of the Industry masks of every living polity this
+    /// one has met. A node whose bit is set here reads `known` at 1000.
+    uint64_t known_mask  = 0;
+};
+
+/// Every scorer term's value for one polity, indexed by the generated
+/// `io::industry_tree::scorer_term` (never positionally — see the guard in
+/// history_sim.cpp). `known` is 0 here because it is per node;
+/// `choose_industry_node` reads it off `known_mask`. THREE TERMS ARE PINNED
+/// AT 0, named so their landing shows as a diff in exploration_sim_harness:
+/// `ground_forest` (no forest reading in the sim — INDUSTRY_TREE.md sec Open
+/// questions), `tariff_pressure` (no price at a market before the campaign)
+/// and `plague_struck` (the history sim runs no plague; the empire scorer
+/// pins it too).
+void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
+                          int (&out)[io::industry_tree::term_count]);
+
+/// The Industry tree's endowment gates. The EMPIRE scorer's shape
+/// (`ore_q`/`arable`/`grassland` against the held means at the 250 bar,
+/// `coastal` on any port) with ONE difference: `fuel` reads the seam.
+bool industry_gate_open(io::industry_tree::gate_atom g, const industry_scorer_reading& r);
+
+/// The scorer (TREES.md sec The scorer — one shape, four trees): argmax over
+/// every available, gate-open node of `term + kind_bonus - cost`, integer
+/// throughout, tie-broken on the lower node index. -1 when nothing is
+/// available. The same kind bonus and cost shape the other two trees use.
+int choose_industry_node(uint64_t mask, const industry_scorer_reading& r);
+
+/// THE RIM (BL-1038): has this polity crossed IN-SP-3m, "The Renewed Line"?
+/// Its `open "campaign tree"` effect is classified `tree_gate` by
+/// `tree_effect_reader_of`, but NOTHING in the sim consumes it — the campaign
+/// tree lives past the 1960 handoff. The harness says so rather than passing
+/// a vacuous check.
+inline bool polity_holds_industry_rim(const polity& q)
+{
+    return (q.industry_mask & (1ULL << io::industry_tree::rim_node_index)) != 0;
+}
+
+// ---------------------------------------------------------------------------
 // The tree effect surface (BL-973) — one fold, generic readers, an honest
 // unread list
 // ---------------------------------------------------------------------------
@@ -2583,9 +2807,10 @@ inline bool polity_holds_exploration_rim(const polity& q)
 // through ONE fold, and what the sim does with each kind is stated here in
 // code, so the harness can hold the store to it.
 
-/// Fold `q.empire_mask` and `q.exploration_mask` into `q.tree_mod_q[]` and
-/// `q.tree_keys`, walking both generated `effects[]` tables in their fixed
-/// authored order. Pure in the masks; idempotent; cheap (≈140 rows).
+/// Fold `q.empire_mask`, `q.exploration_mask` and `q.industry_mask`
+/// (BL-1038; zero unless the Industry switch is on) into `q.tree_mod_q[]` and
+/// `q.tree_keys`, walking the three generated `effects[]` tables in their
+/// fixed authored order. Pure in the masks; idempotent; cheap (≈230 rows).
 void apply_tree_effects(polity& q);
 
 /// Does a held node carry an effect keyed `k`? Reads the folded surface.
@@ -2623,7 +2848,7 @@ enum class tree_effect_reader : uint8_t
     modifier_defence,     ///< the defender's readiness (campaign pricing and resolution)
     modifier_industrial,  ///< the materials ladder's pull-forward
     modifier_cohesion,    ///< Consolidate's recovery rate
-    modifier_research,    ///< both trees' research flow
+    modifier_research,    ///< every invested tree's research flow
 };
 tree_effect_reader tree_effect_reader_of(const io::tree_effect& e);
 
