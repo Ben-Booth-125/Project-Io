@@ -97,6 +97,12 @@ and leaves 208-228 of 348 points unspent at 4x; lifting it reaches the 200-per-b
 legacy live tick; clustering alone costs up to 6x on seed 28. The readings and a recommendation (keep
 the cap for now) are on NR-889. BL-1033 and sprint 44 closed.
 
+**The queue ruled the same morning.** NR-889: the per-resource cap **scales with charter capital** on a
+budget world (the deeper option over keeping it). NR-890: BL-1034 first in sprint 45. NR-886: coastal
+cheapness and the trade re-base accepted as built; seat solvency moved to sprint 45's capital call;
+the three red harness rows filed as BL-1035; the small-grudge fade documented in CIVILISATION.md; the
+culture fold accepted. The review queue is empty.
+
 ---
 
 ## 2026-09-16 (late) — The queue emptied, the backlog cut, wave A built, and the rest archived

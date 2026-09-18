@@ -15,7 +15,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": null,
+   "sprint": "45",
    "written": "2026-09-17",
    "author": "Claude (found by the BL-1033 lane on 2026-09-17, flagged by its cold review; filed by the main session)",
    "requires": [],
@@ -24,7 +24,7 @@
    "id": "BL-1034",
    "short_name": "WORLD_COPY_TICKS_DIVERGE",
    "category": "Determinism",
-   "priority": "A",
+   "priority": "S",
    "difficulty": 3,
    "title": "A copied world does not tick byte for byte as its original: find the unfaithful copy and make world copies exact",
    "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
@@ -33,7 +33,31 @@
     "src/world/world.cpp",
     "tools/verify/player_seed_sweep.cpp"
    ],
-   "design": "FOUND 2026-09-17 by the BL-1033 lane (charter budget cost), probing whether one pre-landscape world per seed could be copied per matrix row. On seed 28 a copied base world matched the BL-1031 pins at D_search and D_land, but after the 12-tick validation settle it digested D_settle 18F78EB9B2B20F29 against the pinned 265C48A23E313B1A — whether copied before the landscape or after it — while the original world, settled with a copied recipe_registry, matches the pin. So `world`'s copy is faithful as data and unfaithful as a program: something the tick path reads differs between an original and its copy. Suspected (not located): an unordered container whose iteration order depends on insertion/rehash history, a pointer-keyed cache, or a cache the copy constructor carries stale.\n\nWHY IT MATTERS. The simulation is deterministic by standing rule. The landscape search copies the base world for every evaluation (landscape_search.cpp score_one) but only scores statically, so today's shipped worlds are unaffected; any future feature or instrument that copies a world and then ticks it (a what-if preview, a save-branch, a matrix instrument) silently diverges. The harness comment in tools/verify/harness_params.hpp above build_app_base_world is the only other record.\n\nTHE WORK. A minimal reproduction in a harness (build seed 28 in app order, copy, settle both, compare snapshot bytes per tick to find the first tick that diverges), then bisect the tick path to the reading that differs, then fix the copy (or the container) so a copy ticks byte for byte. DONE WHEN: the reproduction passes on the 16 library seeds with the BL-1031 pins unmoved; if the fix must change iteration order on the ORIGINAL path, that is a world-mover and needs Ben's re-bless authorisation first."
+   "design": "SCHEDULED (Ben, 2026-09-18, NR-890): early in sprint 45, ahead of Beat 1 — Beat 1 and the wizard's time-lapse round are the likeliest first features to copy a world and tick it.\n\nFOUND 2026-09-17 by the BL-1033 lane (charter budget cost), probing whether one pre-landscape world per seed could be copied per matrix row. On seed 28 a copied base world matched the BL-1031 pins at D_search and D_land, but after the 12-tick validation settle it digested D_settle 18F78EB9B2B20F29 against the pinned 265C48A23E313B1A — whether copied before the landscape or after it — while the original world, settled with a copied recipe_registry, matches the pin. So `world`'s copy is faithful as data and unfaithful as a program: something the tick path reads differs between an original and its copy. Suspected (not located): an unordered container whose iteration order depends on insertion/rehash history, a pointer-keyed cache, or a cache the copy constructor carries stale.\n\nWHY IT MATTERS. The simulation is deterministic by standing rule. The landscape search copies the base world for every evaluation (landscape_search.cpp score_one) but only scores statically, so today's shipped worlds are unaffected; any future feature or instrument that copies a world and then ticks it (a what-if preview, a save-branch, a matrix instrument) silently diverges. The harness comment in tools/verify/harness_params.hpp above build_app_base_world is the only other record.\n\nTHE WORK. A minimal reproduction in a harness (build seed 28 in app order, copy, settle both, compare snapshot bytes per tick to find the first tick that diverges), then bisect the tick path to the reading that differs, then fix the copy (or the container) so a copy ticks byte for byte. DONE WHEN: the reproduction passes on the 16 library seeds with the BL-1031 pins unmoved; if the fix must change iteration order on the ORIGINAL path, that is a world-mover and needs Ben's re-bless authorisation first."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-18",
+   "author": "Ben (2026-09-18, NR-886 item 4: read each over a window long enough to answer it); Claude (item text)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1035",
+   "short_name": "HARNESS_WINDOWS_LONG_ENOUGH",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Three harness rows that went red on the 12-tick settle read over a window long enough to answer their own question",
+   "authority_doc": "docs/economy/ERAS.md",
+   "files": [
+    "tools/verify/spawn_solvency.cpp",
+    "tools/verify/acquisition_viability.cpp",
+    "tools/verify/material_floor.cpp",
+    "tools/verify/harness_params.hpp"
+   ],
+   "design": "WHY. BL-1008 moved these harnesses onto the app's 12-tick validation run, and three rows went honestly red because 12 ticks cannot answer them: spawn_solvency R4 (no rival fields a standing force within 12 ticks), acquisition_viability R1 (judges one quarter), and material_floor's \"dead\" definition (zero output across the whole settle). RULED (Ben, 2026-09-18, NR-886): read each over a window long enough to answer it — never reword a row to pass, and never shorten what it asks.\n\nTHE WORK. For each row, state the question it asks, the window that can answer it (in ticks, with the reason), and run the row over that window AFTER the validation run, using tools/verify/harness_params.hpp's run_app_validation_settle followed by run_app_live_window (BL-1033), so the world is the app's. Keep the 12-tick settle as the start state; do not change it. A row that is still red over its honest window stays red, recorded with its reading.\n\nDONE WHEN. Each of the three rows prints the window it reads and its verdict over that window, on the 16 library seeds or a stated subset; the harness runtime is recorded; the BL-1031 pins are untouched (no src change)."
   }
  ]
 }

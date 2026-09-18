@@ -64,11 +64,16 @@ and/or a version goal (v0.1.1 etc.).
 
 **Goal.** The Digitisation span runs 1660 -> 1960 from the exploration_output struct, the Industry tree is invested in, large cities accumulate located industry points, and each centre's unspent points become the charter budget that sprint 44's path spends, so property 1 reads density following cities as a consequence.
 
+**Planned.**
+- BL-1034 (world copies diverge) — FIRST, ahead of Beat 1 (Ben, 2026-09-18, NR-890).
+
 **Done when.** Density-follows-cities and industrialisation readings taken at 1960 per seed on the sprint 43 harness; the charter budget is read only from the stockpile; one re-bless authorised by Ben against the shape; a cold review passed with its fix round budgeted.
 
 **Risk.** A span resumed from the struct is not mechanism-free: consolidation fires on the round where year == start_year, near-home classifies contacts by first.year < start_year, and the resume path carries only polities, grudges, contacts and corridors, so treaties, tribute and trade flows drop at 1660 unless a resume path is added (history_sim.cpp:888-916, 870, 1481-1497). Wiring the Industry tree follows BL-930 (exploration tree) and BL-973 (tree effects) across the store, lint, generator, tree_effect.hpp and history_sim; the Works-fork lean needs new effect keys in three synchronised lists. Moves every shipped world the moment the budget turns on.
 
 OWED WHEN THE ITEMS ARE CUT, not before: whether consolidation and the near-home cutoff re-anchor at 1660; the resume path for dated objects and trade flows; the span's clock (DIGITISATION.md names none, and sprint 43 measures at Exploration's 4-year band); whether the three sinks (rail, mechanised force, works) come in the first cut or points only stockpile. The epoch flip (NR-869) stays the phase's done-when, and it must select this span, never the superseded arc (DIGITISATION.md, opening: a 1960 epoch names a calendar).
+
+RULED 2026-09-18 on the review queue (NR-886, NR-889, NR-890): BL-1034 comes first. On a budget world the per-resource cap SCALES WITH THE BODY'S CHARTER CAPITAL (DIGITISATION.md § 1) — the scaling rule is this sprint's to set against charter_cost_sweep.json. The specialist's price is chosen here on real stockpiles, not the synthetic test budget. The seat's solvency question (NR-886 item 3: 74.3% of the shortlist with negative trailing net on the app's world) is decided together with the specialist-capital call (whether a charter price becomes starting capital).
 
 ## Where things stand
 

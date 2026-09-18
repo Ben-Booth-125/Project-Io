@@ -212,6 +212,13 @@ desirability are separate gates and only the first had been opened.
 to take than inland ground, which inverts the whole intent. So the fix must make **some** crossings
 survivable without making any of them free.
 
+**MEASURED AND ACCEPTED (Ben, 2026-09-18, NR-886): coastal ground IS a little cheaper, and not
+through the ration.** Over 16 seeds (BL-1022) a region taken on the coast costs 2,613 dead against
+3,084 inland — about 15% cheaper, on 12 of 16 seeds — and the cause is smaller coastal garrisons,
+not the sea-legs ration; the cheapest route is the forage crossing onto a held shore (2,028). A
+garrison is an in-world force with a visible cause, so this is not the inversion the paragraph
+above refuses.
+
 **A REDUCED RATION, SCALED BY HOW SEAFARING THE CREED IS.** Not full forage — that restores the
 inversion — and not a flat allowance either. A creed with deep sea legs lands nearly fed; one with
 shallow sea legs lands hungry but alive; one with none still starves. That makes the ability a

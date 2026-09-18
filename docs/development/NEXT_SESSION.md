@@ -1,7 +1,8 @@
-# Next session — rule NR-889, then cut sprint 45
+# Next session — cut sprint 45, starting with BL-1034
 
-Written 2026-09-18, at the close of sprint 44. **Read this, then the three open entries in
-`docs/development/NEEDS_REVIEW.md`, then `docs/generation/DIGITISATION.md` § 1 and § Beat 1.**
+Written 2026-09-18, at the close of sprint 44, with the review queue ruled and empty. **Read this,
+then `node tools/session/backlog_query.js --status designed --full`, then
+`docs/generation/DIGITISATION.md` § 1 and § Beat 1.**
 
 ## Where things stand
 
@@ -10,21 +11,19 @@ Written 2026-09-18, at the close of sprint 44. **Read this, then the three open 
   background firms around each centre, **off by default** — the app passes no budget, and
   `player_seed_sweep --digest-check` holds all 16 pinned seeds with no budget, an empty budget, an
   all-zero budget and a refused one.
-- **The hot backlog holds one item:** BL-1034 (world copies diverge), filed and unscheduled.
+- **The hot backlog holds two items:** BL-1034 (world copies diverge, sprint 45, first) and
+  BL-1035 (harness windows long enough, unscheduled).
 - **Sprint 45 (industrialisation makes the web real) is a proposed goal row** in `sprints.json`.
 
-## Three calls are waiting for Ben
+## The review queue is empty (ruled 2026-09-18)
 
-- **NR-889 — the density cap.** His 2026-09-06 ruling (a body holds 8 firms per demanded good)
-  against his 2026-09-17 one (the budget decides how many firms stand where). The cost sweep is in
-  (`charter_cost_sweep.json`): keeping the cap freezes firms at 81 a body and leaves capital
-  unspent; lifting it reaches the 200-per-body guard at 4-6x the legacy live tick; clustering alone
-  costs up to 6x on seed 28. The recommendation on the entry is to keep the cap for now.
-- **NR-890 — scheduling BL-1034.** A copied world ticks differently from its original (seed 28:
-  D_settle 18F78EB9B2B20F29 against the pinned 265C48A23E313B1A). Latent today; recommended early in
-  sprint 45, before anything previews or branches a world.
-- **NR-886** — items 1, 2, 4, 5, 6 of wave A's calls (item 3's figure re-read on the app's world:
-  74.3%; item 7 answered).
+- **NR-889:** on a budget world the per-resource cap **scales with the body's charter capital**
+  (`DIGITISATION.md` § 1); the scaling rule and the specialist's price are sprint 45's to set, on
+  real stockpiles, against `charter_cost_sweep.json`.
+- **NR-890:** BL-1034 (world copies diverge) comes **first** in sprint 45, ahead of Beat 1.
+- **NR-886:** coastal cheapness and the trade re-base accepted as built; seat solvency decided with
+  sprint 45's specialist-capital call; the three red harness rows filed as BL-1035 (harness windows
+  long enough); the small-grudge fade accepted and documented; the culture fold accepted.
 
 ## Then cut sprint 45
 
@@ -33,8 +32,10 @@ invested in, large cities accumulate located industry points, and each centre's 
 become the charter budget sprint 44's path spends — one re-bless, one cold review. Owed when its
 items are cut: whether consolidation and the near-home cutoff re-anchor at 1660; a resume path for
 dated objects and trade flows; whether Beat 1's first cut carries the three sinks or only
-stockpiles; what a world with no affordable specialist gets (Ben deferred it here); and the charter
-prices, off NR-889's table.
+stockpiles; what a world with no affordable specialist gets (Ben deferred it here); the rule by
+which the per-resource cap scales with charter capital, and the charter prices, both on real
+stockpiles against `charter_cost_sweep.json`; and whether a charter price becomes starting
+capital, which also decides the seat's solvency question.
 
 ## Tools the two sprints left
 

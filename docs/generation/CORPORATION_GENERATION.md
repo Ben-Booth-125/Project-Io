@@ -366,6 +366,11 @@ a world that consumes twice as much of the same goods gets the same firms. That 
 and it is now the intended one — but it means the demand basket's breadth is a **density knob**,
 and anything editing that basket is editing the size of the background economy.
 
+**AMENDED FORWARD (Ben, 2026-09-18, NR-889): on a Digitisation world the cap scales with capital.**
+Where a charter budget places the web, the per-resource cap above is no longer fixed at 8: it
+scales with the body's charter capital, so a richer body stands more firms per good
+(`DIGITISATION.md` § 1). Worlds without a budget keep the cap exactly as ruled on 2026-09-06.
+
 **AMENDED FORWARD (Ben, 2026-09-15): density follows the city on a Digitisation world.** The opening
 map wants *many companies around population centres*, which breadth cannot place. Where the
 Digitisation span has run, each population centre arrives with a **charter budget** — its unspent

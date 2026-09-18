@@ -562,6 +562,16 @@ The section below names *fragmentation* as the ending. This one names what the f
    Culture phase must hand forward) and is currently inert. It must be consequential: who
    colonises whom is not a fresh roll, it is the last quarrel continued by other means.
 
+**HOW A GRUDGE FADES INSIDE THE SIM (Ben accepted as built, 2026-09-18, NR-886).** A standing
+score sheds 3 per-mille of itself a year (`grudge_decay_per_year_q`), a half-life near 230 years:
+a single old wrong is gone by the epoch, a running feud is not. That rate holds only above a
+truncation line: below a score of 1000 / (rate × step) the proportional shed rounds to zero, so a
+small grudge instead loses one unit a round — it fades **linearly**, faster than the exponential,
+and faster on a finer clock (`history_sim_harness` BL842 prints the measured half-lives per step).
+Keeping the exact rate would need a stored remainder, which brings back rounds on which a score
+stands still; the faster fade of small grudges is accepted instead. Campaign sentiment decays on
+its own authored rate (`../politics/RELATIONS.md` § The authored numbers).
+
 **GROUND RELEASED BACK TO NOBODY WAS DECLINED, and the reason matters.** Collapse does not
 re-wild what it cannot hold. That looks at first like a contradiction with `BL-887`'s note about
 leaving "a new world" for a later phase to find — and it is not, because **a colonial era
@@ -614,6 +624,13 @@ So a realm of one kind earns nothing however large it grows, and a realm that re
 earns on every region it reaches. Ground the network cannot reach earns nothing and lends its
 kind to nobody — which is what makes network failure cost income as well as ground. The per-edge
 magnitude was carried over unchanged; only what it multiplies moved.
+
+**RULED AS BUILT (Ben, 2026-09-18, NR-886).** The reach floor (a region counts as reached only
+while its reach stands above the floor at which its towns can still grow) and the cross-border
+reading (only the ground an amicable corridor touches lends its kind) stand as written. Measured,
+the re-base half-holds and that is accepted: trade helps a realm pay its standing armies but not
+its campaigns, and with three kinds a region earns at most 80 a year, so income grows with regions
+held more than with kinds of ground reached.
 
 **The resource reading stays abstract.** § What this phase hands the industrial era is explicit
 that resources become capital in pass 2 and that reading must not leak backwards. What this phase

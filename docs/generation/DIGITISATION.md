@@ -166,6 +166,14 @@ apply on this path:** a nation whose cities accumulated capital holds the seats 
 bought. The price of a specialist and of a firm are measured against live-play cost before either
 is fixed; a specialist keeps today's starting capital until that measurement is read.
 
+**SETTLED (Ben, 2026-09-18, NR-889): on a budget world the per-resource firm cap SCALES WITH THE
+BODY'S CHARTER CAPITAL.** Pass 6 caps a body at 8 firms per demanded good, which froze firm count
+however rich a world became; lifting the cap outright handed density to the 200-per-body runaway
+guard at four to six times the live tick. So a richer body earns a higher per-good cap — capital
+buys density, and breadth still decides which goods. The scaling rule is set in sprint 45 against
+the cost table (`charter_cost_sweep.json`), and the specialist's price is chosen there on real
+stockpiles, not on the synthetic test budget.
+
 **PROPOSED (listed to Ben 2026-09-17, not overturned): a charter stays near its centre.** A firm is
 anchored inside a window around its centre and then its centre's region; a charter that finds no
 ground there is counted unspent rather than scattered across the nation, because a scattered firm
@@ -642,8 +650,9 @@ Measured rather than argued:
 - **Whether a colony can hold a colony** (carried from `EXPLORATION.md`).
 - **The depletion formula itself** — writing it down is the work.
 - **How a charter budget converts to firms** — the price of a firm charter and of a specialist in
-  budget points, measured against live-play cost before either is fixed (the split itself is
-  settled in § 1).
+  budget points, and the rule by which the per-resource cap scales with a body's charter capital,
+  each set against live-play cost before it is fixed (the split and the scaling itself are settled
+  in § 1).
 - **Whether a specialist's charter price becomes its starting capital**, once that price is measured.
 - **What a world gets when no centre can afford a specialist** — decided when Beat 1's real
   stockpiles exist, not on a synthetic budget.
