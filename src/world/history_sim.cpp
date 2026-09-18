@@ -1842,9 +1842,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // -- so without this seed the record would say a corridor is a Road while
     // the live count `rebuild_reach` reads starts it at tier 0, and a line the
     // Empires round paved would cost the Exploration span as if nobody had
-    // ever walked it. Seeded from `uses` (the record's own traffic, the one
-    // number that crosses), walked in the record's own sorted order; the map
-    // is point-looked-up only, so the order cannot reach an output anyway.
+    // ever walked it. Seeded from `uses` (the record's own traffic), walked in
+    // the record's own sorted order; the map is point-looked-up only, so the
+    // order cannot reach an output anyway. BL-1037: `uses` under-reads a
+    // BOUGHT rung and over-reads a REFUSED walk, so with
+    // `resume_seeds_corridor_tier` on the seed is clamped to the record's
+    // `tier` instead (see that param and the branch below).
     if (params.resume_polities != nullptr && params.resume_live_roads != nullptr)
     {
         // BL-1036 FIDELITY ORACLE: a continued run's own live network, handed
@@ -1859,11 +1862,34 @@ history_sim_state run_history_sim(settlement_state&         ss,
     }
     else if (params.resume_polities != nullptr && params.resume_corridors != nullptr)
     {
+        // BL-1037 -- THE RUNG, NOT THE WALKS (`resume_seeds_corridor_tier`).
+        // With the switch on, the live count is the record's `uses` clamped
+        // into the band of the rung the record carries, so the corridor
+        // reopens at exactly that rung: a bought rung is not demoted to what
+        // its walks earn, and a refused walk is not promoted for free.
+        const auto tier_threshold = [&](int t) -> int {
+            return t <= 0 ? 0
+                 : t == 1 ? params.road_tier1_uses
+                 : t == 2 ? params.road_tier2_uses
+                          : params.road_tier3_uses;
+        };
         for (const history_corridor& c : *params.resume_corridors)
         {
             if (c.a == c.b || c.uses <= 0) continue;
             if (c.a >= owner_index_limit || c.b >= owner_index_limit) continue;
-            road_uses_live[edge_key(c.a, c.b)] += c.uses;
+            if (!params.resume_seeds_corridor_tier)
+            {
+                road_uses_live[edge_key(c.a, c.b)] += c.uses;
+                continue;
+            }
+            const int tier = std::min<int>(c.tier, 3);
+            int live = std::max(c.uses, tier_threshold(tier));
+            if (tier < 3)
+                live = std::max(tier_threshold(tier), std::min(live, tier_threshold(tier + 1) - 1));
+            // The record holds one row per edge; `max` rather than `+=` so a
+            // duplicate row could never carry an edge past its rung.
+            int& slot = road_uses_live[edge_key(c.a, c.b)];
+            slot = std::max(slot, live);
         }
     }
 
@@ -1989,7 +2015,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
     //
     // A REFUSED PROMOTION HOLDS THE COUNT ONE SHORT rather than discarding the
     // walk, so the corridor is promoted the next time it is walked with the
-    // materials standing. Poverty DELAYS a road; it does not forbid one.
+    // materials standing. Poverty DELAYS a road; it does not forbid one. The
+    // RECORD still counts the refused walk, so its `uses` can stand on a rung
+    // the live count never paid for; a resumed span that seeds from `tier`
+    // (BL-1037, `resume_seeds_corridor_tier`) reopens it one short, as here.
     const auto note_corridor = [&](int a, int b, int payer_seat) {
         if (a < 0 || b < 0 || a == b) return;
         if (a >= static_cast<int>(owner_index_limit)
@@ -2035,12 +2064,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // again on its own; a refused PURCHASE simply did not happen, so the
     // uses count is left untouched rather than nudged.
     //
-    // KNOWN UNDER-READ (was BL-959): the promotion appends ONE row to the
-    // corridor record, so the record's `uses` under-reads the tier it grants.
-    // The carried `history_corridor::tier` is right. A reader that wants the
-    // tier reads `tier`, never infers it from `uses`. Making the two agree
-    // moves the 1960/two-span and seedA/off digests, so it rides the next
-    // authorised re-bless rather than spending one of its own.
+    // THE RECORD UNDER-READS A BOUGHT RUNG (was BL-959): the promotion appends
+    // ONE row to the corridor record, so the record's `uses` under-reads the
+    // tier it grants. The carried `history_corridor::tier` is right, and a
+    // reader that wants the rung reads `tier`, never infers it from `uses`.
+    // WHAT NOW HOLDS (BL-1037): the resume is that reader. With
+    // `history_sim_params::resume_seeds_corridor_tier` on, a resumed span seeds
+    // this edge's live count from `tier`, so the rung bought here survives the
+    // span boundary; off -- the default until the sprint 45 re-bless (BL-1044)
+    // turns it on -- the next span reopens it at the rung its walks earn.
+    // `uses` itself stays traffic either way: it counts walks, never rungs.
     const auto try_upgrade_corridor = [&](int a, int b, int payer_seat) -> bool {
         if (a < 0 || b < 0 || a == b) return false;
         if (a >= static_cast<int>(owner_index_limit)

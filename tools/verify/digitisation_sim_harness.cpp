@@ -76,6 +76,11 @@
 //                opening and on one neutralised round, with the 1960
 //                divergence reported by source (see `namespace fidelity`).
 //                This mode GATES: exit 1 when either gate fails on any seed.
+//   --resume-tier BL-1037: at the 1200 and 1660 span boundaries, with
+//                `resume_seeds_corridor_tier` off and on, the corridors whose
+//                resumed rung the switch changes, any rung reopened below or
+//                above its record, and any rung bought twice. GATES the
+//                switch-on invariants (see `run_resume_tier`).
 // ---------------------------------------------------------------------------
 
 #include "harness_params.hpp" // apply_shipped_landscape, print_shipped_landscape
@@ -672,7 +677,7 @@ history_sim_params span_params(const history_sim_params& ep, int64_t start, int6
 
 /// C: Exploration's own call from the fixture's pre-Exploration capture, run
 /// to @p stop, capturing its state at the top of @p capture.
-run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture)
+run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture, bool tier_seed = false)
 {
     history_sim_params hp = span_params(fx.exploration_params, fx.exploration_params.start_year, stop);
     hp.resume_polities  = &fx.pre_exploration_polities;
@@ -680,6 +685,7 @@ run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture
     hp.resume_contacts  = &fx.pre_exploration_contacts;
     hp.resume_corridors = &fx.pre_exploration_corridors;
     hp.capture_year     = capture;
+    hp.resume_seeds_corridor_tier = tier_seed; // BL-1037; off unless --resume-tier asks
     run_out r;
     r.ss = fx.pre_exploration_settlement;
     creed_state cs = fx.pre_exploration_creeds;
@@ -695,6 +701,7 @@ struct resume_spec
     const std::vector<history_corridor>* record  = nullptr; ///< `resume_corridors`
     const std::vector<history_corridor>* live    = nullptr; ///< `resume_live_roads` (oracle) or null
     uint32_t                             seed    = 0;
+    bool                                 tier_seed = false; ///< BL-1037's `resume_seeds_corridor_tier`
 };
 
 /// R: a second call opened on the handoff struct @p H at its own stop year.
@@ -713,6 +720,7 @@ run_out resume(const era_minus_one_fixture& fx, const exploration_output& H, con
     hp.resume_civilisations    = &H.civilisations;
     hp.resume_universal_creeds = &H.universal_creeds;
     hp.capture_year            = capture;
+    hp.resume_seeds_corridor_tier = s.tier_seed;
     run_out r;
     r.ss.regions = *s.regions;
     creed_state cs;
@@ -1159,6 +1167,178 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
     return pass ? 0 : 1;
 }
 
+// ===========================================================================
+// BL-1037 -- A RESUMED SPAN REOPENS A BOUGHT RUNG AT ITS TIER (`--resume-tier`)
+// ===========================================================================
+//
+// Per seed, at BOTH span boundaries -- Exploration's own open at 1200 (from
+// the Empires record) and a Digitisation resume at 1660 (from the handoff) --
+// with `history_sim_params::resume_seeds_corridor_tier` OFF (today) and ON:
+//
+//   changed      record rows whose resumed rung the switch changes, read off
+//                the record: the walks UNDER-read a bought rung ("bought,
+//                demoted") or OVER-read a refused walk ("refused, promoted").
+//   below/above  rows whose rung at the captured OPENING sits below / above
+//                the record's `tier`.
+//   re-crossed   a road_promoted event during the span to a rung at or below
+//                the one the record says the corridor already stood on -- a
+//                rung bought, or walked, twice. "post" counts post roads.
+//
+// The 1660 ON boundary resumes from a handoff folded off an ON Exploration
+// span -- the world the re-bless would ship; OFF resumes from the shipped
+// handoff. Both 1660 resumes run to 1960 on Exploration's seed.
+//
+// GATES the switch-on invariants (exit 1 on any seed): nothing below, nothing
+// above, nothing re-crossed, at either boundary. The OFF columns are the
+// defect's size today, reported.
+
+struct boundary_tiers
+{
+    int     rows = 0;             ///< record rows a resume seeds
+    int     bought_demoted   = 0; ///< walks under-read the rung (walked tier < tier)
+    int     refused_promoted = 0; ///< walks over-read the rung (walked tier > tier)
+    int     below = 0, above = 0; ///< opening live rung against the record's
+    int     recrossed = 0, recrossed_post = 0;
+    int64_t post_roads_built = 0; ///< the span's own post-road purchases
+};
+
+int tier_for_uses(const history_sim_params& p, int uses)
+{
+    if (uses >= p.road_tier3_uses) return 3;
+    if (uses >= p.road_tier2_uses) return 2;
+    if (uses >= p.road_tier1_uses) return 1;
+    return 0;
+}
+
+boundary_tiers measure_boundary(const history_sim_params& p, const std::vector<history_corridor>& record,
+                                const history_sim_state& span)
+{
+    boundary_tiers b;
+    b.post_roads_built = span.post_roads_built;
+    std::map<std::pair<int, int>, int> open_live;
+    for (const history_corridor& e : span.capture.live_roads) open_live[{e.a, e.b}] = e.tier;
+    std::map<std::pair<int, int>, int> record_tier;
+    for (const history_corridor& c : record)
+    {
+        if (c.a == c.b || c.uses <= 0) continue; // exactly the rows a resume seeds
+        ++b.rows;
+        const int walked = tier_for_uses(p, c.uses);
+        if (walked < c.tier) ++b.bought_demoted;
+        if (walked > c.tier) ++b.refused_promoted;
+        const auto it = open_live.find({c.a, c.b});
+        const int live = it == open_live.end() ? 0 : it->second;
+        if (live < c.tier) ++b.below;
+        if (live > c.tier) ++b.above;
+        record_tier[{c.a, c.b}] = c.tier;
+    }
+    for (const lapse_event& e : span.events)
+    {
+        if (e.kind != static_cast<uint8_t>(lapse_event_kind::road_promoted)) continue;
+        const int lo = std::min<int>(e.region, e.other), hi = std::max<int>(e.region, e.other);
+        const auto it = record_tier.find({lo, hi});
+        if (it == record_tier.end()) continue;
+        if (static_cast<int>(e.polity) <= it->second)
+        {
+            ++b.recrossed;
+            if (e.polity == 3) ++b.recrossed_post;
+        }
+    }
+    return b;
+}
+
+int run_resume_tier(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, works_registry& works)
+{
+    world_gen_config cfg = cfg_in;
+    cfg.stop_after_exploration = true;
+
+    std::printf("=== digitisation_sim_harness --resume-tier (BL-1037) - a resumed corridor reopens at its rung ===\n");
+    std::printf("switch: history_sim_params::resume_seeds_corridor_tier. 1200 = Exploration's own open (Empires\n"
+                "record); 1660 = a resume from the handoff to 1960 (OFF: the shipped handoff; ON: one folded off an\n"
+                "ON Exploration span). rows = record rows seeded; changed = bought,demoted / refused,promoted;\n"
+                "below/above = opening rung against the record's tier; re-crossed = a rung bought or walked twice\n"
+                "(post roads in brackets); post = the span's own post-road purchases.\n\n");
+    std::fflush(stdout);
+
+    int ran = 0, failed = 0;
+    double total = 0.0, worst = 0.0;
+    for (uint32_t seed : seeds)
+    {
+        const auto t0 = std::chrono::steady_clock::now();
+        std::fprintf(stderr, "[resume-tier] seed %u generating\n", seed);
+        world_params wp{};
+        wp.seed = seed;
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        (void)make_hard_coded_world(wp, &rep, cfg, /*progress=*/nullptr, &works, &fx);
+        if (!fx.exploration_ran || fx.exploration_handoff.stop_year != 1660)
+        {
+            std::printf("  %5u  SKIPPED: no shipped 1660 handoff\n", seed);
+            continue;
+        }
+        ++ran;
+        const history_sim_params&  ep = fx.exploration_params;
+        const exploration_output&  H  = fx.exploration_handoff;
+        const int64_t open_1200 = ep.start_year;
+        const int64_t first     = open_1200 + ep.tick_bands[0].step_years;
+
+        // 1200, OFF: the opening from a one-round re-run; the span from
+        // generation's own (shipped) run.
+        std::fprintf(stderr, "[resume-tier] seed %u 1200 boundary\n", seed);
+        history_sim_state off_1200 = continued(fx, first, open_1200, false).hs;
+        off_1200.events           = fx.exploration_state.events;
+        off_1200.post_roads_built = fx.exploration_state.post_roads_built;
+        const boundary_tiers b1200_off = measure_boundary(ep, fx.pre_exploration_corridors, off_1200);
+
+        // 1200, ON: the whole Exploration span with the switch, folded into
+        // the handoff an ON world would carry to 1660.
+        run_out on_expl = continued(fx, H.stop_year, open_1200, true);
+        const boundary_tiers b1200_on = measure_boundary(ep, fx.pre_exploration_corridors, on_expl.hs);
+        const exploration_output H_on = make_exploration_output(on_expl.ss, on_expl.hs, &fx.pre_exploration_creeds);
+
+        // 1660: a resume from each handoff to 1960.
+        std::fprintf(stderr, "[resume-tier] seed %u 1660 boundary\n", seed);
+        resume_spec off_spec;
+        off_spec.regions = &H.regions;
+        off_spec.record  = &H.surviving_corridors;
+        off_spec.seed    = fx.exploration_seed;
+        const boundary_tiers b1660_off =
+            measure_boundary(ep, H.surviving_corridors, resume(fx, H, off_spec, 1960, H.stop_year).hs);
+        resume_spec on_spec;
+        on_spec.regions   = &H_on.regions;
+        on_spec.record    = &H_on.surviving_corridors;
+        on_spec.seed      = fx.exploration_seed;
+        on_spec.tier_seed = true;
+        const boundary_tiers b1660_on =
+            measure_boundary(ep, H_on.surviving_corridors, resume(fx, H_on, on_spec, 1960, H_on.stop_year).hs);
+
+        const auto ok = [](const boundary_tiers& b) { return b.below == 0 && b.above == 0 && b.recrossed == 0; };
+        const bool seed_ok = ok(b1200_on) && ok(b1660_on);
+        if (!seed_ok) ++failed;
+
+        const auto line = [](const char* span, const boundary_tiers& off, const boundary_tiers& on) {
+            std::printf("         %s  rows %5d/%-5d changed %3d,%-3d/%3d,%-3d | OFF below %3d above %3d re-crossed "
+                        "%3d (%d) post %3lld | ON below %d above %d re-crossed %d (%d) post %3lld\n",
+                        span, off.rows, on.rows, off.bought_demoted, off.refused_promoted, on.bought_demoted,
+                        on.refused_promoted, off.below, off.above, off.recrossed, off.recrossed_post,
+                        static_cast<long long>(off.post_roads_built), on.below, on.above, on.recrossed,
+                        on.recrossed_post, static_cast<long long>(on.post_roads_built));
+        };
+        const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        total += secs;
+        worst = std::max(worst, secs);
+        std::printf("  %5u  %s  (%.1f s)   [rows / changed: OFF record / ON record]\n", seed,
+                    seed_ok ? "PASS" : "FAIL", secs);
+        line("1200", b1200_off, b1200_on);
+        line("1660", b1660_off, b1660_on);
+        std::fflush(stdout);
+    }
+    std::printf("\nSUMMARY  switch-on invariants (nothing below, above or re-crossed at 1200 and 1660) hold on %d of %d "
+                "seeds | %.1f s total, worst seed %.1f s\n", ran - failed, ran, total, worst);
+    const bool pass = ran > 0 && failed == 0;
+    std::printf("%s\n", pass ? "RESUME-TIER PASS" : "RESUME-TIER FAIL");
+    return pass ? 0 : 1;
+}
+
 } // namespace fidelity
 
 } // namespace
@@ -1172,6 +1352,7 @@ int main(int argc, char** argv)
     int64_t through_year = 1660; // BL-1029
     std::string out_path;        // BL-1029
     bool fidelity_mode = false;  // BL-1036
+    bool resume_tier_mode = false; // BL-1037
     for (int a = 1; a < argc; ++a)
     {
         if (std::strcmp(argv[a], "--limit") == 0 && a + 1 < argc)
@@ -1181,6 +1362,10 @@ int main(int argc, char** argv)
         else if (std::strcmp(argv[a], "--fidelity") == 0)
         {
             fidelity_mode = true;
+        }
+        else if (std::strcmp(argv[a], "--resume-tier") == 0)
+        {
+            resume_tier_mode = true;
         }
         else if (std::strcmp(argv[a], "--through") == 0 && a + 1 < argc)
         {
@@ -1206,7 +1391,7 @@ int main(int argc, char** argv)
         else
         {
             std::printf("unknown argument '%s'\nusage: digitisation_sim_harness [--limit N] [--seeds a,b,c] "
-                        "[--through Y] [--out path] [--fidelity]\n", argv[a]);
+                        "[--through Y] [--out path] [--fidelity] [--resume-tier]\n", argv[a]);
             return 2;
         }
     }
@@ -1265,6 +1450,8 @@ int main(int argc, char** argv)
     // takes a reading. --through does not apply to it (it runs its own 1960).
     if (fidelity_mode)
         return fidelity::run(seeds, cfg, works);
+    if (resume_tier_mode) // BL-1037, same footing: the handoff and the two boundaries only.
+        return fidelity::run_resume_tier(seeds, cfg, works);
 
     const world_params shipped_descriptor{};
     const era_band band = era_band_for_epoch(shipped_descriptor.epoch_year);

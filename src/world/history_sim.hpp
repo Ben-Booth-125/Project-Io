@@ -1759,6 +1759,28 @@ struct history_sim_params
     const std::vector<civilisation>*    resume_civilisations    = nullptr;
     const std::vector<universal_creed>* resume_universal_creeds = nullptr;
 
+    /// BL-1037 -- A RESUMED CORRIDOR REOPENS AT THE RUNG IT WAS BOUGHT TO.
+    ///
+    /// Off (the default): a resumed span seeds each corridor's live count from
+    /// the record's `uses` -- its WALKS. That is wrong in both directions. A
+    /// rung BOUGHT outright (a supply-site purchase, or a post road) sets the
+    /// live count straight to its threshold and records ONE walk, so it
+    /// reopens at the rung its walks earn -- a bought Track or Road demoted at
+    /// 1200, a post road demoted at 1660 and then buyable a second time. And a
+    /// walk REFUSED for want of materials is held one short live but counted in
+    /// the record, so the corridor reopens promoted without being paid for.
+    ///
+    /// On: each corridor's live count is seeded so it stands at EXACTLY the
+    /// record's `tier` (the rung the prior span's live count stood at when it
+    /// closed): `uses` clamped into that rung's band, [threshold(tier),
+    /// threshold(tier + 1) - 1], open above for a post road. Both directions
+    /// close, and the rung above a post road is priced from where the road
+    /// really stands.
+    ///
+    /// It moves every resumed span, Exploration's included, so it stays off
+    /// until the sprint 45 re-bless turns it on (BL-1044).
+    bool resume_seeds_corridor_tier = false;
+
     /// THE TWO 1200 ANCHORS, EXPLICIT (DIGITISATION.md: "Consolidation and the
     /// near-home cutoff stay anchored at 1200"). Before this item both were
     /// read off `start_year`, which is right only for the span that opens at
@@ -4376,8 +4398,10 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
 ///                                  `road_tier3_uses` while adding one walk,
 ///                                  so the two legitimately differ. A resumed
 ///                                  span seeds its live counts from
-///                                  `resume_corridors` (BL-949), so an
-///                                  inherited Road opens the span as a Road.
+///                                  `resume_corridors` (BL-949) -- from `uses`
+///                                  by default, from `tier` under
+///                                  `resume_seeds_corridor_tier` (BL-1037), the
+///                                  only way a BOUGHT rung reopens as bought.
 ///   - Cultural good preference  -> `culture_preference`
 ///   - The overlord graph        -> `polity::overlord` / `polity::subject_kind`
 ///                                  in `polities`; tribute terms in
