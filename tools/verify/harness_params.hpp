@@ -698,7 +698,8 @@ inline constexpr std::int32_t k_synthetic_max_firms_per_body    = 200;
 
 /// The synthetic spend: firm 1 point, specialist 4 firm charters, window 4,
 /// province cap on, the per-good cap FIXED at 8 under the 200-per-body guard
-/// (BL-1033's "cap kept"), no density ceiling, and today's capital DRAW.
+/// (BL-1033's "cap kept"), no density ceiling. A specialist's capital is always
+/// today's draw (Ben, 2026-09-18); the spend carries no capital parameter.
 inline charter_spend_params synthetic_charter_spend()
 {
     charter_spend_params s;
@@ -710,19 +711,7 @@ inline charter_spend_params synthetic_charter_spend()
     s.per_resource_firm_cap    = k_synthetic_per_resource_firm_cap;
     s.max_firms_per_body       = k_synthetic_max_firms_per_body;
     s.density_ceiling          = 0;
-    s.capital_rule             = charter_capital_rule::draw;
-    s.capital_per_point        = 0.0f;
     return s;
-}
-
-/// BL-1039 — the PROPOSED capital rate (DIGITISATION.md § 1): the credits per
-/// unspent point that make one specialist's price in points worth today's
-/// starting capital, `corporation_params::base_capital` (400) — read from that
-/// field, never restated. A PROPOSAL for the table, not a ruled number.
-inline float proposed_capital_per_point(const charter_spend_params& s)
-{
-    const std::int64_t price = s.specialist_price_points();
-    return price > 0 ? corporation_params{}.base_capital / static_cast<float>(price) : 0.0f;
 }
 
 /// SYNTHETIC TEST INPUT. round(@p scale x @p legacy_corporations) points spread
