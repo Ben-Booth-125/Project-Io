@@ -66,11 +66,21 @@
 // THE SEEDS are read from docs/generation/seed_library.json, so the library
 // and the harness cannot drift. Run from the repo root.
 //
-// Usage:  digitisation_sim_harness [--limit N] [--seeds a,b,c] [--through Y] [--out path]
+// Usage:  digitisation_sim_harness [--limit N] [--seeds a,b,c] [--through Y] [--out path] [--fidelity]
 //   --limit N    take the library's first N seeds (a quick run)
 //   --seeds ...  measure these seeds instead of the library's
 //   --through Y  BL-1029: continue Exploration's call to year Y (default 1660)
 //   --out path   BL-1029: also write the per-seed table as JSON
+//   --fidelity   BL-1036: instead of the readings, the RESUME-FIDELITY check --
+//                a span resumed from the 1660 exploration_output, gated on its
+//                opening and on one neutralised round, with the 1960
+//                divergence reported by source (see `namespace fidelity`).
+//                This mode GATES: exit 1 when either gate fails on any seed.
+//   --resume-tier BL-1037: at the 1200 and 1660 span boundaries, with
+//                `resume_seeds_corridor_tier` off and on, the corridors whose
+//                resumed rung the switch changes, any rung reopened below or
+//                above its record, and any rung bought twice. GATES the
+//                switch-on invariants (see `run_resume_tier`).
 // ---------------------------------------------------------------------------
 
 #include "harness_params.hpp" // apply_shipped_landscape, print_shipped_landscape
@@ -90,18 +100,21 @@
 
 #include <algorithm>
 #include <bitset>
+#include <chrono> // --fidelity: per-seed wall time, reported only
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <numeric>
 #include <set>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace
@@ -449,6 +462,888 @@ std::vector<uint32_t> library_seeds(const char* path)
     return out;
 }
 
+// ===========================================================================
+// BL-1036 -- THE RESUME-FIDELITY CHECK (`--fidelity`)
+// ===========================================================================
+//
+// DIGITISATION.md: "The span is its own call, resumed from
+// `exploration_output`, and the resume loses nothing the struct carries."
+// This mode proves the sentence rather than trusting it. Per seed, from the
+// SHIPPED 1660 handoff (`era_minus_one_fixture::exploration_handoff`, the
+// world generated at its defaults and stopped after Exploration):
+//
+//   C    THE CONTINUED RUN. Exploration's own call, re-run from the fixture's
+//        pre-Exploration capture and carried on past 1660 -- to 1664 (its
+//        1660 round), with its working state captured at the top of 1660,
+//        and to 1960 (the world `--through 1960` measures).
+//   R    A RESUME. A second `run_history_sim` call opened on the handoff
+//        struct alone: its polities, grudges, contacts, corridor record,
+//        dated objects and civilisation/creed tables through the resume
+//        pointers; its regions as the settlement; a creed_state rebuilt from
+//        its cultures; works and terrain from the fixture; the Exploration
+//        params with the span moved to 1660 and both anchors left at 1200.
+//
+// GATE 1 (BL-1036 R4): the resume's OPENING, captured before its first act,
+//   equals the struct field for field -- every region field, every polity
+//   field, and every row of the other tables, dated objects included.
+// GATE 2 (BL-1036 R5): after ONE round, a resume whose named network sources
+//   are neutralised -- the corridor record and live road counts it prices on
+//   set to the continued run's own at 1660, and the close's market stamp
+//   undone -- has the continued run's 1660 round's treaties, overlord graph
+//   and stocks exactly. What is left once the named sources are removed is
+//   what the resume LOSES, and it must be nothing.
+// REPORT: the one-round footprint of the real resume, the entry state the
+//   handoff differs from the continued run in, and the 1960 divergence
+//   against the continued run, attributed by source by adding them back one
+//   at a time (V0 all neutralised .. V4 the real resume on its own seed).
+//
+// NEVER GATED BIT FOR BIT AT 1960. A lossless resume cannot equal the
+// continued run: a span reads its INHERITED corridor record until it closes
+// (the continued run prices 1660-1960 on the 1200 record; a resume on the
+// 1660 one), and the handoff filters that record over the span's dead.
+//
+// The own seed below is a STAND-IN for BL-1040's seed fold (that item owns the
+// span's params and seed); it only has to differ from Exploration's.
+namespace fidelity
+{
+
+using field_census = std::map<std::string, int>; ///< field -> rows differing
+
+#define FID_CMP(f)     do { if (!(a.f == b.f)) ++out[#f]; } while (0)
+#define FID_CMP_ARR(f) do { if (!std::equal(std::begin(a.f), std::end(a.f), std::begin(b.f))) ++out[#f]; } while (0)
+
+/// Every `region` field, one by one. A field added to `region` later is not
+/// compared until it is listed here -- the census prints the field count it
+/// knows, so a reader can see the list is the struct's.
+void region_fields(const region& a, const region& b, field_census& out)
+{
+    FID_CMP(anchor); FID_CMP(col); FID_CMP(row); FID_CMP(domain); FID_CMP(culture);
+    FID_CMP(founding_culture); FID_CMP(creed_conquered); FID_CMP(name); FID_CMP(settle_score_q);
+    FID_CMP(farm_q); FID_CMP(ore_q); FID_CMP(energy_q); FID_CMP(port_q); FID_CMP(dominant);
+    FID_CMP(founded_year); FID_CMP(industrial_year); FID_CMP(industrialised);
+    FID_CMP(industrial_lag_years); FID_CMP(nation); FID_CMP(contest_q); FID_CMP(protection_q);
+    FID_CMP(is_seat); FID_CMP(seat_region); FID_CMP(has_market); FID_CMP(material_stock);
+    FID_CMP(treasury); FID_CMP_ARR(scarcity_q); FID_CMP_ARR(scarcity_raw_q); FID_CMP(port_stock_q);
+    FID_CMP(standing_army); FID_CMP(standing_army_owner); FID_CMP(mix_years); FID_CMP(civilisation);
+    FID_CMP(population); FID_CMP(last_demography_year); FID_CMP(manpower_stock); FID_CMP(army_stock);
+    FID_CMP(centres); FID_CMP(centres_razed); FID_CMP(urban_population); FID_CMP(network_supply_q);
+    FID_CMP(creed_hold); FID_CMP(universal_creed); FID_CMP(creed_residue_culture);
+    FID_CMP(creed_hold_years); FID_CMP(works_built); FID_CMP(work_capacity_mod);
+    FID_CMP(work_manpower_mod); FID_CMP(work_reach_mod); FID_CMP(work_defence_mod);
+    FID_CMP(work_industrial_mod);
+}
+constexpr int k_region_fields = 54;
+
+/// Every `polity` field, one by one (same caveat as `region_fields`).
+void polity_fields(const polity& a, const polity& b, field_census& out)
+{
+    FID_CMP(id); FID_CMP(culture); FID_CMP(capital); FID_CMP(aggression_q); FID_CMP_ARR(capacity);
+    FID_CMP_ARR(progress_q); FID_CMP(cohesion_q); FID_CMP(industrial_year); FID_CMP(protection_q);
+    FID_CMP(major); FID_CMP(parent); FID_CMP(universal_creed); FID_CMP(creed_adopted_year);
+    FID_CMP(alive); FID_CMP(empire_mask); FID_CMP(empire_investing); FID_CMP(empire_progress_q);
+    FID_CMP(exploration_mask); FID_CMP(exploration_investing); FID_CMP(exploration_progress_q);
+    FID_CMP(overlord); FID_CMP(subject_kind); FID_CMP(navy_stock); FID_CMP(treaties_broken);
+    FID_CMP_ARR(tree_mod_q); FID_CMP(tree_keys);
+    // BL-1038's Industry triple and its fuel flag (merged beside BL-1036).
+    FID_CMP(industry_mask); FID_CMP(industry_investing); FID_CMP(industry_progress_q);
+    FID_CMP(industry_fuel_seen);
+}
+constexpr int k_polity_fields = 30;
+
+#undef FID_CMP
+#undef FID_CMP_ARR
+
+template <class T, class Census>
+field_census census_of(const std::vector<T>& a, const std::vector<T>& b, Census fields)
+{
+    field_census out;
+    if (a.size() != b.size()) out["(row count)"] = 1;
+    const std::size_t n = std::min(a.size(), b.size());
+    for (std::size_t i = 0; i < n; ++i) fields(a[i], b[i], out);
+    return out;
+}
+
+bool grudge_eq(const grudge& a, const grudge& b)
+{
+    if (a.from != b.from || a.to != b.to || a.score != b.score || a.peak != b.peak
+     || a.event_count != b.event_count || a.events_kept != b.events_kept) return false;
+    for (int k = 0; k < grudge_events_kept; ++k)
+        if (a.events[k].year != b.events[k].year || a.events[k].region != b.events[k].region
+         || a.events[k].kind != b.events[k].kind || a.events[k].magnitude != b.events[k].magnitude)
+            return false;
+    return true;
+}
+bool contact_eq(const contact& a, const contact& b)
+{
+    return a.from == b.from && a.to == b.to && a.first.year == b.first.year
+        && a.first.region == b.first.region && a.first.kind == b.first.kind;
+}
+bool corridor_eq(const history_corridor& a, const history_corridor& b)
+{
+    return a.a == b.a && a.b == b.b && a.uses == b.uses && a.tier == b.tier;
+}
+bool dated_eq(const dated_object& a, const dated_object& b)
+{
+    return a.expires_year == b.expires_year && a.kind == b.kind && a.a == b.a && a.b == b.b;
+}
+bool civ_eq(const civilisation& a, const civilisation& b)
+{
+    return a.name == b.name && a.members == b.members && a.ethic.zeal == b.ethic.zeal
+        && a.ethic.dominion == b.ethic.dominion && a.strain_q == b.strain_q
+        && a.formed_year == b.formed_year;
+}
+bool creed_eq(const universal_creed& a, const universal_creed& b)
+{
+    return a.name == b.name && a.speech.onsets == b.speech.onsets && a.speech.vowels == b.speech.vowels
+        && a.speech.codas == b.speech.codas && a.founded_year == b.founded_year
+        && a.origin_polity == b.origin_polity && a.origin_region == b.origin_region;
+}
+
+/// "" when the two tables are equal row for row, else what differs first.
+template <class T, class Eq>
+std::string table_diff(const std::vector<T>& a, const std::vector<T>& b, Eq eq)
+{
+    if (a.size() != b.size())
+        return "rows " + std::to_string(a.size()) + " vs " + std::to_string(b.size());
+    for (std::size_t i = 0; i < a.size(); ++i)
+        if (!eq(a[i], b[i])) return "row " + std::to_string(i);
+    return {};
+}
+
+std::string census_text(const field_census& c)
+{
+    std::string s;
+    for (const auto& [field, n] : c)
+        s += (s.empty() ? "" : ", ") + field + " x" + std::to_string(n);
+    return s.empty() ? "-" : s;
+}
+
+std::vector<dated_object> sorted_dated(std::vector<dated_object> v)
+{
+    std::sort(v.begin(), v.end(), [](const dated_object& x, const dated_object& y) {
+        if (x.a != y.a) return x.a < y.a;
+        if (x.b != y.b) return x.b < y.b;
+        if (x.kind != y.kind) return x.kind < y.kind;
+        return x.expires_year < y.expires_year;
+    });
+    return v;
+}
+
+/// Size of the symmetric difference of two dated-object tables, as sets.
+int dated_symdiff(const std::vector<dated_object>& a, const std::vector<dated_object>& b)
+{
+    const auto key = [](const dated_object& o) {
+        return std::make_tuple(o.a, o.b, o.kind, o.expires_year);
+    };
+    std::vector<std::tuple<int32_t, int32_t, int32_t, int64_t>> ka, kb, d;
+    for (const dated_object& o : a) ka.push_back(key(o));
+    for (const dated_object& o : b) kb.push_back(key(o));
+    std::sort(ka.begin(), ka.end());
+    std::sort(kb.begin(), kb.end());
+    std::set_symmetric_difference(ka.begin(), ka.end(), kb.begin(), kb.end(), std::back_inserter(d));
+    return static_cast<int>(d.size());
+}
+
+/// Bound (non-aggression) pairs, symmetric difference.
+int treaty_pair_symdiff(const std::vector<dated_object>& a, const std::vector<dated_object>& b)
+{
+    const auto pairs = [](const std::vector<dated_object>& v) {
+        std::vector<std::pair<int32_t, int32_t>> p;
+        for (const dated_object& o : v)
+            if (o.kind == static_cast<int32_t>(treaty_clause::non_aggression)) p.push_back({o.a, o.b});
+        std::sort(p.begin(), p.end());
+        p.erase(std::unique(p.begin(), p.end()), p.end());
+        return p;
+    };
+    const auto pa = pairs(a), pb = pairs(b);
+    std::vector<std::pair<int32_t, int32_t>> d;
+    std::set_symmetric_difference(pa.begin(), pa.end(), pb.begin(), pb.end(), std::back_inserter(d));
+    return static_cast<int>(d.size());
+}
+
+struct run_out
+{
+    settlement_state  ss;
+    history_sim_state hs;
+};
+
+history_sim_params span_params(const history_sim_params& ep, int64_t start, int64_t stop)
+{
+    history_sim_params hp = ep; // Exploration's own params: never the Empires derivation.
+    hp.start_year      = start;
+    hp.stop_year       = stop;
+    hp.tick_bands[0]   = {stop, ep.tick_bands[0].step_years};
+    hp.tick_band_count = 1;
+    hp.trace_battles   = false;
+    return hp;
+}
+
+/// C: Exploration's own call from the fixture's pre-Exploration capture, run
+/// to @p stop, capturing its state at the top of @p capture.
+run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture, bool tier_seed = false)
+{
+    history_sim_params hp = span_params(fx.exploration_params, fx.exploration_params.start_year, stop);
+    hp.resume_polities  = &fx.pre_exploration_polities;
+    hp.resume_grudges   = &fx.pre_exploration_grudges;
+    hp.resume_contacts  = &fx.pre_exploration_contacts;
+    hp.resume_corridors = &fx.pre_exploration_corridors;
+    hp.capture_year     = capture;
+    hp.resume_seeds_corridor_tier = tier_seed; // BL-1037; off unless --resume-tier asks
+    run_out r;
+    r.ss = fx.pre_exploration_settlement;
+    creed_state cs = fx.pre_exploration_creeds;
+    r.hs = run_history_sim(r.ss, &cs, fx.terrain.view(), fx.gw, fx.gh, hp, fx.exploration_seed,
+                           nullptr, fx.works, nullptr);
+    return r;
+}
+
+/// What a resume opens on. Everything else comes from the handoff struct.
+struct resume_spec
+{
+    const std::vector<region>*           regions = nullptr; ///< the settlement's regions
+    const std::vector<history_corridor>* record  = nullptr; ///< `resume_corridors`
+    const std::vector<history_corridor>* live    = nullptr; ///< `resume_live_roads` (oracle) or null
+    uint32_t                             seed    = 0;
+    bool                                 tier_seed = false; ///< BL-1037's `resume_seeds_corridor_tier`
+};
+
+/// R: a second call opened on the handoff struct @p H at its own stop year.
+run_out resume(const era_minus_one_fixture& fx, const exploration_output& H, const resume_spec& s,
+               int64_t stop, int64_t capture)
+{
+    // Both 1200 anchors stay as Exploration set them (`consolidation_year`,
+    // `near_home_cutoff_year`): only the span moves.
+    history_sim_params hp = span_params(fx.exploration_params, H.stop_year, stop);
+    hp.resume_polities         = &H.polities;
+    hp.resume_grudges          = &H.grudges;
+    hp.resume_contacts         = &H.contacts;
+    hp.resume_corridors        = s.record;
+    hp.resume_live_roads       = s.live;
+    hp.resume_dated_objects    = &H.dated_objects;
+    hp.resume_civilisations    = &H.civilisations;
+    hp.resume_universal_creeds = &H.universal_creeds;
+    hp.capture_year            = capture;
+    hp.resume_seeds_corridor_tier = s.tier_seed;
+    run_out r;
+    r.ss.regions = *s.regions;
+    creed_state cs;
+    cs.cultures = H.cultures; // "rebuild creed_state from cultures": the sim reads nothing else of it.
+    r.hs = run_history_sim(r.ss, &cs, fx.terrain.view(), fx.gw, fx.gh, hp, s.seed,
+                           nullptr, fx.works, nullptr);
+    return r;
+}
+
+/// Treaties, the overlord graph and stocks after a round, x against y.
+struct round_diff
+{
+    int          treaty_objects = 0; ///< dated objects, symmetric difference
+    int          overlord       = 0; ///< polities whose overlord or subject kind differs
+    int          alive          = 0; ///< polities whose liveness differs
+    int          polity_rows    = 0; ///< |row count difference|
+    int          navy           = 0; ///< polities whose navy_stock differs
+    int          region_rows    = 0;
+    int          regions_any    = 0; ///< regions with ANY stock or owner field differing
+    field_census stock_fields;       ///< which region stock fields differ, and how often
+
+    bool zero() const
+    {
+        return treaty_objects == 0 && overlord == 0 && alive == 0 && polity_rows == 0
+            && navy == 0 && region_rows == 0 && regions_any == 0;
+    }
+};
+
+round_diff compare_round(const run_out& x, const run_out& y)
+{
+    round_diff d;
+    d.treaty_objects = dated_symdiff(x.hs.dated_objects, y.hs.dated_objects);
+    const std::vector<polity>& px = x.hs.polities;
+    const std::vector<polity>& py = y.hs.polities;
+    d.polity_rows = static_cast<int>(px.size() > py.size() ? px.size() - py.size() : py.size() - px.size());
+    for (std::size_t i = 0; i < std::min(px.size(), py.size()); ++i)
+    {
+        if (px[i].overlord != py[i].overlord || px[i].subject_kind != py[i].subject_kind) ++d.overlord;
+        if (px[i].alive != py[i].alive) ++d.alive;
+        if (px[i].navy_stock != py[i].navy_stock) ++d.navy;
+    }
+    const std::vector<region>& rx = x.ss.regions;
+    const std::vector<region>& ry = y.ss.regions;
+    d.region_rows = static_cast<int>(rx.size() > ry.size() ? rx.size() - ry.size() : ry.size() - rx.size());
+    for (std::size_t i = 0; i < std::min(rx.size(), ry.size()); ++i)
+    {
+        const region& a = rx[i];
+        const region& b = ry[i];
+        field_census f;
+        if (a.treasury != b.treasury)                       ++f["treasury"];
+        if (a.material_stock != b.material_stock)           ++f["material_stock"];
+        if (a.army_stock != b.army_stock)                   ++f["army_stock"];
+        if (a.manpower_stock != b.manpower_stock)           ++f["manpower_stock"];
+        if (a.port_stock_q != b.port_stock_q)               ++f["port_stock_q"];
+        if (a.standing_army != b.standing_army)             ++f["standing_army"];
+        if (a.standing_army_owner != b.standing_army_owner) ++f["standing_army_owner"];
+        if (a.population != b.population)                   ++f["population"];
+        if (a.nation != b.nation)                           ++f["nation"];
+        if (!f.empty()) ++d.regions_any;
+        for (const auto& [k, n] : f) d.stock_fields[k] += n;
+    }
+    return d;
+}
+
+std::string round_text(const round_diff& d)
+{
+    char buf[256];
+    std::snprintf(buf, sizeof buf, "treaty objs %d, overlord %d, alive %d, navy %d, regions %d%s",
+                  d.treaty_objects, d.overlord, d.alive, d.navy, d.regions_any,
+                  (d.polity_rows || d.region_rows) ? " (ROW COUNTS DIFFER)" : "");
+    return buf;
+}
+
+/// One 1960 state against another's (the continued run's, or the previous
+/// variant's for the step-by-step attribution).
+struct divergence
+{
+    int     owner_regions = 0; ///< regions whose owner differs (plus any row-count gap)
+    int     living        = 0; ///< living polities in this run
+    int     treaty_pairs  = 0; ///< bound pairs, symmetric difference
+    int     overlord      = 0;
+    int64_t battles       = 0; ///< this run's battles over its own span
+    int64_t treasury      = 0; ///< this run's summed region treasury at its close
+};
+
+divergence diverge(const run_out& v, const run_out& c)
+{
+    divergence d;
+    const std::size_t n = std::min(v.ss.regions.size(), c.ss.regions.size());
+    for (std::size_t i = 0; i < n; ++i)
+        if (v.ss.regions[i].nation != c.ss.regions[i].nation) ++d.owner_regions;
+    d.owner_regions += static_cast<int>(std::max(v.ss.regions.size(), c.ss.regions.size()) - n);
+    for (const polity& q : v.hs.polities) if (q.alive) ++d.living;
+    d.treaty_pairs = treaty_pair_symdiff(v.hs.dated_objects, c.hs.dated_objects);
+    for (std::size_t i = 0; i < std::min(v.hs.polities.size(), c.hs.polities.size()); ++i)
+        if (v.hs.polities[i].overlord != c.hs.polities[i].overlord) ++d.overlord;
+    d.battles = v.hs.battles;
+    for (const region& r : v.ss.regions) d.treasury += r.treasury;
+    return d;
+}
+
+struct seed_fidelity
+{
+    uint32_t seed = 0;
+    bool     ran  = false;
+    std::string skip_reason;
+
+    // Gate 1 -- the opening against the struct.
+    field_census open_regions, open_polities;
+    std::vector<std::string> open_tables; ///< "<table>: <first difference>" per table that differs
+    int  open_living = 0;       ///< living polities in the handoff (each noted founded once)
+    int  open_dead   = 0;       ///< polities the handoff carries dead (never noted founded)
+    int  open_founded_dead = 0; ///< founded events at the open for a dead polity (must be 0)
+    int  expl_ghosts       = 0; ///< polities dead at 1200 that Exploration's own open carries
+    int  expl_founded_dead = 0; ///< ... and notes founded (must be 0)
+    bool gate1 = false;
+
+    // The entry state the handoff differs from the continued run in.
+    field_census entry_regions, entry_polities;
+    std::vector<std::string> entry_tables;
+    int  record_rows_h = 0, record_rows_c = 0;         ///< corridor record rows, handoff vs continued
+    int  live_edges_h  = 0, live_edges_c  = 0;         ///< live road edges at each opening
+    int  live_count_diff = 0, live_tier_below = 0, live_tier_above = 0, live_missing = 0;
+
+    // Gate 2 -- one network-neutralised round.
+    round_diff neutral_round;
+    bool gate2 = false;
+    round_diff real_round; ///< the real resume's one round, reported
+
+    // The 1960 divergence, V0..V4 against the continued run, each step
+    // against the variant before it, and the continued run's own numbers.
+    divergence v[5];
+    divergence step[5]; ///< step[k] = V_k against V_{k-1} (step[0] unused)
+    int        c_living = 0;
+    int64_t    c_battles = 0;
+    int64_t    c_treasury = 0;
+    double     seconds = 0.0;
+};
+
+int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, works_registry& works)
+{
+    world_gen_config cfg = cfg_in;
+    cfg.stop_after_exploration = true; // the handoff is all this mode reads.
+
+    std::printf("=== digitisation_sim_harness --fidelity (BL-1036) - a span resumed from exploration_output ===\n");
+    std::printf("handoff: the shipped world (world_params defaults) stopped after Exploration at 1660.\n"
+                "C = Exploration's own call continued from the fixture; R = a second call opened on the struct.\n"
+                "field lists: region %d fields, polity %d fields, every row of every other resumed table.\n\n",
+                k_region_fields, k_polity_fields);
+    std::fflush(stdout);
+
+    std::vector<seed_fidelity> rows;
+    for (uint32_t seed : seeds)
+    {
+        const auto t0 = std::chrono::steady_clock::now();
+        seed_fidelity row;
+        row.seed = seed;
+        std::fprintf(stderr, "[fidelity] seed %u generating\n", seed);
+
+        world_params wp{};
+        wp.seed = seed;
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        (void)make_hard_coded_world(wp, &rep, cfg, /*progress=*/nullptr, &works, &fx);
+        if (!fx.exploration_ran)
+        {
+            row.skip_reason = "Exploration did not run";
+            rows.push_back(row);
+            continue;
+        }
+        const exploration_output& H = fx.exploration_handoff;
+        const history_sim_params& ep = fx.exploration_params;
+        if (H.stop_year != 1660 || ep.consolidation_year != ep.start_year
+         || ep.near_home_cutoff_year != ep.start_year || !fx.pre_exploration_settlement.pending_foundings.empty())
+        {
+            row.skip_reason = "the handoff is not the shipped 1660 one, the anchors are not Exploration's "
+                              "start year, or a founding is still pending";
+            rows.push_back(row);
+            continue;
+        }
+        row.ran = true;
+        const int64_t open = H.stop_year;      // 1660
+        const int64_t one  = open + ep.tick_bands[0].step_years; // one round: 1664
+        const uint32_t own_seed = (seed ^ 0x5D1C7A11u) + wp.era_seed * 0x9E3779B9u; // stand-in, see above
+
+        // ---- C: the continued run -------------------------------------------
+        std::fprintf(stderr, "[fidelity] seed %u continued runs\n", seed);
+        const run_out c_one  = continued(fx, one, open);
+        const run_out c_1960 = continued(fx, 1960, INT64_MIN);
+        const history_sim_capture& C = c_one.hs.capture;
+
+        // ---- Gate 1: the real resume's opening, and its one round ------------
+        resume_spec real;
+        real.regions = &H.regions;
+        real.record  = &H.surviving_corridors;
+        real.seed    = fx.exploration_seed;
+        const run_out r_one = resume(fx, H, real, one, open);
+        const history_sim_capture& O = r_one.hs.capture;
+        {
+            row.open_regions  = census_of(O.regions, H.regions, region_fields);
+            row.open_polities = census_of(O.polities, H.polities, polity_fields);
+            const auto note = [&](const char* table, const std::string& d) {
+                if (!d.empty()) row.open_tables.push_back(std::string(table) + ": " + d);
+            };
+            note("grudges",          table_diff(O.grudges, H.grudges, grudge_eq));
+            note("contacts",         table_diff(O.contacts, H.contacts, contact_eq));
+            note("corridor record",  table_diff(O.supply_corridors, H.surviving_corridors, corridor_eq));
+            note("dated objects",    table_diff(O.dated_objects, H.dated_objects, dated_eq));
+            note("civilisations",    table_diff(O.civilisations, H.civilisations, civ_eq));
+            note("universal creeds", table_diff(O.universal_creeds, H.universal_creeds, creed_eq));
+            if (!O.trade_flows.empty())
+                row.open_tables.push_back("trade flows: " + std::to_string(O.trade_flows.size())
+                                          + " rows at the open (round 1 rebuilds them; none may be carried)");
+            int owner_mismatch = 0;
+            for (std::size_t i = 0; i < O.owner.size() && i < O.regions.size(); ++i)
+                if (O.owner[i] != O.regions[i].nation) ++owner_mismatch;
+            if (owner_mismatch > 0)
+                row.open_tables.push_back("owner map vs region::nation: " + std::to_string(owner_mismatch));
+
+            // The event layer: a resumed open notes the LIVING as founded,
+            // each once, and never a polity the prior span already ended.
+            int living = 0, founded_living = 0, founded_dead = 0;
+            for (const polity& q : H.polities) if (q.alive) ++living;
+            for (const lapse_event& e : r_one.hs.events)
+            {
+                if (e.year != open || e.kind != static_cast<uint8_t>(lapse_event_kind::founded)) continue;
+                if (e.polity < H.polities.size() && H.polities[e.polity].alive) ++founded_living;
+                else ++founded_dead;
+            }
+            row.open_living = living;
+            row.open_dead   = static_cast<int>(H.polities.size()) - living;
+            row.open_founded_dead = founded_dead;
+
+            // The same rule on Exploration's own 1200 resume (the continued
+            // run IS that call): the Empires span's dead are carried and no
+            // longer noted founded -- the ghosts the shipped replay lost.
+            const int64_t expl_open = fx.exploration_params.start_year;
+            for (const polity& q : fx.pre_exploration_polities) if (!q.alive) ++row.expl_ghosts;
+            for (const lapse_event& e : c_one.hs.events)
+            {
+                if (e.year != expl_open || e.kind != static_cast<uint8_t>(lapse_event_kind::founded)) continue;
+                if (e.polity < fx.pre_exploration_polities.size() && !fx.pre_exploration_polities[e.polity].alive)
+                    ++row.expl_founded_dead;
+            }
+            if (row.expl_founded_dead != 0)
+                row.open_tables.push_back("Exploration's 1200 open noted " + std::to_string(row.expl_founded_dead)
+                                          + " dead polities founded");
+            if (founded_dead != 0 || founded_living != living)
+                row.open_tables.push_back("founded events at the open: " + std::to_string(founded_living)
+                                          + " living of " + std::to_string(living) + ", "
+                                          + std::to_string(founded_dead) + " for polities already dead");
+            row.gate1 = O.captured && O.year == open && row.open_regions.empty()
+                     && row.open_polities.empty() && row.open_tables.empty();
+        }
+
+        // ---- The entry state: the handoff against the continued run at 1660 --
+        {
+            row.entry_regions  = census_of(H.regions, C.regions, region_fields);
+            row.entry_polities = census_of(H.polities, C.polities, polity_fields);
+            const auto note = [&](const char* table, const std::string& d) {
+                if (!d.empty()) row.entry_tables.push_back(std::string(table) + ": " + d);
+            };
+            note("grudges",          table_diff(H.grudges, C.grudges, grudge_eq));
+            note("contacts",         table_diff(H.contacts, C.contacts, contact_eq));
+            std::vector<dated_object> c_dated = C.dated_objects;
+            expire_dated_objects(c_dated, open); // what round 1 does before any read
+            note("dated objects (as sets, after the 1660 expiry)",
+                 dated_symdiff(H.dated_objects, c_dated) == 0 ? std::string{}
+                     : std::to_string(dated_symdiff(H.dated_objects, c_dated)) + " objects");
+            note("civilisations",    table_diff(H.civilisations, C.civilisations, civ_eq));
+            note("universal creeds", table_diff(H.universal_creeds, C.universal_creeds, creed_eq));
+            row.record_rows_h = static_cast<int>(H.surviving_corridors.size());
+            row.record_rows_c = static_cast<int>(C.supply_corridors.size());
+            row.live_edges_h  = static_cast<int>(O.live_roads.size());
+            row.live_edges_c  = static_cast<int>(C.live_roads.size());
+            std::map<std::pair<int, int>, const history_corridor*> live_h;
+            for (const history_corridor& e : O.live_roads) live_h[{e.a, e.b}] = &e;
+            for (const history_corridor& e : C.live_roads)
+            {
+                const auto it = live_h.find({e.a, e.b});
+                if (it == live_h.end()) { ++row.live_missing; continue; }
+                if (it->second->uses != e.uses) ++row.live_count_diff;
+                if (it->second->tier < e.tier) ++row.live_tier_below;
+                if (it->second->tier > e.tier) ++row.live_tier_above;
+            }
+        }
+
+        // ---- Gate 2: one round with the named network sources neutralised ---
+        // The corridor record and the live road counts the resume prices on
+        // are the continued run's own at 1660, and the 1660 close's market
+        // stamp (BL-910: `has_market` is set on every living capital at a
+        // span's close, and nowhere else) is undone to the continued run's.
+        std::vector<region> neutral_regions = H.regions;
+        if (neutral_regions.size() == C.regions.size())
+            for (std::size_t i = 0; i < neutral_regions.size(); ++i)
+                neutral_regions[i].has_market = C.regions[i].has_market;
+        resume_spec neutral;
+        neutral.regions = &neutral_regions;
+        neutral.record  = &C.supply_corridors;
+        neutral.live    = &C.live_roads;
+        neutral.seed    = fx.exploration_seed;
+        {
+            const run_out n_one = resume(fx, H, neutral, one, INT64_MIN);
+            row.neutral_round = compare_round(n_one, c_one);
+            row.gate2 = row.neutral_round.zero();
+            row.real_round = compare_round(r_one, c_one);
+        }
+
+        // ---- The 1960 divergence, one source added back at a time ------------
+        std::fprintf(stderr, "[fidelity] seed %u 1960 variants\n", seed);
+        {
+            resume_spec v1 = neutral;            // + the 1660 close's market stamp
+            v1.regions = &H.regions;
+            resume_spec v2 = v1;                 // + the 1660 corridor record, unfiltered,
+            v2.record = &fx.exploration_state.supply_corridors; // live counts seeded from it
+            v2.live   = nullptr;
+            resume_spec v3 = v2;                 // + the dead-filter: the handoff as it is
+            v3.record = &H.surviving_corridors;
+            resume_spec v4 = v3;                 // + the span's own seed: the real resume
+            v4.seed = own_seed;
+            const resume_spec* specs[5] = { &neutral, &v1, &v2, &v3, &v4 };
+            run_out prev;
+            for (int k = 0; k < 5; ++k)
+            {
+                run_out cur = resume(fx, H, *specs[k], 1960, INT64_MIN);
+                row.v[k] = diverge(cur, c_1960);
+                if (k > 0) row.step[k] = diverge(cur, prev);
+                prev = std::move(cur);
+            }
+        }
+        for (const polity& q : c_1960.hs.polities) if (q.alive) ++row.c_living;
+        for (const region& r : c_1960.ss.regions) row.c_treasury += r.treasury;
+        row.c_battles = c_1960.hs.battles - fx.exploration_state.battles;
+
+        row.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        std::printf("seed %u  gate1 %s  gate2 %s  (%.1f s)\n", seed, row.gate1 ? "PASS" : "FAIL",
+                    row.gate2 ? "PASS" : "FAIL", row.seconds);
+        std::fflush(stdout);
+        rows.push_back(row);
+    }
+
+    // ---- The report ---------------------------------------------------------
+    int ran = 0, g1 = 0, g2 = 0;
+    std::printf("\n=== GATE 1 (R4): the resumed opening equals exploration_output, field for field ===\n");
+    for (const seed_fidelity& r : rows)
+    {
+        if (!r.ran) { std::printf("  %5u  SKIPPED: %s\n", r.seed, r.skip_reason.c_str()); continue; }
+        ++ran;
+        if (r.gate1) ++g1;
+        std::printf("  %5u  %s  regions: %s | polities: %s | founded at the open: %d living, %d dead carried "
+                    "and not noted (1200: %d dead not noted)", r.seed, r.gate1 ? "PASS" : "FAIL",
+                    census_text(r.open_regions).c_str(), census_text(r.open_polities).c_str(),
+                    r.open_living, r.open_dead, r.expl_ghosts);
+        for (const std::string& t : r.open_tables) std::printf(" | %s", t.c_str());
+        std::printf("\n");
+    }
+
+    std::printf("\n=== ENTRY: where the handoff differs from the continued run at the top of 1660 (reported) ===\n");
+    std::printf("  (record = the corridor rows income and trade price on; live = the road counts reach reads)\n");
+    for (const seed_fidelity& r : rows)
+    {
+        if (!r.ran) continue;
+        std::printf("  %5u  regions: %s | polities: %s", r.seed, census_text(r.entry_regions).c_str(),
+                    census_text(r.entry_polities).c_str());
+        for (const std::string& t : r.entry_tables) std::printf(" | %s", t.c_str());
+        std::printf("\n         record rows H %d vs C %d | live edges H %d vs C %d: missing from H %d, count "
+                    "differs %d, H tier below C %d, above %d\n",
+                    r.record_rows_h, r.record_rows_c, r.live_edges_h, r.live_edges_c, r.live_missing,
+                    r.live_count_diff, r.live_tier_below, r.live_tier_above);
+    }
+
+    std::printf("\n=== GATE 2 (R5): one round, named network sources neutralised, equals the continued run's 1660 round ===\n");
+    std::printf("  (treaties = dated objects; overlord graph = overlord + subject kind; stocks = region treasury,\n"
+                "   material, army, manpower, port, standing army, population, owner, and polity navy)\n");
+    for (const seed_fidelity& r : rows)
+    {
+        if (!r.ran) continue;
+        if (r.gate2) ++g2;
+        std::printf("  %5u  %s  neutralised: %s%s%s\n", r.seed, r.gate2 ? "PASS" : "FAIL",
+                    round_text(r.neutral_round).c_str(),
+                    r.neutral_round.stock_fields.empty() ? "" : " | fields: ",
+                    r.neutral_round.stock_fields.empty() ? "" : census_text(r.neutral_round.stock_fields).c_str());
+        std::printf("         the real resume (reported, the named sources' one-round footprint): %s%s%s\n",
+                    round_text(r.real_round).c_str(),
+                    r.real_round.stock_fields.empty() ? "" : " | fields: ",
+                    r.real_round.stock_fields.empty() ? "" : census_text(r.real_round.stock_fields).c_str());
+    }
+
+    std::printf("\n=== 1960 DIVERGENCE against the continued run (--through 1960), attributed by source (REPORTED) ===\n");
+    std::printf("  V0 all named sources neutralised, Exploration's seed | V1 + the 1660 close's market stamp |\n"
+                "  V2 + the 1660 corridor record, unfiltered, live counts seeded from it | V3 + the dead-filter\n"
+                "  (the handoff as it is) | V4 + the span's own seed (the real resume)\n");
+    std::printf("  Against C: regions owned differently, living polities, treaty pairs differing, battles 1660-1960,\n"
+                "  summed region treasury (x1e3). By source: each variant against the one before it (the source's\n"
+                "  own footprint, 'regions owned differently / treaty pairs differing').\n");
+    for (const seed_fidelity& r : rows)
+    {
+        if (!r.ran) continue;
+        std::printf("  %5u  owner  V0..V4 %4d %4d %4d %4d %4d | living C %3d: %3d %3d %3d %3d %3d | treaty pairs "
+                    "%3d %3d %3d %3d %3d\n",
+                    r.seed, r.v[0].owner_regions, r.v[1].owner_regions, r.v[2].owner_regions,
+                    r.v[3].owner_regions, r.v[4].owner_regions,
+                    r.c_living, r.v[0].living, r.v[1].living, r.v[2].living, r.v[3].living, r.v[4].living,
+                    r.v[0].treaty_pairs, r.v[1].treaty_pairs, r.v[2].treaty_pairs, r.v[3].treaty_pairs,
+                    r.v[4].treaty_pairs);
+        std::printf("         battles C %4lld: %4lld %4lld %4lld %4lld %4lld | treasury C %lld: %lld %lld %lld %lld %lld\n",
+                    static_cast<long long>(r.c_battles), static_cast<long long>(r.v[0].battles),
+                    static_cast<long long>(r.v[1].battles), static_cast<long long>(r.v[2].battles),
+                    static_cast<long long>(r.v[3].battles), static_cast<long long>(r.v[4].battles),
+                    static_cast<long long>(r.c_treasury / 1000), static_cast<long long>(r.v[0].treasury / 1000),
+                    static_cast<long long>(r.v[1].treasury / 1000), static_cast<long long>(r.v[2].treasury / 1000),
+                    static_cast<long long>(r.v[3].treasury / 1000), static_cast<long long>(r.v[4].treasury / 1000));
+        std::printf("         by source: market stamp %d/%d | 1660 record %d/%d | dead-filter %d/%d | seed %d/%d | "
+                    "residual %d/%d\n",
+                    r.step[1].owner_regions, r.step[1].treaty_pairs, r.step[2].owner_regions, r.step[2].treaty_pairs,
+                    r.step[3].owner_regions, r.step[3].treaty_pairs, r.step[4].owner_regions, r.step[4].treaty_pairs,
+                    r.v[0].owner_regions, r.v[0].treaty_pairs);
+    }
+    {
+        // Attribution: each source's own footprint (the variant against the
+        // one before it), spread over the seeds.
+        const char* names[5] = { "residual: V0 against C", "the close's market stamp: V1 against V0",
+                                 "the 1660 corridor record: V2 against V1", "the dead-filter: V3 against V2",
+                                 "the seed: V4 against V3" };
+        std::printf("  regions owned differently at 1960, per source:\n");
+        for (int k = 0; k < 5; ++k)
+        {
+            std::vector<double> inc;
+            for (const seed_fidelity& r : rows)
+                if (r.ran)
+                    inc.push_back(static_cast<double>(k == 0 ? r.v[0].owner_regions : r.step[k].owner_regions));
+            print_spread(names[k], inc);
+        }
+        std::printf("    (a footprint is measured against the variant before it; sources interact, so footprints\n"
+                    "     do not sum to V4's distance from C)\n");
+    }
+
+    double total = 0.0, worst = 0.0;
+    for (const seed_fidelity& r : rows) { total += r.seconds; worst = std::max(worst, r.seconds); }
+    std::printf("\nSUMMARY  gate 1 (opening == struct) %d of %d seeds | gate 2 (one neutralised round == continued) "
+                "%d of %d seeds | %.1f s total, worst seed %.1f s\n", g1, ran, g2, ran, total, worst);
+    const bool pass = ran > 0 && g1 == ran && g2 == ran;
+    std::printf("%s\n", pass ? "FIDELITY PASS" : "FIDELITY FAIL");
+    return pass ? 0 : 1;
+}
+
+// ===========================================================================
+// BL-1037 -- A RESUMED SPAN REOPENS A BOUGHT RUNG AT ITS TIER (`--resume-tier`)
+// ===========================================================================
+//
+// Per seed, at BOTH span boundaries -- Exploration's own open at 1200 (from
+// the Empires record) and a Digitisation resume at 1660 (from the handoff) --
+// with `history_sim_params::resume_seeds_corridor_tier` OFF (today) and ON:
+//
+//   changed      record rows whose resumed rung the switch changes, read off
+//                the record: the walks UNDER-read a bought rung ("bought,
+//                demoted") or OVER-read a refused walk ("refused, promoted").
+//   below/above  rows whose rung at the captured OPENING sits below / above
+//                the record's `tier`.
+//   re-crossed   a road_promoted event during the span to a rung at or below
+//                the one the record says the corridor already stood on -- a
+//                rung bought, or walked, twice. "post" counts post roads.
+//
+// The 1660 ON boundary resumes from a handoff folded off an ON Exploration
+// span -- the world the re-bless would ship; OFF resumes from the shipped
+// handoff. Both 1660 resumes run to 1960 on Exploration's seed.
+//
+// GATES the switch-on invariants (exit 1 on any seed): nothing below, nothing
+// above, nothing re-crossed, at either boundary. The OFF columns are the
+// defect's size today, reported.
+
+struct boundary_tiers
+{
+    int     rows = 0;             ///< record rows a resume seeds
+    int     bought_demoted   = 0; ///< walks under-read the rung (walked tier < tier)
+    int     refused_promoted = 0; ///< walks over-read the rung (walked tier > tier)
+    int     below = 0, above = 0; ///< opening live rung against the record's
+    int     recrossed = 0, recrossed_post = 0;
+    int64_t post_roads_built = 0; ///< the span's own post-road purchases
+};
+
+int tier_for_uses(const history_sim_params& p, int uses)
+{
+    if (uses >= p.road_tier3_uses) return 3;
+    if (uses >= p.road_tier2_uses) return 2;
+    if (uses >= p.road_tier1_uses) return 1;
+    return 0;
+}
+
+boundary_tiers measure_boundary(const history_sim_params& p, const std::vector<history_corridor>& record,
+                                const history_sim_state& span)
+{
+    boundary_tiers b;
+    b.post_roads_built = span.post_roads_built;
+    std::map<std::pair<int, int>, int> open_live;
+    for (const history_corridor& e : span.capture.live_roads) open_live[{e.a, e.b}] = e.tier;
+    std::map<std::pair<int, int>, int> record_tier;
+    for (const history_corridor& c : record)
+    {
+        if (c.a == c.b || c.uses <= 0) continue; // exactly the rows a resume seeds
+        ++b.rows;
+        const int walked = tier_for_uses(p, c.uses);
+        if (walked < c.tier) ++b.bought_demoted;
+        if (walked > c.tier) ++b.refused_promoted;
+        const auto it = open_live.find({c.a, c.b});
+        const int live = it == open_live.end() ? 0 : it->second;
+        if (live < c.tier) ++b.below;
+        if (live > c.tier) ++b.above;
+        record_tier[{c.a, c.b}] = c.tier;
+    }
+    for (const lapse_event& e : span.events)
+    {
+        if (e.kind != static_cast<uint8_t>(lapse_event_kind::road_promoted)) continue;
+        const int lo = std::min<int>(e.region, e.other), hi = std::max<int>(e.region, e.other);
+        const auto it = record_tier.find({lo, hi});
+        if (it == record_tier.end()) continue;
+        if (static_cast<int>(e.polity) <= it->second)
+        {
+            ++b.recrossed;
+            if (e.polity == 3) ++b.recrossed_post;
+        }
+    }
+    return b;
+}
+
+int run_resume_tier(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, works_registry& works)
+{
+    world_gen_config cfg = cfg_in;
+    cfg.stop_after_exploration = true;
+
+    std::printf("=== digitisation_sim_harness --resume-tier (BL-1037) - a resumed corridor reopens at its rung ===\n");
+    std::printf("switch: history_sim_params::resume_seeds_corridor_tier. 1200 = Exploration's own open (Empires\n"
+                "record); 1660 = a resume from the handoff to 1960 (OFF: the shipped handoff; ON: one folded off an\n"
+                "ON Exploration span). rows = record rows seeded; changed = bought,demoted / refused,promoted;\n"
+                "below/above = opening rung against the record's tier; re-crossed = a rung bought or walked twice\n"
+                "(post roads in brackets); post = the span's own post-road purchases.\n\n");
+    std::fflush(stdout);
+
+    int ran = 0, failed = 0;
+    double total = 0.0, worst = 0.0;
+    for (uint32_t seed : seeds)
+    {
+        const auto t0 = std::chrono::steady_clock::now();
+        std::fprintf(stderr, "[resume-tier] seed %u generating\n", seed);
+        world_params wp{};
+        wp.seed = seed;
+        generation_report     rep;
+        era_minus_one_fixture fx;
+        (void)make_hard_coded_world(wp, &rep, cfg, /*progress=*/nullptr, &works, &fx);
+        if (!fx.exploration_ran || fx.exploration_handoff.stop_year != 1660)
+        {
+            std::printf("  %5u  SKIPPED: no shipped 1660 handoff\n", seed);
+            continue;
+        }
+        ++ran;
+        const history_sim_params&  ep = fx.exploration_params;
+        const exploration_output&  H  = fx.exploration_handoff;
+        const int64_t open_1200 = ep.start_year;
+        const int64_t first     = open_1200 + ep.tick_bands[0].step_years;
+
+        // 1200, OFF: the opening from a one-round re-run; the span from
+        // generation's own (shipped) run.
+        std::fprintf(stderr, "[resume-tier] seed %u 1200 boundary\n", seed);
+        history_sim_state off_1200 = continued(fx, first, open_1200, false).hs;
+        off_1200.events           = fx.exploration_state.events;
+        off_1200.post_roads_built = fx.exploration_state.post_roads_built;
+        const boundary_tiers b1200_off = measure_boundary(ep, fx.pre_exploration_corridors, off_1200);
+
+        // 1200, ON: the whole Exploration span with the switch, folded into
+        // the handoff an ON world would carry to 1660.
+        run_out on_expl = continued(fx, H.stop_year, open_1200, true);
+        const boundary_tiers b1200_on = measure_boundary(ep, fx.pre_exploration_corridors, on_expl.hs);
+        const exploration_output H_on = make_exploration_output(on_expl.ss, on_expl.hs, &fx.pre_exploration_creeds);
+
+        // 1660: a resume from each handoff to 1960.
+        std::fprintf(stderr, "[resume-tier] seed %u 1660 boundary\n", seed);
+        resume_spec off_spec;
+        off_spec.regions = &H.regions;
+        off_spec.record  = &H.surviving_corridors;
+        off_spec.seed    = fx.exploration_seed;
+        const boundary_tiers b1660_off =
+            measure_boundary(ep, H.surviving_corridors, resume(fx, H, off_spec, 1960, H.stop_year).hs);
+        resume_spec on_spec;
+        on_spec.regions   = &H_on.regions;
+        on_spec.record    = &H_on.surviving_corridors;
+        on_spec.seed      = fx.exploration_seed;
+        on_spec.tier_seed = true;
+        const boundary_tiers b1660_on =
+            measure_boundary(ep, H_on.surviving_corridors, resume(fx, H_on, on_spec, 1960, H_on.stop_year).hs);
+
+        const auto ok = [](const boundary_tiers& b) { return b.below == 0 && b.above == 0 && b.recrossed == 0; };
+        const bool seed_ok = ok(b1200_on) && ok(b1660_on);
+        if (!seed_ok) ++failed;
+
+        const auto line = [](const char* span, const boundary_tiers& off, const boundary_tiers& on) {
+            std::printf("         %s  rows %5d/%-5d changed %3d,%-3d/%3d,%-3d | OFF below %3d above %3d re-crossed "
+                        "%3d (%d) post %3lld | ON below %d above %d re-crossed %d (%d) post %3lld\n",
+                        span, off.rows, on.rows, off.bought_demoted, off.refused_promoted, on.bought_demoted,
+                        on.refused_promoted, off.below, off.above, off.recrossed, off.recrossed_post,
+                        static_cast<long long>(off.post_roads_built), on.below, on.above, on.recrossed,
+                        on.recrossed_post, static_cast<long long>(on.post_roads_built));
+        };
+        const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        total += secs;
+        worst = std::max(worst, secs);
+        std::printf("  %5u  %s  (%.1f s)   [rows / changed: OFF record / ON record]\n", seed,
+                    seed_ok ? "PASS" : "FAIL", secs);
+        line("1200", b1200_off, b1200_on);
+        line("1660", b1660_off, b1660_on);
+        std::fflush(stdout);
+    }
+    std::printf("\nSUMMARY  switch-on invariants (nothing below, above or re-crossed at 1200 and 1660) hold on %d of %d "
+                "seeds | %.1f s total, worst seed %.1f s\n", ran - failed, ran, total, worst);
+    const bool pass = ran > 0 && failed == 0;
+    std::printf("%s\n", pass ? "RESUME-TIER PASS" : "RESUME-TIER FAIL");
+    return pass ? 0 : 1;
+}
+
+} // namespace fidelity
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -459,11 +1354,21 @@ int main(int argc, char** argv)
     int  limit = -1;
     int64_t through_year = 1660; // BL-1029
     std::string out_path;        // BL-1029
+    bool fidelity_mode = false;  // BL-1036
+    bool resume_tier_mode = false; // BL-1037
     for (int a = 1; a < argc; ++a)
     {
         if (std::strcmp(argv[a], "--limit") == 0 && a + 1 < argc)
         {
             limit = std::atoi(argv[++a]);
+        }
+        else if (std::strcmp(argv[a], "--fidelity") == 0)
+        {
+            fidelity_mode = true;
+        }
+        else if (std::strcmp(argv[a], "--resume-tier") == 0)
+        {
+            resume_tier_mode = true;
         }
         else if (std::strcmp(argv[a], "--through") == 0 && a + 1 < argc)
         {
@@ -489,7 +1394,7 @@ int main(int argc, char** argv)
         else
         {
             std::printf("unknown argument '%s'\nusage: digitisation_sim_harness [--limit N] [--seeds a,b,c] "
-                        "[--through Y] [--out path]\n", argv[a]);
+                        "[--through Y] [--out path] [--fidelity] [--resume-tier]\n", argv[a]);
             return 2;
         }
     }
@@ -542,6 +1447,14 @@ int main(int argc, char** argv)
     if (cfg.corporation_count != 8)
         std::printf("PARITY WARNING  world_gen.lua sets corporation_count=%d but apply_shipped_landscape "
                     "searches from 8; the landscape measured is not the app's\n", cfg.corporation_count);
+
+    // BL-1036: the resume-fidelity check is its own mode -- it reads the 1660
+    // handoff and nothing past it, so it neither builds a campaign world nor
+    // takes a reading. --through does not apply to it (it runs its own 1960).
+    if (fidelity_mode)
+        return fidelity::run(seeds, cfg, works);
+    if (resume_tier_mode) // BL-1037, same footing: the handoff and the two boundaries only.
+        return fidelity::run_resume_tier(seeds, cfg, works);
 
     const world_params shipped_descriptor{};
     const era_band band = era_band_for_epoch(shipped_descriptor.epoch_year);

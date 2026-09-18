@@ -471,6 +471,9 @@ int main()
             history_sim_params ep;
             ep.start_year = fixture.params.stop_year; // 1200, wherever Empires closed.
             ep.stop_year  = fixture.params.stop_year + 460; // EXPLORATION.md's own span.
+            // BL-1036: the two 1200 anchors, explicit, as exploration_sim_params sets them.
+            ep.consolidation_year    = ep.start_year;
+            ep.near_home_cutoff_year = ep.start_year;
             ep.tick_bands[0]   = {ep.stop_year, 4};
             ep.tick_band_count = 1;
             ep.exploration_upkeep_enabled          = true;
@@ -890,6 +893,8 @@ int main()
         qs[1].id = 1; qs[1].capital = 1; qs[1].cohesion_q = 700;
         history_sim_params ep2;
         ep2.start_year = 1200; // consolidation year: not this call's `year`
+        ep2.consolidation_year    = 1200; // BL-1036: the anchors are explicit now,
+        ep2.near_home_cutoff_year = 1200; // no longer read off `start_year`.
 
         run_exploration_upkeep(regions, qs, /*corridors=*/{}, ep2, /*year=*/1234, /*step_years=*/4);
 
@@ -900,7 +905,7 @@ int main()
         check(qs[0].capacity[0] == 3 && qs[1].cohesion_q == 700,
               "R5.3  upkeep does not disturb fields it has no business touching");
 
-        // R5.4: the ONE-TIME consolidation, at year == start_year only.
+        // R5.4: the ONE-TIME consolidation, at year == consolidation_year only.
         // BL-935's PAY/INVEST now spends from this same treasury the very
         // same call, so this test isolates EARN's own consolidation act by
         // switching every BL-935 cost off -- R5.5/R5.6 below cover spend.
@@ -957,6 +962,8 @@ int main()
 
         history_sim_params ep;
         ep.start_year = 9999; // never this call's `year` -- no consolidation noise
+        ep.consolidation_year    = 9999; // BL-1036: the anchors are explicit now;
+        ep.near_home_cutoff_year = 9999; // both keep the value start_year gave them.
 
         exploration_upkeep_spend spend;
         run_exploration_upkeep(regions, qs, /*corridors=*/{}, ep, /*year=*/1234,
@@ -1009,6 +1016,8 @@ int main()
     {
         history_sim_params ep;
         ep.start_year = 1200; // contacts before this are near home; no consolidation at 1234
+        ep.consolidation_year    = 1200; // BL-1036: the anchors are explicit now,
+        ep.near_home_cutoff_year = 1200; // no longer read off `start_year`.
 
         const culture expansionist = lean_culture(/*sea*/1000, /*zeal*/10, /*dominion*/0);  // expn 1000, cons 0
         const culture middling     = lean_culture(/*sea*/500,  /*zeal*/5,  /*dominion*/5);  // expn 500,  cons 250
@@ -1546,6 +1555,8 @@ int main()
 
         history_sim_params ep;
         ep.start_year = 9999; // no consolidation
+        ep.consolidation_year    = 9999; // BL-1036: the anchors are explicit now;
+        ep.near_home_cutoff_year = 9999; // both keep the value start_year gave them.
         ep.port_build_cost_q = 0; ep.navy_build_cost_q = 0; ep.standing_army_build_cost_q = 0;
 
         const std::vector<dated_object> no_trade = {

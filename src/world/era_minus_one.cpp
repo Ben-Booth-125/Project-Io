@@ -383,6 +383,14 @@ history_sim_params exploration_sim_params(const world_params& params)
     // the one caller that wants it called at all.
     hp.exploration_upkeep_enabled = true;
 
+    // BL-1036 — THE 1200 ANCHORS, EXPLICIT. Consolidation and the near-home
+    // cutoff were read off `start_year`; this span opens at
+    // `empires_stop_year`, so setting both to it is byte-identical to the
+    // reads they replace. A later span (Digitisation, from 1660) copies these
+    // params and keeps both at 1200 (DIGITISATION.md, the span paragraphs).
+    hp.consolidation_year    = params.empires_stop_year;
+    hp.near_home_cutoff_year = params.empires_stop_year;
+
     // BL-953 — a want points a campaign outward, and ranks subjection. THIS
     // span only; the struct default (0) keeps the Empires span byte-identical.
     // MEASURED, `exploration_sweep 3 --w_want_q=N`, 2026-09-14 (traced re-run,
