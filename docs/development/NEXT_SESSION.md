@@ -1,60 +1,63 @@
-# Next session — cut sprint 45, starting with BL-1034
+# Next session — finish sprint 45, then cut sprint 46
 
-Written 2026-09-18, at the close of sprint 44, with the review queue ruled and empty. **Read this,
-then `node tools/session/backlog_query.js --status designed --full`, then
-`docs/generation/DIGITISATION.md` § 1 and § Beat 1.**
+Written 2026-09-18 at 21:30, as the PC went to sleep mid-run. **Read this, then
+`node tools/session/sprints` (or `docs/development/SPRINTS.md` § sprints 45 and 46), then
+`docs/development/REFINED.md` § Sprint 45.**
 
-## Where things stand
+## First thing, in this order
 
-- **Sprints 43 and 44 are closed.** The 1960 baseline is measured, and the corporate web's plumbing
-  is in: a per-centre charter budget reaches the landscape search and charters specialists and
-  background firms around each centre, **off by default** — the app passes no budget, and
-  `player_seed_sweep --digest-check` holds all 16 pinned seeds with no budget, an empty budget, an
-  all-zero budget and a refused one.
-- **The hot backlog holds two items:** BL-1034 (world copies diverge, sprint 45, first) and
-  BL-1035 (harness windows long enough, unscheduled).
-- **Sprint 45 (industrialisation makes the web real) is a proposed goal row** in `sprints.json`.
+1. **Chain 8** was running when the PC slept (started 20:55; the script is in the old session's
+   scratchpad, so re-run it rather than look for its log): on main at or after `9f7a0e92`, run
+   `player_seed_sweep --digest-check` (16 seeds, ~60-70 min), `exploration_sweep --out` then
+   `seed_library.js --check --from`, `world_determinism`, `exploration_sim_harness`,
+   `charter_refusal_probe`, `survey_endowment_harness`, `digitisation_sim_harness --fidelity`.
+   A 16/16 digest check closes BL-1040, BL-1051, BL-1053 and BL-1041's R1 rows. Record the
+   evidence on the requirement rows, then close the items as wave 0 was closed (`e8692579`).
+2. **BL-1041's fix round** was in its lane (worktree `agent-a7e880239e1f2e4d6`) when the PC
+   slept: six neutral fixes from its cold review (reading 8's headcount test against integrated
+   heads, the missing original-vs-re-surveyed split, capacity-kind nodes only, tests for Defaults A
+   and B, the switch set pinned, stale comments). If the agent cannot be resumed, snapshot its
+   worktree diff, checkpoint-commit, and finish in the main session. Merge, re-run, record.
+3. **BL-1039's timed rows** (Ben: first thing 2026-09-19, quiet machine, keep-awake, serial):
+   ```
+   bash tools/verify/build_lua_harness.sh player_seed_sweep
+   ./build_gen/verify/player_seed_sweep.exe --charter-cost --seeds 0,28,46 --budget-scales 1,2,4 --resource-cap sqrt --density-ceilings 120,160 --specialist-prices 4 --no-extra --no-forced --out charter_cost_sweep_bl1039.json --note "BL-1039 sqrt c=8 (B on firms), goods in turn, ceilings 120/160, draw capital; quiet machine, main at <hash>, Release /O2 MSVC 14.44.35207, serial"
+   node tools/verify/charter_cost_merge.js charter_cost_sweep.json charter_cost_sweep_bl1039.json bl1039_sqrt
+   ```
+   21 rows. Then file the R6 call: the density ceiling (120 or 160) read off them.
+4. **Two open calls for Ben** (NEEDS_REVIEW.md): NR-896 (forest and coal both read the best
+   held region, which grows with realm size; Charcoal now outnumbers Coke 319 to 200) and NR-897
+   (the treasury-to-points constants; treasury is a median 69% of points, all on the capital).
+   Both change what BL-1042 and BL-1043 measure — put them to Ben before BL-1042 starts.
 
-## The review queue is empty (ruled 2026-09-18)
+## Sprint 45 — where it stands
 
-- **NR-889:** on a budget world the per-resource cap **scales with the body's charter capital**
-  (`DIGITISATION.md` § 1); the scaling rule and the specialist's price are sprint 45's to set, on
-  real stockpiles, against `charter_cost_sweep.json`.
-- **NR-890:** BL-1034 (world copies diverge) comes **first** in sprint 45, ahead of Beat 1.
-- **NR-886:** coastal cheapness and the trade re-base accepted as built; seat solvency decided with
-  sprint 45's specialist-capital call; the three red harness rows filed as BL-1035 (harness windows
-  long enough); the small-grudge fade accepted and documented; the culture fold accepted.
+- **Delivered:** BL-1034, BL-1036, BL-1037 (switch off), BL-1038 (switch off).
+- **Merged, owed only the digest check:** BL-1040 (span, switch off), BL-1051 (span-open survey),
+  BL-1053 (setup reads the 1960 close; the loading bar ends full, checked live by Ben).
+- **Merged, fix round in its lane:** BL-1041 (industry points).
+- **Merged, owed the timed rows and the R6 call:** BL-1039 (round 2: capital back to the draw, B
+  on firm points, the ceiling fills goods in turn).
+- **Not started:** BL-1042 (stockpile to budget), BL-1043 (real-stockpile sweep), BL-1050
+  (order-independent reads — merged only with BL-1044), BL-1044 (Beat 1 ships: the re-bless).
+- The wizard's "Loading the X round" wait gained a progress bar (`2387af55`, Ben watched it).
 
-## Then cut sprint 45
+## Sprint 46 — proposed, cut it after sprint 45's re-bless
 
-Its goal: Digitisation runs 1660 → 1960 from the `exploration_output` struct, the Industry tree is
-invested in, large cities accumulate located industry points, and each centre's unspent points
-become the charter budget sprint 44's path spends — one re-bless, one cold review. Owed when its
-items are cut: whether consolidation and the near-home cutoff re-anchor at 1660; a resume path for
-dated objects and trade flows; whether Beat 1's first cut carries the three sinks or only
-stockpiles; what a world with no affordable specialist gets (Ben deferred it here); the rule by
-which the per-resource cap scales with charter capital, and the charter prices, both on real
-stockpiles against `charter_cost_sweep.json`; and whether a charter price becomes starting
-capital, which also decides the seat's solvency question.
-
-## Tools the two sprints left
-
-- `exploration_sweep --seeds --out --through Y --cost` — per-half weakness counters.
-- `digitisation_sim_harness --through Y --out` — the thirteen readings beside a 1660 control.
-- `player_seed_sweep --digest | --digest-check [--charter-budget none|empty|zero|synthetic|refused]`
-  — four world digests per seed against the BL-1031 pins. **Never re-pin them.**
-- `player_seed_sweep --charter-cost [...]` — the cost matrix (`--budget-scales --resource-cap
-  --province-cap --specialist-prices --ladder-scales --live-ticks --out --note`).
-- `seed_library.js --seed-list | --from path` — the library reads `seed_library_sweep.json`.
+Ben ruled twelve calls on 2026-09-18 (NR-898, archived; sprint 46's notes carry them whole). The
+cut owes: filing ~17 items from `sprints.json` sprint 46's `planned` list (the old session's
+three-lane read is summarised in NR-898 and the planned rows; re-read the code where an item's
+file:line matters), requirement groups, and the doc sweep's own item. Campaign tech state lands
+per corporation (the existing earned_techs gates), not per nation — raise the scope flag. The
+select-corporation screen needs a design session with Ben before it is built (BL-880, cancelled,
+was its first design).
 
 ## Standing hazards
 
-- **Keep the machine awake for long sweeps.** The PC slept 22:07 → 09:03 mid-sweep on 2026-09-17.
-- **Timings need a quiet machine**, serial, Release, build tree quoted. A 16-seed digest check is
-  ~55 min; a cost row 200-1,000 s; the readings harness ~24 min.
-- **Never baseline on `epoch_year = 1960`** (the superseded two-span arc, Exploration off).
-- **Do not copy a world and then tick it** until BL-1034 is fixed.
-- Write measuring runs to `--out`; regenerate tracked artefacts on the final integrated tree.
-- Mint `NR-` ids against the hot store and the archive together.
-- `history_sim_harness` carries a tracked 2-failure baseline (R3a2/R3a3); `story_check` fails 2 on
-  US-016 — both pre-existing.
+- Memory caps concurrency: 15.5 GB; a `player_seed_sweep` holds ~2.9 GB. Lanes never run it;
+  check `systeminfo` before heavy runs.
+- The PC sleeps ~22:00; long correctness runs resume on wake, timing runs must be re-run.
+- The computer-use grant for ProjectIo resolves to a pruned worktree path; launch the app from
+  `build/` via Bash for Ben to watch instead.
+- `backlog_query --grep` does not search design text; continuity-pass items carry a
+  `CONTINUITY PASS` marker in their design (BL-1045, 1046, 1048, 1049, 1052, 1055).

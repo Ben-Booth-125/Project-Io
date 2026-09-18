@@ -10,6 +10,54 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-18 — Sprint 45 cut and mostly built: the span, Beat 1's points and the charter rules, behind switches; sprint 46 shaped
+
+**Runtime:** ~10.5 h. Design (four elicitation forms, two read workflows) and Delivery — Full (eight
+worktree lanes, every one cold-reviewed, five with a fix round; nine main-session verification chains).
+
+### The cut
+A five-lane engine read with an adversarial check per lane mapped the seams before any item was filed.
+Ben ruled the sprint on a form: the span runs whatever the epoch and ships on at epoch 0; Beat 1
+stockpiles, with treasury paid in as a consequence rather than a verb; every living polity enters the
+Industry tree at 1660 and its root is ungated; the per-resource cap scales by a square root under a
+density ceiling. Every world-mover landed behind a switch, so sprint 45 spends one re-bless (BL-1044).
+
+### What was built, all neutral with switches off
+- **BL-1034 (world copies diverge):** MSVC's `unordered_map` copy reverses every multi-key bucket, and
+  `body_mean_habitability` sums floats in that order. `faithful_unordered_map` makes copies iterate in
+  their source's order. The same review found **a saved-and-loaded world still diverges** — BL-1050
+  (order-independent reads) now rides sprint 45's re-bless (NR-894).
+- **BL-1036/1037:** a lossless span resume (dated objects, civilisations, creeds; anchors explicit at
+  1200) proven by a fidelity check, and a road-tier switch.
+- **BL-1038, BL-1051:** the Industry tree wired, with a span-open fuel and forest survey.
+- **BL-1040:** the Digitisation span as its own call from `exploration_output`.
+- **BL-1053:** world setup reads the 1960 close when the span runs.
+- **BL-1041:** located industry points from scale, surveyed fuel, Industry capacity and treasury.
+- **BL-1039:** the charter spend rules (round 2 after Ben reversed the unspent-points capital the same
+  day it was ruled: it opened 10 of 11 specialists with nothing).
+- The wizard's "Loading the X round" wait gained a progress bar; Ben watched it live.
+
+### What the reviews caught
+Cold reviews found something real in every lane: BL-1036's index reuse at 1200 (BL-1049), BL-1040's
+setup still reading 1660 records (BL-1053), BL-1039's capital and breadth problems, `furnace_lit`
+constant wherever it is read (twice), BL-1041's biased headcount reading. No lane's figures were quoted
+to Ben until a main-session chain reproduced them; every one did.
+
+### Sprint 46 shaped
+Ben asked for a sprint that brings the work into the wizard and hands it cleanly to the game. A
+three-lane read found the play list almost untouched (11 of 15 rows with no item), every nation reading
+"Isolationist" on screen, tariffs enacted as zero, and the game on the ancient roster at 0 CE. Ben ruled
+twelve calls (NR-898): the flip lands in sprint 46 after the superseded arc is retired, round 6 plays
+the span, Begin adopts the wizard's world, all eight offered play-list rows carry, and a
+select-corporation screen closes the sprint.
+
+### Left open
+Chain 8's 16-seed digest check (paused by the PC's sleep), BL-1041's fix round, BL-1039's timed rows
+(2026-09-19), NR-896 and NR-897, then BL-1042, 1043, 1050 and 1044, then the sprint 46 cut. See
+`NEXT_SESSION.md`.
+
+---
+
 ## 2026-09-17 — Digitisation picked up: the 1960 baseline measured, then the corporate web's plumbing
 
 **Runtime:** ~11 h. Design (cutting the plan, four elicitation forms), Delivery — Full for sprint 43

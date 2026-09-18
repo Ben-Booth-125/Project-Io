@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 219 entries across 2 volume(s).
+One line per session, newest first — 220 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-09-18 | [Sprint 45 cut and mostly built: the span, Beat 1's points and the charter rules, behind switches; sprint 46 shaped](DEVLOG.md) | BL-1034 BL-1036 BL-1038 BL-1039 BL-1040 BL-1041 BL-1042 BL-1044 BL-1049 BL-1050 BL-1051 BL-1053 | DEVLOG.md |
 | 2026-09-17 | [Digitisation picked up: the 1960 baseline measured, then the corporate web's plumbing](DEVLOG.md) | BL-1026 BL-1027 BL-1028 BL-1029 BL-1030 BL-1031 BL-1032 BL-1033 BL-1034 BL-1035 | DEVLOG.md |
 | 2026-09-16 | [Sprint 42 wave 1: sixteen items, five that moved the world, and the measurements that outran them](DEVLOG.md) | BL-1000 BL-1007 BL-1008 BL-1009 BL-1010 | DEVLOG.md |
 | 2026-09-15 | [Sprint 42 wave 0: instruments before mechanisms, and the harness that paid for itself the same day](DEVLOG.md) | BL-1000 BL-1001 BL-1002 BL-962 BL-964 BL-966 BL-969 BL-970 BL-971 BL-974 BL-977 BL-979 BL-980 BL-981 BL-998 BL-999 | DEVLOG.md |
