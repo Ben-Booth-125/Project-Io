@@ -36,14 +36,15 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
 
 **Wave 1 — the span and Beat 1, still behind switches**
 
-- [ ] **BL-1040 (Digitisation span)** — BUILDING from 2026-09-18 (BL-1036 merged). files: era_minus_one.*, hard_coded_world.*, world_gen_config.hpp, history_sim.hpp, src/ui/startup_screens.cpp, digitisation_sim_harness.cpp, exploration_sweep.cpp.
-- [ ] **BL-1051 (span open survey)** — waits on BL-1040. Every region surveyed for fuel and forest at the span open; ground_forest and furnace_lit read from it (NR-891, NR-892). files: settlement.hpp/.cpp, hard_coded_world.cpp, history_sim.*, exploration_sim_harness.cpp, digitisation_sim_harness.cpp.
+- [ ] **BL-1040 (Digitisation span)** — MERGED 70923856, cold-reviewed (nothing blocking; BL-1053 carries its findings); owed: chain 5 re-verification and the 16-seed --digest-check. files: era_minus_one.*, hard_coded_world.*, world_gen_config.hpp, history_sim.hpp, src/ui/startup_screens.cpp, digitisation_sim_harness.cpp, exploration_sweep.cpp.
+- [ ] **BL-1051 (span open survey)** — BUILDING from 2026-09-18. Every region surveyed for fuel and forest at the span open; ground_forest and furnace_lit read from it (NR-891, NR-892). files: settlement.hpp/.cpp, hard_coded_world.cpp, history_sim.*, exploration_sim_harness.cpp, digitisation_sim_harness.cpp.
 - [ ] **BL-1041 (industry points)** — waits on BL-1038, BL-1040 and BL-1051 (its fuel factor reads BL-1051's survey). files: settlement.hpp, history_sim.*, hard_coded_world.cpp, digitisation_sim_harness.cpp.
+- [ ] **BL-1053 (setup reads span close)** — waits on BL-1040. When the span runs, world setup reads the 1960 close (treasuries, grudges, roads, junction markets); plus the BL-1040 review's harness and validator tightening and the loading-bar count. Must land before BL-1043. files: hard_coded_world.cpp, nation_generation.cpp, history_sim.*, app.cpp, startup_screens.cpp, digitisation_sim_harness.cpp.
 - [ ] **BL-1042 (stockpile to budget)** — waits on BL-1041 and BL-1039. files: population_generation.*, world.hpp, hard_coded_world.cpp, landscape_search.hpp, src/core/app.cpp, harness_params.hpp, verify_api.cpp, main.cpp, player_seed_sweep.cpp, world_determinism.cpp.
 
 **Wave 2 — measure, then Ben's calls**
 
-- [ ] **BL-1043 (real-stockpile charter sweep)** — waits on BL-1042 and BL-1034. Quiet machine, keep-awake. Ends in NEEDS_REVIEW calls.
+- [ ] **BL-1043 (real-stockpile charter sweep)** — waits on BL-1042, BL-1053 and BL-1034. Quiet machine, keep-awake. Ends in NEEDS_REVIEW calls.
 
 **Wave 3 — ship**
 

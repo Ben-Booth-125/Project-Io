@@ -73,6 +73,7 @@ and/or a version goal (v0.1.1 etc.).
 - BL-1040 (Digitisation span) — its own call from exploration_output, wherever Exploration runs; behind a switch. Neutral.
 - BL-1051 (span open survey) — every region surveyed for fuel and forest at the span open; ground_forest and furnace_lit read from it (NR-891, NR-892). Neutral while the span is off.
 - BL-1041 (industry points) — Beat 1: located points on regions with centres, from scale, own fuel, Industry capacity and treasury paid in; no sink this cut.
+- BL-1053 (setup reads span close) — when the span runs, world setup reads its 1960 treasuries, grudges, roads and junction markets, not the 1660 ones; before BL-1043 so the readings measure the right map.
 - BL-1042 (stockpile to budget) — region points reach campaign centres by the carve; the app and its harness mirror pass the budget. Neutral while the span is off.
 - BL-1043 (real-stockpile charter sweep) — prices, capital rate and the no-specialist world measured; ends in calls.
 - BL-1050 (order-dependent reads) — five readers stop letting hash order reach arithmetic, so a loaded world replays; merged with BL-1044, never alone (NR-894).
@@ -91,6 +92,8 @@ CUT 2026-09-18 on a five-lane engine read (span resume, Industry tree, industry 
 FOUND and recorded: the --through continuation that NR-888's figures came from priced trade on the network inherited at 1200 (DIGITISATION.md § Far pairs).
 
 REVIEW FORM 2026-09-18 (Ben): NR-891 readings accepted, but ground_forest gets a source now (BL-1051); NR-892 furnace_lit reads the Fuel Doctrine taken (BL-1051); NR-893 the Invest-frequency spread is accepted for Beat 1, read industrialisation first; NR-894 BL-1050 (order-independent reads, so a saved game replays) rides this sprint's re-bless. Filed from the wave 0 reviews and unscheduled: BL-1048 (tree rate scales unread), BL-1049 (civilisation index reuse at 1200).
+
+From BL-1040's cold review (2026-09-18): BL-1053 filed and scheduled ahead of BL-1043; BL-1054 (subject churn in the span, seed 32) filed unscheduled for Beat 3. BL-1052 (forest as a stock) backlogged for the continuity pass (Ben: "we will do a continuity pass on things like this after each round is done").
 
 ## Where things stand
 
