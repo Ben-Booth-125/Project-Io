@@ -50,5 +50,50 @@
   "PURGE 2026-08-23: 240 open entries -> 18. Every entry referring only to backlog ids <= BL-568 (retired by the same-day backlog purge) was retired; 16 more were answered by reading the current docs and tree. All 223 are frozen verbatim in archive/needs-review-purged-2026-08-23.json, each with a resolution saying why. The survivors are asked as a form: tools/session/register/review_queue.js, built by register/build.js, published at https://claude.ai/code/artifact/53fb4e56-2eae-439e-bcb7-121fa49bd340 . NR-576 records the calls taken in the sweep.",
   "DRAINED 2026-09-01 on Ben's instruction, from 117 open to 0. The queue had become a shadow backlog: most entries named WORK rather than a judgement, so ten backlog items (BL-713..BL-722) were minted to carry it and every entry was closed with a resolution saying where it went. THE RULE THAT KEEPS IT DRAINED, and it is now in CLAUDE.md Rule 0c: a call only Ben can make belongs here; work belongs in backlog.json; a fact worth remembering belongs in the comment or doc next to the code."
  ],
- "items": []
+ "items": [
+  {
+   "id": "NR-896",
+   "title": "CALL: forest and coal both read the BEST held region, which grows with realm size — and Charcoal now outnumbers Coke",
+   "raised": "2026-09-18",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1041 (industry points) build lane and cold review, after the wave 1 ruling \"score forest like fuel\" (NR-895). Figures are the lane's 16-seed run; the main session re-runs them before quoting them as evidence.",
+   "what": "With forest scored like fuel (the best held region against the world mean, capped 1000) the Fuel Doctrine split moved from 391 coke / 132 charcoal / 333 neither to 200 / 319 / 337. 261 of the 319 Charcoal polities had passed the seam gate — Coke was open and they took Charcoal. Mean held forest score by side: coke 739, charcoal 859, neither 306. TREES.md § The scorer: 'Never a rank, never a term inside the scorer that grows with the polity's own size.' A best-of-held maximum can only rise as a realm grows (to its 1000 cap), so both ground_fuel (already a best seam) and ground_forest now breach the letter of that rule, weakly; INDUSTRY_TREE.md rules exactly this shape. The docs disagree, and wide realms read near the cap on both terms.",
+   "why_it_matters": "The Fuel Doctrine is the tree's central fork: coke to scale and the Blast Works, charcoal to quality and a ceiling. If breadth, not ground, decides it, the 1960 spread it manufactures is about realm size.",
+   "options": [
+    "Both terms read the SHARE of held regions whose score clears the world mean — size-neutral, like with like; the fuel GATE still passes on any held seam.",
+    "Keep best-of-held for both, and write it into TREES.md as a stated exception to the size rule.",
+    "Both terms read the held MEAN of the scores — size-neutral, but a large realm with one coalfield reads low."
+   ],
+   "recommendation": "The share of held regions over the world mean, for both terms. It keeps \"any seam opens the gate\" and stops breadth from deciding the pull.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/trees/INDUSTRY_TREE.md",
+    "docs/generation/trees/TREES.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-897",
+   "title": "DECISIONS TAKEN (and a call): the treasury-to-points constants, and treasury points landing only on the capital",
+   "raised": "2026-09-18",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1041 (industry points) build lane and cold review. Figures are the lane's 16-seed run, to be re-run by the main session.",
+   "what": "The lane chose, on your behalf: 1000 industry points per million urban heads per year (defines the point); a fuel factor of 250 + 750 x reading/1000 (floor 250, so fuel is at most a x4 lever); a treasury share of 250 per mille of the round's surplus, where surplus is the treasury's net rise across the round's earn and army/navy bills, floored at 0 and DEBITED (a conversion, not a copy), and tribute is not counted; and an exchange rate of 1000 points per treasury unit. At 1:1 the treasury could not move any region's rank; at 1000:1 the treasury supplies a median 69% of all points (0.16-0.82 by seed), and because treasury points land on the capital's own region (PROPOSED 2026-09-18, not overturned), one region holds up to 65% of a world's points (median top-region share 0.28). The charter budget follows the points, so charters would concentrate at capitals.",
+   "why_it_matters": "\"Density follows cities\" becomes \"density follows capitals\" if the treasury term dominates and lands in one place; the real-stockpile sweep (BL-1043) and the re-bless read this.",
+   "options": [
+    "Spread treasury points over the polity's centres by their urban scale, not the capital alone; keep the constants.",
+    "Keep the capital landing; lower the exchange rate so treasury is a minority input (e.g. a third of points).",
+    "Accept as built and judge on the real-stockpile sweep."
+   ],
+   "recommendation": "Spread treasury points by scale over the polity's centres. A treasury builds its realm's works where its people are, and the capital still leads because it is usually the largest centre.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "docs/generation/DIGITISATION.md"
+   ],
+   "resolution": null
+  }
+ ]
 }
