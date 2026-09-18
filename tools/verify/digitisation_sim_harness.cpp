@@ -11,24 +11,35 @@
 // hands play already reads on each property, before the 1660 -> 1960 span
 // that is supposed to produce it exists.
 //
-// WHAT "AT 1960" READS (BL-1029). There is no Digitisation span. With
-// `--through 1960` the harness generates the SHIPPED world (epoch_year 0) with
-// Exploration's own call continued to 1960 (world_params::exploration_stop_year)
-// — never epoch_year 1960, which selects the superseded 1160 -> 1560 -> 1960
-// two-span arc with Exploration off (DIGITISATION.md's opening). The stretched
-// span runs Exploration's forces only. Every reading is taken off one of three
-// surfaces, and each printed line names its surface and its year:
+// WHAT "AT 1960" READS (BL-1040; BL-1029 before it). With `--through 1960` the
+// harness generates the SHIPPED world (epoch_year 0) with the DIGITISATION SPAN
+// switched on (world_params::digitisation_span_enabled): Exploration closes at
+// 1660 as shipped, and the span runs as its own call from the 1660
+// `exploration_output` to 1960 — 75 rounds, the span's own seed, the Industry
+// tree open — before world setup builds the campaign world on its close. Never
+// epoch_year 1960, which selects the superseded 1160 -> 1560 -> 1960 two-span
+// arc with Exploration (and so this span) off (DIGITISATION.md's opening).
+// Every reading is taken off one of three surfaces, and each printed line
+// names its surface and its year:
 //   * the CAMPAIGN WORLD as the app builds it on that close, up to the applied
 //     search winner (readings 1, 3, 6's proxy, and the evidence counts);
-//   * the HANDOFF at the close (`era_minus_one_fixture::exploration_handoff`,
-//     folded at --through); or
+//   * the HANDOFF at the close (`era_minus_one_fixture::digitisation_handoff`,
+//     the span's own fold at --through); or
 //   * the 1660 CONTROL: the Exploration span re-run from the fixture and
 //     stopped at 1660, folded with `make_exploration_output` — the handoff the
-//     shipped world hands at 1660. Its battles, flows and living polities must
-//     equal the seed library's fingerprint (taken off a default generation):
-//     that equality is the proof the extended run IS the shipped world up to
-//     1660, and a seed that fails it reports no reading as measured.
-// Without --through (1660) the close and the control are the same world.
+//     shipped world hands at 1660, and the one the span resumed from. Its
+//     battles, flows and living polities must equal the seed library's
+//     fingerprint (taken off a default generation): that equality is the proof
+//     the world IS the shipped world up to 1660, and a seed that fails it
+//     reports no reading as measured.
+// `--continued` keeps BL-1029's run instead of the span: Exploration's own call
+// continued to --through (world_params::exploration_stop_year), Exploration's
+// forces only. Every line labels it a 1200-NETWORK RUN — it prices corridor
+// income and land trade on the network it inherited at 1200 until it closes,
+// where the span prices on the network that survived 1660 — so it is a
+// comparison, never the phase's reading.
+// Without --through (1660) there is no span: the close and the control are the
+// same world.
 //
 // FOUR STATES, NEVER A FIFTH. A reading is MEASURED (its observable exists in
 // today's world and is computed off it), PARTIAL (one clause is measured, the
@@ -66,16 +77,22 @@
 // THE SEEDS are read from docs/generation/seed_library.json, so the library
 // and the harness cannot drift. Run from the repo root.
 //
-// Usage:  digitisation_sim_harness [--limit N] [--seeds a,b,c] [--through Y] [--out path] [--fidelity]
+// Usage:  digitisation_sim_harness [--limit N] [--seeds a,b,c] [--through Y [--continued]] [--out path]
+//                                  [--fidelity] [--resume-tier]
 //   --limit N    take the library's first N seeds (a quick run)
 //   --seeds ...  measure these seeds instead of the library's
-//   --through Y  BL-1029: continue Exploration's call to year Y (default 1660)
+//   --through Y  BL-1040: run the Digitisation span from the 1660 handoff to Y
+//                (default 1660: no span). Y = 1960 is the phase's reading.
+//   --continued  BL-1029's run instead of the span: Exploration's own call
+//                continued to Y -- a 1200-NETWORK run, labelled so on every line
 //   --out path   BL-1029: also write the per-seed table as JSON
 //   --fidelity   BL-1036: instead of the readings, the RESUME-FIDELITY check --
-//                a span resumed from the 1660 exploration_output, gated on its
-//                opening and on one neutralised round, with the 1960
-//                divergence reported by source (see `namespace fidelity`).
-//                This mode GATES: exit 1 when either gate fails on any seed.
+//                the Digitisation span's resume from the 1660
+//                exploration_output, gated on its opening, on one neutralised
+//                round, and (BL-1040) on the shipped span BEING that resume,
+//                with the 1960 divergence reported by source (see `namespace
+//                fidelity`). This mode GATES: exit 1 when any gate fails on
+//                any seed.
 //   --resume-tier BL-1037: at the 1200 and 1660 span boundaries, with
 //                `resume_seeds_corridor_tier` off and on, the corridors whose
 //                resumed rung the switch changes, any rung reopened below or
@@ -243,6 +260,8 @@ struct handoff_reading
     // Reading 8's evidence: region half (Stage 4) and polity half (the band).
     int industrialised_regions = 0;
     int polities_industrial    = 0; ///< living polities whose materials band crossed industrial.
+    int polities_industry_nodes = 0; ///< BL-1040: living polities holding any Industry-tree node.
+    int industry_nodes          = 0; ///< ... and the nodes they hold, summed.
 
     // Reading 9's urban half.
     int64_t urban_heads = 0;
@@ -278,6 +297,11 @@ handoff_reading read_handoff(const exploration_output& h, int gw)
         ++out.alive_polities;
         if (q.overlord >= 0) ++out.subjects;
         if (q.industrial_year != k_never_industrialised) ++out.polities_industrial;
+        if (q.industry_mask != 0)
+        {
+            ++out.polities_industry_nodes;
+            out.industry_nodes += static_cast<int>(std::bitset<64>(q.industry_mask).count());
+        }
     }
 
     // Reading 7. A market here is a LIVING polity's capital seat: the flow
@@ -374,6 +398,19 @@ struct seed_row
     uint32_t seed = 0;
     bool     era_ran  = false; ///< The Empires round ran (fx.ran).
     bool     expl_ran = false; ///< The Exploration span ran, so the 1660 handoff exists.
+    /// The close this run reads exists: in span mode the Digitisation span
+    /// ran (fx.digitisation_ran); otherwise the Exploration close exists.
+    bool     close_ran = false;
+
+    // --- BL-1040: the Digitisation span itself (span mode only) -------------
+    bool    span_ran       = false;
+    int64_t span_start     = 0;
+    int64_t span_stop      = 0;
+    int64_t span_rounds    = 0; ///< decision rounds the span ran (75 at 1660 -> 1960)
+    int64_t span_battles   = 0; ///< this span's own counters (a resumed run starts them at 0)
+    int64_t span_conquests = 0;
+    int64_t span_foundings = 0;
+    int64_t span_ms        = 0; ///< the span's run_history_sim call, wall clock (reported only)
 
     // --- Reading 1: density follows cities (campaign world) -----------------
     int    markets        = 0;
@@ -480,8 +517,18 @@ std::vector<uint32_t> library_seeds(const char* path)
 //        struct alone: its polities, grudges, contacts, corridor record,
 //        dated objects and civilisation/creed tables through the resume
 //        pointers; its regions as the settlement; a creed_state rebuilt from
-//        its cultures; works and terrain from the fixture; the Exploration
-//        params with the span moved to 1660 and both anchors left at 1200.
+//        its cultures; works and terrain from the fixture; and (BL-1040) THE
+//        DIGITISATION SPAN'S OWN PARAMS as generation captured them
+//        (`era_minus_one_fixture::digitisation_params`: Exploration's
+//        derivation, the span moved to 1660, both anchors left at 1200, the
+//        Industry tree open from 1660).
+//
+// THE CONTINUED RUN CARRIES THE SPAN'S FORCES FROM 1660 (BL-1040). The span
+// opens the Industry tree, so C does too, from the same year: before 1660 the
+// switch reads nothing (`industry_open_year`), so C up to the top of 1660 is
+// Exploration's shipped run bit for bit, and after it C and R play the same
+// forces. Without that, the Industry tree would be a fifth divergence source
+// the doc does not name.
 //
 // GATE 1 (BL-1036 R4): the resume's OPENING, captured before its first act,
 //   equals the struct field for field -- every region field, every polity
@@ -492,18 +539,27 @@ std::vector<uint32_t> library_seeds(const char* path)
 //   undone -- has the continued run's 1660 round's treaties, overlord graph
 //   and stocks exactly. What is left once the named sources are removed is
 //   what the resume LOSES, and it must be nothing.
+// GATE 3 (BL-1040 R5): THE SHIPPED SPAN IS THE REAL RESUME. V4 below -- the
+//   handoff as it is, the span's own seed and params, run to the span's own
+//   stop -- folded with `make_digitisation_output`, equals generation's own
+//   1960 close (`era_minus_one_fixture::digitisation_handoff`) field for field
+//   and table for table, with the same battle, conquest and founding counts.
+//   This is what makes the span "the real consumer of the resume" a checked
+//   claim: the resume gates 1 and 2 prove lossless is the resume the shipped
+//   world runs, and no settlement or creed state outside the struct reaches it.
 // REPORT: the one-round footprint of the real resume, the entry state the
 //   handoff differs from the continued run in, and the 1960 divergence
 //   against the continued run, attributed by source by adding them back one
 //   at a time (V0 all neutralised .. V4 the real resume on its own seed).
 //
-// NEVER GATED BIT FOR BIT AT 1960. A lossless resume cannot equal the
-// continued run: a span reads its INHERITED corridor record until it closes
-// (the continued run prices 1660-1960 on the 1200 record; a resume on the
-// 1660 one), and the handoff filters that record over the span's dead.
+// NEVER GATED BIT FOR BIT AT 1960 AGAINST C. A lossless resume cannot equal
+// the continued run: a span reads its INHERITED corridor record until it
+// closes (the continued run prices 1660-1960 on the 1200 record; a resume on
+// the 1660 one), and the handoff filters that record over the span's dead.
 //
-// The own seed below is a STAND-IN for BL-1040's seed fold (that item owns the
-// span's params and seed); it only has to differ from Exploration's.
+// The own seed is the span's (`era_minus_one_fixture::digitisation_seed`,
+// `digitisation_sim_seed`); before BL-1040 a stand-in with the same constant
+// stood here, so the "seed" source reads the same run before and after.
 namespace fidelity
 {
 
@@ -665,6 +721,7 @@ struct run_out
 {
     settlement_state  ss;
     history_sim_state hs;
+    creed_state       cs; ///< the creeds as the run left them (BL-1040: the fold reads them)
 };
 
 history_sim_params span_params(const history_sim_params& ep, int64_t start, int64_t stop)
@@ -679,8 +736,12 @@ history_sim_params span_params(const history_sim_params& ep, int64_t start, int6
 }
 
 /// C: Exploration's own call from the fixture's pre-Exploration capture, run
-/// to @p stop, capturing its state at the top of @p capture.
-run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture, bool tier_seed = false)
+/// to @p stop, capturing its state at the top of @p capture. With
+/// @p span_forces (BL-1040), the Digitisation span's Industry switch and open
+/// year ride along -- inert before the open year, so the run is Exploration's
+/// own until then and plays the span's forces after it.
+run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture, bool tier_seed = false,
+                  const history_sim_params* span_forces = nullptr)
 {
     history_sim_params hp = span_params(fx.exploration_params, fx.exploration_params.start_year, stop);
     hp.resume_polities  = &fx.pre_exploration_polities;
@@ -689,10 +750,15 @@ run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture
     hp.resume_corridors = &fx.pre_exploration_corridors;
     hp.capture_year     = capture;
     hp.resume_seeds_corridor_tier = tier_seed; // BL-1037; off unless --resume-tier asks
+    if (span_forces != nullptr)
+    {
+        hp.industry_tree_enabled = span_forces->industry_tree_enabled;
+        hp.industry_open_year    = span_forces->industry_open_year;
+    }
     run_out r;
     r.ss = fx.pre_exploration_settlement;
-    creed_state cs = fx.pre_exploration_creeds;
-    r.hs = run_history_sim(r.ss, &cs, fx.terrain.view(), fx.gw, fx.gh, hp, fx.exploration_seed,
+    r.cs = fx.pre_exploration_creeds;
+    r.hs = run_history_sim(r.ss, &r.cs, fx.terrain.view(), fx.gw, fx.gh, hp, fx.exploration_seed,
                            nullptr, fx.works, nullptr);
     return r;
 }
@@ -707,13 +773,16 @@ struct resume_spec
     bool                                 tier_seed = false; ///< BL-1037's `resume_seeds_corridor_tier`
 };
 
-/// R: a second call opened on the handoff struct @p H at its own stop year.
+/// R: a second call opened on the handoff struct @p H at its own stop year,
+/// on @p base's forces -- the Digitisation span's own captured params for
+/// `--fidelity` (BL-1040), Exploration's for `--resume-tier` (unchanged).
 run_out resume(const era_minus_one_fixture& fx, const exploration_output& H, const resume_spec& s,
-               int64_t stop, int64_t capture)
+               int64_t stop, int64_t capture, const history_sim_params& base)
 {
     // Both 1200 anchors stay as Exploration set them (`consolidation_year`,
-    // `near_home_cutoff_year`): only the span moves.
-    history_sim_params hp = span_params(fx.exploration_params, H.stop_year, stop);
+    // `near_home_cutoff_year`) -- the span's params never move them: only the
+    // span moves.
+    history_sim_params hp = span_params(base, H.stop_year, stop);
     hp.resume_polities         = &H.polities;
     hp.resume_grudges          = &H.grudges;
     hp.resume_contacts         = &H.contacts;
@@ -726,9 +795,8 @@ run_out resume(const era_minus_one_fixture& fx, const exploration_output& H, con
     hp.resume_seeds_corridor_tier = s.tier_seed;
     run_out r;
     r.ss.regions = *s.regions;
-    creed_state cs;
-    cs.cultures = H.cultures; // "rebuild creed_state from cultures": the sim reads nothing else of it.
-    r.hs = run_history_sim(r.ss, &cs, fx.terrain.view(), fx.gw, fx.gh, hp, s.seed,
+    r.cs.cultures = H.cultures; // "rebuild creed_state from cultures": the sim reads nothing else of it.
+    r.hs = run_history_sim(r.ss, &r.cs, fx.terrain.view(), fx.gw, fx.gh, hp, s.seed,
                            nullptr, fx.works, nullptr);
     return r;
 }
@@ -861,16 +929,67 @@ struct seed_fidelity
     int64_t    c_battles = 0;
     int64_t    c_treasury = 0;
     double     seconds = 0.0;
+
+    // Gate 3 (BL-1040) -- the shipped span against V4, the real resume.
+    std::vector<std::string> span_params_issues; ///< the captured params are not the span's derivation
+    field_census span_regions, span_polities;
+    std::vector<std::string> span_tables;        ///< "<table>: <first difference>" per table that differs
+    int64_t span_rounds = 0;
+    double  span_ms     = 0.0;                   ///< generation's own span call, wall clock
+    bool gate3 = false;
 };
+
+bool flow_eq(const trade_flow& a, const trade_flow& b)
+{
+    return a.seller == b.seller && a.buyer == b.buyer && a.good == b.good && a.volume_q == b.volume_q;
+}
+bool holding_eq(const polity_holdings& a, const polity_holdings& b)
+{
+    return a.polity == b.polity && a.regions == b.regions;
+}
+
+/// Is @p dp the Digitisation span's derivation, as far as the params can say?
+/// Exploration's base (the upkeep step and want weight it sets, its band's
+/// step), the span moved to open on the handoff's close, both 1200 anchors
+/// untouched, the Industry tree open from the span's own open, BL-1037's
+/// switch off, and a seed that is neither Exploration's nor a re-use.
+std::vector<std::string> span_params_issues(const history_sim_params& dp, const history_sim_params& ep,
+                                            const exploration_output& H, const world_params& wp,
+                                            uint32_t dseed, uint32_t eseed)
+{
+    std::vector<std::string> out;
+    const auto need = [&](bool ok, const char* what) { if (!ok) out.push_back(what); };
+    need(dp.start_year == H.stop_year, "the span does not open on the handoff's close");
+    need(dp.stop_year == wp.digitisation_stop_year, "the span does not close on digitisation_stop_year");
+    need(dp.tick_band_count == 1 && dp.tick_bands[0].until_year == dp.stop_year
+             && dp.tick_bands[0].step_years == ep.tick_bands[0].step_years,
+         "the span is not one band at Exploration's step");
+    need(dp.consolidation_year == ep.consolidation_year && dp.near_home_cutoff_year == ep.near_home_cutoff_year
+             && dp.consolidation_year == wp.empires_stop_year,
+         "an anchor moved off 1200");
+    need(dp.exploration_upkeep_enabled == ep.exploration_upkeep_enabled && dp.w_want_q == ep.w_want_q,
+         "the base is not Exploration's derivation");
+    need(dp.industry_tree_enabled && dp.industry_open_year == dp.start_year,
+         "the Industry tree is not open from the span's open");
+    need(!ep.industry_tree_enabled, "the Industry tree is open in Exploration's own span");
+    need(!dp.resume_seeds_corridor_tier, "BL-1037's switch is on");
+    need(dseed == digitisation_sim_seed(wp) && dseed != eseed, "the span's seed is not its own fold");
+    return out;
+}
 
 int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, works_registry& works)
 {
+    // BL-1040: generation runs the Digitisation span and stops right after it
+    // -- the 1660 handoff and the span's own 1960 close are all this mode
+    // reads, and nothing of world setup is built.
     world_gen_config cfg = cfg_in;
-    cfg.stop_after_exploration = true; // the handoff is all this mode reads.
+    cfg.stop_after_digitisation = true;
 
-    std::printf("=== digitisation_sim_harness --fidelity (BL-1036) - a span resumed from exploration_output ===\n");
-    std::printf("handoff: the shipped world (world_params defaults) stopped after Exploration at 1660.\n"
-                "C = Exploration's own call continued from the fixture; R = a second call opened on the struct.\n"
+    std::printf("=== digitisation_sim_harness --fidelity (BL-1036, BL-1040) - the Digitisation span, resumed from "
+                "exploration_output ===\n");
+    std::printf("handoff: the shipped world (world_params defaults) with the Digitisation span on, stopped after it.\n"
+                "C = Exploration's own call continued from the fixture, carrying the span's forces from 1660;\n"
+                "R = a second call opened on the struct, on the span's own captured params.\n"
                 "field lists: region %d fields, polity %d fields, every row of every other resumed table.\n\n",
                 k_region_fields, k_polity_fields);
     std::fflush(stdout);
@@ -885,6 +1004,7 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
 
         world_params wp{};
         wp.seed = seed;
+        wp.digitisation_span_enabled = true; // BL-1040: the span is the resume's real consumer
         generation_report     rep;
         era_minus_one_fixture fx;
         (void)make_hard_coded_world(wp, &rep, cfg, /*progress=*/nullptr, &works, &fx);
@@ -894,8 +1014,19 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             rows.push_back(row);
             continue;
         }
+        if (!fx.digitisation_ran)
+        {
+            // Exploration ran and the switch was on, so the span MUST have:
+            // that is its run predicate. Not a skip -- a failure of R3.
+            row.ran = true;
+            row.span_params_issues.push_back("Exploration ran with the switch on and the span did not");
+            row.open_tables.push_back("the Digitisation span did not run");
+            rows.push_back(row);
+            continue;
+        }
         const exploration_output& H = fx.exploration_handoff;
         const history_sim_params& ep = fx.exploration_params;
+        const history_sim_params& dp = fx.digitisation_params; // the span's own, as generation ran it
         if (H.stop_year != 1660 || ep.consolidation_year != ep.start_year
          || ep.near_home_cutoff_year != ep.start_year || !fx.pre_exploration_settlement.pending_foundings.empty())
         {
@@ -905,14 +1036,18 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             continue;
         }
         row.ran = true;
+        row.span_params_issues = span_params_issues(dp, ep, H, wp, fx.digitisation_seed, fx.exploration_seed);
+        row.span_rounds = fx.digitisation_rounds;
+        row.span_ms     = static_cast<double>(fx.ms_digitisation);
         const int64_t open = H.stop_year;      // 1660
-        const int64_t one  = open + ep.tick_bands[0].step_years; // one round: 1664
-        const uint32_t own_seed = (seed ^ 0x5D1C7A11u) + wp.era_seed * 0x9E3779B9u; // stand-in, see above
+        const int64_t one  = open + dp.tick_bands[0].step_years; // one round: 1664
+        const int64_t stop = dp.stop_year;     // 1960
+        const uint32_t own_seed = fx.digitisation_seed; // BL-1040: the span's own fold
 
-        // ---- C: the continued run -------------------------------------------
+        // ---- C: the continued run, carrying the span's forces from 1660 -------
         std::fprintf(stderr, "[fidelity] seed %u continued runs\n", seed);
-        const run_out c_one  = continued(fx, one, open);
-        const run_out c_1960 = continued(fx, 1960, INT64_MIN);
+        const run_out c_one  = continued(fx, one, open, false, &dp);
+        const run_out c_1960 = continued(fx, stop, INT64_MIN, false, &dp);
         const history_sim_capture& C = c_one.hs.capture;
 
         // ---- Gate 1: the real resume's opening, and its one round ------------
@@ -920,7 +1055,7 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
         real.regions = &H.regions;
         real.record  = &H.surviving_corridors;
         real.seed    = fx.exploration_seed;
-        const run_out r_one = resume(fx, H, real, one, open);
+        const run_out r_one = resume(fx, H, real, one, open, dp);
         const history_sim_capture& O = r_one.hs.capture;
         {
             row.open_regions  = census_of(O.regions, H.regions, region_fields);
@@ -1026,7 +1161,7 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
         neutral.live    = &C.live_roads;
         neutral.seed    = fx.exploration_seed;
         {
-            const run_out n_one = resume(fx, H, neutral, one, INT64_MIN);
+            const run_out n_one = resume(fx, H, neutral, one, INT64_MIN, dp);
             row.neutral_round = compare_round(n_one, c_one);
             row.gate2 = row.neutral_round.zero();
             row.real_round = compare_round(r_one, c_one);
@@ -1048,19 +1183,71 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
             run_out prev;
             for (int k = 0; k < 5; ++k)
             {
-                run_out cur = resume(fx, H, *specs[k], 1960, INT64_MIN);
+                run_out cur = resume(fx, H, *specs[k], stop, INT64_MIN, dp);
                 row.v[k] = diverge(cur, c_1960);
                 if (k > 0) row.step[k] = diverge(cur, prev);
                 prev = std::move(cur);
             }
+
+            // ---- Gate 3 (BL-1040): the shipped span IS V4 ---------------------
+            // `prev` is V4: the handoff as it is, on the span's own seed and
+            // params, to the span's own stop. Folded by the span's own rule,
+            // it must be generation's 1960 close exactly.
+            const digitisation_output V = make_digitisation_output(prev.ss, prev.hs, &prev.cs);
+            const digitisation_output& S = fx.digitisation_handoff;
+            const history_sim_state&   T = fx.digitisation_state;
+            row.span_regions  = census_of(V.regions, S.regions, region_fields);
+            row.span_polities = census_of(V.polities, S.polities, polity_fields);
+            const auto note = [&](const char* table, const std::string& d) {
+                if (!d.empty()) row.span_tables.push_back(std::string(table) + ": " + d);
+            };
+            note("grudges",           table_diff(V.grudges, S.grudges, grudge_eq));
+            note("contacts",          table_diff(V.contacts, S.contacts, contact_eq));
+            note("surviving network", table_diff(V.surviving_corridors, S.surviving_corridors, corridor_eq));
+            note("dated objects",     table_diff(V.dated_objects, S.dated_objects, dated_eq));
+            note("trade flows",       table_diff(V.trade_flows, S.trade_flows, flow_eq));
+            note("holdings",          table_diff(V.holdings, S.holdings, holding_eq));
+            note("civilisations",     table_diff(V.civilisations, S.civilisations, civ_eq));
+            note("universal creeds",  table_diff(V.universal_creeds, S.universal_creeds, creed_eq));
+            {
+                // The culture table, by the sim's own row comparator: V's copy
+                // validated against the shipped close's table as the "live" one.
+                creed_state shipped_cultures;
+                shipped_cultures.cultures = S.cultures;
+                std::string why;
+                if (V.culture_count != S.culture_count)
+                    note("cultures", "count " + std::to_string(V.culture_count) + " vs " + std::to_string(S.culture_count));
+                else if (!exploration_output_valid(V, &why, &shipped_cultures))
+                    note("cultures (or V's own validity)", why);
+            }
+            if (V.start_year != S.start_year || V.stop_year != S.stop_year)
+                note("span years", std::to_string(V.start_year) + "-" + std::to_string(V.stop_year) + " vs "
+                                   + std::to_string(S.start_year) + "-" + std::to_string(S.stop_year));
+            if (prev.hs.battles != T.battles || prev.hs.conquests != T.conquests || prev.hs.foundings != T.foundings
+             || prev.hs.subjections_formed != T.subjections_formed || prev.hs.subjections_freed != T.subjections_freed)
+                note("counters", "battles " + std::to_string(prev.hs.battles) + " vs " + std::to_string(T.battles)
+                                 + ", conquests " + std::to_string(prev.hs.conquests) + " vs " + std::to_string(T.conquests)
+                                 + ", foundings " + std::to_string(prev.hs.foundings) + " vs " + std::to_string(T.foundings));
+            // And the shipped close passed its own validator, against the
+            // value it resumed from, on generation's path.
+            {
+                std::string why;
+                if (!digitisation_output_valid(S, &why, nullptr, &H))
+                    note("digitisation_output_valid", why);
+                if (rep.handoff_invalid)
+                    note("generation recorded a handoff violation", rep.handoff_violation);
+            }
+            row.gate3 = row.span_params_issues.empty() && row.span_regions.empty()
+                     && row.span_polities.empty() && row.span_tables.empty();
         }
         for (const polity& q : c_1960.hs.polities) if (q.alive) ++row.c_living;
         for (const region& r : c_1960.ss.regions) row.c_treasury += r.treasury;
         row.c_battles = c_1960.hs.battles - fx.exploration_state.battles;
 
         row.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-        std::printf("seed %u  gate1 %s  gate2 %s  (%.1f s)\n", seed, row.gate1 ? "PASS" : "FAIL",
-                    row.gate2 ? "PASS" : "FAIL", row.seconds);
+        std::printf("seed %u  gate1 %s  gate2 %s  gate3 %s  (%.1f s; the span itself %lld rounds, %.0f ms)\n", seed,
+                    row.gate1 ? "PASS" : "FAIL", row.gate2 ? "PASS" : "FAIL", row.gate3 ? "PASS" : "FAIL",
+                    row.seconds, static_cast<long long>(row.span_rounds), row.span_ms);
         std::fflush(stdout);
         rows.push_back(row);
     }
@@ -1112,7 +1299,8 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                     r.real_round.stock_fields.empty() ? "" : census_text(r.real_round.stock_fields).c_str());
     }
 
-    std::printf("\n=== 1960 DIVERGENCE against the continued run (--through 1960), attributed by source (REPORTED) ===\n");
+    std::printf("\n=== 1960 DIVERGENCE against the continued run (a 1200-network run carrying the span's forces from\n"
+                "    1660), attributed by source (REPORTED) ===\n");
     std::printf("  V0 all named sources neutralised, Exploration's seed | V1 + the 1660 close's market stamp |\n"
                 "  V2 + the 1660 corridor record, unfiltered, live counts seeded from it | V3 + the dead-filter\n"
                 "  (the handoff as it is) | V4 + the span's own seed (the real resume)\n");
@@ -1161,11 +1349,28 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                     "     do not sum to V4's distance from C)\n");
     }
 
+    int g3 = 0;
+    std::printf("\n=== GATE 3 (BL-1040 R5): the shipped Digitisation span IS the real resume (V4), field for field ===\n");
+    std::printf("  (generation's own 1960 close against V4 folded by make_digitisation_output; the span's params\n"
+                "   checked against its derivation; the shipped close's own validator re-run against the 1660 value)\n");
+    for (const seed_fidelity& r : rows)
+    {
+        if (!r.ran) continue;
+        if (r.gate3) ++g3;
+        std::printf("  %5u  %s  rounds %lld | regions: %s | polities: %s", r.seed, r.gate3 ? "PASS" : "FAIL",
+                    static_cast<long long>(r.span_rounds), census_text(r.span_regions).c_str(),
+                    census_text(r.span_polities).c_str());
+        for (const std::string& t : r.span_params_issues) std::printf(" | params: %s", t.c_str());
+        for (const std::string& t : r.span_tables) std::printf(" | %s", t.c_str());
+        std::printf("\n");
+    }
+
     double total = 0.0, worst = 0.0;
     for (const seed_fidelity& r : rows) { total += r.seconds; worst = std::max(worst, r.seconds); }
     std::printf("\nSUMMARY  gate 1 (opening == struct) %d of %d seeds | gate 2 (one neutralised round == continued) "
-                "%d of %d seeds | %.1f s total, worst seed %.1f s\n", g1, ran, g2, ran, total, worst);
-    const bool pass = ran > 0 && g1 == ran && g2 == ran;
+                "%d of %d seeds | gate 3 (shipped span == the resume) %d of %d seeds | %.1f s total, worst seed "
+                "%.1f s\n", g1, ran, g2, ran, g3, ran, total, worst);
+    const bool pass = ran > 0 && g1 == ran && g2 == ran && g3 == ran;
     std::printf("%s\n", pass ? "FIDELITY PASS" : "FIDELITY FAIL");
     return pass ? 0 : 1;
 }
@@ -1305,14 +1510,14 @@ int run_resume_tier(const std::vector<uint32_t>& seeds, const world_gen_config& 
         off_spec.record  = &H.surviving_corridors;
         off_spec.seed    = fx.exploration_seed;
         const boundary_tiers b1660_off =
-            measure_boundary(ep, H.surviving_corridors, resume(fx, H, off_spec, 1960, H.stop_year).hs);
+            measure_boundary(ep, H.surviving_corridors, resume(fx, H, off_spec, 1960, H.stop_year, ep).hs);
         resume_spec on_spec;
         on_spec.regions   = &H_on.regions;
         on_spec.record    = &H_on.surviving_corridors;
         on_spec.seed      = fx.exploration_seed;
         on_spec.tier_seed = true;
         const boundary_tiers b1660_on =
-            measure_boundary(ep, H_on.surviving_corridors, resume(fx, H_on, on_spec, 1960, H_on.stop_year).hs);
+            measure_boundary(ep, H_on.surviving_corridors, resume(fx, H_on, on_spec, 1960, H_on.stop_year, ep).hs);
 
         const auto ok = [](const boundary_tiers& b) { return b.below == 0 && b.above == 0 && b.recrossed == 0; };
         const bool seed_ok = ok(b1200_on) && ok(b1660_on);
@@ -1356,11 +1561,16 @@ int main(int argc, char** argv)
     std::string out_path;        // BL-1029
     bool fidelity_mode = false;  // BL-1036
     bool resume_tier_mode = false; // BL-1037
+    bool continued_mode   = false; // BL-1040: --continued, the 1200-network run
     for (int a = 1; a < argc; ++a)
     {
         if (std::strcmp(argv[a], "--limit") == 0 && a + 1 < argc)
         {
             limit = std::atoi(argv[++a]);
+        }
+        else if (std::strcmp(argv[a], "--continued") == 0)
+        {
+            continued_mode = true;
         }
         else if (std::strcmp(argv[a], "--fidelity") == 0)
         {
@@ -1394,9 +1604,14 @@ int main(int argc, char** argv)
         else
         {
             std::printf("unknown argument '%s'\nusage: digitisation_sim_harness [--limit N] [--seeds a,b,c] "
-                        "[--through Y] [--out path] [--fidelity] [--resume-tier]\n", argv[a]);
+                        "[--through Y [--continued]] [--out path] [--fidelity] [--resume-tier]\n", argv[a]);
             return 2;
         }
+    }
+    if (continued_mode && through_year == 1660)
+    {
+        std::printf("--continued needs --through past 1660 (it continues Exploration's call to that year)\n");
+        return 2;
     }
     if (!seeds_from_args)
     {
@@ -1414,11 +1629,30 @@ int main(int argc, char** argv)
     const std::map<uint32_t, library_fingerprint> fingerprints =
         library_fingerprints("docs/generation/seed_library.json");
 
-    std::printf("=== digitisation_sim_harness (BL-982) - the thirteen Digitisation readings ===\n");
-    std::printf("close: %lld CE - the shipped world (epoch_year 0) with Exploration's own call continued%s;\n"
-                "control: the 1660 handoff, re-run from the fixture and held to the seed library fingerprint\n",
-                static_cast<long long>(through_year),
-                through_year == 1660 ? " (not continued: close and control are one world)" : "");
+    // BL-1040: which close this run reads. SPAN: the Digitisation span, its
+    // own call from the 1660 handoff (the phase's reading). CONTINUED: BL-1029's
+    // run, Exploration's call stretched -- a 1200-network comparison. Neither
+    // past 1660: no span, close == control.
+    const bool past_1660 = through_year > 1660;
+    const bool span_mode = past_1660 && !continued_mode;
+
+    // The readings header belongs to the readings mode; --fidelity and
+    // --resume-tier print their own below.
+    if (!fidelity_mode && !resume_tier_mode)
+    {
+        std::printf("=== digitisation_sim_harness (BL-982) - the thirteen Digitisation readings ===\n");
+        if (span_mode)
+            std::printf("close: %lld CE - the shipped world (epoch_year 0) with the DIGITISATION SPAN on: its own call,\n"
+                        "resumed from the 1660 exploration_output, 1660 -> %lld (BL-1040);\n",
+                        static_cast<long long>(through_year), static_cast<long long>(through_year));
+        else if (continued_mode)
+            std::printf("close: %lld CE - A 1200-NETWORK RUN: the shipped world (epoch_year 0) with Exploration's own\n"
+                        "call continued to %lld, pricing on the network it inherited at 1200 (BL-1029's run, not the span);\n",
+                        static_cast<long long>(through_year), static_cast<long long>(through_year));
+        else
+            std::printf("close: 1660 CE - the shipped world (epoch_year 0), no span: close and control are one world;\n");
+        std::printf("control: the 1660 handoff, re-run from the fixture and held to the seed library fingerprint\n");
+    }
     std::printf("seeds (%s, %zu):", seeds_from_args ? "--seeds" : "docs/generation/seed_library.json",
                 seeds.size());
     for (uint32_t s : seeds) std::printf(" %u", s);
@@ -1480,7 +1714,16 @@ int main(int argc, char** argv)
     {
         world_params wp = shipped_descriptor;
         wp.seed = seed;
-        wp.exploration_stop_year = through_year; // BL-1029: never epoch_year.
+        if (span_mode)
+        {
+            // BL-1040: the span runs from Exploration's shipped 1660 close.
+            wp.digitisation_span_enabled = true;
+            wp.digitisation_stop_year    = through_year;
+        }
+        else if (continued_mode)
+        {
+            wp.exploration_stop_year = through_year; // BL-1029: never epoch_year.
+        }
 
         std::fprintf(stderr, "[digitisation] seed %u generating\n", seed);
         generation_report     rep;
@@ -1497,6 +1740,18 @@ int main(int argc, char** argv)
         row.seed     = seed;
         row.era_ran  = fx.ran;
         row.expl_ran = fx.exploration_ran;
+        row.close_ran = span_mode ? fx.digitisation_ran : fx.exploration_ran;
+        if (fx.digitisation_ran)
+        {
+            row.span_ran       = true;
+            row.span_start     = fx.digitisation_params.start_year;
+            row.span_stop      = fx.digitisation_params.stop_year;
+            row.span_rounds    = fx.digitisation_rounds;
+            row.span_battles   = fx.digitisation_state.battles;
+            row.span_conquests = fx.digitisation_state.conquests;
+            row.span_foundings = fx.digitisation_state.foundings;
+            row.span_ms        = fx.ms_digitisation;
+        }
 
         const entity_id body = fx.ran ? fx.body : w.home_body;
 
@@ -1638,9 +1893,24 @@ int main(int argc, char** argv)
         row.handoff_violation = rep.handoff_violation;
         if (fx.exploration_ran)
         {
-            row.at_close = read_handoff(fx.exploration_handoff, fx.gw);
-            row.secessions_close         = fx.exploration_state.subjections_freed;
-            row.subjections_formed_close = fx.exploration_state.subjections_formed;
+            if (span_mode)
+            {
+                // BL-1040: the close is the span's own fold. Its counters count
+                // the span alone (a resumed run starts them at zero), so the
+                // cumulative figure is Exploration's plus the span's.
+                if (fx.digitisation_ran)
+                    row.at_close = read_handoff(fx.digitisation_handoff, fx.gw);
+                row.secessions_close         = fx.exploration_state.subjections_freed
+                                             + fx.digitisation_state.subjections_freed;
+                row.subjections_formed_close = fx.exploration_state.subjections_formed
+                                             + fx.digitisation_state.subjections_formed;
+            }
+            else
+            {
+                row.at_close = read_handoff(fx.exploration_handoff, fx.gw);
+                row.secessions_close         = fx.exploration_state.subjections_freed;
+                row.subjections_formed_close = fx.exploration_state.subjections_formed;
+            }
 
             // THE 1660 CONTROL: the Exploration span re-run from the fixture
             // and stopped at 1660, built exactly as exploration_sweep's re-runs
@@ -1690,12 +1960,18 @@ int main(int argc, char** argv)
         rows.push_back(row);
     }
 
+    // BL-1040: a handoff reading counts a seed only when its close exists (the span
+    // ran, in span mode), generation recorded no handoff violation, and the 1660
+    // control matched its fingerprint.
+    const auto usable = [](const seed_row& r) {
+        return r.close_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches);
+    };
     std::size_t generated = 0, handoffs = 0;
     std::size_t prefix_checked = 0, prefix_failed = 0, violations = 0;
     for (const seed_row& r : rows)
     {
         if (r.era_ran) ++generated;
-        if (r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches)) ++handoffs;
+        if (usable(r)) ++handoffs;
         if (r.expl_ran && r.has_fingerprint) { ++prefix_checked; if (!r.prefix_matches) ++prefix_failed; }
         if (!r.handoff_ok) ++violations;
     }
@@ -1704,11 +1980,13 @@ int main(int argc, char** argv)
         std::printf("FATAL  no seed generated\n");
         return 1;
     }
-    const bool continued = through_year > 1660;
     const long long T = static_cast<long long>(through_year);
+    const char* close_name = span_mode ? "the Digitisation span's close"
+                           : continued_mode ? "a 1200-network run's close" : "no span";
 
     // ======================= Per-seed table =================================
-    std::printf("\n=== per seed (inputs to the spread; not verdicts) - C = the %lld close, K = the 1660 control ===\n", T);
+    std::printf("\n=== per seed (inputs to the spread; not verdicts) - C = the %lld close (%s), K = the 1660 control ===\n",
+                T, close_name);
     std::printf("  seed | mkts urb corps  rho(f,urb) rho(f,gds) | inst  adv nat nat+adv | chk K/C | "
                 "flows K/C far K/C | subj K/C secess K/C | urban%% K/C | ind.polities K/C | tph gini | prefix\n");
     const auto fmt_rho = [](double x, char* buf, std::size_t len) {
@@ -1725,6 +2003,7 @@ int main(int argc, char** argv)
         fmt_rho(r.rho_firms_goods, b, sizeof b);
         fmt_rho(r.treasury_per_head_gini, c, sizeof c);
         const char* prefix = !r.expl_ran ? "no handoff"
+                           : !r.close_ran ? "no span"
                            : !r.has_fingerprint ? "no fingerprint"
                            : r.prefix_matches ? "matches" : "MISMATCH";
         std::printf("  %4u | %4d %3d %5d    %s    %s | %5lld %4lld %3d %7d | %3d/%-3d | %3d/%-3d %3d/%-3d | "
@@ -1742,6 +2021,44 @@ int main(int argc, char** argv)
                     r.handoff_ok ? "" : "  HANDOFF VIOLATION: ", r.handoff_ok ? "" : r.handoff_violation.c_str());
     }
 
+    // ======================= The span itself (BL-1040) ======================
+    if (span_mode)
+    {
+        std::printf("\n=== THE DIGITISATION SPAN, per seed - its own call from the 1660 handoff (BL-1040) ===\n");
+        std::printf("  rounds = decision rounds the span ran; battles/conquests/foundings = the span's own counters;\n"
+                    "  living and subjects at K (1660) -> C; industry = living polities holding an Industry node at C\n"
+                    "  (nodes summed); ms = generation's own span call, wall clock, this build (reported, never asserted)\n");
+        std::printf("  seed | ran | span       | rounds | battles conq found | living K->C | subj K->C | industry pol/nodes |"
+                    "  span ms\n");
+        std::vector<double> ms;
+        std::size_t ran_n = 0, rounds_ok = 0;
+        for (const seed_row& r : rows)
+        {
+            if (!r.span_ran)
+            {
+                std::printf("  %4u |  no | (the span did not run%s)\n", r.seed,
+                            r.expl_ran ? " though Exploration did -- R3 FAILS" : ": Exploration did not run");
+                continue;
+            }
+            ++ran_n;
+            const int64_t step = 4; // Exploration's band (NR-888); the span's params are checked by --fidelity
+            if (r.span_rounds == (r.span_stop - r.span_start + step - 1) / step) ++rounds_ok;
+            ms.push_back(static_cast<double>(r.span_ms));
+            std::printf("  %4u | yes | %4lld-%4lld |   %4lld | %7lld %4lld %5lld |   %3d->%-3d  |  %3d->%-3d |   %4d/%-5d        | %7lld\n",
+                        r.seed, static_cast<long long>(r.span_start), static_cast<long long>(r.span_stop),
+                        static_cast<long long>(r.span_rounds), static_cast<long long>(r.span_battles),
+                        static_cast<long long>(r.span_conquests), static_cast<long long>(r.span_foundings),
+                        r.at_1660.alive_polities, r.at_close.alive_polities, r.at_1660.subjects, r.at_close.subjects,
+                        r.at_close.polities_industry_nodes, r.at_close.industry_nodes,
+                        static_cast<long long>(r.span_ms));
+        }
+        std::printf("  the span ran on %zu of %zu seeds; ran its full round count ((stop - start) / 4) on %zu\n",
+                    ran_n, rows.size(), rounds_ok);
+        if (!ms.empty())
+            std::printf("  SPAN COST per seed: median %.0f ms, max %.0f ms, over %zu seeds (this harness build, serial)\n",
+                        median_of(ms), *std::max_element(ms.begin(), ms.end()), ms.size());
+    }
+
     const auto collect = [&](double (*get)(const seed_row&)) {
         std::vector<double> v;
         for (const seed_row& r : rows) v.push_back(get(r));
@@ -1752,7 +2069,7 @@ int main(int argc, char** argv)
     const auto handoff_collect = [&](double (*get)(const seed_row&)) {
         std::vector<double> v;
         for (const seed_row& r : rows)
-            v.push_back(r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches) ? get(r) : k_undef);
+            v.push_back(usable(r) ? get(r) : k_undef);
         return v;
     };
     const std::size_t N = rows.size();
@@ -1761,21 +2078,29 @@ int main(int argc, char** argv)
     std::printf("(%zu of %zu worlds ran the Empires round; %zu carry a usable handoff. 1660 control vs the\n"
                 " library fingerprint: %zu checked, %zu mismatched. Handoff violations: %zu.)\n",
                 generated, N, handoffs, prefix_checked, prefix_failed, violations);
-    if (continued)
-        std::printf("WHAT 'AT %lld' READS: the Digitisation span does not exist. The close is the SHIPPED world\n"
-                    "(epoch 0) with Exploration's own call continued to %lld - Exploration's forces only, the\n"
-                    "Empires-round overrides off - plus world setup and the applied landscape search winner\n"
-                    "(the 12-tick validation run is not mirrored). Each line names its surface and year.\n\n", T, T);
+    if (span_mode)
+        std::printf("WHAT 'AT %lld' READS: the DIGITISATION SPAN's close. The shipped world (epoch 0) with the span\n"
+                    "switched on: Exploration closes at 1660 as shipped, the span runs 1660 -> %lld as its own call\n"
+                    "from the 1660 exploration_output (the span's own seed, Exploration's forces plus the Industry\n"
+                    "tree), then world setup and the applied landscape search winner build on its close (the 12-tick\n"
+                    "validation run is not mirrored). World setup still reads Exploration's 1660 grudges, corridors\n"
+                    "and treasuries (BL-1040 scoped that switch out). Each line names its surface and year.\n\n", T, T);
+    else if (continued_mode)
+        std::printf("WHAT 'AT %lld' READS: A 1200-NETWORK RUN, NOT THE SPAN. The shipped world (epoch 0) with\n"
+                    "Exploration's own call continued to %lld - Exploration's forces only, pricing corridor income and\n"
+                    "land trade on the network it inherited at 1200 - plus world setup and the applied landscape\n"
+                    "search winner (the 12-tick validation run is not mirrored). A comparison for the span, never the\n"
+                    "phase's reading. Each line names its surface and year.\n\n", T, T);
     else
-        std::printf("WHAT 'AT 1960' READS TODAY: nothing ran past 1660 (--through 1660). The world play opens on\n"
+        std::printf("WHAT 'AT 1960' READS HERE: nothing ran past 1660 (--through 1660). The world play opens on\n"
                     "is the 1660 Exploration close plus world setup and the applied landscape search winner (the\n"
-                    "12-tick validation run is not mirrored). Run with --through 1960 for the continued world.\n\n");
+                    "12-tick validation run is not mirrored). Run with --through 1960 for the Digitisation span.\n\n");
 
     // ---- 1 ------------------------------------------------------------------
     {
         std::printf("[ 1] Density follows cities - MEASURED on the campaign world built on the %lld close (firms\n"
                     "     laid by today's landscape search; the city charter budget meant to lay them does not exist,\n"
-                    "     so a continued span moves this reading's inputs, not its cause)\n", T);
+                    "     so running past 1660 moves this reading's inputs, not its cause)\n", T);
         std::printf("     firm = a corporation with >= 1 installation clearing against the market (market_for_tile);\n"
                     "     urban population = non-razed centres routed there; good count = distinct goods deposited\n"
                     "     on the catchment's tiles. Spearman rho across one world's markets:\n");
@@ -1867,7 +2192,7 @@ int main(int argc, char** argv)
                      }));
         std::size_t present = 0;
         for (const seed_row& r : rows)
-            if (r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches) && r.at_close.checkered_regions > 0)
+            if (usable(r) && r.at_close.checkered_regions > 0)
                 ++present;
         std::printf("     present at the close in %zu of %zu worlds with a usable handoff\n", present, handoffs);
         std::printf("     concentrated in large centres - n/a: population centres carry no culture shares (the\n"
@@ -1894,7 +2219,7 @@ int main(int argc, char** argv)
         for (const seed_row& r : rows)
         {
             unreadable += static_cast<std::size_t>(r.at_close.flows_unreadable);
-            if (r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches) && r.at_close.flows_far > 0)
+            if (usable(r) && r.at_close.flows_far > 0)
                 ++any_far;
         }
         std::printf("[ 7] Far trade - MEASURED off the standing trade flows at the 1660 control and the %lld close,\n"
@@ -1944,11 +2269,23 @@ int main(int argc, char** argv)
                      handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_1660.polities_industrial); }));
         print_spread("industrial polities per world, at the close",
                      handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.polities_industrial); }));
+        if (span_mode)
+        {
+            // BL-1040: the span opens the Industry tree (BL-1038), so its
+            // uptake is evidence the span played the forces it was given --
+            // still not the reading, which reads industry points.
+            std::printf("     Industry tree - evidence, not the reading: the span opens it at 1660 to every living\n"
+                        "     polity; living polities holding any Industry node at the close, and the nodes held:\n");
+            print_spread("polities holding an Industry node, at the close",
+                         handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.polities_industry_nodes); }));
+            print_spread("Industry nodes held, at the close",
+                         handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.industry_nodes); }));
+        }
         std::printf("\n");
     }
 
     // ---- 9 ------------------------------------------------------------------
-    if (continued)
+    if (past_1660)
     {
         std::printf("[ 9] Migration - PARTIAL\n");
         std::printf("     urban share rising - MEASURED off region urban_population / population at the 1660 control\n"
@@ -1964,7 +2301,7 @@ int main(int argc, char** argv)
         std::size_t rising = 0;
         for (const seed_row& r : rows)
         {
-            if (!(r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches))) continue;
+            if (!(usable(r))) continue;
             if (r.at_1660.heads <= 0 || r.at_close.heads <= 0) continue;
             const double a = static_cast<double>(r.at_1660.urban_heads) / static_cast<double>(r.at_1660.heads);
             const double b = static_cast<double>(r.at_close.urban_heads) / static_cast<double>(r.at_close.heads);
@@ -1982,12 +2319,12 @@ int main(int argc, char** argv)
 
     // ---- 10 -----------------------------------------------------------------
     {
-        std::printf("[10] Decolonisation - %s\n", continued ? "MEASURED" : "n/a (the 1660 half only)");
+        std::printf("[10] Decolonisation - %s\n", past_1660 ? "MEASURED" : "n/a (the 1660 half only)");
         std::printf("     subjects = living polities with an overlord, at the 1660 control%s:\n",
-                    continued ? " and at the close" : "");
+                    past_1660 ? " and at the close" : "");
         print_spread("subjects at 1660",
                      handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_1660.subjects); }));
-        if (continued)
+        if (past_1660)
         {
             print_spread("subjects at the close",
                          handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.subjects); }));
@@ -2002,7 +2339,7 @@ int main(int argc, char** argv)
             std::size_t fewer = 0, none_left = 0, peaceful_loss = 0, held_any = 0;
             for (const seed_row& r : rows)
             {
-                if (!(r.expl_ran && r.handoff_ok && (!r.has_fingerprint || r.prefix_matches))) continue;
+                if (!(usable(r))) continue;
                 if (r.at_1660.subjects == 0) continue;
                 ++held_any;
                 if (r.at_close.subjects < r.at_1660.subjects) ++fewer;
@@ -2036,15 +2373,15 @@ int main(int argc, char** argv)
     {
         std::string measured = "1, 7", partial = "5", zero, na = "2, 4, 6, 8, 11, 12, 13";
         if (r3_structural_zero) zero = "3"; else measured = "1, 3, 7";
-        if (continued) { measured += ", 10"; partial += ", 9"; }
+        if (past_1660) { measured += ", 10"; partial += ", 9"; }
         else           { na += ", 9, 10"; }
         const auto count = [](const std::string& list) {
             return list.empty() ? 0 : 1 + static_cast<int>(std::count(list.begin(), list.end(), ','));
         };
-        std::printf("SUMMARY at %lld  measured %d (%s) | partial %d (%s) | structural zero %d (%s) | n/a %d (%s);\n"
+        std::printf("SUMMARY at %lld (%s)  measured %d (%s) | partial %d (%s) | structural zero %d (%s) | n/a %d (%s);\n"
                     "         6 prints a labelled proxy; 8 prints its region half as a structural zero and its polity\n"
                     "         half as evidence. Prefix: %zu of %zu fingerprinted controls matched.\n",
-                    T, count(measured), measured.c_str(), count(partial), partial.c_str(),
+                    T, close_name, count(measured), measured.c_str(), count(partial), partial.c_str(),
                     count(zero), zero.empty() ? "-" : zero.c_str(), count(na), na.c_str(),
                     prefix_checked - prefix_failed, prefix_checked);
     }
@@ -2067,16 +2404,21 @@ int main(int argc, char** argv)
                 std::fprintf(f, "\"%s\": {\"settled_land_regions\": %d, \"checkered_regions\": %d, \"flows\": %d, "
                                 "\"flows_far\": %d, \"flows_unreadable\": %d, \"volume\": %lld, \"volume_far\": %lld, "
                                 "\"industrialised_regions\": %d, \"polities_industrial\": %d, \"urban_heads\": %lld, "
-                                "\"heads\": %lld, \"subjects\": %d, \"alive_polities\": %d}%s",
+                                "\"heads\": %lld, \"subjects\": %d, \"alive_polities\": %d, "
+                                "\"polities_industry_nodes\": %d, \"industry_nodes\": %d}%s",
                              key, h.settled_land_regions, h.checkered_regions, h.flows, h.flows_far, h.flows_unreadable,
                              (long long)h.volume, (long long)h.volume_far, h.industrialised_regions,
                              h.polities_industrial, (long long)h.urban_heads, (long long)h.heads, h.subjects,
-                             h.alive_polities, tail);
+                             h.alive_polities, h.polities_industry_nodes, h.industry_nodes, tail);
             };
-            std::fprintf(f, "{\n \"_note\": \"BL-1029 digitisation_sim_harness per-seed table. Close = the shipped world "
-                            "(epoch_year 0) with Exploration's call continued to through_year; control = the 1660 handoff "
-                            "re-run from the fixture and held to the seed library fingerprint. Reported, not gated.\",\n");
-            std::fprintf(f, " \"through_year\": %lld,\n \"band_tier3_recipes\": %d,\n \"worlds\": [\n", T, band_tier3_recipes);
+            std::fprintf(f, "{\n \"_note\": \"BL-1029/BL-1040 digitisation_sim_harness per-seed table. mode 'span' (BL-1040): "
+                            "close = the shipped world (epoch_year 0) with the Digitisation span run as its own call from the "
+                            "1660 exploration_output to through_year; mode 'continued': a 1200-network run, Exploration's call "
+                            "continued to through_year (BL-1029), a comparison and not the span; mode 'none': no span, close = "
+                            "control. Control = the 1660 handoff re-run from the fixture and held to the seed library "
+                            "fingerprint. span_ms is wall clock, reported only. Reported, not gated.\",\n");
+            std::fprintf(f, " \"mode\": \"%s\",\n \"through_year\": %lld,\n \"band_tier3_recipes\": %d,\n \"worlds\": [\n",
+                         span_mode ? "span" : (continued_mode ? "continued" : "none"), T, band_tier3_recipes);
             for (std::size_t i = 0; i < rows.size(); ++i)
             {
                 const seed_row& r = rows[i];
@@ -2085,6 +2427,13 @@ int main(int argc, char** argv)
                              r.seed, r.era_ran ? "true" : "false", r.expl_ran ? "true" : "false",
                              r.handoff_ok ? "true" : "false", r.has_fingerprint ? "true" : "false",
                              r.prefix_matches ? "true" : "false", (long long)r.control_battles);
+                std::fprintf(f, "   \"close_ran\": %s, \"span_ran\": %s, \"span_start\": %lld, \"span_stop\": %lld, "
+                                "\"span_rounds\": %lld, \"span_battles\": %lld, \"span_conquests\": %lld, "
+                                "\"span_foundings\": %lld, \"span_ms\": %lld,\n",
+                             r.close_ran ? "true" : "false", r.span_ran ? "true" : "false",
+                             (long long)r.span_start, (long long)r.span_stop, (long long)r.span_rounds,
+                             (long long)r.span_battles, (long long)r.span_conquests, (long long)r.span_foundings,
+                             (long long)r.span_ms);
                 std::fprintf(f, "   \"markets\": %d, \"markets_urban\": %d, \"corps_on_body\": %d, ",
                              r.markets, r.markets_urban, r.corps_on_body);
                 put_rho("rho_firms_urban", r.rho_firms_urban, ", ");

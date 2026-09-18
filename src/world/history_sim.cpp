@@ -9765,3 +9765,84 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
     if (why) why->clear();
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// The Digitisation span's close (BL-1040)
+// ---------------------------------------------------------------------------
+
+digitisation_output make_digitisation_output(const settlement_state&  ss,
+                                             const history_sim_state& hs,
+                                             const creed_state*       cs)
+{
+    // ONE FOLD RULE FOR BOTH CLOSES. The standing-treaty expiry, the flow
+    // prune, the dead-filter on corridors and the derived tables are what
+    // "standing at the close" means for any span of this engine; restating
+    // them here would be a second construction of the same value.
+    digitisation_output o;
+    static_cast<exploration_output&>(o) = make_exploration_output(ss, hs, cs);
+    return o;
+}
+
+bool digitisation_output_valid(const digitisation_output& o, std::string* why,
+                               const creed_state*        live,
+                               const exploration_output* from)
+{
+    // 1. Every rule the Exploration close is held to.
+    if (!exploration_output_valid(o, why, live)) return false;
+
+    const auto fail = [&](const std::string& msg) {
+        if (why) *why = msg;
+        return false;
+    };
+
+    // 2. The span ran: a close that opens and shuts on one year is a span
+    //    that never played, and nothing downstream should read it as 1960.
+    if (!(o.start_year < o.stop_year)) return fail("the span closes on the year it opens");
+
+    if (from != nullptr)
+    {
+        // 3. IT RESUMED FROM `from`, and continued it. The span opens on the
+        //    year the value it resumed from closed on.
+        if (o.start_year != from->stop_year)
+            return fail("the span opens in " + std::to_string(o.start_year)
+                        + ", not on its handoff's close " + std::to_string(from->stop_year));
+
+        // 4. Nothing the resume carried is dropped or renumbered. Each table
+        //    is append-only across a span -- a polity that dies keeps its row,
+        //    a region the span founds is appended, a record coined in the span
+        //    takes the next free index -- so the resumed prefix must still be
+        //    there, in place.
+        if (o.regions.size() < from->regions.size())
+            return fail("the region table shrank across the span");
+        for (std::size_t i = 0; i < from->regions.size(); ++i)
+            if (o.regions[i].col != from->regions[i].col || o.regions[i].row != from->regions[i].row)
+                return fail("region " + std::to_string(i) + " moved across the span");
+
+        if (o.polities.size() < from->polities.size())
+            return fail("the polity table shrank across the span");
+        for (std::size_t i = 0; i < from->polities.size(); ++i)
+            if (o.polities[i].id != from->polities[i].id)
+                return fail("polity " + std::to_string(i) + " changed its id across the span");
+
+        if (o.culture_count < from->culture_count)
+            return fail("the culture table shrank across the span");
+
+        // The records BL-1036 carries so a resumed span continues the
+        // numbering: a span that restarted them would coin record 0 twice.
+        if (o.civilisations.size() < from->civilisations.size())
+            return fail("the civilisation table shrank across the span -- the resume restarted it");
+        for (std::size_t i = 0; i < from->civilisations.size(); ++i)
+            if (o.civilisations[i].name != from->civilisations[i].name
+             || o.civilisations[i].formed_year != from->civilisations[i].formed_year)
+                return fail("civilisation " + std::to_string(i) + " is not the record the span resumed");
+        if (o.universal_creeds.size() < from->universal_creeds.size())
+            return fail("the universal-creed table shrank across the span -- the resume restarted it");
+        for (std::size_t i = 0; i < from->universal_creeds.size(); ++i)
+            if (o.universal_creeds[i].name != from->universal_creeds[i].name
+             || o.universal_creeds[i].founded_year != from->universal_creeds[i].founded_year)
+                return fail("universal creed " + std::to_string(i) + " is not the record the span resumed");
+    }
+
+    if (why) why->clear();
+    return true;
+}

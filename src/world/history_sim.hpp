@@ -1800,6 +1800,8 @@ struct history_sim_params
     // Three more tables cross beside BL-931's four. Each is null by default,
     // and the Exploration caller leaves all three null, so every existing run
     // -- the shipped Exploration span included -- opens exactly as before.
+    // The Digitisation span (BL-1040, hard_coded_world.cpp) is the caller that
+    // sets all seven, from its `exploration_output`.
 
     /// Treaty clauses and tribute standing at the prior span's close
     /// (`exploration_output::dated_objects`), copied into this run's table at
@@ -4775,3 +4777,60 @@ exploration_output make_exploration_output(const settlement_state&  ss,
 /// Writes the first failure into @p why.
 bool exploration_output_valid(const exploration_output& o, std::string* why,
                               const creed_state* live = nullptr);
+
+// ---------------------------------------------------------------------------
+// The Digitisation span's close (BL-1040)
+// ---------------------------------------------------------------------------
+
+/// WHAT THE DIGITISATION SPAN ENDS WITH, AT 1960 -- the fourth span's handoff,
+/// on the footing of `exploration_output` and `pass_one_output`: a VALUE
+/// (copies, never views of live sim state), folded by `make_digitisation_output`
+/// and held to its rules by `digitisation_output_valid`.
+///
+/// THE SAME TABLES AS `exploration_output`, FOLDED BY THE SAME RULE, AND ON
+/// PURPOSE. The span is the same engine resumed from that struct, so its close
+/// is the same kind of value one span later: the region table (ownership,
+/// population, treasury, the stocks), the polities, the culture table, the
+/// standing treaties and flows, contacts, wants, preference, grudges, holdings,
+/// the surviving network and the civilisation/creed records -- every one
+/// filtered and sorted exactly as Exploration's are, so a reader cannot
+/// measure the two closes two different ways (the harness reads both through
+/// one function). Deriving from `exploration_output` rather than copying its
+/// field list is what keeps the two from drifting: a table added to the
+/// Exploration close is on this one too.
+///
+/// WHAT IT DOES NOT YET CARRY. Nothing Digitisation-only exists to carry --
+/// industry points (BL-1041) land on `region` and so cross inside `regions`
+/// without a field here; a charter budget, when one is built, is a table
+/// added beside the inherited ones. DIGITISATION.md § What crosses into play
+/// is the list this grows toward, and is not this struct's claim today.
+///
+/// ITS READERS. World setup reads the live settlement the span left (the
+/// population pass places centres from the 1960 demography); the struct itself
+/// is read by the fixture and the harnesses. World setup's hoisted records --
+/// the grudges, the corridor set, the treasuries -- are still Exploration's
+/// 1660 values when this span runs (hard_coded_world.cpp says so at the call
+/// site): switching them to this close is owed before the span ships on.
+struct digitisation_output : exploration_output
+{
+};
+
+/// Fold the Digitisation span's closing sim state and settlement state into
+/// the handoff value -- `make_exploration_output`'s rule, applied at the
+/// span's close. @param cs The culture table at the close.
+digitisation_output make_digitisation_output(const settlement_state&  ss,
+                                             const history_sim_state& hs,
+                                             const creed_state*       cs);
+
+/// The enforcement half of `digitisation_output`. Every rule
+/// `exploration_output_valid` holds (the tables, the overlord graph, the
+/// holdings, the standing objects and flows, the culture table), PLUS what
+/// makes it a span's close: the span ran (`start_year < stop_year`) -- and,
+/// when @p from (the value it resumed from) is given, that it opened where
+/// @p from closed and continued it rather than restarting it: the region,
+/// polity, culture, civilisation and creed tables never shrink, a region
+/// never moves, a polity keeps its id, and a civilisation or creed record
+/// keeps its name and its year. Writes the first failure into @p why.
+bool digitisation_output_valid(const digitisation_output& o, std::string* why,
+                               const creed_state*        live = nullptr,
+                               const exploration_output* from = nullptr);
