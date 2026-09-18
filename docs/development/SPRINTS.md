@@ -69,13 +69,13 @@ and/or a version goal (v0.1.1 etc.).
 - BL-1036 (span boundary resume) — dated objects cross, the 1200 anchors become explicit params, a fidelity check replaces bit-for-bit equivalence. Neutral.
 - BL-1037 (resume road tier) — a bought rung reopens at its bought tier, behind a switch the re-bless turns on.
 - BL-1038 (Industry tree wired) — every living polity enters at 1660, fuel reads a held seam, urban mass drives the rate; behind a switch. Neutral.
-- BL-1039 (charter spend rules) — square-root cap under a density ceiling, capital from unspent points, and the cost-table rows to set them. Neutral.
+- BL-1039 (charter spend rules) — square-root cap under a density ceiling that fills goods in turn, B net of specialist prices, and the cost-table rows to set them (timed rows 2026-09-19). Neutral.
 - BL-1040 (Digitisation span) — its own call from exploration_output, wherever Exploration runs; behind a switch. Neutral.
 - BL-1051 (span open survey) — every region surveyed for fuel and forest at the span open; ground_forest and furnace_lit read from it (NR-891, NR-892). Neutral while the span is off.
 - BL-1041 (industry points) — Beat 1: located points on regions with centres, from scale, own fuel, Industry capacity and treasury paid in; no sink this cut.
 - BL-1053 (setup reads span close) — when the span runs, world setup reads its 1960 treasuries, grudges, roads and junction markets, not the 1660 ones; before BL-1043 so the readings measure the right map.
 - BL-1042 (stockpile to budget) — region points reach campaign centres by the carve; the app and its harness mirror pass the budget. Neutral while the span is off.
-- BL-1043 (real-stockpile charter sweep) — prices, capital rate and the no-specialist world measured; ends in calls.
+- BL-1043 (real-stockpile charter sweep) — prices and the no-specialist world measured, seat solvency at the draw; ends in calls.
 - BL-1050 (order-dependent reads) — five readers stop letting hash order reach arithmetic, so a loaded world replays; merged with BL-1044, never alone (NR-894).
 - BL-1044 (Beat 1 ships) — span and budget on by default at epoch 0, prices pinned, the one re-bless, the 1960 readings, the cold review.
 
@@ -94,6 +94,8 @@ FOUND and recorded: the --through continuation that NR-888's figures came from p
 REVIEW FORM 2026-09-18 (Ben): NR-891 readings accepted, but ground_forest gets a source now (BL-1051); NR-892 furnace_lit reads the Fuel Doctrine taken (BL-1051); NR-893 the Invest-frequency spread is accepted for Beat 1, read industrialisation first; NR-894 BL-1050 (order-independent reads, so a saved game replays) rides this sprint's re-bless. Filed from the wave 0 reviews and unscheduled: BL-1048 (tree rate scales unread), BL-1049 (civilisation index reuse at 1200).
 
 From BL-1040's cold review (2026-09-18): BL-1053 filed and scheduled ahead of BL-1043; BL-1054 (subject churn in the span, seed 32) filed unscheduled for Beat 3. BL-1052 (forest as a stock) backlogged for the continuity pass (Ben: "we will do a continuity pass on things like this after each round is done").
+
+WAVE 1 FORM (Ben, 2026-09-18, NR-895): capital REVERTS to the 400 +/-40% draw (the unspent-points rule opened 10 of 11 specialists with nothing on a synthetic budget); the ceiling fills goods in turn; B net of specialist prices, B_ref = 8 x goods x firm price; furnace_lit reads Coke Smelting held; forest scored as fuel is; BL-1041's defaults A and B kept; the building screen's bar ends full. Also 2026-09-18: the wizard's Loading-the-X-round wait gained a progress bar (Ben), and the timed charter rows run first thing 2026-09-19.
 
 ## Where things stand
 

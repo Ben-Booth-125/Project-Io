@@ -6110,6 +6110,24 @@
         "src/world/world_save.cpp"
       ],
       "resolution": "RULED (Ben, 2026-09-18, review form): add BL-1050 (order-independent reads) to sprint 45's re-bless; BL-1044 requires it and merges it with the switch flips. TECH_FOUNDATIONS.md states the rule: a loaded world, and a copy, replay byte for byte."
+    },
+    "NR-895": {
+      "id": "NR-895",
+      "title": "EIGHT CALLS from sprint 45 wave 1 (BL-1039, BL-1051, BL-1041, BL-1053), asked on one form",
+      "raised": "2026-09-18",
+      "kind": "question",
+      "status": "resolved",
+      "source": "The cold reviews of BL-1039 (charter spend rules), BL-1051 (span open survey) and BL-1053 (setup reads span close), and BL-1041's two build defaults; every figure re-run by the main session (chain 6) before it was asked.",
+      "what": "(1) Specialist capital from unspent points opened 10 of 11 specialists with nothing on a synthetic 4x budget, because a specialist's centre spends first and fully. (2) The density ceiling filled the biggest gaps first and starved small goods (agricultural produce 0 firms at 4x, 8 under the legacy cap). (3) B counted specialist prices and B_ref only firms, so a body at the legacy spend capped at 9, not 8. (4) furnace_lit, read as a Fuel Doctrine side held, was 1000 at every pick that reads it. (5) Forest, a plain average share (median ~212), could not weigh against coal's best-seam score. (6) Default A: a region founded after the span opens inherits its parent's surveyed fuel x0.7. (7) Default B: every Industry fuel read inside the span takes the survey. (8) The building screen's bar now reads (12/12) and ends full, not (12/14) at ~86%.",
+      "why_it_matters": "They set how the charter budget spends and what Beat 1's Industry tree reads, before the real-stockpile sweep and the re-bless.",
+      "options": [],
+      "recommendation": "See each call on the form: every recommendation but (1) was taken.",
+      "files": [
+        "docs/generation/DIGITISATION.md",
+        "docs/generation/CORPORATION_GENERATION.md",
+        "docs/generation/trees/INDUSTRY_TREE.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-18, wave 1 form): (1) REVERT to the 400 +/-40% draw — the unspent-points rule is removed (BL-1039 round 2); (2) the ceiling fills goods in turn; (3) B net of specialist prices, B_ref = 8 x goods x firm price; (4) furnace_lit reads Coke Smelting held; (5) forest scored as fuel is — the best held forest share against the world mean; (6) Default A kept; (7) Default B kept; (8) the bar ends full at (12/12). DIGITISATION.md § 1 and § Beat 1, CORPORATION_GENERATION.md Pass 4 and Pass 6, INDUSTRY_TREE.md § The scorer carry it; BL-1039 round 2 and BL-1041 build it."
     }
   }
 }

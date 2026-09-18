@@ -5965,7 +5965,7 @@
   },
   {
    "brief": "charter-spend-rules",
-   "title": "BL-1039 - The charter spend takes a square-root cap under a density ceiling and opens a specialist on its centre's unspent points",
+   "title": "BL-1039 - The charter spend takes a square-root cap under a density ceiling that fills goods in turn",
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
@@ -6003,12 +6003,12 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "cancelled",
      "verification": [
       "headless: a synthetic row with the capital rule"
      ],
      "requirement": "A budget specialist's starting capital equals its centre's unspent remainder times the rate, asserted; specialists opening with zero are counted.",
-     "notes": ""
+     "notes": "Cancelled 2026-09-18: Ben reverted capital to the 400 +/-40% draw (NR-895); the unspent-points rule is removed in round 2."
     },
     {
      "id": "R5",
@@ -6036,6 +6036,25 @@
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds no pinned path moved.",
+     "notes": ""
+    },
+    {
+     "id": "R8",
+     "status": "pending",
+     "verification": [
+      "headless: charter_refusal_probe",
+      "headless: player_seed_sweep smoke row"
+     ],
+     "requirement": "B counts firm points net of specialist prices and B_ref = 8 x |G| x firm price, so a body at the legacy firm spend gets exactly the legacy cap of 8 (a probe case proves it).",
+     "notes": ""
+    },
+    {
+     "id": "R9",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep smoke row (sqrt, ceiling 120, 4x)"
+     ],
+     "requirement": "Under the density ceiling firms go to the goods in turn, up to each good's cap, so every good with demand holds firms and the ceiling trims them evenly.",
      "notes": ""
     }
    ],

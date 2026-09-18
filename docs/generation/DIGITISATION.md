@@ -36,8 +36,9 @@
 > ⟳ **What changed (2026-09-18, cutting sprint 45 — remove once reviewed):** Ben ruled on an
 > elicitation form that the span runs whatever the epoch, and that treasury is paid into industry
 > points as a consequence, not a choice. He also ruled on the charter terms: the per-resource cap
-> scales by a square root under a density ceiling, a specialist's price is anchored to the seat
-> menu, and a specialist opens on its centre's unspent points. The Industry tree now opens to every
+> scales by a square root under a density ceiling, and a specialist's price is anchored to the seat
+> menu (a ruling that a specialist opens on its centre's unspent points was reversed the same day).
+> The Industry tree now opens to every
 > living polity at 1660, with its root ungated (`trees/TREES.md`, `trees/INDUSTRY_TREE.md`). The
 > proposals the form listed and Ben did not overturn are marked PROPOSED where they land.
 
@@ -210,19 +211,27 @@ synthetic test budget.
 capital, under a named DENSITY CEILING.** Capital buys density with diminishing returns. The ceiling
 sits below the 200-per-body runaway guard and counts what it refuses under its own unspent reason,
 so the guard goes back to catching runaways only. The constants are read off the cost table once it
-holds rows between 81 and 150 firms and a tally of firms per good, neither of which it has today.
+holds rows between 81 and 150 firms and a tally of firms per good.
+
+**SETTLED (Ben, 2026-09-18, wave 1 form): the budget and its reference are in the same units, and
+the ceiling fills goods in turn.** A body's charter capital B counts only the points spent on firms,
+net of specialist prices; the reference B_ref is 8 firms for every good with demand on the body, at
+the firm price, so a body at the legacy spend keeps the legacy cap of 8. Under the ceiling, firms go
+to the goods in turn — one per good each pass, up to its cap — so the ceiling trims every good
+evenly. A ceiling that filled the biggest gaps first starved the smallest goods of any firm: breadth
+still decides which goods, and density decides how many of each.
 
 **SETTLED (Ben, 2026-09-18, elicitation): a specialist's price is anchored to the SEAT MENU.** The
 price, in firm charters, is the one at which the median library world offers about as many seats as
 a world with no budget does. The number is read on real stockpiles.
 
-**SETTLED (Ben, 2026-09-18, elicitation): a specialist opens on its centre's UNSPENT POINTS.** What
-a centre could not spend on firms around it — because its ground ran out — is the money its
-specialist starts with. So a rich city with little ground opens a rich specialist, and a city that
-spent its budget on a dense web opens a lean one. This is the capital call that NR-886 tied the
-seat's solvency to; solvency is read on real stockpiles. PROPOSED: the rate makes one specialist's price in points
-worth today's starting capital, 400 credits, and it is read on real stockpiles together with how
-many specialists open with nothing.
+**SETTLED (Ben, 2026-09-18, wave 1 form, reversing the same morning's ruling): a budget
+specialist opens on TODAY'S STARTING CAPITAL**, the seeded 400 ±40% draw with the focus premium
+(`CORPORATION_GENERATION.md` § Pass 4). Capital drawn from a centre's unspent points was built and
+measured first: centres spend richest first, so a specialist's own centre spends its whole budget
+unless its ground runs out, and on a synthetic budget 10 of 11 specialists opened with nothing.
+Capital that follows the city in that way funds almost no seat. This is the capital call NR-886 tied
+the seat's solvency to; solvency is read on real stockpiles.
 
 **PROPOSED (listed to Ben 2026-09-17, not overturned): a charter stays near its centre.** A firm is
 anchored inside a window around its centre and then its centre's region; a charter that finds no
@@ -441,7 +450,10 @@ centre* is one number per region with centres; it reaches the campaign's centres
 (Part III). A region's own fuel sets its rate as a soft factor with a floor, so a large unfuelled
 city still builds and the fuel reading is a finding rather than a tautology. Ground the sim founded
 is surveyed again at 1660, because a founding inherits its parent's fuel at a discount rather than
-a survey of its own.
+a survey of its own. SETTLED (Ben, 2026-09-18, wave 1 form): a region founded after the span opens
+inherits its parent's surveyed fuel at ×0.7, as the pre-span reading does; and inside the span
+every Industry fuel read — the gate, the Coke term and the rate — takes the survey, so the tree
+and the points agree about who has coal.
 
 **SETTLED (Ben, 2026-09-15, elicitation): three sinks, and what is not spent charters firms.**
 
@@ -728,8 +740,8 @@ Measured rather than argued:
   budget points, and the square root's constants and the density ceiling, each set against
   live-play cost before it is fixed (the split, the rule's form and the price's anchor are settled
   in § 1).
-- **The rate that turns a centre's unspent points into its specialist's capital**, and how many
-  specialists open with nothing at that rate.
+- **Whether a seat on a budget world is solvent at today's starting capital** — read on real
+  stockpiles, with the trailing net over a window long enough to judge it.
 - **What a world gets when no centre can afford a specialist** — decided when Beat 1's real
   stockpiles exist, not on a synthetic budget.
 

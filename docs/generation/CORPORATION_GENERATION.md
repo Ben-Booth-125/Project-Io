@@ -299,10 +299,9 @@ Each corporation receives starting capital drawn from a seeded range. A tunable
 focus receive slightly higher starting capital to offset their lack of direct resource
 access.
 
-**AMENDED FORWARD (Ben, 2026-09-18): on a charter-budget world a specialist opens on its centre's
-unspent points.** What its centre could not spend on firms around it becomes its starting capital
-at a stated rate, in place of the seeded draw (`DIGITISATION.md` § 1). Worlds without a budget keep
-the draw above.
+**A charter-budget world keeps this draw (Ben, 2026-09-18).** A specialist chartered from a
+centre's budget opens on the same seeded capital as any other; capital drawn from its centre's
+unspent points was measured and reversed the same day (`DIGITISATION.md` § 1).
 
 **Pre-game operating history.** Corporations do not open cold. At campaign start the economy
 is run forward a fixed number of **pre-game ticks** — phase 6's single validation run of the
@@ -376,8 +375,9 @@ and anything editing that basket is editing the size of the background economy.
 Where a charter budget places the web, the per-resource cap above is no longer fixed at 8: it
 scales with the body's charter capital, so a richer body stands more firms per good
 (`DIGITISATION.md` § 1). It scales by a square root, under a named density ceiling below the
-200-per-body guard (Ben, 2026-09-18). Worlds without a budget keep the cap exactly as ruled on
-2026-09-06.
+200-per-body guard, which fills goods in turn so it trims every good evenly (Ben, 2026-09-18).
+The budget path's caps are its own, not restatements of this pass's constants. Worlds without a
+budget keep the cap exactly as ruled on 2026-09-06.
 
 **AMENDED FORWARD (Ben, 2026-09-15): density follows the city on a Digitisation world.** The opening
 map wants *many companies around population centres*, which breadth cannot place. Where the

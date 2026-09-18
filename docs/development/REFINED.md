@@ -32,7 +32,7 @@ harnesses one at a time and never `player_seed_sweep`; the main session runs the
 - [x] **BL-1038 (Industry tree wired)** — DELIVERED 2026-09-18: merged 29b74f69, fix round 191c212b, --digest-check 16/16. Lane B, generation-dev. files: src/world/industry_tree_data.hpp (generated), history_sim.hpp/.cpp, tools/session/tree_lint.js, tools/verify/exploration_sim_harness.cpp. Shares history_sim.* with lane A in disjoint regions; the main session resolves the merge.
   provides: industry_tree_enabled (off), industry_open_year, the Industry mask triple and fold, the urban-mass rate, the fork-reachability lint. consumes: the amended industry_tree.json (this cut).
 - [ ] **BL-1039 (charter spend rules)** — MERGED 38561e52; cold-reviewed (nothing blocking pins; two spec calls to Ben); fix round building; owed: the timed rows — first thing 2026-09-19 on a quiet machine (Ben, 2026-09-18) — and the R6 call. Lane C, economy-dev. Started when BL-1034 landed (both edit player_seed_sweep and harness_params). files: src/world/charter_budget.hpp, corporation_generation.cpp, budget_system.hpp, tools/verify/player_seed_sweep.cpp, harness_params.hpp, charter_cost_sweep.json. Its timing rows run on a quiet machine, serially.
-  provides: the sqrt cap rule, density_ceiling reason, the capital-from-unspent rule, per-good tallies. consumes: charter_budget / charter_spend_params (landed, BL-1032).
+  provides: the sqrt cap rule, density_ceiling reason (filling goods in turn), per-good tallies; the unspent-points capital rule was built and reverted (NR-895). consumes: charter_budget / charter_spend_params (landed, BL-1032).
 
 **Wave 1 — the span and Beat 1, still behind switches**
 

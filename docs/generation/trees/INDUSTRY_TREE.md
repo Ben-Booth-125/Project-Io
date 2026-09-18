@@ -268,12 +268,12 @@ the Empire tree shares, each a reading of polity or region state the sim already
 
 | term | the reading | its visible cause |
 |---|---|---|
-| `furnace_lit` | the polity has taken a Fuel Doctrine side — Coke Smelting or Charcoal Iron held (Ben, 2026-09-18, NR-892) | a lit engine house on the map; the furnace crossing already recorded |
+| `furnace_lit` | the polity holds Coke Smelting — a coal-fired furnace (Ben, 2026-09-18, wave 1 form; a Fuel Doctrine side held read 1000 at every pick that reads the term, since all three nodes sit behind The Cheap Ton) | a lit engine house on the map; the furnace crossing already recorded |
 | `colonial_reach` | at least one held region is reachable from the seat only across a sea leg — read as the seat's line to it crossing sea, the same test that makes a campaign a sea leg | a hull on the route; the tie the campaign reads as a colonial preferred-seller |
 | `tariff_pressure` | at a market the polity's holdings trade through, a neighbour's landed price for a good the polity itself makes is below its own | the price field on the route; the reading that becomes the nation's tariff posture |
 | `fuel_bound` | fuel demanded by held works and engines exceeds fuel landed at the seat this round — read as the seat market's unmet energy want after inbound trade | a lit furnace running short; coal or oil on the order book |
 | `labour_bound` | of the held surplus above subsistence, the share standing under arms — the hands the works cannot have | works standing idle for hands while the fields are full |
-| `ground_forest` | forest share on held ground — the Charcoal endowment, which no gate atom carries; surveyed from tile cover (Ben, 2026-09-18, NR-891) | the terrain under the seat |
+| `ground_forest` | forest on held ground — the Charcoal endowment, which no gate atom carries; surveyed from tile cover and scored as fuel is (Ben, 2026-09-18, NR-891 and the wave 1 form) | the terrain under the seat |
 | `credit_bound` | how far the capital's treasury falls short of the one venture the sim prices in capital, a post road | a venture the seat cannot pay for out of its purse |
 
 **How the sim reads them.** SETTLED (Ben, 2026-09-18, NR-891: accepted as the BL-1038 build read
@@ -284,8 +284,13 @@ carries no landed price — and is pinned at 0.
 
 **Forest is surveyed, so the forest polity chooses Charcoal (Ben, 2026-09-18, NR-891).** A region
 carries a forest share: the share of land tiles in its survey window under forest cover, read from
-the tiles as its fuel is. `ground_forest` is that share averaged over held ground. So a polity takes
-Charcoal Iron because its ground is wooded, not only because Coke is gated out. Of the
+the tiles as its fuel is. **It is scored as fuel is (Ben, 2026-09-18, wave 1 form):** `ground_forest`
+is the best held region's forest share against the mean of every region at the span open, capped
+at 1000, the same shape as `ground_fuel`'s best seam, so the Fuel Doctrine compares like with like.
+A plain average share read about 212 on the median region and let almost any seam outweigh any
+forest. So a polity takes Charcoal Iron because its ground is wooded, not only because Coke is gated
+out. Inside the span every fuel read in this tree — the gate, `ground_fuel` and the seam flag —
+takes the same survey (Ben, 2026-09-18). Of the
 shared core, `threatened` is the heaviest grudge any living polity holds against this one,
 `many_peoples` is the share of held regions whose plurality people is not the realm's, `known` is
 per node (held by a living polity this one has met), and `plague_struck` is pinned at 0 because
