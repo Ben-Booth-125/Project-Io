@@ -50,5 +50,50 @@
   "PURGE 2026-08-23: 240 open entries -> 18. Every entry referring only to backlog ids <= BL-568 (retired by the same-day backlog purge) was retired; 16 more were answered by reading the current docs and tree. All 223 are frozen verbatim in archive/needs-review-purged-2026-08-23.json, each with a resolution saying why. The survivors are asked as a form: tools/session/register/review_queue.js, built by register/build.js, published at https://claude.ai/code/artifact/53fb4e56-2eae-439e-bcb7-121fa49bd340 . NR-576 records the calls taken in the sweep.",
   "DRAINED 2026-09-01 on Ben's instruction, from 117 open to 0. The queue had become a shadow backlog: most entries named WORK rather than a judgement, so ten backlog items (BL-713..BL-722) were minted to carry it and every entry was closed with a resolution saying where it went. THE RULE THAT KEEPS IT DRAINED, and it is now in CLAUDE.md Rule 0c: a call only Ben can make belongs here; work belongs in backlog.json; a fact worth remembering belongs in the comment or doc next to the code."
  ],
- "items": []
+ "items": [
+  {
+   "id": "NR-891",
+   "title": "DECISIONS TAKEN: how the Industry tree's scorer terms and research rate read the sim (BL-1038)",
+   "raised": "2026-09-18",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1038 (Industry tree wired), its build lane and its cold review; merged as 29b74f69, off by default.",
+   "what": "INDUSTRY_TREE.md § The scorer gives each term a reading, and two name quantities the Era -1 sim does not carry. The build took the nearest ones it does carry; the doc now says so (PROPOSED). READINGS: labour_bound = of the held surplus above subsistence, the share standing under arms (the doc's 'what the held works need' has no source). credit_bound = how far the capital's treasury falls short of the post-road price, the one venture the sim prices in capital (nodes are not paid in stores). colonial_reach = the seat's line to a held region crosses sea (the same test that makes a campaign a sea leg). fuel_bound = the seat market's unmet energy want after inbound trade. threatened = the heaviest grudge any living polity holds against this one. many_peoples = the share of held regions whose plurality people is not the realm's. known = per node, held by a living polity this one has met. PINNED AT 0: ground_forest (no forest field on a region), tariff_pressure (no landed price in the sim), plague_struck (the history sim runs no plague). Charcoal Iron is still reached, because a seamless polity finds Coke gated out. RATE: the three largest held regions' urban population, summed, capped at 600k, to the power 1.5 via an integer square root, around a reference of 200k at 6 per mille; TREES.md § State records the form and k = 3. The reference and fraction were re-priced once after a first cut that did not bind (anything above ~200k bought a node every Invest round).",
+   "why_it_matters": "These readings decide which side of each Industry fork a polity takes, and so the 1960 spread and the Works lean. Recorded so a reading can be overturned rather than quietly becoming the design.",
+   "options": [
+    "Accept the readings and the rate as built.",
+    "Re-read named terms (say which, and what they should read).",
+    "Give ground_forest a source now (a forest share on the region), so the forest polity chooses Charcoal rather than being pushed to it."
+   ],
+   "recommendation": "Accept for Beat 1. Revisit ground_forest when a region carries forest, and tariff_pressure when the sim carries a landed price.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "docs/generation/trees/INDUSTRY_TREE.md",
+    "docs/generation/trees/TREES.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-892",
+   "title": "CALL: furnace_lit reads 1000 for every polity that has invested at all — what should it read?",
+   "raised": "2026-09-18",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1038 cold review (code-reviewer, 2026-09-18).",
+   "what": "INDUSTRY_TREE.md § The scorer defines furnace_lit as 'the polity holds the spire's ring-1 major', and the build reads exactly that. But the root is the only node available from an empty mask, so every polity holds it after its first Industry purchase, and furnace_lit is 1000 on every later re-pick. It is the pursued-when term of Electrification, Synthetic Chemistry and Plant Registry, so those three always score the term's maximum, and the term separates no polity from another. The doc's cause column ('a lit engine house; the furnace crossing already recorded') points at something narrower than holding the root.",
+   "why_it_matters": "A term that reads the same for every investor does no work in the scorer, and three ring-3 nodes lean on it.",
+   "options": [
+    "Keep it as written: an entry marker, knowingly inert.",
+    "Read the Fuel Doctrine taken: Coke Smelting or Charcoal Iron held, so the furnace is lit when the polity has answered the fuel question.",
+    "Read a held region's own furnace crossing (Stage 4). No region lights before 1700 today, so this reads 0 until the Stage 4 gate runs in the span."
+   ],
+   "recommendation": "Read the Fuel Doctrine taken. It is already recorded in the mask, it separates polities, and it matches the doc's cause.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/trees/INDUSTRY_TREE.md"
+   ],
+   "resolution": null
+  }
+ ]
 }

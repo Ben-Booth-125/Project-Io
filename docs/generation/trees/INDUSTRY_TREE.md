@@ -269,12 +269,22 @@ the Empire tree shares, each a reading of polity or region state the sim already
 | term | the reading | its visible cause |
 |---|---|---|
 | `furnace_lit` | the polity holds the spire's ring-1 major | a lit engine house on the map; the furnace crossing already recorded |
-| `colonial_reach` | at least one held region is reachable from the seat only across a sea leg | a hull on the route; the tie the campaign reads as a colonial preferred-seller |
+| `colonial_reach` | at least one held region is reachable from the seat only across a sea leg — read as the seat's line to it crossing sea, the same test that makes a campaign a sea leg | a hull on the route; the tie the campaign reads as a colonial preferred-seller |
 | `tariff_pressure` | at a market the polity's holdings trade through, a neighbour's landed price for a good the polity itself makes is below its own | the price field on the route; the reading that becomes the nation's tariff posture |
-| `fuel_bound` | fuel demanded by held works and engines exceeds fuel landed at the seat this round | a lit furnace running short; coal or oil on the order book |
-| `labour_bound` | the labour split's subsistence share leaves the industry slice below what the held works need | works standing idle for hands while the fields are full |
+| `fuel_bound` | fuel demanded by held works and engines exceeds fuel landed at the seat this round — read as the seat market's unmet energy want after inbound trade | a lit furnace running short; coal or oil on the order book |
+| `labour_bound` | of the held surplus above subsistence, the share standing under arms — the hands the works cannot have | works standing idle for hands while the fields are full |
 | `ground_forest` | forest share on held ground — the Charcoal endowment, which no gate atom carries | the terrain under the seat |
-| `credit_bound` | the node or work the scorer wants costs more than one round's surplus of stores | a venture the seat cannot pay for out of one harvest |
+| `credit_bound` | how far the capital's treasury falls short of the one venture the sim prices in capital, a post road | a venture the seat cannot pay for out of its purse |
+
+**How the sim reads them.** PROPOSED (the BL-1038 build, 2026-09-18; listed on NR-891): the sim
+carries no per-work labour need and prices no node in stores, so `labour_bound` and `credit_bound`
+read the nearest quantity it does carry, as above. `ground_forest` and `tariff_pressure` have no
+source — no forest field on a region, no landed price in the sim — and are pinned at 0; Charcoal
+Iron is reached because a polity with no seam finds Coke gated out, not through this term. Of the
+shared core, `threatened` is the heaviest grudge any living polity holds against this one,
+`many_peoples` is the share of held regions whose plurality people is not the realm's, `known` is
+per node (held by a living polity this one has met), and `plague_struck` is pinned at 0 because
+the history sim runs no plague.
 
 **Three worked situations**, each assuming the polity already holds whatever
 `EXPLORATION_TREE.md` gave it at 1660.

@@ -387,6 +387,27 @@
     "tools/verify/exploration_sweep.cpp"
    ],
    "design": "SCHEDULED FOR THE PHASE'S CLOSE (Ben, 2026-09-18, sprint 45 elicitation: the span runs on at epoch 0 and the flip waits for Beats 2 and 3; NR-869 makes the flip the phase's done-when). DIGITISATION.md: the flip changes the calendar alone.\n\nWHY IT IS NOT ONE LINE (engine read 2026-09-18, checked). epoch_year feeds FOUR >= 1700 predicates and a stop year: the arc (era_minus_one.cpp:35, which turns Exploration off), the recipe band (era_band.hpp:42), the settlement pass's antiquity branch (settlement.cpp:1164 — founding schedule, Stage 4 furnace), antiquity_start (hard_coded_world.cpp:1595 — ruptures, the Charter Act, globalisation), and run_settlement's stop year (hard_coded_world.cpp:748). Decoupling only the arc regresses the Empires round's inputs. Consumers of an explicit epoch 1960 build the superseded arc today: world_determinism R4 (:654-676, asserts prehistory_years == 800), era_world_harness R5 (:112-118), haulage_measure's far mode (:178), main.cpp --epoch.\n\nOWED FROM BEN: retire the superseded 1560 -> 1960 arc, or keep it behind one explicit legacy-arc field read by all four gates (never by the arc predicate alone) — which also needs a save_game decision (save_game.cpp:86-101 writes world_params)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": null,
+   "written": "2026-09-18",
+   "author": "Claude (found by the BL-1038 cold review, 2026-09-18)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1048",
+   "short_name": "TREE_RATE_SCALES_UNREAD",
+   "category": "Generation",
+   "priority": "C",
+   "difficulty": 2,
+   "title": "The Exploration research rate ignores the spire ring, and no tree's rate reads contact degree, against TREES.md § State",
+   "authority_doc": "docs/generation/trees/TREES.md",
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "design": "FOUND 2026-09-18 by the BL-1038 cold review. TREES.md § State scales a polity's research rate 'by the spire ring it holds and by its contact degree'. The empire rate applies the spire ring (history_sim.cpp ~l.6255, x1.45 at ring 3) and multiplies by a contact_degree hard-coded to 0; the Exploration rate (~l.6374) applies neither. The BL-1038 fix round applies the spire ring to the Industry rate only. BL-908's contact table exists and the Industry scorer's `known` term already reads it, so the inert multiplier is a choice, not a gap in the data.\n\nTHE WORK. Apply the spire ring to the Exploration rate; read contact degree (distinct living polities met, clamped as the empire formula already clamps it) in every tree's rate; or amend TREES.md if either scale is not wanted. Either code change moves every shipped world, so it waits for a re-bless it can ride; sprint 45's carries only BL-1037 (Ben, 2026-09-18)."
   }
  ]
 }
