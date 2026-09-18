@@ -371,14 +371,16 @@ full would be a balance change smuggled in as a field — still holds for the ON
 never settled generation, and two consumers hit the gap at once (garrison sizing and contract-offer
 funding both scale off treasury, so both flattened to their floor in a freshly generated world).
 Ruled 2026-08-24 that generation credits a treasury of its own; ruled 2026-09-15 that the credit is
-the **Exploration span's 1660 treasury folded across the handoff**, not a levy re-run at world
-creation — the history already wrote the number, and a nation that inherited an empire's chest
-should open richer than one that inherited a city state's.
+the **treasury folded across the last simulated span's handoff** — Exploration's at 1660, or the
+Digitisation span's at 1960 where that span runs — not a levy re-run at world creation. The history
+already wrote the number, and a nation that inherited an empire's chest should open richer than one
+that inherited a city state's.
 
 **The rule.** `EXPLORATION.md` § Where the treasury sits puts one treasury per polity at its
-capital seat, as a fact about the ground (`region::treasury`): the flag over that ground at 1660
-owns the chest. Pass 2d folds a polity's anchored regions into ONE nation, and the polity's whole
-1660 treasury — summed over every region flying its flag, so a water-seated capital still counts —
+capital seat, as a fact about the ground (`region::treasury`): the flag over that ground at the
+close owns the chest. Pass 2d folds a polity's anchored regions into ONE nation, and the polity's
+whole treasury at the close — summed over every region flying its flag, so a water-seated capital
+still counts —
 lands on that nation, once. A seed the size floor (Pass 2c) absorbs hands its chest to the realm
 that absorbed it, the same way it hands over its ground. A nation with **no folded polity** — a
 Voronoi cell the history never held, or any body without a settlement pass — opens on the
@@ -387,7 +389,7 @@ Voronoi cell the history never held, or any body without a settlement pass — o
 **The one stated conversion.** The sim's treasury is in its material currency; the campaign's is
 credits. The conversion is a per-mille, and it is named here and nowhere else:
 
-    treasury_credits = Σ region::treasury (1660, over the folded polities) × 0.01 ‰
+    treasury_credits = Σ region::treasury (at the last span's close, over the folded polities) × 0.01 ‰
 
 that is, **0.01 per mille — one credit per 100,000 units of material**
 (`nation_params::treasury_credit_per_mille`). Chosen against two scales the campaign already has,
