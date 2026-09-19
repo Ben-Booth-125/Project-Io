@@ -10,6 +10,45 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-19 — Sprint 45 wave 1 lands: four items delivered, the Fuel Doctrine re-ruled twice
+
+**Runtime:** ~11 h wall clock (02:20 to 13:30, long unattended chains). Delivery — Full (two
+worktree lanes and a fix round, two cold reviews, two main-session verification chains) with three
+design calls on elicitation forms.
+
+### Picked up from the sleep
+BL-1041's fix round had committed in its worktree before the PC slept; its source change was comments
+only, so it merged first and chain 8 verified it with everything else. **Chain 8 on `849a358d`**
+(digest check 16/16, fidelity 16/16, seed library unmoved, digests unchanged) closed **BL-1040 (the
+Digitisation span)** and **BL-1051 (span-open survey)**. A cold review nobody had run closed **BL-1053
+(setup reads span close)**: no 1660 read left on the span path; two checks that cannot fail went to
+BL-1058 for the continuity pass. The `--through 1960` readings closed **BL-1041 (industry points)**.
+
+### The Fuel Doctrine, re-ruled twice
+- **NR-896 and NR-897 (option A both).** The forest and fuel pulls read the SHARE of held regions over
+  the world mean, not the best one (a best-of-held maximum grows with the realm); treasury points
+  spread over a polity's centres by urban scale, not onto the capital. **BL-1056 (points
+  size-neutral)** built it. Its cold review found the rounding of the spread broke the instrument
+  behind BL-1041's headcount test, silently, and a fallback that still grew with size; the fix round
+  added a report-only treasury tally and one region set for both pulls. Chain 9 on `2867cdaa`: top
+  region's share of points 0.280 -> 0.039, digest check 16/16.
+- **NR-899 (option C).** The share against the mean pushed the split further toward Charcoal
+  (coke 142 / charcoal 373), because coal is concentrated and forest is not. Ben ruled each pull
+  counts regions in its own resource's top third, a bar fixed at the span open. **BL-1059
+  (top-third bar)** is building.
+
+### Also
+BL-1042 (stockpile to budget) started in a lane beside BL-1059; both got requirement groups first.
+BL-1057 (capacity-kind filter) and BL-1058 were filed for the continuity pass. BL-1039's timed rows
+waited all day for a quiet machine.
+
+### Left open
+BL-1059 and BL-1042 (lanes), BL-1039's 21 timed rows and its R6 ceiling call, then BL-1043, BL-1050
+and BL-1044 (the re-bless), then the sprint 46 cut — its item drafts are being written from a fresh
+three-lane code read.
+
+---
+
 ## 2026-09-18 — Sprint 45 cut and mostly built: the span, Beat 1's points and the charter rules, behind switches; sprint 46 shaped
 
 **Runtime:** ~10.5 h. Design (four elicitation forms, two read workflows) and Delivery — Full (eight
