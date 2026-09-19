@@ -92,6 +92,7 @@
 #include <chrono>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -814,9 +815,13 @@ void print_charter_bodies(const charter_spend_report& rep, const char* indent)
         if (rep.cap_rule == charter_cap_rule::sqrt_capital)
         {
             const charter_turn_reading t = read_turn(b);
+            char share[96] = "none (the ceiling does not bind)";
+            if (b.even_share > 0)
+                std::snprintf(share, sizeof share, "%d each, %d goods +1 (NR-905)",
+                              static_cast<int>(b.even_share), static_cast<int>(b.even_share_extra));
             std::printf("%s  the turn (G without construction capacity): %d goods, %d without a firm; "
-                        "firms per good %d..%d\n", indent, t.goods_in_turn, t.goods_without_firm,
-                        t.fewest, t.most);
+                        "firms per good %d..%d; even share %s\n", indent, t.goods_in_turn,
+                        t.goods_without_firm, t.fewest, t.most, share);
         }
     }
 }
@@ -1005,13 +1010,24 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
         case charter_cap_rule::sqrt_capital:
         {
             const long long B = b.firm_points;
+            // k^2 B_ref <= c^2 B < (k+1)^2 B_ref, divided through by c |G| fp:
+            // k^2 <= y < (k+1)^2 with y = floor(c B / (|G| fp)) — the same
+            // inequality, exact for integers, but c^2 B itself can pass int64 on
+            // a spend the refusal accepts (BL-1060). c x B cannot (the refusal
+            // bounds it by the budget's total), nor can (k+1)^2 with k an int32.
             bool ok = true;
             if (g == 0 || B <= 0)
                 ok = (k == c);
-            else if (k > c)
-                ok = k * k * bref <= c * c * B && c * c * B < (k + 1) * (k + 1) * bref;
+            else if (c > 0 && B > std::numeric_limits<long long>::max() / c)
+                ok = false;   // c x B past int64: charter_spend_refusal should have refused it
             else
-                ok = (k == c) && c * c * B < (c + 1) * (c + 1) * bref;
+            {
+                const long long y = (c * B) / (g * fp);
+                if (k > c)
+                    ok = k * k <= y && y < (k + 1) * (k + 1);
+                else
+                    ok = (k == c) && y < (c + 1) * (c + 1);
+            }
             if (!ok)
             {
                 std::snprintf(buf, sizeof buf, "body %u: per-good cap %lld is not max(c, floor(c "
@@ -1058,6 +1074,47 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
                 failed(buf);
             }
         }
+        // THE EVEN SHARE (NR-905), re-derived: the ceiling binds when the body
+        // holds more firm charters than the ceiling AND the turn's per-good caps
+        // sum past it; then ceiling / |turn| each, the remainder one more to the
+        // first goods of the turn, and no turn good past min(cap, its share).
+        if (spend.resource_cap_rule == charter_cap_rule::sqrt_capital)
+        {
+            const std::size_t cap_good = static_cast<std::size_t>(resource_type::construction_capacity);
+            std::vector<std::uint16_t> turn;
+            for (const std::uint16_t gd : b.goods)
+                if (gd != cap_good)
+                    turn.push_back(gd);
+            const long long n_turn = static_cast<long long>(turn.size());
+            const long long ceil_n = b.density_ceiling;
+            const bool binds = n_turn > 0 && fp > 0 && b.firm_points / fp > ceil_n
+                            && n_turn * k > ceil_n;
+            const long long want_share = binds ? ceil_n / n_turn : 0;
+            const long long want_extra = binds ? ceil_n % n_turn : 0;
+            if (b.even_share != want_share || b.even_share_extra != want_extra)
+            {
+                std::snprintf(buf, sizeof buf, "body %u: even share %d (+1 on %d), re-derived %lld "
+                              "(+1 on %lld)", b.body, static_cast<int>(b.even_share),
+                              static_cast<int>(b.even_share_extra), want_share, want_extra);
+                failed(buf);
+            }
+            if (binds)
+                for (std::size_t i = 0; i < turn.size(); ++i)
+                {
+                    const long long share = want_share + (static_cast<long long>(i) < want_extra ? 1 : 0);
+                    const long long held  = turn[i] < b.firms_by_good.size() ? b.firms_by_good[turn[i]] : 0;
+                    if (held > std::min(k, share))
+                    {
+                        std::snprintf(buf, sizeof buf, "body %u: %s holds %lld firms, past its even "
+                                      "share %lld", b.body,
+                                      resource_names::name_of(static_cast<resource_type>(turn[i])).c_str(),
+                                      held, std::min(k, share));
+                        failed(buf);
+                    }
+                }
+        }
+        else if (b.even_share != 0 || b.even_share_extra != 0)
+            failed("a legacy rule carries an even share");
         if (sum != b.firms)
             failed("firms by good do not sum to the body's firms");
         if (b.density_ceiling > 0 && b.firms > b.density_ceiling)
@@ -2387,9 +2444,11 @@ void write_cost_json(const std::string& path, const cost_options& opt,
                         std::fprintf(f, "%s\"%s\"", gi ? ", " : "",
                                      resource_names::name_of(static_cast<resource_type>(br.goods[gi])).c_str());
                     std::fprintf(f, "], \"reference_points\": %lld, \"per_good_cap\": %d, "
-                                    "\"density_ceiling\": %d, \"firms\": %d, \"firms_by_good\": {",
+                                    "\"density_ceiling\": %d, \"even_share\": %d, \"even_share_extra\": %d, "
+                                    "\"firms\": %d, \"firms_by_good\": {",
                                  static_cast<long long>(br.reference_points),
                                  static_cast<int>(br.per_good_cap), static_cast<int>(br.density_ceiling),
+                                 static_cast<int>(br.even_share), static_cast<int>(br.even_share_extra),
                                  static_cast<int>(br.firms));
                     bool first_good = true;
                     for (std::size_t g = 0; g < br.firms_by_good.size(); ++g)
@@ -2532,16 +2591,19 @@ void print_cost_table_header(const cost_options& opt)
                 "trailing net over it, negative share | evalsDue = strategic evals due per live tick "
                 "(count) — NOT a cost: BL-398 bounds counsel's export and evaluation to the one "
                 "open-channel corporation per tick, so only its sort and channel walk follow density. "
-                "BL-1039: ceil = unspent as density_ceiling; under each budget row, the rule line "
+                "BL-1039: ceil = unspent as density_ceiling; BL-1060: late = late_shortfall, refsd = "
+                "refused, share = share_unplaced (NR-905) — the ten reason columns sum to the row's "
+                "unspent total; under each budget row, the rule line "
                 "(per-good cap rule and fill order, ceiling, guard), one line per body (B on firms, "
                 "G, B_ref, per-good cap, firms per good, and under sqrt the turn's spread) and the "
                 "at-land checks, and on every full row the seated corporation's balance and solvent "
                 "flag\n",
                 static_cast<int>(spend.firm_price_points), ladder.c_str());
-    std::printf("  %-52s %3s %3s %4s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s | %4s %5s | %11s | %9s | "
-                "%5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
+    std::printf("  %-52s %3s %3s %4s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
+                "%11s | %9s | %5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
                 "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window", "body",
-                "ceil", "remain", "nonat", "anyS", "natSh", "hold in/out", "corps/bg", "evals",
+                "ceil", "remain", "nonat", "late", "refsd", "share", "anyS", "natSh", "hold in/out",
+                "corps/bg", "evals",
                 "seed_ms", "prop_ms", "val med/mean", "live med/mean", "short", "trail8 min/med/max",
                 "neg%", "evalsDue");
 }
@@ -2600,13 +2662,18 @@ void print_cost_row(const cost_row& r)
                           + r.firm_spill.second_out);
     char corps[32];
     std::snprintf(corps, sizeof corps, "%d/%d", r.at_land.corps, r.at_land.background);
-    std::printf("  %-52s %3s %3s %4s | %4zu %5zu | %6lld %6lld %6lld %6lld %6lld %6lld %6lld | %4s %5.2f | "
-                "%11s | %9s | %5d %7.0f %7.0f",
+    // EVERY reason has a column, so the row sums to its unspent total; a reason
+    // appended to the enum must add its column here.
+    static_assert(charter_unspent_reason_count == 10, "a charter_unspent_reason has no cost-table column");
+    std::printf("  %-52s %3s %3s %4s | %4zu %5zu | %6lld %6lld %6lld %6lld %6lld %6lld %6lld %6lld %6lld "
+                "%6lld | %4s %5.2f | %11s | %9s | %5d %7.0f %7.0f",
                 r.label.c_str(), fp, sfc, spts, r.specialists, r.firms,
                 u(charter_unspent_reason::no_gap), u(charter_unspent_reason::province_cap),
                 u(charter_unspent_reason::window_exhausted), u(charter_unspent_reason::body_cap),
                 u(charter_unspent_reason::density_ceiling),
                 u(charter_unspent_reason::remainder), u(charter_unspent_reason::no_nation),
+                u(charter_unspent_reason::late_shortfall), u(charter_unspent_reason::refused),
+                u(charter_unspent_reason::share_unplaced),
                 r.any_specialist ? "yes" : "NO", r.largest_nation_share, hold, corps,
                 r.evaluations, r.seed_eval_ms, r.proposal_mean_ms);
     if (r.build_only)
