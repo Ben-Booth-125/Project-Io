@@ -6674,6 +6674,17 @@
      "requirement": "A cold review finds nothing blocking.",
      "notes": "",
      "result_metric": ""
+    },
+    {
+     "id": "R8",
+     "status": "pending",
+     "verification": [
+      "headless: charter_refusal_probe",
+      "headless: player_seed_sweep --digest --charter-budget stockpile"
+     ],
+     "requirement": "NR-905/NR-906: when the ceiling binds each turn good keeps an even share of the ceiling less the yards' places, as a reservation: a first centre with no quarry cannot starve the extraction goods, a good that stops being short releases its unused share so the ceiling still fills, and an unfilled share is booked under its own reason. A ceiling smaller than the turn is refused.",
+     "notes": "",
+     "result_metric": ""
     }
    ]
   }

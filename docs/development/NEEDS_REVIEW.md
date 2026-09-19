@@ -24,13 +24,22 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*9 entries — 0 open, 9 resolved.*
+*10 entries — 1 open, 9 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-906 — DECISION TAKEN: an even share of the ceiling is a reservation, not a cap; the yards come off the ceiling first
+*decision taken on your behalf · raised 2026-09-19 · from Cold check of BL-1060 round 2 (2886d20f), 2026-09-19.*
+
+NR-905 was written into DIGITISATION.md as 'a good may take AT MOST its equal part' and built that way. The check found the cap holds room back: if one good stops being short at 6 firms, 9x12 + 6 + 1 = 115, the other nine stall at 12 while still short, the ceiling never fills and later centres book their points no_gap (a false label); near the threshold a single unplaceable good drops a body that would never have hit the ceiling from 118 to 109 firms. And the yard takes a place under the ceiling but outside the shares, so its place comes out of the skipped goods. Taken on your behalf, reading your option 'each good keeps an even share': the share is a RESERVATION — a good may go beyond its share while the room left still covers every other short good's unfilled share — and each yard's place comes off the ceiling before it is shared. Also: a ceiling smaller than the turn is refused rather than silently switching the shares off.
+
+**Why it matters.** Whether a binding ceiling still fills, and whether the unspent reasons BL-1043 reads are true.
+
+> **Recommendation:** Keep it: it is what 'keeps an even share' means, and it makes the ceiling fill.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/charter_budget.hpp`, `docs/generation/DIGITISATION.md`*
 
 ---
 
