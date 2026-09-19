@@ -148,9 +148,11 @@ struct landscape_search_params
 
     landscape_score_params score{};
 
-    /// BL-1032 — the per-centre CHARTER BUDGET, or none. NONE BY DEFAULT, and
-    /// nothing shipped passes one (app.cpp passes nothing; the budget's one
-    /// source, the Digitisation stockpile, does not exist yet).
+    /// BL-1032 — the per-centre CHARTER BUDGET, or none. NONE BY DEFAULT here;
+    /// the shipped new-game path (app::start_new_game_prelude, BL-1042) passes
+    /// the world's own stockpile budget (`build_stockpile_budget`), which is
+    /// EMPTY while the Digitisation span is off — so the shipped search is
+    /// today's search until the span runs.
     ///
     /// Null or EMPTY (an all-zero budget is the same state — charter_budget
     /// drops entries <= 0) is today's search, byte for byte: every axis

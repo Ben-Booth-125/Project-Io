@@ -96,10 +96,18 @@ int scale_for_share(int64_t share_heads)
 /// and a region never touched handed their different counts to the same
 /// undifferentiated body-wide placement pass, and the causal story died at the
 /// last step.
+///
+/// BL-1042 (stockpile to budget) adds the SLOT: the key it sorted on and its
+/// rank inside its region. The carve already knew both and threw them away; the
+/// charter budget needs them, because a region's industry points reach its
+/// campaign centres by those slots (DIGITISATION.md Part III) and nothing after
+/// the carve can recover which centre was which region's k-th.
 struct carved_centre
 {
-    int region = -1; ///< Index into `settlement_state::regions`.
-    int scale  = 1;  ///< 1-5, on `k_population_for_scale`'s own rungs.
+    int     region = -1; ///< Index into `settlement_state::regions`.
+    int     scale  = 1;  ///< 1-5, on `k_population_for_scale`'s own rungs.
+    int64_t key    = 0;  ///< The slot key the carve sorted on: `urban_population / rank`.
+    int     rank   = 0;  ///< 1-based rank of this centre inside its own region.
 };
 
 /// Carve a body's Era -1 demography into centre scales (BL-610), each BOUND to
@@ -230,8 +238,10 @@ std::vector<carved_centre> carve_demography_centres(const settlement_state& sett
     const int64_t c = urban_total * 1000000 / harmonic_millionths;
     out.reserve(static_cast<std::size_t>(n));
     for (int i = 1; i <= n; ++i)
-        out.push_back({ slots[static_cast<std::size_t>(i - 1)].region,
-                        scale_for_share(c / i) });
+    {
+        const slot& sl = slots[static_cast<std::size_t>(i - 1)];
+        out.push_back({ sl.region, scale_for_share(c / i), sl.key, sl.rank_in_region });
+    }
     return out;
 }
 
@@ -429,10 +439,18 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
     // Founding one centre: create the entity, mark the ground taken, and widen
     // the adjacency set. Shared by both placement paths so the two cannot drift
     // in what a founding actually writes.
-    auto found_centre = [&](int chosen_idx, int scale) {
+    //
+    // BL-1042: @p slot, when non-null, is the carved centre this founding
+    // materialises, and the founding records it in `world::gen_carve_centres`
+    // (centre -> region, rank, key). Only the demography path passes one; the
+    // fallback's draw, the coverage foundings and the province anchors carry no
+    // slot, so they hold no share of any region's industry points. Returns the
+    // new centre, or null when nothing was founded.
+    auto found_centre = [&](int chosen_idx, int scale,
+                            const carved_centre* slot) -> entity_id {
         const entity_id chosen_tile = tile_ids[static_cast<std::size_t>(chosen_idx)];
         if (chosen_tile == null_entity)
-            return;
+            return null_entity;
 
         const auto tc_it = w.tiles.find(chosen_tile);
         const float hab = (tc_it != w.tiles.end()) ? tc_it->second.habitability : 1.0f;
@@ -444,6 +462,8 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
         pcc.habitability = hab;
         w.population_centres[centre_id] = pcc;
         w.population_centre_tile[centre_id] = chosen_tile;
+        if (slot != nullptr)
+            w.gen_carve_centres[centre_id] = { slot->region, slot->rank, slot->key };
 
         occupied_indices.insert(chosen_idx);
 
@@ -461,6 +481,7 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
                 continue;
             adjacent_indices.insert(nit->second.grid_y * gw + nit->second.grid_x);
         }
+        return centre_id;
     };
 
     // The ground weight a candidate tile carries, unchanged in its three terms
@@ -560,6 +581,13 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
             return spill_order.emplace(ri, std::move(order)).first->second;
         };
 
+        // BL-1042: where the placement stopped. Every carved centre from here
+        // to the end of the carve is DROPPED — the whole body was built out, or
+        // the carve handed back more centres than the body has candidate tiles
+        // (`centre_count` never attempts those) — and is recorded as such, so
+        // the industry points its slot would have held are counted under their
+        // own unspent reason rather than silently spread over its siblings.
+        int stopped_at = centre_count;
         for (int placed = 0; placed < centre_count; ++placed)
         {
             const carved_centre& cc = demography_centres[static_cast<std::size_t>(placed)];
@@ -580,9 +608,20 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
             }
 
             if (chosen_idx < 0)
+            {
+                stopped_at = placed;
                 break; // The whole body is built out.
+            }
 
-            found_centre(chosen_idx, cc.scale);
+            if (found_centre(chosen_idx, cc.scale, &cc) == null_entity)
+                w.gen_carve_dropped.push_back(
+                    { cc.region, cc.rank, cc.key, carve_drop_reason::no_tile });
+        }
+        for (int d = stopped_at; d < static_cast<int>(demography_centres.size()); ++d)
+        {
+            const carved_centre& dc = demography_centres[static_cast<std::size_t>(d)];
+            w.gen_carve_dropped.push_back(
+                { dc.region, dc.rank, dc.key, carve_drop_reason::body_built_out });
         }
     }
     else
@@ -614,7 +653,7 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
             if (tile_ids[static_cast<std::size_t>(chosen_idx)] == null_entity)
                 continue;
 
-            found_centre(chosen_idx, draw_scale(rng));
+            found_centre(chosen_idx, draw_scale(rng), nullptr);
         }
     }
 

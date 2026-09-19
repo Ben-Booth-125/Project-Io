@@ -87,6 +87,7 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 
 #include "world/corporation_generation.hpp" // assign_default_recipes
 #include "world/landscape_search.hpp"
+#include "world/stockpile_budget.hpp"     // BL-1042: the shipped path's charter budget
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -96,17 +97,22 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 #include <vector>
 
 /// BL-1032 — a charter budget handed to the search, for an instrument that
-/// wants one. THE SHIPPED PATH PASSES NONE: app.cpp's new-game prelude has no
-/// budget source (the Digitisation stockpile does not exist yet), so its search
-/// params carry `landscape_search_params::budget`'s null default, and every
-/// helper below defaults this to the same none. A null `budget` is the app's
-/// call, verbatim; a non-null one (even an empty one) reaches the seam.
+/// wants one. NULL IS THE SHIPPED PATH (BL-1042): app::start_new_game_prelude
+/// builds the world's own stockpile budget (`build_stockpile_budget`, charged at
+/// `stockpile_charter_spend`) and passes it to BOTH the search and the winner's
+/// apply, and `apply_shipped_landscape` does exactly that when this is null.
+/// With the Digitisation span off (the shipped default) that budget is EMPTY,
+/// and an empty budget is today's world byte for byte. A non-null budget (even
+/// an empty one) is an instrument's own, and REPLACES the stockpile.
 struct harness_charter_input
 {
     const charter_budget* budget = nullptr;
+    /// Read only with a non-null `budget`; the shipped path charges the
+    /// stockpile at `stockpile_charter_spend()`.
     charter_spend_params  spend{};
     /// Receives the WINNER'S spend report (the search's own evaluations report
-    /// nothing). Untouched when the budget is null or empty.
+    /// nothing) — the instrument's budget's, or on the shipped path the
+    /// stockpile's. Untouched when the budget in force is empty.
     charter_spend_report* report = nullptr;
 };
 
@@ -120,6 +126,11 @@ struct shipped_landscape
     std::vector<entity_id>  firms;
     std::vector<entity_id>  specialists;  ///< the candidate's specialist roster, ascending id
     bool                    searched = true;  ///< false: the seed candidate was applied unsearched
+    /// BL-1042: the shipped path's stockpile budget and the account of every
+    /// point, as app.cpp builds it. Built only when the instrument passed no
+    /// budget of its own (`stockpile_path`); default (empty) otherwise.
+    stockpile_budget        stockpile;
+    bool                    stockpile_path = false;
 };
 
 /// The search params app.cpp passes, keyed from the world seed exactly as it
@@ -169,13 +180,23 @@ inline shipped_landscape apply_shipped_landscape(
     std::sort(before.begin(), before.end());
 
     landscape_search_params sp = shipped_search_params(world_seed, corporation_count);
-    // BL-1032: app.cpp sets neither field (its budget is none); only an
-    // instrument that asked for a budget writes them.
-    if (charter.budget != nullptr)
+    // BL-1042 — THE BUDGET, as app::start_new_game_prelude builds it: the
+    // world's own stockpile (`build_stockpile_budget`) at the stockpile spend,
+    // unless an instrument handed in a budget of its own. ONE budget and ONE
+    // spend reach BOTH the search and the winner's apply below, and the budget
+    // lives in `out` so it outlives the search. With the span off the stockpile
+    // is empty, the search is today's, and the apply's legacy branch runs first.
+    const charter_budget* budget = charter.budget;
+    charter_spend_params  spend  = charter.spend;
+    if (budget == nullptr)
     {
-        sp.budget = charter.budget;
-        sp.spend  = charter.spend;
+        out.stockpile      = build_stockpile_budget(w);
+        out.stockpile_path = true;
+        budget             = &out.stockpile.budget;
+        spend              = stockpile_charter_spend();
     }
+    sp.budget = budget;
+    sp.spend  = spend;
     if (search)
     {
         out.search = search_landscape(w, reg, sp);
@@ -185,18 +206,11 @@ inline shipped_landscape apply_shipped_landscape(
         out.search.seed_candidate = sp.start;
         out.search.winner         = sp.start;
     }
-    if (charter.budget == nullptr)
-    {
-        // app.cpp:1071, verbatim — the shipped path.
-        apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true);
-    }
-    else
-    {
-        // BL-1032's overload. An EMPTY budget forwards to the call above inside
-        // world/*, which is what `--charter-budget empty|zero` exists to prove.
-        apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true,
-                                  charter.budget, charter.spend, charter.report);
-    }
+    // app.cpp's winner apply, verbatim: the 7-argument overload with the same
+    // budget, spend and a report. An EMPTY budget forwards to the legacy
+    // 4-argument call inside world/* before anything else is read.
+    apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true,
+                              budget, spend, charter.report);
 
     // app.cpp's second pass, and not belt-and-braces: without it every processor
     // a background firm authored keeps `no_recipe` for the whole campaign.
@@ -377,8 +391,9 @@ inline void apply_app_start_landscape(app_start_world& out,
     // app.cpp:1052-1081 — the search, the winner applied — and app.cpp:1092, the
     // second recipe pass: apply_shipped_landscape is that block, given the
     // PARSED config's roster count (app.cpp:1057).
-    // BL-1032: the app passes NO charter budget here (its default is none), and
-    // neither does this mirror unless an instrument hands one in.
+    // BL-1042: with no budget handed in, the mirror builds the world's own
+    // stockpile budget and passes it to the search and the apply, as the app
+    // does; an instrument's budget replaces it.
     out.land = apply_shipped_landscape(out.w, out.reg, out.params.seed, /*search=*/true,
                                        out.cfg.corporation_count, charter);
 }
@@ -667,8 +682,8 @@ inline void run_app_live_window(world& w, const recipe_registry& reg, int first_
 // ---------------------------------------------------------------------------
 // NOT A BUDGET SOURCE, AND NOTHING SHIPPED MAY READ IT. The budget has one source
 // by design — a centre's unspent industry-point stockpile at 1960 (DIGITISATION.md
-// § 1) — and "no stand-in derived from urban population fills it" (Ben,
-// 2026-09-17). This builder exists only so the seam can be shown to DO something
+// § 1), built by `build_stockpile_budget` (BL-1042) — and "no stand-in derived
+// from urban population fills it" (Ben, 2026-09-17). This builder exists only so the seam can be shown to DO something
 // (BL-1032 R4): its weights are SEEDED DRAWS, never population, so a reading taken
 // on it proves the plumbing and cannot be mistaken for a density result.
 //

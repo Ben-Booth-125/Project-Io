@@ -15,7 +15,11 @@
 // is a reading of one generation; neither is a world field, neither enters
 // `write_world_snapshot` or `state_hash`, and neither has a Lua key. The budget
 // has ONE source by design — a centre's unspent industry-point stockpile — and
-// nothing in src/ builds one; a caller that has no stockpile passes none.
+// ONE builder: `build_stockpile_budget` (stockpile_budget.hpp, BL-1042), which
+// the new-game path (app::start_new_game_prelude, mirrored by
+// tools/verify/harness_params.hpp) passes to the search and the winner's apply.
+// With the Digitisation span off that budget is empty, which is today's world.
+// The prices it is charged at are named there, never defaulted here.
 // ---------------------------------------------------------------------------
 
 #include "entity.hpp"
