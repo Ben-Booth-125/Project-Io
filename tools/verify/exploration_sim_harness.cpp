@@ -2358,6 +2358,97 @@ int main()
                     fixture.exploration_state.owner_changes.size(), s1.owner_changes.size());
         check(holders > 0, "T8.13.1  with the switch on the tree is actually invested (some living polity holds a node)");
         check(both_sides == 0, "T8.13.2  no living polity holds both sides of any fork in a real run");
+
+        // T8.15 (BL-1041 fix round): DEFAULTS A AND B THROUGH THE SIM'S OWN
+        // WIRING, on the real generated world -- never by rebuilding the seam
+        // in the harness. The span runs from 1200 with the Industry tree open
+        // and every region SURVEYED at fuel 100, under the 250 seam bar, while
+        // its settlement-pass energy_q is left as generated (many clear it).
+        //   A: a region the run FOUNDS inherits its parent's surveyed fuel
+        //      x0.7 (history_sim.cpp, the Settle founding): with A on, every
+        //      founded region reads a value on the chain 100 -> 70 -> 49 -> ...
+        //      and its forest stays -1; with A off it reads -1. Fails if the
+        //      inheritance line is removed.
+        //   B: the seam reads the survey (`seam_reads_survey`): with B on no
+        //      polity ever passes the fuel gate or holds a fuel-gated node;
+        //      with B off the same world's energy_q opens it for someone.
+        //      Fails if the seam goes back to energy_q.
+        {
+            struct survey_run { settlement_state ss; history_sim_state hs; };
+            const auto run_surveyed = [&](bool a_on, bool b_on) {
+                history_sim_params ep = fixture.exploration_params;
+                ep.resume_polities  = &fixture.pre_exploration_polities;
+                ep.resume_grudges   = &fixture.pre_exploration_grudges;
+                ep.resume_contacts  = &fixture.pre_exploration_contacts;
+                ep.resume_corridors = &fixture.pre_exploration_corridors;
+                ep.industry_tree_enabled                = true;
+                ep.industry_open_year                   = open;
+                ep.industry_survey_inherits_at_founding = a_on;
+                ep.industry_fuel_gate_reads_survey      = b_on;
+                survey_run o;
+                o.ss = fixture.pre_exploration_settlement;
+                for (region& r : o.ss.regions)           r.survey_fuel_q = 100;
+                for (region& r : o.ss.pending_foundings) r.survey_fuel_q = 100;
+                creed_state cs = fixture.pre_exploration_creeds;
+                o.hs = run_history_sim(o.ss, &cs, fixture.terrain.view(), fixture.gw, fixture.gh, ep,
+                                       fixture.exploration_seed, nullptr, fixture.works, nullptr);
+                return o;
+            };
+            const std::size_t base_n = fixture.pre_exploration_settlement.regions.size();
+            // The inheritance chain from 100 at the x0.7 keep, plus 100 itself
+            // (a scheduled founding keeps its own, surveyed, reading).
+            std::vector<int> chain = { 100 };
+            for (int v = 100; v > 0;) { v = (v * 700) / 1000; chain.push_back(v); }
+            const auto on_chain = [&](int v) { return std::find(chain.begin(), chain.end(), v) != chain.end(); };
+
+            const auto fuel_seen_or_gated = [](const history_sim_state& hs) {
+                int n = 0;
+                for (const polity& q : hs.polities)
+                {
+                    bool gated = false;
+                    for (int i = 0; i < io::industry_tree::node_count; ++i)
+                        if (((q.industry_mask >> i) & 1ULL)
+                         && io::industry_tree::nodes[i].gate == io::industry_tree::gate_atom::fuel) gated = true;
+                    if (q.industry_fuel_seen || gated) ++n;
+                }
+                return n;
+            };
+
+            const survey_run ab  = run_surveyed(true,  true);
+            const survey_run a_b = run_surveyed(true,  false); // B off
+            const survey_run na  = run_surveyed(false, true);  // A off
+
+            int founded = 0, founded_on_chain = 0, founded_forest_unsurveyed = 0;
+            for (std::size_t i = base_n; i < ab.ss.regions.size(); ++i)
+            {
+                ++founded;
+                if (on_chain(ab.ss.regions[i].survey_fuel_q)) ++founded_on_chain;
+                if (ab.ss.regions[i].survey_forest_q == -1) ++founded_forest_unsurveyed;
+            }
+            int na_founded = 0, na_unsurveyed = 0;
+            for (std::size_t i = base_n; i < na.ss.regions.size(); ++i)
+            {
+                ++na_founded;
+                if (na.ss.regions[i].survey_fuel_q == -1) ++na_unsurveyed;
+            }
+            const int seen_b_on  = fuel_seen_or_gated(ab.hs);
+            const int seen_b_off = fuel_seen_or_gated(a_b.hs);
+            std::printf("      T8.15 surveyed at fuel 100, 1200 -> 1660: A on founded %d, on the x0.7 chain %d, forest"
+                        " -1 %d; A off founded %d, unsurveyed %d. Polities past the fuel gate or holding a fuel node:"
+                        " B on %d, B off %d\n", founded, founded_on_chain, founded_forest_unsurveyed, na_founded,
+                        na_unsurveyed, seen_b_on, seen_b_off);
+            check(founded > 0 && founded_on_chain == founded && founded_forest_unsurveyed == founded,
+                  "T8.15.1  DEFAULT A: every region the run founds inherits its parent's surveyed fuel x0.7 (the"
+                  " 100 -> 70 -> 49 chain), its forest left -1");
+            check(na_founded > 0 && na_unsurveyed == na_founded,
+                  "T8.15.2  DEFAULT A off: the same foundings read -1 (T8.15.1 is the switch, not a default)");
+            check(seen_b_on == 0,
+                  "T8.15.3  DEFAULT B: on ground surveyed under the bar no polity passes the fuel gate or holds a"
+                  " fuel-gated node, whatever its energy_q");
+            check(seen_b_off > 0,
+                  "T8.15.4  DEFAULT B off: the same world's energy_q opens the fuel gate for some polity (T8.15.3 is"
+                  " the survey's doing)");
+        }
     }
 
     std::printf("\n%s (%d failure%s)\n",

@@ -92,6 +92,12 @@
 //                (default 1660: no span). Y = 1960 is the phase's reading.
 //   --continued  BL-1029's run instead of the span: Exploration's own call
 //                continued to Y -- a 1200-NETWORK run, labelled so on every line
+//   --integral-stride N  BL-1041, span mode: reading 8's head-years integral
+//                samples the span's urban heads every N decision rounds (1, the
+//                default, is every round). It re-runs the span from the 1660
+//                handoff once per sample (a capture at the top of that year),
+//                so it costs about (75 / N) / 2 span-lengths per seed; 0 skips
+//                it and prints the integral lines as not taken.
 //   --out path   BL-1029: also write the per-seed table as JSON
 //   --fidelity   BL-1036: instead of the readings, the RESUME-FIDELITY check --
 //                the Digitisation span's resume from the 1660
@@ -474,6 +480,43 @@ struct seed_row
     double  inherited_share    = k_undef; ///< share of the total on regions the span founded (inherited fuel)
     int     inherited_regions  = 0;     ///< ... how many such regions hold points
     int64_t ns_points          = 0;     ///< the scale accrual's wall clock over the span (reported only)
+
+    // --- BL-1041 fix round: reading 8's honest headcount test ----------------
+    // The rho above ranks 300 years of points against urban heads at 1960 alone,
+    // so a city that grew, shrank, was sacked or founded mid-span pulls it below
+    // 1 even if points were pure headcount x fuel. These rank SCALE points only
+    // (treasury points taken out exactly, below) against the span's integrated
+    // urban head-years, both taken by re-running the span harness-side.
+    //
+    //  * SCALE vs TREASURY, per region, exactly: the exchange rate moves no
+    //    dynamics (it only multiplies the credit), so one re-run at 1 point per
+    //    treasury unit gives P2 = S + T per region beside the shipped close's
+    //    P1 = S + 1000 T; T = (P1 - P2) / 999, S = P2 - T.
+    //  * HEAD-YEARS: the span re-run to the top of each sampled decision year
+    //    (a BL-1036 capture), summing urban heads x the years the sample stands
+    //    for over rounds the region HAD CENTRES (the accrual's own condition).
+    //    The capture is the year's opening state, one demography year before
+    //    the accrual reads it, so this is the integral to within that year.
+    bool    rerun_ok           = false; ///< the re-run's close is the shipped close outside the points
+    int     rerun_mismatch     = 0;     ///< regions whose owner/heads/treasury differ (must be 0)
+    bool    split_ok           = false; ///< every region's P1 - P2 split exactly (divisible, non-negative)
+    int     integral_samples   = 0;     ///< capture years summed (0: the integral was not taken)
+    int64_t integral_ms        = 0;     ///< wall clock of the re-runs, this seed (reported only)
+    int     scale_regions      = 0;     ///< regions with scale points or head-years (the rho's population)
+    double  rho_scale_hy       = k_undef; ///< Spearman(scale points, integrated urban head-years)
+    double  rho_scale_int_fuel = k_undef; ///< Spearman(scale points / head-years, fuel factor)
+
+    // --- BL-1041 fix round: WHERE the points stand, by the ground's survey --
+    // Of every point at the close: original settlement ground (the pre-sim
+    // settlement pass's regions and its scheduled foundings, surveyed from
+    // tiles then), ground the sim founded BEFORE 1660 (its energy_q inherited,
+    // re-surveyed at the span open), and ground the span founded (no survey of
+    // its own: the parent's inherited under DEFAULT A).
+    double  share_original     = k_undef;
+    double  share_resurveyed   = k_undef;
+    int     regions_original   = 0;     ///< regions at the close of each class, holding points or not
+    int     regions_resurveyed = 0;
+    int     regions_span_founded = 0;
 
     // --- Reading 1: density follows cities (campaign world) -----------------
     int    markets        = 0;
@@ -1076,6 +1119,15 @@ std::vector<std::string> span_params_issues(const history_sim_params& dp, const 
     need(dp.industry_tree_enabled && dp.industry_open_year == dp.start_year,
          "the Industry tree is not open from the span's open");
     need(!ep.industry_tree_enabled, "the Industry tree is open in Exploration's own span");
+    // BL-1041: the industry-point switch and its two ruled defaults (A, the
+    // founding inherits the survey; B, every Industry fuel read takes it) are
+    // the span's own forces -- ON here, OFF in Exploration's params.
+    need(dp.industry_points_enabled && dp.industry_survey_inherits_at_founding
+             && dp.industry_fuel_gate_reads_survey,
+         "industry points or a ruled survey default (A, B) is off in the span");
+    need(!ep.industry_points_enabled && !ep.industry_survey_inherits_at_founding
+             && !ep.industry_fuel_gate_reads_survey,
+         "industry points or a ruled survey default (A, B) is on in Exploration's own span");
     need(!dp.resume_seeds_corridor_tier, "BL-1037's switch is on");
     need(dseed == digitisation_sim_seed(wp) && dseed != eseed, "the span's seed is not its own fold");
 
@@ -1880,11 +1932,21 @@ int main(int argc, char** argv)
     bool fidelity_mode = false;  // BL-1036
     bool resume_tier_mode = false; // BL-1037
     bool continued_mode   = false; // BL-1040: --continued, the 1200-network run
+    int  integral_stride  = 1;     // BL-1041: --integral-stride, rounds per head-years sample (0 = off)
     for (int a = 1; a < argc; ++a)
     {
         if (std::strcmp(argv[a], "--limit") == 0 && a + 1 < argc)
         {
             limit = std::atoi(argv[++a]);
+        }
+        else if (std::strcmp(argv[a], "--integral-stride") == 0 && a + 1 < argc)
+        {
+            integral_stride = std::atoi(argv[++a]);
+            if (integral_stride < 0 || integral_stride > 75)
+            {
+                std::printf("--integral-stride must be 0 (off) to 75 rounds\n");
+                return 2;
+            }
         }
         else if (std::strcmp(argv[a], "--continued") == 0)
         {
@@ -1922,7 +1984,8 @@ int main(int argc, char** argv)
         else
         {
             std::printf("unknown argument '%s'\nusage: digitisation_sim_harness [--limit N] [--seeds a,b,c] "
-                        "[--through Y [--continued]] [--out path] [--fidelity] [--resume-tier]\n", argv[a]);
+                        "[--through Y [--continued] [--integral-stride N]] [--out path] [--fidelity] [--resume-tier]\n",
+                        argv[a]);
             return 2;
         }
     }
@@ -2237,6 +2300,148 @@ int main(int argc, char** argv)
             for (int k = 0; k < 5; ++k) row.fuel_factor[k] = rank(factors, pcts[k]);
             row.rho_points_urban   = spearman(rho_p, rho_u);
             row.rho_intensity_fuel = spearman(int_p, int_f);
+
+            // ---- BL-1041 fix round: WHERE the points stand, by survey ------
+            // ORIGINAL ground is the pre-sim settlement pass's: the regions the
+            // Empires sim received (the table's own prefix -- regions are only
+            // ever appended) and its scheduled foundings, which the sim moves
+            // in whole, survey and all, matched on (col, row, founded_year).
+            // Everything else in the table the span opened on is ground the
+            // sim founded before 1660 (energy_q inherited, re-surveyed at the
+            // open); beyond it is ground the span itself founded.
+            {
+                const std::vector<region>& pre = fx.settlement.regions;
+                std::multiset<std::tuple<int, int, int64_t>> scheduled;
+                for (const region& p : fx.settlement.pending_foundings)
+                    scheduled.insert(std::make_tuple(p.col, p.row, p.founded_year));
+                int64_t orig_pts = 0, resurv_pts = 0;
+                for (std::size_t i = 0; i < close_t.size(); ++i)
+                {
+                    const region& rg = close_t[i];
+                    bool original = false;
+                    if (i < pre.size())
+                        original = true; // the prefix (validated col/row-stable across every span)
+                    else if (i < open_n)
+                    {
+                        const auto it = scheduled.find(std::make_tuple(rg.col, rg.row, rg.founded_year));
+                        if (it != scheduled.end()) { original = true; scheduled.erase(it); }
+                    }
+                    if (i >= open_n)  ++row.regions_span_founded;
+                    else if (original) { ++row.regions_original;   orig_pts   += rg.industry_points; }
+                    else               { ++row.regions_resurveyed; resurv_pts += rg.industry_points; }
+                }
+                if (row.points_total > 0)
+                {
+                    row.share_original   = static_cast<double>(orig_pts)   / static_cast<double>(row.points_total);
+                    row.share_resurveyed = static_cast<double>(resurv_pts) / static_cast<double>(row.points_total);
+                }
+            }
+
+            // ---- BL-1041 fix round: the honest headcount test --------------
+            // Two harness-side re-runs of the span on the fixture, each the
+            // shipped span by the same construction `--fidelity`'s gate 3 proves
+            // (V5: the opened table, the span's own seed and params). The first
+            // checks that claim on this seed before anything is read off it.
+            const int64_t E = dpp.industry_points_per_treasury_unit;
+            if (integral_stride > 0 && row.points_on && !row.points_rejected && !open_t.empty() && E > 1)
+            {
+                const auto t_int = std::chrono::steady_clock::now();
+                const exploration_output& H = fx.exploration_handoff;
+                fidelity::resume_spec spec;
+                spec.regions = &open_t;
+                spec.record  = &H.surviving_corridors;
+                spec.live    = nullptr;
+                spec.seed    = fx.digitisation_seed;
+
+                // (1) SCALE vs TREASURY: the same span at one point per
+                // treasury unit. Nothing but the points may differ.
+                history_sim_params d1 = dpp;
+                d1.industry_points_per_treasury_unit = 1;
+                const fidelity::run_out x = fidelity::resume(fx, H, spec, dpp.stop_year, INT64_MIN, d1);
+                const std::vector<region>& R2 = x.ss.regions;
+                if (R2.size() == close_t.size())
+                    for (std::size_t i = 0; i < R2.size(); ++i)
+                    {
+                        const region& a = close_t[i];
+                        const region& b = R2[i];
+                        if (a.nation != b.nation || a.population != b.population
+                         || a.urban_population != b.urban_population || a.centres != b.centres
+                         || a.treasury != b.treasury || a.army_stock != b.army_stock)
+                            ++row.rerun_mismatch;
+                    }
+                else
+                    row.rerun_mismatch = -1;
+                row.rerun_ok = row.rerun_mismatch == 0 && x.hs.industry_points_refused == 0
+                            && dst.industry_points_refused == 0;
+
+                std::vector<int64_t> S(close_t.size(), 0);
+                if (row.rerun_ok)
+                {
+                    bool ok = true;
+                    int64_t sum_s = 0, sum_t = 0;
+                    for (std::size_t i = 0; i < close_t.size(); ++i)
+                    {
+                        const int64_t d = close_t[i].industry_points - R2[i].industry_points; // (E - 1) T
+                        if (d < 0 || d % (E - 1) != 0) { ok = false; break; }
+                        const int64_t T = d / (E - 1);
+                        S[i] = R2[i].industry_points - T;
+                        if (S[i] < 0) { ok = false; break; }
+                        sum_s += S[i];
+                        sum_t += T;
+                    }
+                    // The split must reproduce the span's own ledger exactly.
+                    row.split_ok = ok && sum_s == dst.industry_points_from_scale
+                                      && sum_t * E == dst.industry_points_from_treasury;
+                }
+
+                // (2) HEAD-YEARS: the span re-run to the top of each sampled
+                // decision year. The open is the table the span opened on.
+                std::vector<int64_t> hy(close_t.size(), 0);
+                const int64_t step    = std::max<int64_t>(dpp.tick_bands[0].step_years, 1);
+                const int64_t advance = step * integral_stride;
+                bool captured_all = true;
+                for (int64_t Y = dpp.start_year; Y < dpp.stop_year && row.split_ok; Y += advance)
+                {
+                    fidelity::run_out c;
+                    const std::vector<region>* R = &open_t;
+                    if (Y != dpp.start_year)
+                    {
+                        c = fidelity::resume(fx, H, spec, Y + 1, Y, dpp);
+                        if (!c.hs.capture.captured || c.hs.capture.year != Y) { captured_all = false; break; }
+                        R = &c.hs.capture.regions;
+                    }
+                    const int64_t years = std::min<int64_t>(advance, dpp.stop_year - Y);
+                    for (std::size_t i = 0; i < R->size() && i < hy.size(); ++i)
+                    {
+                        const region& rg = (*R)[i];
+                        if (rg.centres > 0 && rg.urban_population > 0) hy[i] += rg.urban_population * years;
+                    }
+                    ++row.integral_samples;
+                }
+                if (!captured_all) row.integral_samples = 0;
+
+                if (row.split_ok && row.integral_samples > 0)
+                {
+                    std::vector<double> s_v, hy_v, int_v, fuel_v;
+                    for (std::size_t i = 0; i < close_t.size(); ++i)
+                    {
+                        if (S[i] <= 0 && hy[i] <= 0) continue;
+                        ++row.scale_regions;
+                        s_v.push_back(static_cast<double>(S[i]));
+                        hy_v.push_back(static_cast<double>(hy[i]));
+                        if (S[i] > 0 && hy[i] > 0)
+                        {
+                            int_v.push_back(static_cast<double>(S[i]) / static_cast<double>(hy[i]));
+                            fuel_v.push_back(static_cast<double>(
+                                industry_points_fuel_factor_q(industry_fuel_reading_q(close_t[i]), dpp)));
+                        }
+                    }
+                    row.rho_scale_hy       = spearman(s_v, hy_v);
+                    row.rho_scale_int_fuel = spearman(int_v, fuel_v);
+                }
+                row.integral_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                      std::chrono::steady_clock::now() - t_int).count();
+            }
         }
 
         const entity_id body = fx.ran ? fx.body : w.home_body;
@@ -2675,6 +2880,46 @@ int main(int argc, char** argv)
                         r.points_refused > 0 ? "  REFUSED CREDITS: " : "",
                         r.points_refused > 0 ? std::to_string(r.points_refused).c_str() : "");
         }
+
+        // BL-1041 fix round: the honest headcount test, and where the points
+        // stand by the ground's survey. rho(p,urb) above ranks 300 years of
+        // points against 1960's heads alone; these rank SCALE points only
+        // against the span's integrated urban head-years.
+        std::printf("\n  THE HONEST HEADCOUNT TEST, and where the points stand (BL-1041 fix round):\n"
+                    "  re-run = the span re-run harness-side at 1 point per treasury unit, its close equal to the\n"
+                    "  shipped one outside the points (ok) and splitting every region's points exactly into scale\n"
+                    "  and treasury (split); samples = decision years re-run to their top for the head-years integral\n"
+                    "  (urban heads x the years each sample stands for, over rounds the region had centres);\n"
+                    "  rho(S,hy) = Spearman(SCALE points, head-years) over regions with either -- 1.000 would mean\n"
+                    "  scale points only restate time-integrated headcount; rho(S/hy,fuel) = Spearman(scale points\n"
+                    "  per head-year, fuel factor). Of ALL points at the close: orig = on original settlement ground\n"
+                    "  (surveyed from tiles by the settlement pass), resurv = on ground the sim founded before 1660\n"
+                    "  (energy_q inherited, re-surveyed at the open), span = on ground the span founded (DEFAULT A).\n");
+        std::printf("  seed | re-run split samples | regions  rho(S,hy) rho(S/hy,fuel) | orig (reg)    resurv (reg)  "
+                    "span (reg)   | re-runs ms\n");
+        for (const seed_row& r : rows)
+        {
+            if (!r.span_ran) continue;
+            const auto f3 = [](double x, char* b, std::size_t n) {
+                if (std::isnan(x)) std::snprintf(b, n, "    -");
+                else std::snprintf(b, n, "%5.3f", x);
+            };
+            char a[16], b[16], so[16], sr[16], si[16];
+            f3(r.rho_scale_hy, a, sizeof a);
+            f3(r.rho_scale_int_fuel, b, sizeof b);
+            f3(r.share_original, so, sizeof so);
+            f3(r.share_resurveyed, sr, sizeof sr);
+            f3(r.inherited_share, si, sizeof si);
+            std::printf("  %4u |  %-5s %-5s %4d    | %6d    %s      %s      | %s (%5d) %s (%5d) %s (%4d) | %9lld\n",
+                        r.seed,
+                        integral_stride == 0 || !r.points_on ? "-" : r.rerun_ok ? "ok" : "DIFF",
+                        integral_stride == 0 || !r.points_on ? "-" : r.split_ok ? "ok" : "BAD",
+                        r.integral_samples, r.scale_regions, a, b,
+                        so, r.regions_original, sr, r.regions_resurveyed, si, r.regions_span_founded,
+                        static_cast<long long>(r.integral_ms));
+        }
+        if (integral_stride == 0)
+            std::printf("  (--integral-stride 0: the re-runs were not taken; rho(S,hy) and rho(S/hy,fuel) read '-')\n");
     }
 
     const auto collect = [&](double (*get)(const seed_row&)) {
@@ -2929,6 +3174,17 @@ int main(int argc, char** argv)
                          span_collect([](const seed_row& r) { return r.rho_points_urban; }));
             print_spread("rho(points per urban head, fuel factor)",
                          span_collect([](const seed_row& r) { return r.rho_intensity_fuel; }));
+            // BL-1041 fix round: the lines above rank 300 years of points
+            // against 1960's heads; these two are the honest test (scale points
+            // only, against integrated head-years -- see the per-seed table).
+            print_spread("rho(SCALE points, integrated urban head-years)",
+                         span_collect([](const seed_row& r) { return r.rho_scale_hy; }));
+            print_spread("rho(scale points per head-year, fuel factor)",
+                         span_collect([](const seed_row& r) { return r.rho_scale_int_fuel; }));
+            print_spread("share on original settlement ground (surveyed from tiles)",
+                         span_collect([](const seed_row& r) { return r.share_original; }));
+            print_spread("share on ground the sim founded before 1660 (re-surveyed)",
+                         span_collect([](const seed_row& r) { return r.share_resurveyed; }));
             print_spread("share on ground the span founded (inherited fuel)",
                          span_collect([](const seed_row& r) { return r.inherited_share; }));
             print_spread("share on ground nobody holds",
@@ -3189,6 +3445,17 @@ int main(int argc, char** argv)
                 put_rho("rho_points_urban", r.rho_points_urban, ", ");
                 put_rho("rho_intensity_fuel", r.rho_intensity_fuel, ", ");
                 put_rho("inherited_share", r.inherited_share, ",\n");
+                // BL-1041 fix round: the honest headcount test and the survey split.
+                std::fprintf(f, "   \"rerun_ok\": %s, \"rerun_mismatch\": %d, \"split_ok\": %s, "
+                                "\"integral_samples\": %d, \"integral_ms\": %lld, \"scale_regions\": %d, "
+                                "\"regions_original\": %d, \"regions_resurveyed\": %d, \"regions_span_founded\": %d, ",
+                             r.rerun_ok ? "true" : "false", r.rerun_mismatch, r.split_ok ? "true" : "false",
+                             r.integral_samples, (long long)r.integral_ms, r.scale_regions,
+                             r.regions_original, r.regions_resurveyed, r.regions_span_founded);
+                put_rho("rho_scale_hy", r.rho_scale_hy, ", ");
+                put_rho("rho_scale_int_fuel", r.rho_scale_int_fuel, ", ");
+                put_rho("share_original", r.share_original, ", ");
+                put_rho("share_resurveyed", r.share_resurveyed, ",\n");
                 std::fprintf(f, "   \"markets\": %d, \"markets_urban\": %d, \"corps_on_body\": %d, ",
                              r.markets, r.markets_urban, r.corps_on_body);
                 put_rho("rho_firms_urban", r.rho_firms_urban, ", ");
