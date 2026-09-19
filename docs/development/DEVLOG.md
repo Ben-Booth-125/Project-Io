@@ -13,8 +13,8 @@ sessions can be scoped and paced with less waste.
 ## 2026-09-19 — Sprint 45 wave 1 lands: seven items delivered, the Fuel Doctrine and the charter spend ruled nine times
 
 **Runtime:** ~19 h wall clock (02:20 to 21:15, long unattended chains). Delivery — Full (five
-worktree lanes and a fix round, two cold reviews, two main-session verification chains) with three
-design calls on elicitation forms.
+worktree lanes with seven fix rounds, nine cold reviews or checks, four main-session chains and
+the timed rows) with nine design calls on elicitation forms.
 
 ### Picked up from the sleep
 BL-1041's fix round had committed in its worktree before the PC slept; its source change was comments
