@@ -299,10 +299,9 @@ coal's rarity starved its pull — few regions clear a mean that a handful of co
 forest is widespread — and Charcoal led Coke 373 to 142. With a per-resource top third, fuel and
 forest clear at the same rate world-wide, so the fork compares like with like literally. The bar
 is fixed once at the span open from the world's regions: it is a property of the map, never a
-rank among polities, and it does not move as a realm grows. The third is taken over the regions
-that carry the resource at all — the nonzero scores — since ranking the zeros too would put coal's
-cut among regions with no coal and let most coal regions clear. A tie band straddling the cut
-falls out of it whole, so at most a third ever clears (decision taken for Ben, 2026-09-19, NR-900). Both pulls count the same held
+rank among polities, and it does not move as a realm grows. Whether the third is taken over
+every region or only the regions carrying the resource, and how a pile of scores at the survey's
+cap is ranked, is open (NR-900). Both pulls count the same held
 regions: those carrying the span-open survey of both scores. Ground the span founds inherits fuel
 but carries no forest reading, so it is left out of both (Ben, 2026-09-19, NR-899). A plain average share read about 212 on the median region and let almost any
 seam outweigh any forest. So a polity takes Charcoal Iron because its ground is wooded, not only because Coke is gated
