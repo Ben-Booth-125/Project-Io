@@ -444,9 +444,24 @@ struct seed_row
     int    doctrine[3]       = {}; ///< living polities at the close: coke / charcoal / neither
     /// Mean of each living polity's held-ground forest reading
     /// (`industry_ground_forest_q` over the regions it holds at the close:
-    /// the share of its held ground wooded above the mean, BL-1056), per doctrine
+    /// the share of its held ground clearing the forest top-third bar, BL-1056/BL-1059), per doctrine
     /// group; NaN for an empty group.
     double doctrine_forest[3] = { k_undef, k_undef, k_undef };
+    /// ... and of each living polity's `ground_fuel` share (BL-1059), per side.
+    double doctrine_fuel[3]   = { k_undef, k_undef, k_undef };
+
+    // --- BL-1059: the top-third bars (span mode) ---------------------------
+    int    bar_fuel        = industry_ground_bar_none_q; ///< the sim's fuel bar (history_sim_state::ground_bars)
+    int    bar_forest      = industry_ground_bar_none_q; ///< the sim's forest bar
+    int    fuel_nonzero    = 0; ///< surveyed regions at the open with a nonzero fuel score
+    int    fuel_clear      = 0; ///< ... of which clear the fuel bar
+    int    forest_nonzero  = 0; ///< surveyed regions at the open with a nonzero forest score
+    int    forest_clear    = 0; ///< ... of which clear the forest bar
+    /// The sim's bars == the bars re-derived here from the open table AND
+    /// from the 1960 close table (founded ground must not move them).
+    bool   bars_match      = false;
+    /// The harness-side re-run's bars vs the span's: 1 same, 0 DIFFER, -1 not run.
+    int    bars_rerun      = -1;
     int    charcoal_seam_seen  = 0; ///< Charcoal polities that ever passed the seam gate (fuel_seen)
     int    charcoal_seam_close = 0; ///< Charcoal polities holding a seam (the gate's reading >= 250) at the close
 
@@ -1963,11 +1978,16 @@ bool bl1056_self_check()
         rg[static_cast<std::size_t>(i)].energy_q        = i >= 9 ? 600 : 1000; // "rich" if the survey were ignored
     }
     const bool survey_ran = industry_span_survey_ran(rg);
-    const auto terms = [&rg, survey_ran](const std::vector<int>& held, int& gf, int& gw, bool& gate) {
+    // BL-1059: the bars over the fixture's read set (rows 0,1,2,4,5,7,8).
+    // Fuel nonzero {100,300,450,500,900,1000}: m 6, k 2, bar 900. Forest
+    // nonzero {200,300,500,600,800,900}: bar 800. Pinned here so a change in
+    // the bar's definition fails loudly rather than moving the check below.
+    const industry_ground_bars bars = industry_ground_bars_at_open(rg);
+    const auto terms = [&rg, &bars, survey_ran](const std::vector<int>& held, int& gf, int& gw, bool& gate) {
         industry_scorer_reading r;
         for (int hi : held) r.fuel_seam_q = std::max(r.fuel_seam_q, industry_fuel_reading_q(rg[static_cast<std::size_t>(hi)]));
-        r.ground_fuel_q   = industry_ground_fuel_q(rg, held, survey_ran);
-        r.ground_forest_q = industry_ground_forest_q(rg, held);
+        r.ground_fuel_q   = industry_ground_fuel_q(rg, held, bars, survey_ran);
+        r.ground_forest_q = industry_ground_forest_q(rg, held, bars);
         int v[io::industry_tree::term_count];
         industry_term_values(0, r, v);
         gf   = v[static_cast<int>(io::industry_tree::scorer_term::ground_fuel)];
@@ -1986,10 +2006,12 @@ bool bl1056_self_check()
         for (int add = 0; add < NR; ++add)
         {
             if (mask & (1u << add)) continue;
-            // Below the world mean on both, or with no span-open reading of
-            // both (such ground is out of the pulls, so it cannot raise one).
+            // Not clearing its bar on either resource (BL-1059: its own top
+            // third), or with no span-open reading of both (such ground is
+            // out of the pulls, so it cannot raise one).
             const bool unread = fuel[add] < 0 || forest[add] < 0;
-            if (!unread && (fuel[add] > industry_ground_share_bar_q || forest[add] > industry_ground_share_bar_q))
+            if (!unread && (industry_ground_clears(fuel[add], bars.fuel_q)
+                            || industry_ground_clears(forest[add], bars.forest_q)))
                 continue;
             std::vector<int> grown = held;
             grown.push_back(add);
@@ -2003,21 +2025,22 @@ bool bl1056_self_check()
     // The shape it replaced, for the record: a best-of-held forest.
     int gf_a = 0, gw_a = 0, gf_b = 0, gw_b = 0; bool g_a = false, g_b = false;
     terms({4}, gf_a, gw_a, g_a);        // one bare region
-    terms({4, 1, 7}, gf_b, gw_b, g_b);  // + a wooded region + a below-mean one
+    terms({4, 1, 7}, gf_b, gw_b, g_b);  // + a wooded region (clears 800) + one under the bar
     // The review's counterexample: an unsurveyed-only realm inside the span,
     // then the same realm gaining surveyed ground under the mean.
     int gf_u = 0, gw_u = 0, gf_v = 0, gw_v = 0; bool g_u = false, g_v = false;
     terms({9, 10, 11}, gf_u, gw_u, g_u);
     terms({9, 10, 11, 1}, gf_v, gw_v, g_v);
-    std::printf("BL-1056 self-check (1): %d held sets, %d below-mean or unread regions gained: ground_fuel or"
+    std::printf("BL-1056/BL-1059 self-check (1): bars fuel %d forest %d; %d held sets, %d not-clearing or unread"
+                " regions gained: ground_fuel or"
                 " ground_forest rose on %d, the fuel gate closed on %d; e.g. {bare} forest %d -> {bare, wooded,"
-                " below-mean} %d; unsurveyed-only realm fuel/forest %d/%d (seam gate %s) -> + surveyed fuel 100:"
+                " not-clearing} %d; unsurveyed-only realm fuel/forest %d/%d (seam gate %s) -> + surveyed fuel 100:"
                 " %d/%d\n",
-                sets, adds, rose, gate_lost, gw_a, gw_b, gf_u, gw_u, g_u ? "open" : "shut", gf_v, gw_v);
+                bars.fuel_q, bars.forest_q, sets, adds, rose, gate_lost, gw_a, gw_b, gf_u, gw_u, g_u ? "open" : "shut", gf_v, gw_v);
     if (rose != 0 || gate_lost != 0 || adds == 0 || gw_b != 333 || !survey_ran
-        || gf_u != 0 || gw_u != 0 || gf_v != 0 || !g_u)
+        || gf_u != 0 || gw_u != 0 || gf_v != 0 || !g_u || bars.fuel_q != 900 || bars.forest_q != 800)
     {
-        std::printf("FAIL  BL-1056 (1): a Fuel Doctrine pull rose on ground below the world mean\n");
+        std::printf("FAIL  BL-1056/BL-1059 (1): a Fuel Doctrine pull rose on ground not clearing its bar\n");
         ok = false;
     }
 
@@ -2348,7 +2371,20 @@ int main(int argc, char** argv)
             std::map<int, std::vector<int>> held_by;
             for (std::size_t i = 0; i < close_t.size(); ++i)
                 if (close_t[i].nation >= 0) held_by[close_t[i].nation].push_back(static_cast<int>(i));
-            double forest_sum[3] = {};
+            double forest_sum[3] = {}, fuel_sum[3] = {};
+            // BL-1059: the bars the span fixed at its open, read back off its
+            // state; the pulls below read them exactly as the scorer did.
+            const industry_ground_bars span_bars = fx.digitisation_state.ground_bars;
+            row.bar_fuel   = span_bars.fuel_q;
+            row.bar_forest = span_bars.forest_q;
+            row.bars_match = industry_ground_bars_at_open(open_t) == span_bars
+                          && industry_ground_bars_at_open(close_t) == span_bars;
+            for (const region& rg : open_t)
+            {
+                if (rg.survey_forest_q < 0 || rg.survey_fuel_q < 0) continue;
+                if (rg.survey_fuel_q > 0)   { ++row.fuel_nonzero;   if (industry_ground_clears(rg.survey_fuel_q, span_bars.fuel_q))     ++row.fuel_clear; }
+                if (rg.survey_forest_q > 0) { ++row.forest_nonzero; if (industry_ground_clears(rg.survey_forest_q, span_bars.forest_q)) ++row.forest_clear; }
+            }
             for (const polity& q : fx.digitisation_handoff.polities)
             {
                 if (!q.alive) continue;
@@ -2357,7 +2393,8 @@ int main(int argc, char** argv)
                 const auto it = held_by.find(q.id);
                 const std::vector<int> none;
                 const std::vector<int>& held = it != held_by.end() ? it->second : none;
-                forest_sum[side] += static_cast<double>(industry_ground_forest_q(close_t, held));
+                forest_sum[side] += static_cast<double>(industry_ground_forest_q(close_t, held, span_bars));
+                fuel_sum[side]   += static_cast<double>(industry_ground_fuel_q(close_t, held, span_bars, true));
                 if (side == 1)
                 {
                     if (q.industry_fuel_seen) ++row.charcoal_seam_seen;
@@ -2374,7 +2411,11 @@ int main(int argc, char** argv)
                 }
             }
             for (int s = 0; s < 3; ++s)
-                if (row.doctrine[s] > 0) row.doctrine_forest[s] = forest_sum[s] / row.doctrine[s];
+                if (row.doctrine[s] > 0)
+                {
+                    row.doctrine_forest[s] = forest_sum[s] / row.doctrine[s];
+                    row.doctrine_fuel[s]   = fuel_sum[s]   / row.doctrine[s];
+                }
 
             // ---- BL-1041: reading 8, industry points at the close ----------
             const history_sim_params& dpp = fx.digitisation_params;
@@ -2545,6 +2586,7 @@ int main(int argc, char** argv)
                     }
                 else
                     row.rerun_mismatch = -1;
+                row.bars_rerun = x.hs.ground_bars == fx.digitisation_state.ground_bars ? 1 : 0; // BL-1059
                 row.rerun_ok = row.rerun_mismatch == 0 && x.hs.industry_points_refused == 0
                             && dst.industry_points_refused == 0;
 
@@ -2921,7 +2963,7 @@ int main(int argc, char** argv)
                     "  close (1960): regions the span founded after its open are unsurveyed (-1, out of every mean);\n"
                     "  the Fuel Doctrine side each living polity holds (IN-MT-1a coke / IN-MT-1b charcoal / neither),\n"
                     "  per side the mean over its polities of ground_forest (each polity's SHARE of held\n"
-                    "  ground wooded above the world mean, per mille; BL-1056),\n"
+                    "  ground clearing the forest top-third bar, per mille; BL-1056/BL-1059),\n"
                     "  and Charcoal polities that ever passed the seam gate (fuel_seen) or hold a seam at the close --\n"
                     "  they had Coke open and took Charcoal anyway.\n");
         std::printf("  seed | open (unseen) | forest min/p25/med/p75/max | any / >=500 | fuel med | seams surv/energy_q |"
@@ -2975,12 +3017,33 @@ int main(int argc, char** argv)
                     "         BL-1051 cites 404 / 118 / 340 for BL-1038's run, which this harness does not reproduce;\n"
                     "         the like-for-like split WITHOUT the survey is --fidelity's V4 column (V5 is this run).\n",
                     p_doc[0], p_doc[1], p_doc[2]);
-        std::printf("  ARE THE CHARCOAL POLITIES THE WOODED ONES? mean ground_forest (share wooded above the mean), pooled\n"
+        std::printf("  ARE THE CHARCOAL POLITIES THE WOODED ONES? mean ground_forest (share clearing the forest bar), pooled\n"
                     "         over polities: coke %.0f, charcoal %.0f, neither %.0f;\n"
                     "         charcoal wooder than coke on %d of %d seeds holding both sides; Charcoal polities that\n"
                     "         ever passed the seam gate %d, holding a seam at the close %d (of %d)\n",
                     pooled_mean(0), pooled_mean(1), pooled_mean(2), seeds_charcoal_wooder, seeds_compared,
                     p_seen, p_now, p_doc[1]);
+
+        // BL-1059: THE TOP-THIRD BARS, per seed. R4 wants each bar cleared by
+        // roughly a third (25-34%) of surveyed regions with a nonzero score;
+        // the rate is printed, flagged, not gated. The bars' identity (the
+        // sim's == re-derived from the open and the close tables == the
+        // harness re-run's) IS gated, at the end of the run.
+        std::printf("\n=== BL-1059 THE TOP-THIRD BARS, per seed (fixed at the span open; clear = score > 0 && >= bar) ===\n");
+        std::printf("  seed | fuel bar | fuel clear / nonzero (rate) | forest bar | forest clear / nonzero (rate) |"
+                    " re-derived | re-run\n");
+        for (const seed_row& r : rows)
+        {
+            if (!r.span_ran) continue;
+            const double fr = r.fuel_nonzero   > 0 ? 100.0 * r.fuel_clear   / r.fuel_nonzero   : 0.0;
+            const double wr = r.forest_nonzero > 0 ? 100.0 * r.forest_clear / r.forest_nonzero : 0.0;
+            const auto band = [](double x) { return x >= 25.0 && x <= 34.0 ? "" : " OUT"; };
+            std::printf("  %4u |   %4d   |   %4d / %-4d (%4.1f%%)%-4s    |    %4d    |   %4d / %-4d (%4.1f%%)%-4s      |"
+                        "    %s    | %s\n",
+                        r.seed, r.bar_fuel, r.fuel_clear, r.fuel_nonzero, fr, band(fr), r.bar_forest,
+                        r.forest_clear, r.forest_nonzero, wr, band(wr), r.bars_match ? "same" : "DIFF",
+                        r.bars_rerun < 0 ? "-" : r.bars_rerun ? "same" : "DIFF");
+        }
     }
 
     // ============ BL-1041: readings 8 and 9, per seed =========================
@@ -3321,11 +3384,17 @@ int main(int argc, char** argv)
                 // polities at the close, and the top region's share of its
                 // world's points (median and max over the worlds).
                 int split[3] = {};
+                double pull_fuel[3] = {}, pull_forest[3] = {};
                 std::vector<double> tops;
                 for (const seed_row& r : rows)
                 {
                     if (!r.span_ran) continue;
-                    for (int d = 0; d < 3; ++d) split[d] += r.doctrine[d];
+                    for (int d = 0; d < 3; ++d)
+                    {
+                        split[d] += r.doctrine[d];
+                        if (!std::isnan(r.doctrine_fuel[d]))   pull_fuel[d]   += r.doctrine_fuel[d]   * r.doctrine[d];
+                        if (!std::isnan(r.doctrine_forest[d])) pull_forest[d] += r.doctrine_forest[d] * r.doctrine[d];
+                    }
                     if (r.points_on && !std::isnan(r.points_top_region)) tops.push_back(r.points_top_region);
                 }
                 std::sort(tops.begin(), tops.end());
@@ -3339,6 +3408,14 @@ int main(int argc, char** argv)
                 std::printf("     BL-1056  Fuel Doctrine coke/charcoal/neither %d/%d/%d (living polities, pooled);"
                             " top-region share of points median %.3f, max %.3f (over %zu worlds)\n",
                             split[0], split[1], split[2], med, mx, tops.size());
+                // BL-1059: the mean pulls by side, pooled over living polities
+                // at the close (each polity's share of held ground clearing
+                // that resource's top-third bar, per mille).
+                const auto pm = [&](const double* sum, int d) { return split[d] > 0 ? sum[d] / split[d] : k_undef; };
+                std::printf("     BL-1059  mean pulls by side (per mille, pooled): ground_fuel coke %.0f / charcoal %.0f /"
+                            " neither %.0f; ground_forest coke %.0f / charcoal %.0f / neither %.0f\n",
+                            pm(pull_fuel, 0), pm(pull_fuel, 1), pm(pull_fuel, 2),
+                            pm(pull_forest, 0), pm(pull_forest, 1), pm(pull_forest, 2));
             }
             print_spread("Gini of points over living polities (zeros in)",
                          span_collect([](const seed_row& r) { return r.points_polity_gini; }));
@@ -3669,12 +3746,20 @@ int main(int argc, char** argv)
     // reproduce the span's own ledger, or whose harness-side resume is not
     // the span when the integral was asked for, fails the run -- a '-' in
     // the rho columns must never be the only sign of it.
-    std::size_t split_bad = 0, rerun_bad = 0;
+    std::size_t split_bad = 0, rerun_bad = 0, bars_bad = 0;
     for (const seed_row& r : rows)
     {
+        if (r.span_ran && (!r.bars_match || r.bars_rerun == 0)) ++bars_bad; // BL-1059
+
         if (!r.span_ran || !r.points_on || r.points_rejected) continue;
         if (!r.split_ok) ++split_bad;
         if (integral_stride > 0 && !r.rerun_ok) ++rerun_bad;
+    }
+    if (bars_bad > 0)
+    {
+        std::printf("FAIL  BL-1059: the top-third bars moved (re-derived or re-run differ from the span's) on %zu"
+                    " seed(s)\n", bars_bad);
+        return 1;
     }
     if (split_bad > 0 || rerun_bad > 0)
     {
