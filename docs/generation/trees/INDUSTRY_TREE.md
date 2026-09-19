@@ -304,9 +304,12 @@ region, and on the unclamped survey share (Ben, 2026-09-19, NR-900).** Ranking e
 makes fuel and forest clear at one rate world-wide; ranking only the regions that carry a resource
 clears a third of its carriers, so a rarer resource clears less of the world and the rarity tilt
 returns. The survey score is capped at twice the world mean, so ranking it lets a pile of regions at
-the cap push the bar past every one of them and empty it; the share the score is taken from has no
-cap, so the ranking reads the share. A region with none of the resource never clears, however few
-regions carry it. Both pulls count the same held
+the cap push the bar past every one of them and empty it; the ranking reads the share the score is
+taken from instead. A region with none of the resource never clears, however few regions carry it.
+**A tie at the cut clears whole (Ben, 2026-09-19, NR-904):** regions whose share equals the share at
+the cut all clear, so a bar can never come out empty. The forest share is a proportion of tiles and
+tops out at a fully wooded window, so on a heavily wooded world more than a third of regions may
+tie there and clear; a fully wooded region is a forest whatever its neighbours hold. Both pulls count the same held
 regions: those carrying the span-open survey of both scores. Ground the span founds inherits fuel
 but carries no forest reading, so it is left out of both (Ben, 2026-09-19, NR-899). A plain average share read about 212 on the median region and let almost any
 seam outweigh any forest. So a polity takes Charcoal Iron because its ground is wooded, not only because Coke is gated

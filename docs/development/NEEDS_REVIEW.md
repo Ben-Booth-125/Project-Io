@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*7 entries — 1 open, 6 resolved.*
+*8 entries — 1 open, 7 resolved.*
 
 ---
 
@@ -152,4 +152,20 @@ The turn's cursor moves only on a charter, and a failed placement ends the centr
 > **RESOLVED.** RULED (Ben, 2026-09-19): option A, skip. A good with no free site in a centre's window is passed over for that centre; the centre stops only when no good in the turn can place. Written into DIGITISATION.md; built with BL-1060 (charter spend hardening).
 
 *Files: `src/world/corporation_generation.cpp`*
+
+### NR-904 — CALL: a tie band at the top-third cut clears whole or falls out whole
+*question · raised 2026-09-19 · from Cold check of BL-1059 (top-third bar) fix round 4a7bb291, 2026-09-19.*
+
+The forest share is a proportion of tiles, capped at 1000 per mille by definition (settlement.cpp:396). The built tie rule pushes a band straddling the cut out whole (at most a third clears), so if more than a third of regions are fully wooded the forest bar becomes 1001 and forest clears nowhere: the NR-900 cliff surviving for forest. No library seed hit it; the harness gate would catch it, the shipped sim would not.
+
+**Why it matters.** Which ground counts as forest for the Fuel Doctrine on a heavily wooded world.
+
+- The tie clears whole: a bar can never empty; more than a third may clear on a wooded world.
+- The tie falls out whole, as built: never more than a third; a bar can empty.
+
+> **Recommendation:** The first.
+
+> **RESOLVED.** RULED (Ben, 2026-09-19): option A. Regions tied at the cut all clear. Written into INDUSTRY_TREE.md § The scorer; BL-1059 (top-third bar) carries it.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/trees/INDUSTRY_TREE.md`*
 
