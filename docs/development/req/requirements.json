@@ -6397,6 +6397,191 @@
     }
    ],
    "resolution": "Beat 1's located points accrue inside the span only; switch off, the pins held (chain 8). The treasury landing was re-ruled (NR-897) and moves in BL-1056."
+  },
+  {
+   "brief": "top-third-bar",
+   "title": "BL-1059 - The Fuel Doctrine pulls count held regions in each resource's own top third",
+   "difficulty": 2,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1059 - sprint 45 (2026-09-19)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "tool: seed_library.js --check",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "With the span switch off, every world_determinism digest, seed-library fingerprint and BL-1031 pin is unmoved.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: the bar",
+      "headless: digitisation_sim_harness (self-check)"
+     ],
+     "requirement": "At the span open a fuel bar and a forest bar are fixed once from every region's span-open score: a region clears when its score is in the top third of the world for that resource, a 0 never clears, ties at the bar resolve by a stated, pinned rule; the bars are identical across a re-run.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: the pulls",
+      "headless: exploration_sim_harness"
+     ],
+     "requirement": "ground_forest and ground_fuel read the share of held regions (surveyed for both; span-founded ground excluded) clearing their own bar; the fuel gate, its re-check, the seam flag, the span-ran flag and the -1 fallback are unchanged.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960"
+     ],
+     "requirement": "On every library seed each bar is cleared by roughly a third (25-34%) of surveyed regions with a nonzero score, printed per seed; no pull rises when a realm gains a region that does not clear its bar.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness --through 1960"
+     ],
+     "requirement": "Reading 8 reports the Fuel Doctrine split and mean pulls by side at 1960 over 16 seeds, for Ben's judgement.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: digitisation_sim_harness --fidelity"
+     ],
+     "requirement": "--fidelity passes 16 of 16.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds no term that grows with realm size and no bar that moves after the open.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "stockpile-to-budget",
+   "title": "BL-1042 - A region's industry points become its campaign centres' charter budgets, built in world/* and passed by the app and its harness mirror alike",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1042 - sprint 45 (2026-09-19)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: the carve index"
+     ],
+     "requirement": "carved_centre carries its slot key and rank; found_centre records a non-serialised centre -> (region, rank) index on world, beside gen_settlement.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: the builder",
+      "headless: player_seed_sweep --charter-budget stockpile (main session)"
+     ],
+     "requirement": "A world/* builder splits each region's points over its carved centres by slot key with largest-remainder apportionment; anchors and coverage foundings get nothing; a carved centre dropped when its body is built out has its share counted under its own unspent reason. Every point is accounted for by a centre or a reason.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: both sides",
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "app::start_new_game_prelude and tools/verify/harness_params.hpp pass the same budget, spend and report to the 7-argument apply, the budget outliving the search; the two diffs are reviewed against each other.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: entry points"
+     ],
+     "requirement": "The search-less entry points (verify_api.cpp, main.cpp) state or mirror the budget; prices are named constants where the stockpile budget is built, never charter_budget.hpp defaults.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "code: comments"
+     ],
+     "requirement": "The stale \"nothing shipped passes a budget\" comments are corrected in the same commit (landscape_search.hpp, charter_budget.hpp, harness_params.hpp, app.cpp).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep --digest-check (main session)",
+      "headless: world_determinism"
+     ],
+     "requirement": "With the span off the stockpile is empty and the legacy branch runs first: --digest-check with stockpile == none == the BL-1031 pins, 16/16.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep --charter-budget stockpile (main session)"
+     ],
+     "requirement": "With the span on in a harness, a non-empty budget reaches the search on at least three library seeds, every point accounted for by spend or reason.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R8",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "world_determinism folds the stockpile into its region digest.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
