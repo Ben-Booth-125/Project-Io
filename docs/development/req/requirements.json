@@ -5969,19 +5969,20 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1039 - sprint 45 (2026-09-18)",
    "batch": "sprint-45",
-   "resolved": null,
+   "resolved": "2026-09-19",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep --digest-check (none, empty, zero, refused)"
      ],
      "requirement": "Every no-budget, empty, all-zero and refused digest equals its pin.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged): player_seed_sweep --digest-check 16/16 PASS (none, the shipped path); --digest-check --seeds 0,28,46 --charter-budget empty 3/3 PASS, zero 3/3 PASS, refused 3/3 PASS (each exits 3 by design: a partial seed set)."
     },
     {
      "id": "R2",
@@ -6065,7 +6066,7 @@
      "result_metric": "The 4x ceiling-120 rows (seeds 0, 28, 46): 120 firms, every good with demand holds firms, trimmed evenly to within one (seed 0: nine goods at 12, one at 11, one yard); checks at land PASS on every square-root row. Caveat: a failed placement ends the centre's walk, so an unplaceable extraction good can forfeit the remainder (NR-903)."
     }
    ],
-   "resolution": ""
+   "resolution": "The square-root cap under a density ceiling (120, NR-902), goods filled in turn, B on firm points; the pins held. R4 cancelled with the capital rule (NR-895); R2 rests on the lane's before/after digests."
   },
   {
    "brief": "digitisation-span",
@@ -6411,15 +6412,15 @@
    "difficulty": 2,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1059 - sprint 45 (2026-09-19)",
    "batch": "sprint-45",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-09-19",
+   "resolution": "Each Fuel Doctrine pull counts held regions in its own resource's top third of the world, on the unclamped share, ties clearing whole; the pins held.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "tool: seed_library.js --check",
@@ -6427,69 +6428,69 @@
      ],
      "requirement": "With the span switch off, every world_determinism digest, seed-library fingerprint and BL-1031 pin is unmoved.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged): world_determinism ALL PASS, digests 099530C9B7A211D7 / 3C348D569EEF30EB / 583A788BD8045DA0 / 2EC67DAE697FBA02 unchanged; exploration_sweep --out then seed_library --check --from: 0 moved, 0 absent, 16 unchanged; player_seed_sweep --digest-check 16/16 PASS (2959 s)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the bar",
       "headless: digitisation_sim_harness (self-check)"
      ],
-     "requirement": "At the span open a fuel bar and a forest bar are fixed once from every region's span-open score: a region clears when its score is in the top third of the world for that resource, a 0 never clears, ties at the bar resolve by a stated, pinned rule; the bars are identical across a re-run.",
+     "requirement": "At the span open a fuel bar and a forest bar are fixed once from every region's unclamped span-open survey share: a region clears when its share is in the top third of the world for that resource, a 0 never clears, a tie at the cut clears whole; the bars are identical across a re-run.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Code (rounds 1-3: 15713143, 4a7bb291, 6a0d64f1), cold-reviewed twice: the bars are fixed once at the span open from every region carrying both span-open scores, ranking the unclamped survey share (NR-900); a tie at the cut clears whole (NR-904) and a share of 0 never clears; the three bar checks (open, close, re-run) read 'same' on all 16 seeds in chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the pulls",
       "headless: exploration_sim_harness"
      ],
      "requirement": "ground_forest and ground_fuel read the share of held regions (surveyed for both; span-founded ground excluded) clearing their own bar; the fuel gate, its re-check, the seam flag, the span-ran flag and the -1 fallback are unchanged.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Code and exploration_sim_harness ALL PASS (chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged); T8.7.5-T8.7.7 read the bar, confirmed by mutation in the lane): both pulls read the share of held regions clearing their own bar; the fuel gate, seam flag, span-ran flag and -1 fallback unchanged (cold review)."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --through 1960"
      ],
-     "requirement": "On every library seed each bar is cleared by roughly a third (25-34%) of surveyed regions with a nonzero score, printed per seed; no pull rises when a realm gains a region that does not clear its bar.",
+     "requirement": "On every library seed each bar is cleared by about a third of the world's ranked regions (more only where a tie at the cut clears whole), printed per seed; no pull rises when a realm gains a region that does not clear its bar.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "digitisation_sim_harness --through 1960 --integral-stride 5 (chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged)): each bar clears about a third of the WORLD on every seed (fuel 33.3-33.4%, forest 33.3-34.3% where ties at the cut clear whole); no bar empty; the empty-bar gate never tripped. Carrier rates run higher by design (fuel 51% of carriers on seed 43)."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --through 1960"
      ],
      "requirement": "Reading 8 reports the Fuel Doctrine split and mean pulls by side at 1960 over 16 seeds, for Ben's judgement.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Same run: Fuel Doctrine at 1960 over 16 seeds coke 239 / charcoal 277 / neither 340 (from 142 / 373 / 341 under the mean, NR-899); charcoal polities wooder than coke on 15 of 16 seeds; top region's share of points median 0.030, max 0.195; rho(scale points, head-years) median 0.896."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --fidelity"
      ],
      "requirement": "--fidelity passes 16 of 16.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "digitisation_sim_harness --fidelity: FIDELITY PASS, gates 1-3 16 of 16 (chain 11 on be5b3d72 (main session, 2026-09-19; BL-1042 and its fix round, BL-1059 rounds 1-3 merged); gate 3 now recomputes each score from its share, and the comparator names all 57 region fields)."
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds no term that grows with realm size and no bar that moves after the open.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "code-reviewer (cold) on round 1 (the cap cliff and the nonzero-only ranking -> NR-900) and focused cold checks on rounds 2 and 3 (the missing region field, the share/score check, the forest tie -> NR-904); nothing blocks after round 3."
     }
    ]
   },
