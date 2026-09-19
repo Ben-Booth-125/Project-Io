@@ -167,7 +167,7 @@
    "title": "CALL: the density ceiling — 120 or 160 firms per body — read off BL-1039's 21 timed rows",
    "raised": "2026-09-19",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1039 (charter spend rules) R6. player_seed_sweep --charter-cost on seeds 0, 28, 46 at 1x/2x/4x under the square-root rule (c = 8, B on firms, goods in turn), ceilings 120 and 160; quiet machine, main at ab9c38f8, Release /O2 MSVC 14.44.35207, serial, 7126 s; folded into charter_cost_sweep.json as runs.bl1039_sqrt. Every row: spend rules PASS at land, points balance PASS, nothing threw; the none rows match the pins. The reference budget's definition was already ruled (NR-895: B_ref = 8 x goods x firm price).",
    "what": "At 1x and 2x the two ceilings give identical worlds: neither binds. At 4x: ceiling 120 lays 120 firms on every seed (12 per good, trimmed evenly, 167-190 points unspent to the ceiling); ceiling 160 lays 141/141/151 firms — it never binds, because every good reaches its own square-root cap of 15 first, so 160 is in effect no ceiling up to 4x. Live economy tick (median ms, a lower bound) at 4x, 120 vs 160: seed 0 11,582 vs 12,934 (+12%); seed 28 26,634 vs 34,614 (+30%); seed 46 13,756 vs 18,004 (+31%). The seated corporation is solvent on every row; budget specialists solvent 10 or 11 of 11 at 4x either way. These are SYNTHETIC budgets (seeded weights, not population); BL-1043's real-stockpile sweep re-reads the ceiling on real budgets. BL-1042 built with a provisional ceiling of 150; this call replaces it.",
    "why_it_matters": "The ceiling is the only brake on firm density when budgets run large; it sets the per-tick cost of a dense 1960 world and how many firms each good carries.",
@@ -182,7 +182,7 @@
     "src/world/charter_budget.hpp",
     "charter_cost_sweep.json"
    ],
-   "resolution": null
+   "resolution": "RULED (Ben, 2026-09-19): 120 firms per body. Written into DIGITISATION.md (the square-root cap paragraph); BL-1060 (charter spend hardening) replaces BL-1042's provisional 150 with it. BL-1043's real-stockpile sweep reads it on real budgets."
   },
   {
    "id": "NR-903",

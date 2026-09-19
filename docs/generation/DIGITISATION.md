@@ -217,7 +217,11 @@ synthetic test budget.
 capital, under a named DENSITY CEILING.** Capital buys density with diminishing returns. The ceiling
 sits below the 200-per-body runaway guard and counts what it refuses under its own unspent reason,
 so the guard goes back to catching runaways only. The constants are read off the cost table once it
-holds rows between 81 and 150 firms and a tally of firms per good.
+holds rows between 81 and 150 firms and a tally of firms per good. **The ceiling is 120 firms per
+body (Ben, 2026-09-19, NR-902):** on the cost table's square-root rows it is the ceiling that binds —
+at four times the reference budget it trims every good evenly to 12 firms — while 160 never bound,
+each good's own cap of 15 filling first, and cost a 12-31% dearer economy tick for it. A ceiling that
+never binds is not a brake.
 
 **SETTLED (Ben, 2026-09-18, wave 1 form): the budget and its reference are in the same units, and
 the ceiling fills goods in turn.** A body's charter capital B counts only the points spent on firms,
