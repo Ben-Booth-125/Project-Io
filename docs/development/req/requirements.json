@@ -6318,10 +6318,10 @@
    "difficulty": 4,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1041 - sprint 45 (2026-09-18)",
    "batch": "sprint-45",
-   "resolved": null,
+   "resolved": "2026-09-19",
    "rows": [
     {
      "id": "R1",
@@ -6337,39 +6337,43 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: the accrual"
      ],
      "requirement": "Each round every region with centres is credited, on itself (order-independent, int64), scale x its fuel factor (soft, with a floor) x (1000 + the Industry industrial modifier)/1000; the fuel factor reads the span-open survey, and a region founded after the open reads a stated inheritance.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Main-session code read on 849a358d (history_sim.cpp industry_points_scale_credit ~l.8531, accrue_industry_points, the call ~l.3471): each region with centres is credited on itself off the round's opening state, int64 staged (heads x rate x years / 1e6, x fuel factor floor 250 + 750 x reading / 1000, x (1000 + industrial)/1000), out-of-domain inputs refused (-1), never clamped; the fuel reading is the span-open survey with Default A's x0.7 inheritance (exploration_sim_harness T8.15 pins both defaults). Known drift: every held node's industrial modifier is summed, not capacity nodes only (BL-1057)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "code: treasury paid in"
      ],
      "requirement": "A fixed share of the capital treasury's surplus after the round's army and navy bills converts to points on the capital's own region each round — a consequence, no scored choice, no new verb.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Met AS BUILT on 849a358d: 250 per mille of the round's surplus after the bills converts, debited, to points on the capital's region; no scored choice, no verb. RE-RULED 2026-09-19 (NR-897): the points spread over the polity's centres by urban scale; BL-1056 carries that, and this row records the build it replaced."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --through 1960 (reading 8)"
      ],
      "requirement": "Reading 8 per library seed: points spread across regions and polities, the treasury-paid share of points, the fuel factor's spread, and rho(points, urban heads) printed.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "digitisation_sim_harness --through 1960 on 849a358d (main session, 2026-09-19), 16 of 16 worlds, ledger == credited on 16, 0 refused, 0 rejected: points/world med 78.7M; Gini over regions med 0.856; top-region share med 0.280 (max 0.646); treasury-paid share med 0.690; fuel factor median 454, spread 750; rho(points, urban heads) med 0.839; rho(scale points, head-years) med 0.900; rho(scale points per head-year, fuel) med 0.911; original ground 0.570, pre-1660 sim ground 0.454, span-founded 0.003."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: digitisation_sim_harness --through 1960 (reading 9)"
      ],
      "requirement": "Reading 9 (Migration) is reported as failing where it fails, never n/a.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "Same run: reading 9 reports FAILING on 11 of 16 worlds (urban share flat or falling: 46 11 31 40 37 13 43 10 25 38 0) and on every world for its stream clause (0 cross-border streams); failing, never n/a."
     },
     {
      "id": "R6",
@@ -6383,15 +6387,16 @@
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: code-reviewer (cold)"
      ],
      "requirement": "A cold review finds no point credited outside the span and no narrowing without a range check.",
-     "notes": ""
+     "notes": "",
+     "result_metric": "code-reviewer (cold) on the BL-1041 merge, 2026-09-18 (NR-896/NR-897 raised from it, fa65047f); its six neutral findings handled in 2c6df95f (merged 849a358d): five made, the capacity-kind filter carried by BL-1057. No point credited outside the span; narrowing range-checked."
     }
    ],
-   "resolution": ""
+   "resolution": "Beat 1's located points accrue inside the span only; switch off, the pins held (chain 8). The treasury landing was re-ruled (NR-897) and moves in BL-1056."
   }
  ]
 }
