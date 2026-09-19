@@ -6589,6 +6589,93 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "charter-spend-hardening",
+   "title": "BL-1060 - The charter turn skips a good it cannot place, the ceiling is 120, and the spend refuses and labels honestly",
+   "difficulty": 1,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1060 - sprint 45 (2026-09-19)",
+   "batch": "sprint-45",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "code: the constant"
+     ],
+     "requirement": "The stockpile path's density ceiling is 120 (NR-902), a named constant with the ruling cited.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "code: the turn",
+      "headless: charter_refusal_probe or a synthetic sweep row"
+     ],
+     "requirement": "Under the goods-in-turn fill a good that cannot be placed in a centre's window is skipped for that centre; the centre stops only when no good in the turn can place (NR-903); a synthetic case where the first good has no deposit tile still charters the later processing goods.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "code: the refusal",
+      "headless: charter_refusal_probe"
+     ],
+     "requirement": "charter_spend_params refuses c and firm price above a bound that keeps c x |G| x fp and cap(B_ref) in range.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "code: G and the reasons"
+     ],
+     "requirement": "A good that falls short only because of the walk's own firms is either served or booked under its own reason, never no_gap.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: charter_refusal_probe"
+     ],
+     "requirement": "charter_refusal_probe covers a negative firm price and a non-positive specialist price with a positive firm price, and fails if either refusal is removed.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "headless: player_seed_sweep --digest-check (main session)"
+     ],
+     "requirement": "The shipped path does not move: world_determinism digests unchanged; player_seed_sweep --digest-check 16/16 (main session).",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "verification": [
+      "review: code-reviewer (cold)"
+     ],
+     "requirement": "A cold review finds nothing blocking.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
